@@ -1,5 +1,37 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index f548ccde2..040170431 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -304,7 +304,7 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
+  */
+ export function deriveCriticCourseAdmission(input) {
+   if (!exact(input, ["history", "candidate", "correctionCommitsInRange", "requestedMode", "delta"])
+-    || !Array.isArray(input.history) || input.history.length > 4
++    || !Array.isArray(input.history) || input.history.length > Number.MAX_SAFE_INTEGER
+     || !exact(input.candidate, ["base", "commit", "tree"])
+     || ![input.candidate.base, input.candidate.commit, input.candidate.tree].every((oid) => typeof oid === "string" && OID.test(oid))
+     || !Number.isSafeInteger(input.correctionCommitsInRange) || input.correctionCommitsInRange < 0
+@@ -581,8 +581,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  if(pass)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
+  // Source-owned immutable consumed history fixes the batch's next round.
+  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
+- if(budgets.reviewRound>CRITIC_DISPATCH_LIMITS.criticRounds || budgets.correctionCommitCount>CRITIC_DISPATCH_LIMITS.correctionCommits)
+-  return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
++ // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.
+  if(history.length && source.correctionCommits.length===0)fail('CCA-CORRECTION-RANGE');
+  source.reviewUnit=featureReviewUnit(input,resolved);
+  const evidence=deterministic(resolved.resolvedRepository.repoRoot,input.registrationCommit,resolved.courseIdentity.originalFeatureId,source.candidate,evidencePaths);
+@@ -595,7 +594,7 @@ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(inpu
+ function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
+ export function prepareRegisteredCriticDeltaRequest(input){try{
+  if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
+- const request={...input.courseRequest,deltaRequestPath:null},c=runtimeCompose(request,{preparing:true,evidencePaths:input.deterministicEvidencePaths});if(!c.history.length)fail('CCA-DELTA-PARENT');if(c.budgets.reviewRound>CRITIC_DISPATCH_LIMITS.criticRounds || c.budgets.correctionCommitCount>CRITIC_DISPATCH_LIMITS.correctionCommits)fail('CCA-REVIEW-BUDGET-EXHAUSTED');
++ const request={...input.courseRequest,deltaRequestPath:null},c=runtimeCompose(request,{preparing:true,evidencePaths:input.deterministicEvidencePaths});if(!c.history.length)fail('CCA-DELTA-PARENT');
+  const i=c.resolved.courseIdentity,descriptor={schema:'pipeline.critic-delta-request.v1',featureId:i.originalFeatureId,manifestPath:i.manifestPath,courseKey:i.courseKey,acceptedEnvelopeSha256:i.envelopeSha256,genesisRecordSha256:i.genesisRecordSha256,historySha256:c.source.historySha256,parent:parentProjection(c.history.at(-1)),candidate:c.source.candidate,changedPaths:c.source.changedPaths,changedBehaviorClaims:input.changedBehaviorClaims,pathInvariantMap:input.pathInvariantMap,pathInvariantMapSha256:sha256Canonical(input.pathInvariantMap),coordinatorImpactConfirmed:input.coordinatorImpactConfirmed,trustBoundaryChanged:input.trustBoundaryChanged,impactAmbiguous:input.impactAmbiguous,deterministicEvidence:c.evidence.entries};
+  return ok({descriptor,artifact:artifact(`specs/${i.originalFeatureId}/evidence/critic-delta-request-<digest>.json`,descriptor)});
+  }catch(error){return refused(error);}}
 diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
-index 381cd5cbf..a9078e459 100644
+index 381cd5cbf..67ad61fb9 100644
 --- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
 +++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
 @@ -18,7 +18,7 @@ const H = (c) => c.repeat(64);
@@ -11,6 +43,18 @@ index 381cd5cbf..a9078e459 100644
    const base = O(chars[index]);
    const commit = O(chars[index + 1]);
    return {
+@@ -98,9 +98,9 @@ function fourRoundHistory(roundCount = 4) {
+       parent: rows.at(-1),
+       packages: [{ id: "package", subjectSha256: H("d"), changedPaths: [path], integrationEdges: ["edge"] }],
+       coverage: { changedPaths: [path], acceptanceIds: ["AC-1"], integrationEdges: ["edge"], complete: true, receiptSha256: H("e") },
+-      lane: { laneId: `lane-${index + 1}`, contextSha256: H(String(index + 3)), evidenceSha256: H(String(index + 6)) },
++      lane: { laneId: `lane-${index + 1}`, contextSha256: H((index + 3).toString(16)), evidenceSha256: H((index + 6).toString(16)) },
+       verdict: { status: "findings", schemaValid: true, resultSha256: H("2"), failure: null },
+-      findings: [{ id: "finding-1", priorFindingId: "finding-1", severity: "high", status: "open", evidenceSha256: H(String(index + 2)) }],
++      findings: [{ id: "finding-1", priorFindingId: "finding-1", severity: "high", status: "open", evidenceSha256: H((index + 2).toString(16)) }],
+       correction: { commit: currentPacket.candidate.commit, deltaSha256: currentPacket.diff.sha256, impactSha256: sha256Canonical(["edge"]) },
+       invalidation: { kind: "none", reason: null, evidenceSha256: null },
+       reviewAttempt: {
 @@ -372,6 +372,43 @@ test("CCA15 a new full review cannot be admitted after retained findings", () =>
    assert.equal(decision.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
  });
@@ -55,3 +99,172 @@ index 381cd5cbf..a9078e459 100644
  function runtimeRequest(fx, overrides = {}) {
    return { repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.genesisCommit, candidateCommit: fx.candidateCommit, registrationCommit: fx.candidateCommit, requestedMode: "delta", acceptedReference: null, criterionLocator: null, deltaRequestPath: null, ...overrides };
  }
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index 5a12cb8d7..114c3fe5d 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -210,10 +210,8 @@ function courseCode(course) {
+   if (!exact(course, ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"])
+     || !Number.isSafeInteger(course.reviewRound)
+     || course.reviewRound < 1
+-    || course.reviewRound > REVIEW_LIMITS.criticRounds + 1
+     || !Number.isSafeInteger(course.correctionCommitCount)
+     || course.correctionCommitCount < 0
+-    || course.correctionCommitCount > REVIEW_LIMITS.correctionCommits + 1
+     || course.maxReviewRounds !== REVIEW_LIMITS.criticRounds
+     || course.maxCorrectionCommits !== REVIEW_LIMITS.correctionCommits
+     || !COURSE_STATUSES.has(course.status)) {
+@@ -221,7 +219,8 @@ function courseCode(course) {
+   }
+   const exhausted = course.reviewRound > REVIEW_LIMITS.criticRounds
+     || course.correctionCommitCount > REVIEW_LIMITS.correctionCommits;
+-  return exhausted === (course.status === "po-course-gate") ? null : "CRL-COURSE-GATE";
++  // D190: a po-course-gate record must be exhausted; an admitted (diff) record may exceed the old limits.
++  return course.status === "po-course-gate" && !exhausted ? "CRL-COURSE-GATE" : null;
+ }
+ 
+ export function compiledRequest(record) {
+@@ -458,7 +457,7 @@ export function validateCriticReviewLineage(record) {
+ 
+ /** Validate a complete oldest-to-newest synthetic or retained review course. */
+ export function validateCriticReviewHistory(records) {
+-  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
++  if (!Array.isArray(records) || records.length < 1 || records.length > Number.MAX_SAFE_INTEGER) {
+     return { ok: false, code: "CRL-HISTORY-SHAPE" };
+   }
+   const reviewIds = new Set();
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.mjs b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+index 15cfa5652..da2ff5855 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+@@ -66,10 +66,8 @@ function reviewAttemptCode(attempt) {
+     || !Object.hasOwn(attempt, "requestedMode")
+     || !Number.isSafeInteger(attempt.round)
+     || attempt.round < 1
+-    || attempt.round > REVIEW_LIMITS.criticRounds + 1
+     || !Number.isSafeInteger(attempt.correctionCommits)
+     || attempt.correctionCommits < 0
+-    || attempt.correctionCommits > REVIEW_LIMITS.correctionCommits + 1
+     || !["full", "delta"].includes(attempt.requestedMode)) {
+     return "CRL-REVIEW-ATTEMPT";
+   }
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index 1ab5f6125..8cef29904 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -577,7 +577,8 @@ check("accepts a correction-budget crossing even when the exact Git range adds t
+     parent,
+     findings: structuredClone(parent.findings),
+     invalidation: none,
+-    reviewAttempt: { round: 4, correctionCommits: 4, requestedMode: "delta" },
++    // D190: the old correction cap gates a FULL request only (a diff round is admitted), so the gate record is built from a full request.
++    reviewAttempt: { round: 4, correctionCommits: 4, requestedMode: "full" },
+     lane: { laneId: "correction-gate-lane", contextSha256: H("6"), evidenceSha256: H("7") },
+   });
+   assert.equal(gate.course.status, "po-course-gate");
+diff --git a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+index 1f1849174..f25727e3a 100644
+--- a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+@@ -40,18 +40,21 @@ test("AC1 round counter: round beyond the cap is refused with a typed course-gat
+   const max = CRITIC_DISPATCH_LIMITS.criticRounds;
+   assert.equal(max, 4);
+   assert.equal(admitReviewAttempt(delta({ round: max })).ok, true);
+-  const refused = admitReviewAttempt(delta({ round: max + 1 }));
++  // D190: the cap gates a FULL request only; a diff round past it is admitted.
++  assert.equal(admitReviewAttempt(delta({ round: max + 1 })).ok, true);
++  const refused = admitReviewAttempt(delta({ round: max + 1, requestedMode: "full" }));
+   assert.equal(refused.ok, false);
+   assert.equal(refused.code, "RE-CRITIC-ROUND-LIMIT");
+   assert.equal(refused.courseGateRequired, true);
+-  const corr = admitReviewAttempt(delta({ correctionCommits: 4 }));
++  assert.equal(admitReviewAttempt(delta({ correctionCommits: 4 })).ok, true);
++  const corr = admitReviewAttempt(delta({ correctionCommits: 4, requestedMode: "full" }));
+   assert.equal(corr.code, "RE-CORRECTION-LIMIT");
+   assert.equal(corr.courseGateRequired, true);
+ });
+ 
+ test("AC1 RED: a mirror without the cap admits the over-cap round, so the pin is meaningful", () => {
+   assert.equal(mirrorNoCap(delta({ round: 5 })).ok, true);
+-  assert.notEqual(admitReviewAttempt(delta({ round: 5 })).ok, mirrorNoCap(delta({ round: 5 })).ok);
++  assert.notEqual(admitReviewAttempt(delta({ round: 5, requestedMode: "full" })).ok, mirrorNoCap(delta({ round: 5 })).ok);
+ });
+ 
+ test("AC1 course derivation computes round from history, never from invented counters", () => {
+diff --git a/plugins/pipeline-core/lib/review-economy.mjs b/plugins/pipeline-core/lib/review-economy.mjs
+index f43a2f7f7..8e95c4377 100644
+--- a/plugins/pipeline-core/lib/review-economy.mjs
++++ b/plugins/pipeline-core/lib/review-economy.mjs
+@@ -185,10 +185,12 @@ function validPathInvariantMap(map) {
+ 
+ export function admitReviewAttempt(input) {
+   if (!isObject(input)) return { ok: false, mode: null, code: "RE-REVIEW-SHAPE" };
+-  if (!safeInteger(input.round) || input.round < 1 || input.round > CRITIC_DISPATCH_LIMITS.criticRounds) {
++  // D190: the course is one full round, then diff rounds until PASS; no count refuses a diff round.
++  const deltaFollowUp = safeInteger(input.round) && input.round > 1 && input.requestedMode === "delta";
++  if (!safeInteger(input.round) || input.round < 1 || (!deltaFollowUp && input.round > CRITIC_DISPATCH_LIMITS.criticRounds)) {
+     return { ok: false, mode: null, code: "RE-CRITIC-ROUND-LIMIT", courseGateRequired: true };
+   }
+-  if (!safeInteger(input.correctionCommits) || input.correctionCommits > REVIEW_LIMITS.correctionCommits) {
++  if (!safeInteger(input.correctionCommits) || (!deltaFollowUp && input.correctionCommits > REVIEW_LIMITS.correctionCommits)) {
+     return { ok: false, mode: null, code: "RE-CORRECTION-LIMIT", courseGateRequired: true };
+   }
+   if (input.round === 1) {
+@@ -384,9 +386,9 @@ function criticProjectionRecordCode(record) {
+     || !exactKeys(record.course, ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"])
+     || record.course.maxReviewRounds !== REVIEW_LIMITS.criticRounds
+     || record.course.maxCorrectionCommits !== REVIEW_LIMITS.correctionCommits
+-    || !safeInteger(record.course.reviewRound, REVIEW_LIMITS.criticRounds + 1)
++    || !safeInteger(record.course.reviewRound)
+     || record.course.reviewRound < 1
+-    || !safeInteger(record.course.correctionCommitCount, REVIEW_LIMITS.correctionCommits + 1)
++    || !safeInteger(record.course.correctionCommitCount)
+     || !new Set(["admitted", "po-course-gate"]).has(record.course.status)
+     || !(record.previousSha256 === null || SHA256.test(record.previousSha256))
+     || !SHA256.test(record.recordSha256 ?? "")
+@@ -407,7 +409,8 @@ function criticProjectionRecordCode(record) {
+   if (!criticSame(record.diff.changedPaths, record.coverage.changedPaths)
+     || record.request.requestSha256 !== record.references.requestSha256
+     || record.request.compiledSha256 !== sha256Canonical(criticCompiledRequest(record))
+-    || admitted === exhausted
++    || (!admitted && !exhausted)
++    || (admitted && exhausted && record.request.mode !== "delta")
+     || admitted === (record.request.mode === "none")
+     || record.parentReviewId === null
+       && (record.previousSha256 !== null || record.lane.freshFromReviewId !== null || record.correction !== null)
+@@ -542,7 +545,7 @@ function criticProjectionTransitionCode(parent, current) {
+  * verdict and never uses a generic PASS value.
+  */
+ export function projectCriticReviewEconomy(records) {
+-  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
++  if (!Array.isArray(records) || records.length < 1 || records.length > Number.MAX_SAFE_INTEGER) {
+     return { ok: false, code: "RE-CRITIC-PROJECTION-INPUT" };
+   }
+   const reviewIds = new Set();
+diff --git a/plugins/pipeline-core/lib/review-economy.test.mjs b/plugins/pipeline-core/lib/review-economy.test.mjs
+index a5910a0ce..e32e23299 100644
+--- a/plugins/pipeline-core/lib/review-economy.test.mjs
++++ b/plugins/pipeline-core/lib/review-economy.test.mjs
+@@ -139,16 +139,19 @@ ok("RE20 prior receipt omission refuses fallback full", admitReviewAttempt({ ...
+ ok("RE21 new trust boundary refuses fallback full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === null);
+ ok("RE22 ambiguous impact refuses fallback full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === null);
+ ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
+-ok("RE24 fourth Critic round creates course gate", admitReviewAttempt({ ...delta, round: 5 }).courseGateRequired === true);
++// D190: the old cap now gates only a FULL request; a diff round past it is admitted.
++ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);
++ok("RE24d D190 a diff round past the old round cap is admitted", admitReviewAttempt({ ...delta, round: 5 }).mode === "delta" && admitReviewAttempt({ ...delta, round: 9 }).ok === true);
+ ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
+-ok("RE26 fourth correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 4 }).courseGateRequired === true);
++ok("RE26 fourth correction commit creates course gate for a full request", admitReviewAttempt({ ...delta, correctionCommits: 4, requestedMode: "full" }).courseGateRequired === true);
++ok("RE26d2 D190 a diff round past the old correction-commit cap is admitted", admitReviewAttempt({ ...delta, correctionCommits: 4 }).mode === "delta");
+ 
+ for (const round of [2, 3, 4]) {
+   ok(`RE26a round ${round} admits only a bound correction DIFF`, admitReviewAttempt({ ...delta, round, correctionCommits: round - 1 }).mode === "delta");
+   ok(`RE26b round ${round} refuses another full review`, admitReviewAttempt({ ...delta, round, requestedMode: "full" }).ok === false);
+   ok(`RE26c round ${round} refuses empty DIFF`, admitReviewAttempt({ ...delta, round, changedPaths: [] }).ok === false);
+ }
+-ok("RE26d accepted actual PASS criterion cannot extend the four-review budget", admitAuthenticatedReviewAttempt({ attempt: { ...delta, round: 5 }, acceptedCriterion: { ok: true } }).code === "RE-CRITIC-ROUND-LIMIT");
++ok("RE26d accepted actual PASS criterion cannot extend the four-review budget", admitAuthenticatedReviewAttempt({ attempt: { ...delta, round: 5, requestedMode: "full" }, acceptedCriterion: { ok: true } }).code === "RE-CRITIC-ROUND-LIMIT");
+ 
+ const criticPath = "plugins/pipeline-core/lib/critic-review-lineage.mjs";
+ const criticEdge = "critic-packet-claim";

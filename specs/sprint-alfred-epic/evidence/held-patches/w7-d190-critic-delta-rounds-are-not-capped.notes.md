@@ -1,44 +1,50 @@
-# D190 held patch, slice 1: diff Critic rounds are not capped (CHECKPOINT, partial)
+# D190 held patch: diff Critic rounds are not capped
 
-Status: checkpoint. The patch next to this note carries ONLY the RED cases (test file); no production edit was made. Base: candidate 2d8b02548afcf6b7a787ac202c3f87db1166dc5f. Parent continues in a second slice.
+Status: implementation complete in a scratch clone, targeted suites green, patch regenerated against candidate 9eec48b18847daa76e75ee75dcf88bcc1f30f937 (`git apply --check` passes in a second clone at the candidate). Independent Critic review, Full Verify and PO acceptance are pending (parent-owned batch gates).
 
-## Where each count is checked (re-verified in the clone; recon lines hold)
+## Where each count is checked (re-verified in the clone; every cited line held)
 
-- `lib/review-economy.mjs` `CRITIC_DISPATCH_LIMITS` / `REVIEW_LIMITS` (criticRounds 4, correctionCommits 3, lines 32-41).
-- `admitReviewAttempt` 186-193: round > 4 gives RE-CRITIC-ROUND-LIMIT, correctionCommits > 3 gives RE-CORRECTION-LIMIT, both before the mode check.
-- `criticProjectionRecordCode` 384-410: record fields maxReviewRounds === 4 and maxCorrectionCommits === 3 (retained on disk, must stay), reviewRound <= 5, correctionCommitCount <= 4, and `admitted === exhausted` is refused (an admitted record may not exceed the limits; a po-course-gate record must). Transition 474-495 (gate crossing only at exactly 4 to 5 / 3 to 4); `projectCriticReviewEconomy` 545 caps records at 5.
-- `lib/critic-review-lineage-core.mjs` `courseCode` 209-225 (round <= 5, count <= 4, `exhausted === (status === "po-course-gate")`), history chain 392-409 (CRL-HISTORY-COURSE-GATE, CRL-HISTORY-ROUND needs round = parent + 1), 461 (history length <= 5).
-- `lib/critic-review-lineage.mjs` `reviewAttemptCode` 61-77 (round <= 5, correctionCommits <= 4; CRL-REVIEW-ATTEMPT); record writer 439 hardcodes max 4 and 3.
-- `lib/critic-course-admission.mjs`: `deriveCriticCourseAdmission` 307 (history.length > 4 is CCA-SHAPE), 326 (CCA-CORRECTION-RANGE, keep), 346 (`admitReviewAttempt`); runtime v2 `runtimeCompose` 576 (CCA-HISTORIC-COUNTER-BINDING: record.correctionCommitCount === classified count, keep untouched, no retroactive recount), 580 budgets, 584-585 early return when over the limits, 586 (CCA-CORRECTION-RANGE, keep), 598 (`prepareRegisteredCriticDeltaRequest`: CCA-REVIEW-BUDGET-EXHAUSTED). Line 570 refuses a full request when history exists (CCA-REQUESTED-MODE), which already gives hard behaviour (b) on the runtime route.
-- `review-economy.mjs` brief limits 853-865 belong to the course-decision brief (continuity), a different surface; not touched in this slice. `scripts/course-decision.schema.json` was not read; unverified whether it pins the limits.
+- `lib/review-economy.mjs` `CRITIC_DISPATCH_LIMITS` / `REVIEW_LIMITS` (criticRounds 4, correctionCommits 3); `admitReviewAttempt`; `criticProjectionRecordCode`; `projectCriticReviewEconomy`.
+- `lib/critic-review-lineage-core.mjs` `courseCode`, history length cap in `validateCriticReviewHistory`.
+- `lib/critic-review-lineage.mjs` `reviewAttemptCode`; record writer still hardcodes max 4 and 3 (kept on purpose).
+- `lib/critic-course-admission.mjs` `deriveCriticCourseAdmission` history cap, `runtimeCompose` early return, `prepareRegisteredCriticDeltaRequest` budget refusal. CCA-CORRECTION-RANGE, CCA-HISTORIC-COUNTER-BINDING and CCA-REQUESTED-MODE untouched.
+- `scripts/course-decision.schema.json`: read. It pins `consumedBudgets.reviewRounds` and `correctionCommits` (maximum 2) and the budget name enum, but only on the course-decision brief surface (same surface as review-economy brief limits, a different surface). It does not pin the lineage or admission limits. NOT edited.
 
-## Chosen design (not yet implemented)
+## Design as implemented
 
-Keep the recorded constants (maxReviewRounds 4, maxCorrectionCommits 3) so every retained record stays byte-valid; only the GATING changes, for delta follow-up rounds only.
+Recorded constants (maxReviewRounds 4, maxCorrectionCommits 3) are unchanged so retained records stay byte-valid; counters are never recomputed. Only gating changed, for diff follow-up rounds only.
 
-1. `admitReviewAttempt`: `deltaFollowUp = round > 1 && requestedMode === "delta"`; skip both limit checks for it (still safe-integer checks). Full requests keep RE-CRITIC-ROUND-LIMIT / RE-CORRECTION-LIMIT / RE-FOLLOWUP-DELTA-REQUIRED exactly as before.
-2. Record validation (`criticProjectionRecordCode`, `courseCode`): reviewRound and correctionCommitCount upper bounds become safe-integer; replace `admitted === exhausted` by "a po-course-gate record must be exhausted; an admitted record over the limits must have request.mode delta". Old gate records (mode none, over the limit) and old admitted records (within limits) validate exactly as before; counters are never recomputed.
-3. Lineage: `reviewAttemptCode` and history length caps (core 461, economy 545, admission 307) relaxed to safe-integer / a large sanity bound; round = parent + 1 rule stays.
-4. `runtimeCompose` 584-585 and `prepareRegisteredCriticDeltaRequest` 598: drop the over-limit early exits (history exists implies delta, because line 570 refuses full). 586 stays, so an empty delta cannot loop.
-5. `critic-verify-lifecycle.mjs` untouched: CVL-CRITIC-FAILED stays; PO-exception route is the next slice.
+1. `admitReviewAttempt`: `deltaFollowUp = round > 1 && requestedMode === "delta"` skips the round and correction limit checks (still safe-integer checks). Full requests keep RE-CRITIC-ROUND-LIMIT / RE-CORRECTION-LIMIT / RE-FOLLOWUP-DELTA-REQUIRED.
+2. Record validation: `criticProjectionRecordCode` reviewRound / correctionCommitCount bounds are safe-integer; `admitted === exhausted` replaced by "not admitted and not exhausted is refused; admitted and exhausted requires request.mode delta". `courseCode`: a po-course-gate record must be exhausted, an admitted record may exceed the old limits.
+3. Lineage: `reviewAttemptCode` upper bounds removed (safe-integer only); history length caps in core, economy and admission relaxed to `Number.MAX_SAFE_INTEGER`. The round = parent + 1 rule stays.
+4. `runtimeCompose` over-limit early return and `prepareRegisteredCriticDeltaRequest` CCA-REVIEW-BUDGET-EXHAUSTED refusal removed. The empty-range refusal (CCA-CORRECTION-RANGE) stays, so an empty delta cannot loop. Gate vs admitted status of a written record is driven by `admission.courseGateRequired`, so no downstream code keyed on the removed sentinel.
+5. `critic-verify-lifecycle.mjs` untouched.
 
-## RED cases (in the patch; test file only, existing suite file)
+## Evidence
 
-In `plugins/pipeline-core/lib/critic-course-admission.test.mjs` (fixture `packet()` char table extended from 6 to 12 entries so rounds beyond 5 can be built; existing indexes unchanged):
+- RED (before production edits, clone with the committed test patch): `critic-course-admission.test.mjs` exit 1, failing exactly CCA016 and CCA017.
+- GREEN (patched clone): CCA016, CCA017, CCA018, CCA019 pass. `critic-course-admission.test.mjs` 72 tests, 72 pass, 0 fail.
+- Revert proof (four production files stashed, test edits kept): exit 1, failing exactly CCA016 and CCA017; stash popped, `git diff --stat` equals the patch stat (restore proof).
+- Whole files, clone2 (unchanged candidate, baseline): all green. critic-course-admission 68/68, review-economy 131 minus the 2 new cases (129 checks listed as passing), critic-review-lineage 17/17, critic-verify-lifecycle 7/7, critic-generic-batch 35/35, round-cap pin 10/10, security-review budget pin 8/8, design-course-run-v2 pin 10/10, kernel-closure 11/11, session-critic-finalizer 90/90, architecture overview `--check` current.
+- Whole files, patched clone: critic-course-admission 72/72, review-economy 131/131, critic-review-lineage 17/17, critic-verify-lifecycle 7/7, critic-generic-batch 35/35, round-cap pin 10/10, security pin 8/8, design-course-run-v2 10/10, kernel-closure 11/11, session-critic-finalizer 90/90, architecture overview current. Baseline failing set: empty. Patched failing set after the justified updates: empty. (The first patched run showed failures in review-economy RE24, RE26, RE26d, the round-cap pin AC1 x2, critic-review-lineage CRL12 and CCA016 (fixture); all fixed as below and rerun green.)
 
-- CCA016 D190 (a): delta after 4 and 5 retained rounds is admitted. RED.
-- CCA017 D190 (a2): delta whose range pushes correction commits to 6 is admitted. RED.
-- CCA018 D190 (b): full request after a consumed round is refused (RE-CRITIC-ROUND-LIMIT / RE-FOLLOWUP-DELTA-REQUIRED). Green already (guard, must stay).
-- CCA019 D190 (c): delta with zero correction commits in range raises CCA-CORRECTION-RANGE. Green already (guard, must stay).
+## Existing cases updated (each pinned the OLD cap for a diff round; none weakened, skipped or deleted)
 
-RED run: `node plugins/pipeline-core/lib/critic-course-admission.test.mjs` in the clone, exit 1, failing names exactly CCA016 and CCA017 (log: scratch/agent-out/w7d190/red.critic-course-admission.test.mjs.log, untracked). Existing cases were not changed; none pinning the old cap for delta rounds was identified yet (CCA04/CCA05 use full mode and stay valid).
+- `review-economy.test.mjs` RE24, RE26, RE26d: the over-cap request is now a FULL request (the cap still refuses it, same assertions); added RE24d and RE26d2 pinning that a diff round past the cap is admitted. Justification: D190, the cap gates full requests only.
+- `pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs` AC1 (two cases): same change (full request keeps refusal and typed course-gate code; diff admitted asserted additionally; the mirror comparison uses the full request).
+- `critic-review-lineage.test.mjs` CRL12 gate record: the attempt that builds a po-course-gate record is now a full request at round 4 / correction 4 (a diff request there is admitted by D190 and cannot compile into a gate record).
+- `critic-course-admission.test.mjs` fixture `fourRoundHistory`: `String(index + n)` replaced by `(index + n).toString(16)` (index 4+ produced a two-character value, an invalid digest); identical output for indexes below 10. Fixture fix of the first-slice RED cases, not a behaviour change.
+- `harness/scripts/check-verify-case-completion.test.mjs`: not touched; the VCR01 count pin was not run in this slice (not in the briefed suite list). The parent should run it in Full Verify because RE24d, RE26d2 and CCA016 to CCA019 add cases.
 
 ## NOT done
 
-Production edits (items 1 to 4 above), GREEN run, whole-file runs of the ten named suites in clone and clone2, failing-name comparison, revert proof, read of `course-decision.schema.json`, the PO-exception route, refusal wording. Patch is kernel-path work (review-economy, lineage, course admission): the PO applies it under a Guard Maintenance Window. The clones under scratch/agent-out/w7d190/ were left in place for continuation (driver.mjs there: setup, run, patch, check, cleanup; cleanup not yet run).
+- The PO-exception route and the refusal wording (CVL-CRITIC-FAILED stays).
+- Known gap: CCA017 admits a correction count jump 1 to 6 at the admission layer, but the record-chain rules left in place (`review-economy.mjs` `![0, 1].includes(correctionStep)` and the core history `correctionDelta` rule) still refuse a lineage record whose correction count steps by more than 1. Not resolved in this slice.
+- `records.length > Number.MAX_SAFE_INTEGER` bounds are vacuous (array lengths cannot reach it); a real sanity bound (for example 4096) would read better. Left as the design's latitude.
+- Run of `check-verify-case-completion.test.mjs`, Full Verify, independent Critic review, PO acceptance.
 
-## Proposed commit message
+## Application
 
-feat(critic): admit a diff round after the first full round without a round or correction-commit count refusing it
+All four production files (review-economy, critic-course-admission, critic-review-lineage-core, critic-review-lineage) are never-liftable kernel paths, so the PO applies the patch under a Guard Maintenance Window. Operator flow: apply-diff, `git add -u` with a path limit, commit as the PO, stamp, install. An independent Critic review stays a parent-owned batch gate.
 
-Operator flow after completion: apply-diff, `git add -u` with a path limit, commit as the PO, stamp, install. An independent Critic review stays a parent-owned batch gate.
+Proposed commit message: feat(critic): admit a diff round after the first full round without a round or correction-commit count refusing it
