@@ -1,0 +1,25 @@
+diff --git a/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs b/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
+index 76486aa6b..d50128d6d 100644
+--- a/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
++++ b/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
+@@ -2,13 +2,13 @@
+ // Pin for pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block (AC-119).
+ // PARTIAL: covers the draft-time applicability predicate and the entry-readiness fall-through to the
+ // adoption disposition through the real modules. The implementation-entry inspector itself is pinned by
+-// lib/architecture-design.test.mjs (hotfix 9 cases) and is not re-pinned here. The net-new ratchet under
+-// a deferred adoption (a6641cce4, PO decision 2026-10-16 #5) IS covered: section (c) names both states the
+-// item distinguishes -- an already-existing path stays ready/report-only, a net-new path gets the full
+-// fitness check -- plus the mixed surface. NOT covered (D66, signed once with AC-9 under D142, built after
+-// 0.7.0): the explicit "established with ratchet" repository state and a frozen accepted baseline whose worsened
+-// findings block. Sections (d) and (e) add the project-onboarding-v3 consumer (reopen-design only on ok:false)
+-// and the win32-dialect plan-path case.
++// lib/architecture-design.test.mjs (hotfix 9 cases) and is not re-pinned here. Under a deferred adoption
++// (a6641cce4, PO decision 2026-10-16 #5) section (c) pins, since D162, that EVERY path -- net-new or already
++// existing -- gets the typed migration refusal ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED; the earlier net-new
++// ratchet (existing path ready/report-only, net-new path fully fitness-checked) is retired and not pinned.
++// NOT covered (D66, signed once with AC-9 under D142, follow-up work after 0.7.0): the explicit "established
++// with ratchet" repository state and a frozen accepted baseline whose worsened findings block. Sections (d)
++// and (e) add the project-onboarding-v3 consumer (reopen-design only on ok:false) and the win32-dialect plan-path case.
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
