@@ -18,6 +18,10 @@ The Goldfish must RECEIVE the file bytes. The guard can read and verify them, bu
 
 A throwaway PreToolUse hook is a kernel-adjacent act, so the probe should not edit `guard-dispatch.mjs`. A scratch hook script registered only in a scratch project (or through a session-local hooks override) that answers an `Agent` dispatch with `updatedInput` containing a changed prompt, followed by a read-only dispatch whose first output line echoes the prompt it received, answers outcome 1 versus 2 in one dispatch. That is a PO-attended live check (the runner must load the hook), not a unit test.
 
+## Probe result (2026-10-29, PO-run, WSL, Claude Code 2.1.312)
+
+`node scripts/probe-hook-updated-input.mjs` from a neutral directory returned `UPDATED-INPUT-HONOURED`: one hook call, the child answered the hook's nonce and not the original word. **Outcome 1 holds for `Agent` on Claude Code 2.1.312**: a PreToolUse hook's `updatedInput.prompt` is what the child receives. Not covered by this probe, so still separate questions: `Task` as a tool name, Workflow `agent()` scripts, Codex `spawn_agent`, Antigravity `invoke_subagent`, and the interplay with other PreToolUse hooks that also answer on the same call (the probe ran one hook only). The patch below proceeds as option a, Claude-only first; every other carrier keeps the full-text form and refuses a pointer with a typed code.
+
 ## Patch shape if outcome 1
 
 - New pure module `lib/briefing-file-reference.mjs` (not a protected path): `parseBriefingFileReference(prompt)` and `loadReferencedBriefing({ root, prompt, readFile })` with refusals `DBG-REF-PATH` (repository-relative, under `scratch/`, no `..`, regular file, size bound), `DBG-REF-DIGEST` (file text must verify through `verifyGeneratedBriefing` and its digest must equal the pointer digest) and `DBG-REF-AMBIGUOUS` (pointer plus inline text in one prompt).

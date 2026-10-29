@@ -43,3 +43,15 @@ wall clock 3078.3 ms
 - Next slice: let the dispatch hooks (at least `guard-dispatch`, the item-queue admission and the native-host preparation) emit the same trace line when `PIPELINE_AUTHORITY_TRACE` is set, then take one measurement of a real Agent dispatch in the consumer. Only that run tells whether the minutes come from the number of native calls or from lock contention.
 - Second slice, after that measurement: the cheapest reduction of spawns (batching, or dropping the write probe from read-only paths).
 - Matrix row `pipeline.agent-dispatch-pretooluse-step-takes-minutes-in-a-consumer` stays at 25: the state-command trace is measured, the dispatch hook is not.
+
+## Second run: preload on the dispatch hooks (2026-10-29, later)
+
+The Toolbox session ran with the preload (`NODE_OPTIONS`, `PIPELINE_AUTHORITY_TRACE`, `_FILE`, `_PLUGIN_ROOT`). Reported by that session (the trace file itself has not reached the repository, so no numbers are recorded here): the file holds 33 lines, 7 of them from the `guard-dispatch` hook. The one dispatch attempted (a `goldfish-mechanic` diagnosis task) passed through the hooks and was **refused with `DBG-GENERATED-BRIEFING-REQUIRED`**, because a Goldfish dispatch needs a briefing built by `dispatch-briefing.mjs build`, which needs a package with a real plan item, acceptance criterion and write paths. The session did not invent one and did not bypass the guard. That is correct behaviour, and it also fixes what the data means:
+
+- The seven `guard-dispatch` lines cover the hook path of a dispatch **up to the refusal**. The slice reservation, the part the preload header names as not measurable from outside, is missing, and the refusal happens before the expensive admission steps, so these lines are a lower bound, not the cost of a real dispatch.
+- The Toolbox feature sits at the push gate with no open slice, so no real Goldfish item exists there to measure. The next feature with a Goldfish item measures itself as long as the preload variables are still set.
+- Still unmeasured: the cost of a dispatch that passes admission. Still open: **the diagnosis slice**. The row stays at 25.
+
+Cleanup on the Toolbox terminal when the measurement window ends: remove `NODE_OPTIONS`, `PIPELINE_AUTHORITY_TRACE`, `PIPELINE_AUTHORITY_TRACE_FILE` and `PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT`, otherwise every Node process keeps loading the preload.
+
+What the PO can still send from that file without a real dispatch: the wall time and native-call counters of the seven `guard-dispatch` lines (`nativeAuthorityStats`, `custodyInspectionStats`), which at least show how much of the refusal path is native spawns.
