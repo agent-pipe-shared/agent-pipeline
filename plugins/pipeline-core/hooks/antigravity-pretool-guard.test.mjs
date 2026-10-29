@@ -970,13 +970,16 @@ check("Antigravity signature guidance assigns only sign-intent to the external P
       },
     }, root));
     assert.equal(res.decision, "deny");
+    // Slice A2-c4 justification: this route's text comes from guard-gate-strength, which now prints
+    // the one-command flow. The former four-step pins are replaced by the equivalent assertions on
+    // the new continuation sentence and prepare-for-signature line, plus refusals of the old text.
     assert.match(
       res.reason,
-      /emit-signature-digest --repo[^\n]*\n[^\n]*PO\/operator[^\n]*intentSha256[^\n]*\n[^\n]*sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>[^\n]*\n[^\n]*back in this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+      /Then, in this session, the agent runs prepare-for-signature[^\n]*gates\.human_approval is "signature"[^\n]*exactly one sign-intent command[^\n]*authorize-by-signature by the full path that command writes:\n[^\n]*prepare-for-signature --repo/u,
     );
-    assert.match(res.reason, /PO\/operator[^\n]*human-held Ed25519 key/u);
-    assert.match(res.reason, /back in this session[^\n]*proof path, not the private key/u);
-    assert.match(res.reason, /--proof <proof-path-from-sign-intent>/u);
+    assert.doesNotMatch(res.reason, /emit-signature-digest/u);
+    assert.doesNotMatch(res.reason, /<intent-sha256-from-emit-signature-digest>/u);
+    assert.doesNotMatch(res.reason, /<proof-path-from-sign-intent>/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -1015,7 +1018,13 @@ check("Antigravity GS-1 widening of pipeline.user.yaml stays denied without an a
     }, root));
     assert.equal(res.decision, "deny", "a widening without a capability must not be admitted");
     assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
-    assert.match(res.reason, /authorize-by-signature --repo/u, "the repair is a human signature, not an agent action");
+    // Slice A2-c4 (PO decision 2026-10-27): the former authorize-by-signature command line is now
+    // reached through the single prepare-for-signature command; the guidance still says the repair
+    // is a human signature (exactly one sign-intent command for the person), not an agent action.
+    assert.match(res.reason, /prepare-for-signature --repo/u, "the repair is a human signature, not an agent action");
+    assert.match(res.reason, /exactly one sign-intent command/u, "the person receives one signing command");
+    assert.doesNotMatch(res.reason, /emit-signature-digest|<proof-path-from-sign-intent>|<external-proof\.json>/u,
+      "no former four-step text or proof placeholder");
     assert.equal(readFileSync(sourcePath, "utf8"), before, "the denied edit left pipeline.user.yaml untouched");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

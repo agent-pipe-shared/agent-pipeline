@@ -586,13 +586,21 @@ try {
 
     const sigStderr = ask(governedGit({ mode: "signature" }), rule.path).stderr;
     assert.match(sigStderr, /plan --repo/u);
-    assert.match(sigStderr, /prepare-authorization --repo/u);
-    assert.match(sigStderr, /emit-signature-digest --repo/u);
-    assert.match(sigStderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
-    assert.match(sigStderr, /sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>/u);
-    assert.match(sigStderr, /back in this session[^\n]*proof path, not the private key/u);
-    assert.match(sigStderr, /authorize-by-signature --repo/u);
-    assert.match(sigStderr, /--proof <proof-path-from-sign-intent>/u);
+    // Slice A2-c4 (PO decision 2026-10-27): signature mode prints plan, then ONE continuation
+    // sentence (agent runs prepare-for-signature; the person gets exactly one sign-intent command;
+    // the agent imports the proof by the full path that command writes) and the single
+    // prepare-for-signature line. The former four-step text (prepare-authorization,
+    // emit-signature-digest, sign-intent with the intent placeholder, authorize-by-signature with the
+    // proof placeholder) is replaced by the equivalent assertions on the new text plus refusals.
+    assert.match(
+      sigStderr,
+      /Then, in this session, the agent runs prepare-for-signature[^\n]*gates\.human_approval is "signature"[^\n]*exactly one sign-intent command[^\n]*authorize-by-signature by the full path that command writes:\n[^\n]*prepare-for-signature --repo[^\n]*--request-sha256/u,
+    );
+    assert.doesNotMatch(sigStderr, /prepare-authorization/u);
+    assert.doesNotMatch(sigStderr, /emit-signature-digest/u);
+    assert.doesNotMatch(sigStderr, /<intent-sha256-from-emit-signature-digest>/u);
+    assert.doesNotMatch(sigStderr, /<proof-path-from-sign-intent>/u);
+    assert.doesNotMatch(sigStderr, /<plan-sha256/u);
     assert.doesNotMatch(sigStderr, /--activate/u);
     assert.doesNotMatch(sigStderr, /--selection-sha256/u);
 
