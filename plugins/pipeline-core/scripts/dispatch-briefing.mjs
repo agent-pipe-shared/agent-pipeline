@@ -978,9 +978,19 @@ export function buildDispatchBriefing(options, deps = {}) {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, rendered.text, "utf8");
   }
+  // The Claude Agent call the dispatcher makes next, so the tool-layer parameters need not be derived from the contract (MP-29):
+  // the tier of the (possibly raised) binding, the model family of the package's model id, the briefing passed verbatim.
+  const boundTier = generated.binding?.agentType;
+  const family = ["opus", "sonnet", "haiku", "fable"].find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
+  const dispatchCall = pkg.runner === "codex" || typeof boundTier !== "string" ? null : {
+    tool: "Agent",
+    subagent_type: `pipeline-core:${boundTier}`,
+    model: family,
+    prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
+  };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 

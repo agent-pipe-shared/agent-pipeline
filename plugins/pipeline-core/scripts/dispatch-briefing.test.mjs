@@ -616,6 +616,17 @@ test("build refuses an unknown package key and a missing required field, each na
   assert.match(refusedField.message, /"goal".*repair: /u);
 });
 
+test("first dispatch: a successful build prints the Agent call (tier, model family, briefing source) it expects", async () => {
+  const { runDispatchBriefing } = await lib();
+  const ok = packageFixture({});
+  const built = runDispatchBriefing(ok.argv, depsOf(ok.fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  assert.equal(built.dispatchCall.tool, "Agent");
+  assert.match(built.dispatchCall.subagent_type, /^pipeline-core:goldfish-(implementor|deep|mechanic)$/u);
+  assert.ok(["opus", "sonnet", "haiku", "fable"].includes(built.dispatchCall.model), JSON.stringify(built.dispatchCall));
+  assert.match(built.dispatchCall.prompt, /verbatim/u);
+});
+
 test("first dispatch: build reports every field problem of the package in one answer, the first code kept", async () => {
   const { runDispatchBriefing } = await lib();
   const bad = packageFixture({ goal: undefined, estimatedToolCalls: 0, facts: "a string" });
