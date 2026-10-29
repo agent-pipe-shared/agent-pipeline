@@ -154,7 +154,7 @@ routing:
         state: "unavailable"
         unavailable: "defer"
       claude:
-        effort: "medium"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
