@@ -30,7 +30,11 @@ Status: read-only recon, 2026-10-29. No code changed. Source: the PO's relay of 
 2. **N13 in the same patch** as text-only (cheap, pin update), so the user lands on the right verb.
 3. **N10 as a separate, later patch.** It touches the counting of retained courses and the carry-forward trust model; it should not ride on the unblock. Interim for the consumer: N12 closes the current course.
 
-## Open design questions for the PO
+## PO answers (2026-10-29, recorded as D187, D188, D189)
+
+Authority follows `gates.push_approval` (chat means chat, signature means signature); the acceptance covers P2 and below only; N10 is built immediately in the same candidate as N12 and N13. The path-set question for N10 (which paths count as code) and the carry-forward rule stay with the Elephant's design under the recon's hazards, to be reviewed in the patch.
+
+## Open design questions for the PO (answered above, kept for the record)
 
 - Is a signed PO acceptance (detached signature, like the push approval) the right authority for N12, or is a chat-recorded acceptance enough here as an attribution record? (The push approval has both modes, ADR-0056.)
 - May an accepted-residual course be closed over **any** open finding, or only P2 and below? (The recommendation: P0 and P1 findings cannot be accepted away; they need a fix or a scope split.)
