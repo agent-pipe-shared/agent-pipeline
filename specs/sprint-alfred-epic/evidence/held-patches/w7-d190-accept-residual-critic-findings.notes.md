@@ -155,3 +155,32 @@ Kernel production files the PO applies under a Guard Maintenance Window: critic-
 Proposed commit message unchanged: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
 
 CONTINUATION CARD -- done: pins, comparisons, revert proof, patch; remaining: docs/human-authorization-inventory.md acknowledgement (scope must add it), command surface, push-prepare sentence; next step: setup clones, apply the stack, add the doc rows, re-run the drift suite.
+
+## C7 slice: inventory rows added, drift suite STILL RED on a second out-of-list file; command surface and push-prepare sentence NOT done (checkpoint at the budget)
+
+Status: partial. Batch Critic, Full Verify and PO acceptance stay pending. Patch regenerated: 9 files, +425/-11; `git apply --check` on a clone of candidate plus budget patch (committed): exit 0. docs/human-authorization-inventory.md is not a protected path (agent-obligations section 2).
+
+### Changed in this slice (docs/human-authorization-inventory.md, in the patch)
+- New row `accept-residual-critic-findings` with the inventory-id marker, placed before the `critical-action-family` row.
+- Kind added to the enumerated `CRITICAL_ACTION_KINDS` list in the `critical-action-family` row.
+- Disposition row `accept-residual-critic-findings | legacy-renderer | -` after the `interruption-promotion` row.
+
+### STOP item 1 (drift suite still RED)
+After the docs edits the AUTH-GATE-UNDOCUMENTED finding is gone; the remaining finding (finished log, twice) is `AUTH-GATE-TERMINAL-CATALOG-MISSING accept-residual-critic-findings`. The drift check reads `plugins/pipeline-core/templates/human-terminal-actions/catalog.json` (parsed by `plugins/pipeline-core/lib/human-terminal-action-catalog.mjs`): it needs an entry for inventoryId `accept-residual-critic-findings` whose disposition and templateId match the docs disposition row (`legacy-renderer`, no template). That file is outside the allowed list: the next slice must add it to scope and model the entry on the `interruption-promotion` entry. If an entry is added, keep the disposition row; if not, the drift suite stays red.
+
+### Findings that shape the command surface (not implemented)
+- `CRITICAL_COMMAND_KINDS` is at po-human-approval.mjs line ~1026; the USAGE text (line ~70) lists the kinds too, and `criticalApprovalRequest` builds the request for them.
+- The signature route of `authorizeRecordedResidualAcceptance` verifies a record at `state.residualAcceptance.lastAccepted` plus a `criticalProofConsumption` ledger entry. The existing writers for that shape live in pipeline-state.mjs (`approve-push`, about lines 12287-12550, with a mutation-catalog/entry frame) and are large. po-human-approval.mjs itself writes no repository state. A residual-acceptance writer (computing the finding list from the consumed Critic receipt via `residualFindingId` and the open-findings reader, refusing any non-minor finding) therefore needs a new pipeline-state subcommand or a decision on where the state write happens: a design question for the next slice, not guessed here.
+
+### NOT done
+- Terminal catalog entry (stop item 1), po-human-approval kind and cases, pipeline-state printing, writer for `state.residualAcceptance.lastAccepted`.
+- push-prepare closing sentence: target is the first remedy string at push-prepare.mjs line ~752 (the `private-critic-binding-unavailable` branch); the pinning case is the test at push-prepare.test.mjs line ~818 (append a `assert.match` for `accept-residual-critic-findings` and `CCA-REVIEW-BUDGET-EXHAUSTED`; neither file is protected). Not started.
+- Suite comparison in this slice: only the drift suite was run (clone: RED as above; baseline clone2/clone3 GREEN 35/35 per C6). Other suites unchanged since C6 (the docs edit cannot affect them) and were not re-run. Revert proof for this slice: none (no production code edited).
+- Independent Critic review (parent-owned batch gate), Full Verify, PO acceptance.
+
+### Kernel production files and operator flow
+Unchanged: critic-verify-lifecycle.mjs, critical-action-approval-request.mjs, critical-action-authorization.mjs, critical-human-proof-policy.mjs, critic-verify-readiness.mjs under a Guard Maintenance Window. Flow: apply-diff budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install. Do not apply without the catalog entry or the drift suite stays red.
+
+Proposed commit message unchanged: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
+
+CONTINUATION CARD -- done: docs inventory rows, patch regenerated and apply-checked; remaining: catalog.json entry (scope), po-human-approval kind plus state writer plus cases, pipeline-state printing, push-prepare sentence plus case; next step: add catalog.json, push-prepare.mjs/.test.mjs, po-human-approval.mjs/.test.mjs, pipeline-state.mjs to scope, set up clones with the stack, add the catalog entry modelled on interruption-promotion, rerun the drift suite.
