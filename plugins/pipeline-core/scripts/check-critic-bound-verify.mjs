@@ -3,9 +3,22 @@
 /** Read-only exact-checkout final Verify/consumed-Critic qualification. */
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
+
+/**
+ * Whether two spellings name the same checkout root. Git prints `D:/Dev/repo` on Windows and Node's realpath prints
+ * `D:\Dev\repo`, so the two must be compared as paths, not as text (N11). On Windows the separator, a trailing separator
+ * and the letter case (file names are case-insensitive there) do not distinguish roots; elsewhere the comparison is
+ * exact and a backslash stays an ordinary file name character.
+ */
+export function sameCheckoutRoot(gitTopLevel, physicalRoot, platform = process.platform) {
+  if (typeof gitTopLevel !== "string" || typeof physicalRoot !== "string") return false;
+  if (platform !== "win32") return posix.normalize(gitTopLevel) === posix.normalize(physicalRoot);
+  const canonical = (value) => win32.normalize(value).replace(/[\\/]+$/u, "").toLowerCase();
+  return canonical(gitTopLevel) === canonical(physicalRoot);
+}
 
 function git(root, args) {
   return execFileSync("git", ["-C", root, ...args], {
@@ -20,7 +33,7 @@ export function checkCurrentCriticBoundVerify(rootDir) {
   let root;
   try {
     root = realpathSync(rootDir);
-    if (git(root, ["rev-parse", "--show-toplevel"]) !== root) throw new Error("not-root");
+    if (!sameCheckoutRoot(realpathSync(git(root, ["rev-parse", "--show-toplevel"])), root)) throw new Error("not-root");
   } catch { return { ok: false, code: "CBV-ROOT", currentCheckoutOk: false }; }
   let head, tree, gitCommonDir, worktreeState;
   try {
