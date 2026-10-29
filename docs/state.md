@@ -114,11 +114,11 @@ added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-
 75 means focused Source readiness, not native acceptance or release.
 All-at75 remains the continuation objective after transfer.
 
-**Status 2026-10-29 (27 held patches, none applied; apply, install, Full Verify, Critic, native runs, PO acceptance pending):**
+**Status 2026-10-29 (27 patches applied and installed, stamp f6fd58003; Full Verify, Critic, native runs, acceptance pending):**
 state authority diagnostics, trace and memo (e1b, e1c, e2, e3); the Critic path rule for every legitimate file name
 character with the registration route walk (f1, f1-c2, f2, f3, f4); operator text of the range bindings (d2); takeover
 verbs in the admit refusal (c24); two production fixes found by walking round 2 of a Critic course (h1, h2); a replayed old takeover moves its leftover origin (k1); test-only m1, n1, n2, p1, q1, q2, q3 (baseline reds fixed). Apply blocks, counts, gaps: `held-patches/STATE-AUTHORITY-AND-CRITIC-PATHS-VERIFY-2026-10-29.md`.
-The matrix moves no row until they are applied and installed.
+Matrix rows of these patches are lifted next.
 
 **Status 2026-10-28 night (round-2 bundle held; apply, install, Full Verify, Critic, native runs and PO acceptance pending):**
 after the 2026-10-27 install the remaining complete held patches are composed in
