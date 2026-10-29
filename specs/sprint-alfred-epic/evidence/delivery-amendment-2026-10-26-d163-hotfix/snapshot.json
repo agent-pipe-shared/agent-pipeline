@@ -7633,11 +7633,12 @@
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; analyzed (read-only recon of the remainder, 2026-10-27) with part patches held (D165 patches, d179, w7-brownfield-e2e-regression, not applied); no implementation is claimed. Delivered: D179 (93f1a4d55) and the end-to-end regression w7-brownfield-e2e-regression (49be7a1ec) on top of the earlier D165 patches. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
+      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; analyzed (read-only recon of the remainder, 2026-10-27) with part patches held (D165 patches, d179, w7-brownfield-e2e-regression, not applied); no implementation is claimed. Delivered: D179 (93f1a4d55) and the end-to-end regression w7-brownfield-e2e-regression (49be7a1ec) on top of the earlier D165 patches. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss. Intake 2026-10-29: this row also covers backlog/items/2026-10-26-brownfield-architecture-deferral-blocks-implementation-entry.md; the deferral allowance was removed by the D162 slices S2 to S4 in the operator commit 9ce6c2361 (a new deferred adoption is refused with ADOPTION-DEFERRAL-RETIRED, a legacy deferred record with ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED at entry; code and test names spot-checked).",
       "evidence": [
         "backlog/items/2026-10-26-brownfield-architecture-gate-never-passes.md",
         "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-brownfield-gate-remainder.md",
-        "specs/sprint-alfred-epic/evidence/held-patches/w7-brownfield-e2e-regression.notes.md"
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-brownfield-e2e-regression.notes.md",
+        "backlog/items/2026-10-26-brownfield-architecture-deferral-blocks-implementation-entry.md"
       ],
       "open": [
         {
