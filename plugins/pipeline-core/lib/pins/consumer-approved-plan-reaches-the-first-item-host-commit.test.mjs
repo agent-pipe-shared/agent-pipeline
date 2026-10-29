@@ -344,7 +344,7 @@ test("(g) PF-34: a feature registered before the review unit existed gets it wit
   assert.equal(added.status, 0, `${added.stdout}${added.stderr}`);
   assert.equal(added.json.status, "review-unit-added", added.stdout);
   assert.deepEqual(added.json.commitPaths, [MANIFEST, REVIEW_UNIT]);
-  assert.match(added.json.next, /earliest base a Critic review of this feature course can use/u);
+  assert.match(added.json.next, /may start from any base on the candidate history that already lists the feature manifest/u);
   const amended = JSON.parse(fx.read(MANIFEST));
   assert.deepEqual(amended.artifacts.slice(0, -1), manifest.artifacts.filter((artifact) => artifact.path !== REVIEW_UNIT), "nothing else of the manifest changes");
   assert.deepEqual(amended.artifacts.at(-1), { class: "design", path: REVIEW_UNIT, sha256: sha256(fx.read(REVIEW_UNIT)), authority: false, mutability: "immutable", retention: "retain" });
