@@ -429,8 +429,8 @@ export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={})
 
 /** One-line repair per unmet configure-verify condition (AC-140, never-fully-blocking). */
 export function configureVerifyRepair(code) {
-  if (code === "CVCT-AUTHORITY-STALE") return "restore the approved PRD/Spec bytes, or run reopen-design and approve the plan again";
-  if (code === "CVCT-PROFILE-STALE") return "restore the approved PO profile, or submit and approve the plan again";
+  if (code === "CVCT-AUTHORITY-STALE") return "on a clone or transferred checkout with unchanged approved bytes run `pipeline-state.mjs rebind-approval` (no new approval); otherwise restore the approved PRD/Spec bytes, or run reopen-design and approve the plan again";
+  if (code === "CVCT-PROFILE-STALE") return "on a clone or transferred checkout with unchanged approved bytes run `pipeline-state.mjs rebind-approval` (no new approval); otherwise restore the approved PO profile, or submit and approve the plan again";
   if (code === "CVCT-FILE") return "make the State file a private regular file of its owner (mode 0600 on POSIX, owner-only ACL on Windows), then retry";
   if (code === "CVCT-SOURCE-MISSING" || code === "CVCT-PATH") return "restore the approved source file the approval names (or run reopen-design and approve again), then retry";
   if (code === "CVCT-CAS" || code === "CVCT-APPROVAL-CAS") return "a source changed during the check; retry once no other write is running";

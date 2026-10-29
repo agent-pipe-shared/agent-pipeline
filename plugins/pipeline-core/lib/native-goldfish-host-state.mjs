@@ -1174,7 +1174,7 @@ function writeGovernedQueue(path,preimage,raw) {
 const STATE_SCRIPT=fileURLToPath(new URL('../scripts/pipeline-state.mjs',import.meta.url));
 export function staleApprovalRepair(code) {
   if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
-    return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} changed after the plan approval, which binds it; submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
+    return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} no longer matches what the plan approval binds. If this checkout is a clone or a transfer of the approving one and the approved bytes are unchanged, only its device-local values differ: run node ${STATE_SCRIPT} rebind-approval (it re-checks every bound digest, takes no argument and asks for no new approval), then retry. If the approved bytes themselves changed, submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
 }
 /** D52 (2), Critic F1: an item operation that another session owns is refused naming that session and the route
