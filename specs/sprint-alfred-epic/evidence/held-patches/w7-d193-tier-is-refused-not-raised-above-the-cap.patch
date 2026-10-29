@@ -1,0 +1,82 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index fd6e7e739..0c8bfe1eb 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -129,14 +129,16 @@ export function skeletonToolBudget(skeleton) {
+  * step is the deep tier; past the deep cap the package must carry a grant rationale. Returns the agent type to bind
+  * with and whether the estimate still exceeds the cap (then the rationale is rendered for the grant).
+  */
+-export function budgetDecision(pkg, budget, deepBudget = null) {
++export function budgetDecision(pkg, budget) {
+   const estimate = pkg.estimatedToolCalls;
+   if (estimate === undefined || budget === null || estimate <= budget) return { agentType: pkg.agentType, raised: false, exceeds: false };
+-  if (pkg.agentType !== "goldfish-deep" && deepBudget !== null && estimate <= deepBudget) return { agentType: "goldfish-deep", raised: true, exceeds: false };
++  // D193 (PO, 2026-10-29): the tier is never raised silently. An estimate above the cap is refused with the way out named:
++  // a grant planned in the package (the dispatcher continues the same agent at the checkpoint, D191), the deep tier chosen
++  // on purpose, or a split.
+   if (!nonEmpty(pkg.budgetRationale)) {
+-    refuse("DBG-PACKAGE-BUDGET-EXCEEDED", `estimatedToolCalls ${estimate} exceeds the ${pkg.agentType === "goldfish-deep" || deepBudget === null ? "" : "deep "}tier cap ${deepBudget ?? budget}; repair: split the outcome, or add "budgetRationale" so the dispatcher records a budget grant (D75) at the checkpoint`);
++    refuse("DBG-PACKAGE-BUDGET-EXCEEDED", `estimatedToolCalls ${estimate} exceeds the ${pkg.agentType} cap ${budget}; the tier is not raised silently; repair: add "budgetRationale" (why the outcome needs more calls) so the dispatcher plans a budget grant and continues the same agent at the checkpoint (D191), or set "agentType" to goldfish-deep together with that rationale, or split the outcome into slices with disjoint scopes`);
+   }
+-  return { agentType: pkg.agentType === "goldfish-deep" || deepBudget === null ? pkg.agentType : "goldfish-deep", raised: pkg.agentType !== "goldfish-deep" && deepBudget !== null, exceeds: true };
++  return { agentType: pkg.agentType, raised: false, exceeds: true };
+ }
+ 
+ /** Every path the package names: the write scope, the binding check and each file named in a targeted command. */
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index e50dfc54f..8e3fd147d 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -965,15 +965,10 @@ export function buildDispatchBriefing(options, deps = {}) {
+     // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
+     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
+   }, deps);
+-  // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
+-  let generated = bind(pkg.agentType);
++  // Test-first budget (D193, PO 2026-10-29): an estimate above the tier cap is refused unless the package plans a grant; the tier is never raised silently.
++  const generated = bind(pkg.agentType);
+   const budget = skeletonToolBudget(generated.skeleton);
+-  let deep = null;
+-  if (pkg.estimatedToolCalls !== undefined && budget !== null && pkg.estimatedToolCalls > budget && pkg.agentType !== "goldfish-deep") deep = bind("goldfish-deep");
+-  const decision = budgetDecision(pkg, budget, deep === null ? null : skeletonToolBudget(deep.skeleton));
+-  if (decision.raised) {
+-    generated = { ...deep, warnings: [...deep.warnings, { code: "DBG-PACKAGE-TIER-RAISED", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the ${pkg.agentType} cap ${budget}; bound to goldfish-deep` }] };
+-  }
++  const decision = budgetDecision(pkg, budget);
+   const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
+   if (options.out !== undefined) {
+     const target = resolve(root, options.out);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 07bd7ca81..82991fb83 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -763,15 +763,23 @@ test("a project that calibrates no Verify command still gets targeted -> quick -
+   assert.deepEqual(checkRouteProblems(result.text, { verifyCommand: null }), []);
+ });
+ 
+-test("an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale", async () => {
++test("D193: an estimate above the tier cap is refused with the grant route named, never raised to the deep tier silently; a rationale plans the grant", async () => {
+   const { runDispatchBriefing } = await lib();
+   const base = packageFixture();
+   const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
+-  const raised = packageFixture({ estimatedToolCalls: cap + 1 });
+-  const raisedResult = runDispatchBriefing(raised.argv, depsOf(raised.fx));
+-  assert.equal(raisedResult.ok, true, JSON.stringify(raisedResult));
+-  assert.equal(parseNativeGoldfishBriefing(raisedResult.text).binding.agentType, "goldfish-deep");
+-  assert.ok(raisedResult.warnings.some((entry) => entry.code === "DBG-PACKAGE-TIER-RAISED"));
++  const over = packageFixture({ estimatedToolCalls: cap + 1 });
++  const overResult = runDispatchBriefing(over.argv, depsOf(over.fx));
++  assert.equal(overResult.ok, false, JSON.stringify(overResult));
++  assert.equal(overResult.code, "DBG-PACKAGE-BUDGET-EXCEEDED");
++  assert.match(overResult.message, /the tier is not raised silently/u);
++  assert.match(overResult.message, /budgetRationale/u);
++  assert.match(overResult.message, /goldfish-deep/u);
++  const planned = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "one test-first cycle that needs a few calls more than the base cap" });
++  const plannedResult = runDispatchBriefing(planned.argv, depsOf(planned.fx));
++  assert.equal(plannedResult.ok, true, JSON.stringify(plannedResult));
++  assert.notEqual(parseNativeGoldfishBriefing(plannedResult.text).binding.agentType, "goldfish-deep", "the tier stays the one the package named");
++  assert.ok(!plannedResult.warnings.some((entry) => entry.code === "DBG-PACKAGE-TIER-RAISED"));
++  assert.match(plannedResult.text, /Budget grant expected at the 80 % checkpoint: one test-first cycle/u);
+   const tooMany = packageFixture({ estimatedToolCalls: 100000 });
+   const refused = runDispatchBriefing(tooMany.argv, depsOf(tooMany.fx));
+   assert.equal(refused.code, "DBG-PACKAGE-BUDGET-EXCEEDED");
