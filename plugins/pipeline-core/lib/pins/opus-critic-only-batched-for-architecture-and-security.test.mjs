@@ -96,12 +96,12 @@ test("rule 3 (mechanical): a declared re-critic needs Batch scope and exactly on
   assert.ok(rc("- Re-critic (MP-07): since the last review\n- Batch scope (MP-07): S1").includes("DISPATCH-RECRITIC-NO-DELTA-RANGE"));
 });
 
-test("rule 3 (mechanical): a re-critic naming more than the delta is flagged; ordinal above four is refused", () => {
+test("rule 3 (mechanical): a re-critic naming more than the delta is flagged; no review ordinal refuses a diff round (D190)", () => {
   const wide = "- Re-critic (MP-07): delta aaaaaaa..bbbbbbb\n- Batch scope (MP-07): S1\nDIFF RANGE: 1234567..bbbbbbb";
   assert.ok(rc(wide).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
   const fifth = "- Re-critic (MP-07): delta aaaaaaa..bbbbbbb\n- Batch scope (MP-07): S1\n- Review ordinal: 5";
-  assert.ok(rc(fifth).includes("DISPATCH-RECRITIC-ORDINAL"));
-  assert.ok(!rc(fifth.replace("5", "4")).includes("DISPATCH-RECRITIC-ORDINAL"));
+  // Before D190 an ordinal above four answered DISPATCH-RECRITIC-ORDINAL, which blocked the round-5 Critic of a consumer course.
+  for (const ordinal of ["4", "5", "9"]) assert.deepEqual(rc(fifth.replace("5", ordinal)).filter((c) => c.startsWith("DISPATCH-RECRITIC")), [], `ordinal ${ordinal}`);
 });
 
 // AC-222 correction (Critic C6g5 D2): the beyond-delta check must read the Diff field the REAL critic template

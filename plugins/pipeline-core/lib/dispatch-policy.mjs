@@ -199,7 +199,6 @@ const SURFACE_RANGE = /\b([0-9a-f]{7,40})(\^?)(\.{2,3})([0-9a-f]{7,40})\b/gi;
 //      previous candidate (which would re-include an already reviewed commit) are judged, so a caret range
 //      starting further back than the previous candidate passes.
 const SEARCH_SURFACE_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:(?:diff range|candidate diff|search surface)\b|diff\s*\(the object under review\))[^:\n]*:/i;
-const REVIEW_ORDINAL_LINE = /^\s*(?:[-*]\s*)?\**\s*review ordinal\b[^:\n]*:\**\s*(\d+)/im;
 const indentOf = (line) => /^[ \t]*/.exec(line)[0].length;
 function searchSurfaceFields(lines) {
   const fields = [];
@@ -238,10 +237,7 @@ function recriticFindings(text) {
       out.push({ code: "DISPATCH-RECRITIC-BEYOND-DELTA", why: `a re-critic is restricted to the delta ${delta[0]}; it also names ${wider.join(", ")} as a search surface (MP-07)` });
     }
   }
-  const ordinal = REVIEW_ORDINAL_LINE.exec(text);
-  if (ordinal && Number(ordinal[1]) > 4) {
-    out.push({ code: "DISPATCH-RECRITIC-ORDINAL", why: "a batch allows ONE full review plus at most three correction-diff reviews; a fifth review is refused (MP-07)" });
-  }
+  // D190: no review ordinal refuses a correction-diff round; the batch runs one full review, then diff reviews until PASS.
   return out;
 }
 
