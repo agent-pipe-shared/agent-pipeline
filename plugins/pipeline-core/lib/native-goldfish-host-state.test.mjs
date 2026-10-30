@@ -1286,6 +1286,15 @@ const cases = [
     namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
     const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
+    // PO 2026-10-30: an unreadable registry (a producer refuses its reconcile) names inspect, the routine heal and the human move-aside.
+    assert.equal(typeof mod.readinessUnavailableRepair,"function","readinessUnavailableRepair is exported");
+    const unavailable=mod.readinessUnavailableRepair();
+    assert.match(unavailable,/session-authority-repair\.mjs inspect --root <root>/u);
+    assert.match(unavailable,/routine-repair\.mjs run heal --root <root> --reason/u);
+    assert.match(unavailable,/move-aside --no-goldfish-running/u);
+    assert.match(unavailable,/still reconcile-refused and no Goldfish runs, run [^\n]*move-aside/u);
+    assert.match(unavailable,/nothing is deleted/u);
+    assert.match(source,/integration readiness \$\{readiness\.status\}[^\n]*repair:readinessUnavailableRepair\(\)/u,"the readiness-unavailable refusal attaches the repair");
   })}},
 
   { id: "NGHS45", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
