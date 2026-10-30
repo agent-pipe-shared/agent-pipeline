@@ -1,0 +1,306 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index c9c9dfa7e..ab73fd5c4 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -1339,4 +1339,82 @@ test("D207 a PASS with a minor finding registers its lineage as findings and the
+   assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
+   assert.equal(after.budgets.reviewRound, 2);
+ });
++// N20 (consumer finding 2026-10-30, decision D206): every round of a session-mode course runs in the SAME hosting session. The lane
++// of a round used to be that session (id and digest), so round 2 equalled round 1 and its lineage was refused CRL-HISTORY-CHAIN.
++// Genuine consumed rounds below: round 1 and round 2 use the same sessionId on purpose.
++function n20SecondRoundInSameSession(fx, { sessionId = "feature-held-review" } = {}) {
++  pf94WriteInput(fx);
++  const delta = pf94Delta(fx);
++  assert.equal(delta.status, "delta-request-added", `step delta request: ${JSON.stringify(delta)}`);
++  const registration = pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request");
++  const specPath = `specs/${fx.featureId}/spec.md`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
++  const taskId = "feature-held-task-round2", packetId = "9b".repeat(16);
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, fx.candidate, fx.correctionCommit) };
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
++  admitSessionCriticReview(request, {});
++  const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
++  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
++  return { delta, registration, packetId };
++}
++test("N20 (a) two session-mode rounds in the same hosting session: the lineage of round 2 registers, has its own lane, and the next admission reads both rounds back", () => {
++  const fx = pf94DeltaFixture();
++  const round1 = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
++  const second = n20SecondRoundInSameSession(fx);
++  const added = addCriticReviewLineage({ root: fx.root, packetId: second.packetId });
++  assert.equal(added.status, "lineage-added", `the lineage of a follow-up round of the same session registers: ${JSON.stringify(added)}`);
++  const round2 = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  assert.equal(round2.parentReviewId, round1.reviewId);
++  assert.notEqual(round2.lane.laneId, round1.lane.laneId, "each round's lane identifies its own Critic run");
++  assert.notEqual(round2.lane.contextSha256, round1.lane.contextSha256);
++  assert.equal(round2.lane.freshFromReviewId, round1.reviewId);
++  const registration2 = pf94CommitPaths(fx.root, added.commitPaths, "register the lineage of round 2");
++  const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration2, requestedMode: "delta", deltaRequestPath: second.delta.deltaRequestPath });
++  assert.equal(next.decision.code, "RE-CONSUMED-PACKAGE-PASS", `the retained rounds re-read against their consumed results: ${JSON.stringify(next.decision)}`);
++});
++test("N20 (b) a registered round 1 with the legacy lane (hosting session id and digest of the session) stays valid for the next round", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  const session = { id: "feature-held-review", freshContext: true, historyInherited: false, mayDelegate: false };
++  record.lane.laneId = session.id; record.lane.contextSha256 = sha256Canonical(session);
++  const { recordSha256: _drop, ...core } = record;
++  record.recordSha256 = sha256Canonical(core);
++  const legacyPath = `specs/${fx.featureId}/evidence/critic-lineage-${record.recordSha256}.json`;
++  const bytes = Buffer.from(JSON.stringify(record));
++  rmSync(join(fx.root, added.lineagePath));
++  writeFileSync(join(fx.root, legacyPath), bytes);
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  const entry = manifest.artifacts.find((artifact) => artifact.path === added.lineagePath);
++  assert.ok(entry, "the lineage artifact is in the manifest");
++  entry.path = legacyPath; entry.sha256 = hash(bytes);
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  const registration = pf94CommitPaths(fx.root, [fx.manifestPath, legacyPath], "register a lineage with the legacy lane");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
++  assert.notEqual(after.decision.code, "CVL-COURSE-RECORD", JSON.stringify(after.decision));
++  // No correction commit follows the round, so the history is read back and the delta request is judged against the parent (CCA-PARENT); the
++  // lane mirror did not refuse the retained legacy lane.
++  assert.equal(after.decision.code, "CCA-PARENT", `the legacy round is read back like before: ${JSON.stringify(after.decision)}`);
++});
++test("N20 (c) a registered round whose lane is neither the legacy lane nor the lane derived from its own consumed result is refused", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const added = pf94Lineage(fx);
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  record.lane.laneId = "forged-lane-of-another-run"; record.lane.contextSha256 = H("e");
++  const { recordSha256: _drop, ...core } = record;
++  record.recordSha256 = sha256Canonical(core);
++  const forgedPath = `specs/${fx.featureId}/evidence/critic-lineage-${record.recordSha256}.json`;
++  const bytes = Buffer.from(JSON.stringify(record));
++  rmSync(join(fx.root, added.lineagePath));
++  writeFileSync(join(fx.root, forgedPath), bytes);
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  const entry = manifest.artifacts.find((artifact) => artifact.path === added.lineagePath);
++  entry.path = forgedPath; entry.sha256 = hash(bytes);
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  const registration = pf94CommitPaths(fx.root, [fx.manifestPath, forgedPath], "register a lineage with a forged lane");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
++  assert.equal(after.decision.code, "CVL-COURSE-RECORD", `a forged lane must not read back as a genuine round: ${JSON.stringify(after.decision)}`);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index c0dde2b05..b4c55a927 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -381,16 +381,47 @@ function lineageCode(record) {
+   return record.recordSha256 === sha256Canonical(recordCore(record)) ? null : "CRL-DIGEST";
+ }
+ 
++/**
++ * N20 / D206: the lane of one session-mode round. Every round of a course may run in the SAME hosting session
++ * (result.session.id is bound to packet.request.sessionBinding.sessionId), so a lane read from the session alone is
++ * equal for every round and transitionCode refuses each follow-up round. The lane of a round identifies that round's own
++ * Critic run: derived from the hosting session AND the round's packet (packetId and the packet digest of its receipt).
++ * Pure; one helper for the lineage compiler and for the lifecycle mirror, so the two can never drift apart.
++ */
++export function sessionRoundLane({ session, packetId, packetDigest }) {
++  const key = sha256Canonical({ schema: "pipeline.critic-session-round-lane.v1", session, packetId, packetDigest });
++  return { laneId: `round-lane-${key.slice(0, 40)}`, contextSha256: sha256Canonical({ schema: "pipeline.critic-session-round-context.v1", session, packetId, packetDigest }) };
++}
++
++/** The lane written before N20: the hosting session itself. Kept readable so an already registered round stays valid. */
++export function legacySessionLane(session) {
++  return { laneId: session.id, contextSha256: sha256Canonical(session) };
++}
++
++/** Whether a retained lane is a genuine one of this consumed session result: the derived lane, or the legacy lane. */
++export function sessionLaneMatches(lane, { session, packetId, packetDigest }) {
++  const derived = sessionRoundLane({ session, packetId, packetDigest });
++  const legacy = legacySessionLane(session);
++  return (lane.laneId === derived.laneId && lane.contextSha256 === derived.contextSha256)
++    || (lane.laneId === legacy.laneId && lane.contextSha256 === legacy.contextSha256);
++}
++
++// N20 / D206: CRL-HISTORY-CHAIN carries every condition that failed, so a refusal says which link of the chain broke.
++function chainConditions(parent, current) {
++  const failed = [];
++  if (current.parentReviewId !== parent.reviewId) failed.push("parent-review-id");
++  if (current.previousSha256 !== parent.recordSha256) failed.push("previous-sha256");
++  if (current.reviewId === parent.reviewId) failed.push("review-id-repeated");
++  if (current.lane.freshFromReviewId !== parent.reviewId) failed.push("fresh-from");
++  if (current.lane.laneId === parent.lane.laneId) failed.push("lane-id-equal");
++  if (current.lane.contextSha256 === parent.lane.contextSha256) failed.push("context-equal");
++  return failed;
++}
++
+ export function transitionCode(parent, current) {
+   if (parent.course.status !== "admitted") return "CRL-HISTORY-AFTER-GATE";
+-  if (current.parentReviewId !== parent.reviewId
+-    || current.previousSha256 !== parent.recordSha256
+-    || current.reviewId === parent.reviewId
+-    || current.lane.freshFromReviewId !== parent.reviewId
+-    || current.lane.laneId === parent.lane.laneId
+-    || current.lane.contextSha256 === parent.lane.contextSha256) {
+-    return "CRL-HISTORY-CHAIN";
+-  }
++  const chain = chainConditions(parent, current);
++  if (chain.length > 0) return `CRL-HISTORY-CHAIN:${chain.join(",")}`;
+   if (current.course.status === "po-course-gate") {
+     if (!same(current.candidate, parent.candidate)
+       || !same(current.diff, parent.diff)
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.mjs b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+index 2c8bac476..6ccba6f49 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+@@ -42,6 +42,7 @@ import {
+   invalidationCode,
+   compiledRequest,
+   transitionCode,
++  sessionRoundLane,
+   validateCriticReviewLineage,
+ } from "./critic-review-lineage-core.mjs";
+ 
+@@ -435,7 +436,9 @@ export function compileRegisteredCriticReviewLineage(input){try{
+  const i=admission.courseIdentity,b=admission.budgets;
+  let criterionSha256=null;
+  if(admission.acceptance!==null){const observed=readAcceptedCriticCriterion({repoRoot:input.courseRequest.repoRoot,featureId:i.originalFeatureId,envelopePath:input.courseRequest.acceptedReference.path,criterionLocator:input.courseRequest.criterionLocator});if(!observed.ok)return observed;criterionSha256=sha256Canonical({acceptance:observed.acceptance,criterion:observed.criterion,source:observed.source,locator:observed.locator});}
+- const record={schema:'pipeline.critic-review-lineage.v2',reviewId:input.reviewId,parentReviewId:parent?.reviewId??null,candidate:{commit:packet.candidate.commit,tree:packet.candidate.tree},diff:{base:packet.candidate.base,sha256:packet.diff.sha256,changedPaths:[...packet.diffPaths]},references:{packetSha256:sha256Canonical(packet),requestSha256:packet.bindings.requestSha256,diffPathsSha256:packet.bindings.diffPathsSha256,governanceSha256:packet.bindings.governanceSha256},packages:structuredClone(input.packages),coverage:structuredClone(input.coverage),request:{packetId:packet.packetId,requestSha256:packet.bindings.requestSha256,compiledSha256:'0'.repeat(64),mode:decision.mode,admissionCode:decision.code},lane:{laneId:result.session.id,contextSha256:sha256Canonical(result.session),independent:true,evidenceSha256:actual.value.receiptSha256,freshFromReviewId:parent?.reviewId??null},verdict:{status:receipt.reviewPass?'no-findings':'findings',schemaValid:true,resultSha256:actual.value.resultSha256,failure:null},findings,correction:structuredClone(input.correction),invalidation:structuredClone(input.invalidation),course:{reviewRound:b.reviewRound,correctionCommitCount:b.correctionCommitCount,maxReviewRounds:4,maxCorrectionCommits:3,status:'admitted'},previousSha256:parent?.recordSha256??null,recordSha256:'0'.repeat(64),courseBinding:{courseKey:i.courseKey,originalFeatureId:i.originalFeatureId,originalManifestSha256:i.originalManifestSha256,genesisCandidate:i.genesisCandidate,submissionSha256:i.submissionSha256,envelopeSha256:i.envelopeSha256,criterionSha256:admission.acceptance?sha256Canonical(admission.acceptance):null,deltaRequestSha256:admission.deltaRequestSha256,deterministicEvidenceSha256:admission.deterministicEvidenceSha256,courseSourceSha256,courseDecisionSha256},consumedResult:{packetId:packet.packetId,packetDigest:sha256Canonical(packet),receiptSha256:actual.value.receiptSha256,resultSha256:actual.value.resultSha256,verdictSha256:sha256Canonical(result.verdict),findingBindings:projected.map((f,index)=>({findingId:f.id,index,sha256:f.evidenceSha256}))}};
++ // N20/D206: the lane identifies THIS round's Critic run (hosting session + this round's packet), not the hosting session alone.
++ const roundLane=sessionRoundLane({session:result.session,packetId:packet.packetId,packetDigest:receipt.packetDigest});
++ const record={schema:'pipeline.critic-review-lineage.v2',reviewId:input.reviewId,parentReviewId:parent?.reviewId??null,candidate:{commit:packet.candidate.commit,tree:packet.candidate.tree},diff:{base:packet.candidate.base,sha256:packet.diff.sha256,changedPaths:[...packet.diffPaths]},references:{packetSha256:sha256Canonical(packet),requestSha256:packet.bindings.requestSha256,diffPathsSha256:packet.bindings.diffPathsSha256,governanceSha256:packet.bindings.governanceSha256},packages:structuredClone(input.packages),coverage:structuredClone(input.coverage),request:{packetId:packet.packetId,requestSha256:packet.bindings.requestSha256,compiledSha256:'0'.repeat(64),mode:decision.mode,admissionCode:decision.code},lane:{laneId:roundLane.laneId,contextSha256:roundLane.contextSha256,independent:true,evidenceSha256:actual.value.receiptSha256,freshFromReviewId:parent?.reviewId??null},verdict:{status:receipt.reviewPass?'no-findings':'findings',schemaValid:true,resultSha256:actual.value.resultSha256,failure:null},findings,correction:structuredClone(input.correction),invalidation:structuredClone(input.invalidation),course:{reviewRound:b.reviewRound,correctionCommitCount:b.correctionCommitCount,maxReviewRounds:4,maxCorrectionCommits:3,status:'admitted'},previousSha256:parent?.recordSha256??null,recordSha256:'0'.repeat(64),courseBinding:{courseKey:i.courseKey,originalFeatureId:i.originalFeatureId,originalManifestSha256:i.originalManifestSha256,genesisCandidate:i.genesisCandidate,submissionSha256:i.submissionSha256,envelopeSha256:i.envelopeSha256,criterionSha256:admission.acceptance?sha256Canonical(admission.acceptance):null,deltaRequestSha256:admission.deltaRequestSha256,deterministicEvidenceSha256:admission.deterministicEvidenceSha256,courseSourceSha256,courseDecisionSha256},consumedResult:{packetId:packet.packetId,packetDigest:sha256Canonical(packet),receiptSha256:actual.value.receiptSha256,resultSha256:actual.value.resultSha256,verdictSha256:sha256Canonical(result.verdict),findingBindings:projected.map((f,index)=>({findingId:f.id,index,sha256:f.evidenceSha256}))}};
+  // Owner packet/verdict digests use that owner's pretty JSON+LF encoding;
+  // artifact/result/lineage digests keep the established compact canonical form.
+  record.consumedResult.packetDigest=receipt.packetDigest;
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index f34d0dcff..42bb584fb 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -892,3 +892,95 @@ check("a full round over more than 256 changed paths compiles, validates and adm
+ 
+ assert.equal(passed, 20);
+ console.log(`${passed}/20 checks passed.`);
++
++// N20 (consumer finding 2026-10-30, decision D206): every round of one session-mode course ran in the SAME hosting session, so
++// laneId and contextSha256 (both read from result.session) were equal for every round and no follow-up round could register.
++// The lane of a round now identifies that round's own Critic run: derived from the hosting session AND the round's packet.
++// These cases carry their own counter, so the original 20-check assertion above stays exactly as it was.
++let n20Passed = 0;
++function n20Check(name, fn) {
++  fn();
++  n20Passed += 1;
++  console.log(`PASS N20-${String(n20Passed).padStart(2, "0")} ${name}`);
++}
++const hostSession = Object.freeze({ id: "feature-held-review", freshContext: true, historyInherited: false, mayDelegate: false });
++const packet3 = Object.freeze({
++  packetId: "3".repeat(32),
++  request: { projectId: "pipeline", taskId: "nova-a5-correction-2", trigger: "T1" },
++  candidate: { base: O("4"), commit: O("6"), tree: O("7") },
++  diff: { base: O("4"), commit: O("6"), path: ".git/review.diff", bytes: 3, sha256: H("9") },
++  diffPaths: [PATH],
++  bindings: { requestSha256: H("a"), diffPathsSha256: H("b"), governanceSha256: H("c") },
++});
++const roundLane = (packet, packetDigest, evidence) => ({
++  ...lineageCore.sessionRoundLane({ session: hostSession, packetId: packet.packetId, packetDigest }),
++  evidenceSha256: evidence,
++});
++const retained = { ...findingOpen, priorFindingId: findingOpen.id };
++function sameSessionChain() {
++  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen], lane: roundLane(packet1, H("1"), H("3")) });
++  const second = compile({
++    packet: packet2, reviewId: "review-2", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
++    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2), lane: roundLane(packet2, H("2"), H("4")),
++  });
++  return { first, second };
++}
++
++n20Check("N20 the lane of a session-mode round is derived from the hosting session and the round's packet, so two rounds of one session differ", () => {
++  const lane1 = lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("1") });
++  const lane2 = lineageCore.sessionRoundLane({ session: hostSession, packetId: packet2.packetId, packetDigest: H("2") });
++  assert.notEqual(lane1.laneId, lane2.laneId);
++  assert.notEqual(lane1.contextSha256, lane2.contextSha256);
++  assert.deepEqual(lane1, lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("1") }), "pure and repeatable");
++  assert.notEqual(lane1.laneId, lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("9") }).laneId, "the packet digest is part of the identity");
++  assert.notEqual(lane1.laneId, lineageCore.sessionRoundLane({ session: { ...hostSession, id: "another-session" }, packetId: packet1.packetId, packetDigest: H("1") }).laneId, "the hosting session is part of the identity");
++  assert.equal(lineageCore.identifier(lane1.laneId), true, "the derived lane id passes the lane id charset and length check");
++  assert.equal(lineageCore.digest(lane1.contextSha256), true);
++  assert.notEqual(lane1.laneId, hostSession.id, "differs from the legacy lane id (the session id)");
++  assert.notEqual(lane1.contextSha256, sha256Canonical(hostSession), "differs from the legacy context digest");
++  const longSession = { ...hostSession, id: "s".repeat(128) };
++  assert.equal(lineageCore.identifier(lineageCore.sessionRoundLane({ session: longSession, packetId: packet1.packetId, packetDigest: H("1") }).laneId), true, "a long session id cannot overflow the lane id bound");
++});
++
++n20Check("N20 (anchor, unit level) rounds 1, 2 and 3 of one hosting session compile with their derived lanes and the history validates", () => {
++  const { first, second } = sameSessionChain();
++  assert.equal(validateCriticReviewHistory([first, second]).ok, true);
++  const third = compile({
++    packet: packet3, reviewId: "review-3", parent: second, coverage: completeCoverage(packet3), verdict: findingsVerdict, findings: [retained],
++    correction: correction(packet3), invalidation: none, reviewAttempt: deltaAttempt(3, 2, packet3), lane: roundLane(packet3, H("3"), H("5")),
++  });
++  assert.deepEqual(validateCriticReviewHistory([first, second, third]), { ok: true, code: null, headSha256: third.recordSha256 });
++  assert.equal(new Set([first, second, third].map((record) => record.lane.laneId)).size, 3);
++});
++
++n20Check("N20 a registered round with the legacy lane (session id, digest of the session) stays valid as the parent of a derived round", () => {
++  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen], lane: { laneId: hostSession.id, contextSha256: sha256Canonical(hostSession), evidenceSha256: H("3") } });
++  const second = compile({
++    packet: packet2, reviewId: "review-2", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
++    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2), lane: roundLane(packet2, H("2"), H("4")),
++  });
++  assert.equal(validateCriticReviewHistory([first, second]).ok, true);
++});
++
++n20Check("N20 a forged round whose lane equals its parent's is still refused, and the refusal names the lane conditions", () => {
++  const { first } = sameSessionChain();
++  assert.throws(() => compile({
++    packet: packet2, reviewId: "review-2-forged", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
++    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2),
++    lane: { laneId: first.lane.laneId, contextSha256: first.lane.contextSha256, evidenceSha256: H("4") },
++  }), /CRL-HISTORY-CHAIN:lane-id-equal,context-equal/u);
++});
++
++n20Check("N20 CRL-HISTORY-CHAIN names the one condition that failed, each pinned once", () => {
++  const { first, second } = sameSessionChain();
++  const variant = (mutate) => { const copy = structuredClone(second); mutate(copy); return lineageCore.transitionCode(first, copy); };
++  assert.equal(lineageCore.transitionCode(first, second), null);
++  assert.equal(variant((r) => { r.parentReviewId = "review-other"; }), "CRL-HISTORY-CHAIN:parent-review-id");
++  assert.equal(variant((r) => { r.previousSha256 = H("0"); }), "CRL-HISTORY-CHAIN:previous-sha256");
++  assert.equal(variant((r) => { r.reviewId = first.reviewId; }), "CRL-HISTORY-CHAIN:review-id-repeated");
++  assert.equal(variant((r) => { r.lane.freshFromReviewId = "review-other"; }), "CRL-HISTORY-CHAIN:fresh-from");
++  assert.equal(variant((r) => { r.lane.laneId = first.lane.laneId; }), "CRL-HISTORY-CHAIN:lane-id-equal");
++  assert.equal(variant((r) => { r.lane.contextSha256 = first.lane.contextSha256; }), "CRL-HISTORY-CHAIN:context-equal");
++  assert.equal(variant((r) => { r.lane.laneId = first.lane.laneId; r.lane.contextSha256 = first.lane.contextSha256; }), "CRL-HISTORY-CHAIN:lane-id-equal,context-equal");
++});
++console.log(`${n20Passed}/5 N20 checks passed.`);
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index debb4601e..a6703dd9b 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -15,6 +15,7 @@ import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+ import { canonicalJson as canonicalCourseJson, sha256Canonical } from "./review-economy.mjs";
+ import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
++import { sessionLaneMatches } from "./critic-review-lineage-core.mjs";
+ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { isAbsolute, join, resolve } from "node:path";
+ 
+@@ -449,7 +450,9 @@ export function readConsumedCriticCourseResult(input) {
+         || retained.references.packetSha256 !== sha256Canonical(packet)
+         || retained.references.requestSha256 !== packet.bindings.requestSha256
+         || retained.coverage.complete !== true || retained.coverage.receiptSha256 !== receiptSha256
+-        || retained.lane.laneId !== result.session.id || retained.lane.contextSha256 !== sha256Canonical(result.session)) {
++        // N20/D206: the lane is that of this round's own Critic run (derived from the hosting session and the packet); a lane
++        // registered before the fix (the hosting session itself) stays valid. Same helper as the lineage compiler.
++        || !sessionLaneMatches(retained.lane, { session: result.session, packetId: input.packetId, packetDigest: receipt.packetDigest })) {
+         fail("CVL-COURSE-RECORD", "Retained record is not bound to the genuine consumed result.");
+       }
+       if (retained.schema === "pipeline.critic-review-lineage.v2") {
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index abe5bd521..32901f4e0 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -563,7 +563,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   });
+   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
+   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+-  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: compiled.code, packetId });
++  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}${String(compiled.code).startsWith("CRL-HISTORY-CHAIN:") ? ": the chain to the last registered round broke at the named condition; parent-review-id and previous-sha256 mean the parent is not the last registered round, review-id-repeated that the review id is not new, fresh-from, lane-id-equal and context-equal that the round is not an independent run after its parent" : ""}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: compiled.code, packetId });
+   const artifact = compiled.value.artifact;
+   const target = join(root, artifact.path), created = !existsSync(target);
+   const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
