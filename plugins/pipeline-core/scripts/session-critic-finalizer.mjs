@@ -38,6 +38,19 @@ function takeoverRequestRepair(supersede) {
     ? `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA}, featureId, digestSha256, reason; ${TAKEOVER_REQUEST_FILE_TEXT}`
     : `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA}, featureId; ${TAKEOVER_REQUEST_FILE_TEXT}`;
 }
+/** `<verb> --help`: the --request file shape, its keys and one example. */
+export function takeoverVerbHelp(verb) {
+  const supersede = verb === "supersede-course-takeover";
+  const example = supersede
+    ? { schema: SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA, featureId: "<feature>", digestSha256: "<digest printed by inspect-course-takeover>", reason: "<short reason>" }
+    : { schema: SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA, featureId: "<feature>" };
+  return [
+    `Usage: session-critic-finalizer.mjs ${verb} --root <repository-root> --request <repo-relative request.json>`,
+    `The request file ${TAKEOVER_REQUEST_FILE_TEXT.replace(/^the file /u, "")}; the operator types only the feature id.`,
+    `keys: ${Object.keys(example).join(", ")}`,
+    `example: ${JSON.stringify(example)}`,
+  ].join("\n");
+}
 function takeoverTarget(root, featureId, supersede = false) {
   if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
   const run = (args) => {
@@ -987,6 +1000,8 @@ if (isDirectInvocation(import.meta.url)) {
   const argv = process.argv.slice(2);
   if (argv.length === 1 && argv[0] === "--help") {
     process.stdout.write(`${CLI_HELP}\n`);
+  } else if (argv.length === 2 && argv[1] === "--help" && (argv[0] === "inspect-course-takeover" || argv[0] === "supersede-course-takeover")) {
+    process.stdout.write(`${takeoverVerbHelp(argv[0])}\n`);
   } else {
     const result = runSessionCriticFinalizerCli(argv);
     process.stdout.write(`${JSON.stringify(result.output)}\n`);

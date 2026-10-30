@@ -54,6 +54,7 @@ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pip
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
@@ -693,6 +694,19 @@ export function foldPendingPushApprovalWrite(dir, deps = {}, options = {}) {
   return { folded: true };
 }
 
+/**
+ * The remedy for a missing Critic/Verify binding. A feature with registered course history is refused CCA-PARENT for the merge base:
+ * the base the preflight accepts there is the last registered round's candidate (the same derivation the preflight uses).
+ */
+export function criticBoundVerifyRemedy(dir, headCommit) {
+  let bases = [];
+  try { bases = deriveRegisteredCourseBases({ repoRoot: dir, candidateCommit: headCommit }); } catch { bases = []; }
+  const publicationBase = "<merge base of HEAD with the publication target>";
+  const first = bases.length > 0 ? bases[0].lastRegisteredCandidate : publicationBase;
+  const registered = bases.map((row) => ` Feature ${row.featureId} has a registered Critic course through round ${row.lastRegisteredRound}: its preflight base is ${row.lastRegisteredCandidate} (the last registered round's candidate), not the merge base (CCA-PARENT); add --spec specs/${row.featureId}/spec.md and the course selectors of the CCA-PARENT repair.`).join("");
+  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).`;
+}
+
 export function pushPrepareReport(argv, deps = {}, options = {}) {
   const dir = deps.dir ?? projectDir();
   const parsed = parseArgs(argv);
@@ -749,8 +763,8 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
         message: review.ok ? "independent Critic and Verify bind this exact candidate"
           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
-          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value)."
-          : "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
+          ? criticBoundVerifyRemedy(dir, headCommit)
+          :"complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
       });
     }
     if (securityGateActive) {

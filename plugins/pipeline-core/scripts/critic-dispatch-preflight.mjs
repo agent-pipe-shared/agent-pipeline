@@ -31,7 +31,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
@@ -263,7 +263,10 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, 
     const candidate = { commit: candidateCommit, tree: candidateTree };
     if (value?.schema === "pipeline.verify-evidence.v0") diagnostic = inspectCriticVerifyDiagnostic(value, candidate);
     else if (value?.schema === CRITIC_DIAGNOSTIC_SCHEMA) diagnostic = validateCriticDiagnostic(value, { root, candidate, spec, guardrails });
-    else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
+    else {
+      const reason = `${path} carries schema ${JSON.stringify(typeof value?.schema === "string" ? value.schema : null)}; security evidence is not admitted here. The admitted evidence schemas are pipeline.verify-evidence.v0 (Verify evidence of mode critic) and ${CRITIC_DIAGNOSTIC_SCHEMA} (scripts/critic-diagnostic-evidence.mjs)`;
+      fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`, { reason, admittedSchemas: ["pipeline.verify-evidence.v0", CRITIC_DIAGNOSTIC_SCHEMA] });
+    }
   } catch (error) {
     if (error instanceof CriticDispatchPreflightError) throw error;
     const diagnosticCode = error.code ?? "CDI-INVALID";
@@ -271,7 +274,10 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, 
       const requiredGuardrailPaths = guardrails.map((entry) => entry.path);
       fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths });
     }
-    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode });
+    const reason = value?.schema === "pipeline.verify-evidence.v0"
+      ? `A Verify evidence of mode critic is required (${diagnosticCode}); ${path} is not one. Produce it for the exact candidate: node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <evidence file>`
+      : `${path} is not a valid Critic diagnostic evidence (${diagnosticCode}); produce one with node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, or pass a Verify evidence of mode critic (verify-evidence-producer.mjs --root <root> --mode critic --out <evidence file>)`;
+    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode, reason });
   }
   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
 }
@@ -294,12 +300,14 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
   try {
   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
-    fail("CDP-INPUT", "root and candidate are required.");
+    const missing = [...(typeof root !== "string" || root.length === 0 ? ["--root"] : []), ...(typeof candidate !== "string" ? ["--candidate"] : [])];
+    const reason = missing.length === 1 ? `${missing[0]} is required` : `${missing.join(" and ")} are required`;
+    fail("CDP-INPUT", reason, { reason, missingFlags: missing });
   }
   const realRoot = realpathSync(root);
   stage = "paths";
   const scope = reviewScope === null ? null : currentArtifactScope(reviewScope);
-  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.");
+  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.", { reason: "--base is required for an exact-range review (a current-artifact review gives a review scope instead)", missingFlags: ["--base"] });
   if (scope !== null && base !== null) fail("CDP-SCOPE-MIXED", "Current-artifact scope cannot include a review base.");
   stage = "candidate";
   const rangeBase = scope === null ? resolveBase(realRoot, base) : null;
@@ -395,9 +403,14 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       deltaRequestPath: context.deltaRequestPath });
     if (admission?.decision?.status !== "admitted") {
       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
-      const repair = criticCourseRepair(admission?.decision?.code);
+      let repair = criticCourseRepair(admission?.decision?.code);
+      // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
+      const parentDetail = admission?.decision?.code === "CCA-PARENT"
+        ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
+      if (parentDetail !== null) repair = criticCourseParentRepair({ detail: parentDetail, candidate: candidateCommit, specPath: spec });
       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+        ...(parentDetail === null ? {} : { detail: parentDetail }),
         ...(repair === null ? {} : { repair }),
         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
     }

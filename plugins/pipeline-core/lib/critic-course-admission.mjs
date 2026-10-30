@@ -60,6 +60,52 @@ export function criticCourseRepair(code) {
 }
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+/**
+ * The one derivation of the base a Critic preflight accepts for a feature with registered course history: the candidate of the
+ * last registered round. Shared by the preflight's CCA-PARENT refusal and by push-init's remedy, so the two cannot disagree.
+ * Features without registered history, or whose history cannot be read, are absent from the result.
+ */
+export function deriveRegisteredCourseBases({ repoRoot, candidateCommit }) {
+  let root;
+  try { root = realpathSync(repoRoot); } catch { return []; }
+  let names;
+  try { names = execFileSync("git", ["-C", root, "ls-tree", "--name-only", "-z", candidateCommit, "specs/"], { encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 }).toString("utf8").split("\0").filter(Boolean); } catch { return []; }
+  const rows = [];
+  for (const name of names) {
+    const featureId = name.slice("specs/".length);
+    if (!FEATURE_ID.test(featureId)) continue;
+    try {
+      // The same retained-lineage reader the runtime admission uses (retainedV2), so the base named here is the one it accepts.
+      const retained = retainedV2(root, featureId, candidateCommit).rows.map((row) => row.record).sort((a, b) => a.course.reviewRound - b.course.reviewRound);
+      if (retained.length > 0) rows.push({ featureId, lastRegisteredRound: retained.length, lastRegisteredCandidate: retained.at(-1).candidate.commit });
+    } catch { /* a feature without a readable course contributes no base */ }
+  }
+  return rows.sort((a, b) => a.featureId.localeCompare(b.featureId));
+}
+
+/** CCA-PARENT detail for one feature, or null when the feature has no registered history. */
+export function criticCourseParentDetail({ repoRoot, featureId, candidateCommit, givenBase }) {
+  const row = deriveRegisteredCourseBases({ repoRoot, candidateCommit }).find((entry) => entry.featureId === featureId);
+  if (!row) return null;
+  return Object.freeze({ lastRegisteredRound: row.lastRegisteredRound, lastRegisteredCandidate: row.lastRegisteredCandidate, expectedBase: row.lastRegisteredCandidate, givenBase });
+}
+
+/** The route that admits from a CCA-PARENT state; every step is followed to an admitted dispatch by the preflight test fixture. ${PIPELINE_PLUGIN_ROOT} is a literal placeholder. */
+export function criticCourseParentRepair({ detail, candidate, specPath }) {
+  const scripts = "${PIPELINE_PLUGIN_ROOT}/scripts";
+  return Object.freeze({
+    route: "delta-from-last-registered-round",
+    decidedBy: "Coordinator",
+    reason: `The feature already has a registered Critic course through round ${detail.lastRegisteredRound}; the next review is a diff round whose base is the last registered round's candidate ${detail.expectedBase}, not ${detail.givenBase}. A round that passed but is not registered as lineage is retired by the takeover (steps 1-2) and reviewed again inside that diff. Step 3 needs the diagnostic evidence of the candidate registered first (register-feature-package.mjs --add-diagnostic-evidence).`,
+    steps: Object.freeze([
+      Object.freeze({ step: 1, command: `node ${scripts}/session-critic-finalizer.mjs inspect-course-takeover --root <root> --request scratch/takeover-inspect.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"} (the verb's --help prints the shape). Copy the printed digestSha256. If it reports CGB-TAKEOVER-COURSE there is no unregistered round: skip step 2." }),
+      Object.freeze({ step: 2, command: `node ${scripts}/session-critic-finalizer.mjs supersede-course-takeover --root <root> --request scratch/takeover-supersede.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest from step 1>\",\"reason\":\"<short reason>\"}. It retires only the rounds above the registered lineage." }),
+      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file lists changedBehaviorClaims, pathInvariantMap, coordinatorImpactConfirmed, trustBoundaryChanged and impactAmbiguous; run it once to read the changed paths a map must cover." }),
+      Object.freeze({ step: 4, command: `node ${scripts}/critic-dispatch-preflight.mjs --root <root> --base ${detail.expectedBase} --candidate ${candidate} --spec ${specPath} --evidence <evidence> --registration-commit <registration commit of step 3> --delta-request <delta request path printed by step 3> --correction-input-bindings <bindings file>`, note: "<bindings file>: node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-correction-input-bindings.mjs derive --root <root> --base <expectedBase> --head <candidate> --out <file under scratch/>." }),
+    ]),
+  });
+}
+
 function gitBytes(root, args, code) {
   try {
     return execFileSync("git", ["-C", root, ...args], {
