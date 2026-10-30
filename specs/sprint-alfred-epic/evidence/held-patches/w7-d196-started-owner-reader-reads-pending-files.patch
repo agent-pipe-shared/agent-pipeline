@@ -1,0 +1,88 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 58a7d88f6..aba9dcb11 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -118,7 +118,7 @@ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/publi
+ const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
+ const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+ const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
+-const { inspectNativeGoldfishItemDelivery, observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
++const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+ // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+ const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+ const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+@@ -333,11 +333,32 @@ function defaultQueueRows(root) {
+  * D196 (R1): slices of the governed item course that were started and have not finished. The queue stores no started state
+  * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); a started slice is a native pending state without a terminal
+  * record (phase "active"), which is also what a budget checkpoint leaves (the reservation stays live). A fault yields none (warn only).
++ * Read straight from the pending files: the full item delivery inspection verifies every historical member and took minutes on a
++ * repository with a long dispatch history, which hung every build. Only a slice the governed queue still holds as ready counts:
++ * an old dispatch whose pending state was never settled but whose slice was cancelled or never queued is no owner.
+  */
+-function defaultStartedOwners(root) {
++export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
+   try {
+-    const observed = inspectNativeGoldfishItemDelivery({ root });
+-    return observed.status === "observed" ? observed.items.filter((entry) => entry.phase === "active").map((entry) => ({ dispatchId: entry.dispatchId, itemId: entry.itemId })) : [];
++    const live = new Set(queueRows.filter((entry) => entry?.state === "ready").map((entry) => entry.id));
++    if (live.size === 0) return [];
++    // A slice with a commit carrying its Dispatch trailer is delivered (one git call; the full integration read takes tens of seconds).
++    const trailers = execFileSync("git", ["-C", root, "log", "--format=%(trailers:key=Dispatch,valueonly,separator=%x0a)"], { encoding: "utf8", maxBuffer: 1 << 26 });
++    for (const line of trailers.split("\n")) { const id = /^(\S+) \(goldfish\)$/u.exec(line.trim())?.[1]; if (id) live.delete(id); }
++    if (live.size === 0) return [];
++    const commonDir = resolve(root, execFileSync("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim());
++    const dir = resolve(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
++    if (!existsSync(dir)) return [];
++    const names = readdirSync(dir);
++    const started = [];
++    for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
++      try {
++        const bytes = readFileSync(resolve(dir, name));
++        if (names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) continue;
++        const value = JSON.parse(bytes.toString("utf8"));
++        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId });
++      } catch { /* an unreadable pending file names no owner */ }
++    }
++    return started;
+   } catch { return []; }
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 99a575a80..675e83491 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1713,3 +1713,34 @@ test("D196 R4: an estimate above twice the base cap plus one grant step warns DB
+   assert.ok(warningCodes(farResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"), JSON.stringify(farResult.warnings));
+   assert.match(farResult.warnings.find((entry) => entry.code === "DBG-ESTIMATE-NEEDS-SPLIT").message, /independent criteria/u);
+ });
++
++test("D196 R1 default reader: an unsettled pending state of a ready queue slice names its owner; settled, unreadable, delivery-less, cancelled, unqueued and committed (Dispatch trailer) ones do not", async () => {
++  const { defaultStartedOwners } = await lib();
++  const dir = mkdtempSync(join(tmpdir(), "dbg-started-owner-"));
++  try {
++    assert.equal(spawnSync("git", ["init", "-q", dir]).status, 0);
++    assert.deepEqual(defaultStartedOwners(dir), [], "no host directory: no owner");
++    const host = join(dir, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
++    mkdirSync(host, { recursive: true });
++    const pending = (dispatchId, delivery = { itemId: "item.a" }) => {
++      const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId }, ...(delivery ? { delivery } : {}) }));
++      const digest = createHash("sha256").update(bytes).digest("hex");
++      writeFileSync(join(host, `pending-claude-${createHash("sha256").update(dispatchId).digest("hex")}.json`), bytes);
++      return digest;
++    };
++    pending("ALF-OPEN");
++    writeFileSync(join(host, `authority-terminal-${pending("ALF-DONE")}.json`), "{}");
++    pending("ALF-NO-DELIVERY", null);
++    pending("ALF-CANCELLED");
++    pending("ALF-UNQUEUED");
++    pending("ALF-DELIVERED");
++    assert.equal(spawnSync("git", ["-C", dir, "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty",
++      "-m", "fixture delivery", "-m", "Dispatch: ALF-DELIVERED (goldfish)"]).status, 0);
++    writeFileSync(join(host, `pending-codex-${"0".repeat(64)}.json`), "not json");
++    writeFileSync(join(host, "pending-claude-short.json"), JSON.stringify({ binding: { dispatchId: "ALF-BADNAME" }, delivery: { itemId: "item.a" } }));
++    const rows = [{ id: "ALF-OPEN", state: "ready" }, { id: "ALF-DONE", state: "ready" }, { id: "ALF-NO-DELIVERY", state: "ready" },
++      { id: "ALF-CANCELLED", state: "cancelled" }, { id: "ALF-BADNAME", state: "ready" }, { id: "ALF-DELIVERED", state: "ready" }];
++    assert.deepEqual(defaultStartedOwners(dir, rows), [{ dispatchId: "ALF-OPEN", itemId: "item.a" }]);
++    assert.deepEqual(defaultStartedOwners(dir, []), [], "no live queue row: no owner, whatever the pending states say");
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
