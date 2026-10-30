@@ -94,6 +94,14 @@ ADR-0003 and this ADR. Operative detail: `policies/model-policy.md` MP-07 and
 amendment: the model route of `goldfish-mechanic` (Ruling 158 also moves it to Haiku at effort `medium`);
 that is an agent-route change tracked in the same backlog item, not an ADR-0014 decision.
 
+### Amendment — the project-state record role and the bindings command (2026-10-28)
+
+**Context:** a feature-course range that contained the project state file and handover files could not be briefed admissibly: the canon admitted exclusion bindings only for a retained prior result or a finding-disposition record, and no command derived the bindings.
+
+**Decision:** one narrow role, project-state record, admissible only for the file the project calibration names as its handover/state file and a `pipeline-handover*.md` file in the same directory, as an exclusion binding only (blob SHA-256 and mode verified, bytes never emitted, never read). One deriving command, `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (schema `pipeline.critic-correction-input-bindings.v1`). The forbidden-material rule for handover, state and history is unchanged.
+
+**Consequences:** the dispatch preflight refusal for a range with such paths and no bindings follows as a separate slice. The Critic still never reads those paths. Operative detail: `templates/prompts/critic-review.md`, `harness/review-protocol.md` §2.2, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`.
+
 ## Consequences
 
 Findings are reproducible and tied to the actual diff. Disclosure makes unavoidable context contamination visible instead of pretending it does not exist. The trajectory check prevents claimed-but-unexecuted verification from passing as evidence.
