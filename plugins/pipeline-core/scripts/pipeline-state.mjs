@@ -5984,24 +5984,58 @@ function resultBootstrapNextState(state, result, updatedAt) {
   return next;
 }
 
+// A refused registered package names the class, the path and the condition that failed (N29), so the
+// operator reads which entry to repair instead of a bare code. `class` is "manifest" for a whole-file
+// condition, otherwise the artifact class the bootstrap looked for; `path` is the manifest path for a
+// whole-file condition, otherwise the path the bootstrap expected that entry to bind.
+const RESULT_BOOTSTRAP_PACKAGE_CONDITIONS = Object.freeze(["manifest-unsafe", "manifest-invalid", "feature-id-mismatch",
+  "entry-missing", "entry-duplicate", "authority-false", "path-mismatch", "digest-mismatch"]);
+function resultBootstrapPackageRefusal(klass, path, condition) {
+  return { ok: false, detail: { class: klass, path, condition } };
+}
+
 function resultBootstrapPackage(dir, state, prd, spec, resultPath) {
   const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
   const manifest = physicalRebindFile(dir, path);
   if (manifest === null) {
     // A missing manifest is the legacy unregistered course. An unsafe present
     // manifest must never be mistaken for that course.
-    try { lstatSync(resolve(dir, path)); return { ok: false }; }
-    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : { ok: false }; }
+    try { lstatSync(resolve(dir, path)); return resultBootstrapPackageRefusal("manifest", path, "manifest-unsafe"); }
+    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : resultBootstrapPackageRefusal("manifest", path, "manifest-unsafe"); }
   }
   const checked = validateFeaturePackage(dir, path);
-  if (!checked.ok || checked.receipt?.featureId !== state.activeFeature.id) return { ok: false };
+  if (!checked.ok) return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid");
+  if (checked.receipt?.featureId !== state.activeFeature.id) return resultBootstrapPackageRefusal("manifest", path, "feature-id-mismatch");
   let value;
-  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return { ok: false }; }
+  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid"); }
+  if (!Array.isArray(value?.artifacts)) return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid");
+  let resultAuthorityLift = false;
   for (const [kind, observed] of [["prd", prd], ["spec", spec], ["result", resultPath]]) {
-    const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
-    if (entries.length !== 1 || entries[0].path !== observed.path || entries[0].sha256 !== observed.sha256) return { ok: false };
+    const ofClass = value.artifacts.filter((entry) => entry.class === kind);
+    const authoritative = ofClass.filter((entry) => entry.authority === true);
+    if (authoritative.length > 1) return resultBootstrapPackageRefusal(kind, observed.path, "entry-duplicate");
+    if (authoritative.length === 1) {
+      if (authoritative[0].path !== observed.path) return resultBootstrapPackageRefusal(kind, observed.path, "path-mismatch");
+      if (authoritative[0].sha256 !== observed.sha256) return resultBootstrapPackageRefusal(kind, observed.path, "digest-mismatch");
+      continue;
+    }
+    if (ofClass.length === 0) return resultBootstrapPackageRefusal(kind, observed.path, "entry-missing");
+    // No authoritative entry. Only the Result may be registered that way: a package from an earlier build can
+    // carry it with authority:false. Then it must be the ONLY result-class entry, at the canonical Result path,
+    // bound to the observed bytes; the lift of its authority rides the PO-bound reconcile the bootstrap
+    // completion already names for the digest move. PRD and Spec stay strict.
+    if (kind !== "result") return resultBootstrapPackageRefusal(kind, observed.path, "authority-false");
+    if (ofClass.length > 1) return resultBootstrapPackageRefusal(kind, observed.path, "entry-duplicate");
+    if (ofClass[0].path !== observed.path) return resultBootstrapPackageRefusal(kind, observed.path, "path-mismatch");
+    if (ofClass[0].sha256 !== observed.sha256) return resultBootstrapPackageRefusal(kind, observed.path, "digest-mismatch");
+    resultAuthorityLift = true;
   }
-  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256 } };
+  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256, ...(resultAuthorityLift ? { resultAuthorityLift: true } : {}) } };
+}
+
+function resultBootstrapPackageDetailText(detail) {
+  return RESULT_BOOTSTRAP_PACKAGE_CONDITIONS.includes(detail?.condition)
+    ? ` class=${detail.class} path=${detail.path} condition=${detail.condition}` : "";
 }
 
 function planLegacyResultRepair(dir, state, manifestPath) {
@@ -6056,7 +6090,7 @@ function resultBootstrapCompletion(dir, state, packageBinding) {
     planSha256: pending ? sha256CanonicalJson(preview) : null,
     nextAction: preview.status === "legacy-repair-preview"
       ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
-      : preview.status === "reconcile-preview" ? "obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it" : "resolve package drift through authenticated recovery",
+      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start` : "resolve package drift through authenticated recovery",
     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
       requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
@@ -6097,7 +6131,7 @@ function buildResultBootstrapPlan(dir, existing, updatedAt) {
   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
   const registration = resultBootstrapPackage(dir, state, prd, spec, resultPath);
-  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE" };
+  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE", detail: registration.detail };
   const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
   if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
   const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
@@ -6396,7 +6430,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
           return 0;
         }
       }
-      console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2;
+      console.error(`Error: Result bootstrap plan refused (${planned.code}${resultBootstrapPackageDetailText(planned.detail)}); zero mutation.`); return 2;
     }
     const writer = fileURLToPath(import.meta.url);
     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));

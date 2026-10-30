@@ -213,7 +213,9 @@ function authorityFromState(root, snapshot, { requireResult = false } = {}) {
   }
   const resultPath = snapshot.state.continuity?.authority?.result?.path ?? null;
   const result = resultPath === null ? null : safeFile(root, resultPath, "Implementation Result");
-  if (requireResult && result === null) fail("CLOSE-RESULT", "feature close requires a bound Implementation Result");
+  if (requireResult && result === null) {
+    fail("CLOSE-RESULT", `feature close requires a bound Implementation Result: Continuity authority.result is null. Bind it first with the Result bootstrap: run \`node ${STATE_WRITER} continuity-result-bootstrap-plan\` in the project root ${root} (working directory or CLAUDE_PROJECT_DIR; that verb takes no --root flag), apply the action it returns and, when its completion names a feature-package-reconcile plan, apply that too; then run this feature-close-prepared transition again on the same lifecycle (plan-start is not restarted)`);
+  }
   return {
     feature,
     authority: {
@@ -516,7 +518,10 @@ async function transitionPlan(values) {
     catch (error) { if (error?.code !== "ENOENT") fail("CLOSE-PACKAGE", "registered feature package path is unreadable"); }
     if (hasRegisteredManifest) {
       const checked = validateFeaturePackage(root, registeredManifest);
-      if (!checked.ok) fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}`);
+      if (!checked.ok) {
+        const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
+        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the PO-bound feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256), then plan this transition again on the same lifecycle` : ""}`);
+      }
       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
       for (const [kind, path, digest] of [
         ["prd", observed.feature.planPath, observed.authority.prdSha256],

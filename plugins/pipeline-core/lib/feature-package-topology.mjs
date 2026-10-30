@@ -342,17 +342,29 @@ function sameJsonValue(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
  * order, same candidate, same schema, same every other byte. Exported so a violation is
  * directly provable (a hand-built postimage that also changes a second field) without
  * needing a real filesystem race to trigger it.
+ *
+ * `options.liftResultAuthorityPath` (default none: strictly digest-only) admits ONE further change, for
+ * the single entry whose path it names: a `result`-class entry may move `authority` from `false` to
+ * `true` together with its fence-proven digest move. A package registered by an earlier build can carry
+ * its Result without authority, and Continuity binds that very Result (N29). Nothing else widens: no
+ * other class, no lowering, no other key, no authority move without a digest move.
  */
-export function reconcileNoDriftOk(preimageValue, postimageValue) {
+export function reconcileNoDriftOk(preimageValue, postimageValue, options = {}) {
   if (!object(preimageValue) || !object(postimageValue)) return false;
   if (!Array.isArray(preimageValue.artifacts) || !Array.isArray(postimageValue.artifacts)
     || preimageValue.artifacts.length !== postimageValue.artifacts.length) return false;
+  const liftPath = typeof options?.liftResultAuthorityPath === "string" ? options.liftResultAuthorityPath : null;
   for (let i = 0; i < preimageValue.artifacts.length; i++) {
     const before = preimageValue.artifacts[i]; const after = postimageValue.artifacts[i];
     if (!object(before) || !object(after)) return false;
     const beforeKeys = Object.keys(before).sort(); const afterKeys = Object.keys(after).sort();
     if (beforeKeys.join("\0") !== afterKeys.join("\0")) return false;
-    for (const key of beforeKeys) if (key !== "sha256" && !sameJsonValue(before[key], after[key])) return false;
+    const lifted = liftPath !== null && before.class === "result" && before.path === liftPath
+      && before.authority === false && after.authority === true && before.sha256 !== after.sha256;
+    for (const key of beforeKeys) {
+      if (key === "sha256" || (key === "authority" && lifted)) continue;
+      if (!sameJsonValue(before[key], after[key])) return false;
+    }
   }
   const { artifacts: _pa, ...preRest } = preimageValue;
   const { artifacts: _qa, ...postRest } = postimageValue;
@@ -427,6 +439,11 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
   catch { return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: ["FTP-MANIFEST: invalid JSON"] }; }
   const id = value?.feature?.id;
   const nextArtifacts = []; const changes = [];
+  // N29: a package registered by an earlier build can carry its Result without authority while Continuity
+  // binds that very Result. The fence-proven digest move of that SOLE result entry also lifts its authority,
+  // in this same PO-bound plan and nowhere else; with any other result entry present nothing is lifted.
+  const resultEntries = (Array.isArray(value.artifacts) ? value.artifacts : []).filter((entry) => entry?.class === "result");
+  let liftedPath = null;
   for (const [index, artifact] of (Array.isArray(value.artifacts) ? value.artifacts : []).entries()) {
     const label = `FTP-RECONCILE-${index}`;
     const rel = packageRelative(id, artifact?.path);
@@ -435,19 +452,22 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
     const currentBytes = readFileSync(join(root, file));
     const currentSha256 = digest(currentBytes);
     if (currentSha256 === artifact.sha256) { nextArtifacts.push(artifact); continue; }
+    let lift = false;
     if (artifact.class === "result") {
       const fence = checkResultReconciliationFence(resultAuthority, artifact, currentBytes, currentSha256);
       if (!fence.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: fence.reason, findings: fence.findings };
+      lift = artifact.authority === false && resultEntries.length === 1;
     }
-    nextArtifacts.push({ ...artifact, sha256: currentSha256 });
-    changes.push({ path: artifact.path, class: artifact.class, operation: "reconcile-digest", from: artifact.sha256, to: currentSha256 });
+    if (lift) liftedPath = artifact.path;
+    nextArtifacts.push({ ...artifact, sha256: currentSha256, ...(lift ? { authority: true } : {}) });
+    changes.push({ path: artifact.path, class: artifact.class, operation: "reconcile-digest", from: artifact.sha256, to: currentSha256, ...(lift ? { authority: { from: false, to: true } } : {}) });
   }
   if (changes.length === 0) {
     return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: checked.receipt.state, to: checked.receipt.state, changes: [] };
   }
   const nextValue = { ...value, artifacts: nextArtifacts };
-  if (!reconcileNoDriftOk(value, nextValue)) {
-    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "reconcile-drift", findings: ["FTP-RECONCILE-DRIFT: a reconcile plan may only change artifact digest fields"] };
+  if (!reconcileNoDriftOk(value, nextValue, liftedPath === null ? {} : { liftResultAuthorityPath: liftedPath })) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "reconcile-drift", findings: ["FTP-RECONCILE-DRIFT: a reconcile plan may only change artifact digest fields (and lift the authority of the one Result entry Continuity binds)"] };
   }
   return {
     schema: "pipeline.feature-package-transition-plan.v1",
