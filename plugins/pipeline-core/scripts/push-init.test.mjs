@@ -40,6 +40,9 @@ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../lib/windows-owned-authority-backend.mjs";
+import { chmodSync } from "node:fs";
+import { renderImpl, renderShim } from "./pre-push-hook-install.mjs";
+import { canonicalJson as packetCanonicalJson } from "./critic-packet-preflight.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -985,4 +988,223 @@ test("drivePushInit (N25): only the stale verdict is an early check -- a structu
     assert.equal(none.outcome, "chat-ready", JSON.stringify(none));
     assert.equal(none.steps.some((step) => /architecture/u.test(step.id)), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------
+// N27b / D206: delivery of the verified candidate when HEAD is ahead only by handover or Critic-export commits.
+// ---------------------------------------------------------------------------
+
+const VERIFIED = "c".repeat(40);
+const DELIVERY_ELIGIBLE = {
+  eligible: true, verifiedCommit: VERIFIED, headCommit: HEAD, approvalBound: true,
+  laterCommits: [{ commit: "d".repeat(40), kind: "handover" }, { commit: "e".repeat(40), kind: "critic-export" }],
+};
+const staleVerifiedDeps = () => satisfiabilityDepsAllGreen({
+  readFile: (path) => {
+    if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
+    if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(VERIFIED));
+    if (path === "/fake/calibration.json") return JSON.stringify({ verify: "node harness/scripts/verify.mjs" });
+    throw new Error(`unexpected read: ${path}`);
+  },
+});
+
+test("drivePushInit (N27b): a stale verified candidate that the delivery assessment accepts returns the typed outcome naming the exact push of the verified commit", () => {
+  const root = freshFixtureRoot();
+  try {
+    let prepareCalls = 0;
+    const asked = [];
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: staleVerifiedDeps(),
+      assessVerifiedCandidateDelivery: (input) => { asked.push(input); return DELIVERY_ELIGIBLE; },
+      pushPrepareReport: () => { prepareCalls += 1; throw new Error("must not run: the verified commit is not HEAD"); },
+    });
+    assert.equal(result.outcome, "deliver-verified-candidate", JSON.stringify(result));
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].remote, "origin");
+    assert.equal(asked[0].destination, "refs/heads/main");
+    assert.equal(prepareCalls, 0);
+    assert.equal(result.verifiedCommit, VERIFIED);
+    assert.equal(result.headCommit, HEAD);
+    assert.deepEqual(result.pushAction, { executable: "git", argv: ["-C", resolve(root), "push", "origin", `${VERIFIED}:refs/heads/main`] });
+    assert.ok(result.gitPushLine.includes(`push origin ${VERIFIED}:refs/heads/main`), result.gitPushLine);
+    assert.deepEqual(result.laterCommits.map((entry) => entry.kind), ["handover", "critic-export"]);
+    assert.match(result.laterCommitsRoute, /keep their own route/u);
+    assert.equal(result.checks, undefined, "an accepted delivery is not a failed precondition");
+    assert.equal(result.recovery, undefined);
+    assert.equal(result.signatureCommand, undefined, "the driver still never presents a signature for a commit it did not prepare");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit (N27b): without an accepted delivery assessment, or with any OTHER failed check, today's precondition refusal is unchanged", () => {
+  const root = freshFixtureRoot();
+  try {
+    const ineligible = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: staleVerifiedDeps(), prepareDeps: prepareDepsAllGreen(),
+      assessVerifiedCandidateDelivery: () => ({ eligible: false, reason: "a code commit lies between" }),
+    });
+    assert.equal(ineligible.outcome, "precondition-unmet", JSON.stringify(ineligible));
+    assert.equal(ineligible.checks.some((check) => check.id === "verify-evidence-bound" && check.status === "stale-commit"), true, JSON.stringify(ineligible.checks));
+    const other = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: { ...staleVerifiedDeps(), exists: (path) => path.endsWith("trust-policy.json") }, prepareDeps: prepareDepsAllGreen(),
+      assessVerifiedCandidateDelivery: () => DELIVERY_ELIGIBLE,
+    });
+    assert.equal(other.outcome, "precondition-unmet", "a missing threat model also blocks the push of the verified commit: not offered");
+    assert.equal(other.checks.some((check) => check.id === "push-threat-model-materialized"), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("push-init CLI (N27b): the delivery outcome is a ready-to-act result and exits 0; the retry action lists it among the outcomes a retry may reach", () => {
+  const args = ["--root", "/fixture", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
+  let stdout = "";
+  const status = main(args, { write: (value) => { stdout += value; }, writeError: () => {}, drive: () => ({ schema: "pipeline.push-init.v1", outcome: "deliver-verified-candidate" }) });
+  assert.equal(status, 0, stdout);
+  const root = freshFixtureRoot();
+  try {
+    const refused = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: staleVerifiedDeps(), prepareDeps: prepareDepsAllGreen(),
+      assessVerifiedCandidateDelivery: () => ({ eligible: false }),
+    });
+    assert.ok(refused.recovery.retryAction.expected.outcomes.includes("deliver-verified-candidate"), JSON.stringify(refused.recovery.retryAction.expected));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// The anchor: one replay of the consumer sequence in a temporary repository with a local bare remote and the REAL generated
+// pre-push hook as the gate. Trust assumption: a commit reachable from the local remote-tracking refs of the same remote
+// counts as published (what a push or fetch recorded there).
+const EXPORT_PACKET = "a".repeat(32);
+function deliveryRepo(label, { codeCommitBetween = false } = {}) {
+  const base = mkdtempSync(join(SCRATCH, `push-init-delivery-${label}-`));
+  const remote = join(base, "remote.git");
+  const root = join(base, "work");
+  const sh = (cwd, ...args) => {
+    const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  mkdirSync(remote); mkdirSync(root);
+  sh(remote, "init", "-q", "--bare", "-b", "main");
+  sh(root, "init", "-q", "-b", "main");
+  sh(root, "config", "user.email", "goldfish@example.invalid");
+  sh(root, "config", "user.name", "Goldfish");
+  const commitFile = (path, text, message) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+    sh(root, "add", path);
+    sh(root, "commit", "-q", "-m", message);
+    return sh(root, "rev-parse", "HEAD");
+  };
+  writeFileSync(join(root, ".git", "info", "exclude"), "/.claude/\n/evidence/\n");
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "fixture", handover: "docs/state.md", verify: "node verify.mjs" }));
+  const preMerge = commitFile("README.md", "fixture\n", "init");
+  sh(root, "remote", "add", "origin", remote);
+  sh(root, "push", "-q", "origin", "main");
+  // The generated hook, from the live library, as the git-level gate (the hook is installed after the bootstrap push).
+  const hookDir = join(root, ".git", "agent-pipeline", "pre-push-hook");
+  mkdirSync(hookDir, { recursive: true });
+  const implPath = join(hookDir, "impl.mjs");
+  writeFileSync(implPath, renderImpl(join(REPO_ROOT, "plugins", "pipeline-core", "lib")));
+  writeFileSync(join(root, ".git", "hooks", "pre-push"), renderShim(implPath));
+  chmodSync(join(root, ".git", "hooks", "pre-push"), 0o755);
+  const approve = (forCommit, destination) => {
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", pushApproval: { lastApproved: { forCommit, destination, remote: "origin" } } }));
+  };
+  const verify = (commit) => {
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit }));
+  };
+  const verified = commitFile("src/feature.txt", "reviewed feature\n", "feat: the verified candidate");
+  verify(verified); approve(verified, "refs/heads/staging");
+  const push = (...refspecs) => spawnSync("git", ["-C", root, "push", "origin", ...refspecs], { encoding: "utf8", timeout: 60000 });
+  const staging = push(`${verified}:refs/heads/staging`);
+  const record = { stagingPush: staging };
+  if (codeCommitBetween) commitFile("src/extra.txt", "an unreviewed code change\n", "fix: a code commit after the candidate");
+  commitFile("docs/state.md", "handover after the staging push\n", "docs: handover");
+  const tree = sh(root, "rev-parse", `${verified}^{tree}`);
+  const receipt = { packetId: EXPORT_PACKET, candidate: { commit: verified, tree }, reviewPass: true, findingCount: 0 };
+  const receiptBytes = packetCanonicalJson(receipt);
+  const report = "# Critic\n\nNo findings.\n";
+  const exportDir = `specs/anchor-feature/evidence/critic/${EXPORT_PACKET}`;
+  mkdirSync(join(root, exportDir), { recursive: true });
+  writeFileSync(join(root, exportDir, "receipt.json"), receiptBytes);
+  writeFileSync(join(root, exportDir, "report.md"), report);
+  writeFileSync(join(root, exportDir, "index.json"), packetCanonicalJson({
+    schema: "pipeline.session-critic-evidence-index.v1", packetId: EXPORT_PACKET, candidate: receipt.candidate,
+    receiptSha256: createHash("sha256").update(receiptBytes).digest("hex"), reportSha256: createHash("sha256").update(report).digest("hex"),
+    reviewPass: true, findingCount: 0,
+  }));
+  sh(root, "add", exportDir);
+  sh(root, "commit", "-q", "-m", "docs: export the consumed Critic review");
+  return {
+    base, root, remote, preMerge, verified, sh, push, record, approve, verify, receipt,
+    head: sh(root, "rev-parse", "HEAD"),
+    readCriticReceipt: () => ({ receipt }),
+    drive: (extra = {}) => drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      assessPushHookBackstop: () => ({ blocking: true, backed: true }),
+      inspectArchitectureCurrency: () => ({ ok: true, applicable: false }),
+      readCriticReceipt: () => ({ receipt }),
+      satisfiabilityDeps: satisfiabilityDepsAllGreen({
+        resolveHeadCommit: () => sh(root, "rev-parse", "HEAD"),
+        readFile: (path) => {
+          if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
+          if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(verified));
+          if (path === "/fake/calibration.json") return JSON.stringify({ verify: "node harness/scripts/verify.mjs" });
+          throw new Error(`unexpected read: ${path}`);
+        },
+      }),
+      prepareDeps: prepareDepsAllGreen({ gitHead: () => sh(root, "rev-parse", "HEAD") }),
+      ...extra,
+    }),
+  };
+}
+
+test("N27 anchor: staging push, handover and Critic-export commits, rollback tag, then push-init for main names the verified-commit push and that push passes", () => {
+  const repo = deliveryRepo("anchor");
+  try {
+    assert.equal(repo.record.stagingPush.status, 0, `staging push of the verified candidate must pass the hook: ${repo.record.stagingPush.stderr}`);
+    // The rollback tag on the pre-merge main commit: already published, so no Verify and no approval for that old commit.
+    repo.sh(repo.root, "tag", "rollback/2026-10-30-block1", repo.preMerge);
+    const tag = repo.push("refs/tags/rollback/2026-10-30-block1");
+    assert.equal(tag.status, 0, `the rollback tag must pass the generated hook without an operator route: ${tag.stderr}`);
+    assert.equal(spawnSync("git", ["--git-dir", repo.remote, "rev-parse", "refs/tags/rollback/2026-10-30-block1^{commit}"], { encoding: "utf8" }).stdout.trim(), repo.preMerge);
+    // The approval for main is bound to the verified candidate; HEAD has moved on by two evidence-only commits.
+    repo.approve(repo.verified, "refs/heads/main");
+    const result = repo.drive();
+    assert.equal(result.outcome, "deliver-verified-candidate", JSON.stringify(result, null, 2));
+    assert.equal(result.verifiedCommit, repo.verified);
+    assert.equal(result.headCommit, repo.head);
+    assert.deepEqual(result.laterCommits.map((entry) => entry.kind), ["handover", "critic-export"]);
+    const delivered = spawnSync(result.pushAction.executable, result.pushAction.argv, { encoding: "utf8", timeout: 60000 });
+    assert.equal(delivered.status, 0, `the named push of the verified commit must pass the generated hook: ${delivered.stderr}`);
+    assert.equal(spawnSync("git", ["--git-dir", repo.remote, "rev-parse", "refs/heads/main"], { encoding: "utf8" }).stdout.trim(), repo.verified);
+    // No circle: once the verified commit is on the remote, the later commits keep their own route and push-init no longer offers it.
+    const again = repo.drive({ prepareDeps: prepareDepsAllGreen({ gitHead: () => repo.head }) });
+    assert.notEqual(again.outcome, "deliver-verified-candidate", JSON.stringify(again, null, 2));
+  } finally { rmSync(repo.base, { recursive: true, force: true }); }
+});
+
+test("N27 negative pins: a code commit between the verified candidate and HEAD keeps stale-commit; a release tag stays refused, published or not", () => {
+  const repo = deliveryRepo("negative", { codeCommitBetween: true });
+  try {
+    repo.approve(repo.verified, "refs/heads/main");
+    const result = repo.drive();
+    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result, null, 2));
+    assert.equal(result.checks.some((check) => check.id === "verify-evidence-bound" && check.status === "stale-commit"), true, JSON.stringify(result.checks));
+    assert.equal(result.pushAction, undefined);
+    repo.sh(repo.root, "tag", "v1.2.3", repo.head);
+    const unpublished = repo.push("refs/tags/v1.2.3");
+    assert.notEqual(unpublished.status, 0, "a release tag on an unpublished commit stays refused");
+    assert.match(unpublished.stderr, /BLOCKED \(agent-pipeline pre-push hook\)/);
+    repo.sh(repo.root, "tag", "v1.2.4", repo.preMerge);
+    const published = repo.push("refs/tags/v1.2.4");
+    assert.notEqual(published.status, 0, "a release tag stays gated even on a published commit");
+    repo.sh(repo.root, "tag", "rollback/2026-10-30-unpublished", repo.head);
+    assert.notEqual(repo.push("refs/tags/rollback/2026-10-30-unpublished").status, 0, "a rollback tag on an unpublished commit stays refused");
+  } finally { rmSync(repo.base, { recursive: true, force: true }); }
 });

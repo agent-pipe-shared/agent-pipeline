@@ -275,6 +275,43 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
   } catch { return false; }
 }
 
+const CRITIC_EXPORT_PATH = /^specs\/([^/]+)\/evidence\/critic\/[a-f0-9]{32}\/[^/]+$/u;
+/**
+ * N27b / D206: which commits lie between a verified candidate and HEAD, and are all of them delivery tail? A commit is tail
+ * when it only changes the calibrated handover file(s) ("handover"), or only adds the export of a consumed Critic review
+ * ("critic-export", classified by `criticExportOnlyCommit` above -- no second classifier; the feature ids it is asked about
+ * are the ones the commit's own export paths name, and the receipt binding inside it stays the real proof). One commit is
+ * one kind: a commit mixing handover and export changes is not classified, and neither is a merge, a code change or an
+ * empty range. `ok` is true only when EVERY commit in `verifiedCommit..headCommit` is tail; `offending` names the first that
+ * is not. Never throws.
+ */
+export function classifyVerifiedDeliveryTail({ repoRoot, verifiedCommit, headCommit, handoverPaths, readReceipt = readConsumedCandidateReceipt }) {
+  const refuse = (reason, offending = null) => Object.freeze({ ok: false, reason, offending, commits: Object.freeze([]) });
+  try {
+    if (!OID.test(verifiedCommit) || !OID.test(headCommit) || verifiedCommit === headCommit) return refuse("not-a-range");
+    if (!Array.isArray(handoverPaths) || handoverPaths.some((path) => typeof path !== "string" || path === "")) return refuse("handover-unresolved");
+    const root = realpathSync(repoRoot);
+    gitBytes(root, ["merge-base", "--is-ancestor", verifiedCommit, headCommit], "CCA-RANGE-ANCESTRY");
+    const rangeCommits = gitBytes(root, ["rev-list", "--reverse", `${verifiedCommit}..${headCommit}`], "CCA-RANGE-READ")
+      .toString("utf8").trim().split("\n").filter(Boolean);
+    if (rangeCommits.length === 0 || rangeCommits.length > 512 || rangeCommits.some((oid) => !OID.test(oid))) return refuse("range-unreadable");
+    const handover = new Set(handoverPaths);
+    const commits = [];
+    for (const commit of rangeCommits) {
+      const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
+      if (parents.length !== 2) return refuse("merge-or-root-commit", commit);
+      const changed = gitBytes(root, ["diff", "--name-only", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ")
+        .toString("utf8").split("\0").filter(Boolean);
+      if (changed.length === 0) return refuse("empty-commit", commit);
+      if (changed.every((path) => handover.has(path))) { commits.push(Object.freeze({ commit, kind: "handover" })); continue; }
+      const featureIds = [...new Set(changed.map((path) => CRITIC_EXPORT_PATH.exec(path)?.[1]).filter(Boolean))];
+      if (featureIds.length > 0 && criticExportOnlyCommit(root, commit, featureIds, readReceipt)) { commits.push(Object.freeze({ commit, kind: "critic-export" })); continue; }
+      return refuse("not-delivery-tail", commit);
+    }
+    return Object.freeze({ ok: true, reason: null, offending: null, commits: Object.freeze(commits) });
+  } catch (error) { return refuse(String(error?.code ?? error?.message ?? "unreadable")); }
+}
+
 function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
   try {
     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ")

@@ -144,6 +144,7 @@ import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../l
 import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
 import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
 import { formatArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+import { classifyPublishedTagPush, RELEASE_TAG_REF } from "../lib/published-tag-push.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
@@ -1720,12 +1721,26 @@ function runDeployBranch(release, manifestResult, cmd) {
 //
 // Mirrors ruleset-freshness.mjs's `validTag` grammar exactly (same numeric definition --
 // no leading zeros) so this hook and the channel resolver never drift into two different
-// definitions of "release tag".
-const RELEASE_TAG_NUMERIC = "(?:0|[1-9]\\d*)";
-const RELEASE_TAG_REF = new RegExp(
-  `^refs/tags/v${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}(?:-beta\\.${RELEASE_TAG_NUMERIC})?$`,
-  "u",
-);
+// definitions of "release tag". The grammar now lives in lib/published-tag-push.mjs (imported above), because the N27a
+// published-tag pass must read the SAME definition: one rule for "a release tag is never relaxed", not two.
+
+/**
+ * The tag ref this push writes, or null when it is not a tag push: an explicit refs/tags/ destination, or a bare name that
+ * git's own DWIM resolves to an existing local tag before any branch (refs/tags/<name> BEFORE refs/heads/<name>).
+ * Shared by the release-tag ancestry check and the N27a published-tag pass so both agree on what a tag push is.
+ */
+function resolvePushedTagRef(binding) {
+  if (!binding.ok) return null;
+  const { dst } = parseRefspec(binding.refspec, false);
+  if (!dst) return null;
+  if (dst.startsWith(TAG_REF_PREFIX)) return dst;
+  if (dst.startsWith(HEAD_REF_PREFIX)) return null; // explicit branch destination -- never a tag (AC-4).
+  const localTag = spawnSync(
+    "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", `${TAG_REF_PREFIX}${dst}`],
+    { timeout: 5000 },
+  );
+  return localTag.status === 0 ? `${TAG_REF_PREFIX}${dst}` : null; // no local tag by this name -- not a tag push here.
+}
 
 /**
  * `binding` is the module-level `pushBinding` (single, unambiguous remote+refspec).
@@ -1739,26 +1754,11 @@ const RELEASE_TAG_REF = new RegExp(
  * this function has to special-case.
  */
 function checkReleaseTagAncestry(binding, releaseSection) {
-  if (!binding.ok) return;
-  const { dst } = parseRefspec(binding.refspec, false);
-  if (!dst) return;
-
-  let tagRef;
-  if (dst.startsWith(TAG_REF_PREFIX)) {
-    tagRef = dst;
-  } else if (dst.startsWith(HEAD_REF_PREFIX)) {
-    return; // explicit branch destination -- never a tag (AC-4).
-  } else {
-    // Bare name: git's own ref DWIM lookup for an unqualified push source checks
-    // refs/tags/<name> BEFORE refs/heads/<name> (resolveImplicitPushDestination's own
-    // docstring above records this precedence) -- mirror it instead of assuming branch.
-    const localTag = spawnSync(
-      "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", `${TAG_REF_PREFIX}${dst}`],
-      { timeout: 5000 },
-    );
-    if (localTag.status !== 0) return; // no local tag by this name -- not a tag push here.
-    tagRef = `${TAG_REF_PREFIX}${dst}`;
-  }
+  // Bare name: git's own ref DWIM lookup for an unqualified push source checks refs/tags/<name> BEFORE
+  // refs/heads/<name> (resolveImplicitPushDestination's own docstring above records this precedence) --
+  // resolvePushedTagRef mirrors it instead of assuming branch.
+  const tagRef = resolvePushedTagRef(binding);
+  if (tagRef === null) return;
   if (!RELEASE_TAG_REF.test(tagRef)) return; // AC-4: a non-release tag is unaffected.
 
   // Defer entirely to the pre-existing deploy-trigger / deployApproval mechanism when
@@ -1948,6 +1948,28 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
     "BLOCKED (guard-push destination policy): the explicit checkpoint policy is malformed or unrecognized.",
     "Fix the manifest policy before pushing; no partially parsed policy can select the lower-rigor lane.",
   ]);
+}
+
+// N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes
+// nothing new, so Verify evidence and an approval for that old commit can neither be met nor mean anything. The ONE predicate
+// is shared with the generated pre-push hook (lib/published-tag-push.mjs, which also states the trust assumption: a local
+// remote-tracking ref of the same remote is the record of publication). Release tags and every tag on an unpublished commit
+// keep the full gate below, unchanged; so does a tag that triggers a declared release adapter (a deployment is not nothing new).
+{
+  const publishedTagRef = resolvePushedTagRef(pushBinding);
+  const releaseTriggers = publishedTagRef !== null && hasRelease ? collectTriggerPatterns(releaseSection) : null;
+  // An unreadable trigger declaration fails TOWARD the gate (collectTriggerPatterns' own contract), never toward the pass.
+  const triggersReleaseAdapter = releaseTriggers !== null
+    && (releaseTriggers.uncertain || matchAdapters([publishedTagRef], releaseTriggers.byAdapter).length > 0);
+  if (publishedTagRef !== null && !triggersReleaseAdapter) {
+    const published = classifyPublishedTagPush({
+      projectDir: pushBinding.projectDir, remote: pushBinding.remote, tagRef: publishedTagRef, target: sourceCommit,
+    });
+    if (published.passes) {
+      if (invalidityNote) emit(1, [invalidityNote]);
+      allowExit();
+    }
+  }
 }
 
 function portableCleanupBaselineFailure(binding, commit) {

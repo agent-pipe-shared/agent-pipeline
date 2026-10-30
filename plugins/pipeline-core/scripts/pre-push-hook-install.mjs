@@ -287,6 +287,10 @@ export function renderImpl(pluginLibDir) {
  *     classifyCheckpointPorcelain on the RAW porcelain text); any other dirt blocks. The
  *     approval binds the remote NAME, so a push addressed by URL is never admitted here.
  *     A failure to load the shared module is a fault and blocks like every other fault.
+ *   - (e) a TAG push whose target is already reachable from a remote-tracking ref of the SAME remote (N27a / D206, e.g. a
+ *     rollback tag on the pre-merge main commit) needs no Verify evidence and no approval for that old commit: decided by the
+ *     SAME shared predicate guard-push.mjs uses (lib/published-tag-push.mjs; reused, never copied). Release tags and every tag
+ *     on an unpublished commit stay gated exactly as above; a remote given as a URL never passes.
  *
  * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION
  *   Every plugin PreToolUse guard (guard-push.mjs included) fails OPEN on unparseable
@@ -459,6 +463,8 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   // D206: an approval (and its consumption entry) lives in the private store under the git common directory;
   // the tracked state record is only the legacy fallback. Reused from the shared owner, never copied.
   const { withPrivateCriticalApprovals } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
+  // N27a / D206: the ONE predicate guard-push.mjs also uses for "a tag on an already published commit". Reused, never copied.
+  const { classifyPublishedTagPush } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
   // The repository-relative path of the pipeline state record: the one place a push approval is
   // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
   const stateRelPathFor = () => {
@@ -522,8 +528,18 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
       : { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true };
   }
 
+  // N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes
+  // nothing new, so Verify evidence and an approval for that old commit are neither meetable nor meaningful. Release tags and
+  // every tag on an unpublished commit fall through to the gates below, unchanged. Skipped here is logged with its reason.
+  if (typeof remoteRef === "string" && remoteRef.startsWith("refs/tags/")) {
+    const published = classifyPublishedTagPush({ projectDir: projectRoot, remote, tagRef: remoteRef, target: commit });
+    if (published.passes) {
+      return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "tag on an already published commit (" + published.code + ")" };
+    }
+  }
+
   const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
-  const sourceTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
+  const sourceTree =treeResult.status === 0 ? treeResult.stdout.trim() : null;
 
   // (a) verify evidence.
   failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
@@ -620,7 +636,7 @@ async function main() {
       continue;
     }
     if (result.skipped) {
-      recordLog(commonDir, { verdict: "allowed", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, note: "push gate not configured or off" });
+      recordLog(commonDir, { verdict: "allowed", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, note: result.note ?? "push gate not configured or off" });
       continue;
     }
     const blocking = (result.failures.length > 0 && result.pushGateMode !== "warn")

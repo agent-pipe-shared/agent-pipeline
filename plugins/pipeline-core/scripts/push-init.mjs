@@ -106,19 +106,23 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+import { classifyVerifiedDeliveryTail } from "../lib/critic-course-admission.mjs";
+import { withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
-import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
+import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
 import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
 import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
 
@@ -255,7 +259,7 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
       mutation: false,
       requiresConfirmation: false,
       executionBoundary: "local-process",
-      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "chat-ready", "signature-required"] },
+      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "chat-ready", "signature-required", "deliver-verified-candidate"] },
     },
   };
 }
@@ -307,6 +311,71 @@ export function buildReconciliationArgv({ scriptPath, base, candidate, root, rec
   return argv;
 }
 
+const OID_TEXT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+
+/** The calibrated handover file(s) (calibration `handover`: a path or a list of paths); the documented default when unreadable. */
+function calibratedHandoverPaths(root) {
+  const defaults = ["docs/state.md"];
+  try {
+    const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
+    if (!artifact?.exists) return defaults;
+    const declared = JSON.parse(readFileSync(artifact.path, "utf8"))?.handover;
+    const paths = (Array.isArray(declared) ? declared : [declared])
+      .filter((path) => typeof path === "string" && path !== "" && !isAbsolute(path) && !path.split(/[\\/]/u).includes(".."))
+      .map((path) => path.replaceAll("\\", "/").replace(/^\.\//u, ""));
+    return paths.length > 0 ? paths : defaults;
+  } catch { return defaults; }
+}
+
+/**
+ * Does the push approval name THIS commit at THIS destination? Read exactly the way the generated pre-push hook reads it
+ * (the tracked state record, with the private approval store laid over it), so an offer made here is a push the gates admit.
+ */
+function approvalBoundTo(root, commit, remote, destination) {
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const stateRelPath = authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+    const state = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(root, stateRelPath), "utf8")), root);
+    const approval = state?.pushApproval?.lastApproved;
+    return approval?.forCommit === commit && approval?.destination === destination
+      && (approval?.remote === undefined || approval?.remote === remote);
+  } catch { return false; }
+}
+
+/**
+ * N27b / D206: HEAD is ahead of the verified candidate only by delivery-tail commits (the calibrated handover file, the
+ * export of a consumed Critic review), so the verified commit itself is still deliverable. Eligible only when ALL hold:
+ * the commit named by evidence/verify-latest.json (green) is an ancestor of HEAD; the push approval names that exact
+ * commit and destination; every commit between is classified by `classifyVerifiedDeliveryTail` (the shared
+ * `criticExportOnlyCommit` classification, no second classifier); and the verified commit is not already on the remote's
+ * destination branch (the remote-tracking ref says so) -- once delivered, the later commits keep their own route and this
+ * is not offered again. Anything else is `{ eligible: false, reason }` and keeps today's refusal. Never throws, never mutates.
+ */
+export function assessVerifiedCandidateDelivery({ root, remote, destination, readReceipt, run = spawnSync } = {}) {
+  const no = (reason, offending = null) => ({ eligible: false, reason, ...(offending === null ? {} : { offending }) });
+  try {
+    const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], run);
+    if (head === null || !OID_TEXT.test(head)) return no("head-unresolved");
+    let evidence;
+    try { evidence = JSON.parse(readFileSync(join(resolveEvidenceProjectDir(root), VERIFY_EVIDENCE_DEFAULT_PATH), "utf8")); } catch { return no("verify-evidence-unreadable"); }
+    const verified = evidence?.commit;
+    if (evidence?.exitCode !== 0 || typeof verified !== "string" || !OID_TEXT.test(verified) || verified === head) return no("verify-evidence-not-a-delivery-candidate");
+    if (!approvalBoundTo(root, verified, remote, destination)) return no("approval-not-bound-to-the-verified-commit");
+    const branch = typeof destination === "string" && destination.startsWith("refs/heads/") ? destination.slice("refs/heads/".length) : null;
+    if (branch === null) return no("destination-is-not-a-branch");
+    const onRemote = run("git", ["-C", root, "merge-base", "--is-ancestor", verified, `refs/remotes/${remote}/${branch}`], { encoding: "utf8", timeout: 5000 });
+    if (onRemote?.status === 0) return no("verified-commit-already-delivered");
+    const tail = classifyVerifiedDeliveryTail({
+      repoRoot: root, verifiedCommit: verified, headCommit: head, handoverPaths: calibratedHandoverPaths(root),
+      ...(readReceipt === undefined ? {} : { readReceipt }),
+    });
+    if (!tail.ok) return no(`not-delivery-tail:${tail.reason}`, tail.offending);
+    return { eligible: true, verifiedCommit: verified, headCommit: head, approvalBound: true, laterCommits: tail.commits.map((entry) => ({ ...entry })) };
+  } catch { return no("assessment-unavailable"); }
+}
+
 /**
  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
  * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
@@ -327,6 +396,8 @@ export function drivePushInit({
   prepareDeps = {},
   assessPushHookBackstop = realAssessPushHookBackstop,
   inspectArchitectureCurrency = inspectHeadArchitectureCurrency,
+  assessVerifiedCandidateDelivery: assessDelivery = assessVerifiedCandidateDelivery,
+  readCriticReceipt,
 } = {}) {
   const root = resolve(rootDir);
   for (const [name, value] of [["by", by], ["remote", remote], ["destination", destination]]) {
@@ -415,6 +486,29 @@ export function drivePushInit({
       schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
       recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
     };
+  }
+
+  // Delivery of the verified candidate (N27b / D206). The ONLY failed check so far is Verify evidence bound to an earlier commit
+  // than HEAD, and HEAD is ahead of that verified commit by delivery-tail commits only (the calibrated handover, the export of
+  // a consumed Critic review): the verified commit itself is still deliverable under its own evidence and approval, so name that
+  // exact push instead of refusing. The later commits are NOT covered by it and keep their own route. Any other failed check,
+  // any other commit in between, an approval not bound to the verified commit, or a verified commit already on the remote keeps
+  // today's refusal below. The driver still executes nothing: the push is a command for the caller to run, and the gates judge it.
+  if (failedChecks.length === 1 && failedChecks[0].id === "verify-evidence-bound" && failedChecks[0].status === "stale-commit") {
+    const delivery = assessDelivery({ root, remote, destination, ...(readCriticReceipt === undefined ? {} : { readReceipt: readCriticReceipt }) });
+    if (delivery?.eligible === true) {
+      steps.push({ id: "verified-candidate-delivery", inProcess: true, ok: true });
+      const pushAction = { executable: "git", argv: ["-C", root, "push", remote, `${delivery.verifiedCommit}:${destination}`] };
+      return {
+        schema: SCHEMA, root, by, remote, destination, base, outcome: "deliver-verified-candidate", steps,
+        verifiedCommit: delivery.verifiedCommit, headCommit: delivery.headCommit, approvalBound: delivery.approvalBound === true,
+        laterCommits: delivery.laterCommits,
+        laterCommitsRoute: "The later commits (the handover and Critic-export commits listed above) are not delivered by this push and are not "
+          + "covered by its approval; they keep their own route: Verify evidence and a push approval bound to the new HEAD, then push-init again.",
+        pushAction,
+        gitPushLine: boundedCopySafeCommand({ executable: pushAction.executable, argv: pushAction.argv }).command,
+      };
+    }
   }
 
   // Architecture map currency (N25 / D208) -- the check guard-push applies to the pushed commit, run here through
@@ -512,7 +606,7 @@ export function main(args = process.argv.slice(2), {
     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
   });
   write(`${JSON.stringify(result, null, 2)}\n`);
-  return ["chat-ready", "signature-required", "checkpoint-ready"].includes(result.outcome) ? 0 : 1;
+  return ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome) ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());

@@ -581,6 +581,98 @@ test("HK7 the snapshot digest tracks the approval module and the installer, so a
   assert.equal(stale.updateRequired, true);
 });
 
+// ---- N27a / D206: a tag on an already published commit passes the generated hook; every other tag stays gated -------
+// Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
+function tagPushRepo(prefix) {
+  const repo = freshRepo(prefix);
+  writeManifest(repo.dir, { approval: "required" });
+  repo.git("remote", "add", "origin", "https://example.invalid/fixture.git");
+  repo.git("update-ref", "refs/remotes/origin/main", repo.head);
+  writeFileSync(join(repo.dir, "later.txt"), "unpublished\n");
+  repo.git("add", "later.txt");
+  repo.git("commit", "-q", "-m", "unpublished");
+  repo.unpublished = repo.git("rev-parse", "HEAD").stdout.trim();
+  repo.stdin = (ref, sha) => `${ref} ${sha} ${ref} ${ZERO40}\n`;
+  return repo;
+}
+
+test("N27a installed hook: a rollback tag on a commit already on the same remote passes with no Verify evidence and no approval, and the log says why", () => {
+  const repo = tagPushRepo("n27-rollback");
+  const ref = "refs/tags/rollback/2026-10-30-block1";
+  const result = runInstalledHook(repo.dir, repo.stdin(ref, repo.head));
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /verify-latest|approval/);
+  const last = readLog(repo.dir).at(-1);
+  assert.equal(last.verdict, "allowed");
+  assert.match(String(last.note), /published/);
+});
+
+test("N27a installed hook: an annotated tag object is peeled to the commit it targets", () => {
+  const repo = tagPushRepo("n27-annotated");
+  repo.git("tag", "-a", "-m", "annotated rollback", "rollback/2026-10-30-annotated", repo.head);
+  const tagObject = repo.git("rev-parse", "rollback/2026-10-30-annotated").stdout.trim();
+  assert.notEqual(tagObject, repo.head, "fixture: the tag object differs from the commit");
+  const result = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-annotated", tagObject));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test("N27a installed hook: every other tag push stays gated exactly as before", () => {
+  const repo = tagPushRepo("n27-gated");
+  const gated = [
+    ["a rollback tag on an unpublished commit", "refs/tags/rollback/2026-10-30-unpublished", repo.unpublished],
+    ["a release tag on a published commit", "refs/tags/v1.2.3", repo.head],
+    ["a beta release tag on a published commit", "refs/tags/v1.2.3-beta.1", repo.head],
+    ["a release tag on an unpublished commit", "refs/tags/v2.0.0", repo.unpublished],
+    ["a branch push of a published commit", "refs/heads/feature-published", repo.head],
+  ];
+  for (const [label, ref, sha] of gated) {
+    const result = runInstalledHook(repo.dir, repo.stdin(ref, sha));
+    assert.equal(result.code, 1, `${label}: ${result.stderr}`);
+    assert.match(result.stderr, /verify-latest\.json missing/, label);
+    assert.equal(readLog(repo.dir).at(-1).verdict, "blocked", label);
+  }
+});
+
+test("N27a installed hook: publication on another remote, or a remote addressed by URL, never counts", () => {
+  const repo = tagPushRepo("n27-remote");
+  repo.git("update-ref", "refs/remotes/other/main", repo.unpublished);
+  const other = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-other", repo.unpublished));
+  assert.equal(other.code, 1, other.stderr);
+  const url = "https://example.invalid/fixture.git";
+  const byUrl = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-url", repo.head), { remote: url, url });
+  assert.equal(byUrl.code, 1, byUrl.stderr);
+  assert.doesNotMatch(byUrl.stderr, /example\.invalid/, "a remote may carry credentials and must not reach a transcript (SEC-01)");
+});
+
+test("N27a the generated hook imports the shared published-tag predicate from the plugin library and the runtime snapshot carries it", () => {
+  const imported = new Set([...renderImpl(PLUGIN_LIB_DIR).matchAll(/join\(PLUGIN_LIB_DIR, "([a-z0-9-]+\.mjs)"\)/g)].map((m) => m[1]));
+  assert.ok(imported.has("published-tag-push.mjs"), "the generated hook must import the shared predicate guard-push also uses");
+  const inventory = JSON.parse(inspectGitHookSourceSnapshot({ pluginLibDir: PLUGIN_LIB_DIR }).manifestBytes).inventory.map((row) => row.path);
+  assert.ok(inventory.includes("lib/published-tag-push.mjs"), "lib/published-tag-push.mjs must be part of the runtime snapshot digest");
+});
+
+test("N27a an existing install made before the predicate is refreshed with the new bytes (impl and runtime snapshot)", () => {
+  const { dir } = freshRepo("n27-refresh");
+  assert.equal(applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
+  const markerPath = join(dir, ".git", "agent-pipeline", "pre-push-hook", "install-marker.json");
+  const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+  const installed = readFileSync(marker.implPath, "utf8");
+  assert.match(installed, /published-tag-push\.mjs/, "a fresh install carries the predicate import");
+  const prior = installed.split("\n").filter((line) => !line.includes("published-tag-push.mjs")).join("\n");
+  assert.doesNotMatch(prior, /published-tag-push/);
+  writeFileSync(marker.implPath, prior);
+  marker.implSha256 = createHash("sha256").update(prior, "utf8").digest("hex");
+  writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
+  const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(plan.status, "ready-to-upgrade");
+  assert.equal(applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
+  const refreshed = readFileSync(marker.implPath, "utf8");
+  assert.match(refreshed, /published-tag-push\.mjs/);
+  const libDir = /const PLUGIN_LIB_DIR = ("[^"]+");/u.exec(refreshed);
+  assert.ok(libDir, "the refreshed hook names its plugin library directory");
+  assert.ok(existsSync(join(JSON.parse(libDir[1]), "published-tag-push.mjs")), "the runtime snapshot it names carries the predicate module");
+});
+
 // The pre-PUSHSIG case, now the chat/standing variant: a repository whose push gate is
 // `standing-approved` keeps admitting an exact checkpoint with no approval (design section 2).
 test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (standing-approved variant)", () => {

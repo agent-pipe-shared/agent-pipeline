@@ -2598,6 +2598,34 @@ function freshRepoIn(parentDir, name) {
   }
 }
 
+// ---- PG-N27-TAG: a tag on an already published commit passes; every other tag stays gated (D206, N27a) ------------------
+// Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
+{
+  const { dir, head } = freshRepo("n27-tag");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  gitAt(dir, "remote", "add", "origin", "https://example.invalid/fixture.git");
+  gitAt(dir, "update-ref", "refs/remotes/origin/main", head);
+  writeFileSync(join(dir, "later.txt"), "unpublished\n");
+  gitAt(dir, "add", "later.txt");
+  gitAt(dir, "commit", "-q", "-m", "unpublished");
+  const unpublished = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  const EVIDENCE_MISSING = ["evidence/verify-latest.json missing"];
+  check("PG-N27-TAG-01 allow  rollback tag on a commit already on the same remote needs no Verify and no approval", `git push origin ${head}:refs/tags/rollback/2026-10-30-block1`, dir, ALLOW);
+  gitAt(dir, "tag", "rollback/2026-10-30-bare", head);
+  check("PG-N27-TAG-02 allow  the bare tag name resolves to the same published commit", "git push origin rollback/2026-10-30-bare", dir, ALLOW);
+  gitAt(dir, "tag", "-a", "-m", "annotated rollback", "rollback/2026-10-30-annotated", head);
+  check("PG-N27-TAG-03 allow  an annotated tag is peeled to the commit it targets", "git push origin rollback/2026-10-30-annotated", dir, ALLOW);
+  check("PG-N27-TAG-04 allow  a non-release tag on a published commit passes whatever its namespace", `git push origin ${head}:refs/tags/checkpoint-2026-10-30`, dir, ALLOW);
+  check("PG-N27-TAG-05 block  a rollback tag on an unpublished commit stays gated", `git push origin ${unpublished}:refs/tags/rollback/2026-10-30-unpublished`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+  check("PG-N27-TAG-06 block  a release tag stays gated even on a published commit", `git push origin ${head}:refs/tags/v1.2.3`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+  check("PG-N27-TAG-07 block  a beta release tag stays gated even on a published commit", `git push origin ${head}:refs/tags/v1.2.3-beta.1`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+  check("PG-N27-TAG-08 block  a release tag on an unpublished commit stays gated", `git push origin ${unpublished}:refs/tags/v2.0.0`, dir, BLOCK, { stderrIncludes: ["release tag 'refs/tags/v2.0.0'", "not reachable from refs/remotes/origin/main"] });
+  check("PG-N27-TAG-09 block  the pass is for tags: a branch push of a published commit stays gated", `git push origin ${head}:refs/heads/feature-published`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+  gitAt(dir, "update-ref", "refs/remotes/other/main", unpublished);
+  check("PG-N27-TAG-10 block  publication on ANOTHER remote does not count for this remote", `git push origin ${unpublished}:refs/tags/rollback/2026-10-30-other-remote`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+  check("PG-N27-TAG-11 block  a remote addressed by URL cannot be matched to a remote-tracking ref and stays gated", `git push https://example.invalid/fixture.git ${head}:refs/tags/rollback/2026-10-30-url`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
