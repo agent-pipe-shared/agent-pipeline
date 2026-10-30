@@ -484,7 +484,7 @@ test("the unconfigured-verify handover exception is exact about its input and pl
 // The fixtures below are the producer's literals (that function is module-private); the conformance test
 // pins them against the producer's source text so a drifting producer fails here, loudly, not in the field.
 const REOPEN_DESIGN_ACTOR_PLACEHOLDER = "<recovery actor's name>";
-const REOPEN_STALE_GUIDANCE = "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
+const REOPEN_STALE_GUIDANCE = "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
 const REOPEN_INVALID_EVIDENCE_GUIDANCE = "The approved PRD is immutable and its architecture evidence is invalid (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.";
 const FOREIGN_PLUGIN_SCRIPTS = join(tmpdir(), "foreign-plugin", "scripts");
 

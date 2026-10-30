@@ -3340,7 +3340,9 @@ function designToImplementationHandoverAction(root, fs) {
       inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
       mutation: false,
       requiresConfirmation: false,
-      guidance: "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
+      // A clone or transfer with unchanged approved bytes is repaired by rebind-approval and keeps the approval;
+      // reopen-design discards it, so it is named second.
+      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
       applyAction: commandAction([PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,
         "pipeline.project-onboarding.v4", ["ready"]),
     };
