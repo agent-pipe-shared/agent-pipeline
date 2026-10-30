@@ -89,6 +89,8 @@ const depsOf = (fx, over = {}) => ({
   resolveBaseline: () => ({ status: "ready", entries: [] }),
   defaultSpecPath: () => null,
   queueRow: () => null,
+  // hermetic: the pre-existing cases never run session-authority-repair inspect for the settled-pending count (W7 cases inject their own)
+  settledPending: () => null,
   // hermetic: the pre-existing cases never read the real runner-profile registry; the route here equals each fixture agent's own effort
   // (no contradiction, no unreadable-route warning), and the W2-R2 cases inject their own
   claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: { "duty.implement": "medium", "duty.mechanic": "low", "duty.deep": "xhigh" }[taskRoute] }),
@@ -1653,6 +1655,41 @@ test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINT
   const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { startedOwners: () => [startedOwner()] }));
   assert.equal(binding.ok, true, JSON.stringify(binding));
   assert.ok(warningCodes(binding).includes("DBG-CHECKPOINTED-OWNER"), "the binding route warns too");
+});
+
+test("W7: settled pending states and stop-failure records of settled dispatches yield a typed preDispatch heal and one summary warning; build writes no file", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const before = directorySnapshot(fx.root);
+  const settled = () => ({ settledCount: 3, leavingDispatchIds: ["ALF-BG"] });
+  const stops = () => [stopFailure({ dispatchId: "ALF-BG" }), stopFailure({ dispatchId: "ALF-OPEN" })];
+  const result = runDispatchBriefing(argv, depsOf(fx, { settledPending: settled, stopFailures: stops }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.preDispatch.length, 1);
+  const [step] = result.preDispatch;
+  assert.equal(step.kind, "routine-repair");
+  assert.equal(step.argv[0], "node");
+  assert.match(step.argv[1], /scripts[\\/]routine-repair\.mjs$/u);
+  assert.deepEqual(step.argv.slice(2, 5), ["run", "heal", "--root"]);
+  assert.deepEqual(step.argv.slice(-2), ["--reason", "retire settled pending states before dispatch"]);
+  assert.equal(step.why, "3 settled pending states, 1 stop-failure records");
+  assert.deepEqual(stopWarnings(result).map((entry) => entry.dispatchId), ["ALF-OPEN"]);
+  const summary = result.warnings.filter((entry) => entry.code === "DBG-SETTLED-PENDING-HEAL");
+  assert.equal(summary.length, 1);
+  assert.match(summary[0].message, /routine-repair\.mjs run heal/u);
+  const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { settledPending: settled, stopFailures: stops }));
+  assert.equal(binding.preDispatch?.length, 1, "the binding route reports it too");
+  assert.deepEqual(directorySnapshot(fx.root), before);
+});
+
+test("W7: nothing settled and no leaving stop-failure record prints no preDispatch and keeps every stop-failure warning", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const result = runDispatchBriefing(argv, depsOf(fx, { settledPending: () => ({ settledCount: 0, leavingDispatchIds: [] }), stopFailures: () => [stopFailure()] }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.equal("preDispatch" in result, false);
+  assert.equal(stopWarnings(result).length, 1);
+  assert.ok(!warningCodes(result).includes("DBG-SETTLED-PENDING-HEAL"));
 });
 
 test("D196 R1: a started slice of another item, the same dispatch id, or no started slice gives no warning", async () => {

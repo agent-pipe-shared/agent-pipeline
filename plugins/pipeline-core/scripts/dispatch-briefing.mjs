@@ -47,6 +47,7 @@ import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync, 
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
 
 const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const cliArguments = process.argv.slice(2);
@@ -778,7 +779,24 @@ export function generateDispatchBinding(options, deps = {}) {
   const stopEntries = (Array.isArray(stopFailures) ? stopFailures : [])
     .filter((entry) => entry && typeof entry === "object" && entry.schema === STOP_FAILURE_SCHEMA && typeof entry.dispatchId === "string" && typeof entry.code === "string")
     .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
-  for (const entry of stopEntries) {
+  // W7 (PO 2026-10-30): a routine must be used, not only present. The settled pending states of finished dispatches make every authority
+  // scan walk them and keep the stop-failure rule from retiring records; the typed step below is the routine-repair heal that clears both.
+  // Read-only: this build never runs it.
+  const settledPreview = (() => {
+    try {
+      const found = (deps.settledPending ?? readSettledPendingPreview)(root);
+      return found && Number.isSafeInteger(found.settledCount) && found.settledCount >= 0 && Array.isArray(found.leavingDispatchIds) ? found : null;
+    } catch { return null; }
+  })();
+  const leavingIds = new Set(settledPreview?.leavingDispatchIds ?? []);
+  const leavingEntries = stopEntries.filter((entry) => leavingIds.has(entry.dispatchId));
+  let preDispatch = null;
+  if (settledPreview !== null && (settledPreview.settledCount > 0 || leavingEntries.length > 0)) {
+    const argv = ["node", fileURLToPath(new URL("./routine-repair.mjs", import.meta.url)), "run", "heal", "--root", root, "--reason", "retire settled pending states before dispatch"];
+    preDispatch = [{ kind: "routine-repair", argv, why: `${settledPreview.settledCount} settled pending states, ${leavingEntries.length} stop-failure records` }];
+    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.join(" ")}` });
+  }
+  for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
     warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
   }
@@ -994,7 +1012,7 @@ export function generateDispatchBinding(options, deps = {}) {
   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
 
   // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings };
+  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
 }
 
 const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
@@ -1066,7 +1084,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 

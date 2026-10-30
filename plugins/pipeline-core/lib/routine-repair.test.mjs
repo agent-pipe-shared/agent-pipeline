@@ -60,7 +60,7 @@ const inspectWith = (producer) => ({ ...emptyInspect, registry: { status: "prese
 
 // The ONE shared table. `expect.calls` is the delegated tool + first argv word list; `stopFailures` marks the real repair.
 const TABLE = [
-  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
+  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
   { id: "slice-cancel budget", request: { kind: "slice-cancel", sliceId: "S-1", cancelClass: "budget", started: true, reason: "budget exhausted" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["S-1", "--class", "budget", "--started"] } },
   { id: "slice-cancel integrated-elsewhere", request: { kind: "slice-cancel", sliceId: "S-2", cancelClass: "integrated-elsewhere", reason: "landed in another commit" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["integrated-elsewhere"] } },
   { id: "stop-failure-aside", request: { kind: "stop-failure-aside", reason: "diagnostic of a settled dispatch" }, setup: (ap) => { writeStopFailure(ap, "1", "D-1"); }, expect: { exit: 0, code: "moved-aside", calls: [], moved: 1 } },
@@ -148,8 +148,104 @@ test("stop-failure-aside never moves a symlink or a record of another schema", (
   assert.equal(result.retained.length, 3);
 }));
 
-test("the closed list is frozen, names exactly four kinds, and plan refuses everything else without mutating", () => {
-  assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
+// W7: a pending state named by the sha256 of its bytes, with the reservation row session-authority-repair inspect would report.
+function writeNamedPending(ap, dispatchId, { terminal = false, integration = false } = {}) {
+  mkdirSync(commitDir(ap), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId }, delivery: { sliceId: dispatchId, itemId: "I-1" } }));
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const name = `pending-claude-${digest}.json`;
+  writeFileSync(join(commitDir(ap), name), bytes);
+  const siblings = [];
+  if (terminal) { siblings.push(`authority-terminal-${digest}.json`); writeFileSync(join(commitDir(ap), siblings.at(-1)), "{}"); }
+  if (integration) { siblings.push(`authority-integration-${digest}.json`); writeFileSync(join(commitDir(ap), siblings.at(-1)), "{}"); }
+  return { name, digest, siblings, dispatchId };
+}
+const rowOf = (pending, settled) => ({ pending: pending.name, sliceId: pending.dispatchId, dispatchId: pending.dispatchId, settled });
+const inspectRows = (...reservations) => ({ ...emptyInspect, reservations });
+const SETTLED_DEPS = { now: () => Date.parse("2026-10-30T12:00:00Z") };
+
+test("settled-pending-aside moves the stop-failure record of a retired dispatch into the same aside directory and keeps the one of an unsettled dispatch", () => withRepo((root, ap) => {
+  const retired = writeNamedPending(ap, "D-A", { terminal: true });
+  const ready = writeNamedPending(ap, "D-C");
+  const moved = writeStopFailure(ap, "1", "D-A");
+  const kept = writeStopFailure(ap, "2", "D-C");
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(retired, "integrated-by-commit"), rowOf(ready, null))).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.ok(!existsSync(join(diagDir(ap), moved)) && existsSync(join(diagDir(ap), kept)));
+  assert.deepEqual(result.retiredStopFailures.map((row) => row.dispatchId), ["D-A"]);
+  assert.match(result.keptStopFailures[0].reason, /unsettled pending state/u);
+  const aside = files(join(ap, "session-authority-abandoned"));
+  assert.equal(new Set(aside.map((file) => file.split("/")[0])).size, 1, "one aside directory");
+  assert.ok(aside.every((file) => file.split("/")[0].endsWith("-settled-pending")));
+  assert.ok(aside.some((file) => file.endsWith(`/${moved}`)));
+}));
+
+test("settled-pending-aside moves settled pending states with their terminal and integration siblings, keeps the rest with reasons, and moves the stop-failure record of a retired dispatch only", () => withRepo((root, ap) => {
+  const byCommit = writeNamedPending(ap, "D-A", { terminal: true, integration: true });
+  const cancelled = writeNamedPending(ap, "D-B");
+  const ready = writeNamedPending(ap, "D-C");
+  const unreadable = { name: `pending-claude-${hex("c", 64)}.json` };
+  writeFileSync(join(commitDir(ap), unreadable.name), "{ not json");
+  const target = join(root, "elsewhere.json");
+  writeFileSync(target, "{}");
+  const linkName = `pending-codex-${hex("d", 64)}.json`;
+  symlinkSync(target, join(commitDir(ap), linkName));
+  const { calls, spawn } = stub(inspectRows(rowOf(byCommit, "integrated-by-commit"), rowOf(cancelled, "cancelled"), rowOf(ready, null),
+    { pending: unreadable.name, status: "unreadable", reason: "bad json" }, { pending: linkName, sliceId: "D-L", dispatchId: "D-L", settled: "integrated-by-commit" }));
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "retire settled pending states" }, { spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.equal(result.code, "moved-aside");
+  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect"]);
+  const left = readdirSync(commitDir(ap)).sort();
+  assert.ok(!left.includes(byCommit.name) && !left.includes(cancelled.name));
+  for (const sibling of byCommit.siblings) assert.ok(!left.includes(sibling), sibling);
+  for (const name of [ready.name, unreadable.name, linkName]) assert.ok(left.includes(name), name);
+  assert.deepEqual(result.retiredPending.map((row) => row.name).sort(), [byCommit.name, cancelled.name].sort());
+  assert.deepEqual(result.keptPending.map((row) => row.name).sort(), [linkName, ready.name, unreadable.name].sort());
+  assert.ok(result.keptPending.every((row) => typeof row.reason === "string" && row.reason !== ""));
+  const aside = files(join(ap, "session-authority-abandoned"));
+  for (const name of [byCommit.name, cancelled.name, ...byCommit.siblings]) assert.ok(aside.some((file) => file.endsWith(`-settled-pending/${name}`)), name);
+  assert.ok(existsSync(target));
+  assert.equal(ledger(ap).length, 1);
+  assert.equal(ledger(ap)[0].kind, "settled-pending-aside");
+  // A replay with nothing settled left moves nothing.
+  const again = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "again" }, { spawn: stub(inspectRows(rowOf(ready, null))).spawn, ...SETTLED_DEPS });
+  assert.equal(again.exit, 0);
+  assert.equal(again.result.code, "nothing-to-move");
+  assert.equal(again.result.moved.length, 0);
+}));
+
+test("settled-pending-aside never moves a pending state whose bytes no longer match its name", () => withRepo((root, ap) => {
+  const pending = writeNamedPending(ap, "D-M");
+  writeFileSync(join(commitDir(ap), pending.name), "{\"changed\":true}");
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(pending, "integrated"))).spawn });
+  assert.equal(exit, 0);
+  assert.equal(result.code, "nothing-to-move");
+  assert.match(result.keptPending[0].reason, /digest/u);
+  assert.ok(existsSync(join(commitDir(ap), pending.name)));
+}));
+
+test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {
+  assert.equal(runRoutineRepair({ kind: "settled-pending-aside", root }, { spawn: stub(emptyInspect).spawn }).result.code, "RR-REASON-REQUIRED");
+  const failing = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: () => ({ status: 1, stdout: "", stderr: "x" }) });
+  assert.equal(failing.exit, 2);
+  assert.equal(failing.result.code, "RR-INSPECT-FAILED");
+}));
+
+test("heal retires settled pending states before its delegate runs, and reports them in its record", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-H", { terminal: true });
+  const ready = writeNamedPending(ap, "D-R");
+  const { calls, spawn } = stub(inspectRows(rowOf(settled, "integrated-by-commit"), rowOf(ready, null)));
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "heal"]);
+  assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+  assert.deepEqual(result.settledPending.keptPending.map((row) => row.name), [ready.name]);
+  assert.ok(!existsSync(join(commitDir(ap), settled.name)) && existsSync(join(commitDir(ap), ready.name)));
+}));
+
+test("the closed list is frozen, names exactly five kinds, and plan refuses everything else without mutating", () => {
+  assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside", "settled-pending-aside"]);
   assert.ok(Object.isFrozen(ROUTINE_REPAIRS) && ROUTINE_REPAIRS.every((row) => Object.isFrozen(row)));
   assert.throws(() => ROUTINE_REPAIRS.push({ kind: "rm" }), TypeError);
   assert.equal(planRoutineRepair({ kind: "rm", reason: "r", root: "x" }).code, "RR-OUTSIDE-LIST");
@@ -166,7 +262,7 @@ test("CLI: list prints the closed list, an unknown kind is refused outside the l
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", shell: false });
   const listed = run("list");
   assert.equal(listed.status, 0);
-  assert.deepEqual(JSON.parse(listed.stdout).repairs.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
+  assert.deepEqual(JSON.parse(listed.stdout).repairs.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside", "settled-pending-aside"]);
   const unknown = run("run", "release-lock", "--root", root, "--reason", "r");
   assert.equal(unknown.status, 2);
   assert.equal(JSON.parse(unknown.stdout).code, "RR-OUTSIDE-LIST");

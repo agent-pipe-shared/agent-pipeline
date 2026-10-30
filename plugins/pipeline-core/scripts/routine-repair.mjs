@@ -6,7 +6,9 @@
 //
 // D194 / D197: the closed list of repairs the Elephant runs without asking the human. Two verbs only.
 //   list  Read-only. Prints the closed list as JSON.
-//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running
+//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running | settled-pending-aside
+//         settled-pending-aside moves aside the pending states of settled dispatches (plus their terminal and integration records and the
+//         stop-failure records that then have no unsettled pending state); heal does the same first.
 //         Each run is retained aside (never deleted) and appended to <git-common-dir>/agent-pipeline/routine-repair-ledger.jsonl.
 //         A kind outside the list is refused RR-OUTSIDE-LIST with the original tool's own command; the human decides it.
 // Prints one JSON result. Exit 0: done. Exit 2: refused (typed RR-* code).
