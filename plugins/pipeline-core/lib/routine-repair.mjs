@@ -20,7 +20,7 @@ export const ROUTINE_REPAIRS = Object.freeze([
   Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
-  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
+  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused is healed first, and moved aside only when it is still reconcile-refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
   Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate" }),
 ]);
 const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
@@ -193,10 +193,15 @@ export function classifyInspectFindings(inspect) {
   for (const row of inspect?.registry?.producers ?? []) {
     if (row?.status === "ok") continue;
     add(`producer:${row?.producerId}`, text(row?.status, row?.code, row?.reason, ...(row?.drifted ?? [])));
+    if (row?.status === "reconcile-refused") rows.at(-1).reconcileRefused = true;
   }
   if (inspect?.registry?.read?.status === "refused") add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
   return rows;
 }
+
+// D203: the only findings move-aside admits after an unsuccessful heal are reconcile-refused producers.
+const onlyReconcileRefused = (rows) => rows.length > 0 && rows.every((row) => row.allowed || row.reconcileRefused === true);
+const moveAsideNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run move-aside --no-goldfish-running --root <root> --reason "<why>" (D203: only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
 
 const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
 
@@ -295,7 +300,11 @@ function execute(plan, ctx) {
       const inspect = run.status === 0 ? parseJson(run.stdout) : null;
       settledPending = inspect === null ? { skipped: "session-authority-repair inspect did not report, so no pending state was classified" } : retireSettledPending(ctx, inspect);
     } catch (error) { settledPending = { skipped: short(error) }; }
-    return { ...delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx), settledPending };
+    const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
+    // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
+    const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
+    const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
+    return { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
   }
   if (plan.kind === "settled-pending-aside") {
     const run = spawn(SAR, ["inspect", "--root", root], root);
@@ -321,8 +330,18 @@ function execute(plan, ctx) {
   const inspectRun = spawn(SAR, ["inspect", "--root", root], root);
   const inspect = parseJson(inspectRun.stdout);
   if (inspectRun.status !== 0 || inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no finding can be classified", `node ${SAR} inspect --root <root>`);
-  const findings = classifyInspectFindings(inspect);
+  let findings = classifyInspectFindings(inspect);
   if (!findings.length) return refuse("RR-OUTSIDE-LIST", "inspect reports no blocking finding, so there is nothing for move-aside to repair", humanStep("move-aside"));
+  if (findings.some((row) => !row.allowed) && onlyReconcileRefused(findings)) {
+    // D203: heal first; only a producer that heal did not resolve is moved aside.
+    const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
+    if (!healed.ok) return { ...healed, healedFirst: true };
+    const again = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
+    if (again === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report after heal, so no finding can be classified", `node ${SAR} inspect --root <root>`);
+    findings = classifyInspectFindings(again);
+    if (!findings.length) return { ...healed, healedFirst: true };
+    if (onlyReconcileRefused(findings)) return { ...delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx), healedFirst: true };
+  }
   const other = findings.find((row) => !row.allowed);
   if (other) return refuse("RR-OUTSIDE-LIST", `finding ${other.finding} (${other.source}) is not on the closed list for move-aside (${ROUTINE_REPAIRS.find((row) => row.kind === "move-aside").findings.join(", ")})`, `this repair is decided by the human; the original tool's own command: ${humanStep("inspect")}`);
   return delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx);
