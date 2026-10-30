@@ -484,6 +484,8 @@
         "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
+        "verify-phase:harness/scripts/verify.mjs:greenfield-comparison-citation-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:greenfield-public-comparison-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-approval-unverified-tests",

@@ -4284,6 +4284,18 @@
       "file": "plugins/pipeline-core/lib/host-skill-catalog.test.mjs",
       "invariantPinned": "The host skill-catalog carrier is a sealed private record written only by the host readback; a valid entry admits only a bounded search inside that one declared directory, drift and forgery invalidate it, and a runner without a declaration surface leaves the D108 refusal unchanged.",
       "nonOverlapNote": "Unit-level carrier and policy admission tests; the guard-level skill pins (lifecycle-read-scope-blocks-host-declared-system-skill, declared-system-skill-read-requires-human-override) drive the same carrier through evaluateLifecycleReadyGuard."
+    },
+    {
+      "name": "greenfield-public-comparison-tests",
+      "file": "plugins/pipeline-core/lib/greenfield-public-comparison.test.mjs",
+      "invariantPinned": "A runner comparison is built only from a bounded, canonical, screened public observation input bound by sha256 (schema, optional pipelineVersion/phasesReached/refusalCodes, public path scope, publish compare-and-swap, locale-independent order), and the first published second-run observation set and comparison validate, reproduce and carry no private identifier or absolute path.",
+      "nonOverlapNote": "Unique unit and committed-evidence suite for the greenfield public comparison library, its command and evidence/greenfield-public; the citation checker has its own suite."
+    },
+    {
+      "name": "greenfield-comparison-citation-check-tests",
+      "file": "scripts/check-greenfield-comparison-citations.test.mjs",
+      "invariantPinned": "Every runner comparison claim a release or retro marks must cite a published comparison file by repo-relative path and matching sha256; unknown, private, missing, mismatching, unscreened or non-comparison citations are refused with a typed GFC code.",
+      "nonOverlapNote": "Unique suite for scripts/check-greenfield-comparison-citations.mjs; the cited files themselves are validated by greenfield-public-comparison-tests."
     }
   ]
 }

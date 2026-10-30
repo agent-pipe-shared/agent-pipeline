@@ -58,6 +58,8 @@ tmp-inbounds.txt
 !/evidence/design-course/sprint-alfred-epic/r5d.readiness.json
 !/evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json
 !/evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json
+# Published, sanitized runner observations and comparisons (AC-190): cited by path and sha256.
+!/evidence/greenfield-public/
 
 # Local interruption reporting / store runs (C1 Slice 2)
 /telemetry/interruptions/

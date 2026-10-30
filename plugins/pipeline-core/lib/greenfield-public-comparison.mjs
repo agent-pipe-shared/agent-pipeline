@@ -43,8 +43,35 @@ function readBound(rootDir,path,expectedSha256){
     return {root,full,bytes,stat:before};
   }finally{closeSync(fd);}
 }
+// Additive v1 fields (AC-190): a case may name its Pipeline version, the ordered phases it reached
+// and the typed refusal codes it hit. All three are optional; an input without them stays valid.
+const CASE_REQUIRED=['caseId','runner','pipeline','rulesetSha256','taskSha256','window','metrics','coverage','result','fidelity'];
+const CASE_OPTIONAL=['pipelineVersion','phasesReached','refusalCodes'];
+const VERSION=/^\d+\.\d+\.\d+(?:\+[A-Za-z0-9][A-Za-z0-9.-]{0,95})?$/u;
+const PHASE=/^[a-z][a-z0-9-]{0,31}$/u;
+const REFUSAL=/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
+const MAX_PHASES=16,MAX_REFUSAL_CODES=64;
+const known=(v,required,optional)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&required.every(k=>Object.hasOwn(v,k))&&Object.keys(v).every(k=>required.includes(k)||optional.includes(k));
+function validOptional(row){
+  if(Object.hasOwn(row,'pipelineVersion')){
+    const v=row.pipelineVersion;
+    if(!(v===null||(typeof v==='string'&&VERSION.test(v)))||(row.pipeline==='no-pipeline'&&v!==null))return false;
+  }
+  if(Object.hasOwn(row,'phasesReached')){
+    const p=row.phasesReached;
+    if(!Array.isArray(p)||p.length>MAX_PHASES||!p.every(x=>typeof x==='string'&&PHASE.test(x))||new Set(p).size!==p.length)return false;
+  }
+  if(Object.hasOwn(row,'refusalCodes')){
+    const r=row.refusalCodes;
+    if(!Array.isArray(r)||r.length>MAX_REFUSAL_CODES)return false;
+    if(!r.every(e=>exact(e,['code','count'])&&typeof e.code==='string'&&e.code.length<=64&&REFUSAL.test(e.code)&&Number.isSafeInteger(e.count)&&e.count>=1))return false;
+    // Strictly ascending by code unit: sorted and duplicate-free in one comparison.
+    for(let i=1;i<r.length;i++)if(!(r[i-1].code<r[i].code))return false;
+  }
+  return true;
+}
 function validCase(row){
-  if(!exact(row,['caseId','runner','pipeline','rulesetSha256','taskSha256','window','metrics','coverage','result','fidelity']))return false;
+  if(!known(row,CASE_REQUIRED,CASE_OPTIONAL)||!validOptional(row))return false;
   if(!id(row.caseId)||!['claude','codex','antigravity'].includes(row.runner)||!['pipeline','no-pipeline'].includes(row.pipeline)||!SHA.test(row.taskSha256)||!(row.rulesetSha256===null||SHA.test(row.rulesetSha256)))return false;
   if(row.pipeline==='no-pipeline'&&row.rulesetSha256!==null)return false;
   const w=row.window;
@@ -97,7 +124,8 @@ export function buildGreenfieldPublicComparison({inputHandle}={}){
   try{
     const before=readBound(context.source.root,context.inputPath,context.inputSha256);
     if(!before.bytes.equals(context.source.bytes))throw Error('GPC-CAS');
-    const cases=context.input.cases.slice().sort((a,b)=>a.caseId.localeCompare(b.caseId)).map(summarize),pairs=[];
+    // Code-unit order, not localeCompare: the published digest must not depend on the process locale.
+    const cases=context.input.cases.slice().sort((a,b)=>a.caseId<b.caseId?-1:a.caseId>b.caseId?1:0).map(summarize),pairs=[];
     for(let i=0;i<cases.length;i++)for(let j=i+1;j<cases.length;j++){
       const a=cases[i],b=cases[j],reasons=[];
       for(const k of ['taskSha256'])if(a[k]!==b[k])reasons.push('different-task');
