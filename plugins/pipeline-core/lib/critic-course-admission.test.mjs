@@ -1339,4 +1339,82 @@ test("D207 a PASS with a minor finding registers its lineage as findings and the
   assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
   assert.equal(after.budgets.reviewRound, 2);
 });
+// N20 (consumer finding 2026-10-30, decision D206): every round of a session-mode course runs in the SAME hosting session. The lane
+// of a round used to be that session (id and digest), so round 2 equalled round 1 and its lineage was refused CRL-HISTORY-CHAIN.
+// Genuine consumed rounds below: round 1 and round 2 use the same sessionId on purpose.
+function n20SecondRoundInSameSession(fx, { sessionId = "feature-held-review" } = {}) {
+  pf94WriteInput(fx);
+  const delta = pf94Delta(fx);
+  assert.equal(delta.status, "delta-request-added", `step delta request: ${JSON.stringify(delta)}`);
+  const registration = pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request");
+  const specPath = `specs/${fx.featureId}/spec.md`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
+  const taskId = "feature-held-task-round2", packetId = "9b".repeat(16);
+  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
+  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, fx.candidate, fx.correctionCommit) };
+  const request = { preflightInput, taskId, projectId: "pipeline", sessionId, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
+  admitSessionCriticReview(request, {});
+  const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
+  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
+  return { delta, registration, packetId };
+}
+test("N20 (a) two session-mode rounds in the same hosting session: the lineage of round 2 registers, has its own lane, and the next admission reads both rounds back", () => {
+  const fx = pf94DeltaFixture();
+  const round1 = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
+  const second = n20SecondRoundInSameSession(fx);
+  const added = addCriticReviewLineage({ root: fx.root, packetId: second.packetId });
+  assert.equal(added.status, "lineage-added", `the lineage of a follow-up round of the same session registers: ${JSON.stringify(added)}`);
+  const round2 = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+  assert.equal(round2.parentReviewId, round1.reviewId);
+  assert.notEqual(round2.lane.laneId, round1.lane.laneId, "each round's lane identifies its own Critic run");
+  assert.notEqual(round2.lane.contextSha256, round1.lane.contextSha256);
+  assert.equal(round2.lane.freshFromReviewId, round1.reviewId);
+  const registration2 = pf94CommitPaths(fx.root, added.commitPaths, "register the lineage of round 2");
+  const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration2, requestedMode: "delta", deltaRequestPath: second.delta.deltaRequestPath });
+  assert.equal(next.decision.code, "RE-CONSUMED-PACKAGE-PASS", `the retained rounds re-read against their consumed results: ${JSON.stringify(next.decision)}`);
+});
+test("N20 (b) a registered round 1 with the legacy lane (hosting session id and digest of the session) stays valid for the next round", () => {
+  const fx = consumedCourseRoundFixture({ failing: true });
+  const added = pf94Lineage(fx);
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+  const session = { id: "feature-held-review", freshContext: true, historyInherited: false, mayDelegate: false };
+  record.lane.laneId = session.id; record.lane.contextSha256 = sha256Canonical(session);
+  const { recordSha256: _drop, ...core } = record;
+  record.recordSha256 = sha256Canonical(core);
+  const legacyPath = `specs/${fx.featureId}/evidence/critic-lineage-${record.recordSha256}.json`;
+  const bytes = Buffer.from(JSON.stringify(record));
+  rmSync(join(fx.root, added.lineagePath));
+  writeFileSync(join(fx.root, legacyPath), bytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  const entry = manifest.artifacts.find((artifact) => artifact.path === added.lineagePath);
+  assert.ok(entry, "the lineage artifact is in the manifest");
+  entry.path = legacyPath; entry.sha256 = hash(bytes);
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  const registration = pf94CommitPaths(fx.root, [fx.manifestPath, legacyPath], "register a lineage with the legacy lane");
+  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
+  assert.notEqual(after.decision.code, "CVL-COURSE-RECORD", JSON.stringify(after.decision));
+  // No correction commit follows the round, so the history is read back and the delta request is judged against the parent (CCA-PARENT); the
+  // lane mirror did not refuse the retained legacy lane.
+  assert.equal(after.decision.code, "CCA-PARENT", `the legacy round is read back like before: ${JSON.stringify(after.decision)}`);
+});
+test("N20 (c) a registered round whose lane is neither the legacy lane nor the lane derived from its own consumed result is refused", () => {
+  const fx = consumedCourseRoundFixture({ failing: true });
+  const added = pf94Lineage(fx);
+  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+  record.lane.laneId = "forged-lane-of-another-run"; record.lane.contextSha256 = H("e");
+  const { recordSha256: _drop, ...core } = record;
+  record.recordSha256 = sha256Canonical(core);
+  const forgedPath = `specs/${fx.featureId}/evidence/critic-lineage-${record.recordSha256}.json`;
+  const bytes = Buffer.from(JSON.stringify(record));
+  rmSync(join(fx.root, added.lineagePath));
+  writeFileSync(join(fx.root, forgedPath), bytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  const entry = manifest.artifacts.find((artifact) => artifact.path === added.lineagePath);
+  entry.path = forgedPath; entry.sha256 = hash(bytes);
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  const registration = pf94CommitPaths(fx.root, [fx.manifestPath, forgedPath], "register a lineage with a forged lane");
+  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
+  assert.equal(after.decision.code, "CVL-COURSE-RECORD", `a forged lane must not read back as a genuine round: ${JSON.stringify(after.decision)}`);
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

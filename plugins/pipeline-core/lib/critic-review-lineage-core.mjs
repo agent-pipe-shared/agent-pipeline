@@ -381,16 +381,47 @@ function lineageCode(record) {
   return record.recordSha256 === sha256Canonical(recordCore(record)) ? null : "CRL-DIGEST";
 }
 
+/**
+ * N20 / D206: the lane of one session-mode round. Every round of a course may run in the SAME hosting session
+ * (result.session.id is bound to packet.request.sessionBinding.sessionId), so a lane read from the session alone is
+ * equal for every round and transitionCode refuses each follow-up round. The lane of a round identifies that round's own
+ * Critic run: derived from the hosting session AND the round's packet (packetId and the packet digest of its receipt).
+ * Pure; one helper for the lineage compiler and for the lifecycle mirror, so the two can never drift apart.
+ */
+export function sessionRoundLane({ session, packetId, packetDigest }) {
+  const key = sha256Canonical({ schema: "pipeline.critic-session-round-lane.v1", session, packetId, packetDigest });
+  return { laneId: `round-lane-${key.slice(0, 40)}`, contextSha256: sha256Canonical({ schema: "pipeline.critic-session-round-context.v1", session, packetId, packetDigest }) };
+}
+
+/** The lane written before N20: the hosting session itself. Kept readable so an already registered round stays valid. */
+export function legacySessionLane(session) {
+  return { laneId: session.id, contextSha256: sha256Canonical(session) };
+}
+
+/** Whether a retained lane is a genuine one of this consumed session result: the derived lane, or the legacy lane. */
+export function sessionLaneMatches(lane, { session, packetId, packetDigest }) {
+  const derived = sessionRoundLane({ session, packetId, packetDigest });
+  const legacy = legacySessionLane(session);
+  return (lane.laneId === derived.laneId && lane.contextSha256 === derived.contextSha256)
+    || (lane.laneId === legacy.laneId && lane.contextSha256 === legacy.contextSha256);
+}
+
+// N20 / D206: CRL-HISTORY-CHAIN carries every condition that failed, so a refusal says which link of the chain broke.
+function chainConditions(parent, current) {
+  const failed = [];
+  if (current.parentReviewId !== parent.reviewId) failed.push("parent-review-id");
+  if (current.previousSha256 !== parent.recordSha256) failed.push("previous-sha256");
+  if (current.reviewId === parent.reviewId) failed.push("review-id-repeated");
+  if (current.lane.freshFromReviewId !== parent.reviewId) failed.push("fresh-from");
+  if (current.lane.laneId === parent.lane.laneId) failed.push("lane-id-equal");
+  if (current.lane.contextSha256 === parent.lane.contextSha256) failed.push("context-equal");
+  return failed;
+}
+
 export function transitionCode(parent, current) {
   if (parent.course.status !== "admitted") return "CRL-HISTORY-AFTER-GATE";
-  if (current.parentReviewId !== parent.reviewId
-    || current.previousSha256 !== parent.recordSha256
-    || current.reviewId === parent.reviewId
-    || current.lane.freshFromReviewId !== parent.reviewId
-    || current.lane.laneId === parent.lane.laneId
-    || current.lane.contextSha256 === parent.lane.contextSha256) {
-    return "CRL-HISTORY-CHAIN";
-  }
+  const chain = chainConditions(parent, current);
+  if (chain.length > 0) return `CRL-HISTORY-CHAIN:${chain.join(",")}`;
   if (current.course.status === "po-course-gate") {
     if (!same(current.candidate, parent.candidate)
       || !same(current.diff, parent.diff)

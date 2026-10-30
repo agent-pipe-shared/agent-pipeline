@@ -892,3 +892,95 @@ check("a full round over more than 256 changed paths compiles, validates and adm
 
 assert.equal(passed, 20);
 console.log(`${passed}/20 checks passed.`);
+
+// N20 (consumer finding 2026-10-30, decision D206): every round of one session-mode course ran in the SAME hosting session, so
+// laneId and contextSha256 (both read from result.session) were equal for every round and no follow-up round could register.
+// The lane of a round now identifies that round's own Critic run: derived from the hosting session AND the round's packet.
+// These cases carry their own counter, so the original 20-check assertion above stays exactly as it was.
+let n20Passed = 0;
+function n20Check(name, fn) {
+  fn();
+  n20Passed += 1;
+  console.log(`PASS N20-${String(n20Passed).padStart(2, "0")} ${name}`);
+}
+const hostSession = Object.freeze({ id: "feature-held-review", freshContext: true, historyInherited: false, mayDelegate: false });
+const packet3 = Object.freeze({
+  packetId: "3".repeat(32),
+  request: { projectId: "pipeline", taskId: "nova-a5-correction-2", trigger: "T1" },
+  candidate: { base: O("4"), commit: O("6"), tree: O("7") },
+  diff: { base: O("4"), commit: O("6"), path: ".git/review.diff", bytes: 3, sha256: H("9") },
+  diffPaths: [PATH],
+  bindings: { requestSha256: H("a"), diffPathsSha256: H("b"), governanceSha256: H("c") },
+});
+const roundLane = (packet, packetDigest, evidence) => ({
+  ...lineageCore.sessionRoundLane({ session: hostSession, packetId: packet.packetId, packetDigest }),
+  evidenceSha256: evidence,
+});
+const retained = { ...findingOpen, priorFindingId: findingOpen.id };
+function sameSessionChain() {
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen], lane: roundLane(packet1, H("1"), H("3")) });
+  const second = compile({
+    packet: packet2, reviewId: "review-2", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
+    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2), lane: roundLane(packet2, H("2"), H("4")),
+  });
+  return { first, second };
+}
+
+n20Check("N20 the lane of a session-mode round is derived from the hosting session and the round's packet, so two rounds of one session differ", () => {
+  const lane1 = lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("1") });
+  const lane2 = lineageCore.sessionRoundLane({ session: hostSession, packetId: packet2.packetId, packetDigest: H("2") });
+  assert.notEqual(lane1.laneId, lane2.laneId);
+  assert.notEqual(lane1.contextSha256, lane2.contextSha256);
+  assert.deepEqual(lane1, lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("1") }), "pure and repeatable");
+  assert.notEqual(lane1.laneId, lineageCore.sessionRoundLane({ session: hostSession, packetId: packet1.packetId, packetDigest: H("9") }).laneId, "the packet digest is part of the identity");
+  assert.notEqual(lane1.laneId, lineageCore.sessionRoundLane({ session: { ...hostSession, id: "another-session" }, packetId: packet1.packetId, packetDigest: H("1") }).laneId, "the hosting session is part of the identity");
+  assert.equal(lineageCore.identifier(lane1.laneId), true, "the derived lane id passes the lane id charset and length check");
+  assert.equal(lineageCore.digest(lane1.contextSha256), true);
+  assert.notEqual(lane1.laneId, hostSession.id, "differs from the legacy lane id (the session id)");
+  assert.notEqual(lane1.contextSha256, sha256Canonical(hostSession), "differs from the legacy context digest");
+  const longSession = { ...hostSession, id: "s".repeat(128) };
+  assert.equal(lineageCore.identifier(lineageCore.sessionRoundLane({ session: longSession, packetId: packet1.packetId, packetDigest: H("1") }).laneId), true, "a long session id cannot overflow the lane id bound");
+});
+
+n20Check("N20 (anchor, unit level) rounds 1, 2 and 3 of one hosting session compile with their derived lanes and the history validates", () => {
+  const { first, second } = sameSessionChain();
+  assert.equal(validateCriticReviewHistory([first, second]).ok, true);
+  const third = compile({
+    packet: packet3, reviewId: "review-3", parent: second, coverage: completeCoverage(packet3), verdict: findingsVerdict, findings: [retained],
+    correction: correction(packet3), invalidation: none, reviewAttempt: deltaAttempt(3, 2, packet3), lane: roundLane(packet3, H("3"), H("5")),
+  });
+  assert.deepEqual(validateCriticReviewHistory([first, second, third]), { ok: true, code: null, headSha256: third.recordSha256 });
+  assert.equal(new Set([first, second, third].map((record) => record.lane.laneId)).size, 3);
+});
+
+n20Check("N20 a registered round with the legacy lane (session id, digest of the session) stays valid as the parent of a derived round", () => {
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen], lane: { laneId: hostSession.id, contextSha256: sha256Canonical(hostSession), evidenceSha256: H("3") } });
+  const second = compile({
+    packet: packet2, reviewId: "review-2", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
+    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2), lane: roundLane(packet2, H("2"), H("4")),
+  });
+  assert.equal(validateCriticReviewHistory([first, second]).ok, true);
+});
+
+n20Check("N20 a forged round whose lane equals its parent's is still refused, and the refusal names the lane conditions", () => {
+  const { first } = sameSessionChain();
+  assert.throws(() => compile({
+    packet: packet2, reviewId: "review-2-forged", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict, findings: [retained],
+    correction: correction(packet2), invalidation: none, reviewAttempt: deltaAttempt(2, 1, packet2),
+    lane: { laneId: first.lane.laneId, contextSha256: first.lane.contextSha256, evidenceSha256: H("4") },
+  }), /CRL-HISTORY-CHAIN:lane-id-equal,context-equal/u);
+});
+
+n20Check("N20 CRL-HISTORY-CHAIN names the one condition that failed, each pinned once", () => {
+  const { first, second } = sameSessionChain();
+  const variant = (mutate) => { const copy = structuredClone(second); mutate(copy); return lineageCore.transitionCode(first, copy); };
+  assert.equal(lineageCore.transitionCode(first, second), null);
+  assert.equal(variant((r) => { r.parentReviewId = "review-other"; }), "CRL-HISTORY-CHAIN:parent-review-id");
+  assert.equal(variant((r) => { r.previousSha256 = H("0"); }), "CRL-HISTORY-CHAIN:previous-sha256");
+  assert.equal(variant((r) => { r.reviewId = first.reviewId; }), "CRL-HISTORY-CHAIN:review-id-repeated");
+  assert.equal(variant((r) => { r.lane.freshFromReviewId = "review-other"; }), "CRL-HISTORY-CHAIN:fresh-from");
+  assert.equal(variant((r) => { r.lane.laneId = first.lane.laneId; }), "CRL-HISTORY-CHAIN:lane-id-equal");
+  assert.equal(variant((r) => { r.lane.contextSha256 = first.lane.contextSha256; }), "CRL-HISTORY-CHAIN:context-equal");
+  assert.equal(variant((r) => { r.lane.laneId = first.lane.laneId; r.lane.contextSha256 = first.lane.contextSha256; }), "CRL-HISTORY-CHAIN:lane-id-equal,context-equal");
+});
+console.log(`${n20Passed}/5 N20 checks passed.`);

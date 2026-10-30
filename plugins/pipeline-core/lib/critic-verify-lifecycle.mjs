@@ -15,6 +15,7 @@ import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { canonicalJson as canonicalCourseJson, sha256Canonical } from "./review-economy.mjs";
 import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
+import { sessionLaneMatches } from "./critic-review-lineage-core.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
@@ -449,7 +450,9 @@ export function readConsumedCriticCourseResult(input) {
         || retained.references.packetSha256 !== sha256Canonical(packet)
         || retained.references.requestSha256 !== packet.bindings.requestSha256
         || retained.coverage.complete !== true || retained.coverage.receiptSha256 !== receiptSha256
-        || retained.lane.laneId !== result.session.id || retained.lane.contextSha256 !== sha256Canonical(result.session)) {
+        // N20/D206: the lane is that of this round's own Critic run (derived from the hosting session and the packet); a lane
+        // registered before the fix (the hosting session itself) stays valid. Same helper as the lineage compiler.
+        || !sessionLaneMatches(retained.lane, { session: result.session, packetId: input.packetId, packetDigest: receipt.packetDigest })) {
         fail("CVL-COURSE-RECORD", "Retained record is not bound to the genuine consumed result.");
       }
       if (retained.schema === "pipeline.critic-review-lineage.v2") {
