@@ -11,7 +11,8 @@ import {
 import { tmpdir, devNull } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {observeOnboardingEnrollmentHistory} from "./onboarding-continuity.mjs";
+import {observeOnboardingEnrollmentHistory,KickoffError} from "./onboarding-continuity.mjs";
+import { SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
 import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
 import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
@@ -1267,6 +1268,60 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(readyAppServerCalls, 1);
     assert.equal(readyAndApplied.status, "ready");
     assertPlanLifecycleInspectAction(readyAndApplied.nextAction);
+
+    // D48 / AC-160: an apply that is refused ONLY because no session-power-controlled
+    // invocation is bound (typed code + reason, never message text) defers the recovery
+    // instead of ending the onboarding partial; every other apply failure stays partial.
+    let deferredAppServerCalls = 0;
+    const inspectWithApplyError = (error) => inspectProjectOnboardingV3({ runner: "codex",
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          deferredAppServerCalls += 1;
+          return fakeAppServer(options);
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "ready",
+            recovery: "bind-orphan",
+            planSha256: "c".repeat(64),
+          };
+        },
+        applySessionCleanupRecovery() { throw error; },
+      },
+    });
+    const unboundMessage = "continuity current invocation required before binding";
+    const deferred = inspectWithApplyError(new KickoffError(
+      "SDC-AUTHORITY-UNAVAILABLE", unboundMessage, { reason: "continuity-invocation-unbound" },
+    ));
+    assert.equal(deferred.status, "ready");
+    assert.equal(deferredAppServerCalls, 1);
+    assertPlanLifecycleInspectAction(deferred.nextAction);
+    assert.equal(deferred.diagnostics.length, 1);
+    assert.deepEqual(Object.keys(deferred.diagnostics[0]).sort(), ["code", "guidance", "message", "path", "severity"]);
+    assert.equal(deferred.diagnostics[0].code, "cleanup_recovery_deferred");
+    assert.equal(deferred.diagnostics[0].path, "$.authority.sessionCleanup");
+    assert.equal(deferred.diagnostics[0].severity, "warning");
+    assert.match(deferred.diagnostics[0].message, /next session-power-controlled invocation/u);
+    assert.match(deferred.diagnostics[0].message, /governed dispatch does not need it/u);
+    for (const error of [
+      new KickoffError("SDC-AUTHORITY-UNAVAILABLE", unboundMessage, { reason: "another-reason" }),
+      new KickoffError("SDC-AUTHORITY-UNAVAILABLE", unboundMessage),
+      new KickoffError("SDC-AUTHORITY-CAS", unboundMessage, { reason: "continuity-invocation-unbound" }),
+      Object.assign(new Error(unboundMessage), { code: "SDC-AUTHORITY-UNAVAILABLE" }),
+    ]) {
+      const kept = inspectWithApplyError(error);
+      assert.equal(kept.status, "partial");
+      assert.deepEqual(kept.nextAction, humanRecoveryAction);
+      assertDiagnostic(kept, "cleanup_recovery_apply_failed");
+    }
+    const typedKept = inspectWithApplyError(new SessionCleanupRecoveryError("WT-SESSION-RECOVERY-READBACK", "typed readback failure"));
+    assert.equal(typedKept.status, "partial");
+    assert.deepEqual(typedKept.nextAction, humanRecoveryAction);
+    assertDiagnostic(typedKept, "WT-SESSION-RECOVERY-READBACK");
 
     // RF2B (ALFRED-RF2B-20261004): the retained-binding rule is MONOTONE. It used
     // to key off a descriptor COUNT, so two residues locked LESS than one. Now

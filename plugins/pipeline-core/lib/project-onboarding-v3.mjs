@@ -1956,6 +1956,22 @@ export function partialCleanupRecoveryResultCore({
         });
         return null;
       } catch (error) {
+        // D48: the only thing missing is a session-power-controlled invocation, which a governed
+        // dispatch does not need. Typed code + reason decide, never the message text.
+        if (observation !== null
+          && error?.code === "SDC-AUTHORITY-UNAVAILABLE"
+          && error?.reason === "continuity-invocation-unbound") {
+          observation.warnings.push({
+            ...lifecycleDiagnostic(
+              "$.authority.sessionCleanup",
+              "cleanup_recovery_deferred",
+              "the session-cleanup binding is created at the next session-power-controlled invocation; a governed dispatch does not need it",
+              "nothing has to be repaired for dispatch",
+            ),
+            severity: "warning",
+          });
+          return null;
+        }
         const typed = error instanceof SessionCleanupRecoveryError;
         return lifecycleResult({
           status: "partial",

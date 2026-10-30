@@ -296,11 +296,12 @@ export const KICKOFF_FAULT_STAGES = Object.freeze([
 ]);
 
 export class KickoffError extends Error {
-  constructor(code, message, { committed = false } = {}) {
+  constructor(code, message, { committed = false, reason = undefined } = {}) {
     super(message);
     this.name = "KickoffError";
     this.code = code;
     this.committed = committed;
+    if (reason !== undefined) this.reason = reason;
   }
 }
 
@@ -9968,7 +9969,7 @@ export function bindOnboardingSessionCleanup(request={}) {
   const repository=continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
   const context=readSourceOwnedAuthorityContext({repository});
   // D48: say what is true, so nobody hunts for a repair that a dispatch does not need.
-  if(context.status!=='bound')fail('SDC-AUTHORITY-UNAVAILABLE','continuity current invocation required before binding: a session-cleanup binding is created only inside a session-power-controlled invocation, never from a plain terminal. A governed item dispatch does not need it; nothing has to be repaired for dispatch.');
+  if(context.status!=='bound')fail('SDC-AUTHORITY-UNAVAILABLE','continuity current invocation required before binding: a session-cleanup binding is created only inside a session-power-controlled invocation, never from a plain terminal. A governed item dispatch does not need it; nothing has to be repaired for dispatch.',{reason:'continuity-invocation-unbound'});
   const port=createOnboardingContinuityAuthorityProducerPort({repository}),data=continuityAuthorityPorts.get(port);
   const requester=continuityAuthorityCurrent(data,context.requesterHandle);
   const tuple={sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256};
