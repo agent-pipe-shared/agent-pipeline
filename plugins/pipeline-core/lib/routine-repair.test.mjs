@@ -148,12 +148,13 @@ test("stop-failure-aside never moves a symlink or a record of another schema", (
   assert.equal(result.retained.length, 3);
 }));
 
-// W7: a pending state named by the sha256 of its bytes, with the reservation row session-authority-repair inspect would report.
+// W7: a pending state as the host writes it: the name carries a key digest, not the sha256 of the bytes; the terminal and integration
+// siblings carry the sha256 of the pending bytes. The reservation row is the one session-authority-repair inspect would report.
 function writeNamedPending(ap, dispatchId, { terminal = false, integration = false } = {}) {
   mkdirSync(commitDir(ap), { recursive: true });
   const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId }, delivery: { sliceId: dispatchId, itemId: "I-1" } }));
   const digest = createHash("sha256").update(bytes).digest("hex");
-  const name = `pending-claude-${digest}.json`;
+  const name = `pending-claude-${createHash("sha256").update(`key:${dispatchId}`).digest("hex")}.json`;
   writeFileSync(join(commitDir(ap), name), bytes);
   const siblings = [];
   if (terminal) { siblings.push(`authority-terminal-${digest}.json`); writeFileSync(join(commitDir(ap), siblings.at(-1)), "{}"); }
@@ -215,14 +216,18 @@ test("settled-pending-aside moves settled pending states with their terminal and
   assert.equal(again.result.moved.length, 0);
 }));
 
-test("settled-pending-aside never moves a pending state whose bytes no longer match its name", () => withRepo((root, ap) => {
-  const pending = writeNamedPending(ap, "D-M");
-  writeFileSync(join(commitDir(ap), pending.name), "{\"changed\":true}");
-  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(pending, "integrated"))).spawn });
-  assert.equal(exit, 0);
-  assert.equal(result.code, "nothing-to-move");
-  assert.match(result.keptPending[0].reason, /digest/u);
-  assert.ok(existsSync(join(commitDir(ap), pending.name)));
+test("settled-pending-aside keys the siblings by the sha256 of the pending bytes, never by the key digest in the pending name", () => withRepo((root, ap) => {
+  const pending = writeNamedPending(ap, "D-M", { terminal: true });
+  const nameDigest = /^pending-claude-([a-f0-9]{64})\.json$/u.exec(pending.name)[1];
+  assert.notEqual(nameDigest, pending.digest);
+  const foreign = `authority-terminal-${nameDigest}.json`;
+  writeFileSync(join(commitDir(ap), foreign), "{}");
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(pending, "integrated"))).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(result.retiredPending.map((row) => row.name), [pending.name]);
+  const left = readdirSync(commitDir(ap));
+  assert.ok(!left.includes(pending.name) && !left.includes(pending.siblings[0]));
+  assert.ok(left.includes(foreign), "a sibling named by the key digest stays");
 }));
 
 test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {

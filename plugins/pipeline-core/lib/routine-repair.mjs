@@ -78,8 +78,9 @@ const diagnosticsDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run",
 /**
  * W7: which pending states of the reservation rows of `session-authority-repair inspect` may leave the authority namespace (read-only).
  * The settled rule itself is inspect's (integrated, integrated-by-commit, cancelled); it is not re-implemented here. A pending file is
- * retired only when its row is settled, it is a regular non-symlink file, and the sha256 of its bytes equals the digest in its name;
- * its authority-terminal and authority-integration siblings of that digest travel with it. Everything else is listed in `kept`.
+ * retired only when its row is settled and it is a regular non-symlink file. The digest in a pending name is a key, not the sha256 of
+ * its bytes; the authority-terminal and authority-integration siblings are named by the sha256 of the pending bytes (pendingSha256 in
+ * native-goldfish-host-state), so those travel with it. Everything else is listed in `kept`.
  */
 export function planSettledPending({ pendingDir, reservations }) {
   const retire = [], kept = [];
@@ -93,11 +94,11 @@ export function planSettledPending({ pendingDir, reservations }) {
     const path = join(pendingDir, name);
     try {
       if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
-      if (createHash("sha256").update(readFileSync(path)).digest("hex") !== match[2]) { kept.push({ name, reason: "the sha256 of the bytes differs from the digest in the name" }); continue; }
+      const pendingSha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
       const siblings = [];
       let blocked = null;
       for (const prefix of SETTLED_SIBLINGS) {
-        const sibling = `${prefix}-${match[2]}.json`;
+        const sibling = `${prefix}-${pendingSha256}.json`;
         if (!existsSync(join(pendingDir, sibling))) continue;
         if (lstatSync(join(pendingDir, sibling)).isSymbolicLink()) blocked = `${sibling} is a symlink`; else siblings.push(sibling);
       }
