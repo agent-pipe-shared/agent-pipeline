@@ -444,7 +444,8 @@ export function readConsumedCriticCourseResult(input) {
         || retained.candidate.tree !== packet.candidate.tree || retained.diff.base !== packet.diff.base
         || retained.diff.sha256 !== packet.diff.sha256
         || retained.verdict.resultSha256 !== resultSha256 || !retained.verdict.schemaValid
-        || retained.verdict.status !== (result.verdict.pass ? "no-findings" : "findings")
+        // D207: a PASS that still reports findings is recorded as "findings" (critic-review-lineage.mjs).
+        || retained.verdict.status !== (result.verdict.pass && (result.verdict.findings?.length ?? 0) === 0 ? "no-findings" : "findings")
         || retained.references.packetSha256 !== sha256Canonical(packet)
         || retained.references.requestSha256 !== packet.bindings.requestSha256
         || retained.coverage.complete !== true || retained.coverage.receiptSha256 !== receiptSha256

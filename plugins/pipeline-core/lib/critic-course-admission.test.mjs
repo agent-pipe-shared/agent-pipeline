@@ -782,7 +782,7 @@ const pf94Bindings = (root, base, head) => {
 const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
 /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
 // Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
-export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task", extraCandidateFiles = [] } = {}) {
+export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task", extraCandidateFiles = [], verdict = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pf94-course-round-"));
   git(root, ["init", "-q", "-b", "main"]);
   mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
@@ -825,7 +825,7 @@ export function consumedCourseRoundFixture({ course = true, failing = false, fea
   const preflightInput = { root, base, candidate, specPath, guardrailPaths: course ? [] : pf94Guardrails, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
   if (course) preflightInput.courseContext = { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
   const packetId = "9a".repeat(16);
-  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: failing ? { ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] } : pf94Verdict };
+  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: verdict ?? (failing ? { ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] } : pf94Verdict) };
   let preflightBeforeBatch = null;
   if (!course) {
     preflightBeforeBatch = preflightCriticDispatch({ ...preflightInput, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
@@ -974,8 +974,8 @@ const pf94WriteInput = (fx, value) => {
 };
 const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath });
 /** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
-function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true } = {}) {
-  const fx = consumedCourseRoundFixture({ failing });
+function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true, verdict = null } = {}) {
+  const fx = consumedCourseRoundFixture({ failing, verdict });
   let lineageAdded = null;
   if (lineage) { lineageAdded = pf94Lineage(fx); assert.equal(lineageAdded.status, "lineage-added", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
   let correctionCommit = null, evidenceRegistration = null;
@@ -1321,5 +1321,22 @@ test("full round over 300 changed paths: the real route admits, finalizes and re
   assert.equal(added.status, "lineage-added", JSON.stringify(added));
   const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   assert.ok(lineage.diff.changedPaths.length > 300, String(lineage.diff.changedPaths.length));
+});
+// D207 (consumer finding 2026-10-30): a PASS with minor findings never registered (CRL-NO-FINDINGS); its lineage status
+// now follows the findings, and the registered record reads back in the next course admission.
+test("D207 a PASS with a minor finding registers its lineage as findings and the next admission reads it back", () => {
+  const minor = { ...pf94Verdict, pass: true, findings: [{ gap: "wording drift", risk: "reader confusion", severity: "minor", evidence: "specs/held-feature/spec.md:1", spec_ref: "AC-1" }] };
+  const fx = pf94DeltaFixture({ failing: false, verdict: minor });
+  assert.equal(fx.lineageAdded.status, "lineage-added", JSON.stringify(fx.lineageAdded));
+  const lineage = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
+  assert.equal(lineage.verdict.status, "findings");
+  assert.ok(lineage.findings.some((f) => f.status === "open"), JSON.stringify(lineage.findings));
+  pf94WriteInput(fx);
+  const added = pf94Delta(fx);
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  const registration = pf94CommitPaths(fx.root, added.commitPaths, "register the delta request");
+  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: added.deltaRequestPath });
+  assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
+  assert.equal(after.budgets.reviewRound, 2);
 });
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

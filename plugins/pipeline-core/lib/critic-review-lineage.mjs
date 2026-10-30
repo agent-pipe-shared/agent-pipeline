@@ -441,6 +441,9 @@ export function compileRegisteredCriticReviewLineage(input){try{
  record.consumedResult.packetDigest=receipt.packetDigest;
  record.courseBinding.criterionSha256=criterionSha256;
  record.consumedResult.verdictSha256=receipt.verdictSha256;
+ // D207: the lineage status follows the findings. A PASS that still carries open (minor) findings is recorded as
+ // "findings"; the receipt's PASS stays what Verify and the push gate read.
+ if(record.verdict.status==='no-findings'&&findings.some(f=>f.status==='open'))record.verdict.status='findings';
  record.request.compiledSha256=sha256Canonical(compiledRequest(record));record.recordSha256=sha256Canonical(recordCore(record));const checked=validateCriticReviewLineage(record);if(!checked.ok)throw Error(checked.code);if(parent){const invalid=transitionCode(parent,record);if(invalid)throw Error(invalid);}
  return {ok:true,value:{record:Object.freeze(record),artifact:bindingArtifact(record,i.originalFeatureId)}};
  }catch(error){return {ok:false,status:'refused',code:error.code??error.message??'CRL-V2-COMPILE'};}}
