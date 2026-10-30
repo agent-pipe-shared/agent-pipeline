@@ -181,12 +181,12 @@
         {
           "greenfieldId": "G9a.command",
           "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
-          "stage": "50"
+          "stage": "75"
         },
         {
           "greenfieldId": "G23.reads",
           "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
-          "stage": "50"
+          "stage": "75"
         },
         {
           "greenfieldId": "G30",
