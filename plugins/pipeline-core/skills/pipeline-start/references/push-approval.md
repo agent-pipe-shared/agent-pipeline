@@ -228,6 +228,28 @@ that proves your approvals — it must live **outside** this repository (nothing
 in it is ever committed), and if it is lost, that key can no longer sign
 approvals and a new key/authority record has to be created instead."
 
+### Git transport credentials are not the PO approval proof
+
+Two different secrets meet at a push and must never be confused. The **PO
+approval proof** is the detached signature over the candidate, made with the
+PO key in the directory above. The **Git transport credential** is whatever
+lets `git push` reach the remote (an SSH key, a credential helper, a token
+store). The Pipeline never needs to read, choose or name the transport
+credential: `git push` already uses the one the repository and the machine are
+configured with.
+
+When a push fails for transport reasons (authentication refused, host key
+unknown, no credential), use the **configured route** only: read the remote URL
+(`git remote get-url <remote>`), the effective SSH settings for that host
+(`ssh -G <host>`, which prints the configured `identityfile`), or the
+configured helper (`git config --get credential.helper`). Never list a
+credential store (`ls ~/.ssh`, a keychain, a token directory) and never guess
+key filenames one after another; a refused read of a credential store is not a
+prompt to try names. If the configured route does not resolve the credential,
+ask the PO **one** question with context, early, before any further attempt:
+which credential or remote this repository should push with. Then retry once
+with what the PO named.
+
 ### The two-step shape (superseded as a human step, still supported)
 
 ```

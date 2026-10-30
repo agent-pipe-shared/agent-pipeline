@@ -533,6 +533,18 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
 (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
 `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
 
+**The Git transport credential is not the PO approval proof.** The proof
+consumed in Layer 4 says the PO approved this candidate; whatever lets
+`git push` reach the remote (an SSH key, a credential helper, a token) is the
+repository's and the machine's own configuration, and the Pipeline never needs
+to choose it. On a transport failure use the configured route only
+(`git remote get-url <remote>`, `ssh -G <host>` for the configured
+`identityfile`, `git config --get credential.helper`); never list a credential
+store or guess key filenames, and if the configured route does not resolve it,
+ask the PO one question with context before any further attempt
+(`plugins/pipeline-core/skills/pipeline-start/references/push-approval.md`,
+"Git transport credentials are not the PO approval proof").
+
 **The push command's refspec must be the full `<source>:refs/heads/<branch>`
 form**, matching what `approve-push` already recorded via its own
 `--destination refs/heads/<branch>`. A bare branch name (`git push origin

@@ -3132,6 +3132,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/protected-baseline-rejects-canonical-discarded-idle-state.test.mjs"
     },
     {
+      "name": "pin-push-approval-doc-names-the-transport-credential-route-tests",
+      "file": "plugins/pipeline-core/lib/pins/push-approval-doc-names-the-transport-credential-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-approval-doc-names-the-transport-credential-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/push-approval-doc-names-the-transport-credential-route.test.mjs"
+    },
+    {
       "name": "pin-push-classifier-deny-list-does-not-converge-tests",
       "file": "plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs",
