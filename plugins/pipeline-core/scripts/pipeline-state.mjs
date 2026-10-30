@@ -545,7 +545,7 @@ import {
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
 import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
-import { criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -6081,7 +6081,58 @@ function planLegacyResultRepair(dir, state, manifestPath) {
   };
 }
 
-function resultBootstrapCompletion(dir, state, packageBinding) {
+/**
+ * N30 (D210): the PO-bound reconcile approval names the exact subject it signs -- `{ manifest, planSha256, candidate }`
+ * under kind `feature-package-reconcile` (the preimage `verifyCriticalHumanProof` recomputes at reconcile time). The
+ * completion prints the signing command with that digest and the follow-on reconcile argv, so nobody recomputes the
+ * digest from the library by hand. It only renders: it never signs, never creates a proof and never runs either
+ * command. The candidate is the current HEAD commit and tree, read the same way the reconcile reads it, so a later
+ * commit changes the digest and the printed command has to be taken again from a fresh completion.
+ */
+function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+  const root = realpathSync(resolve(dir));
+  const approvalKind = "feature-package-reconcile";
+  const placeholders = [
+    { flag: "--by", token: "<by>", from: "the name of the person who ran the signing step" },
+    { flag: "--proof-request", token: "<proof-request>", from: "externalPaths.request in the signing step's output" },
+    { flag: "--proof-authority", token: "<proof-authority>", from: "externalPaths.authority in the signing step's output" },
+    { flag: "--proof", token: "<proof>", from: "externalPaths.proof in the signing step's output" },
+  ];
+  const reconcileCommand = {
+    executable: process.execPath,
+    argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", root, "--manifest", manifest, "--plan-sha256", planSha256,
+      ...placeholders.flatMap((entry) => [entry.flag, entry.token])],
+    placeholders, requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind, executionBoundary: "host-authorized-wsl",
+  };
+  const unavailable = (reason) => ({ signatureCommand: null, signatureUnavailable: reason, reconcileCommand });
+  let observed;
+  try { observed = (deps.gitCandidate ?? defaultGitCandidate)(root); }
+  catch (error) { observed = { ok: false, error: error?.message ?? "candidate read failed" }; }
+  if (!observed?.ok) return unavailable(`the current candidate identity (commit and tree) could not be read (${observed?.error ?? "unknown"}); once HEAD is readable, rerun the bootstrap plan to get the signing command`);
+  const candidate = { commit: observed.commit, tree: observed.tree };
+  const featureId = state.activeFeature?.id;
+  const plan = state.activeFeature?.planPath;
+  const spec = state.continuity?.authority?.spec?.path;
+  if (![featureId, plan, spec].every((value) => typeof value === "string" && value.length > 0)) return unavailable("the active feature, its plan path or its Continuity spec binding is missing");
+  let subjectSha256; let expiresAt;
+  const subject = { manifest, planSha256, candidate };
+  try {
+    subjectSha256 = criticalActionSubjectSha256({ kind: approvalKind, candidate, subject });
+    expiresAt = new Date((Date.parse((deps.now ?? (() => new Date().toISOString()))()) || Date.now()) + 3_600_000).toISOString();
+  } catch (error) { return unavailable(`the subject digest could not be computed (${error?.message ?? "invalid subject"})`); }
+  try {
+    const rendered = authorizeCriticalActionCommand({ kind: approvalKind, repoRoot: root, featureId, plan, spec, subjectSha256, expiresAt });
+    return {
+      signatureCommand: {
+        ...rendered, kind: approvalKind, subjectSha256, subject, candidate, expiresAt,
+        requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false,
+      },
+      reconcileCommand,
+    };
+  } catch (error) { return unavailable(`the signing command could not be rendered (${error?.message ?? "invalid input"})`); }
+}
+
+function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
   const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
   if (packageBinding === null) {
     try { lstatSync(resolve(dir, path)); }
@@ -6102,13 +6153,15 @@ function resultBootstrapCompletion(dir, state, packageBinding) {
   const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
     ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
   const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
+  const signing = pending ? reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps) : {};
   return {
     scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
     manifest, preview,
     planSha256: pending ? sha256CanonicalJson(preview) : null,
+    ...signing,
     nextAction: preview.status === "legacy-repair-preview"
-      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
-      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start` : "resolve package drift through authenticated recovery",
+      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair; signatureCommand prints the signing command with its subject digest and reconcileCommand the command to run afterwards"
+      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start; the signing command and its subject digest are printed in signatureCommand (the PO runs it in their own terminal), the reconcile command to run afterwards in reconcileCommand, and the whole close order in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"` : "resolve package drift through authenticated recovery",
     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
       requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
@@ -6410,7 +6463,7 @@ function recoverJournaledLegacyResultBootstrap(dir, current, apply, journal, loc
   return { status: 0, receipt: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "recovered-legacy", featureId: apply.featureId,
     revision: persisted.state.continuity.revision, stateSha256: newStateSha256,
     result: persisted.state.continuity.authority.result, mutated: nextState !== null,
-    completion: resultBootstrapCompletion(dir, persisted.state, registration) } };
+    completion: resultBootstrapCompletion(dir, persisted.state, registration, deps) } };
 }
 
 // NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
@@ -6436,7 +6489,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
     if (!planned.ok) {
       const current = readStateRaw(deps.dir);
       if (current.status === "ok" && current.state.continuity?.authority?.result !== null) {
-        const completion = resultBootstrapCompletion(deps.dir, current.state, null);
+        const completion = resultBootstrapCompletion(deps.dir, current.state, null, deps);
         if (completion.preview?.status === "legacy-repair-preview") {
           const journal = loadBootstrapJournal(deps.dir, deps);
           if (!journal.ok || journal.journal !== null) {
@@ -6483,7 +6536,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
-      const completion = resultBootstrapCompletion(deps.dir, current.state, null);
+      const completion = resultBootstrapCompletion(deps.dir, current.state, null, deps);
       if (completion.state === "authenticated-recovery-required") { console.error(`Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: ${completion.preview.reason}; journal retained if present.`); return 2; }
       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
       console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion })); return 0;
@@ -6527,7 +6580,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
     const recovered = loadBootstrapJournal(deps.dir, deps);
     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null) })); return 0;
+    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null, deps) })); return 0;
   } finally { releaseContinuityLock(lock); }
 }
 
@@ -9012,7 +9065,7 @@ function runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps) {
   if (!retireLegacyResultRepairJournal(privateState.paths)) return { ok: false, code: "FTP-LEGACY-REPAIR-RETIRE" };
   return { ok: true, receipt: { schema: FEATURE_PACKAGE_RECONCILE_SCHEMA, status: "legacy-repaired", manifest,
     planSha256, result: persisted.state.continuity.authority.result,
-    completion: resultBootstrapCompletion(root, persisted.state, registration) } };
+    completion: resultBootstrapCompletion(root, persisted.state, registration, deps) } };
 }
 
 /**
@@ -13038,7 +13091,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       if (requiresContinuityClose) {
         const closeRequest = readContinuityRequest(dir, closeValues["continuity-close-request"]);
         if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
-          console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");
+          console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence. "
+            + "The request is { schema: \"pipeline.continuity-close.v0\", featureId, expectedRevision, result, closeEvidence }; closeEvidence is a { path, sha256 } binding of a regular repository-relative file, "
+            + "different from `result`, whose path is unique across closed features (the combined Verify/Critic receipt is the usual choice). "
+            + "The whole order is in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\".");
           return 2;
         }
         continuityClose = structuredClone(closeRequest.value);

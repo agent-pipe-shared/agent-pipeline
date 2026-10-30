@@ -83,6 +83,51 @@ Without separately authorized publication, confirmed descriptor-bound cleanup
 may end at `closed-local`. Publication, readback, release and promotion are
 separate coordinator transitions and are never implied by this skill.
 
+## Closing a feature with active Continuity: the ordered route
+
+A feature whose State carries `continuity` closes in this order. Every step is first a read-only plan, then an
+`--activate` apply of the returned action after confirmation; nothing below signs or pushes on its own.
+
+1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
+2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, `signatureCommand` and `reconcileCommand`.
+4. Sign the reconcile (PO only, in the PO's own terminal): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
+5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders (`<by>`, `<proof-request>`, `<proof-authority>`, `<proof>`) with the name and the `externalPaths` the signing step printed.
+6. Write the Continuity close request (below) and plan `close-coordinator.mjs plan-transition ... --phase feature-close-prepared --architecture-impact <impact> --continuity-close-request <request>`; apply the returned action.
+7. Run the State-writer action that apply returns (`pipeline-state.mjs close-feature ...` with `--continuity-close-request`), as shown in Step 2.
+
+The close request is one JSON file in the repository, schema `pipeline.continuity-close.v0`, with exactly the keys `schema`,
+`featureId`, `expectedRevision` (the State's Continuity revision), `result` (the State's Result binding, `{ path, sha256 }`) and
+`closeEvidence`. The rules for `closeEvidence`:
+
+- it is a `{ path, sha256 }` binding of a regular repository-relative file (no symlink, not empty, hash equal to the file);
+- it is different from `result`;
+- its path is unique across closed features: a path already claimed by a closed feature is refused.
+
+The usual choice is the combined Verify/Critic receipt of the feature. The State must also be close-ready: queue head `nextAction`
+`close`, no dispatch, no blocker, no decision transaction.
+
+## Command signatures
+
+Spellings are taken from each script's own parser or help; `<...>` is a value.
+
+| Command | Flags |
+|---|---|
+| `pipeline-state.mjs feature-package-status` | --root <dir> --manifest <repo-relative-path> |
+| `pipeline-state.mjs feature-package-reconcile` | --root --manifest --plan-sha256 <sha256> --by <name> --proof-request <abs-path> --proof-authority <abs-path> --proof <abs-path> |
+| `pipeline-state.mjs continuity-result-bootstrap-plan` | (none) |
+| `pipeline-state.mjs continuity-result-bootstrap-apply` | --feature-id --expected-revision --expected-state-sha256 --expected-post-state-sha256 --updated-at --plan-sha256 --activate (use the returned action) |
+| `pipeline-state.mjs close-feature` | --by --architecture-impact --coordinator-lifecycle --coordinator-sha256 --continuity-close-request |
+| `close-coordinator.mjs inspect` | --root --lifecycle |
+| `close-coordinator.mjs plan-start` | --root --lifecycle --actor --close-intent <durable-stop or runtime-transfer> |
+| `close-coordinator.mjs apply-start` | the plan-start flags plus --plan-sha256 --activate |
+| `close-coordinator.mjs plan-transition` | --root --lifecycle --actor --phase [--architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --authorized] |
+| `close-coordinator.mjs apply-transition` | the plan-transition flags plus --plan-sha256 --activate |
+| `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`) |
+
+A commit message goes in a file: `git commit -F <msgfile> -- <paths>` after `git add -- <paths>` (the refusals for several `-m`
+flags and for a message with parentheses name this form); a Pipeline-owned file commits with `scripts/commit-pipeline-owned.mjs`.
+
 ## Explicitly out of scope
 
 **No feature-wide cost aggregation.** Step 1 only appends the CURRENT session's usage row (exactly

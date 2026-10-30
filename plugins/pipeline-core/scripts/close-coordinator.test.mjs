@@ -477,6 +477,30 @@ test("process: registered package digest drift blocks close preparation before a
   assert.equal(f.refused.code, "CLOSE-PACKAGE");
 });
 
+// N31/N32 (D210): the refusal for a Continuity close request that is not bound to the close-ready State names the rule
+// that failed (the three closeEvidence rules) and the skill section that carries the whole ordered route.
+test("process: a close request whose closeEvidence is the Result is refused with the closeEvidence rules and the skill section named", () => {
+  const f = processFixture("close-evidence-is-result", {
+    beforePrepared({ root, paths, state }) {
+      writeJson(join(root, paths.closeRequest), {
+        schema: "pipeline.continuity-close.v0",
+        featureId: state.activeFeature.id,
+        expectedRevision: state.continuity.revision,
+        result: state.continuity.authority.result,
+        closeEvidence: state.continuity.authority.result,
+      });
+    },
+    expectPreparedRefusal: "CLOSE-CONTINUITY",
+  });
+  assert.equal(f.refused.code, "CLOSE-CONTINUITY");
+  assert.match(f.refused.message, /closeEvidence/u);
+  assert.match(f.refused.message, /different from (?:the )?`?result/u);
+  assert.match(f.refused.message, /unique across closed features/u);
+  assert.match(f.refused.message, /regular repository-relative file/u);
+  assert.match(f.refused.message, /close-feature skill/u);
+  assert.match(f.refused.message, /not bound to the exact close-ready State/u, "the original wording stays, the rule text is appended");
+});
+
 test("process: local close is read-only planned, replay-safe, candidate-bound and never pushes", () => {
   const fixture = processFixture("local");
   const originalTracked = readFileSync(fixture.trackedPath);

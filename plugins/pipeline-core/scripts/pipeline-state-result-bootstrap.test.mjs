@@ -3,7 +3,8 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
+import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { afterEach, test } from "node:test";
 import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -603,6 +604,86 @@ test("N29 anchor: a package whose Result entry has authority:false closes from c
   assert.equal(proceeds.code, "CLOSE-QUALIFICATION-REQUIRED");
   assert.equal(closeCli(["inspect", "--root", root, "--lifecycle", lifecycle]).coordinator.phase, "checkpointed");
 });
+
+// ---- N30 (D210): the completion prints the exact reconcile signing command and its subject digest ----
+// Like `push-init` does for a push. The digest is the one the verifier recomputes from { manifest, planSha256, candidate }
+// (pipeline-state.mjs verifyCriticalHumanProof); the printed reconcile command is admitted with a proof made for that digest.
+
+test("N30 anchor: the completion prints the signing command with the subject digest the verifier recomputes, and the printed reconcile command is admitted with a proof made for it", () => {
+  const f = fixture("n30-anchor"); const { manifestPath } = registerPackageWithoutResultAuthority(f);
+  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  const gitDeps = { gitCandidate: () => ({ ok: true, ...candidate }) };
+  const p = plan(f);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
+  const completion = JSON.parse(applied.out).completion;
+  assert.equal(completion.state, "reconciliation-pending");
+  const expectedSubject = { manifest: manifestPath, planSha256: completion.planSha256, candidate };
+  const expectedDigest = criticalActionSubjectSha256({ kind: "feature-package-reconcile", candidate, subject: expectedSubject });
+  const signature = completion.signatureCommand;
+  assert.equal(signature.kind, "feature-package-reconcile");
+  assert.equal(signature.subjectSha256, expectedDigest, "the printed digest is criticalActionSubjectSha256 over the verifier's preimage");
+  assert.deepEqual(signature.subject, expectedSubject); assert.deepEqual(signature.candidate, candidate);
+  assert.equal(signature.executable, "node");
+  const flag = (argv, name) => argv[argv.indexOf(name) + 1];
+  assert.equal(argv0(signature.argv), "authorize-critical");
+  assert.equal(flag(signature.argv, "--kind"), "feature-package-reconcile");
+  assert.equal(flag(signature.argv, "--subject-sha256"), expectedDigest);
+  assert.equal(flag(signature.argv, "--feature-id"), "feature");
+  assert.equal(flag(signature.argv, "--plan"), "specs/feature/prd_feature.md");
+  assert.equal(flag(signature.argv, "--spec"), "specs/feature/spec.md");
+  assert.equal(flag(signature.argv, "--repo-root"), realpathSync(f.root));
+  assert.equal(typeof signature.command, "string"); assert.equal(signature.requiresPoApproval, true);
+  assert.equal(signature.argv.includes("--directory"), false, "the approval directory is resolved by the signing step and never printed");
+  // The PO's terminal makes this proof; the test makes it the same way, for exactly the printed digest.
+  const expiresAt = flag(signature.argv, "--expires-at");
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  const authority = { keyReference: "test-key", publicKeySha256: hash(publicKey) };
+  const external = mkdtempSync(join(tmpdir(), "n30-external-")); roots.push(external);
+  const proofFiles = (digest, name) => {
+    const request = createCriticalActionApprovalRequest({ candidate, featureId: "feature", planBytes: readFileSync(join(f.root, "specs/feature/prd_feature.md")), specBytes: readFileSync(join(f.root, "specs/feature/spec.md")),
+      action: { kind: "feature-package-reconcile", subjectSha256: digest, expiresAt } });
+    const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey,
+      signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
+    const files = { request: join(external, `${name}-request.json`), authority: join(external, `${name}-authority.json`), proof: join(external, `${name}-proof.json`) };
+    writeFileSync(files.request, JSON.stringify(request)); writeFileSync(files.authority, JSON.stringify(authority)); writeFileSync(files.proof, JSON.stringify(proof));
+    return files;
+  };
+  mkdirSync(join(f.root, "project"), { recursive: true });
+  writeFileSync(join(f.root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["feature-package-reconcile"] }));
+  // The follow-on command is printed with named placeholders for the three files the signing step writes and the actor.
+  const reconcile = completion.reconcileCommand;
+  assert.equal(reconcile.executable, process.execPath); assert.equal(argv0(reconcile.argv), "feature-package-reconcile");
+  assert.equal(flag(reconcile.argv, "--manifest"), manifestPath); assert.equal(flag(reconcile.argv, "--plan-sha256"), completion.planSha256);
+  assert.deepEqual(reconcile.placeholders.map((entry) => entry.flag).sort(), ["--by", "--proof", "--proof-authority", "--proof-request"]);
+  const fill = (files) => reconcile.argv.map((entry) => {
+    const hit = reconcile.placeholders.find((placeholder) => placeholder.token === entry);
+    if (hit === undefined) return entry;
+    return { "--by": "PO", "--proof-request": files.request, "--proof-authority": files.authority, "--proof": files.proof }[hit.flag];
+  });
+  // A proof made for a DIFFERENT digest is refused, so the admission below is not vacuous.
+  const wrong = proofFiles("c".repeat(64), "wrong");
+  const refused = invoke(f.root, fill(wrong).slice(1), gitDeps);
+  assert.equal(refused.status, 2, refused.err); assert.match(refused.err, /FTP-RECONCILE-APPROVAL-REJECTED/);
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false, "a refused reconcile leaves the package stale");
+  const good = proofFiles(expectedDigest, "good");
+  const admitted = invoke(f.root, fill(good).slice(1), gitDeps);
+  assert.equal(admitted.status, 0, admitted.err);
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
+});
+
+test("N30: without a readable candidate the completion says why it has no signing command and still names the reconcile verb", () => {
+  const f = fixture("n30-nocandidate"); registerPackageWithoutResultAuthority(f);
+  const p = plan(f);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: false, error: "no commit" }) }); assert.equal(applied.status, 0, applied.err);
+  const completion = JSON.parse(applied.out).completion;
+  assert.equal(completion.state, "reconciliation-pending");
+  assert.equal(completion.signatureCommand, null);
+  assert.match(completion.signatureUnavailable, /candidate/u);
+  assert.match(completion.nextAction, /feature-package-reconcile/u);
+});
+
+const argv0 = (argv) => argv[1];
 
 test("N29 negatives: two Result entries, a Result at another path and a PRD without authority stay refused with a typed detail", () => {
   const refusal = (name, mutate, state = null) => {

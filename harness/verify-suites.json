@@ -3564,6 +3564,12 @@
       "nonOverlapNote": "Unique regression pin (ALF-W3B-CRITIC-CLOSE-GATE) driving the real coordinator process in its own fixture repository"
     },
     {
+      "name": "pin-close-feature-names-reconcile-order-and-close-evidence-tests",
+      "file": "plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs",
+      "invariantPinned": "The close-feature skill names the ordered feature-close route, the continuity-close request keys and the three closeEvidence rules, its signature table only names verbs and flags that exist in the scripts, and the two close-request refusals name the rule and the skill section",
+      "nonOverlapNote": "Unique source-text pin for N30-N32/G12 (D210); the reconcile signing command itself is pinned by the result-bootstrap suite"
+    },
+    {
       "name": "pin-codex-readiness-process-root-registration-tests",
       "file": "plugins/pipeline-core/lib/pins/codex-readiness-process-root-registration.test.mjs",
       "invariantPinned": "The Codex readiness host store registers the process root it creates with the process journal and exposes exactly the path the registry returns, while an unregistered sibling stays refused",

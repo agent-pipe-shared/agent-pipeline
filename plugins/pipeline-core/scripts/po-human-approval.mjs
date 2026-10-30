@@ -2039,8 +2039,9 @@ function interruptionPromotionConfirmationLines(kind, subjectPreimage) {
  * project-onboarding-v3.mjs; this function never duplicates it.
  *
  * `--kind` is always `"push"`: this helper is specific to the push-approval
- * ceremony (`references/push-approval.md`'s worked example), not a general
- * `authorize-critical` renderer for `deploy`/`publication`.
+ * ceremony (`references/push-approval.md`'s worked example). The general
+ * `authorize-critical` renderer is `authorizeCriticalActionCommand()` below
+ * (N30); this function is its `kind: "push"` case.
  *
  * `launcher` defaults to this script's OWN resolved absolute path
  * (`fileURLToPath(import.meta.url)`) so a caller can never relay a wrong or
@@ -2054,11 +2055,43 @@ export function authorizeCriticalPushCommand({
   repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
   launcher = fileURLToPath(import.meta.url),
 } = {}) {
-  for (const [name, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
-    if (typeof value !== "string" || value.length === 0) throw new TypeError(`authorizeCriticalPushCommand requires a non-empty ${name}`);
+  return renderAuthorizeCriticalCommand("authorizeCriticalPushCommand", {
+    kind: "push", repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+  });
+}
+
+/**
+ * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
+ * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
+ */
+export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile"]);
+
+/**
+ * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
+ * case of this one (same rendering, same argv, same refusal wording under its own name), so a second signing route
+ * -- the feature-close reconcile -- prints its exact command from ONE definition instead of a hand-formatted copy.
+ * It renders; it never executes, signs or reads a key.
+ */
+export function authorizeCriticalActionCommand({
+  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
+  launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  return renderAuthorizeCriticalCommand("authorizeCriticalActionCommand", {
+    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+  });
+}
+
+function renderAuthorizeCriticalCommand(name, {
+  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+}) {
+  if (!AUTHORIZE_CRITICAL_COMMAND_KINDS.includes(kind)) {
+    throw new TypeError(`${name} requires a known kind (${AUTHORIZE_CRITICAL_COMMAND_KINDS.join(", ")})`);
+  }
+  for (const [field, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
+    if (typeof value !== "string" || value.length === 0) throw new TypeError(`${name} requires a non-empty ${field}`);
   }
   if (directory !== null && (typeof directory !== "string" || directory.length === 0)) {
-    throw new TypeError("authorizeCriticalPushCommand requires directory to be null or a non-empty string");
+    throw new TypeError(`${name} requires directory to be null or a non-empty string`);
   }
   const argv = [
     launcher, "authorize-critical",
@@ -2069,7 +2102,7 @@ export function authorizeCriticalPushCommand({
     "--feature-id", featureId,
     "--plan", plan,
     "--spec", spec,
-    "--kind", "push",
+    "--kind", kind,
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
   );

@@ -364,7 +364,7 @@ function continuityCloseRequest(root, snapshot, path) {
     if (path !== undefined) fail("CLOSE-CONTINUITY", "continuity close request is unexpected");
     return null;
   }
-  if (!path) fail("CLOSE-CONTINUITY", "active Continuity requires an exact close request");
+  if (!path) fail("CLOSE-CONTINUITY", "active Continuity requires an exact close request (--continuity-close-request <repo-relative-json>; its keys, the closeEvidence rules and the whole order are in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\")");
   const request = readJsonFile(root, path, "Continuity close request");
   const value = request.value;
   const continuity = snapshot.state.continuity;
@@ -382,7 +382,10 @@ function continuityCloseRequest(root, snapshot, path) {
     || result === null
     || canonical(value.result) !== canonical(result)
     || canonical(value.closeEvidence) === canonical(value.result)) {
-    fail("CLOSE-CONTINUITY", "Continuity close request is not bound to the exact close-ready State");
+    fail("CLOSE-CONTINUITY", "Continuity close request is not bound to the exact close-ready State: the request keys are schema (pipeline.continuity-close.v0), featureId, expectedRevision, result and closeEvidence; "
+      + "result must equal the State's Result binding; closeEvidence is a { path, sha256 } binding of a regular repository-relative file, different from `result`, whose path is unique across closed features "
+      + "(the combined Verify/Critic receipt is the usual choice); and the State must be close-ready (queue head nextAction close, no dispatch, blocker or decision transaction). "
+      + "The whole order is in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\"");
   }
   for (const [label, binding] of [["Result", value.result], ["close evidence", value.closeEvidence]]) {
     if (!binding || Object.keys(binding).sort().join("\0") !== "path\0sha256"

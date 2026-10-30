@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after } from "node:test";
 
-import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
+import { authorizeCriticalActionCommand, authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
 import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
@@ -4555,6 +4555,29 @@ test("GF-105: authorizeCriticalPushCommand omits the configured private director
   ]);
   assert.equal(typeof built.command, "string");
   assert.ok(built.copyCommand);
+});
+
+// N30 (D210): the kind-parametric sibling. The push builder delegates to it, so the push signing route is
+// byte-compatible (same argv, same rendering) and the reconcile signing command comes from one definition.
+test("N30: authorizeCriticalActionCommand renders the exact feature-package-reconcile authorize-critical argv and the push builder delegates to it byte-identically", () => {
+  const reconcile = authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture() });
+  assert.equal(reconcile.executable, "node");
+  assert.equal(reconcile.argv[0], OWN_SCRIPT_PATH);
+  assert.deepEqual(reconcile.argv.slice(1), [
+    "authorize-critical", "--repo-root", "/repo root", "--feature-id", "cyb-6",
+    "--plan", "specs/x y/prd.md", "--spec", "specs/x/spec.md",
+    "--kind", "feature-package-reconcile", "--subject-sha256", "a".repeat(64), "--expires-at", "2026-08-10T12:00:00.000Z",
+  ]);
+  const viaAction = authorizeCriticalActionCommand({ kind: "push", ...pushCommandFixture() });
+  assert.deepEqual(viaAction, authorizeCriticalPushCommand(pushCommandFixture()), "the push builder is the kind=push case of the generic one");
+  const withDirectory = authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture({ directory: "/po dir" }) });
+  assert.deepEqual(withDirectory.argv.slice(1, 6), ["authorize-critical", "--repo-root", "/repo root", "--directory", "/po dir"]);
+});
+
+test("N30: authorizeCriticalActionCommand refuses an unknown kind and a missing value under its own name, while the push builder keeps its own message", () => {
+  assert.throws(() => authorizeCriticalActionCommand({ kind: "not-a-kind", ...pushCommandFixture() }), /authorizeCriticalActionCommand requires a known kind/u);
+  assert.throws(() => authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture({ plan: "" }) }), /authorizeCriticalActionCommand requires a non-empty plan/u);
+  assert.throws(() => authorizeCriticalPushCommand(pushCommandFixture({ plan: "" })), /authorizeCriticalPushCommand requires a non-empty plan/u);
 });
 
 test("GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory", () => {

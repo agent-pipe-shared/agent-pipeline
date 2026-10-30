@@ -69,7 +69,9 @@ independent sequence and must not advance when its coordinator phase is stale.
    `feature-close-prepared` (then execute only its returned, separately
    confirmed State-writer action, including any continuity close request) →
    complete the ritual's tracked Result/backlog/handover/HISTORY/telemetry/
-   retrospective effects → bind them as `tracked-close-finalized` → create the
+   retrospective effects (a feature with active Continuity first follows the
+   ordered route in `close-feature`: bootstrap, reconcile signature, close
+   request) → bind them as `tracked-close-finalized` → create the
    one final tracked commit → `candidate-frozen` → persist exact private
    Verify/Security evidence → `final-verify-green`.
 4. After `final-verify-green`, a no-push close uses confirmed descriptor-bound

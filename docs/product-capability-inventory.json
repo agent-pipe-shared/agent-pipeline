@@ -693,6 +693,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-greenfield-lifecycle-not-walkable-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-guard-refuses-every-in-repo-read-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-close-feature-names-reconcile-order-and-close-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-evidence-fails-after-host-update-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-shared-namespace-rejects-fresh-repository-identity-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-bootstrap-in-the-typed-next-action-tests",
