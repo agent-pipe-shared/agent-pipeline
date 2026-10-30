@@ -735,6 +735,22 @@ check("Antigravity pretool guard blocks writes outside project root (GUARD-CROSS
   rmSync(root, { recursive: true, force: true });
 });
 
+check("Antigravity pretool guard names the artifact copy route when a refused copy aims at a brain directory (G13)", () => {
+  const root = fixture();
+  const brain = join(tmpdir(), "agy-g13-home", "brain", "11111111-2222-4333-8444-555555555555");
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: `cp -r public/gallery ${brain}/gallery`, Cwd: root } },
+  }, root));
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /AGY-ARTIFACT-COPY-ROUTE/);
+  const plain = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: `cp notes.md ${join(tmpdir(), "agy-g13-other", "notes.md")}`, Cwd: root } },
+  }, root));
+  assert.equal(plain.decision, "deny");
+  assert.doesNotMatch(plain.reason, /AGY-ARTIFACT-COPY-ROUTE/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("Antigravity pretool guard blocks write when Dev-Plan is not approved", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({

@@ -883,7 +883,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       deny(denials.map((entry) => entry.reason).join("\n"));
     }
     if (crossRepositoryOnlyDenial) {
-      deny(crossRepositoryDenialReason(denials));
+      deny(crossRepositoryDenialReason(denials, antigravityGuardPayload(input, normalized, projectRoot)));
     }
 
     const pureRecovery = classifyNonLiftableGuardDenials(denials);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, symlinkSync, linkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { antigravityArtifactHostContext, isCurrentSessionArtifactExport, crossRepositoryDenialReason } from './current-session-artifact-export.mjs';
+import { antigravityArtifactHostContext, isCurrentSessionArtifactExport, crossRepositoryDenialReason, ARTIFACT_COPY_ROUTE_HINT } from './current-session-artifact-export.mjs';
 import { registerTestCaseCompletion } from './test-case-completion.mjs';
 const cases = [];
 function test(name, run) { cases.push({ id: `G13A${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
@@ -89,5 +89,14 @@ test('cross-repository denial transport preserves the authoritative recovery ver
   assert.equal(crossRepositoryDenialReason([{ reason }]), reason);
   assert.equal(crossRepositoryDenialReason([{ reason }]).includes('PLUGIN-CACHE'), false);
 });
-if (cases.length !== 6) throw new Error('g13 artifact case count drift');
+test('a refused copy into an artifact directory names the one admitted shape after the recovery (G13)', () => {
+  const reason = 'GUARD-CROSS-REPO-MUTATION\nHGO-EXTERNAL-PROJECT-BOUNDARY';
+  const brain = '/synthetic-home/.gemini/synthetic-appdata/brain/11111111-2222-4333-8444-555555555555';
+  const bash = (command) => ({ tool_name: 'Bash', tool_input: { command }, cwd: '/synthetic-project' });
+  const aimed = crossRepositoryDenialReason([{ reason }], bash(`cp -r public/gallery ${brain}/gallery`));
+  assert.equal(aimed, `${reason}\n${ARTIFACT_COPY_ROUTE_HINT}`);
+  assert.equal(crossRepositoryDenialReason([{ reason }], bash(`cp notes.md /synthetic-home/other/notes.md`)), reason);
+  assert.equal(crossRepositoryDenialReason([{ reason }], { tool_name: 'Write', tool_input: { file_path: `${brain}/x.png` } }), reason);
+});
+if (cases.length !== 7) throw new Error('g13 artifact case count drift');
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });

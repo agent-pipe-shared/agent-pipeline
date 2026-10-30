@@ -78,8 +78,23 @@ export function isCurrentSessionArtifactExport(input, root, { runner } = {}) {
   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
 
-export function crossRepositoryDenialReason(denials) {
+export const ARTIFACT_COPY_ROUTE_HINT = 'AGY-ARTIFACT-COPY-ROUTE: an image for the current conversation goes into its artifact directory with exactly '
+  + '`cp [--] <regular PNG inside the project> <new .png directly in the current artifact directory>`: one source, no options, no glob, '
+  + 'a target that does not exist yet, the absolute artifact directory of this conversation and no other.';
+
+/** True when a refused command aims a copy or move at an Antigravity brain directory; read-only, never a permission. */
+function aimsAtArtifactDirectory(input) {
+  if (input?.tool_name !== 'Bash' || typeof input.tool_input?.command !== 'string') return false;
+  const parsed = parseGuardCommand(input.tool_input.command, input.cwd ?? process.cwd(), { platform: 'linux' });
+  if (parsed.parseStatus !== 'accepted') return false;
+  return parsed.segments.some((segment) => ['cp', 'mv', 'install'].includes(segment.executable)
+    && segment.argv.some((arg) => /(?:^|[\\/])brain[\\/][A-Fa-f0-9-]{36}(?:[\\/]|$)/u.test(arg)));
+}
+
+export function crossRepositoryDenialReason(denials, input) {
   // The shared guard already selected the exact HGO recovery. A second adapter
   // classification used to label every outside target as a plugin cache.
-  return denials.map((entry) => entry.reason).join('\n');
+  const reason = denials.map((entry) => entry.reason).join('\n');
+  // G13: a refused artifact copy names the one admitted shape, after the authoritative recovery.
+  return aimsAtArtifactDirectory(input) ? `${reason}\n${ARTIFACT_COPY_ROUTE_HINT}` : reason;
 }
