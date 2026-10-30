@@ -1,0 +1,28 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+index 3e4f51a88..f0eef23bf 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+@@ -484,7 +484,7 @@ test("the unconfigured-verify handover exception is exact about its input and pl
+ // The fixtures below are the producer's literals (that function is module-private); the conformance test
+ // pins them against the producer's source text so a drifting producer fails here, loudly, not in the field.
+ const REOPEN_DESIGN_ACTOR_PLACEHOLDER = "<recovery actor's name>";
+-const REOPEN_STALE_GUIDANCE = "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
++const REOPEN_STALE_GUIDANCE = "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
+ const REOPEN_INVALID_EVIDENCE_GUIDANCE = "The approved PRD is immutable and its architecture evidence is invalid (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.";
+ const FOREIGN_PLUGIN_SCRIPTS = join(tmpdir(), "foreign-plugin", "scripts");
+ 
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 9083b5f11..30fe6759d 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3340,7 +3340,9 @@ function designToImplementationHandoverAction(root, fs) {
+       inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+       mutation: false,
+       requiresConfirmation: false,
+-      guidance: "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
++      // A clone or transfer with unchanged approved bytes is repaired by rebind-approval and keeps the approval;
++      // reopen-design discards it, so it is named second.
++      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
+       applyAction: commandAction([PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,
+         "pipeline.project-onboarding.v4", ["ready"]),
+     };
