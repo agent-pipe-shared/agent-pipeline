@@ -1,0 +1,96 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index e16dcd90a..40d075218 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -26,7 +26,9 @@ const GENERATOR_MARKER_LINE = /^<!-- pipeline-briefing-generator:v1 sha256=([a-f
+ const GENERATOR_MARKER_ANY = /<!-- pipeline-briefing-generator:/gu;
+ 
+ const REQUIRED_STRINGS = Object.freeze(["id", "item", "agentType", "modelId", "check", "title", "ac", "goal"]);
+-const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner"]);
++// effortEscalation: the model-policy act (MP-05 or MP-07) that authorises an agent definition effort above its route effort; the
++// binding validates the closed value exactly as for the --effort-escalation flag (DBG-EFFORT-ESCALATION-UNKNOWN).
++const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation"]);
+ // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
+ export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
+ const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 6290d70cd..b22bd4d7f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -75,7 +75,7 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+   Required strings: id, item, agentType, modelId, check, title, ac, goal.
+   Required non-empty string arrays: paths, context, targeted.
+-  Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
++  Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation (MP-05|MP-07, as the flag).
+   Optional string arrays: newFiles (files the dispatch creates: exempt from the must-exist check AND added to the write scope), forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
+   Unknown keys are refused. --package is repository-relative. Only --out writes,
+   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
+@@ -839,7 +839,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   let effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
+   let claudeRouteDuty = null;
+   if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
+-    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort), or omit the flag`);
++    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort; in a briefing package the key "effortEscalation"), or omit it`);
+   }
+   if (runner !== "codex") {
+     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+@@ -853,7 +853,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       claudeRouteDuty = taskRoute;
+       warnings.push({ code: "DBG-EFFORT-ESCALATION", message: `${effortEscalation} escalation: agent definition ${agentType} pins effort ${resolved.effort}, above the ${routeEffort} the configured Claude route ${taskRoute} selects; the binding records ${resolved.effort}, the effort the run will really get` });
+     } else {
+-      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07), or pass the --agent-type whose definition matches the route`);
++      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07; in a briefing package the key "effortEscalation"), or pass the --agent-type whose definition matches the route`);
+     }
+   }
+   let maxTurns;
+@@ -1052,6 +1052,8 @@ function packageBindingOptions(root, pkg, agentType) {
+     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
+     // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
+     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
++    // The package carries the same escalation act as the --effort-escalation flag; the binding is its only validator.
++    ...(pkg.effortEscalation === undefined ? {} : { effortEscalation: pkg.effortEscalation }),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 1eef6f8b7..ae558211b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1327,6 +1327,36 @@ test("W2-R2 an escalation flag where the route already equals the pin changes no
+   assert.equal(lower.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
+ });
+ 
++// 2026-10-30: a package could not carry the escalation act, so a deep-tier package above the route effort had no generator route at all
++// (the flag exists only on the direct binding). The package key reaches the same binding check: parity with the flag for every value.
++test("a briefing package carries effortEscalation exactly like the flag: admitted with the same warning, unknown refused, absent contradicts", async () => {
++  const { runDispatchBriefing } = await lib();
++  const deep = { agentType: "goldfish-deep" };
++  for (const act of ["MP-05", "MP-07"]) {
++    const { fx, argv } = packageFixture({ ...deep, effortEscalation: act });
++    const built = runDispatchBriefing(argv, depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++    assert.equal(built.ok, true, JSON.stringify(built).slice(0, 400));
++    const parsed = parseNativeGoldfishBriefing(built.text);
++    assert.equal(parsed.ok, true, parsed.code);
++    assert.equal(parsed.binding.effort, "xhigh", "the binding records the effort the agent definition really runs");
++    const warning = built.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION");
++    assert.ok(warning && warning.message.includes(act), JSON.stringify(built.warnings));
++    const flag = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", act]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++    assert.equal(flag.binding.effort, parsed.binding.effort, `${act}: package and flag bind the same effort`);
++    assert.equal(flag.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION").message, warning.message, `${act}: same warning`);
++  }
++  const unknown = packageFixture({ ...deep, effortEscalation: "because" });
++  const refused = runDispatchBriefing(unknown.argv, depsOf(unknown.fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(refused.code, "DBG-EFFORT-ESCALATION-UNKNOWN", refused.message);
++  assert.match(refused.message, /"effortEscalation"/u, "the repair names the package key");
++  const empty = packageFixture({ ...deep, effortEscalation: "" });
++  assert.equal(runDispatchBriefing(empty.argv, depsOf(empty.fx, { claudeRoute: claudeRouteOf("medium") })).code, "DBG-PACKAGE-FIELD-TYPE");
++  const absent = packageFixture(deep);
++  const contradiction = runDispatchBriefing(absent.argv, depsOf(absent.fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(contradiction.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
++  assert.match(contradiction.message, /"effortEscalation"/u, "the contradiction names the package key as a repair");
++});
++
+ test("W2-R2 an unreadable Claude route is announced and the agent definition's effort stays the briefed one", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();
