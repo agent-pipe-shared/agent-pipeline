@@ -1,0 +1,626 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 99f4a7631..a6dea7101 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -43,7 +43,12 @@ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispa
+ import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+-import { antigravityArtifactHostContext, crossRepositoryDenialReason } from "../lib/current-session-artifact-export.mjs";
++import {
++  antigravityArtifactHostContext, antigravityArtifactLayoutIsValid, crossRepositoryDenialReason,
++  sweepAntigravityHostHandoffs, writeAntigravityHostHandoff,
++} from "../lib/current-session-artifact-export.mjs";
++import { TRANSCRIPT_RECOVERY_SCRIPT } from "../lib/guard/constants.mjs";
++import { resolveSanctionedScriptInvocation, sanctionedTranscriptRecoveryArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+ 
+@@ -341,6 +346,35 @@ export function antigravityGuardPayload(input, normalized, projectRoot) {
+   };
+ }
+ 
++/**
++ * AC-175C. Runs only for a shell call this hook is about to ADMIT. (1) Clears handoffs older than their lifetime, so no
++ * handoff outlives its use: this hook sees every admitted shell call, which makes it the mandatory path for the routine.
++ * (2) For the one command that needs it -- the sanctioned `runner-transcript-recovery.mjs export` of runner antigravity, whose
++ * `--session-id` and `--exclude-session` both name the conversation THIS envelope belongs to -- writes the host context this
++ * envelope carries into a single-use handoff bound to that conversation, project root and exact argv. Every other command,
++ * runner, conversation or form writes nothing. A failure to write is a diagnostic, never a denial: the CLI then answers
++ * `antigravity-host-context-unavailable`, exactly as before this handoff existed.
++ */
++function handOffAntigravityHostContext({ input, command, projectRoot, toolName }) {
++  if (toolName !== "Bash") return;
++  try {
++    sweepAntigravityHostHandoffs({ root: projectRoot });
++    const host = antigravityArtifactHostContext(input);
++    if (host === undefined) return;
++    const invocation = resolveSanctionedScriptInvocation(command, projectRoot);
++    if (invocation === null || invocation.script !== TRANSCRIPT_RECOVERY_SCRIPT) return;
++    const { args } = invocation;
++    if (args[0] !== "export" || !sanctionedTranscriptRecoveryArgs(args, projectRoot)) return;
++    const value = (flag) => args[args.indexOf(flag) + 1];
++    if (value("--runner") !== "antigravity" || value("--session-id") !== host.conversationId
++      || value("--exclude-session") !== host.conversationId || !antigravityArtifactLayoutIsValid(host, projectRoot)) return;
++    const written = writeAntigravityHostHandoff({ root: projectRoot, host, args });
++    if (written.status !== "written") diagnostic("antigravity-host-handoff-not-written", { reason: written.reason });
++  } catch (error) {
++    diagnostic("antigravity-host-handoff-failed", { name: error?.name, code: error?.code });
++  }
++}
++
+ function isNativeImplementationSubagent(entry) {
+   const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
+     ? entry.TypeName.slice("pipeline-core:".length)
+@@ -1099,6 +1133,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   }
+ 
+   if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
++  handOffAntigravityHostContext({ input, command, projectRoot, toolName });
+   allow();
+ }
+ 
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 2f08c6591..d6a07b552 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -9,9 +9,11 @@ import {
+   mkdtempSync,
+   mkdirSync,
+   openSync,
++  readdirSync,
+   realpathSync,
+   readFileSync,
+   rmSync,
++  utimesSync,
+   writeFileSync,
+ } from "node:fs";
+ import { tmpdir } from "node:os";
+@@ -22,6 +24,8 @@ import { createHash } from "node:crypto";
+ 
+ import { inspectScratchShellScript, normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
++// AC-175C: reached through a namespace so only the handoff cases fail on code without the helpers.
++import * as exportLib from "../lib/current-session-artifact-export.mjs";
+ import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+ import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
+ import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
+@@ -1544,6 +1548,97 @@ check("Antigravity pretool guard allows running a node script file, not inline c
+   rmSync(root, { recursive: true, force: true });
+ });
+ 
++// AC-175C: the CLI transcript export cannot receive the host context on its argv, so the hook hands the context of THIS
++// conversation to the one admitted export command, through a private single-use file under the git common dir.
++const AGY_HANDOFF_CONVERSATION = "11111111-2222-4333-8444-555555555555";
++const AGY_HANDOFF_OTHER = "11111111-2222-4333-8444-666666666666";
++const recoveryScript = join(pluginRoot, "scripts", "runner-transcript-recovery.mjs");
++
++function agyHandoffFixture() {
++  const root = realpathSync(fixture());
++  execFileSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
++  const artifacts = join(root, "agy-home", "brain", AGY_HANDOFF_CONVERSATION);
++  mkdirSync(join(artifacts, ".system_generated", "logs"), { recursive: true });
++  const transcriptPath = join(artifacts, ".system_generated", "logs", "transcript.jsonl");
++  writeFileSync(transcriptPath, "{}\n");
++  const exportArgs = (overrides = {}) => {
++    const { id = AGY_HANDOFF_CONVERSATION, exclude = id, session = id, runner = "antigravity", operation = "export" } = overrides;
++    return [operation, "--root", root, "--runner", runner, "--exclude-session", exclude, "--session-id", session];
++  };
++  const commandFor = (args) => `node ${JSON.stringify(recoveryScript)} ${args.map((arg) => JSON.stringify(arg)).join(" ")}`;
++  const hostEnvelope = (command) => ({
++    conversationId: AGY_HANDOFF_CONVERSATION, artifactDirectoryPath: artifacts, transcriptPath,
++    toolCall: { name: "run_command", args: { CommandLine: command, Cwd: root } },
++  });
++  const host = { conversationId: AGY_HANDOFF_CONVERSATION, artifactDirectoryPath: artifacts, transcriptPath, workspacePaths: [root] };
++  const directory = () => exportLib.antigravityHostHandoffDirectory(root);
++  const files = () => (existsSync(directory()) ? readdirSync(directory()) : []);
++  return { root, exportArgs, commandFor, hostEnvelope, host, directory, files };
++}
++
++check("Antigravity pretool guard hands the host context of its own conversation to the admitted CLI export (AC-175C)", () => {
++  const f = agyHandoffFixture();
++  try {
++    const args = f.exportArgs();
++    const res = decision(run(f.hostEnvelope(f.commandFor(args)), f.root));
++    assert.equal(res.decision, "allow");
++    assert.deepEqual(f.files(), [`${AGY_HANDOFF_CONVERSATION}.json`]);
++    const file = join(f.directory(), `${AGY_HANDOFF_CONVERSATION}.json`);
++    assert.equal(lstatSync(file).mode & 0o777, 0o600);
++    const consumed = exportLib.consumeAntigravityHostHandoff({ root: f.root, sessionId: AGY_HANDOFF_CONVERSATION, args });
++    assert.equal(consumed.status, "consumed");
++    assert.deepEqual(consumed.host, f.host);
++    assert.deepEqual(f.files(), []);
++    // The same command with any other argv is not served by the handoff the hook wrote for this one.
++    run(f.hostEnvelope(f.commandFor(args)), f.root);
++    assert.equal(exportLib.consumeAntigravityHostHandoff({ root: f.root, sessionId: AGY_HANDOFF_CONVERSATION, args: f.exportArgs({ exclude: AGY_HANDOFF_OTHER }) }).status, "invalid");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("Antigravity pretool guard writes no handoff for another conversation, another runner, another form or a denied call (AC-175C)", () => {
++  const f = agyHandoffFixture();
++  try {
++    const cases = {
++      "a foreign session id": f.exportArgs({ session: AGY_HANDOFF_OTHER, exclude: AGY_HANDOFF_OTHER }),
++      "a foreign claimed session": f.exportArgs({ exclude: AGY_HANDOFF_OTHER }),
++      "the codex runner": f.exportArgs({ runner: "codex" }),
++      "the claude runner": f.exportArgs({ runner: "claude" }),
++      "the list operation": f.exportArgs({ operation: "list" }).slice(0, 6),
++      "an unadmitted extra flag": [...f.exportArgs(), "--host-context", "x"],
++    };
++    for (const [name, args] of Object.entries(cases)) {
++      run(f.hostEnvelope(f.commandFor(args)), f.root);
++      assert.deepEqual(f.files(), [], name);
++    }
++    // No hook-supplied conversation (the canonical envelope carries no host fields): nothing to hand over.
++    const canonical = decision(run({ tool_name: "Bash", tool_input: { command: f.commandFor(f.exportArgs()) } }, f.root));
++    assert.equal(canonical.decision, "allow");
++    assert.deepEqual(f.files(), []);
++    // A call the guard denies hands over nothing, even when it names the admitted export.
++    const marker = join(f.root, ".git", "agent-pipeline", "run", `session-${AGY_HANDOFF_CONVERSATION}`, "requires-bootstrap.pending");
++    mkdirSync(join(marker, ".."), { recursive: true });
++    writeFileSync(marker, "pending\n");
++    const denied = decision(run(f.hostEnvelope(f.commandFor(f.exportArgs())), f.root));
++    assert.equal(denied.decision, "deny");
++    assert.deepEqual(f.files(), []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("Antigravity pretool guard clears stale handoffs on every shell call it admits (AC-175C)", () => {
++  const f = agyHandoffFixture();
++  try {
++    mkdirSync(f.directory(), { recursive: true, mode: 0o700 });
++    const stale = join(f.directory(), `${AGY_HANDOFF_OTHER}.json`);
++    const live = join(f.directory(), `${AGY_HANDOFF_CONVERSATION}.json`);
++    for (const path of [stale, live]) writeFileSync(path, "{}", { mode: 0o600 });
++    const old = new Date(Date.now() - 10 * 60_000);
++    utimesSync(stale, old, old);
++    // An unrelated read-only call that the governed, not-yet-ready lane admits.
++    const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: "git rev-parse HEAD", Cwd: f.root } } }, f.root));
++    assert.equal(res.decision, "allow", res.reason);
++    assert.deepEqual(f.files(), [`${AGY_HANDOFF_CONVERSATION}.json`]);  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ check("Antigravity start hint never creates .git before Git initialization", () => {
+   const root = uninitializedTempRoot();
+   try {
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-export.mjs b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+index eabf57932..aa7818cd5 100644
+--- a/plugins/pipeline-core/lib/current-session-artifact-export.mjs
++++ b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+@@ -1,7 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Native hook metadata has the same transport trust as cwd. This is not a
+ // portable attestation and must never be populated from tool arguments.
+-import { constants, fstatSync, lstatSync, realpathSync, openSync, readSync, closeSync } from 'node:fs';
++import { createHash, randomBytes } from 'node:crypto';
++import { constants, fstatSync, lstatSync, mkdirSync, readdirSync, realpathSync, openSync, readFileSync, readSync, closeSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+ import { parseGuardCommand } from '../hooks/guard-command-grammar.mjs';
+ 
+@@ -31,6 +32,163 @@ function physical(path, kind) {
+ /** True when `path` is an absolute, symlink-free (every ancestor included) directory, or a single-link regular file. */
+ export const artifactPathIsPhysical = physical;
+ 
++// ---------------------------------------------------------------------------------------------------------------------
++// AC-175C: the host-context HANDOFF. The CLI transcript export cannot receive the Antigravity host context on its argv, and
++// no environment variable carries it. The pretool hook holds the envelope, so for the ONE admitted export command of its own
++// conversation it writes the context it already computed into a private single-use file under the git common dir; the CLI
++// reads that file, checks every binding, consumes it and then applies its existing screens unchanged. The file location is
++// derived from the repository root and the conversation id alone: no agent-supplied path, flag value or variable selects it.
++// Same transport trust as the hook metadata itself: a writer who can create files under the git common dir is out of scope.
++// ---------------------------------------------------------------------------------------------------------------------
++
++export const ANTIGRAVITY_HOST_HANDOFF_SCHEMA = 'pipeline.antigravity-host-handoff.v1';
++/**
++ * A handoff lives for one tool round trip; anything older is stale and cleared. Five minutes, not seconds: the hook runs at
++ * PreToolUse, and a command that waits for the person's confirmation before it starts must still find its handoff.
++ */
++export const ANTIGRAVITY_HOST_HANDOFF_TTL_MS = 5 * 60_000;
++const HANDOFF_MAX_BYTES = 16 * 1024;
++const HANDOFF_CLOCK_SKEW_MS = 5_000;
++const CONVERSATION_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu;
++const HOST_HANDOFF_KEYS = ['artifactDirectoryPath', 'conversationId', 'transcriptPath', 'workspacePaths'];
++const argsSha256 = (args) => createHash('sha256').update(JSON.stringify(args)).digest('hex');
++const flagValue = (args, flag) => (Array.isArray(args) && args.indexOf(flag) >= 0 ? args[args.indexOf(flag) + 1] : undefined);
++const ownedByThisUser = (stat) => process.platform === 'win32' || typeof process.getuid !== 'function' || stat.uid === process.getuid();
++
++function plainDirectory(path) {
++  try { const stat = lstatSync(path); return stat.isDirectory() && !stat.isSymbolicLink() && ownedByThisUser(stat); } catch { return false; }
++}
++
++/** The git common dir of `root`, from the filesystem alone (no spawn): a `.git` directory, or the admin dir a worktree's `.git` file names. */
++function gitCommonDirectory(root) {
++  if (typeof root !== 'string' || !isAbsolute(root)) return null;
++  const dotGit = join(root, '.git');
++  try {
++    const stat = lstatSync(dotGit);
++    if (stat.isSymbolicLink()) return null;
++    if (stat.isDirectory()) return dotGit;
++    if (!stat.isFile() || stat.size > 4096) return null;
++    const pointer = /^gitdir: (.+)\r?\n?$/u.exec(readFileSync(dotGit, 'utf8'));
++    if (!pointer) return null;
++    const admin = resolve(root, pointer[1]);
++    const common = resolve(admin, readFileSync(join(admin, 'commondir'), 'utf8').trim());
++    return plainDirectory(admin) && plainDirectory(common) && dirname(admin) === join(common, 'worktrees') ? common : null;
++  } catch { return null; }
++}
++
++/** Where the handoffs of `root` live (a path, not a promise that it exists), or null when `root` has no usable git common dir. */
++export function antigravityHostHandoffDirectory(root) {
++  const common = gitCommonDirectory(root);
++  return common === null ? null : join(common, 'agent-pipeline', 'antigravity-host-handoff');
++}
++
++const hostShapeIsValid = (host) => host !== null && typeof host === 'object' && !Array.isArray(host)
++  && JSON.stringify(Object.keys(host).sort()) === JSON.stringify(HOST_HANDOFF_KEYS)
++  && CONVERSATION_ID.test(host.conversationId)
++  && typeof host.artifactDirectoryPath === 'string' && typeof host.transcriptPath === 'string'
++  && Array.isArray(host.workspacePaths) && host.workspacePaths.every((path) => typeof path === 'string');
++
++/**
++ * Hook side. Binds the host context to the conversation id, the exact admitted argv (digest), the project root and a short
++ * expiry. The caller (the pretool hook) has already admitted the command and validated the layout. Never throws.
++ */
++export function writeAntigravityHostHandoff({ root, host, args, now = Date.now() } = {}) {
++  const refuse = (reason) => ({ status: 'refused', reason });
++  try {
++    if (!Array.isArray(args) || args[0] !== 'export' || args.some((arg) => typeof arg !== 'string')) return refuse('argv-not-an-export');
++    if (!hostShapeIsValid(host) || flagValue(args, '--session-id') !== host.conversationId) return refuse('host-context-not-bound-to-the-session');
++    const directory = antigravityHostHandoffDirectory(root);
++    if (directory === null) return refuse('git-common-dir-unavailable');
++    mkdirSync(directory, { recursive: true, mode: 0o700 });
++    if (!plainDirectory(dirname(directory)) || !plainDirectory(directory)) return refuse('handoff-directory-unsafe');
++    const record = {
++      schema: ANTIGRAVITY_HOST_HANDOFF_SCHEMA,
++      conversationId: host.conversationId,
++      root,
++      argsSha256: argsSha256(args),
++      issuedAt: now,
++      expiresAt: now + ANTIGRAVITY_HOST_HANDOFF_TTL_MS,
++      host: Object.fromEntries(HOST_HANDOFF_KEYS.map((key) => [key, host[key]])),
++    };
++    const final = join(directory, `${host.conversationId}.json`);
++    const temporary = join(directory, `.${host.conversationId}.${randomBytes(6).toString('hex')}.tmp`);
++    writeFileSync(temporary, `${JSON.stringify(record)}\n`, { flag: 'wx', mode: 0o600 });
++    try { renameSync(temporary, final); } catch (error) { try { unlinkSync(temporary); } catch { /* best effort */ } throw error; }
++    return { status: 'written' };
++  } catch { return refuse('handoff-not-written'); }
++}
++
++/** Reads the open handle of an already lstat-checked handoff file; null when anything about it is not what lstat saw. */
++function readHandoffBytes(file, before) {
++  let fd;
++  try {
++    fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
++    const stat = fstatSync(fd);
++    if (!stat.isFile() || stat.dev !== before.dev || stat.ino !== before.ino || stat.size !== before.size) return null;
++    const bytes = Buffer.alloc(stat.size);
++    return readSync(fd, bytes, 0, stat.size, 0) === stat.size ? bytes : null;
++  } catch { return null; } finally { if (fd !== undefined) try { closeSync(fd); } catch { /* already closed */ } }
++}
++
++/**
++ * CLI side. `status`: `unavailable` (no handoff, an expired one, or a lost race for it), `invalid` (a handoff that is malformed,
++ * over-permissive, linked, misnamed, or bound to another command or project), or `consumed` with the host context. The file is
++ * removed when it is expired, malformed or consumed; a well-formed handoff bound to a different command is left to its owner.
++ */
++export function consumeAntigravityHostHandoff({ root, sessionId, args, now = Date.now() } = {}) {
++  const unavailable = { status: 'unavailable' };
++  const invalid = { status: 'invalid' };
++  if (typeof sessionId !== 'string' || !CONVERSATION_ID.test(sessionId) || !Array.isArray(args)) return unavailable;
++  const directory = antigravityHostHandoffDirectory(root);
++  if (directory === null) return unavailable;
++  const file = join(directory, `${sessionId}.json`);
++  const discard = () => { try { unlinkSync(file); } catch { /* already gone */ } };
++  let before;
++  try { before = lstatSync(file); } catch (error) { return error?.code === 'ENOENT' ? unavailable : invalid; }
++  if (!plainDirectory(dirname(directory)) || !plainDirectory(directory)) return invalid;
++  if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1 || before.size > HANDOFF_MAX_BYTES
++    || !ownedByThisUser(before) || (process.platform !== 'win32' && (before.mode & 0o077) !== 0)) { discard(); return invalid; }
++  const bytes = readHandoffBytes(file, before);
++  let record = null;
++  try { record = bytes === null ? null : JSON.parse(bytes.toString('utf8')); } catch { record = null; }
++  const wellFormed = record !== null && typeof record === 'object' && !Array.isArray(record)
++    && record.schema === ANTIGRAVITY_HOST_HANDOFF_SCHEMA && Number.isFinite(record.issuedAt) && Number.isFinite(record.expiresAt)
++    && record.expiresAt - record.issuedAt === ANTIGRAVITY_HOST_HANDOFF_TTL_MS && record.issuedAt <= now + HANDOFF_CLOCK_SKEW_MS
++    && typeof record.root === 'string' && typeof record.argsSha256 === 'string' && hostShapeIsValid(record.host)
++    && record.conversationId === sessionId && record.host.conversationId === sessionId;
++  if (!wellFormed) { discard(); return invalid; }
++  if (record.expiresAt <= now) { discard(); return unavailable; }
++  // Bound to another project or another command: it belongs to the command the hook admitted, not to this one.
++  if (record.root !== root || record.argsSha256 !== argsSha256(args)) return invalid;
++  // Claim by rename so exactly one reader wins, then check the claimed bytes are the bytes that were validated.
++  const claimed = `${file}.claim-${process.pid}-${randomBytes(4).toString('hex')}`;
++  try { renameSync(file, claimed); } catch { return unavailable; }
++  let claimedBytes = null;
++  try { claimedBytes = readHandoffBytes(claimed, lstatSync(claimed)); } catch { claimedBytes = null; }
++  try { unlinkSync(claimed); } catch { /* the sweep clears a leftover claim */ }
++  if (claimedBytes === null || !claimedBytes.equals(bytes)) return invalid;
++  return { status: 'consumed', host: record.host };
++}
++
++/** Clears handoffs and claim/temporary leftovers older than the lifetime. Best effort; returns how many entries it removed. */
++export function sweepAntigravityHostHandoffs({ root, now = Date.now() } = {}) {
++  let removed = 0;
++  try {
++    const directory = antigravityHostHandoffDirectory(root);
++    if (directory === null || !plainDirectory(directory)) return { removed };
++    for (const name of readdirSync(directory)) {
++      const entry = join(directory, name);
++      try {
++        const stat = lstatSync(entry);
++        if (stat.isDirectory() || now - stat.mtimeMs <= ANTIGRAVITY_HOST_HANDOFF_TTL_MS) continue;
++        unlinkSync(entry);
++        removed += 1;
++      } catch { /* a concurrent consumer or sweep got there first */ }
++    }
++  } catch { /* nothing to clear */ }
++  return { removed };
++}
++
+ /**
+  * The established Antigravity brain layout, as ONE shared predicate (G13; AC-175 part B reads the same layout): a conversation
+  * id, its artifact root `<...>/brain/<conversationId>` with no repository, credential, plugin or cache part, the fixed transcript
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index 86d17c7ba..7e87b33f6 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -19,7 +19,9 @@ import { homedir } from "node:os";
+ import { basename, isAbsolute, join, relative, resolve } from "node:path";
+ 
+ import { auditCurrentRunnerSession } from "../lib/runner-own-session-audit.mjs";
+-import { antigravityArtifactLayoutIsValid, artifactPathIsPhysical } from "../lib/current-session-artifact-export.mjs";
++import {
++  antigravityArtifactLayoutIsValid, artifactPathIsPhysical, consumeAntigravityHostHandoff, sweepAntigravityHostHandoffs,
++} from "../lib/current-session-artifact-export.mjs";
+ import { isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+@@ -412,8 +414,11 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
+ //                <...>/brain/<conversationId> and <artifactRoot>/.system_generated/logs/transcript.jsonl,
+ //                resolved ONLY from the host context the Antigravity pretool hook supplies
+ //                (`antigravityArtifactHost`, shaped by antigravityArtifactHostContext); no directory is listed or
+-//                guessed, and no environment variable carries it, so the CLI (which cannot receive it) names that
+-//                reason. The export is of the CURRENT conversation only. Child sessions are not recorded there.
++//                guessed. The CLI receives it from ONE place: the single-use, expiring handoff file the pretool hook
++//                writes (mode 0600, under the git common dir) for exactly this admitted argv of its own conversation
++//                (AC-175C, `main` -> exportFromCommandLine); no flag, path or environment variable carries it, and a
++//                missing or expired handoff is `antigravity-host-context-unavailable`, any other failure `-invalid`.
++//                The export is of the CURRENT conversation only. Child sessions are not recorded there.
+ //
+ // Turn model (emitted as `turns.model`): claude = one distinct assistant message.id (usage-ledger.mjs convention);
+ // codex = one event_msg task_started record; antigravity = one turn.started record. A child's startTurnIndex is the
+@@ -1051,13 +1056,33 @@ function parseArgs(argv) {
+   };
+ }
+ 
+-export function main(argv = process.argv.slice(2)) {
++/**
++ * AC-175C: the CLI export for Antigravity. The host context comes from ONE place: the single-use handoff the pretool hook wrote
++ * for exactly this admitted argv of this conversation (lib/current-session-artifact-export.mjs). Claude and Codex never reach it.
++ * A missing or expired handoff leaves the context absent (`antigravity-host-context-unavailable`); a handoff that fails any
++ * binding is `antigravity-host-context-invalid`; the existing screens in exportRunnerTranscript then apply unchanged.
++ */
++function exportFromCommandLine(args, argv, seams) {
++  if (args.runner !== ANTIGRAVITY_RUNNER) return exportRunnerTranscript(args);
++  sweepAntigravityHostHandoffs({ root: args.rootDir });
++  const handed = consumeAntigravityHostHandoff({ root: args.rootDir, sessionId: args.sessionId, args: argv });
++  if (handed.status === "invalid") return unavailable(ANTIGRAVITY_RUNNER, "antigravity-host-context-invalid");
++  return exportRunnerTranscript({
++    ...args,
++    // The only seams: the two machine-plane lookups a test stubs. Nothing here can carry a host context.
++    ...(typeof seams.homedirFn === "function" ? { homedirFn: seams.homedirFn } : {}),
++    ...(isObject(seams.credentialScreen) ? { credentialScreen: seams.credentialScreen } : {}),
++    ...(handed.status === "consumed" ? { antigravityArtifactHost: handed.host } : {}),
++  });
++}
++
++export function main(argv = process.argv.slice(2), seams = {}) {
+   const args = parseArgs(argv);
+   const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
+     if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
+     if (args.operation === "list") return listRunnerTranscripts(args);
+     if (args.operation === "read") return readRunnerTranscript(args);
+-    if (args.operation === "export") return exportRunnerTranscript(args);
++    if (args.operation === "export") return exportFromCommandLine(args, argv, seams);
+     return recoverRunnerTranscript(args);
+   })();
+   if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index 1230e7875..55bdda00d 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ 
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
+ import { realpathSync } from "node:fs";
+ import { basename } from "node:path";
+ import { antigravityArtifactHostContext } from "../lib/current-session-artifact-export.mjs";
++// AC-175C: the handoff helpers are reached through a namespace, so on code without them only the handoff cases fail.
++import * as handoff from "../lib/current-session-artifact-export.mjs";
+ 
+ function transcript(path, { cwd, sessionId, entries = [], malformed = false } = {}) {
+   mkdirSync(join(path, "sessions", "2026", "09"), { recursive: true });
+@@ -925,3 +927,175 @@ test("AC-175B: an Antigravity layout located under a credential root is refused
+     assert.deepEqual(result, { schema: SCHEMA, status: "unavailable", runner: "antigravity", reason: "antigravity-host-context-invalid" });
+   });
+ });
++
++// ---------------------------------------------------------------------------------------------
++// AC-175 follow-up (AC-175C): the CLI export reaches the host context of its OWN Antigravity conversation through a handoff
++// the pretool hook wrote for exactly this admitted command. The context never comes from a flag, a path or the environment.
++// ---------------------------------------------------------------------------------------------
++
++const AGY_OTHER = "11111111-2222-4333-8444-666666666666";
++const agyCliArgs = (root, { id = AGY_CONVERSATION, exclude = id, session = id } = {}) =>
++  ["export", "--root", root, "--runner", "antigravity", "--exclude-session", exclude, "--session-id", session];
++
++/** The CLI exactly as the agent runs it; only the two machine-plane seams a test must stub travel as the second argument. */
++function runCli(argv, seams = {}) {
++  const chunks = [];
++  const originalWrite = process.stdout.write;
++  process.stdout.write = (chunk) => { chunks.push(Buffer.from(chunk)); return true; };
++  try { recovery.main(argv, seams); } finally { process.stdout.write = originalWrite; }
++  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
++}
++
++function withHandoffFixture(run) {
++  return withExportFixture((context) => {
++    mkdirSync(join(context.project, ".git"));
++    const root = realpathSync(context.project);
++    const agy = agyFixture(context.fixture, context.project, AGY_LINES);
++    const seams = { homedirFn: () => agy.home, credentialScreen: NO_MACHINE_PLANE };
++    const typed = (reason) => ({ schema: SCHEMA, status: "unavailable", runner: "antigravity", reason });
++    return run({ ...context, root, agy, seams, typed, args: agyCliArgs(root) });
++  });
++}
++
++const handoffFile = (root, id = AGY_CONVERSATION) => join(handoff.antigravityHostHandoffDirectory(root), `${id}.json`);
++
++test("AC-175C: a CLI export on Antigravity succeeds with the handoff the hook wrote, equals the library route, and consumes the handoff", () => {
++  withHandoffFixture(({ root, agy, seams, args }) => {
++    assert.equal(handoff.writeAntigravityHostHandoff({ root, host: agy.host, args }).status, "written");
++    const file = handoffFile(root);
++    assert.equal(existsSync(file), true);
++    const printed = runCli(args, seams);
++    const expected = recovery.exportRunnerTranscript({
++      rootDir: root, runner: "antigravity", excludeSession: AGY_CONVERSATION, sessionId: AGY_CONVERSATION, env: {}, ...seams, antigravityArtifactHost: agy.host,
++    });
++    assert.equal(printed.status, "available");
++    assert.deepEqual(printed, expected);
++    assert.equal(existsSync(file), false, "the handoff does not outlive its one use");
++    assert.deepEqual(readdirSync(handoff.antigravityHostHandoffDirectory(root)), []);
++  });
++});
++
++test("AC-175C: a replayed handoff is refused typed because it is consumed by its first use", () => {
++  withHandoffFixture(({ root, agy, seams, args, typed }) => {
++    handoff.writeAntigravityHostHandoff({ root, host: agy.host, args });
++    assert.equal(runCli(args, seams).status, "available");
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-unavailable"));
++  });
++});
++
++test("AC-175C: a missing or expired handoff is typed unavailable, and an expired one is removed", () => {
++  withHandoffFixture(({ root, agy, seams, args, typed }) => {
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-unavailable"));
++    const longAgo = Date.now() - 10 * 60_000;
++    handoff.writeAntigravityHostHandoff({ root, host: agy.host, args, now: longAgo });
++    assert.equal(existsSync(handoffFile(root)), true);
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-unavailable"));
++    assert.equal(existsSync(handoffFile(root)), false, "an expired handoff is not left behind");
++  });
++});
++
++test("AC-175C: a handoff of another conversation or another command is typed invalid and never exports", () => {
++  withHandoffFixture(({ root, agy, seams, args, typed }) => {
++    // A handoff for the other conversation, planted under this conversation's file name.
++    const foreignHost = { ...agy.host, conversationId: AGY_OTHER };
++    handoff.writeAntigravityHostHandoff({ root, host: foreignHost, args: agyCliArgs(root, { id: AGY_OTHER }) });
++    mkdirSync(handoff.antigravityHostHandoffDirectory(root), { recursive: true });
++    writeFileSync(handoffFile(root), readFileSync(handoffFile(root, AGY_OTHER)), { mode: 0o600 });
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"));
++    // A handoff admitted for different argv (another claimed session) does not serve this command.
++    rmSync(handoffFile(root), { force: true });
++    handoff.writeAntigravityHostHandoff({ root, host: agy.host, args: agyCliArgs(root, { exclude: AGY_OTHER }) });
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"));
++    // A handoff admitted for another project root does not serve this one.
++    rmSync(handoffFile(root), { force: true });
++    handoff.writeAntigravityHostHandoff({ root, host: { ...agy.host, workspacePaths: ["/somewhere/else"] }, args });
++    assert.equal(runCli(args, seams).reason, "antigravity-host-context-invalid");
++  });
++});
++
++test("AC-175C: a malformed, over-permissive or linked handoff is typed invalid and is not left behind", () => {
++  withHandoffFixture(({ root, agy, seams, args, typed, fixture }) => {
++    const directory = handoff.antigravityHostHandoffDirectory(root);
++    mkdirSync(directory, { recursive: true });
++    const file = handoffFile(root);
++    const good = () => {
++      handoff.writeAntigravityHostHandoff({ root, host: agy.host, args });
++      return JSON.parse(readFileSync(file, "utf8"));
++    };
++    const plant = (text, mode = 0o600) => { rmSync(file, { force: true }); writeFileSync(file, text, { mode }); chmodSync(file, mode); };
++    for (const [name, text] of [
++      ["not json", "{not json"],
++      ["not an object", "[]"],
++      ["wrong schema", JSON.stringify({ ...good(), schema: "other.v1" })],
++      ["host with an extra field", JSON.stringify({ ...good(), host: { ...agy.host, extra: "x" } })],
++      ["host missing the transcript", JSON.stringify({ ...good(), host: { ...agy.host, transcriptPath: undefined } })],
++      ["lifetime beyond the cap", JSON.stringify({ ...good(), expiresAt: Date.now() + 24 * 3_600_000 })],
++    ]) {
++      plant(text);
++      assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"), name);
++      assert.equal(existsSync(file), false, `${name}: not left behind`);
++    }
++    plant(JSON.stringify(good()), 0o644);
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"), "group/other readable");
++    // A linked handoff is never followed.
++    const real = join(fixture, "elsewhere.json");
++    writeFileSync(real, JSON.stringify(good()), { mode: 0o600 });
++    rmSync(file, { force: true });
++    symlinkSync(real, file);
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"), "symlink");
++    rmSync(file, { force: true });
++    linkSync(real, file);
++    assert.deepEqual(runCli(args, seams), typed("antigravity-host-context-invalid"), "hard link");
++  });
++});
++
++test("AC-175C: nothing an agent supplies selects the host context (flag, environment, library option)", () => {
++  withHandoffFixture(({ root, agy, seams, args, typed }) => {
++    // No flag carries a context: an extra flag is an invalid invocation, whatever its value.
++    for (const extra of [["--host-context", agy.transcriptPath], ["--transcript", agy.transcriptPath], ["--artifact-directory", agy.artifacts]]) {
++      assert.deepEqual(runCli([...args, ...extra], seams), { schema: SCHEMA, status: "unavailable", runner: "unknown", reason: "invalid-invocation" }, extra[0]);
++    }
++    // No environment variable carries it either.
++    const printed = JSON.parse(runMain(args, { ANTIGRAVITY_ARTIFACT_DIRECTORY: agy.artifacts, ANTIGRAVITY_TRANSCRIPT_PATH: agy.transcriptPath, ANTIGRAVITY_CONVERSATION_ID: AGY_CONVERSATION }));
++    assert.deepEqual(printed, typed("antigravity-host-context-unavailable"));
++    // The second parameter of main() is a test seam for two lookups: it cannot inject a context.
++    assert.deepEqual(runCli(args, { ...seams, antigravityArtifactHost: agy.host }), typed("antigravity-host-context-unavailable"));
++  });
++});
++
++test("AC-175C: a Claude or Codex export is unchanged and neither reads nor consumes an Antigravity handoff", () => {
++  withHandoffFixture(({ root, agy, args, codexHome, claudeHome, project }) => {
++    handoff.writeAntigravityHostHandoff({ root, host: agy.host, args });
++    const before = readFileSync(handoffFile(root), "utf8");
++    codexSegment(codexHome, "prior.jsonl", { cwd: project, sessionId: "prior", records: [{ type: "event_msg", payload: { type: "task_started" } }] });
++    const codexArgs = ["export", "--root", root, "--runner", "codex", "--exclude-session", "current-session", "--session-id", "prior"];
++    const viaCli = runMain(codexArgs, { CODEX_HOME: codexHome });
++    const viaLibrary = recovery.exportRunnerTranscript({ rootDir: root, runner: "codex", excludeSession: "current-session", sessionId: "prior", env: { CODEX_HOME: codexHome } });
++    assert.equal(viaCli, `${JSON.stringify(viaLibrary)}\n`);
++    assert.equal(JSON.parse(viaCli).status, "available");
++    claudeSegment(claudeHome, project, "prior.jsonl", [claudeUser("prior", root, stamp("10:00:00")), claudeAssistant("prior", root, stamp("10:00:01"), "m1", { input_tokens: 1, output_tokens: 2 })]);
++    const claudeArgs = ["export", "--root", root, "--runner", "claude", "--exclude-session", "current-session", "--session-id", "prior"];
++    const claudeEnv = { CLAUDE_CONFIG_DIR: claudeHome, CLAUDE_CODE_SESSION_ID: "current-session" };
++    const claudeViaCli = runMain(claudeArgs, claudeEnv);
++    assert.equal(claudeViaCli, `${JSON.stringify(recovery.exportRunnerTranscript({ rootDir: root, runner: "claude", excludeSession: "current-session", sessionId: "prior", env: claudeEnv }))}\n`);
++    assert.equal(JSON.parse(claudeViaCli).status, "available");
++    assert.equal(readFileSync(handoffFile(root), "utf8"), before, "the handoff is untouched by the other runners");
++  });
++});
++
++test("AC-175C: the stale-handoff sweep removes expired and foreign leftovers and keeps a live handoff", () => {
++  withHandoffFixture(({ root, agy, args }) => {
++    const directory = handoff.antigravityHostHandoffDirectory(root);
++    handoff.writeAntigravityHostHandoff({ root, host: agy.host, args });
++    const staleName = `${AGY_OTHER}.json`;
++    writeFileSync(join(directory, staleName), "{}", { mode: 0o600 });
++    writeFileSync(join(directory, `${AGY_OTHER}.json.claim-1`), "{}", { mode: 0o600 });
++    const old = new Date(Date.now() - 10 * 60_000);
++    utimesSync(join(directory, staleName), old, old);
++    utimesSync(join(directory, `${AGY_OTHER}.json.claim-1`), old, old);
++    const swept = handoff.sweepAntigravityHostHandoffs({ root });
++    assert.equal(swept.removed, 2);
++    assert.deepEqual(readdirSync(directory), [`${AGY_CONVERSATION}.json`]);
++    assert.equal(handoff.sweepAntigravityHostHandoffs({ root: join(root, "no-such-root") }).removed, 0);
++  });
++});
