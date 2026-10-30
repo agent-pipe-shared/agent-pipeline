@@ -82,6 +82,319 @@ index de202cd10..9f239f51a 100644
    `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
    as of NVA-PUSHFOLD-1
    (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,
+diff --git a/harness/scripts/pipeline-state-decision-reference.test.mjs b/harness/scripts/pipeline-state-decision-reference.test.mjs
+index 9d3be30d6..86270498d 100644
+--- a/harness/scripts/pipeline-state-decision-reference.test.mjs
++++ b/harness/scripts/pipeline-state-decision-reference.test.mjs
+@@ -33,6 +33,10 @@ import { discoverRepository } from "../../plugins/pipeline-core/lib/worktree-lif
+ import { derivePoGateRepositoryFingerprint } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
+ import { run } from "./pipeline-state.mjs";
+ 
++// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
++// store the cases still load and fail on their assertions rather than at link time).
++const { withPrivateCriticalApprovals = (state) => state } = await import("../../plugins/pipeline-core/lib/critical-action-authorization.mjs");
++
+ let passed = 0;
+ let failed = 0;
+ const fixtureRoots = [];
+@@ -221,6 +225,13 @@ function stateOf(dir) {
+   return JSON.parse(readFileSync(join(dir, STATE_REL), "utf8"));
+ }
+ 
++// D206: a push approval lives in the private store, not in the tracked state file; every reader sees it through the one
++// store owner (withPrivateCriticalApprovals), never by opening store files. The "nothing was written" cases below (PSDR03-07)
++// read through the same owner, so they keep meaning "no approval exists anywhere", not merely "the tracked file is empty".
++function storedStateOf(dir) {
++  return withPrivateCriticalApprovals(stateOf(dir), dir);
++}
++
+ const DISAGREEMENT = "DECISION-REFERENCE-DISAGREEMENT";
+ 
+ // ---- PSDR01: approve-push WITHOUT --decision-reference -> prior behavior, byte-for-byte ------
+@@ -231,10 +242,15 @@ check("PSDR01 approve-push without --decision-reference records exactly the pre-
+   const { dir, argv } = pushFixture("push-absent");
+   const { code, output } = call(dir, argv);
+   assert.equal(code, 0, output);
+-  const approval = stateOf(dir).pushApproval.lastApproved;
++  // D206 restatement. OLD intent: the pre-existing tracked record shape plus NVA-PUSHFOLD-1's `pendingAuditWrite` hint, read from
++  // the tracked state file. NEW intent (same: the record gains no key beyond the pre-existing shape, in particular no
++  // `decisionReference`): the record is read through the private-store owner; the tracked file is untouched, so there is
++  // nothing to fold and no `pendingAuditWrite` hint -- every other key is unchanged.
++  assert.equal(stateOf(dir).pushApproval, undefined, "D206: the tracked state file must not receive the approval");
++  const approval = storedStateOf(dir).pushApproval.lastApproved;
+   assert.equal(Object.hasOwn(approval, "decisionReference"), false);
+   assert.deepEqual(Object.keys(approval).sort(),
+-    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "pendingAuditWrite", "remote", "threatModel"]);
++    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "remote", "threatModel"]);
+ });
+ 
+ // ---- PSDR02: present and agreeing -> the transition proceeds and the reference is recorded ----
+@@ -244,7 +260,9 @@ check("PSDR02 approve-push with an agreeing --decision-reference proceeds and re
+   writeReference(dir, value);
+   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
+   assert.equal(code, 0, output);
+-  assert.deepEqual(stateOf(dir).pushApproval.lastApproved.decisionReference, value);
++  // D206 restatement: OLD intent read the recorded reference from the tracked state file; NEW intent (same: the agreeing
++  // reference is recorded with the approval) reads it through the private-store owner.
++  assert.deepEqual(storedStateOf(dir).pushApproval.lastApproved.decisionReference, value);
+ });
+ 
+ // ---- PSDR03: present and disagreeing (different candidate commit) -> refused, zero mutation ---
+@@ -256,7 +274,7 @@ check("PSDR03 approve-push with a --decision-reference bound to another commit i
+   assert.match(output, new RegExp(DISAGREEMENT));
+   assert.match(output, /legacy=true, decision-reference=false/);
+   assert.match(output, /compatibility owner "pipeline"/);
+-  assert.equal(stateOf(dir).pushApproval, undefined); // nothing was written
++  assert.equal(storedStateOf(dir).pushApproval, undefined); // nothing was written
+ });
+ 
+ // ---- PSDR04: present and disagreeing (different tree -- invisible to every legacy check) ------
+@@ -265,7 +283,7 @@ check("PSDR04 approve-push with a --decision-reference bound to another tree is
+   writeReference(dir, reference(dir, { tree: "e".repeat(40) }));
+   const { code } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
+   assert.equal(code, 2);
+-  assert.equal(stateOf(dir).pushApproval, undefined);
++  assert.equal(storedStateOf(dir).pushApproval, undefined);
+ });
+ 
+ // ---- PSDR05: present but malformed -> fails closed, never a silent "no reference supplied" ----
+@@ -275,7 +293,7 @@ check("PSDR05 approve-push with a malformed --decision-reference fails closed",
+   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
+   assert.equal(code, 2);
+   assert.match(output, new RegExp(DISAGREEMENT));
+-  assert.equal(stateOf(dir).pushApproval, undefined);
++  assert.equal(storedStateOf(dir).pushApproval, undefined);
+ });
+ 
+ // ---- PSDR06: absent reference file -> refused with its own code, never a pass-through ---------
+@@ -287,7 +305,7 @@ check("PSDR06 approve-push with a missing --decision-reference file is refused",
+   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
+   assert.equal(code, 2);
+   assert.match(output, /DECISION-REFERENCE-FILE/);
+-  assert.equal(stateOf(dir).pushApproval, undefined);
++  assert.equal(storedStateOf(dir).pushApproval, undefined);
+ });
+ 
+ // ---- PSDR06b: reference file exists but is not JSON -> DECISION-REFERENCE-UNREADABLE ----------
+@@ -298,7 +316,7 @@ check("PSDR06b approve-push with a non-JSON --decision-reference file is refused
+   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
+   assert.equal(code, 2);
+   assert.match(output, /DECISION-REFERENCE-UNREADABLE/);
+-  assert.equal(stateOf(dir).pushApproval, undefined);
++  assert.equal(storedStateOf(dir).pushApproval, undefined);
+ });
+ 
+ // ---- PSDR07: an unsafe reference path never leaves the repository -----------------------------
+@@ -307,7 +325,7 @@ check("PSDR07 approve-push with an absolute --decision-reference path is refused
+   const { code, output } = call(dir, [...argv, "--decision-reference", "/etc/passwd"]);
+   assert.equal(code, 2);
+   assert.match(output, /DECISION-REFERENCE-FILE/);
+-  assert.equal(stateOf(dir).pushApproval, undefined);
++  assert.equal(storedStateOf(dir).pushApproval, undefined);
+ });
+ 
+ // ---- PSDR08: approve-deploy WITHOUT --decision-reference -> prior behavior, byte-for-byte -----
+diff --git a/harness/scripts/pipeline-state-external-push-ledger.test.mjs b/harness/scripts/pipeline-state-external-push-ledger.test.mjs
+index aded1023e..5b762db30 100644
+--- a/harness/scripts/pipeline-state-external-push-ledger.test.mjs
++++ b/harness/scripts/pipeline-state-external-push-ledger.test.mjs
+@@ -39,6 +39,14 @@ import { derivePoGateRepositoryFingerprint } from "../../plugins/pipeline-core/l
+ import { appendExternalPushLedgerConsumption } from "../../plugins/pipeline-core/lib/external-push-ledger.mjs";
+ import { run } from "./pipeline-state.mjs";
+ 
++// D206: the approval and the proof consumption are read through the private-store owner (dynamic import + fallbacks: against a
++// build without the store the cases still load and fail on their assertions rather than at link time).
++const {
++  withPrivateCriticalApprovals = (state) => state,
++  resolveCriticalApprovalCommonDir = () => null,
++  isCriticalProofConsumedPrivately = () => false,
++} = await import("../../plugins/pipeline-core/lib/critical-action-authorization.mjs");
++
+ let passed = 0;
+ let failed = 0;
+ const fixtureRoots = [];
+@@ -236,9 +244,16 @@ check("PSXL03 approve-push refuses with ALREADY-CONSUMED when the external ledge
+   assert.equal(result.code, 2);
+   assert.ok(result.output.some((entry) => entry.stream === "error" && entry.text.includes("PUSH-EXTERNAL-LEDGER-ALREADY-CONSUMED")));
+   assert.ok(!result.output.some((entry) => entry.text.startsWith('Push approved by "PO"')), "success line must be unreachable");
+-  // The local write already happened (design §4: the two writes are not one transaction).
++  // D206 restatement. OLD intent: "the local write already happened (design §4: the two writes are not one transaction)" --
++  // the tracked state file held the approval although the external ledger refused afterwards. NEW intent (same: a replay seen
++  // only by the external ledger is refused and the success line stays unreachable): the external-ledger replay is now refused
++  // BEFORE anything is written, which is stricter -- no approval and no proof consumption exist anywhere (read through the
++  // private-store owner, never by opening store files), and the tracked state file is untouched.
+   const finalState = JSON.parse(readFileSync(join(dir, "project", "pipeline-state.json"), "utf8"));
+-  assert.equal(finalState.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
++  assert.equal(finalState.pushApproval, undefined, "D206: the tracked state file must not receive the approval");
++  const stored = withPrivateCriticalApprovals(finalState, dir);
++  assert.equal(stored.pushApproval?.lastApproved, undefined, "a replay refused by the external ledger must record no approval");
++  assert.equal(isCriticalProofConsumedPrivately(resolveCriticalApprovalCommonDir(dir), bundle.proofSha256), false, "a refused replay must not burn the private marker either");
+ });
+ 
+ // ---- gate required, ledger directory unwritable -> WRITE-FAILED, success unreachable ------
+@@ -262,8 +277,18 @@ check("PSXL04 approve-push refuses with WRITE-FAILED on a genuine filesystem con
+   assert.equal(result.code, 2);
+   assert.ok(result.output.some((entry) => entry.stream === "error" && entry.text.includes("PUSH-EXTERNAL-LEDGER-WRITE-FAILED")));
+   assert.ok(!result.output.some((entry) => entry.text.startsWith('Push approved by "PO"')), "success line must be unreachable");
++  // D206 restatement. OLD intent: the local (tracked) approval had already been written when the ledger append failed (the two
++  // writes are not one transaction). NEW intent (same): the approval is durably recorded -- now in the private store, read
++  // through its owner -- the tracked file is untouched, and because the proof is consumed privately a retry of the same proof is
++  // a replay and stays refused (fail closed; recovery is a fresh signing ceremony).
+   const finalState = JSON.parse(readFileSync(join(dir, "project", "pipeline-state.json"), "utf8"));
+-  assert.equal(finalState.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
++  assert.equal(finalState.pushApproval, undefined, "D206: the tracked state file must not receive the approval");
++  const stored = withPrivateCriticalApprovals(finalState, dir);
++  assert.equal(stored.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
++  assert.equal(isCriticalProofConsumedPrivately(resolveCriticalApprovalCommonDir(dir), bundle.proofSha256), true);
++  const retry = callApprove(bundle.argv, deps(dir, home, CANDIDATE));
++  assert.equal(retry.code, 2);
++  assert.ok(retry.output.some((entry) => entry.stream === "error" && entry.text.includes("CRITICAL-PROOF-REPLAY")), JSON.stringify(retry.output));
+ });
+ 
+ // ---- gate required, dir is not a real git repository -> TOPOLOGY-UNRESOLVED ---------------
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index de202cd10..9f239f51a 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -144,8 +144,11 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" --by <name> --remote ori
+ It demands no Verify/security/Critic evidence and prints three steps: the PO's
+ one `authorize-critical --kind push` command (attended terminal; OpenSSL must be
+ on that terminal's PATH), the agent's `pipeline-state.mjs approve-push`, and the
+-exact `git -C <root> push origin <ref>:<ref>`. `approve-push` rewrites the
+-tracked state file; the checkpoint clean-tree check exempts exactly that path.
++exact `git -C <root> push origin <ref>:<ref>`. `approve-push` writes the
++approval and the proof consumption to a private store under the Git common
++directory and leaves the tree clean (D206); the checkpoint clean-tree check
++still exempts exactly the tracked state path, for a repository that carries an
++older tracked record.
+ A missing key directory is repaired once with `po-human-approval.mjs
+ set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+ signature).
+@@ -575,7 +578,7 @@ too, and `guard-git.mjs` simply lets such a push through. What actually
+ enforces the recorded push approval for an ordinary push is a separate hook,
+ `guard-push.mjs`, which runs after `guard-git.mjs`: its approval check
+ requires, under `gates.push.approval: "required"`, that
+-`state.pushApproval.lastApproved.forCommit` equal the pushed source commit
++the recorded approval's `forCommit` (read through the private approval store; the legacy `state.pushApproval.lastApproved` is the fallback) equal the pushed source commit
+ and that `authorizeRecordedPush` independently verify the recorded approval
+ for this exact candidate, remote and destination ref; a failure there is
+ reported under `gates.push.mode`. The entry deliberately covers `git push`
+@@ -658,7 +661,7 @@ whatever ref
+ | 4 | `pipeline-state.mjs approve-push` | Agent |
+ | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
+ | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
+-| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds the push-approval record into one local commit once the remote is proven to hold the signed commit (D161) | Agent |
++| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
+ | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
+ | 7 | `gh release create` (tag + release) | Agent |
+ 
+@@ -679,19 +682,34 @@ narrowing.
+   happen, and the retry needs a fresh token. Do not assume a blocked command
+   left the ledger untouched — read `agent-pipeline/guard-override.log.jsonl`
+   under the repository's common Git directory (`git rev-parse --git-common-dir`).
+-- `approve-push` writes into the tracked `project/pipeline-state.json`, so the
+-  tree is dirty from that moment on. **Commit nothing between `approve-push` and
+-  the push**: every commit moves `HEAD` past the `forCommit` the signature
+-  names and voids the approval. Verify has to run *before* the approval, and the
+-  state record's write is committed *after* the push -- not by this push
+-  itself (which only ever pushes the already-signed `HEAD`, unchanged), but by
+-  the close step, `push-prepare.mjs --close` (D161), run as the LAST step after
+-  the signed push. It folds immediately, leaving the tree clean, but only after
+-  a bounded read-only `git ls-remote` shows the remote holds `forCommit` at the
+-  record's destination; otherwise it refuses and writes nothing. The fold
+-  commit stays unpushed until the next signed push. If the close step is
+-  skipped, the **next** `push-prepare.mjs` run still folds it, automatically
+-  (the earlier behavior, unchanged). This is finding 7c of
++- **Where the approval lives (D206, supersedes D161).** `approve-push` (and the
++  feature-package reconcile approval) writes the approval record and the proof
++  consumption to a private store under the Git common directory,
++  `<git common dir>/agent-pipeline/critical-approvals/` (`approvals/<kind>/` and
++  `consumed/<proofSha256>.json`, mode 0700/0600, exclusive writes), **not** into
++  the tracked `project/pipeline-state.json`. The tree stays clean after the
++  approval, nothing has to be reset by hand, and a reset of the state file can no
++  longer drop the replay entry. Every gate -- `guard-push`, the generated pre-push
++  hook, `push-init`, `push-prepare`, the checkpoint check -- reads the approval
++  through that store (`withPrivateCriticalApprovals` in
++  `lib/critical-action-authorization.mjs`); a record still present in the tracked
++  state is only a legacy fallback and the private record wins when both exist. A
++  proof already consumed in the private store, in the legacy tracked list or in
++  the external push ledger is refused as a replay. **Still: commit nothing
++  between `approve-push` and the push** -- every commit moves `HEAD` past the
++  `forCommit` the signature names and voids the approval; Verify has to run
++  *before* the approval. The one exception is the action-local `gates.push_approval:
++  chat` ceremony (a `pendingPushChallenge` is in the tracked state): it still
++  writes the tracked record too, because the Source-owned state-push authority
++  observes exactly that write.
++- **The fold (NVA-PUSHFOLD-1 / NVA-CF-PUSHFOLD / D161) is legacy only.** A new
++  record is never in the working tree, so there is nothing to fold and no
++  `pendingAuditWrite` hint is set for it. `push-prepare.mjs` (and `--close`) keep
++  folding a LEGACY pending tracked record exactly as before: the state file is
++  the sole dirty path, `pendingAuditWrite` is `true`, `HEAD` has moved past
++  `forCommit` (or, at close, a bounded read-only `git ls-remote` shows the remote
++  holds `forCommit` at the record's destination); otherwise it refuses and writes
++  nothing. The rest of this item describes that legacy shape. This is finding 7c of
+   `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
+   as of NVA-PUSHFOLD-1
+   (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,
+diff --git a/plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs b/plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs
+index 510f366db..dc2a78cad 100644
+--- a/plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs
+@@ -35,6 +35,9 @@ import { classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs
+ import { createCriticalActionApprovalRequest, criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { run as runPipelineState } from "../scripts/pipeline-state.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
++// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
++// store C14 still loads and fails on its assertions rather than at link time).
++const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
+ import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+ 
+ const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
+@@ -614,6 +617,7 @@ function splitSourceRepo(prefix) {
+ 
+     const before = gitAt(dir, "status", "--porcelain").stdout;
+     if (before !== "") problems.push(`premise: the fixture was not clean before approve-push: ${JSON.stringify(before)}`);
++    const stateBytesBefore = readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8");
+     console.error = (...parts) => { stderrSeen.push(parts.join(" ")); };
+     let exitCode;
+     try {
+@@ -625,20 +629,30 @@ function splitSourceRepo(prefix) {
+       console.error = realConsoleError;
+     }
+     if (exitCode !== 0) problems.push(`the real approve-push exited ${exitCode}: ${stderrSeen.join(" | ").slice(0, 300)}`);
++    // D206 restatement. OLD intent: the real writer leaves exactly ` M project/pipeline-state.json` (the tracked state
++    // record carrying pendingAuditWrite: true), and the checkpoint classifier reads that as the one tolerated entry.
++    // NEW intent (same: the real writer's footprint on the neutral path is what the checkpoint classifier expects):
++    // the signature approval is written to the private store, so the porcelain is EMPTY (clean) and the tracked file is
++    // byte-identical; the approval is read through the store owner (withPrivateCriticalApprovals), never by opening
++    // store files, and the classifier reads the real writer's porcelain as clean. The legacy ` M <state>` shape stays
++    // tolerated by the classifier (pinned by the other C cases that fabricate it).
+     const porcelain = gitAt(dir, "status", "--porcelain").stdout;
+-    if (porcelain.replace(/\r?\n$/u, "") !== ` M ${NEUTRAL_STATE_REL}`) problems.push(`porcelain after approve-push was ${JSON.stringify(porcelain)}`);
++    if (porcelain !== "") problems.push(`porcelain after approve-push was ${JSON.stringify(porcelain)}; the tree must stay clean`);
+     if (gitAt(dir, "ls-files", "--error-unmatch", NEUTRAL_STATE_REL).status !== 0) problems.push("the neutral state record is not tracked");
+     if (existsSync(join(dir, STATE_REL))) problems.push("the writer also created the legacy state path");
+-    const written = JSON.parse(readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8"));
+-    if (written.pushApproval?.lastApproved?.forCommit !== head) problems.push("the written state record does not name the approved commit");
+-    if (written.pushApproval?.lastApproved?.pendingAuditWrite !== true) problems.push("the written state record does not carry pendingAuditWrite: true");
+-    if (!classifyCheckpointPorcelain(porcelain, [NEUTRAL_STATE_REL]).approvalRecordOnly) problems.push("the checkpoint classifier does not read the real writer's porcelain as the one tolerated entry");
++    const trackedBytes = readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8");
++    if (trackedBytes !== stateBytesBefore) problems.push("the tracked state record changed; D206 forbids writing the approval there");
++    const written = withPrivateCriticalApprovals(JSON.parse(trackedBytes), dir);
++    if (written.pushApproval?.lastApproved?.forCommit !== head) problems.push("the approval read through the private store does not name the approved commit");
++    if (written.pushApproval?.lastApproved?.pendingAuditWrite === true) problems.push("the private approval carries pendingAuditWrite although nothing was written to the tree");
++    if (written.criticalProofConsumption?.length !== 1) problems.push("the proof consumption is not visible through the private store");
++    if (!classifyCheckpointPorcelain(porcelain, [NEUTRAL_STATE_REL]).clean) problems.push("the checkpoint classifier does not read the real writer's porcelain as clean");
+   } catch (error) {
+     problems.push(`fixture or writer threw: ${error?.message ?? error}`);
+   } finally {
+     console.error = realConsoleError;
+   }
+-  record("C14 the real approve-push writer leaves exactly ` M project/pipeline-state.json` on the neutral path (design 3.4 premise)", problems);
++  record("C14 the real approve-push writer leaves the tree clean and the approval in the private store on the neutral path (D206; was: exactly ` M project/pipeline-state.json`)", problems);
+ }
+ 
+ // ---- cleanup and summary ---------------------------------------------------------------------
 diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
 index b2b335ef9..9d6e6c1c5 100644
 --- a/plugins/pipeline-core/hooks/guard-push.mjs
@@ -372,6 +685,134 @@ index 33163ffdc..676a1260f 100644
    if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
      || typeof remote !== "string" || remote === ""
      || typeof destination !== "string" || destination === "") {
+diff --git a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+index 468c2e447..93d8ae246 100644
+--- a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+@@ -9,6 +9,10 @@ import { tmpdir } from "node:os";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { run } from "./pipeline-state.mjs";
+ 
++// D206: the approval is read through the private-store owner. Dynamic import with an identity fallback, so that against a build
++// without the store the cases still LOAD and fail on their assertions (the byte-identity / consumption checks), not at link time.
++const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
++
+ const root = mkdtempSync(join(tmpdir(), "critical-proof-gate-"));
+ const external = mkdtempSync(join(tmpdir(), "critical-proof-external-"));
+ // The fixture owns its repository, so it can never resolve an enclosing one.
+@@ -48,14 +52,21 @@ writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify
+ assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
+ writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
+ assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 0);
+-const after = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
++// D206 restatement. OLD intent: the approval and its single proof consumption were read from the TRACKED state file
++// (pushApproval.lastApproved, criticalProofConsumption length 1) and the file had to differ from `before`.
++// NEW intent (same: "the approval is recorded, bound to commit/remote/threat model, the proof is consumed once and a
++// replay is refused"): the approval and the consumption are read through the private-store owner
++// (withPrivateCriticalApprovals, never by opening store files), and the tracked file stays byte-identical to `before`.
++const trackedAfterBytes = readFileSync(join(root, "project", "pipeline-state.json"), "utf8");
++assert.equal(trackedAfterBytes, before, "D206: a signature approval must not write the tracked state file");
++const after = withPrivateCriticalApprovals(JSON.parse(trackedAfterBytes), root);
+ assert.equal(after.pushApproval.lastApproved.forCommit, candidate.commit);
+ assert.equal(typeof after.pushApproval.lastApproved.criticalProof?.proofSha256, "string");
+ assert.equal(after.pushApproval.lastApproved.remote, pushTarget.remote);
+ assert.deepEqual(after.pushApproval.lastApproved.threatModel, threatModel);
+ assert.equal(after.criticalProofConsumption?.length, 1);
+ assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
+-assert.notEqual(before, JSON.stringify(after));
++assert.equal(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"), before, "a refused replay must leave the tracked file untouched too");
+ 
+ const deploySubject = { artifact: "v0.5.1-rc.1", environment: "production" };
+ const deployRequest = createCriticalActionApprovalRequest({
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs
+index fce25e484..89309c66d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs
+@@ -11,6 +11,10 @@ import { validateGovernanceActionEvent } from "../lib/governance-action-events.m
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { run, statePath } from "./pipeline-state.mjs";
+ 
++// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
++// store the cases still load and fail on their assertions rather than at link time).
++const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
++
+ const cases = [];
+ const injectedFailure = process.env.PIPELINE_GATE_ACTION_EVENT_TEST_INJECT_FAILURE ?? "";
+ function check(name, execute) {
+@@ -96,6 +100,8 @@ function actionFrom(root, rel) {
+ }
+ 
+ function state(root) { return JSON.parse(readFileSync(statePath(root), "utf8")); }
++// D206: the state every approval reader sees -- the tracked file with the private approval store overlaid (store owner, never file reads).
++function storedState(root) { return withPrivateCriticalApprovals(state(root), root); }
+ 
+ check("push approval publishes one completed event bound to the exact candidate", () => {
+   const f = fixture({ humanChat: true });
+@@ -153,7 +159,12 @@ check("omitting action-event-out preserves the existing push and deploy call pat
+     assert.equal(deployResult.status, 0, deployResult.err.join("\n"));
+     assert.match(pushResult.out.join("\n"), /^Push approved by/u);
+     assert.match(deployResult.out.join("\n"), /^Deploy approval granted by/u);
+-    assert.ok(state(push.root).pushApproval?.lastApproved);
++    // D206 restatement. OLD intent: the push approval is in the TRACKED state file after the existing call path. NEW intent
++    // (same: the existing path still records the approval): it is read through the private-store owner, and the tracked file
++    // and the working tree stay untouched (global chat mode has no challenge, so it never takes the tracked write).
++    assert.ok(storedState(push.root).pushApproval?.lastApproved);
++    assert.equal(state(push.root).pushApproval, undefined, "D206: the tracked state file must not receive the push approval");
++    assert.equal(git(push.root, "status", "--porcelain"), "", "D206: the tree stays clean after a push approval");
+     assert.equal(state(deploy.root).deployApprovals?.length, 1);
+     assert.equal(existsSync(join(push.root, "evidence")), false);
+     assert.equal(existsSync(join(deploy.root, "evidence")), false);
+@@ -171,7 +182,10 @@ check("event-requested physical state readback failure publishes no event", () =
+     assert.equal(result.status, 2);
+     assert.match(result.err.join("\n"), /PS-STATE-POSTIMAGE-READBACK/u);
+     assert.equal(existsSync(join(f.root, rel)), false);
+-    assert.ok(state(f.root).pushApproval?.lastApproved, "the result must not falsely describe the durable source mutation as zero");
++    // D206 restatement: OLD intent read the durable approval from the tracked state file; NEW intent (same: the refusal must
++    // not falsely describe the durable source mutation as zero) reads it through the private-store owner.
++    assert.ok(storedState(f.root).pushApproval?.lastApproved, "the result must not falsely describe the durable source mutation as zero");
++    assert.match(result.err.join("\n"), /recorded privately/u, "the refusal text names where the approval durably is");
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs
+index ad13c591b..79e2afef2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs
+@@ -38,6 +38,10 @@ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from
+ import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
+ import { run } from "./pipeline-state.mjs";
+ import { readFileSync } from "node:fs";
++
++// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
++// store the cases still load and fail on their assertions rather than at link time).
++const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+ import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
+@@ -405,7 +409,12 @@ test("K52-1: with a catalogue present, signature-mode approve-push approves a co
+   assert.ok(!result.stderr.includes("state-push-source-requester"), `the producer route must not be taken\n${describeResult(result)}`);
+   assert.equal(result.code, 0, describeResult(result));
+   assert.ok(result.stdout.includes(SUCCESS_LINE), describeResult(result));
+-  const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
++  // D206 restatement. OLD intent: read pushApproval.lastApproved from the TRACKED state file. NEW intent (same: the approval
++  // is recorded and bound to the exact candidate commit): read it through the private-store owner, never the store files,
++  // and the tracked file carries no approval at all.
++  const tracked = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
++  assert.equal(tracked.pushApproval?.lastApproved, undefined, "D206: the tracked state file must not receive the approval");
++  const state = withPrivateCriticalApprovals(tracked, fixture.dir);
+   assert.equal(state.pushApproval?.lastApproved?.forCommit, git(fixture.dir, ["rev-parse", "HEAD"]), "the approval is bound to the exact candidate commit");
+ });
+ 
+@@ -416,7 +425,8 @@ for (const [tamper, label] of [["commit", "a proof signed for another commit"],
+     const result = callApprove(fixture);
+     assert.notEqual(result.code, 0, describeResult(result));
+     assert.ok(!result.stdout.includes(SUCCESS_LINE), describeResult(result));
+-    const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
++    // D206: "no approval recorded" is now read through the private-store owner as well (the tracked file never held one).
++    const state = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8")), fixture.dir);
+     assert.equal(state.pushApproval?.lastApproved, undefined, "no approval may be recorded");
+   });
+ }
 diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
 index b7857513e..f146f7915 100644
 --- a/plugins/pipeline-core/scripts/pipeline-state.mjs
@@ -666,7 +1107,7 @@ index b7857513e..f146f7915 100644
          phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
          nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,
 diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
-index 3c76f227b..ddd94a4ac 100644
+index 3c76f227b..6e3cc897f 100644
 --- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
 +++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
 @@ -99,6 +99,15 @@ function capturedStderr(fn) {
@@ -722,7 +1163,7 @@ index 3c76f227b..ddd94a4ac 100644
    assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
  }
  
-@@ -3482,3 +3492,174 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
+@@ -3482,3 +3492,200 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
  
  assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
  console.log("D190 residual acceptance C11-a..e complete.");
@@ -895,8 +1336,34 @@ index 3c76f227b..ddd94a4ac 100644
 +  assert.equal(n26Git(fx.root, "status", "--porcelain"), "");
 +});
 +
++// N26-h pins the residual replay line in `runApproveResidualAcceptance`: the shared ledger a proof is checked against now
++// also lives in the private approval store (consumed by approve-push / the reconcile approval), so a proof consumed ONLY there
++// -- the residual store itself holds nothing -- is still refused as CRITICAL-PROOF-REPLAY with zero mutation.
++n26Test("N26-h a residual-acceptance proof consumed only in the private approval store is refused as a replay", () => {
++  const fx = c11Fixture({ chat: false, findings: c11Minor });
++  try {
++    const flags = c11SignatureFiles(fx, c11Minor);
++    const argv = ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags];
++    assert.equal(capturedStderr(() => run(argv, fx.deps)).result, 0, "premise: the signed acceptance is first admitted");
++    const proofSha256 = c11Private(fx).consumption.proofSha256;
++    // Forget the residual store's own record, then consume the same proof ONLY in the private approval store, through its owner.
++    rmSync(c11PrivatePath(fx), { force: true });
++    const seeded = n26Authorization.writeCriticalApproval({ gitCommonDir: fx.common, kind: "push", approval: {
++      approvedBy: "PO", approvedAt: "2026-08-08T19:00:00.000Z", forCommit: candidate.commit, remote: "origin", destination: "refs/heads/main",
++      criticalProof: { proofSha256 } } });
++    assert.equal(seeded.ok, true, JSON.stringify(seeded));
++    assert.equal(n26Authorization.isCriticalProofConsumedPrivately(fx.common, proofSha256), true);
++    const before = readFileSync(fx.statePathFile);
++    const replay = capturedStderr(() => run(argv, fx.deps));
++    assert.equal(replay.result, 2, replay.lines.join(" "));
++    assert.ok(replay.lines.some((line) => line.includes("approve-residual-acceptance refused (CRITICAL-PROOF-REPLAY)")), replay.lines.join(" "));
++    assert.ok(before.equals(readFileSync(fx.statePathFile)), "a refused replay writes nothing to the tracked state");
++    assert.equal(existsSync(c11PrivatePath(fx)), false, "a refused replay writes no residual record either");
++  } finally { fx.cleanup(); }
++});
++
 +assert.deepEqual(n26Failures, [], "N26 private approval store cases failed: " + n26Failures.join(" | "));
-+console.log("N26 private approval store cases a..g complete.");
++console.log("N26 private approval store cases a..h complete.");
 diff --git a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
 index 50b4adafd..40a9b7829 100644
 --- a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
