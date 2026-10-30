@@ -388,7 +388,44 @@ function sanctionedPhoenixRevisionArgs(args, root) {
   });
 }
 
+// W7 D197: the plugin's OWN routine-repair verb. The closed D194 list must stay reachable exactly when the lifecycle is not ready, so
+// its argv shapes are admitted here by exact match (never by prefix or basename): `list`, or `run <kind> --root <this root>
+// --reason <non-empty one-line value>` plus the kind's own flags, each flag at most once, in any order.
+const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
+const ROUTINE_REPAIR_KINDS = new Set(["heal", "stop-failure-aside", "settled-pending-aside", "move-aside", "slice-cancel"]);
+const ROUTINE_REPAIR_CANCEL_CLASSES = new Set(["budget", "integrated-elsewhere"]);
+function sanctionedRoutineRepairArgs(args, root) {
+  if (args[0] === "list") return args.length === 1;
+  if (args[0] !== "run" || !ROUTINE_REPAIR_KINDS.has(args[1])) return false;
+  const kind = args[1];
+  const values = new Map(), booleans = new Set(), positional = [];
+  for (let index = 2; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === "--root" || token === "--reason" || token === "--class") {
+      const value = args[index + 1];
+      if (typeof value !== "string" || value.startsWith("--") || values.has(token)) return false;
+      values.set(token, value);
+      index += 1;
+    } else if (token === "--started" || token === "--no-goldfish-running") {
+      if (booleans.has(token)) return false;
+      booleans.add(token);
+    } else if (token.startsWith("--")) return false;
+    else positional.push(token);
+  }
+  const reason = values.get("--reason");
+  if (values.get("--root") !== root
+    || typeof reason !== "string" || reason.trim() === "" || reason.length > 500 || /[\u0000-\u001f\u007f]/u.test(reason)) return false;
+  if (kind === "slice-cancel") {
+    return positional.length === 1 && ROUTINE_REPAIR_CANCEL_CLASSES.has(values.get("--class")) && !booleans.has("--no-goldfish-running");
+  }
+  if (kind === "move-aside") {
+    return positional.length === 0 && values.size === 2 && booleans.size === 1 && booleans.has("--no-goldfish-running");
+  }
+  return positional.length === 0 && values.size === 2 && booleans.size === 0;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === ROUTINE_REPAIR_SCRIPT) return sanctionedRoutineRepairArgs(args, root);
   if (script === PHOENIX_AUTHORITY_REVISION_SCRIPT) return sanctionedPhoenixRevisionArgs(args, root);
   if (script === ARCHITECTURE_ADOPTION_SCRIPT || script === ARCHITECTURE_MEASURE_SCRIPT || script === ARCHITECTURE_FITNESS_SCRIPT) {
     return sanctionedArchitectureAdoptionToolArgs(script, args, root);

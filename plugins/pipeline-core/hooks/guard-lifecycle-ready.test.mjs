@@ -12876,3 +12876,140 @@ for (const status of ["draft", "approved"]) {
     } finally { rmSync(path, { recursive: true, force: true }); }
   });
 }
+
+// W7 D197 (item routine-repair-loop-must-not-need-the-human): the lifecycle guard admits exactly the closed D194 argv shapes of the
+// plugin's OWN routine-repair.mjs in every non-ready lifecycle state, so the repairs are reachable when they are needed.
+import { runRoutineRepair as rrRun } from "../lib/routine-repair.mjs";
+const RR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+const RR_STATES = {
+  invalid() { throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "raw observation message", { intent: "session" }); },
+  notReady() { deny("partial"); },
+  unavailable() { throw new ProjectOnboardingReadyError("PORG-OBSERVATION-UNAVAILABLE", "observation unavailable", { intent: "session" }); },
+};
+function rrRunCommand(path, command, state) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: RR_STATES[state],
+  });
+}
+function rrAdmitted(path) {
+  const reason = "\"routine repair of a blocked lifecycle\"";
+  const flags = `--root ${path} --reason ${reason}`;
+  return [
+    `node ${RR_SCRIPT} list`,
+    `${process.execPath} ${RR_SCRIPT} list`,
+    `node ${RR_SCRIPT} run heal ${flags}`,
+    `node ${RR_SCRIPT} run heal --reason ${reason} --root ${path}`,
+    `node ${RR_SCRIPT} run stop-failure-aside ${flags}`,
+    `node ${RR_SCRIPT} run settled-pending-aside ${flags}`,
+    `node ${RR_SCRIPT} run move-aside ${flags} --no-goldfish-running`,
+    `node ${RR_SCRIPT} run move-aside --no-goldfish-running ${flags}`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 ${flags} --class budget`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 --class integrated-elsewhere ${flags} --started`,
+    `node ${RR_SCRIPT} run slice-cancel ${flags} --class budget S-1`,
+  ];
+}
+function rrRefused(path) {
+  const reason = "\"routine repair\"";
+  const flags = `--root ${path} --reason ${reason}`;
+  const foreign = join(path, "plugins", "pipeline-core", "scripts", "routine-repair.mjs");
+  return [
+    `node ${RR_SCRIPT} run delete-everything ${flags}`,
+    `node ${RR_SCRIPT} run heal --root ${path}`,
+    `node ${RR_SCRIPT} run heal --root ${path} --reason ""`,
+    `node ${RR_SCRIPT} run heal --root ${path} --reason "   "`,
+    `node ${RR_SCRIPT} run heal --root ${path}-other --reason ${reason}`,
+    `node ${RR_SCRIPT} run heal --reason ${reason}`,
+    `node ${RR_SCRIPT} run heal ${flags} --extra`,
+    `node ${RR_SCRIPT} run heal ${flags} --reason ${reason}`,
+    `node ${RR_SCRIPT} run heal ${flags} --root ${path}`,
+    `node ${RR_SCRIPT} run heal ${flags} stray`,
+    `node ${RR_SCRIPT} run heal ${flags} --no-goldfish-running`,
+    `node ${RR_SCRIPT} run heal ${flags} --class budget`,
+    `node ${RR_SCRIPT} run move-aside ${flags}`,
+    `node ${RR_SCRIPT} run slice-cancel ${flags} --class budget`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 ${flags} --class forever`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 ${flags}`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 S-2 ${flags} --class budget`,
+    `node ${RR_SCRIPT} run slice-cancel S-1 ${flags} --class budget --started --started`,
+    `node ${RR_SCRIPT} run ${flags}`,
+    `node ${RR_SCRIPT} list extra`,
+    `node ${RR_SCRIPT}`,
+    `node ${RR_SCRIPT} run`,
+    `node ${RR_SCRIPT} inspect`,
+    `node ${foreign} list`,
+    `node ${foreign} run heal ${flags}`,
+    `node ${RR_SCRIPT}.bak list`,
+    `bash ${RR_SCRIPT} list`,
+    `node ${RR_SCRIPT} run heal ${flags} && echo done`,
+  ];
+}
+
+for (const state of ["invalid", "notReady", "unavailable"]) {
+  test(`D197 ${state}: every closed routine-repair argv shape is admitted`, () => {
+    const path = qw04GuardRoot(QW04_STATES.approved);
+    for (const command of rrAdmitted(path)) {
+      const result = rrRunCommand(path, command, state);
+      assert.equal(result.exitCode, 0, `refused an admitted shape: ${command} -- ${result.stderr}`);
+    }
+  });
+
+  test(`D197 ${state}: unknown kinds, missing or bad reasons, foreign roots, extra flags and foreign scripts stay refused`, () => {
+    const path = qw04GuardRoot(QW04_STATES.approved);
+    for (const command of rrRefused(path)) {
+      const result = rrRunCommand(path, command, state);
+      assert.equal(result.exitCode, 2, `admitted a refused shape: ${command}`);
+    }
+  });
+}
+
+test("D197 a multi-line reason is refused by the guard and by the verb itself", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  const result = rrRunCommand(path, `node ${RR_SCRIPT} run heal --root ${path} --reason "two\nlines"`, "invalid");
+  assert.equal(result.exitCode, 2);
+  const verb = rrRun({ kind: "stop-failure-aside", root: path, reason: "two\nlines" });
+  assert.equal(verb.exit, 2);
+  assert.equal(verb.result.code, "RR-REASON-REQUIRED");
+});
+
+test("D197 an admitted run with a reason appends exactly one ledger entry carrying that reason; an empty reason is refused RR-REASON-REQUIRED", () => {
+  const repo = mkdtempSync(join(osTmpdir(), "d197-ledger-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", repo]).status, 0);
+    const ledgerPath = join(repo, ".git", "agent-pipeline", "routine-repair-ledger.jsonl");
+    const done = rrRun({ kind: "stop-failure-aside", root: repo, reason: "d197 ledger probe" });
+    assert.equal(done.exit, 0, JSON.stringify(done.result));
+    const lines = readFileSync(ledgerPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].reason, "d197 ledger probe");
+    assert.equal(lines[0].kind, "stop-failure-aside");
+    const refused = rrRun({ kind: "stop-failure-aside", root: repo, reason: "" });
+    assert.equal(refused.exit, 2);
+    assert.equal(refused.result.code, "RR-REASON-REQUIRED");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("D197/D203 a producer still reconcile-refused after heal (native-authority-orphan-prefix) is moved aside, a different finding stays refused", () => {
+  const repo = mkdtempSync(join(osTmpdir(), "d197-d203-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", repo]).status, 0);
+    const inspectOf = (row) => ({ lock: { status: "absent" }, reservations: [], registry: { status: "present", producers: row ? [row] : [], read: { status: "ok" } } });
+    const orphan = { producerId: "native-goldfish", status: "reconcile-refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "native-authority-orphan-prefix" };
+    const calls = [];
+    const spawn = (script, args) => {
+      calls.push(args[0]);
+      if (args[0] === "inspect") return { status: 0, stdout: `${JSON.stringify(inspectOf(orphan))}\n`, stderr: "" };
+      return { status: 0, stdout: `${JSON.stringify({ status: args[0] === "heal" ? "healed" : "moved-aside", retained: ["x"] })}\n`, stderr: "" };
+    };
+    const moved = rrRun({ kind: "move-aside", root: repo, reason: "orphan prefix after heal" }, { spawn });
+    assert.equal(moved.exit, 0, JSON.stringify(moved.result));
+    assert.ok(calls.includes("move-aside"), calls.join(","));
+    const other = { producerId: "native-goldfish", status: "invalid", code: "SOMETHING-ELSE", reason: "not reconcile refused" };
+    const refusedCalls = [];
+    const refused = rrRun({ kind: "move-aside", root: repo, reason: "other finding" }, {
+      spawn: (script, args) => { refusedCalls.push(args[0]); return { status: 0, stdout: `${JSON.stringify(inspectOf(other))}\n`, stderr: "" }; },
+    });
+    assert.equal(refused.exit, 2);
+    assert.equal(refused.result.code, "RR-OUTSIDE-LIST");
+    assert.ok(!refusedCalls.includes("move-aside"));
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
