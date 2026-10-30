@@ -13507,6 +13507,21 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "rebind-approval": {
+      // `--help` is a question, never a run: before this branch it executed the rebind and wrote a receipt.
+      if (rest.includes("--help") || rest.includes("-h")) {
+        console.log(`Usage: node pipeline-state.mjs rebind-approval
+
+Re-binds the current plan approval to this checkout when it is a clone or a
+transfer of the approving one and the approved PRD/Spec bytes are unchanged.
+It re-checks every bound digest, takes no argument, requests no signature and
+changes no State; only the device-local receipt is written. When the approved
+bytes changed it refuses, and the plan must be submitted and approved again.`);
+        return 0;
+      }
+      if (rest.length > 0) {
+        console.error(`Error: rebind-approval takes no argument (got ${rest.join(" ")}). Run "rebind-approval --help" for usage.`);
+        return 2;
+      }
       const rebind = rebindApproval({ dir, now, deps });
       console.log(JSON.stringify(rebind.payload, null, 2));
       return rebind.exit;

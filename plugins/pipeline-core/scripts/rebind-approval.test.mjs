@@ -522,3 +522,20 @@ test("R7-5f: a device rebind never matches another approval, device or tampered 
   assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT }), null,
     "a receipt whose origin values differ from the approval's is ignored");
 });
+
+test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {
+  const origin = approvedOrigin("help");
+  const clone = cloneOf(origin, "help");
+  const stateBefore = stateBytes(clone.dir); const privateBefore = privateSnapshot(clone.dir);
+  for (const flag of ["--help", "-h"]) {
+    const result = invoke(["rebind-approval", flag], clone.deps);
+    assert.equal(result.status, 0, result.err);
+    assert.match(result.out, /Usage: node pipeline-state\.mjs rebind-approval/u);
+    assert.doesNotMatch(result.out, /"status"/u, "help prints usage, not a rebind result");
+  }
+  const extra = invoke(["rebind-approval", "--by", "someone"], clone.deps);
+  assert.equal(extra.status, 2);
+  assert.match(extra.err, /takes no argument/u);
+  assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
+  assert.deepEqual([...privateSnapshot(clone.dir).keys()], [...privateBefore.keys()], "no receipt is written by --help, -h or a refused argument");
+});
