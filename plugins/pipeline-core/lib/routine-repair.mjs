@@ -71,7 +71,11 @@ export function moveStopFailuresAside({ sourceDir, pendingDir, asideDir }) {
 
 const PENDING_NAME = /^pending-(claude|codex)-([a-f0-9]{64})\.json$/u;
 const SETTLED_STATES = new Set(["integrated", "integrated-by-commit", "cancelled"]);
-const SETTLED_SIBLINGS = ["authority-terminal", "authority-integration"];
+// Every authority record of a pending state carries the sha256 of the pending bytes in its name: authority-<kind>-<sha>.json or
+// authority-<kind>-<sha>-<revision>.json (terminal, integration, check, scope, recheck, checkpoint, ...). The host state reader refuses
+// any authority record whose pendingSha256 has no pending file (native-authority-orphan-prefix), so all of them travel together.
+// 2026-10-30: heal moved only the terminal and integration records and so left orphans that locked every dispatch.
+const authoritySiblingOf = (name, pendingSha256) => new RegExp(`^authority-[a-z][a-z-]*-${pendingSha256}(?:-\\d+)?\\.json$`, "u").test(name);
 const pendingDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
 const diagnosticsDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
 
@@ -79,11 +83,13 @@ const diagnosticsDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run",
  * W7: which pending states of the reservation rows of `session-authority-repair inspect` may leave the authority namespace (read-only).
  * The settled rule itself is inspect's (integrated, integrated-by-commit, cancelled); it is not re-implemented here. A pending file is
  * retired only when its row is settled and it is a regular non-symlink file. The digest in a pending name is a key, not the sha256 of
- * its bytes; the authority-terminal and authority-integration siblings are named by the sha256 of the pending bytes (pendingSha256 in
- * native-goldfish-host-state), so those travel with it. Everything else is listed in `kept`.
+ * its bytes; every authority record is named by the sha256 of the pending bytes (pendingSha256 in native-goldfish-host-state), so
+ * all of them travel with it. Everything else is listed in `kept`.
  */
 export function planSettledPending({ pendingDir, reservations }) {
   const retire = [], kept = [];
+  let names = [];
+  try { names = readdirSync(pendingDir); } catch { names = []; }
   for (const row of Array.isArray(reservations) ? reservations : []) {
     const name = typeof row?.pending === "string" ? row.pending : null;
     if (name === null) continue;
@@ -97,13 +103,35 @@ export function planSettledPending({ pendingDir, reservations }) {
       const pendingSha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
       const siblings = [];
       let blocked = null;
-      for (const prefix of SETTLED_SIBLINGS) {
-        const sibling = `${prefix}-${pendingSha256}.json`;
-        if (!existsSync(join(pendingDir, sibling))) continue;
+      for (const sibling of names.filter((entry) => authoritySiblingOf(entry, pendingSha256)).sort()) {
         if (lstatSync(join(pendingDir, sibling)).isSymbolicLink()) blocked = `${sibling} is a symlink`; else siblings.push(sibling);
       }
       if (blocked !== null) { kept.push({ name, reason: blocked }); continue; }
       retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null, siblings });
+    } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
+  }
+  return { retire, kept };
+}
+
+/**
+ * Read-only: the authority records whose pendingSha256 names no pending file of the directory, the exact condition under which the
+ * host state reader refuses (native-authority-orphan-prefix). A record that cannot be read or carries no sha256 is kept, never guessed.
+ */
+export function planOrphanAuthority({ pendingDir }) {
+  const retire = [], kept = [];
+  let names = [];
+  try { names = readdirSync(pendingDir); } catch { return { retire, kept }; }
+  const pendingHashes = new Set();
+  for (const name of names.filter((entry) => PENDING_NAME.test(entry))) {
+    try { if (!lstatSync(join(pendingDir, name)).isSymbolicLink()) pendingHashes.add(createHash("sha256").update(readFileSync(join(pendingDir, name))).digest("hex")); }
+    catch { return { retire: [], kept: [{ name, reason: "a pending file cannot be read, so no authority record is classified as orphaned" }] }; }
+  }
+  for (const name of names.filter((entry) => entry.startsWith("authority-")).sort()) {
+    try {
+      if (lstatSync(join(pendingDir, name)).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
+      const sha = JSON.parse(readFileSync(join(pendingDir, name), "utf8"))?.pendingSha256;
+      if (typeof sha !== "string" || !/^[a-f0-9]{64}$/u.test(sha)) { kept.push({ name, reason: "no pendingSha256" }); continue; }
+      if (!pendingHashes.has(sha)) retire.push({ name, pendingSha256: sha });
     } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
   }
   return { retire, kept };
@@ -284,10 +312,19 @@ function retireSettledPending(ctx, inspect) {
     retiredPending.push(row);
   }
   for (const row of kept) ctx.retained.push(rel(join(pendingDir, row.name)));
+  // Authority records left without their pending file (by an earlier heal that moved only two kinds, or any other cause) make the host
+  // state reader refuse every dispatch; they leave too, into the same retained directory.
+  const orphans = planOrphanAuthority({ pendingDir });
+  for (const row of orphans.retire) {
+    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
+    renameSync(join(pendingDir, row.name), join(asideDir, row.name));
+    ctx.moved.push({ from: rel(join(pendingDir, row.name)), to: `${abandonedRel(asideName)}/${row.name}` });
+  }
+  for (const row of orphans.kept) ctx.retained.push(rel(join(pendingDir, row.name)));
   const stop = moveStopFailuresAside({ sourceDir, pendingDir, asideDir });
   for (const row of stop.retired) ctx.moved.push({ from: rel(join(sourceDir, row.name)), to: `${abandonedRel(asideName)}/${row.name}` });
   for (const row of stop.kept) ctx.retained.push(rel(join(sourceDir, row.name)));
-  return { retiredPending, keptPending: kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
+  return { retiredPending, keptPending: kept, retiredOrphanAuthority: orphans.retire, keptOrphanAuthority: orphans.kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
 }
 
 function execute(plan, ctx) {
@@ -311,7 +348,7 @@ function execute(plan, ctx) {
     const inspect = run.status === 0 ? parseJson(run.stdout) : null;
     if (inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no pending state can be classified as settled", `node ${SAR} inspect --root <root>`);
     const step = retireSettledPending(ctx, inspect);
-    return { ok: true, code: step.retiredPending.length || step.retiredStopFailures.length ? "moved-aside" : "nothing-to-move", ...step };
+    return { ok: true, code: step.retiredPending.length || step.retiredOrphanAuthority.length || step.retiredStopFailures.length ? "moved-aside" : "nothing-to-move", ...step };
   }
   if (plan.kind === "slice-cancel") {
     const args = ["cancel", plan.sliceId, "--reason", plan.reason, "--class", plan.cancelClass, "--root", root, ...(plan.started ? ["--started"] : [])];

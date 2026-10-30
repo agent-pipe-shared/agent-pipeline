@@ -245,6 +245,50 @@ test("settled-pending-aside keys the siblings by the sha256 of the pending bytes
   assert.ok(left.includes(foreign), "a sibling named by the key digest stays");
 }));
 
+// 2026-10-30, live: heal moved only the terminal and integration records of 246 settled pending states and left their scope,
+// checkpoint and recheck records behind; the host state reader then refused every dispatch with native-authority-orphan-prefix.
+// The assertion is the reader's own condition: every authority record left names the sha256 of a pending file still present.
+test("settled-pending-aside moves every authority record of a retired pending state and every orphaned one, so no authority record names a missing pending file", () => withRepo((root, ap) => {
+  const record = (name, pendingSha256, extra = {}) => writeFileSync(join(commitDir(ap), name), JSON.stringify({ pendingSha256, ...extra }));
+  const settled = writeNamedPending(ap, "D-S");
+  const live = writeNamedPending(ap, "D-L");
+  const settledKinds = [`authority-terminal-${settled.digest}.json`, `authority-integration-${settled.digest}.json`, `authority-check-${settled.digest}.json`,
+    `authority-scope-${settled.digest}-1.json`, `authority-scope-${settled.digest}-2.json`, `authority-checkpoint-${settled.digest}-1.json`, `authority-recheck-${settled.digest}-1.json`];
+  for (const name of settledKinds) record(name, settled.digest);
+  const liveKinds = [`authority-scope-${live.digest}-1.json`, `authority-checkpoint-${live.digest}-1.json`];
+  for (const name of liveKinds) record(name, live.digest);
+  const gone = hex("e", 64);
+  const orphans = [`authority-scope-${gone}-1.json`, `authority-recheck-${gone}-3.json`];
+  for (const name of orphans) record(name, gone);
+  writeFileSync(join(commitDir(ap), `authority-scope-${hex("f", 64)}-1.json`), "{ not json");
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(settled, "integrated-by-commit"), rowOf(live, null))).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  const left = readdirSync(commitDir(ap)).sort();
+  for (const name of [settled.name, ...settledKinds, ...orphans]) assert.ok(!left.includes(name), `${name} left`);
+  for (const name of [live.name, ...liveKinds]) assert.ok(left.includes(name), `${name} moved`);
+  assert.deepEqual(result.retiredPending[0].siblings.sort(), [...settledKinds].sort());
+  assert.deepEqual(result.retiredOrphanAuthority.map((row) => row.name).sort(), [...orphans].sort());
+  assert.deepEqual(result.keptOrphanAuthority.map((row) => row.name), [`authority-scope-${hex("f", 64)}-1.json`], "an unreadable record is kept, never guessed");
+  const present = new Set(left.filter((name) => name.startsWith("pending-")).map((name) => createHash("sha256").update(readFileSync(join(commitDir(ap), name))).digest("hex")));
+  for (const name of left.filter((entry) => entry.startsWith("authority-"))) {
+    let sha = null;
+    try { sha = JSON.parse(readFileSync(join(commitDir(ap), name), "utf8")).pendingSha256; } catch { continue; }
+    assert.ok(present.has(sha), `${name} names a missing pending file`);
+  }
+  const aside = files(join(ap, "session-authority-abandoned"));
+  for (const name of [...settledKinds, ...orphans]) assert.ok(aside.some((file) => file.endsWith(`-settled-pending/${name}`)), `${name} retained aside`);
+}));
+
+test("heal also moves orphaned authority records when no pending state is settled", () => withRepo((root, ap) => {
+  mkdirSync(commitDir(ap), { recursive: true });
+  const gone = hex("a", 64);
+  writeFileSync(join(commitDir(ap), `authority-checkpoint-${gone}-1.json`), JSON.stringify({ pendingSha256: gone }));
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: stub(emptyInspect).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(result.settledPending.retiredOrphanAuthority.map((row) => row.name), [`authority-checkpoint-${gone}-1.json`]);
+  assert.deepEqual(readdirSync(commitDir(ap)), []);
+}));
+
 test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {
   assert.equal(runRoutineRepair({ kind: "settled-pending-aside", root }, { spawn: stub(emptyInspect).spawn }).result.code, "RR-REASON-REQUIRED");
   const failing = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: () => ({ status: 1, stdout: "", stderr: "x" }) });
