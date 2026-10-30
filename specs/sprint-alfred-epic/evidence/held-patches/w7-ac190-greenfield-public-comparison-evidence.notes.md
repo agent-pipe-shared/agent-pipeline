@@ -101,3 +101,16 @@ The CLI script, `command-catalogue.mjs`, the screen in `bound-artifact-transfer.
 test therefore also enforces a closed vocabulary for every string value), the `sourceBaseline`, and the second-run evidence folder.
 
 Targeted delivery: green. Full Verify, batch Critic and PO acceptance stay pending.
+
+## Elephant additions after the return (regenerated patch)
+
+- `.gitignore`: `!/evidence/greenfield-public/` after the design-course exceptions. `/evidence/*` ignored the
+  publication folder, so a plain `git add` skipped it and the committed-set cases would fail in a clean checkout;
+  `git check-ignore` now reports the folder as not ignored.
+- `docs/operating-tools.md`: one row for `scripts/check-greenfield-comparison-citations.mjs` (CLAUDE.md: reusable
+  scripts are listed there). No test reads that file.
+- Candidate-12 rehearsal on `93d5cde4a` (all five held patches, apply commit, `node scripts/rebaseline-inventory.mjs`,
+  commit, `node scripts/sync-reader-inputs.mjs`): inventory PASS, suite registration only the 16 pre-existing
+  unregistered suites, both new suites green (40/40, 14/14) on the committed files, Reader inputs consistent after
+  the sync (4 drift items before it, as expected).
+- The driver's same-basename revert defect is fixed in the scratch driver tooling, not in the repository.

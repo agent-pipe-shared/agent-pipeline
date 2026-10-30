@@ -1,3 +1,28 @@
+diff --git a/.gitignore b/.gitignore
+index 8f4d19449..e067ab768 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -58,6 +58,8 @@ tmp-inbounds.txt
+ !/evidence/design-course/sprint-alfred-epic/r5d.readiness.json
+ !/evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json
+ !/evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json
++# Published, sanitized runner observations and comparisons (AC-190): cited by path and sha256.
++!/evidence/greenfield-public/
+ 
+ # Local interruption reporting / store runs (C1 Slice 2)
+ /telemetry/interruptions/
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 89cebfa82..e4610f50c 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -19,6 +19,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
+ | The capability inventory gate went red after a suite, hook or skill was added | `scripts/rebaseline-inventory.mjs` | the `sourceBaseline` block of the inventory (protected file) |
+ | A Reader input (capability inventory, observation governance, reader protocol) changed and the plugin's hash-pinned mirrors must follow, or you want to know whether they already drifted | `scripts/sync-reader-inputs.mjs [<root>] [--check]` | the three mirrors, `reader-inputs/manifest.json` and the two pins in `lib/doc-reader-documentation-snapshot.mjs` (`--check` writes nothing) |
++| A release note or retro claims one runner's greenfield course is faster, cheaper or more reliable: check that every marked claim cites a published comparison under `evidence/greenfield-public/` by path and sha256 | `scripts/check-greenfield-comparison-citations.mjs <file.md>` (`node --test scripts/check-greenfield-comparison-citations.test.mjs`) | none |
+ | Re-measure the delivery matrix and run the gap rounds | `scripts/delivery-owners.mjs`, `scripts/delivery-agent-items.mjs`, `scripts/matrix-gaps.mjs`, `scripts/gap-inputs.mjs`, `scripts/gap-summary.mjs`, `scripts/gap-collect.mjs`, `scripts/gap-evidence.mjs`, `scripts/delivery-remeasure-inputs.mjs` | see below |
+ | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
+ | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
 diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
 index f83c472cf..e4a5c23ab 100644
 --- a/docs/product-capability-inventory.json
