@@ -1,0 +1,112 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index cfe98c80c..19bd8ee46 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -172,7 +172,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",79],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+-    ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",17],
++    ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",20],
+     ["darwin-native-process-observer-tests","plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs","top-level-assertions",24],
+     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
+     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 72b3bb40c..99f4a7631 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -883,7 +883,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+       deny(denials.map((entry) => entry.reason).join("\n"));
+     }
+     if (crossRepositoryOnlyDenial) {
+-      deny(crossRepositoryDenialReason(denials));
++      deny(crossRepositoryDenialReason(denials, antigravityGuardPayload(input, normalized, projectRoot)));
+     }
+ 
+     const pureRecovery = classifyNonLiftableGuardDenials(denials);
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 897e25621..2f08c6591 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -735,6 +735,22 @@ check("Antigravity pretool guard blocks writes outside project root (GUARD-CROSS
+   rmSync(root, { recursive: true, force: true });
+ });
+ 
++check("Antigravity pretool guard names the artifact copy route when a refused copy aims at a brain directory (G13)", () => {
++  const root = fixture();
++  const brain = join(tmpdir(), "agy-g13-home", "brain", "11111111-2222-4333-8444-555555555555");
++  const res = decision(run({
++    toolCall: { name: "run_command", args: { CommandLine: `cp -r public/gallery ${brain}/gallery`, Cwd: root } },
++  }, root));
++  assert.equal(res.decision, "deny");
++  assert.match(res.reason, /AGY-ARTIFACT-COPY-ROUTE/);
++  const plain = decision(run({
++    toolCall: { name: "run_command", args: { CommandLine: `cp notes.md ${join(tmpdir(), "agy-g13-other", "notes.md")}`, Cwd: root } },
++  }, root));
++  assert.equal(plain.decision, "deny");
++  assert.doesNotMatch(plain.reason, /AGY-ARTIFACT-COPY-ROUTE/);
++  rmSync(root, { recursive: true, force: true });
++});
++
+ check("Antigravity pretool guard blocks write when Dev-Plan is not approved", () => {
+   const root = fixture();
+   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-export.mjs b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+index f2270387b..e221cd00f 100644
+--- a/plugins/pipeline-core/lib/current-session-artifact-export.mjs
++++ b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+@@ -78,8 +78,23 @@ export function isCurrentSessionArtifactExport(input, root, { runner } = {}) {
+   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
+ }
+ 
+-export function crossRepositoryDenialReason(denials) {
++export const ARTIFACT_COPY_ROUTE_HINT = 'AGY-ARTIFACT-COPY-ROUTE: an image for the current conversation goes into its artifact directory with exactly '
++  + '`cp [--] <regular PNG inside the project> <new .png directly in the current artifact directory>`: one source, no options, no glob, '
++  + 'a target that does not exist yet, the absolute artifact directory of this conversation and no other.';
++
++/** True when a refused command aims a copy or move at an Antigravity brain directory; read-only, never a permission. */
++function aimsAtArtifactDirectory(input) {
++  if (input?.tool_name !== 'Bash' || typeof input.tool_input?.command !== 'string') return false;
++  const parsed = parseGuardCommand(input.tool_input.command, input.cwd ?? process.cwd(), { platform: 'linux' });
++  if (parsed.parseStatus !== 'accepted') return false;
++  return parsed.segments.some((segment) => ['cp', 'mv', 'install'].includes(segment.executable)
++    && segment.argv.some((arg) => /(?:^|[\\/])brain[\\/][A-Fa-f0-9-]{36}(?:[\\/]|$)/u.test(arg)));
++}
++
++export function crossRepositoryDenialReason(denials, input) {
+   // The shared guard already selected the exact HGO recovery. A second adapter
+   // classification used to label every outside target as a plugin cache.
+-  return denials.map((entry) => entry.reason).join('\n');
++  const reason = denials.map((entry) => entry.reason).join('\n');
++  // G13: a refused artifact copy names the one admitted shape, after the authoritative recovery.
++  return aimsAtArtifactDirectory(input) ? `${reason}\n${ARTIFACT_COPY_ROUTE_HINT}` : reason;
+ }
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs b/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs
+index a1ae81623..612601053 100644
+--- a/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs
++++ b/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs
+@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, symlinkSync, linkSync } from 'node:fs';
+ import { join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { antigravityArtifactHostContext, isCurrentSessionArtifactExport, crossRepositoryDenialReason } from './current-session-artifact-export.mjs';
++import { antigravityArtifactHostContext, isCurrentSessionArtifactExport, crossRepositoryDenialReason, ARTIFACT_COPY_ROUTE_HINT } from './current-session-artifact-export.mjs';
+ import { registerTestCaseCompletion } from './test-case-completion.mjs';
+ const cases = [];
+ function test(name, run) { cases.push({ id: `G13A${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
+@@ -89,5 +89,14 @@ test('cross-repository denial transport preserves the authoritative recovery ver
+   assert.equal(crossRepositoryDenialReason([{ reason }]), reason);
+   assert.equal(crossRepositoryDenialReason([{ reason }]).includes('PLUGIN-CACHE'), false);
+ });
+-if (cases.length !== 6) throw new Error('g13 artifact case count drift');
++test('a refused copy into an artifact directory names the one admitted shape after the recovery (G13)', () => {
++  const reason = 'GUARD-CROSS-REPO-MUTATION\nHGO-EXTERNAL-PROJECT-BOUNDARY';
++  const brain = '/synthetic-home/.gemini/synthetic-appdata/brain/11111111-2222-4333-8444-555555555555';
++  const bash = (command) => ({ tool_name: 'Bash', tool_input: { command }, cwd: '/synthetic-project' });
++  const aimed = crossRepositoryDenialReason([{ reason }], bash(`cp -r public/gallery ${brain}/gallery`));
++  assert.equal(aimed, `${reason}\n${ARTIFACT_COPY_ROUTE_HINT}`);
++  assert.equal(crossRepositoryDenialReason([{ reason }], bash(`cp notes.md /synthetic-home/other/notes.md`)), reason);
++  assert.equal(crossRepositoryDenialReason([{ reason }], { tool_name: 'Write', tool_input: { file_path: `${brain}/x.png` } }), reason);
++});
++if (cases.length !== 7) throw new Error('g13 artifact case count drift');
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
