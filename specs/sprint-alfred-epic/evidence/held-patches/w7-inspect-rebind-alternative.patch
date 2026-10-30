@@ -1,0 +1,132 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
+index fcd60df84..98b8d72f2 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
+@@ -262,8 +262,28 @@ function validReopenDesignActorInput(value) {
+     && value.rejectNul === true;
+ }
+ 
++// The stale-approval form also carries `alternativeAction`: the approval-keeping `rebind-approval`
++// command, pinned as exactly as reopen-design itself (one argv shape, one schema, one status).
++function validRebindApprovalCommand(value) {
++  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
++    && value.kind === "command"
++    && value.executable === "node"
++    && Array.isArray(value.argv)
++    && value.argv.length === 2
++    && validPipelineStateScript(value.argv[0])
++    && value.argv[1] === "rebind-approval"
++    && value.mutation === true
++    && value.requiresConfirmation === false
++    && exactKeys(value.expected, ["schema", "statuses"])
++    && value.expected.schema === "pipeline.rebind-approval.v1"
++    && JSON.stringify(value.expected.statuses) === JSON.stringify(["verified"]);
++}
++
+ function validReopenDesignCollectAction(value) {
+-  return exactKeys(value, ["kind", "inputs", "mutation", "requiresConfirmation", "guidance", "applyAction"])
++  const keys = ["kind", "inputs", "mutation", "requiresConfirmation", "guidance", "applyAction"];
++  const withAlternative = value !== null && typeof value === "object" && Object.hasOwn(value, "alternativeAction");
++  return exactKeys(value, withAlternative ? [...keys, "alternativeAction"] : keys)
++    && (!withAlternative || validRebindApprovalCommand(value.alternativeAction))
+     && value.kind === "collect-input"
+     && Array.isArray(value.inputs)
+     && value.inputs.length === 1
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+index f0eef23bf..a4e88f6c8 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+@@ -517,12 +517,28 @@ function reopenDesignAction(guidance = REOPEN_STALE_GUIDANCE) {
+   };
+ }
+ 
++function rebindApprovalAction() {
++  return {
++    kind: "command",
++    executable: "node",
++    argv: [PIPELINE_STATE_SCRIPT, "rebind-approval"],
++    mutation: true,
++    requiresConfirmation: false,
++    expected: { schema: "pipeline.rebind-approval.v1", statuses: ["verified"] },
++  };
++}
++
++// A stale approval carries the approval-keeping rebind-approval as a structured alternative.
++function staleApprovalAction() {
++  return { ...reopenDesignAction(), alternativeAction: rebindApprovalAction() };
++}
++
+ // What the producer publishes per lifecycle status (v3 :3041 stale approval, :3048 materialization required,
+ // :3055-3060 invalid architecture evidence; the last two only in `approved` / `implementing`).
+ const NEW_SHAPE_PRODUCER_CASES = [
+   { lifecycleStatus: "approved", name: "materialization required", build: materializeArchitectureAction },
+   { lifecycleStatus: "approved", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
+-  { lifecycleStatus: "approved", name: "stale approval", build: () => reopenDesignAction() },
++  { lifecycleStatus: "approved", name: "stale approval", build: staleApprovalAction },
+   { lifecycleStatus: "implementing", name: "materialization required", build: materializeArchitectureAction },
+   { lifecycleStatus: "implementing", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
+ ];
+@@ -577,6 +593,8 @@ test("the new-shape fixtures mirror the literals the producer publishes (drift o
+     `[PO_AUTHORITY_REBIND_WRITER, "materialize-architecture"],`,
+     `"pipeline.architecture-design-materialization.v1",`,
+     `["materialized"],`,
++    `action.alternativeAction = commandAction([PO_AUTHORITY_REBIND_WRITER, "rebind-approval"], true, false,`,
++    `"pipeline.rebind-approval.v1", ["verified"]);`,
+     REOPEN_STALE_GUIDANCE,
+     REOPEN_INVALID_EVIDENCE_GUIDANCE.replace(" (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED)", " (${architecture.code ?? \"ARCHITECTURE-DESIGN-INVALID\"})"),
+   ]) {
+@@ -667,6 +685,34 @@ test("the new shapes are bound to the plugin's own resolved pipeline-state.mjs,
+     const reopen = reopenDesignAction();
+     reopen.applyAction.argv[0] = script;
+     assertInvalidObservation(reopen, `reopen-design via ${script}`);
++    const stale = staleApprovalAction();
++    stale.alternativeAction.argv[0] = script;
++    assertInvalidObservation(stale, `rebind-approval alternative via ${script}`);
++  }
++});
++
++test("the rebind-approval alternative is exact about its argv, flags and expected result", () => {
++  const mutations = [
++    ["other subcommand", (a) => { a.alternativeAction.argv[1] = "reopen-design"; }],
++    ["extra argv", (a) => { a.alternativeAction.argv.push("--force"); }],
++    ["missing subcommand", (a) => { a.alternativeAction.argv = [a.alternativeAction.argv[0]]; }],
++    ["foreign script", (a) => { a.alternativeAction.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "pipeline-state.mjs"); }],
++    ["non-node executable", (a) => { a.alternativeAction.executable = "bash"; }],
++    ["not mutating", (a) => { a.alternativeAction.mutation = false; }],
++    ["confirmation required", (a) => { a.alternativeAction.requiresConfirmation = true; }],
++    ["other schema", (a) => { a.alternativeAction.expected.schema = "pipeline.other.v1"; }],
++    ["other status", (a) => { a.alternativeAction.expected.statuses = ["refused"]; }],
++    ["extra status", (a) => { a.alternativeAction.expected.statuses = ["verified", "refused"]; }],
++    ["extra key", (a) => { a.alternativeAction.unexpected = true; }],
++    ["collect-input kind", (a) => { a.alternativeAction.kind = "collect-input"; }],
++    ["null alternative", (a) => { a.alternativeAction = null; }],
++    ["alternative is the reopen-design apply action", (a) => { a.alternativeAction = a.applyAction; }],
++    ["second extra key next to the alternative", (a) => { a.unexpected = true; }],
++  ];
++  for (const [label, mutate] of mutations) {
++    const action = staleApprovalAction();
++    mutate(action);
++    assertInvalidObservation(action, `rebind-approval alternative: ${label}`);
+   }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index c7f999e0a..262233209 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3363,7 +3363,14 @@ function designToImplementationHandoverAction(root, fs) {
+         "pipeline.project-onboarding.v4", ["ready"]),
+     };
+   };
+-  if (authority.status === "drifted" && authority.nextAction === "reopen-design") return reopenDesignAction();
++  if (authority.status === "drifted" && authority.nextAction === "reopen-design") {
++    // A stale approval offers the approval-keeping repair as a structured alternative next to reopen-design;
++    // the invalid-architecture-evidence case below never gets it.
++    const action = reopenDesignAction();
++    action.alternativeAction = commandAction([PO_AUTHORITY_REBIND_WRITER, "rebind-approval"], true, false,
++      "pipeline.rebind-approval.v1", ["verified"]);
++    return action;
++  }
+   if (authority.status !== "observed" || !["approved", "implementing"].includes(authority.lifecycleStatus)) return null;
+   // The approved PRD is the sole human decision. Its closed greenfield design
+   // package may now be rendered deterministically before implementation; the
