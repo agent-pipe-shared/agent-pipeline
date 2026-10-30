@@ -1,0 +1,413 @@
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index e941a0718..702ccc3cb 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -21,6 +21,7 @@ export const ROUTINE_REPAIRS = Object.freeze([
+   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
+   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
+   Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
++  Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate" }),
+ ]);
+ const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
+ const SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+@@ -68,6 +69,90 @@ export function moveStopFailuresAside({ sourceDir, pendingDir, asideDir }) {
+   return { retired, kept };
+ }
+ 
++const PENDING_NAME = /^pending-(claude|codex)-([a-f0-9]{64})\.json$/u;
++const SETTLED_STATES = new Set(["integrated", "integrated-by-commit", "cancelled"]);
++const SETTLED_SIBLINGS = ["authority-terminal", "authority-integration"];
++const pendingDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
++const diagnosticsDirOf = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++
++/**
++ * W7: which pending states of the reservation rows of `session-authority-repair inspect` may leave the authority namespace (read-only).
++ * The settled rule itself is inspect's (integrated, integrated-by-commit, cancelled); it is not re-implemented here. A pending file is
++ * retired only when its row is settled, it is a regular non-symlink file, and the sha256 of its bytes equals the digest in its name;
++ * its authority-terminal and authority-integration siblings of that digest travel with it. Everything else is listed in `kept`.
++ */
++export function planSettledPending({ pendingDir, reservations }) {
++  const retire = [], kept = [];
++  for (const row of Array.isArray(reservations) ? reservations : []) {
++    const name = typeof row?.pending === "string" ? row.pending : null;
++    if (name === null) continue;
++    const match = PENDING_NAME.exec(name);
++    if (!match) { kept.push({ name: name.slice(0, 120), reason: "not a pending state file name" }); continue; }
++    if (row.status === "unreadable") { kept.push({ name, reason: `status unreadable: ${short(row.reason ?? "no reason reported")}` }); continue; }
++    if (!SETTLED_STATES.has(row.settled)) { kept.push({ name, reason: "not settled: its item reservation is open" }); continue; }
++    const path = join(pendingDir, name);
++    try {
++      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
++      if (createHash("sha256").update(readFileSync(path)).digest("hex") !== match[2]) { kept.push({ name, reason: "the sha256 of the bytes differs from the digest in the name" }); continue; }
++      const siblings = [];
++      let blocked = null;
++      for (const prefix of SETTLED_SIBLINGS) {
++        const sibling = `${prefix}-${match[2]}.json`;
++        if (!existsSync(join(pendingDir, sibling))) continue;
++        if (lstatSync(join(pendingDir, sibling)).isSymbolicLink()) blocked = `${sibling} is a symlink`; else siblings.push(sibling);
++      }
++      if (blocked !== null) { kept.push({ name, reason: blocked }); continue; }
++      retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null, siblings });
++    } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
++  }
++  return { retire, kept };
++}
++
++/**
++ * W7 (read-only, for dispatch-briefing build): how many pending states a settled-pending-aside run would retire, and the dispatch ids of
++ * the current stop-failure records that would then leave (same rule as moveStopFailuresAside). null when inspect does not report.
++ * `deps.spawn` (tests only).
++ */
++export function readSettledPendingPreview(root, deps = {}) {
++  try {
++    const resolved = resolve(root);
++    const commonDir = commonDirOf(resolved);
++    if (commonDir === null) return null;
++    const run = (deps.spawn ?? defaultSpawn)(SAR, ["inspect", "--root", resolved], resolved);
++    const inspect = run.status === 0 ? parseJson(run.stdout) : null;
++    if (inspect === null) return null;
++    const pendingDir = pendingDirOf(commonDir);
++    const { retire } = planSettledPending({ pendingDir, reservations: inspect.reservations });
++    const retiring = new Set(retire.flatMap((row) => [row.name]));
++    const sourceDir = diagnosticsDirOf(commonDir);
++    const records = existsSync(sourceDir) ? readdirSync(sourceDir).filter((name) => STOP_FAILURE_NAME.test(name)) : [];
++    const leaving = new Set();
++    if (records.length) {
++      const names = existsSync(pendingDir) ? readdirSync(pendingDir) : [];
++      const unsettled = new Set(); let problem = false;
++      for (const name of names.filter((row) => PENDING_NAME.test(row) && !retiring.has(row))) {
++        try {
++          const bytes = readFileSync(join(pendingDir, name));
++          const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
++          if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
++          if (!names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
++        } catch { problem = true; }
++      }
++      if (!problem) {
++        for (const name of records) {
++          try {
++            const path = join(sourceDir, name);
++            if (lstatSync(path).isSymbolicLink()) continue;
++            const record = JSON.parse(readFileSync(path, "utf8"));
++            if (record?.schema === "pipeline.native-goldfish-host-stop-failure.v1" && typeof record.dispatchId === "string" && !unsettled.has(record.dispatchId)) leaving.add(record.dispatchId);
++          } catch { /* an unreadable record is kept, so it does not leave */ }
++        }
++      }
++    }
++    return { settledCount: retire.length, leavingDispatchIds: [...leaving].sort() };
++  } catch { return null; }
++}
++
+ const refuse = (code, reason, next) => ({ ok: false, status: "refused", code, reason, ...(next ? { next } : {}) });
+ 
+ /** The typed next step of an outside-list refusal: the human decides, with the original tool's own command. */
+@@ -171,9 +256,53 @@ function delegated(label, run, ctx) {
+   return { ok, code: ok ? (json?.status ?? "done") : (json?.code ?? `RR-DELEGATE-EXIT-${run.status}`), delegate: label, ...(ok ? {} : { reason: json?.reason ?? String(run.stderr).slice(0, 240) }), ...(ok || !json?.repair ? {} : { next: json.repair }) };
+ }
+ 
++/**
++ * W7: moves the settled pending states aside (never deleted) under one `-settled-pending` directory, then the stop-failure records of the
++ * current diagnostics directory that no longer have an unsettled pending state into the same directory. `inspect` is a parsed
++ * session-authority-repair inspect result; its reservation rows decide what is settled.
++ */
++function retireSettledPending(ctx, inspect) {
++  const { commonDir, now } = ctx;
++  const pendingDir = pendingDirOf(commonDir), sourceDir = diagnosticsDirOf(commonDir);
++  const asideName = `${stamp(now)}-${randomBytes(4).toString("hex")}-settled-pending`;
++  const asideDir = join(commonDir, "agent-pipeline", "session-authority-abandoned", asideName);
++  const rel = (path) => relative(commonDir, path).split("\\").join("/");
++  const { retire, kept } = planSettledPending({ pendingDir, reservations: inspect?.reservations });
++  const retiredPending = [];
++  for (const row of retire) {
++    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
++    for (const file of [row.name, ...row.siblings]) {
++      renameSync(join(pendingDir, file), join(asideDir, file));
++      ctx.moved.push({ from: rel(join(pendingDir, file)), to: `${abandonedRel(asideName)}/${file}` });
++    }
++    retiredPending.push(row);
++  }
++  for (const row of kept) ctx.retained.push(rel(join(pendingDir, row.name)));
++  const stop = moveStopFailuresAside({ sourceDir, pendingDir, asideDir });
++  for (const row of stop.retired) ctx.moved.push({ from: rel(join(sourceDir, row.name)), to: `${abandonedRel(asideName)}/${row.name}` });
++  for (const row of stop.kept) ctx.retained.push(rel(join(sourceDir, row.name)));
++  return { retiredPending, keptPending: kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
++}
++
+ function execute(plan, ctx) {
+   const { root, commonDir, spawn, now } = ctx;
+-  if (plan.kind === "heal") return delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
++  if (plan.kind === "heal") {
++    // W7: the settled pending states leave BEFORE the delegate runs, so heal re-anchors the registry on the namespace as it stays.
++    let settledPending;
++    try {
++      const run = spawn(SAR, ["inspect", "--root", root], root);
++      const inspect = run.status === 0 ? parseJson(run.stdout) : null;
++      settledPending = inspect === null ? { skipped: "session-authority-repair inspect did not report, so no pending state was classified" } : retireSettledPending(ctx, inspect);
++    } catch (error) { settledPending = { skipped: short(error) }; }
++    return { ...delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx), settledPending };
++  }
++  if (plan.kind === "settled-pending-aside") {
++    const run = spawn(SAR, ["inspect", "--root", root], root);
++    const inspect = run.status === 0 ? parseJson(run.stdout) : null;
++    if (inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no pending state can be classified as settled", `node ${SAR} inspect --root <root>`);
++    const step = retireSettledPending(ctx, inspect);
++    return { ok: true, code: step.retiredPending.length || step.retiredStopFailures.length ? "moved-aside" : "nothing-to-move", ...step };
++  }
+   if (plan.kind === "slice-cancel") {
+     const args = ["cancel", plan.sliceId, "--reason", plan.reason, "--class", plan.cancelClass, "--root", root, ...(plan.started ? ["--started"] : [])];
+     return delegated("slice-queue cancel", spawn(SLICE_QUEUE, args, root), ctx);
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 2abeca692..b87933924 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -60,7 +60,7 @@ const inspectWith = (producer) => ({ ...emptyInspect, registry: { status: "prese
+ 
+ // The ONE shared table. `expect.calls` is the delegated tool + first argv word list; `stopFailures` marks the real repair.
+ const TABLE = [
+-  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
++  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
+   { id: "slice-cancel budget", request: { kind: "slice-cancel", sliceId: "S-1", cancelClass: "budget", started: true, reason: "budget exhausted" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["S-1", "--class", "budget", "--started"] } },
+   { id: "slice-cancel integrated-elsewhere", request: { kind: "slice-cancel", sliceId: "S-2", cancelClass: "integrated-elsewhere", reason: "landed in another commit" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["integrated-elsewhere"] } },
+   { id: "stop-failure-aside", request: { kind: "stop-failure-aside", reason: "diagnostic of a settled dispatch" }, setup: (ap) => { writeStopFailure(ap, "1", "D-1"); }, expect: { exit: 0, code: "moved-aside", calls: [], moved: 1 } },
+@@ -148,8 +148,104 @@ test("stop-failure-aside never moves a symlink or a record of another schema", (
+   assert.equal(result.retained.length, 3);
+ }));
+ 
+-test("the closed list is frozen, names exactly four kinds, and plan refuses everything else without mutating", () => {
+-  assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
++// W7: a pending state named by the sha256 of its bytes, with the reservation row session-authority-repair inspect would report.
++function writeNamedPending(ap, dispatchId, { terminal = false, integration = false } = {}) {
++  mkdirSync(commitDir(ap), { recursive: true });
++  const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId }, delivery: { sliceId: dispatchId, itemId: "I-1" } }));
++  const digest = createHash("sha256").update(bytes).digest("hex");
++  const name = `pending-claude-${digest}.json`;
++  writeFileSync(join(commitDir(ap), name), bytes);
++  const siblings = [];
++  if (terminal) { siblings.push(`authority-terminal-${digest}.json`); writeFileSync(join(commitDir(ap), siblings.at(-1)), "{}"); }
++  if (integration) { siblings.push(`authority-integration-${digest}.json`); writeFileSync(join(commitDir(ap), siblings.at(-1)), "{}"); }
++  return { name, digest, siblings, dispatchId };
++}
++const rowOf = (pending, settled) => ({ pending: pending.name, sliceId: pending.dispatchId, dispatchId: pending.dispatchId, settled });
++const inspectRows = (...reservations) => ({ ...emptyInspect, reservations });
++const SETTLED_DEPS = { now: () => Date.parse("2026-10-30T12:00:00Z") };
++
++test("settled-pending-aside moves the stop-failure record of a retired dispatch into the same aside directory and keeps the one of an unsettled dispatch", () => withRepo((root, ap) => {
++  const retired = writeNamedPending(ap, "D-A", { terminal: true });
++  const ready = writeNamedPending(ap, "D-C");
++  const moved = writeStopFailure(ap, "1", "D-A");
++  const kept = writeStopFailure(ap, "2", "D-C");
++  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(retired, "integrated-by-commit"), rowOf(ready, null))).spawn, ...SETTLED_DEPS });
++  assert.equal(exit, 0, JSON.stringify(result));
++  assert.ok(!existsSync(join(diagDir(ap), moved)) && existsSync(join(diagDir(ap), kept)));
++  assert.deepEqual(result.retiredStopFailures.map((row) => row.dispatchId), ["D-A"]);
++  assert.match(result.keptStopFailures[0].reason, /unsettled pending state/u);
++  const aside = files(join(ap, "session-authority-abandoned"));
++  assert.equal(new Set(aside.map((file) => file.split("/")[0])).size, 1, "one aside directory");
++  assert.ok(aside.every((file) => file.split("/")[0].endsWith("-settled-pending")));
++  assert.ok(aside.some((file) => file.endsWith(`/${moved}`)));
++}));
++
++test("settled-pending-aside moves settled pending states with their terminal and integration siblings, keeps the rest with reasons, and moves the stop-failure record of a retired dispatch only", () => withRepo((root, ap) => {
++  const byCommit = writeNamedPending(ap, "D-A", { terminal: true, integration: true });
++  const cancelled = writeNamedPending(ap, "D-B");
++  const ready = writeNamedPending(ap, "D-C");
++  const unreadable = { name: `pending-claude-${hex("c", 64)}.json` };
++  writeFileSync(join(commitDir(ap), unreadable.name), "{ not json");
++  const target = join(root, "elsewhere.json");
++  writeFileSync(target, "{}");
++  const linkName = `pending-codex-${hex("d", 64)}.json`;
++  symlinkSync(target, join(commitDir(ap), linkName));
++  const { calls, spawn } = stub(inspectRows(rowOf(byCommit, "integrated-by-commit"), rowOf(cancelled, "cancelled"), rowOf(ready, null),
++    { pending: unreadable.name, status: "unreadable", reason: "bad json" }, { pending: linkName, sliceId: "D-L", dispatchId: "D-L", settled: "integrated-by-commit" }));
++  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "retire settled pending states" }, { spawn, ...SETTLED_DEPS });
++  assert.equal(exit, 0, JSON.stringify(result));
++  assert.equal(result.code, "moved-aside");
++  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect"]);
++  const left = readdirSync(commitDir(ap)).sort();
++  assert.ok(!left.includes(byCommit.name) && !left.includes(cancelled.name));
++  for (const sibling of byCommit.siblings) assert.ok(!left.includes(sibling), sibling);
++  for (const name of [ready.name, unreadable.name, linkName]) assert.ok(left.includes(name), name);
++  assert.deepEqual(result.retiredPending.map((row) => row.name).sort(), [byCommit.name, cancelled.name].sort());
++  assert.deepEqual(result.keptPending.map((row) => row.name).sort(), [linkName, ready.name, unreadable.name].sort());
++  assert.ok(result.keptPending.every((row) => typeof row.reason === "string" && row.reason !== ""));
++  const aside = files(join(ap, "session-authority-abandoned"));
++  for (const name of [byCommit.name, cancelled.name, ...byCommit.siblings]) assert.ok(aside.some((file) => file.endsWith(`-settled-pending/${name}`)), name);
++  assert.ok(existsSync(target));
++  assert.equal(ledger(ap).length, 1);
++  assert.equal(ledger(ap)[0].kind, "settled-pending-aside");
++  // A replay with nothing settled left moves nothing.
++  const again = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "again" }, { spawn: stub(inspectRows(rowOf(ready, null))).spawn, ...SETTLED_DEPS });
++  assert.equal(again.exit, 0);
++  assert.equal(again.result.code, "nothing-to-move");
++  assert.equal(again.result.moved.length, 0);
++}));
++
++test("settled-pending-aside never moves a pending state whose bytes no longer match its name", () => withRepo((root, ap) => {
++  const pending = writeNamedPending(ap, "D-M");
++  writeFileSync(join(commitDir(ap), pending.name), "{\"changed\":true}");
++  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(pending, "integrated"))).spawn });
++  assert.equal(exit, 0);
++  assert.equal(result.code, "nothing-to-move");
++  assert.match(result.keptPending[0].reason, /digest/u);
++  assert.ok(existsSync(join(commitDir(ap), pending.name)));
++}));
++
++test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {
++  assert.equal(runRoutineRepair({ kind: "settled-pending-aside", root }, { spawn: stub(emptyInspect).spawn }).result.code, "RR-REASON-REQUIRED");
++  const failing = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: () => ({ status: 1, stdout: "", stderr: "x" }) });
++  assert.equal(failing.exit, 2);
++  assert.equal(failing.result.code, "RR-INSPECT-FAILED");
++}));
++
++test("heal retires settled pending states before its delegate runs, and reports them in its record", () => withRepo((root, ap) => {
++  const settled = writeNamedPending(ap, "D-H", { terminal: true });
++  const ready = writeNamedPending(ap, "D-R");
++  const { calls, spawn } = stub(inspectRows(rowOf(settled, "integrated-by-commit"), rowOf(ready, null)));
++  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn, ...SETTLED_DEPS });
++  assert.equal(exit, 0, JSON.stringify(result));
++  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "heal"]);
++  assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
++  assert.deepEqual(result.settledPending.keptPending.map((row) => row.name), [ready.name]);
++  assert.ok(!existsSync(join(commitDir(ap), settled.name)) && existsSync(join(commitDir(ap), ready.name)));
++}));
++
++test("the closed list is frozen, names exactly five kinds, and plan refuses everything else without mutating", () => {
++  assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside", "settled-pending-aside"]);
+   assert.ok(Object.isFrozen(ROUTINE_REPAIRS) && ROUTINE_REPAIRS.every((row) => Object.isFrozen(row)));
+   assert.throws(() => ROUTINE_REPAIRS.push({ kind: "rm" }), TypeError);
+   assert.equal(planRoutineRepair({ kind: "rm", reason: "r", root: "x" }).code, "RR-OUTSIDE-LIST");
+@@ -166,7 +262,7 @@ test("CLI: list prints the closed list, an unknown kind is refused outside the l
+   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", shell: false });
+   const listed = run("list");
+   assert.equal(listed.status, 0);
+-  assert.deepEqual(JSON.parse(listed.stdout).repairs.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
++  assert.deepEqual(JSON.parse(listed.stdout).repairs.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside", "settled-pending-aside"]);
+   const unknown = run("run", "release-lock", "--root", root, "--reason", "r");
+   assert.equal(unknown.status, 2);
+   assert.equal(JSON.parse(unknown.stdout).code, "RR-OUTSIDE-LIST");
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index aba9dcb11..31fa34bff 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -47,6 +47,7 @@ import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync,
+ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
++import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
+ 
+ const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+ const cliArguments = process.argv.slice(2);
+@@ -778,7 +779,24 @@ export function generateDispatchBinding(options, deps = {}) {
+   const stopEntries = (Array.isArray(stopFailures) ? stopFailures : [])
+     .filter((entry) => entry && typeof entry === "object" && entry.schema === STOP_FAILURE_SCHEMA && typeof entry.dispatchId === "string" && typeof entry.code === "string")
+     .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
+-  for (const entry of stopEntries) {
++  // W7 (PO 2026-10-30): a routine must be used, not only present. The settled pending states of finished dispatches make every authority
++  // scan walk them and keep the stop-failure rule from retiring records; the typed step below is the routine-repair heal that clears both.
++  // Read-only: this build never runs it.
++  const settledPreview = (() => {
++    try {
++      const found = (deps.settledPending ?? readSettledPendingPreview)(root);
++      return found && Number.isSafeInteger(found.settledCount) && found.settledCount >= 0 && Array.isArray(found.leavingDispatchIds) ? found : null;
++    } catch { return null; }
++  })();
++  const leavingIds = new Set(settledPreview?.leavingDispatchIds ?? []);
++  const leavingEntries = stopEntries.filter((entry) => leavingIds.has(entry.dispatchId));
++  let preDispatch = null;
++  if (settledPreview !== null && (settledPreview.settledCount > 0 || leavingEntries.length > 0)) {
++    const argv = ["node", fileURLToPath(new URL("./routine-repair.mjs", import.meta.url)), "run", "heal", "--root", root, "--reason", "retire settled pending states before dispatch"];
++    preDispatch = [{ kind: "routine-repair", argv, why: `${settledPreview.settledCount} settled pending states, ${leavingEntries.length} stop-failure records` }];
++    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.join(" ")}` });
++  }
++  for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
+     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+     warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+   }
+@@ -994,7 +1012,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
+ 
+   // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
+-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings };
++  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
+ }
+ 
+ const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
+@@ -1066,7 +1084,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   };
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
++    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 675e83491..7d99741bd 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -89,6 +89,8 @@ const depsOf = (fx, over = {}) => ({
+   resolveBaseline: () => ({ status: "ready", entries: [] }),
+   defaultSpecPath: () => null,
+   queueRow: () => null,
++  // hermetic: the pre-existing cases never run session-authority-repair inspect for the settled-pending count (W7 cases inject their own)
++  settledPending: () => null,
+   // hermetic: the pre-existing cases never read the real runner-profile registry; the route here equals each fixture agent's own effort
+   // (no contradiction, no unreadable-route warning), and the W2-R2 cases inject their own
+   claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: { "duty.implement": "medium", "duty.mechanic": "low", "duty.deep": "xhigh" }[taskRoute] }),
+@@ -1655,6 +1657,41 @@ test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINT
+   assert.ok(warningCodes(binding).includes("DBG-CHECKPOINTED-OWNER"), "the binding route warns too");
+ });
+ 
++test("W7: settled pending states and stop-failure records of settled dispatches yield a typed preDispatch heal and one summary warning; build writes no file", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const before = directorySnapshot(fx.root);
++  const settled = () => ({ settledCount: 3, leavingDispatchIds: ["ALF-BG"] });
++  const stops = () => [stopFailure({ dispatchId: "ALF-BG" }), stopFailure({ dispatchId: "ALF-OPEN" })];
++  const result = runDispatchBriefing(argv, depsOf(fx, { settledPending: settled, stopFailures: stops }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.preDispatch.length, 1);
++  const [step] = result.preDispatch;
++  assert.equal(step.kind, "routine-repair");
++  assert.equal(step.argv[0], "node");
++  assert.match(step.argv[1], /scripts[\\/]routine-repair\.mjs$/u);
++  assert.deepEqual(step.argv.slice(2, 5), ["run", "heal", "--root"]);
++  assert.deepEqual(step.argv.slice(-2), ["--reason", "retire settled pending states before dispatch"]);
++  assert.equal(step.why, "3 settled pending states, 1 stop-failure records");
++  assert.deepEqual(stopWarnings(result).map((entry) => entry.dispatchId), ["ALF-OPEN"]);
++  const summary = result.warnings.filter((entry) => entry.code === "DBG-SETTLED-PENDING-HEAL");
++  assert.equal(summary.length, 1);
++  assert.match(summary[0].message, /routine-repair\.mjs run heal/u);
++  const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { settledPending: settled, stopFailures: stops }));
++  assert.equal(binding.preDispatch?.length, 1, "the binding route reports it too");
++  assert.deepEqual(directorySnapshot(fx.root), before);
++});
++
++test("W7: nothing settled and no leaving stop-failure record prints no preDispatch and keeps every stop-failure warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const result = runDispatchBriefing(argv, depsOf(fx, { settledPending: () => ({ settledCount: 0, leavingDispatchIds: [] }), stopFailures: () => [stopFailure()] }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal("preDispatch" in result, false);
++  assert.equal(stopWarnings(result).length, 1);
++  assert.ok(!warningCodes(result).includes("DBG-SETTLED-PENDING-HEAL"));
++});
++
+ test("D196 R1: a started slice of another item, the same dispatch id, or no started slice gives no warning", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { fx, argv } = packageFixture();
+diff --git a/plugins/pipeline-core/scripts/routine-repair.mjs b/plugins/pipeline-core/scripts/routine-repair.mjs
+index 4c227c70b..a606b8e30 100644
+--- a/plugins/pipeline-core/scripts/routine-repair.mjs
++++ b/plugins/pipeline-core/scripts/routine-repair.mjs
+@@ -6,7 +6,9 @@
+ //
+ // D194 / D197: the closed list of repairs the Elephant runs without asking the human. Two verbs only.
+ //   list  Read-only. Prints the closed list as JSON.
+-//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running
++//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running | settled-pending-aside
++//         settled-pending-aside moves aside the pending states of settled dispatches (plus their terminal and integration records and the
++//         stop-failure records that then have no unsettled pending state); heal does the same first.
+ //         Each run is retained aside (never deleted) and appended to <git-common-dir>/agent-pipeline/routine-repair-ledger.jsonl.
+ //         A kind outside the list is refused RR-OUTSIDE-LIST with the original tool's own command; the human decides it.
+ // Prints one JSON result. Exit 0: done. Exit 2: refused (typed RR-* code).
