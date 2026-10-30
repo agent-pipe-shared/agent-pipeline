@@ -372,7 +372,7 @@
   "openByOwner": {
     "critic": 273,
     "po-acceptance": 272,
-    "native-host": 159,
+    "native-host": 158,
     "agent": 51,
     "po-decision": 3,
     "verify-wsl": 131,
@@ -9609,7 +9609,7 @@
       "title": "close-feature is unreachable without result authority",
       "stage": "75",
       "priority": "P1",
-      "reason": "Joined 2026-10-30 (consumer report N29: a finished feature could not be closed because close-feature demanded result authority the project never had). Operator commit 24b0f38e3 gives close-feature a sanctioned route without result authority. Delivered in candidate 11 (stamp 0cf2cba73 (0.7.0+claude.20261030170444.85c269e), installedVersion read back equal): 75. No Full Verify, Critic, native or acceptance claim.",
+      "reason": "Joined 2026-10-30 (consumer report N29: a finished feature could not be closed because close-feature demanded result authority the project never had). Operator commit 24b0f38e3 gives close-feature a sanctioned route without result authority. Delivered in candidate 11 (stamp 0cf2cba73 (0.7.0+claude.20261030170444.85c269e), installedVersion read back equal): 75. No Full Verify, Critic, native or acceptance claim. Consumer retest 2026-10-30 on 0.7.0+claude.20261030170444.85c269e (PO message from the consumer session): continuity-result-bootstrap-plan returned an apply action, bootstrap-apply and close-apply ran through; the native-host retest entry falls.",
       "evidence": [
         "backlog/items/2026-10-30-close-feature-unreachable-without-result-authority.md",
         "specs/sprint-alfred-epic/evidence/held-patches/w7-n29-close-without-result-authority.notes.md",
@@ -9619,10 +9619,6 @@
         {
           "owner": "agent",
           "what": "D1: the bootstrap verb takes no --root; D2: the composed close stops at CLOSE-QUALIFICATION-REQUIRED (0.7.1 follow-ups)."
-        },
-        {
-          "owner": "native-host",
-          "what": "Consumer retest: close the finished feature on the installed build."
         },
         {
           "owner": "verify-wsl",
