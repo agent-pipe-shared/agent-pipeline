@@ -1,0 +1,242 @@
+diff --git a/plugins/pipeline-core/lib/agy-item-delivery.test.mjs b/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
+index 83bdcce63..14b3664bd 100644
+--- a/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
+@@ -108,7 +108,16 @@ const cases=[
+     const alias={...itemDelivery,itemId:'AC-1-ALIAS',sliceId:'ITEM-ALIAS',checks:[{id:'alias',path:'unit.test.cjs',dependencies:['dependency.txt']}]};
+     const aliasPacket={...packet,dispatchId:'ITEM-ALIAS',requiredPaths:['dependency.txt'],prompt:packet.prompt.replaceAll('ITEM-A','ITEM-ALIAS').replace('src/change.mjs','dependency.txt')};
+     const collided=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet:aliasPacket,itemDelivery:alias,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/alias.json'}));
+-    assert.equal(collided.code,'AGY-ITEM-CRITERION-OWNER-COLLISION','a caller alias of the same approved criterion cannot acquire another owner');
++    // D205: disjoint scopes admitted, PO 2026-10-30. The alias binds the same approved criterion under another item label with a disjoint write scope,
++    // so no owner or scope collision refuses it (PF-66 once did); it reaches the same later stage as the first slice (unavailable native model).
++    assert.ok(!/COLLISION/u.test(String(collided.code)),`a disjoint-scope alias is admitted past the reservation check: ${JSON.stringify(collided.code)}`);
++    // The same slice dispatched twice stays refused, and an overlapping write scope on the same criterion stays refused: the queue ordering holds it behind
++    // the first slice (the shared reservation predicate's scope answer is pinned in native-goldfish-host-state.test.mjs NGHS58, NGHS07 and NGHS45).
++    const again=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet,itemDelivery,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/again.json'}));
++    assert.equal(again.code,'AGY-ITEM-OWNER-COLLISION','the same slice is never admitted twice');
++    const overlap={...itemDelivery,itemId:'AC-1-OVERLAP',sliceId:'ITEM-OVERLAP'},overlapPacket={...packet,dispatchId:'ITEM-OVERLAP',prompt:packet.prompt.replaceAll('ITEM-A','ITEM-OVERLAP')};
++    const overlapped=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet:overlapPacket,itemDelivery:overlap,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/overlap.json'}));
++    assert.equal(overlapped.ok,false);assert.equal(overlapped.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD','an overlapping write scope on the same criterion is refused behind the first slice');
+ 
+   })},
+   {id:'AGYID06',name:'consent journal physical identity survives actual HEAD advance and candidate-bound v1 stays closed',run:()=>fixture(({root,git})=>{
+diff --git a/plugins/pipeline-core/lib/agy-session-dispatch.mjs b/plugins/pipeline-core/lib/agy-session-dispatch.mjs
+index 5f9942dae..7ac09d086 100644
+--- a/plugins/pipeline-core/lib/agy-session-dispatch.mjs
++++ b/plugins/pipeline-core/lib/agy-session-dispatch.mjs
+@@ -13,10 +13,9 @@ import { execFileSync } from "node:child_process";
+ import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, relative, resolve, sep } from "node:path";
+ 
+-import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness, readSettledItemSliceIds } from "./native-goldfish-host-state.mjs";
++import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness, readSettledItemSliceIds, itemReservationCollision } from "./native-goldfish-host-state.mjs";
+ import { bindAgyItemDeliveryChecks, inspectAgyItemMainIntegration, inspectAgyItemMainIntegrationValue } from "./agy-item-delivery.mjs";
+ import { parseDispatchSlice } from "./dispatch-policy.mjs";
+-import { scopesOverlap } from "./slice-queue.mjs";
+ import { invokeAgy } from "./antigravity-execution-host.mjs";
+ import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn, validateAgyFamilyReturnBinding } from "./agy-final-return.mjs";
+ import { parseStrictJson } from "./governance-event.mjs";
+@@ -103,13 +102,10 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
+         if(item.dependsOn.length){const readiness=observeGovernedItemIntegrationReadiness({root});if(readiness.status!=='observed'||item.dependsOn.some(id=>!readiness.integrated.includes(id)))authorityFailure('AGY-ITEM-INTEGRATION-DEPENDENCY-HELD');}
+         if(item.delivery.baseCommit!==repository.candidate.commit)authorityFailure('AGY-ITEM-BASE-MISMATCH');
+         itemDelivery={itemId:item.delivery.itemId,sliceId:item.id,queuePath:governed.path,queueSha256:governed.sha256,writeScope:[...item.writeScope]};
+-        const criterionSha256=familyDigest(itemBriefing.criterionLocator);
++        // D205 (PO, 2026-10-30): the one predicate of both routes; the same item or criterion alone no longer refuses, only the same slice or an overlapping write scope.
++        const collide=(held)=>{const collision=itemReservationCollision({sliceId:held.sliceId,writeScope:held.writeScope},{sliceId:itemDelivery.sliceId,writeScope:itemDelivery.writeScope});if(collision)authorityFailure(collision==='same-slice'?'AGY-ITEM-OWNER-COLLISION':'AGY-ITEM-SCOPE-COLLISION');};
+         const {reservations}=readNativeReservedItemScopes({repository,boundary});
+-        for(const row of reservations) {
+-          if(row.criterionSha256===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
+-          if(row.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
+-          if(scopesOverlap(row.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
+-        }
++        for(const row of reservations)collide(row);
+         const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
+         const latest=new Map();for(const row of agy.entries.filter(entry=>entry.value?.basis?.itemDelivery)){const prior=latest.get(row.value.operationId);if(!prior||(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);}
+         const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
+@@ -117,10 +113,7 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
+         // D51 (2): the same settled definition as the native route; an integrated or cancelled slice no longer collides.
+         const settled=readSettledItemSliceIds({repository,boundary,governed});
+         for(const row of [...latest.values()].filter(entry=>!released.has(entry.value.bindingSha256)&&!settled.has(entry.value.basis.itemDelivery.sliceId))) {
+-          const previous=row.value.basis.itemDelivery;
+-          if(row.value.basis.itemBriefing?.criterionLocator&&familyDigest(row.value.basis.itemBriefing.criterionLocator)===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
+-          if(previous.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
+-          if(scopesOverlap(previous.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
++          collide(row.value.basis.itemDelivery);
+         }
+       }
+     }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 0cef9177d..95c7b1e37 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -791,11 +791,11 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+       // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
+       checkpoint('collision-check');
+       const settled=readSettledItemSliceIds({repository,boundary,governed});
++      // D205: the same item or criterion alone no longer refuses; only the same slice or an overlapping write scope does.
+       for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
+         const pending=entry.value.basis.itemDelivery;
+-        if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
+-        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.sliceId);
+-        if(scopesOverlap(pending.writeScope,state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.sliceId);
++        const collision=itemReservationCollision({sliceId:pending.sliceId,writeScope:pending.writeScope},{sliceId:state.delivery.sliceId,writeScope:state.delivery.writeScope});
++        if(collision)throw reservationFault(itemReservationCollisionReason(collision),pending.sliceId);
+       }
+       const inventory=nativeAuthorityScan(owner);
+       for(const entry of inventory.entries.filter(row=>row.relativePath.startsWith('pending-'))){
+@@ -804,9 +804,8 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+         // A terminal report alone frees no item reservation; a native release, the slice's
+         // integration by commit evidence, or its cancellation does (D51 (2)).
+         if(settled.has(pending.delivery?.sliceId))continue;
+-        if(pending.delivery?.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.delivery?.sliceId);
+-        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.delivery?.sliceId);
+-        if(scopesOverlap(pending.delivery?.writeScope??pending.binding?.allowedPaths??[],state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.delivery?.sliceId);
++        const collision=itemReservationCollision({sliceId:pending.delivery?.sliceId,writeScope:pending.delivery?.writeScope??pending.binding?.allowedPaths??[]},{sliceId:state.delivery.sliceId,writeScope:state.delivery.writeScope});
++        if(collision)throw reservationFault(itemReservationCollisionReason(collision),pending.delivery?.sliceId);
+       }
+     }
+     // PF-55: every check that can still refuse runs before the registry member is reserved, so a
+@@ -1706,9 +1705,19 @@ export function itemReservationRepair(sliceId) {
+     :'a reservation that names no slice holds this item; report it to the PO with the refusal';
+ }
+ function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}
+-/** PF-66: one criterion has one owner at a time, also for slices whose write scopes are disjoint; the repair says so and names the way out. */
+-export const CRITERION_OWNER_COLLISION_TEACHING='Two slices that bind the same item criterion cannot run at the same time, even with disjoint write scopes: the criterion has one owner. Serialise them (add a dependency so the second starts after the first is integrated), or bind each slice to its own criterion in its package.';
+-function criterionOwnerCollisionFault(sliceId){const fault=reservationFault('item-delivery-criterion-owner-collision',sliceId);fault.repair=`${CRITERION_OWNER_COLLISION_TEACHING} ${fault.repair}`;return fault;}
++/** D205 (PO, 2026-10-30): the one reservation predicate of the native and the Antigravity route. A held reservation blocks a new slice only
++ * when it is the same slice (a slice is never admitted twice) or its write scope overlaps the new slice's scope. Binding the same item or the
++ * same criterion no longer refuses by itself: every maintenance package binds one placeholder item and criterion, so that rule (PF-66)
++ * serialised every dispatch. An unjudgeable scope overlaps (scopesOverlap answers true), the safe direction.
++ * Both arguments are `{sliceId, writeScope}`; the answer is `'same-slice'`, `'scope'` or `null`. */
++export function itemReservationCollision(pending,next) {
++  if(typeof pending?.sliceId==='string'&&pending.sliceId===next?.sliceId)return 'same-slice';
++  return scopesOverlap(pending?.writeScope,next?.writeScope)?'scope':null;
++}
++/** The native refusal reason for an itemReservationCollision answer. */
++export function itemReservationCollisionReason(collision) {
++  return collision==='same-slice'?'item-delivery-owner-collision':'item-delivery-scope-collision';
++}
+ /** D52 (2): a dirty host baseline names its paths and the repair, not only its code. */
+ function baselineFault(captured) {
+   const fault=nativeManagedFault(captured.code);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 8c80bdaf9..7507b6a02 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -335,8 +335,9 @@ const cases = [
+     };
+     const first=launch("ITEM-A","src/change.mjs","session-one");
+     assert.equal(first.ok,true,JSON.stringify(first));
+-    const duplicate=launch("ITEM-B","src/b.mjs","session-two");
+-    assert.equal(duplicate.ok,false);assert.equal(duplicate.reason,"item-delivery-owner-collision");
++    // D205: disjoint scopes admitted, PO 2026-10-30. ITEM-B binds the same item as ITEM-A but its write scope is disjoint.
++    const sameItemDisjoint=launch("ITEM-B","src/b.mjs","session-two");
++    assert.equal(sameItemDisjoint.ok,true,JSON.stringify(sameItemDisjoint));
+     const other=launch("ITEM-C","src/c.mjs","session-three");
+     assert.equal(other.ok,true,JSON.stringify(other));
+     // A governed queue replacement cannot hide a still-held older reservation.
+@@ -423,7 +424,8 @@ const cases = [
+     const cancelled=runtime.run(()=>cancelNativeGoldfishItemDelivery({root,pendingSha256:first.sha256,cancelled:true}));assert.equal(cancelled.code,'NGHS-ITEM-CANCELLATION-WITNESS-UNAVAILABLE');assert.equal(cancelled.reservation,'retained');
+     const ownership=runtime.run(()=>inspectNativeGoldfishItemDelivery({root}));assert.equal(ownership.status,'observed',JSON.stringify(ownership));assert.equal(ownership.items[0].itemId,'AC-1');assert.equal(ownership.items[0].checkpoint.declaredPhase,'targeted-checks');assert.deepEqual(ownership.items[0].checkpoint.remainingClauses,['AC-1']);assert.ok(ownership.items[0].checkpointRef);
+     const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(readiness.status,'observed',JSON.stringify(readiness));assert.deepEqual(readiness.integrated,[]);
+-    const duplicate=launch('ITEM-B','src/b.mjs','session-two');assert.equal(duplicate.reason,'item-delivery-owner-collision');
++    // D205: disjoint scopes admitted, PO 2026-10-30. The item's checkpointed first slice still holds its reservation; a second slice on the same item with a disjoint scope is admitted.
++    const sameItemDisjoint=launch('ITEM-B','src/b.mjs','session-two');assert.equal(sameItemDisjoint.ok,true,JSON.stringify(sameItemDisjoint));
+   })},
+ 
+   {id:'NGHS11',name:'actual original approval continuation automatically creates and rebinds legacy queue without promoting old completion',run:()=>fixture(({root})=>{
+@@ -562,7 +564,10 @@ const cases = [
+     initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+     const launch=(id,itemId,locator,path,correlation)=>{const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId,criterionLocator:locator,checks:[{id:'original-criterion',path:`src/${path}.test.mjs`,dependencies:[`src/${path}.mjs`,`src/${path}.test.mjs`]}]};const binding={...makeBinding({dispatchId:id,commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:[`src/${path}.mjs`],schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};const input=toolInput('claude',{root,session:`session-${id}`,toolUseId:correlation,binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;return {input,binding,prepared:runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}))};};
+     const first=launch('FIRST','AC-1',original.criterionLocator,'change','first-tool');assert.equal(first.prepared.ok,true,JSON.stringify(first.prepared));
+-    const alias=launch('ALIAS','ALIAS-LABEL',original.criterionLocator,'alias','alias-tool');assert.equal(alias.prepared.ok,false);assert.equal(alias.prepared.reason,'item-delivery-criterion-owner-collision',JSON.stringify(alias.prepared));assert.match(JSON.stringify(alias.prepared),/bind the same item criterion cannot run at the same time/u,'PF-66: the refusal teaches why two disjoint-scope slices collide and how to serialise them');
++    // D205: disjoint scopes admitted, PO 2026-10-30. The alias binds the same criterion as FIRST under another item label; its write scope is disjoint, so it runs at the same time (PF-66 once refused it).
++    const alias=launch('ALIAS','ALIAS-LABEL',original.criterionLocator,'alias','alias-tool');assert.equal(alias.prepared.ok,true,JSON.stringify(alias.prepared));
++    // The same criterion with a write scope that overlaps FIRST's is still refused: the queue ordering holds it behind FIRST (NGHS07 and NGHS45 pin the scope collision at the reservation check).
++    const overlapping=launch('OVERLAP','OVERLAP-LABEL',original.criterionLocator,'change','overlap-tool');assert.equal(overlapping.prepared.ok,false);assert.equal(overlapping.prepared.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(overlapping.prepared));
+     const second=launch('SECOND','AC-2',original.criterionLocators['AC-2'],'second','second-tool');assert.equal(second.prepared.ok,true,JSON.stringify(second.prepared));
+     const readback=runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'}));assert.equal(readback.ok,true,JSON.stringify(readback));assert.equal(readback.sha256,first.prepared.sha256);
+     // Only runtime metadata gained rows; the first item's original approved
+@@ -1265,16 +1270,19 @@ const cases = [
+     const ports=createSessionAuthorityParticipantPorts({repository});
+     for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId);
+     assert.equal(initializeSessionAuthorityRegistry({repository},ports).status,"initialized");
+-    const launch=(id,path,session)=>{
++    const launch=(id,path,session,toolUseId=`tool-${id}`)=>{
+       const binding={...makeBinding({dispatchId:id,commit,tree}),allowedPaths:[path]};
+-      const input=toolInput("claude",{root,session,toolUseId:`tool-${id}`,binding});
++      const input=toolInput("claude",{root,session,toolUseId,binding});
+       input.tool_input.prompt+=`\nSlice: ${id}\nWrite scope: ${path}\n`;
+       return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:"claude",input},dependencies));
+     };
+     assert.equal(launch("ITEM-A","src/change.mjs","session-one").ok,true);
+-    // Pin: the owner collision already carries a repair (reservationFault).
+-    const duplicate=launch("ITEM-B","src/b.mjs","session-two");
++    // Pin: the owner collision already carries a repair (reservationFault). D205: it now fires for the same slice dispatched twice;
++    // a second slice on the same item with a disjoint scope is admitted (PO 2026-10-30).
++    const duplicate=launch("ITEM-A","src/change.mjs","session-two","tool-ITEM-A-again");
+     assert.equal(duplicate.reason,"item-delivery-owner-collision");namesRepair(duplicate.repair,'owner collision');
++    const sameItemDisjoint=launch("ITEM-B","src/b.mjs","session-two");
++    assert.equal(sameItemDisjoint.ok,true,JSON.stringify(sameItemDisjoint));
+     // A successor whose dependency is held is refused at the held-dependency branch (not the readiness branch) with a repair.
+     const successor=launch("ITEM-D","src/d.mjs","session-three");
+     assert.equal(successor.ok,false,JSON.stringify(successor));
+@@ -1325,9 +1333,13 @@ const cases = [
+     assert.equal(firstLaunch.ok,true,JSON.stringify(firstLaunch));
+     const secondLaunch=launch("ITEM-B","src/b.mjs","session-two");
+     assert.equal(secondLaunch.ok,true,JSON.stringify(secondLaunch));
+-    const third=launch("ITEM-C","src/c.mjs","session-three");
++    // D205: disjoint scopes admitted, PO 2026-10-30. The third slice shares ITEM-A's item and its scope (src/a.mjs); the item alone no longer
++    // refuses, the overlapping write scope does, so the refusal is the scope collision.
++    // A governed queue replacement cannot hide the still-held older reservation of src/a.mjs (as in NGHS07).
++    writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify({schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-C","AC-1","src/a.mjs")]}));
++    const third=launch("ITEM-C","src/a.mjs","session-three");
+     assert.equal(third.ok,false,JSON.stringify(third));
+-    assert.match(String(third.reason),/item-delivery-(scope|owner|criterion-owner)-collision/u);
++    assert.equal(third.reason,"item-delivery-scope-collision",JSON.stringify(third));
+   })}},
+ 
+   { id: "NGHS46", name: "PF-86 (ii): a pre-scan is adopted only when the queue digest and the candidate commit still match; a competing change is re-read, never silently overwritten", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
+@@ -1487,6 +1499,42 @@ const cases = [
+     const untouched=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate,baseCommit:candidate.commit});
+     assert.equal(untouched.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(untouched));
+   })},
++  { id: "NGHS58", name: "D205: the one shared reservation predicate refuses only the same slice or an overlapping (or unjudgeable) write scope; the same item or criterion alone does not", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
++    assert.equal(typeof mod.itemReservationCollision,"function","the shared predicate is exported (one core for the native and the Antigravity route)");
++    const row=(sliceId,writeScope,itemId="AC-1",criterionSha256="c".repeat(64))=>({sliceId,itemId,criterionSha256,writeScope});
++    // D205: disjoint scopes admitted, PO 2026-10-30: same item, same criterion, disjoint scopes do not collide.
++    assert.equal(mod.itemReservationCollision(row("A",["src/a.mjs"]),row("B",["src/b.mjs"])),null);
++    assert.equal(mod.itemReservationCollision(row("A",["src/a.mjs"]),row("B",["src/b.mjs"],"AC-2","d".repeat(64))),null);
++    // The same slice is never admitted twice, whatever its scope.
++    assert.equal(mod.itemReservationCollision(row("A",["src/a.mjs"]),row("A",["src/b.mjs"])),"same-slice");
++    // Overlapping scopes keep the scope refusal.
++    assert.equal(mod.itemReservationCollision(row("A",["src/shared/**"]),row("B",["src/shared/x.mjs"])),"scope");
++    // A scope that cannot be judged overlaps (the safe direction), and a reservation that names no slice is judged by scope alone.
++    assert.equal(mod.itemReservationCollision(row("A",["../outside"]),row("B",["src/b.mjs"])),"scope");
++    assert.equal(mod.itemReservationCollision(row(null,["src/a.mjs"]),row("B",["src/b.mjs"])),null);
++    assert.equal(mod.itemReservationCollision(row(null,["src/a.mjs"]),row("B",["src/a.mjs"])),"scope");
++    assert.equal("CRITERION_OWNER_COLLISION_TEACHING" in mod,false,"the PF-66 criterion-owner teaching is unreachable under D205 and is removed");
++  }},
++  { id: "NGHS59", name: "D205: two slices on the same item and the same criterion with disjoint scopes are both admitted, author at the same time, land one on top of the other's delivery commit (foreignCommits) and the settled set frees both", run: () => fixture(({root})=>{
++    // D205: disjoint scopes admitted, PO 2026-10-30. NGHS17 drives the concurrent lineage with two items; this drives it with the one placeholder item and criterion every maintenance package binds.
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')}),plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit original course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    mkdirSync(join(root,'src'),{recursive:true});writeFileSync(join(root,'src/second.mjs'),"export const value='expected';\n");writeFileSync(join(root,'src/second.test.mjs'),"import test from 'node:test';import assert from 'node:assert/strict';import {value} from './second.mjs';test('second original criterion',()=>assert.equal(value,'expected'));\n");
++    const original=prepareApprovedItemCourseFixture({root}),repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/parallel-same-item'),sessionId:'parallel-same-item-owner'});
++    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
++    const items={};
++    for(const [id,path] of [['LEFT','change'],['RIGHT','second']]){
++      const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'original-criterion',path:`src/${path}.test.mjs`,dependencies:[`src/${path}.mjs`,`src/${path}.test.mjs`]}]},binding={...makeBinding({dispatchId:id,commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:[`src/${path}.mjs`],schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
++      const input=toolInput('claude',{root,session:`session-${id}`,toolUseId:`tool-${id}`,binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;
++      const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,`${id}: ${JSON.stringify(prepared)}`);items[id]={binding,input,prepared,path};
++    }
++    for(const item of Object.values(items))writeFileSync(join(root,`src/${item.path}.mjs`),`export const value='expected'; // ${item.binding.dispatchId} simultaneous author\n`);
++    const returned=id=>{const item=items[id];return {...item.input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:item.binding.model,content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:id,candidateCommit:item.binding.candidateCommit,outcome:'succeeded',report:'Same item and criterion, disjoint scope, completed.',changedPaths:[`src/${item.path}.mjs`]})}]}};};
++    const first=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned('LEFT')}));assert.equal(first.status,'authored-commit-recorded',JSON.stringify(first));assert.equal(first.delivery.checkStatus.verdict,'passed');
++    const second=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned('RIGHT')}));assert.equal(second.status,'authored-commit-recorded',JSON.stringify(second));assert.equal(second.delivery.checkStatus.verdict,'passed');
++    assert.equal(spawnSync('git',['-C',root,'rev-parse',`${second.commit}^`],{encoding:'utf8'}).stdout.trim(),first.commit,'the second slice lands on top of the first slice\'s delivery commit');
++    for(const id of ['LEFT','RIGHT'])assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:items[id].prepared.sha256})).status,'integrated');
++    const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual([...readiness.integrated].sort(),['LEFT','RIGHT'],'the settled set frees both slices');
++  })},
+ 
+ ];
+ 
