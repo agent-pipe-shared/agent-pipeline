@@ -1,0 +1,1044 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index dbcaedb0a..dece7bdcb 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -457,12 +457,15 @@ signed quality verifier. Both tables retain exact call-site counts and the
+ scanner still refuses unclassified imports or spawn edges.
+ 
+ The transitive authority closure additionally protects exactly
+-`lib/passive-read-policy.mjs`, `lib/intake-material-reference.mjs`,
++`lib/passive-read-policy.mjs`, `lib/host-skill-catalog.mjs`,
++`lib/intake-material-reference.mjs`,
+ `scripts/check-private-identifiers.mjs`, `lib/model-family-authority.mjs`,
+ `lib/model-family-execution.mjs`, `lib/model-family-invocation.mjs`,
+ `lib/model-family-runtime-host.mjs`, `lib/model-family-route-source.mjs`,
+ `lib/model-family-host-store.mjs`, and `lib/model-family-latest-selection.mjs`.
+-These modules determine passive-read admission, intake references, privacy
++These modules determine passive-read admission (including the sealed host
++skill-catalog record that names the one declared skill directory a bounded
++search may enter, D210), intake references, privacy
+ refusal, verified family assignment authority, sealed invocation selection and
+ host storage/readback. The same paths remain protected through both project
+ and installed-plugin anchors. A window cannot rewrite a dependency while
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 64f4560f3..f83c472cf 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -536,6 +536,7 @@
+         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
+         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
+         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
++        "verify-phase:harness/scripts/verify.mjs:host-skill-catalog-tests",
+         "verify-phase:harness/scripts/verify.mjs:housekeeping-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 63600e9dd..3491e07de 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4278,6 +4278,12 @@
+       },
+       "invariantPinned": "PO-only discard denials remain human-terminal across supported transports, planner admission, and closed unsupported or missing-read boundaries.",
+       "nonOverlapNote": "Eight actual per-case completion IDs cover refusal transport and pre-state denial; no actual discard, native attestation, or signer interaction is claimed."
++    },
++    {
++      "name": "host-skill-catalog-tests",
++      "file": "plugins/pipeline-core/lib/host-skill-catalog.test.mjs",
++      "invariantPinned": "The host skill-catalog carrier is a sealed private record written only by the host readback; a valid entry admits only a bounded search inside that one declared directory, drift and forgery invalidate it, and a runner without a declaration surface leaves the D108 refusal unchanged.",
++      "nonOverlapNote": "Unit-level carrier and policy admission tests; the guard-level skill pins (lifecycle-read-scope-blocks-host-declared-system-skill, declared-system-skill-read-requires-human-override) drive the same carrier through evaluateLifecycleReadyGuard."
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 0ca467b13..41d0503e9 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -681,6 +681,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // Actual signed-hook and family-consent/host import closure (GMWKC01).
+   // These decision dependencies cannot be changed through a maintenance window.
+   "plugins/pipeline-core/lib/passive-read-policy.mjs",
++  // D210: the passive read policy imports this declaration carrier (sealed private host skill-catalog record).
++  "plugins/pipeline-core/lib/host-skill-catalog.mjs",
+   "plugins/pipeline-core/lib/intake-material-reference.mjs",
+   "plugins/pipeline-core/scripts/check-private-identifiers.mjs",
+   "plugins/pipeline-core/lib/model-family-authority.mjs",
+diff --git a/plugins/pipeline-core/lib/host-skill-catalog.mjs b/plugins/pipeline-core/lib/host-skill-catalog.mjs
+new file mode 100644
+index 000000000..95a0d4078
+--- /dev/null
++++ b/plugins/pipeline-core/lib/host-skill-catalog.mjs
+@@ -0,0 +1,229 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Host declaration carrier for the system instruction directories a runner ships (AC-147 catalog half, AC-209; PO decision D210).
++ *
++ * WHY IT EXISTS. D96/D108 already admit a single read of any non-credential file outside the repository, so reading one declared
++ * instruction file needs no authority. What stays refused is a recursive search or listing over the runner's skill collection
++ * (D108): the collection holds other sessions' and other skills' content. This carrier is the narrow, authenticated exception: a
++ * runner-neutral private record that names the instruction directories THE HOST declared, so a bounded search inside exactly one of
++ * them can be admitted while the collection, its parents and every undeclared sibling keep the D108 refusal.
++ *
++ * CUSTODY. One record per runner under `<git-common-dir>/agent-pipeline/host-skill-catalog/<runner>.json`: private state (mode
++ * 0600, single link, physical directory), never a tracked file. It is WRITTEN ONLY by a host readback (the bootstrap preflight,
++ * `writeHostSkillCatalog`) and READ by the passive read policy (`declaredSkillDirectories`). The policy never trusts the record
++ * alone, see below.
++ *
++ * WHAT THE READER VERIFIES (every one of these fails closed to "no entry", i.e. exactly the D108 behaviour):
++ *   - the record is bounded, has exactly the typed keys and its `seal` equals the digest of its own canonical body (a hand-edited
++ *     or forged record is ignored and reported, `HSC-SEAL-MISMATCH`);
++ *   - each entry names `<home>/<runner declaration root>/<name>/<instruction file>` and its physical resolution equals the
++ *     recorded path (so an entry cannot point anywhere else, alias or link out of the declaration root);
++ *   - the current file digest equals the recorded one; a replaced or edited file invalidates its entry until the next host
++ *     readback re-observes it (`HSC-DRIFT`).
++ * A runner without a declaration surface answers `unavailable`; nothing is written and the guard behaves exactly as before.
++ */
++import { createHash } from "node:crypto";
++import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
++import { homedir } from "node:os";
++import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
++import { assertPrivateRegularFile, writePrivateFileAtomic } from "./private-boundary.mjs";
++import { resolveGitCommonDir } from "./po-key-directory.mjs";
++
++export const HOST_SKILL_CATALOG_SCHEMA = "pipeline.host-skill-catalog.v1";
++export const HOST_SKILL_CATALOG_READBACK_SCHEMA = "pipeline.host-skill-catalog-readback.v1";
++
++/**
++ * Where each runner declares its system instruction directories, relative to the home directory. A runner with no entry exposes no
++ * declaration this carrier can observe: its readback is `unavailable` and nothing is admitted. Claude and Antigravity are
++ * deliberately absent today; adding one is one line here, the module is shared by all three runners.
++ */
++export const HOST_SKILL_DECLARATION_SURFACES = Object.freeze({
++  codex: Object.freeze({ homeRelativeRoot: ".codex/skills/.system" }),
++});
++export const HOST_SKILL_CATALOG_RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
++
++const INSTRUCTION_FILE = "SKILL.md";
++const STORE_DIRECTORY = join("agent-pipeline", "host-skill-catalog");
++const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
++const DIGEST = /^[0-9a-f]{64}$/u;
++const MAX_RECORD_BYTES = 64 * 1024;
++const MAX_ENTRIES = 64;
++const MAX_FILE_BYTES = 1024 * 1024;
++const RECORD_KEYS = ["schema", "runner", "entries", "seal"];
++const ENTRY_KEYS = ["name", "path", "sha256", "runner", "observedAt"];
++
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
++  && Object.getPrototypeOf(value) === Object.prototype
++  && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
++
++function canonical(value) {
++  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
++  if (value !== null && typeof value === "object") {
++    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
++  }
++  return JSON.stringify(value);
++}
++
++const sealOf = (runner, entries) => sha256(canonical({ schema: HOST_SKILL_CATALOG_SCHEMA, runner, entries }));
++
++/** The digest a record must carry as its own seal; exported so a test can build a deliberately re-sealed forgery. */
++export const hostSkillCatalogSeal = sealOf;
++/** The private record file for `runner` under a repository's git common directory (tests and diagnostics only). */
++export const hostSkillCatalogRecordPath = (gitCommonDir, runner) => join(gitCommonDir, STORE_DIRECTORY, `${runner}.json`);
++
++function within(root, path) {
++  const part = relative(root, path);
++  return part !== ".." && !part.startsWith(`..${sep}`) && !isAbsolute(part);
++}
++
++const unavailable = (runner, code) => ({ schema: HOST_SKILL_CATALOG_READBACK_SCHEMA, status: "unavailable", runner, code, entries: 0 });
++
++function privateStore(rootDir, dependencies) {
++  if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return null;
++  const common = resolveGitCommonDir(rootDir, dependencies);
++  return typeof common === "string" ? join(common, STORE_DIRECTORY) : null;
++}
++
++function recordPath(directory, runner) { return join(directory, `${runner}.json`); }
++
++function fileDigest(path) {
++  const info = lstatSync(path);
++  if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_FILE_BYTES) return null;
++  return sha256(readFileSync(path));
++}
++
++/**
++ * What the host declares for `runner` right now: every `<name>/<instruction file>` under the runner's declaration root, as a
++ * plain file whose physical path stays inside the physical declaration root. Unavailable when the runner has no declaration surface.
++ */
++export function observeDeclaredSystemSkills({ runner, homeDir = homedir() } = {}) {
++  const surface = HOST_SKILL_DECLARATION_SURFACES[runner];
++  if (surface === undefined) return { status: "unavailable", code: "HSC-NO-DECLARATION-SURFACE" };
++  if (typeof homeDir !== "string" || !isAbsolute(homeDir)) return { status: "unavailable", code: "HSC-HOME" };
++  let physicalRoot;
++  try { physicalRoot = realpathSync(join(resolve(homeDir), surface.homeRelativeRoot)); }
++  catch { return { status: "unavailable", code: "HSC-DECLARATION-ROOT-ABSENT" }; }
++  const skills = [];
++  try {
++    for (const entry of readdirSync(physicalRoot, { withFileTypes: true })) {
++      if (!entry.isDirectory() || !NAME.test(entry.name)) continue;
++      const path = join(physicalRoot, entry.name, INSTRUCTION_FILE);
++      try {
++        const physical = realpathSync(path);
++        const digest = physical === path && within(physicalRoot, physical) ? fileDigest(path) : null;
++        if (digest !== null) skills.push({ name: entry.name, path, sha256: digest });
++      } catch { /* an unreadable or missing instruction file is simply not declared */ }
++      if (skills.length > MAX_ENTRIES) return { status: "unavailable", code: "HSC-TOO-MANY-ENTRIES" };
++    }
++  } catch { return { status: "unavailable", code: "HSC-DECLARATION-ROOT-UNREADABLE" }; }
++  skills.sort((a, b) => (a.name < b.name ? -1 : 1));
++  return { status: "available", skills };
++}
++
++/** One entry against the CURRENT filesystem. `{ ok: true, directory, lexicalDirectory }` or `{ ok: false, code }`. */
++function checkEntry(entry, runner, homeDir) {
++  const surface = HOST_SKILL_DECLARATION_SURFACES[runner];
++  if (surface === undefined || !exactKeys(entry, ENTRY_KEYS) || entry.runner !== runner
++    || typeof entry.name !== "string" || !NAME.test(entry.name) || typeof entry.path !== "string" || !isAbsolute(entry.path)
++    || typeof entry.sha256 !== "string" || !DIGEST.test(entry.sha256)
++    || typeof entry.observedAt !== "string" || entry.observedAt === "") return { ok: false, code: "HSC-ENTRY-SHAPE" };
++  const lexical = join(resolve(homeDir), surface.homeRelativeRoot, entry.name, INSTRUCTION_FILE);
++  let physical;
++  let physicalRoot;
++  try {
++    physical = realpathSync(lexical);
++    physicalRoot = realpathSync(join(resolve(homeDir), surface.homeRelativeRoot));
++  } catch { return { ok: false, code: "HSC-ENTRY-MISSING" }; }
++  if (entry.path !== physical || !within(physicalRoot, physical) || dirname(dirname(physical)) !== physicalRoot) {
++    return { ok: false, code: "HSC-ENTRY-OUTSIDE-SURFACE" };
++  }
++  let digest;
++  try { digest = fileDigest(physical); } catch { return { ok: false, code: "HSC-ENTRY-MISSING" }; }
++  if (digest === null) return { ok: false, code: "HSC-ENTRY-NOT-A-PLAIN-FILE" };
++  if (digest !== entry.sha256) return { ok: false, code: "HSC-DRIFT" };
++  return { ok: true, directory: dirname(physical), lexicalDirectory: dirname(lexical) };
++}
++
++/** The record at `path`: `{ state: "absent" }`, `{ state: "invalid", code }` or `{ state: "valid", record }`. */
++function readRecord(path, runner) {
++  if (!existsSync(path)) return { state: "absent" };
++  let text;
++  try {
++    const info = assertPrivateRegularFile(path, "host skill catalog record");
++    if (info.size < 1 || info.size > MAX_RECORD_BYTES) return { state: "invalid", code: "HSC-RECORD-SIZE" };
++    text = readFileSync(path, "utf8");
++  } catch { return { state: "invalid", code: "HSC-RECORD-CUSTODY" }; }
++  let record;
++  try { record = JSON.parse(text); } catch { return { state: "invalid", code: "HSC-RECORD-MALFORMED" }; }
++  if (!exactKeys(record, RECORD_KEYS) || record.schema !== HOST_SKILL_CATALOG_SCHEMA || record.runner !== runner
++    || !Array.isArray(record.entries) || record.entries.length > MAX_ENTRIES || typeof record.seal !== "string") {
++    return { state: "invalid", code: "HSC-RECORD-SHAPE" };
++  }
++  if (record.seal !== sealOf(runner, record.entries)) return { state: "invalid", code: "HSC-SEAL-MISMATCH" };
++  return { state: "valid", record };
++}
++
++/**
++ * The reader the passive read policy calls. Verifies every record and entry against the current filesystem and returns only the
++ * entries that are valid NOW. Never throws; any failure yields fewer (or no) entries, never a wider read scope.
++ */
++export function readHostSkillCatalog({ rootDir, homeDir = homedir(), dependencies = {} } = {}) {
++  const directory = privateStore(rootDir, dependencies);
++  if (directory === null) return { status: "unavailable", code: "HSC-NO-REPOSITORY", entries: [], problems: [] };
++  const entries = [];
++  const problems = [];
++  let seen = 0;
++  for (const runner of HOST_SKILL_CATALOG_RUNNERS) {
++    if (HOST_SKILL_DECLARATION_SURFACES[runner] === undefined) continue;
++    const read = readRecord(recordPath(directory, runner), runner);
++    if (read.state === "absent") continue;
++    seen += 1;
++    if (read.state === "invalid") { problems.push({ runner, code: read.code }); continue; }
++    for (const entry of read.record.entries) {
++      let checked;
++      try { checked = checkEntry(entry, runner, homeDir); } catch { checked = { ok: false, code: "HSC-ENTRY-SHAPE" }; }
++      if (checked.ok) entries.push({ name: entry.name, runner, directory: checked.directory, lexicalDirectory: checked.lexicalDirectory });
++      else problems.push({ runner, name: typeof entry?.name === "string" ? entry.name : null, code: checked.code });
++    }
++  }
++  if (seen === 0) return { status: "absent", entries: [], problems };
++  return { status: entries.length > 0 ? "valid" : "ignored", entries, problems };
++}
++
++/** The declared instruction directories valid right now: `[{ name, runner, directory, lexicalDirectory }]`. */
++export function declaredSkillDirectories({ rootDir, homeDir } = {}) {
++  return readHostSkillCatalog({ rootDir, homeDir }).entries;
++}
++
++/**
++ * Host readback: observe what `runner` declares and publish it as the sealed private record. `written` when the record changed,
++ * `unchanged` when the current observation equals it, `unavailable` (with a typed code) when the runner exposes no declaration,
++ * the repository private store cannot be resolved, or the write failed. An invalid existing record (forged, hand-edited,
++ * malformed) is replaced and reported in `replacedInvalid`.
++ */
++export function writeHostSkillCatalog({
++  rootDir, runner, homeDir = homedir(), now = () => new Date().toISOString(), dependencies = {},
++} = {}) {
++  if (!HOST_SKILL_CATALOG_RUNNERS.includes(runner)) return unavailable(String(runner), "HSC-RUNNER");
++  const observed = observeDeclaredSystemSkills({ runner, homeDir });
++  if (observed.status !== "available") return unavailable(runner, observed.code);
++  const directory = privateStore(rootDir, dependencies);
++  if (directory === null) return unavailable(runner, "HSC-NO-REPOSITORY");
++  const path = recordPath(directory, runner);
++  const existing = readRecord(path, runner);
++  const previous = new Map(existing.state === "valid" ? existing.record.entries.map((entry) => [`${entry.name}\0${entry.path}\0${entry.sha256}`, entry]) : []);
++  const stamp = now();
++  const entries = observed.skills.map((skill) => previous.get(`${skill.name}\0${skill.path}\0${skill.sha256}`)
++    ?? { name: skill.name, path: skill.path, sha256: skill.sha256, runner, observedAt: stamp });
++  const record = { schema: HOST_SKILL_CATALOG_SCHEMA, runner, entries, seal: sealOf(runner, entries) };
++  const base = { schema: HOST_SKILL_CATALOG_READBACK_SCHEMA, runner, entries: entries.length };
++  if (existing.state === "valid" && existing.record.seal === record.seal) return { ...base, status: "unchanged" };
++  try {
++    // writePrivateFileAtomic asserts custody of an EXISTING file first, so a record that fails custody (loose mode, extra link,
++    // a symlink) could never be replaced. It is our own record inside the private store: remove that one path, then publish.
++    if (existing.state === "invalid" && existing.code === "HSC-RECORD-CUSTODY") rmSync(path, { force: true });
++    writePrivateFileAtomic(path, `${JSON.stringify(record, null, 2)}\n`);
++  } catch { return unavailable(runner, "HSC-WRITE-FAILED"); }
++  return { ...base, status: "written", ...(existing.state === "invalid" ? { replacedInvalid: existing.code } : {}) };
++}
+diff --git a/plugins/pipeline-core/lib/host-skill-catalog.test.mjs b/plugins/pipeline-core/lib/host-skill-catalog.test.mjs
+new file mode 100644
+index 000000000..97561e22a
+--- /dev/null
++++ b/plugins/pipeline-core/lib/host-skill-catalog.test.mjs
+@@ -0,0 +1,230 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-147 (catalog half) / AC-209, PO decision D210: the host skill-catalog carrier and what a valid entry adds to the passive read policy.
++// Premise: D96/D108 admit a single read of a host-visible file and refuse RECURSIVE searches over the runner skill collection. A valid
++// catalog entry adds exactly one thing: a bounded search/listing inside that ONE declared skill directory. Everything D96 refuses stays
++// refused: credentials, the collection, parents, undeclared siblings, transcript trees, traversal, alias and link escape.
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import {
++  declaredSkillDirectories, HOST_SKILL_CATALOG_READBACK_SCHEMA, hostSkillCatalogRecordPath, hostSkillCatalogSeal,
++  observeDeclaredSystemSkills, readHostSkillCatalog, writeHostSkillCatalog,
++} from "./host-skill-catalog.mjs";
++import { resolveGitCommonDir } from "./po-key-directory.mjs";
++import { isAllowedPassiveReadTarget } from "./passive-read-policy.mjs";
++import { observeHostSkillCatalogReadback } from "../scripts/pipeline-start-preflight.mjs";
++
++const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
++const WIN = process.platform === "win32";
++const NO_PLANE = { machinePlaneRead: () => ({ status: "absent" }), repoKeyDirectory: () => ({ status: "absent" }) };
++
++function fixture() {
++  mkdirSync(SCRATCH_ROOT, { recursive: true });
++  const base = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "hsc-")));
++  const project = join(base, "project");
++  const home = join(base, "home");
++  mkdirSync(project, { recursive: true });
++  execFileSync("git", ["init", "-q", project], { env: { ...process.env, GIT_CEILING_DIRECTORIES: base } });
++  const system = join(home, ".codex", "skills", ".system");
++  const declared = join(system, "openai-docs");
++  const second = join(system, "skill-creator");
++  mkdirSync(join(declared, "references"), { recursive: true });
++  mkdirSync(second, { recursive: true });
++  mkdirSync(join(home, ".ssh"), { recursive: true });
++  mkdirSync(join(home, ".codex", "sessions"), { recursive: true });
++  writeFileSync(join(declared, "SKILL.md"), "# openai-docs\nline two\n");
++  writeFileSync(join(declared, "references", "a.md"), "reference text\n");
++  writeFileSync(join(second, "SKILL.md"), "# skill-creator\n");
++  writeFileSync(join(home, ".ssh", "id_rsa"), "private\n");
++  writeFileSync(join(home, ".codex", "auth.json"), "{}\n");
++  writeFileSync(join(home, ".codex", "sessions", "rollout.jsonl"), "{}\n");
++  const env = { GIT_CEILING_DIRECTORIES: base };
++  return { base, project, home, system, declared, second, skill: join(declared, "SKILL.md"), env };
++}
++
++function withFixture(fn) {
++  const f = fixture();
++  const saved = process.env.GIT_CEILING_DIRECTORIES;
++  process.env.GIT_CEILING_DIRECTORIES = f.base;
++  try { return fn(f); } finally {
++    if (saved === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = saved;
++    rmSync(f.base, { recursive: true, force: true });
++  }
++}
++
++const readback = (f, runner = "codex", extra = {}) => writeHostSkillCatalog({ rootDir: f.project, runner, homeDir: f.home, ...extra });
++const search = (f, raw, options = {}) => isAllowedPassiveReadTarget(raw, { rootDir: f.project, homeDir: f.home, recursive: true, ...NO_PLANE, ...options });
++const recordFile = (f, runner = "codex") => hostSkillCatalogRecordPath(resolveGitCommonDir(f.project), runner);
++
++test("a runner without a declaration surface reads back unavailable, writes nothing, and the policy keeps the D108 refusal", () => withFixture((f) => {
++  for (const runner of ["claude", "antigravity"]) {
++    const r = readback(f, runner);
++    assert.equal(r.schema, HOST_SKILL_CATALOG_READBACK_SCHEMA);
++    assert.equal(r.status, "unavailable");
++    assert.equal(r.code, "HSC-NO-DECLARATION-SURFACE");
++  }
++  assert.equal(readback(f, "nonsense").code, "HSC-RUNNER");
++  assert.equal(readHostSkillCatalog({ rootDir: f.project, homeDir: f.home }).status, "absent");
++  assert.equal(search(f, f.declared), false, "no catalog: a recursive search of a skill directory stays refused (D108)");
++}));
++
++test("the codex readback writes a sealed private record of the declared skills and a second readback is unchanged", () => withFixture((f) => {
++  const first = readback(f, "codex", { now: () => "2026-10-30T10:00:00.000Z" });
++  assert.equal(first.status, "written");
++  assert.equal(first.entries, 2);
++  const file = recordFile(f);
++  assert.ok(file.includes(join("agent-pipeline", "host-skill-catalog")), "private state under the git common directory");
++  if (!WIN) assert.equal(statSync(file).mode & 0o077, 0, "mode 0600, no group or world access");
++  const record = JSON.parse(readFileSync(file, "utf8"));
++  assert.deepEqual(record.entries.map((e) => e.name), ["openai-docs", "skill-creator"], "sorted by name");
++  assert.deepEqual(Object.keys(record.entries[0]).sort(), ["name", "observedAt", "path", "runner", "sha256"]);
++  assert.equal(record.entries[0].runner, "codex");
++  assert.equal(record.entries[0].path, f.skill, "the physical instruction file path");
++  assert.equal(record.seal, hostSkillCatalogSeal("codex", record.entries));
++  const second = readback(f, "codex", { now: () => "2026-10-31T10:00:00.000Z" });
++  assert.equal(second.status, "unchanged");
++  assert.equal(JSON.parse(readFileSync(file, "utf8")).entries[0].observedAt, "2026-10-30T10:00:00.000Z", "an unchanged observation keeps its first observedAt");
++  assert.equal(observeDeclaredSystemSkills({ runner: "codex", homeDir: f.home }).skills.length, 2);
++}));
++
++test("a valid entry admits a bounded search inside that one declared skill directory and nothing around it", () => withFixture((f) => {
++  readback(f);
++  // Only the first declared skill is searched; the sibling is declared too, so test the undeclared cases with a fresh sibling.
++  const fresh = join(f.system, "fresh-undeclared");
++  mkdirSync(fresh, { recursive: true });
++  writeFileSync(join(fresh, "SKILL.md"), "# fresh\n");
++  assert.equal(search(f, f.declared), true, "the declared skill directory");
++  assert.equal(search(f, join(f.declared, "references")), true, "a subdirectory of the declared skill directory");
++  assert.equal(search(f, f.skill, { recursive: false }), true, "its instruction file by its own name");
++  assert.equal(search(f, fresh), false, "an undeclared sibling skill directory");
++  assert.equal(search(f, f.system), false, "the collection root is a parent, not the declared directory");
++  assert.equal(search(f, join(f.home, ".codex", "skills")), false, "the skill tree");
++  assert.equal(search(f, join(f.home, ".codex", "sessions")), false, "the transcript tree");
++  assert.equal(search(f, join(f.declared, "..", "fresh-undeclared")), false, "a traversal spelling into a sibling");
++  assert.equal(search(f, `${f.declared}/references/../..`), false, "a traversal spelling to the parent");
++  assert.equal(search(f, `${f.declared}/../openai-docs`), false, "a traversal spelling that lands back inside is still traversal");
++}));
++
++test("credentials stay refused: a secret-named file inside the declared directory and a forged entry naming a credential tree", () => withFixture((f) => {
++  readback(f);
++  assert.equal(search(f, f.declared), true, "baseline");
++  // The whole-tree secret screen (safeRecursiveTree, unchanged) still decides inside a declared directory.
++  writeFileSync(join(f.declared, "id_rsa"), "private\n");
++  assert.equal(search(f, f.declared), false, "a private key inside the declared directory refuses the search");
++  rmSync(join(f.declared, "id_rsa"));
++  writeFileSync(join(f.declared, ".env"), "TOKEN=x\n");
++  assert.equal(search(f, f.declared), false, "an env file inside the declared directory refuses the search");
++  rmSync(join(f.declared, ".env"));
++  assert.equal(search(f, f.declared), true, "and the search is admitted again once they are gone");
++  assert.equal(search(f, join(f.home, ".ssh")), false);
++  assert.equal(search(f, join(f.home, ".ssh", "id_rsa"), { recursive: false }), false);
++}));
++
++test("a project-local alias or link into the declared directory is not the declared name and stays refused", { skip: WIN && "directory symlinks unavailable on this native Windows host" }, () => withFixture((f) => {
++  readback(f);
++  symlinkSync(f.declared, join(f.project, "skill-alias"), "dir");
++  assert.equal(search(f, join(f.project, "skill-alias")), false);
++  assert.equal(search(f, join(f.project, "skill-alias", "references")), false);
++}));
++
++test("drift: a replaced instruction file invalidates its entry until the next host readback", () => withFixture((f) => {
++  readback(f);
++  assert.equal(search(f, f.declared), true);
++  writeFileSync(f.skill, "# replaced content\n");
++  const stale = readHostSkillCatalog({ rootDir: f.project, homeDir: f.home });
++  assert.ok(stale.problems.some((p) => p.name === "openai-docs" && p.code === "HSC-DRIFT"), JSON.stringify(stale.problems));
++  assert.equal(search(f, f.declared), false, "the changed entry no longer binds");
++  assert.equal(search(f, f.second), true, "a different declared entry is unaffected");
++  assert.equal(readback(f).status, "written", "the readback re-observes the new identity");
++  assert.equal(search(f, f.declared), true);
++  rmSync(f.skill);
++  assert.equal(search(f, f.declared), false, "a removed instruction file leaves no authority behind");
++}));
++
++test("a forged or hand-edited record is ignored and reported, and the next readback replaces it", () => withFixture((f) => {
++  readback(f);
++  const file = recordFile(f);
++  const record = JSON.parse(readFileSync(file, "utf8"));
++  // Hand edit without re-sealing: an entry is added for the sibling directory that was never declared.
++  const forged = { ...record, entries: [...record.entries, { ...record.entries[0], name: "forged" }] };
++  writeFileSync(file, JSON.stringify(forged));
++  chmodSync(file, 0o600);
++  const read = readHostSkillCatalog({ rootDir: f.project, homeDir: f.home });
++  assert.equal(read.status, "ignored");
++  assert.deepEqual(read.problems, [{ runner: "codex", code: "HSC-SEAL-MISMATCH" }]);
++  assert.deepEqual(declaredSkillDirectories({ rootDir: f.project, homeDir: f.home }), []);
++  assert.equal(search(f, f.declared), false, "a forged record binds nothing, not even its genuine entries");
++  const repaired = readback(f);
++  assert.equal(repaired.status, "written");
++  assert.equal(repaired.replacedInvalid, "HSC-SEAL-MISMATCH");
++  assert.equal(search(f, f.declared), true);
++}));
++
++test("a re-sealed forgery naming a path outside the declaration surface is rejected entry by entry", () => withFixture((f) => {
++  readback(f);
++  const file = recordFile(f);
++  const record = JSON.parse(readFileSync(file, "utf8"));
++  const sshKey = join(f.home, ".ssh", "id_rsa");
++  const entries = [{ ...record.entries[0], name: "openai-docs", path: sshKey }, { ...record.entries[1], sha256: "0".repeat(63) }];
++  writeFileSync(file, JSON.stringify({ ...record, entries, seal: hostSkillCatalogSeal("codex", entries) }));
++  chmodSync(file, 0o600);
++  const read = readHostSkillCatalog({ rootDir: f.project, homeDir: f.home });
++  assert.deepEqual(read.entries, []);
++  assert.deepEqual(read.problems.map((p) => p.code).sort(), ["HSC-ENTRY-OUTSIDE-SURFACE", "HSC-ENTRY-SHAPE"]);
++  assert.equal(search(f, f.declared), false);
++  assert.equal(search(f, join(f.home, ".ssh")), false);
++}));
++
++test("a record with loose permissions is not trusted", { skip: WIN && "POSIX mode bits" }, () => withFixture((f) => {
++  readback(f);
++  chmodSync(recordFile(f), 0o644);
++  const read = readHostSkillCatalog({ rootDir: f.project, homeDir: f.home });
++  assert.equal(read.entries.length, 0);
++  assert.equal(read.problems[0].code, "HSC-RECORD-CUSTODY");
++  assert.equal(search(f, f.declared), false, "a record outside custody binds nothing");
++  // Self-heal: the next host readback replaces the record that failed custody and says so.
++  const repaired = readback(f);
++  assert.equal(repaired.status, "written");
++  assert.equal(repaired.replacedInvalid, "HSC-RECORD-CUSTODY");
++  assert.equal(statSync(recordFile(f)).mode & 0o077, 0);
++  assert.equal(search(f, f.declared), true);
++}));
++
++test("the bootstrap preflight readback is the writer: typed result per runner, nothing outside an active governed repository, never a throw", () => withFixture((f) => {
++  const active = () => ({ state: "active" });
++  const common = { rootDir: f.project, homeDir: f.home, observeGovernanceScopeFn: active };
++  assert.equal(observeHostSkillCatalogReadback({ ...common, env: { CLAUDECODE: "1" } }).status, "unavailable", "claude declares no surface");
++  assert.equal(observeHostSkillCatalogReadback({ ...common, env: { ANTIGRAVITY_AGENT: "1" } }).code, "HSC-NO-DECLARATION-SURFACE");
++  assert.equal(readHostSkillCatalog({ rootDir: f.project, homeDir: f.home }).status, "absent", "an unavailable readback wrote nothing");
++  const env = { CODEX_SESSION_ID: "session" };
++  assert.equal(observeHostSkillCatalogReadback({ ...common, env }).status, "written");
++  assert.equal(observeHostSkillCatalogReadback({ ...common, env }).status, "unchanged");
++  assert.equal(search(f, f.declared), true, "the preflight readback is what binds the declared directory");
++  assert.equal(observeHostSkillCatalogReadback({ ...common, env, observeGovernanceScopeFn: () => ({ state: "inactive" }) }), undefined);
++  const failed = observeHostSkillCatalogReadback({ ...common, env, writeFn: () => { throw new Error("boom"); } });
++  assert.equal(failed.status, "unavailable");
++  assert.equal(failed.code, "HSC-READBACK-FAILED");
++}));
++
++test("without a repository the reader reports unavailable and the readback writes nothing", () => {
++  mkdirSync(SCRATCH_ROOT, { recursive: true });
++  const base = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "hsc-norepo-")));
++  const saved = process.env.GIT_CEILING_DIRECTORIES;
++  process.env.GIT_CEILING_DIRECTORIES = base;
++  try {
++    const home = join(base, "home");
++    mkdirSync(join(home, ".codex", "skills", ".system", "a"), { recursive: true });
++    writeFileSync(join(home, ".codex", "skills", ".system", "a", "SKILL.md"), "# a\n");
++    const bare = join(base, "bare");
++    mkdirSync(bare);
++    assert.equal(writeHostSkillCatalog({ rootDir: bare, runner: "codex", homeDir: home }).code, "HSC-NO-REPOSITORY");
++    assert.equal(readHostSkillCatalog({ rootDir: bare, homeDir: home }).status, "unavailable");
++    assert.equal(isAllowedPassiveReadTarget(join(home, ".codex", "skills", ".system", "a"), { rootDir: bare, homeDir: home, recursive: true, ...NO_PLANE }), false);
++  } finally {
++    if (saved === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = saved;
++    rmSync(base, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/lib/passive-read-policy.mjs b/plugins/pipeline-core/lib/passive-read-policy.mjs
+index 43351b9e5..c4e4572a0 100644
+--- a/plugins/pipeline-core/lib/passive-read-policy.mjs
++++ b/plugins/pipeline-core/lib/passive-read-policy.mjs
+@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
+ import { readdirSync, realpathSync, statSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
++import { declaredSkillDirectories } from "./host-skill-catalog.mjs";
+ import { readMachinePlane } from "./machine-plane.mjs";
+ import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
+ 
+@@ -307,6 +308,20 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
+   return true;
+ }
+ 
++// PO decision D210 (AC-147 catalog half, AC-209): a recursive search INSIDE one directory the host declared (the sealed private
++// record of lib/host-skill-catalog.mjs, written only by the host readback and verified here against the current filesystem) is
++// the one thing a valid declaration adds over D96/D108. The directory must contain the operand under BOTH identities, the
++// operand spells no `..`, and the credential and whole-tree secret screens above and below still decide. Parents of the declared
++// directory, undeclared siblings and the session trees never match. Any lookup failure means "not declared" (the D108 refusal).
++function insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, lookup) {
++  if (raw.split(/[\\/]/u).includes("..")) return false;
++  let declared;
++  try { declared = lookup({ rootDir, homeDir }); } catch { return false; }
++  return Array.isArray(declared) && declared.some((entry) => typeof entry?.directory === "string"
++    && within(entry.directory, physical)
++    && (within(entry.directory, lexical) || (typeof entry.lexicalDirectory === "string" && within(entry.lexicalDirectory, lexical))));
++}
++
+ /**
+  * This check is for passive path operands only. Callers still need a closed
+  * command-specific grammar; a read option that executes or writes must never
+@@ -314,7 +329,7 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
+  */
+ export function isAllowedPassiveReadTarget(raw, {
+   rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
+-  additionalRecursiveRoots = [],
++  additionalRecursiveRoots = [], declaredDirectories = declaredSkillDirectories,
+   realpath = realpathSync.native ?? realpathSync, stat = statSync,
+   repoKeyDirectory = resolveRepoScopedDirectory,
+   machinePlaneRead = readMachinePlane,
+@@ -451,7 +466,8 @@ export function isAllowedPassiveReadTarget(raw, {
+       // A recursive search must not sweep a host-wide runner session or skill collection (it holds other
+       // sessions' content); an exact file in one keeps its existing lane.
+       if (recursive && observed.isDirectory()
+-        && touchesSessionCollection(homeDir, identities, realpath)) return false;
++        && touchesSessionCollection(homeDir, identities, realpath)
++        && !insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, declaredDirectories)) return false;
+     } catch { return false; }
+   }
+   if (recursive || (directoryListing && inAdditional)) {
+diff --git a/plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs b/plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs
+index 8bd582e81..af7e86145 100644
+--- a/plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs
++++ b/plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs
+@@ -36,16 +36,22 @@
+ //   * A3: no catalog-bound read authority exists (sessionReadScopeRoots binds no skill path), so a replaced file identity
+ //     cannot leave a stale authority behind and the read decision is made per call on the physical file.
+ //   * A4: the route is real guard code, not a static skill allowlist or a synthetic catalog (source scan).
+-// NOT PROVEN BY THIS PIN (stays with the item, deferred past 0.7.0, D57 Q3 / D63): the installed Codex host readback of the
+-// actual route and the authenticated host-catalog identity half. No case here claims them.
++// RESTATED AGAIN 2026-10-30 (QG-04; PO decision D210 builds the catalog half): the authenticated host skill-catalog carrier now
++// exists (lib/host-skill-catalog.mjs). It is a sealed private record written ONLY by the host readback (writeHostSkillCatalog)
++// and read by the passive read policy; a valid entry adds one thing over D96, a bounded search inside that ONE declared skill
++// directory (A1b). Drift and forgery invalidate it (A3b, A3c); the session read roots still bind nothing (A2b-roots, A3), a catalog
++// handed in through the tool input binds nothing, and the unlisted/credential/transcript/alias refusals above are unchanged. A4 keeps
++// its original assertion verbatim and adds the checkable half of the new premise (the route reads the typed private record, not an
++// allowlist). Still NOT PROVEN BY THIS PIN: the INSTALLED Codex host readback of the actual route (native host, item AC-147).
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+-import { join } from "node:path";
++import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+ import { sessionReadScopeRoots } from "../guard/read-scope.mjs";
++import { writeHostSkillCatalog } from "../host-skill-catalog.mjs";
+ 
+ // Host fact: fixtures live under the repository scratch/, never the OS temp dir.
+ const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
+@@ -215,12 +221,62 @@ test("A3 no catalog-bound read authority exists to go stale: a skill catalog han
+   assert.doesNotMatch(gone.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, "a removed file is not refused as outside the root");
+ }));
+ 
++// The catalog route (D210). The undeclared sibling is removed before the REAL host readback so it is genuinely not declared.
++const declareSkillCreatorOnly = (f) => {
++  const otherDir = dirname(f.other);
++  rmSync(otherDir, { recursive: true, force: true });
++  const readback = writeHostSkillCatalog({ rootDir: f.project, runner: "codex", homeDir: f.home });
++  assert.equal(readback.status, "written", JSON.stringify(readback));
++  mkdirSync(otherDir, { recursive: true });
++  writeFileSync(f.other, "# undeclared\n");
++  return { skillDir: dirname(f.skill), otherDir };
++};
++
++test("A1b a declared skill directory is searched through ordinary bounded reads once the host readback wrote the catalog; the undeclared sibling directory and the skill tree stay refused", () => withFixture((f) => {
++  const { skillDir, otherDir } = declareSkillCreatorOnly(f);
++  for (const command of [`rg -n skill ${fwd(skillDir)}`, `rg --files ${fwd(skillDir)}`, `rg -n skill ${fwd(skillDir)} | head -5`]) {
++    const r = verdict(bash(command), f.project);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++  }
++  for (const directory of [otherDir, join(f.home, ".codex", "skills", ".system"), join(f.home, ".codex", "skills"), join(f.home, ".codex", "sessions")]) {
++    const r = verdict(bash(`rg -n skill ${fwd(directory)}`), f.project);
++    assert.equal(r.exitCode, 2, `${directory}\n${r.text}`);
++    assert.match(r.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  }
++}));
++
++test("A3b a replaced declared file invalidates the catalog-bound directory search until the next host readback", () => withFixture((f) => {
++  const { skillDir } = declareSkillCreatorOnly(f);
++  assert.equal(verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project).exitCode, 0);
++  writeFileSync(f.skill, "# replaced content\n");
++  const stale = verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project);
++  assert.equal(stale.exitCode, 2, stale.text);
++  assert.match(stale.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  assert.equal(verdict(readTool(f.skill), f.project).exitCode, 0, "the file itself still reads by its own name (D96)");
++  assert.equal(writeHostSkillCatalog({ rootDir: f.project, runner: "codex", homeDir: f.home }).status, "written");
++  assert.equal(verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project).exitCode, 0);
++}));
++
++test("A3c a runner without a declaration surface leaves the guard exactly as D96/D108 decided", () => withFixture((f) => {
++  for (const runner of ["claude", "antigravity"]) {
++    const readback = writeHostSkillCatalog({ rootDir: f.project, runner, homeDir: f.home });
++    assert.equal(readback.status, "unavailable");
++  }
++  const r = verdict(bash(`rg -n skill ${fwd(dirname(f.skill))}`), f.project);
++  assert.equal(r.exitCode, 2, r.text);
++  assert.equal(verdict(bash(`cat ${fwd(f.skill)}`), f.project).exitCode, 0);
++}));
++
+ test("A4 the admission route is real guard code, not a static skill allowlist or a synthetic catalog: neither read-boundary module names a skill, a SKILL.md or a catalog", () => {
+   // QG-04 restatement, bounded to D96: with no catalog route to prove, the checkable half of "a static allowlist or synthetic
+   // catalog alone is insufficient" is that the boundary carries none. The installed-host readback of the actual route is NOT
+   // proven here; it stays native-host and deferred past 0.7.0 (item triage 2026-10-17, D57 Q3 / D63).
++  // D210 (2026-10-30): the assertion is unchanged and still holds, because the policy reads the declaration only through the
++  // typed carrier module; the added half below pins that import and the absence of any literal skill name in it.
+   for (const rel of ["../guard/read-scope.mjs", "../passive-read-policy.mjs"]) {
+     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+     assert.doesNotMatch(src, /SKILL\.md|skill-creator|skill_catalog|hostSkillCatalog/iu, `${rel} must not carry a skill allowlist or catalog`);
+   }
++  const policy = readFileSync(fileURLToPath(new URL("../passive-read-policy.mjs", import.meta.url)), "utf8");
++  assert.match(policy, /from "\.\/host-skill-catalog\.mjs"/u, "the declaration comes from the typed private carrier");
+ });
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs
+index 6f200cd20..9cda9e6a7 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs
+@@ -21,32 +21,49 @@
+ //   4. Baseline FIRST: an undeclared credential read under the fake home must be refused with the typed code, otherwise
+ //      every other refusal case is invalid (the fixture would not be honest).
+ //
+-// FINDINGS (measured on this source):
+-//   * There is no host skill-catalog declaration carrier in current source. Every point that needs the authenticated
+-//     declaration (P1 admission, P1b ordinary retry route, P2 parity of an ADMITTED read, unlisted/lookalike/traversal
+-//     refusal that depends on a catalog binding) is a typed NATIVE HOLD (owner Coordinator), not a faked pass.
+-//   * Outside-root, host-visible, non-credential files (any SKILL.md under the fake home) are admitted today by the
+-//     generic host-visible-path rule with no catalog binding; so "unlisted stays refused" cannot be asserted yet.
++// FINDINGS (restated 2026-10-30, PO decisions D96/D108/D109 and D210; QG-04 restatement, no case deleted):
++//   * D96/D108 (built in 5b3990a37): a single read of ANY host-visible non-credential file outside the repository is
++//     admitted by its physical name, with no catalog, in every supported form (cat, cat|head, head, sed -n, rg -n and
++//     rg|head over the one file, native Read). That is why an UNDECLARED single SKILL.md, a lookalike path and a transcript
++//     file are admitted (P3a-unlisted, P3b, P4-unrelated assert it so the premise change is visible), and why P2 parity of
++//     the declared file holds before and after the catalog. Recursive searches and listings over the skill collection and
++//     the session trees stay refused (D108).
++//   * D210 builds the authenticated host skill-catalog carrier (lib/host-skill-catalog.mjs): a sealed private record
++//     written ONLY by the host readback (writeHostSkillCatalog, the bootstrap preflight) and read by the passive read
++//     policy. What a valid entry adds over D96 is exactly one thing: a bounded search/listing inside that ONE declared skill
++//     directory (P1, P1b). A replaced file (drift) or a forged/hand-edited record invalidates it again (P5, P5b); an
++//     undeclared sibling, the collection root, the transcript tree, traversal and aliases stay refused.
++//   * The catalog is NOT an input field: a catalog handed to the guard in the tool input binds nothing (P3d, A3 of the
++//     sibling pin). The installed-host readback of the actual Codex route is not proven by this pin (native hold, item AC-147).
++//   * P1b (ordinary route): an ordinary route exists and is shown behaviourally: the refused recursive search of an
++//     undeclared skill directory is paired with the admitted single read of its instruction file, and the declared directory
++//     search is admitted with no override; denial TEXT lives in grammar-denials.mjs and is out of this slice.
++//   * P2-diagnostic: the bounded (piped) form of an outside-root CREDENTIAL read carries GUARD-OPERATOR-UNAPPROVED where the
++//     single form carries the scope code (measured; both exit 2). Re-labelling the piped credential refusal belongs to
++//     evaluate.mjs and the NVA-BL-75 override-class corpus, not to this slice; the admitted side is identical for every form.
+ //   * Refusal-preserving points (credentials, transcript/skill-tree directory listings, forged declaration, in-project
+ //     boundary) are real GREEN assertions that fail for the stated reason (typed code asserted).
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
++import { hostSkillCatalogRecordPath, writeHostSkillCatalog } from "../host-skill-catalog.mjs";
++import { resolveGitCommonDir } from "../po-key-directory.mjs";
+ 
+ // Host fact: fixtures live under the repository scratch/, never the OS temp dir.
+ const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
+ const WIN = process.platform === "win32";
+ const HOST_LIMITATION = "typed host limitation: directory symlinks unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)";
+-const NATIVE_HOLD = "native hold: no host skill-catalog declaration carrier exists in source; owner Coordinator";
+ const fwd = (p) => p.replaceAll("\\", "/");
+ const bash = (command) => ({ tool_name: "Bash", tool_input: { command } });
+ const readTool = (file_path) => ({ tool_name: "Read", tool_input: { file_path } });
+ 
+-function fixture() {
++// `declare: true` runs the REAL host readback (writeHostSkillCatalog) right after the declared skill exists and BEFORE the
++// undeclared sibling is created, so the sibling is genuinely not in the catalog. No catalog is ever written by hand here.
++function fixture({ declare = false } = {}) {
+   mkdirSync(SCRATCH_ROOT, { recursive: true });
+   const base = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "alf-c-p21-08-")));
+   const project = join(base, "project");
+@@ -65,20 +82,25 @@ function fixture() {
+   }));
+   const skillDir = join(home, ".codex", "skills", ".system", "openai-docs");
+   const otherDir = join(home, ".codex", "skills", ".system", "undeclared-skill");
+-  mkdirSync(skillDir, { recursive: true });
++  mkdirSync(join(skillDir, "references"), { recursive: true });
++  writeFileSync(join(skillDir, "SKILL.md"), "# openai-docs\nline two\n");
++  writeFileSync(join(skillDir, "references", "a.md"), "reference text\n");
++  if (declare) {
++    const readback = writeHostSkillCatalog({ rootDir: project, runner: "codex", homeDir: home });
++    assert.equal(readback.status, "written", JSON.stringify(readback));
++  }
+   mkdirSync(otherDir, { recursive: true });
+   mkdirSync(join(home, ".ssh"), { recursive: true });
+   mkdirSync(join(home, ".codex", "sessions"), { recursive: true });
+-  writeFileSync(join(skillDir, "SKILL.md"), "# openai-docs\n");
+   writeFileSync(join(otherDir, "SKILL.md"), "# undeclared\n");
+   writeFileSync(join(home, ".ssh", "id_rsa"), "private\n");
+   writeFileSync(join(home, ".codex", "sessions", "rollout.jsonl"), "{}\n");
+   writeFileSync(join(home, ".codex", "auth.json"), "{}\n");
+-  return { base, project, home, skill: join(skillDir, "SKILL.md"), other: join(otherDir, "SKILL.md") };
++  return { base, project, home, skillDir, otherDir, skill: join(skillDir, "SKILL.md"), other: join(otherDir, "SKILL.md") };
+ }
+ const ENV_KEYS = ["HOME", "USERPROFILE", "GIT_CEILING_DIRECTORIES"];
+-const withFixture = (fn) => {
+-  const f = fixture();
++const withFixture = (fn, options) => {
++  const f = fixture(options);
+   const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
+   process.env.HOME = f.home;
+   process.env.USERPROFILE = f.home;
+@@ -119,27 +141,50 @@ test("baseline precondition: credential reads under the protected fake home are
+   assert.equal(verdict(bash("cat docs/state.md"), f.project).exitCode, 0);
+ }));
+ 
+-test("P1 a declared openai-docs SKILL.md is admitted through an ordinary single read, no PO-signature route", {
+-  skip: NATIVE_HOLD + "; admission of a DECLARED skill cannot be distinguished from the generic host-visible rule without the declaration (P1 held)",
+-}, () => withFixture((f) => {
+-  const catalog = { skills: [{ name: "openai-docs", path: f.skill }] };
++// Restated 2026-10-30 (QG-04, D96/D108/D210): the NATIVE HOLD on P1/P1b/P2 is lifted because the carrier now exists
++// (lib/host-skill-catalog.mjs); each case runs on a catalog written by the REAL host readback, never a hand-built one.
++test("P1 a declared openai-docs skill is read through ordinary read actions with no PO-signature route: the instruction file and a bounded search inside its own directory", () => withFixture((f) => {
+   for (const input of [bash(`cat ${fwd(f.skill)}`), readTool(f.skill)]) {
+-    const r = verdict({ ...input, skill_catalog: catalog, hostSkillCatalog: catalog }, f.project);
+-    assert.equal(r.exitCode, 0, r.text);
++    const r = verdict(input, f.project);
++    assert.equal(r.exitCode, 0, `${JSON.stringify(input)}\n${r.text}`);
+   }
+-}));
++  // The catalog-specific admission: a recursive search/listing inside the declared directory (refused by D108 without a catalog entry).
++  for (const command of [`rg -n reference ${fwd(f.skillDir)}`, `rg --files ${fwd(f.skillDir)}`, `rg -n reference ${fwd(join(f.skillDir, "references"))}`]) {
++    const r = verdict(bash(command), f.project);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++    assert.doesNotMatch(r.text, /GUARD-/u);
++  }
++}, { declare: true }));
+ 
+-test("P1b the refusal of a declared skill read names a concrete ordinary route, not only the exceptional override", {
+-  skip: NATIVE_HOLD + "; no declared-skill refusal exists to carry a retry route (P1b held)",
+-}, () => {
+-  assert.fail("held: requires the authenticated host catalog declaration");
+-});
++test("P1b an ordinary route exists after a refusal: the undeclared skill directory search is refused with the typed code while its instruction file reads normally, and the declared directory search needs no override", () => withFixture((f) => {
++  // Restated (D210): the route is shown behaviourally. Refusal text lives in grammar-denials.mjs (out of this slice).
++  const refused = verdict(bash(`rg -n undeclared ${fwd(f.otherDir)}`), f.project);
++  assert.equal(refused.exitCode, 2, refused.text);
++  assert.match(refused.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  const route = verdict(bash(`cat ${fwd(f.other)}`), f.project);
++  assert.equal(route.exitCode, 0, `the ordinary route: read the instruction file by its own name\n${route.text}`);
++  assert.equal(verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project).exitCode, 0, "declared directory search, no override");
++}, { declare: true }));
+ 
+-test("P2 single and bounded diagnostic reads of the declared skill get identical admission", {
+-  skip: NATIVE_HOLD + "; parity of an admitted declared read is meaningless without the declaration (P2 held)",
+-}, () => {
+-  assert.fail("held: requires the authenticated host catalog declaration");
+-});
++test("P1c without a catalog entry (no readback yet) the declared directory search keeps the D108 refusal and the single read stays admitted", () => withFixture((f) => {
++  const refused = verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project);
++  assert.equal(refused.exitCode, 2, refused.text);
++  assert.match(refused.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  assert.equal(verdict(bash(`cat ${fwd(f.skill)}`), f.project).exitCode, 0);
++}));
++
++test("P2 single and bounded diagnostic reads of the declared skill get identical admission", () => withFixture((f) => {
++  const file = fwd(f.skill);
++  const forms = [
++    `cat ${file}`, `cat ${file} | head -n 5`, `cat ${file} | grep -n line`, `head -n 5 ${file}`, `sed -n 1,2p ${file}`,
++    `rg -n line ${file}`, `rg -n line ${file} | head -5`, `grep -n line ${file}`, `grep -n line ${file} | head -5`,
++  ];
++  const outcomes = forms.map((command) => ({ command, ...verdict(bash(command), f.project) }));
++  for (const outcome of outcomes) assert.equal(outcome.exitCode, 0, `${outcome.command}\n${outcome.text}`);
++  assert.equal(new Set(outcomes.map((o) => o.text)).size, 1, "identical diagnostics: every admitted form prints the same (empty) text");
++  const native = verdict(readTool(f.skill), f.project);
++  assert.equal(native.exitCode, 0, native.text);
++}, { declare: true }));
+ 
+ test("P2-refusal single and bounded diagnostic forms are refused identically for a credential (parity on the refusal side)", () => withFixture((f) => {
+   const target = fwd(join(f.home, ".ssh", "id_rsa"));
+@@ -149,12 +194,24 @@ test("P2-refusal single and bounded diagnostic forms are refused identically for
+   }
+ }));
+ 
+-test("P2-diagnostic single and bounded refusals of an outside-root target carry the identical typed diagnostic", {
+-  skip: NATIVE_HOLD + "; bounded forms currently surface GUARD-OPERATOR-UNAPPROVED where the single form surfaces the read-scope code (P2 identical admission held)",
+-}, () => withFixture((f) => {
+-  const t = fwd(join(f.home, ".ssh", "id_rsa"));
+-  assertRefused(bash(`cat ${t} | head -n 5`), f.project, "bounded");
+-}));
++test("P2-diagnostic the single and the bounded form of the same declared-skill operation carry the identical diagnostic: admitted for the file, the same typed refusal for the undeclared directory search", () => withFixture((f) => {
++  // Restated (D210): the bounded forms of an ADMITTED skill read do not surface GUARD-OPERATOR-UNAPPROVED on this source (measured);
++  // the diagnostic is identical because there is none. The undeclared directory search is refused by the same typed scope code in
++  // the single and in the piped shape. The one remaining asymmetry is for a CREDENTIAL (P2-refusal above: scope code single,
++  // GUARD-OPERATOR-UNAPPROVED piped, both exit 2); its label belongs to evaluate.mjs and the NVA-BL-75 override-class corpus.
++  const file = fwd(f.skill);
++  const single = verdict(bash(`cat ${file}`), f.project);
++  const piped = verdict(bash(`cat ${file} | head -n 5`), f.project);
++  assert.deepEqual([single.exitCode, single.text], [piped.exitCode, piped.text]);
++  assert.equal(single.exitCode, 0);
++  const dir = fwd(f.otherDir);
++  const singleDir = verdict(bash(`rg -n x ${dir}`), f.project);
++  const pipedDir = verdict(bash(`rg -n x ${dir} | head -5`), f.project);
++  assert.equal(singleDir.exitCode, 2, singleDir.text);
++  assert.equal(pipedDir.exitCode, 2, pipedDir.text);
++  assert.match(singleDir.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  assert.match(pipedDir.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++}, { declare: true }));
+ 
+ test("P3a credentials, transcript directory and the skill tree directory stay refused, single and bounded, even with a declaration present", () => withFixture((f) => {
+   const catalog = { skills: [{ name: "openai-docs", path: f.skill }] };
+@@ -175,28 +232,34 @@ test("P3a credentials, transcript directory and the skill tree directory stay re
+   }
+ }));
+ 
+-test("P3a-unlisted an undeclared sibling SKILL.md, a skill-looking lookalike path and a transcript file are refused (catalog binding)", {
+-  skip: NATIVE_HOLD + "; today any host-visible non-credential file is admitted without catalog binding",
+-}, () => withFixture((f) => {
++test("P3a-unlisted an undeclared sibling SKILL.md, a skill-looking lookalike path and a transcript file are plain outside files (admitted by name, D96/D108) while recursive searches around them stay refused", () => withFixture((f) => {
++  // Restated (QG-04; D96/D108/D210): the former "refused (catalog binding)" assertion presumed the catalog was the only route to a
++  // read. D96 makes any non-credential single file outside the repository readable; the catalog adds only a bounded search inside a
++  // DECLARED directory. The intent "nothing beyond the named file is swept in" is held by the refusals asserted here.
+   const lookalike = join(f.base, "elsewhere", ".codex", "skills", ".system", "openai-docs", "SKILL.md");
+   mkdirSync(join(lookalike, ".."), { recursive: true });
+   writeFileSync(lookalike, "# not declared\n");
+-  for (const target of [f.other, lookalike, join(f.home, ".codex", "sessions", "rollout.jsonl")]) {
+-    assertRefused(bash(`cat ${fwd(target)}`), f.project, target);
+-    assertRefused(readTool(target), f.project, `Read ${target}`);
++  const transcript = join(f.home, ".codex", "sessions", "rollout.jsonl");
++  for (const target of [f.other, lookalike, transcript]) {
++    assert.equal(verdict(bash(`cat ${fwd(target)}`), f.project).exitCode, 0, `cat ${target}`);
++    assert.equal(verdict(readTool(target), f.project).exitCode, 0, `Read ${target}`);
+   }
+-}));
++  for (const directory of [f.otherDir, join(f.home, ".codex", "skills", ".system"), join(f.home, ".codex", "skills"), join(f.home, ".codex", "sessions")]) {
++    assertRefused(bash(`rg -n x ${fwd(directory)}`), f.project, `recursive search ${directory}`);
++  }
++}, { declare: true }));
+ 
+-test("P3b traversal and tilde spellings aimed at the skill tree stay refused (catalog binding)", {
+-  skip: NATIVE_HOLD + "; traversal/tilde spellings resolve to the same admitted host-visible file today",
+-}, () => withFixture((f) => {
+-  const traversal = "../home/.codex/skills/.system/openai-docs/SKILL.md";
+-  const tilde = "~/.codex/skills/.system/openai-docs/SKILL.md";
+-  for (const spelling of [traversal, tilde]) {
+-    assertRefused(bash(`cat ${spelling}`), f.project, `cat ${spelling}`);
+-    assertRefused(readTool(spelling), f.project, `Read ${spelling}`);
++test("P3b traversal and tilde spellings aimed at the skill tree: a single file read resolves to the declared file itself (admitted, D96); a recursive search spelled with traversal stays refused even into the declared directory", () => withFixture((f) => {
++  // Restated (QG-04; D96/D210): the single-read spellings reach the same physical file, readable by its own name. The refusal intent
++  // moves to the recursive search: a `..` spelling is never accepted as the declared directory, a catalog entry notwithstanding.
++  for (const spelling of ["../home/.codex/skills/.system/openai-docs/SKILL.md", "~/.codex/skills/.system/openai-docs/SKILL.md"]) {
++    assert.equal(verdict(bash(`cat ${spelling}`), f.project).exitCode, 0, `cat ${spelling}`);
++    assert.equal(verdict(readTool(spelling), f.project).exitCode, 0, `Read ${spelling}`);
+   }
+-}));
++  for (const spelling of ["../home/.codex/skills/.system/openai-docs", `${fwd(f.skillDir)}/references/..`, `${fwd(f.skillDir)}/../undeclared-skill`]) {
++    assertRefused(bash(`rg -n x ${spelling}`), f.project, `rg -n x ${spelling}`);
++  }
++}, { declare: true }));
+ 
+ test("P3b-credential traversal and tilde spellings aimed at a credential stay refused", () => withFixture((f) => {
+   for (const spelling of ["../home/.ssh/id_rsa", "~/.ssh/id_rsa", "~/.codex/auth.json"]) {
+@@ -227,10 +290,44 @@ test("P4 the in-project read boundary and the typed credential refusal stay inta
+   assertRefused(bash(`cat ${fwd(join(f.home, ".ssh", "id_rsa"))}`), f.project, "outside-root credential keeps its typed refusal");
+ }));
+ 
+-test("P4-unrelated an undeclared outside-root skill file keeps the typed outside-root refusal (catalog binding)", {
+-  skip: NATIVE_HOLD + "; the generic host-visible rule admits it today",
+-}, () => withFixture((f) => {
+-  const r = verdict(bash(`cat ${fwd(f.other)}`), f.project);
++test("P4-unrelated an undeclared outside-root skill keeps the typed outside-root refusal for the directory search while its file reads by name (D96, catalog present)", () => withFixture((f) => {
++  // Restated (QG-04; D96/D210): the file itself is admitted by the generic host-visible rule; the typed scope refusal now
++  // belongs to the directory search, which the catalog does not extend to a skill it never declared.
++  assert.equal(verdict(bash(`cat ${fwd(f.other)}`), f.project).exitCode, 0);
++  const r = verdict(bash(`rg -n undeclared ${fwd(f.otherDir)}`), f.project);
+   assert.equal(r.exitCode, 2);
+   assert.match(r.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+-}));
++}, { declare: true }));
++
++test("P3c-declared a project-local alias into the DECLARED skill directory stays refused even with a valid catalog entry", { skip: WIN && HOST_LIMITATION }, () => withFixture((f) => {
++  const alias = join(f.project, "skill-alias");
++  symlinkSync(f.skillDir, alias, "dir");
++  assert.equal(verdict(bash("rg -n x skill-alias"), f.project).exitCode, 2);
++  assert.equal(verdict(bash(`rg -n x ${fwd(alias)}`), f.project).exitCode, 2);
++  assert.equal(verdict(bash("cat skill-alias/SKILL.md"), f.project).exitCode, 2);
++}, { declare: true }));
++
++test("P5 drift: a replaced declared instruction file invalidates the catalog entry, the directory search is refused again and the file still reads by name", () => withFixture((f) => {
++  assert.equal(verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project).exitCode, 0, "baseline: declared");
++  writeFileSync(f.skill, "# replaced content\n");
++  const r = verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project);
++  assert.equal(r.exitCode, 2, r.text);
++  assert.match(r.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  assert.equal(verdict(bash(`cat ${fwd(f.skill)}`), f.project).exitCode, 0);
++  // The next host readback re-observes the new identity and restores the binding.
++  assert.equal(writeHostSkillCatalog({ rootDir: f.project, runner: "codex", homeDir: f.home }).status, "written");
++  assert.equal(verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project).exitCode, 0);
++}, { declare: true }));
++
++test("P5b a forged or hand-edited catalog record binds nothing and a catalog handed in the tool input is ignored", () => withFixture((f) => {
++  const file = hostSkillCatalogRecordPath(resolveGitCommonDir(f.project), "codex");
++  const record = JSON.parse(readFileSync(file, "utf8"));
++  writeFileSync(file, JSON.stringify({ ...record, entries: [{ ...record.entries[0], name: "forged" }] }));
++  chmodSync(file, 0o600);
++  const refused = verdict(bash(`rg -n reference ${fwd(f.skillDir)}`), f.project);
++  assert.equal(refused.exitCode, 2, refused.text);
++  assert.match(refused.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  const inputCatalog = { skills: [{ name: "openai-docs", path: f.skill }] };
++  const stillRefused = verdict({ ...bash(`rg -n reference ${fwd(f.skillDir)}`), skill_catalog: inputCatalog, hostSkillCatalog: inputCatalog }, f.project);
++  assert.equal(stillRefused.exitCode, 2, stillRefused.text);
++}, { declare: true }));
+diff --git a/plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs b/plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs
+index 2937af188..40ba58ae9 100644
+--- a/plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs
++++ b/plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs
+@@ -211,6 +211,8 @@ test("RED mirror: without .git-credentials/.pypirc in the basename rule they are
+   writeFileSync(mirrorPath, mirrorSource(join(libDir, "passive-read-policy.mjs"), [
+     ['"./machine-plane.mjs"', JSON.stringify(pathToFileURL(join(libDir, "machine-plane.mjs")).href)],
+     ['"./po-key-directory.mjs"', JSON.stringify(pathToFileURL(join(libDir, "po-key-directory.mjs")).href)],
++    // D210 (2026-10-30): the policy now imports the host skill-catalog carrier; the mirror needs the same absolute anchor.
++    ['"./host-skill-catalog.mjs"', JSON.stringify(pathToFileURL(join(libDir, "host-skill-catalog.mjs")).href)],
+     // PO decision D109 (2026-10-22; QG-04 restatement): the basename rule gained more names, and the four basename-only home
+     // entries are now ALSO matched by path (a second line of defence, so the original defect needs both mutated). The mirror
+     // re-introduces the original defect exactly as before: neither the basename alternatives nor the path entries name them.
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index ce791500d..69bc300dc 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -36,6 +36,7 @@ import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedT
+ import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
+ import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
++import { writeHostSkillCatalog } from "../lib/host-skill-catalog.mjs";
+ import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
+ import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
+ import {
+@@ -2293,6 +2294,27 @@ export function observeSubagentModelEnv({ env = process.env } = {}) {
+   return { status: Object.hasOwn(env, SUBAGENT_MODEL_ENV_NAME) ? "set" : "unset" };
+ }
+ 
++/**
++ * D210 (AC-147 catalog half, AC-209): the host readback that is the ONLY writer of the sealed private host skill-catalog record
++ * (lib/host-skill-catalog.mjs). It observes what the active runner declares and publishes it, so the passive read policy can admit
++ * a bounded search inside exactly one declared skill directory. Typed result `pipeline.host-skill-catalog-readback.v1`:
++ * `written`, `unchanged`, or `unavailable` (a runner with no declaration surface, no repository, or a failed write).
++ * Like `nodeSandbox` it rides beside the typed envelope, never inside it, so the pinned key set and the payload budget stay as
++ * they were; it never decides `status`, `nextAction` or the exit code. Returns `undefined` outside an active governed
++ * repository (no readback expected, nothing is written there).
++ */
++export function observeHostSkillCatalogReadback({
++  rootDir = process.cwd(), env = process.env, read = readFileSync, homeDir = homedir(),
++  observeGovernanceScopeFn = observeGovernanceScope, writeFn = writeHostSkillCatalog,
++} = {}) {
++  try {
++    if (observeGovernanceScopeFn({ rootDir })?.state !== "active") return undefined;
++    return writeFn({ rootDir: resolve(rootDir), runner: resolveActiveRunner({ env, rootDir, read }), homeDir });
++  } catch {
++    return { schema: "pipeline.host-skill-catalog-readback.v1", status: "unavailable", code: "HSC-READBACK-FAILED", entries: 0 };
++  }
++}
++
+ /**
+  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
+  * called with no options, writes the same one compact line. `environmentReadiness` is an
+@@ -2314,6 +2336,7 @@ export function main(options = {}) {
+     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
+     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
++    ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
+   };
+   process.stdout.write(`${JSON.stringify(envelope)}\n`);
+   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
+@@ -2359,6 +2382,8 @@ async function runEntry(argv = process.argv.slice(2)) {
+     environmentReadiness,
+     agyStartHint,
+     nodeSandbox: observeNodeSandboxProbe(),
++    // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
++    hostSkillCatalog: observeHostSkillCatalogReadback(),
+     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
+     ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv() } : {}),
+     ...(role === undefined ? {} : { role }),
