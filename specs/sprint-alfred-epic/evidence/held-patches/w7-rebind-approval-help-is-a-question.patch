@@ -1,0 +1,51 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b66288f76..32fb7548d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13507,6 +13507,21 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     }
+ 
+     case "rebind-approval": {
++      // `--help` is a question, never a run: before this branch it executed the rebind and wrote a receipt.
++      if (rest.includes("--help") || rest.includes("-h")) {
++        console.log(`Usage: node pipeline-state.mjs rebind-approval
++
++Re-binds the current plan approval to this checkout when it is a clone or a
++transfer of the approving one and the approved PRD/Spec bytes are unchanged.
++It re-checks every bound digest, takes no argument, requests no signature and
++changes no State; only the device-local receipt is written. When the approved
++bytes changed it refuses, and the plan must be submitted and approved again.`);
++        return 0;
++      }
++      if (rest.length > 0) {
++        console.error(`Error: rebind-approval takes no argument (got ${rest.join(" ")}). Run "rebind-approval --help" for usage.`);
++        return 2;
++      }
+       const rebind = rebindApproval({ dir, now, deps });
+       console.log(JSON.stringify(rebind.payload, null, 2));
+       return rebind.exit;
+diff --git a/plugins/pipeline-core/scripts/rebind-approval.test.mjs b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+index db9f52130..ce172b1fd 100644
+--- a/plugins/pipeline-core/scripts/rebind-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+@@ -522,3 +522,20 @@ test("R7-5f: a device rebind never matches another approval, device or tampered
+   assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT }), null,
+     "a receipt whose origin values differ from the approval's is ignored");
+ });
++
++test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {
++  const origin = approvedOrigin("help");
++  const clone = cloneOf(origin, "help");
++  const stateBefore = stateBytes(clone.dir); const privateBefore = privateSnapshot(clone.dir);
++  for (const flag of ["--help", "-h"]) {
++    const result = invoke(["rebind-approval", flag], clone.deps);
++    assert.equal(result.status, 0, result.err);
++    assert.match(result.out, /Usage: node pipeline-state\.mjs rebind-approval/u);
++    assert.doesNotMatch(result.out, /"status"/u, "help prints usage, not a rebind result");
++  }
++  const extra = invoke(["rebind-approval", "--by", "someone"], clone.deps);
++  assert.equal(extra.status, 2);
++  assert.match(extra.err, /takes no argument/u);
++  assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
++  assert.deepEqual([...privateSnapshot(clone.dir).keys()], [...privateBefore.keys()], "no receipt is written by --help, -h or a refused argument");
++});

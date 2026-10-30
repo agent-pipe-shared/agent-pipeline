@@ -1,0 +1,198 @@
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index d984862c0..ffa176dda 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -237,7 +237,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+ 
+ ### EL-25a (MUST) — Outcome-sized work and resource checkpoints
+ 
+-- **Rule:** Assign a complete independently verifiable outcome to one Goldfish owner, including analysis, test cases, implementation, targeted checks and fixes. File count, tool-use estimate or remaining token budget alone does not force a horizontal split or early handback. Use checkpoints to preserve the same outcome, owner, attempt history, evidence and next action when resources tighten. Split only into coherent vertical sub-outcomes that can each be independently verified or when a real dependency/ownership boundary requires it. An exhausted budget blocks or checkpoints that same outcome; it does not create a successor identity that resets limits. **Standard procedure:** (1) brief the whole independently verifiable outcome once; when the honest estimate exceeds the base cap, put the reason in the briefing package (`budgetRationale`) so the grant is planned, not requested after the failure (the generator refuses an estimate above the cap without it and never raises the tier on its own); (2) a checkpoint is neither a failure nor a new task: read the report and the actual diff and evidence, record a grant of up to 30 calls with a reason (`dispatch-budget-grant.mjs`) and resume the SAME agent with `SendMessage` to its id, so nothing is re-read; grants are repeatable without a lifetime limit; (3) a successor dispatch (new id) is allowed only for a genuinely new vertical outcome with its own criteria, or, with a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`), when the agent is lost or has run itself into a corner, never as budget recovery, and its briefing names the checkpointed outcome it does not continue; (4) never commit a checkpoint under the original dispatch's trailer to release the reservation and then dispatch afresh for the same outcome: that is the successor route with an extra step.
++- **Rule:** Assign a complete independently verifiable outcome to one Goldfish owner, including analysis, test cases, implementation, targeted checks and fixes. File count, tool-use estimate or remaining token budget alone does not force a horizontal split or early handback. Use checkpoints to preserve the same outcome, owner, attempt history, evidence and next action when resources tighten. Split only into coherent vertical sub-outcomes that can each be independently verified or when a real dependency/ownership boundary requires it. An exhausted budget blocks or checkpoints that same outcome; it does not create a successor identity that resets limits. **Standard procedure:** (1) brief the whole independently verifiable outcome once; when the honest estimate exceeds the base cap, put the reason in the briefing package (`budgetRationale`) so the grant is planned, not requested after the failure (the generator refuses an estimate above the cap without it and never raises the tier on its own); (2) a checkpoint is neither a failure nor a new task: read the report and the actual diff and evidence, record a grant of up to 30 calls with a reason (`dispatch-budget-grant.mjs`) and resume the SAME agent with `SendMessage` to its id, so nothing is re-read; grants are repeatable without a lifetime limit; (3) a successor dispatch (new id) is allowed only for a genuinely new vertical outcome with its own criteria, or, with a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`), when the agent is lost or has run itself into a corner, never as budget recovery, and its briefing names the checkpointed outcome it does not continue; (4) never commit a checkpoint under the original dispatch's trailer to release the reservation and then dispatch afresh for the same outcome: that is the successor route with an extra step; (5) the briefing generator warns, never refuses, when another slice of the same item is started and unfinished (`DBG-CHECKPOINTED-OWNER`) or when the estimate exceeds the base cap without a planned grant (`DBG-ESTIMATE-ABOVE-BASE`, `DBG-ESTIMATE-NEEDS-SPLIT`); to release a slice instead of continuing it, `slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`.
+ - **Why:** Preparation defects and late test discovery are expensive; slicing analysis, tests and implementation into separate default owners loses context without improving independent acceptance. Lived example (2026-10-29): one outcome was worked as seven successor dispatches, four of which ended at the 40-call cap having only read the same large files again, and about a day of wall-clock went into briefings; the rules above were already canon and nothing refused the successor route.
+ - **Check:** The dispatch ledger names one outcome and owner through targeted-green or a typed block. Any split identifies the independent criteria, evidence mapping and dependency that justify it; any checkpoint keeps the same owner and recovery pointer.
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 2451de6c5..58a7d88f6 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -118,7 +118,7 @@ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/publi
+ const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
+ const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+ const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
+-const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
++const { inspectNativeGoldfishItemDelivery, observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+ // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+ const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+ const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+@@ -329,6 +329,18 @@ function defaultQueueRows(root) {
+   } catch { return []; }
+ }
+ 
++/**
++ * D196 (R1): slices of the governed item course that were started and have not finished. The queue stores no started state
++ * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); a started slice is a native pending state without a terminal
++ * record (phase "active"), which is also what a budget checkpoint leaves (the reservation stays live). A fault yields none (warn only).
++ */
++function defaultStartedOwners(root) {
++  try {
++    const observed = inspectNativeGoldfishItemDelivery({ root });
++    return observed.status === "observed" ? observed.items.filter((entry) => entry.phase === "active").map((entry) => ({ dispatchId: entry.dispatchId, itemId: entry.itemId })) : [];
++  } catch { return []; }
++}
++
+ /**
+  * K106: ids of the governed queue slices the lib treats as a completed delivery. The queue stores no delivered state
+  * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); readyAndLive derives status "done" from the
+@@ -716,6 +728,14 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   }
+ 
++  // D196 (R1): warn, never refuse, when another slice of this item is started and unfinished (a running or budget-checkpointed owner).
++  const startedOwners = (() => { try { const found = (deps.startedOwners ?? defaultStartedOwners)(root); return Array.isArray(found) ? found : []; } catch { return []; } })()
++    .filter((entry) => entry && entry.itemId === itemId && entry.dispatchId !== dispatchId && typeof entry.dispatchId === "string")
++    .map((entry) => entry.dispatchId).sort();
++  for (const owner of startedOwners) {
++    warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent with SendMessage. A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });
++  }
++
+   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
+   // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
+   const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
+@@ -999,6 +1019,12 @@ export function buildDispatchBriefing(options, deps = {}) {
+   const generated = bind(pkg.agentType);
+   const budget = skeletonToolBudget(generated.skeleton);
+   const decision = budgetDecision(pkg, budget);
++  // D196 (R4): warnings only. An estimate above the base cap with no planned grant, and one far above a single grant step.
++  const estimateWarnings = [];
++  if (Number.isSafeInteger(pkg.estimatedToolCalls) && Number.isSafeInteger(budget) && pkg.estimatedToolCalls > budget) {
++    if (!/grant/iu.test(String(pkg.budgetRationale ?? ""))) estimateWarnings.push({ code: "DBG-ESTIMATE-ABOVE-BASE", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the base cap ${budget} and budgetRationale does not say a grant is planned; repair: name the planned grant in budgetRationale (the word grant), or lower the estimate` });
++    if (pkg.estimatedToolCalls > 2 * (budget + 30)) estimateWarnings.push({ code: "DBG-ESTIMATE-NEEDS-SPLIT", message: `estimatedToolCalls ${pkg.estimatedToolCalls} is more than twice the base cap ${budget} plus one grant step of 30; repair: split the outcome along independent criteria into slices with disjoint scopes` });
++  }
+   const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
+   if (options.out !== undefined) {
+     const target = resolve(root, options.out);
+@@ -1019,7 +1045,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   };
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
++    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index c3aed3cf5..99a575a80 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1631,3 +1631,85 @@ test("D195 the package route admits check command:<id> to the same admission as
+   assert.equal(refused.ok, false);
+   assert.equal(refused.code, "DBG-CHECK-COMMAND-UNKNOWN", refused.message);
+ });
++
++// --- D196 (R1, R4): warn about a started unfinished owner of the same item; lint the estimate (warnings only, never a refusal) ---
++
++const startedOwner = (over = {}) => ({ dispatchId: "ALF-T0", itemId: SLICE_ITEM, ...over });
++const warningCodes = (result) => result.warnings.map((entry) => entry.code);
++
++test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINTED-OWNER with the grant-and-resume procedure; the build still succeeds with its dispatchCall", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => [startedOwner()] }));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.ok(result.dispatchCall, "the dispatchCall is still printed");
++  const warning = result.warnings.find((entry) => entry.code === "DBG-CHECKPOINTED-OWNER");
++  assert.ok(warning, JSON.stringify(result.warnings));
++  assert.match(warning.message, /ALF-T0/u);
++  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.30> --reason/u);
++  assert.match(warning.message, /SendMessage/u);
++  assert.match(warning.message, /elephant-restart, owner-lost, context-poisoned or new-vertical-outcome/u);
++  assert.match(warning.message, /slice-queue\.mjs cancel ALF-T0 --started --reason "<why>" --class budget/u);
++  const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { startedOwners: () => [startedOwner()] }));
++  assert.equal(binding.ok, true, JSON.stringify(binding));
++  assert.ok(warningCodes(binding).includes("DBG-CHECKPOINTED-OWNER"), "the binding route warns too");
++});
++
++test("D196 R1: a started slice of another item, the same dispatch id, or no started slice gives no warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  for (const owners of [[startedOwner({ itemId: "other.item" })], [startedOwner({ dispatchId: "ALF-T1" })], []]) {
++    const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => owners }));
++    assert.equal(result.ok, true, JSON.stringify(result));
++    assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"), JSON.stringify(owners));
++  }
++});
++
++test("D196 R1: a finished or cancelled slice of the same item gives no warning (queue rows carry no started state)", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const rows = [cancelledRow("budget"), cancelledRow("superseded", { id: "ALF-T9" })];
++  const result = runDispatchBriefing(argv, withRows(fx, rows, { startedOwners: () => [] }));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
++});
++
++test("D196 R1: an unreadable started-owner reader never refuses the build", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => { throw new Error("unreadable"); } }));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
++});
++
++test("D196 R4: an estimate above the base cap whose rationale does not say a grant is planned warns DBG-ESTIMATE-ABOVE-BASE; grant wording silences it; D193 still refuses a missing rationale", async () => {
++  const { runDispatchBriefing } = await lib();
++  const base = packageFixture();
++  const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
++  const within = packageFixture({ estimatedToolCalls: cap });
++  assert.ok(!warningCodes(runDispatchBriefing(within.argv, depsOf(within.fx))).includes("DBG-ESTIMATE-ABOVE-BASE"));
++  const plain = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "one test-first cycle that needs a few calls more than the base cap" });
++  const plainResult = runDispatchBriefing(plain.argv, depsOf(plain.fx));
++  assert.equal(plainResult.ok, true, JSON.stringify(plainResult));
++  assert.ok(warningCodes(plainResult).includes("DBG-ESTIMATE-ABOVE-BASE"), JSON.stringify(plainResult.warnings));
++  assert.ok(!warningCodes(plainResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"));
++  const planned = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "a budget grant of 20 calls is planned at the checkpoint" });
++  const plannedResult = runDispatchBriefing(planned.argv, depsOf(planned.fx));
++  assert.equal(plannedResult.ok, true, JSON.stringify(plannedResult));
++  assert.ok(!warningCodes(plannedResult).includes("DBG-ESTIMATE-ABOVE-BASE"), JSON.stringify(plannedResult.warnings));
++  const none = packageFixture({ estimatedToolCalls: cap + 1 });
++  assert.equal(runDispatchBriefing(none.argv, depsOf(none.fx)).code, "DBG-PACKAGE-BUDGET-EXCEEDED");
++});
++
++test("D196 R4: an estimate above twice the base cap plus one grant step warns DBG-ESTIMATE-NEEDS-SPLIT without refusing", async () => {
++  const { runDispatchBriefing } = await lib();
++  const base = packageFixture();
++  const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
++  const edge = packageFixture({ estimatedToolCalls: 2 * (cap + 30), budgetRationale: "a grant is planned" });
++  assert.ok(!warningCodes(runDispatchBriefing(edge.argv, depsOf(edge.fx))).includes("DBG-ESTIMATE-NEEDS-SPLIT"), "the edge itself is not above the factor");
++  const far = packageFixture({ estimatedToolCalls: 2 * (cap + 30) + 1, budgetRationale: "a grant is planned" });
++  const farResult = runDispatchBriefing(far.argv, depsOf(far.fx));
++  assert.equal(farResult.ok, true, JSON.stringify(farResult));
++  assert.ok(warningCodes(farResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"), JSON.stringify(farResult.warnings));
++  assert.match(farResult.warnings.find((entry) => entry.code === "DBG-ESTIMATE-NEEDS-SPLIT").message, /independent criteria/u);
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index 6ab25f490..5b9ab7d44 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -186,6 +186,8 @@ state this priority explicitly in the briefing, not just the number.
+ 
+ A returned `outcome: checkpoint` keeps the reservation live and the agent resumable. The cheap move is always the same: read the report and the actual diff, run `dispatch-budget-grant.mjs --agent-id <id> --extra 30 --reason "<why>"`, then `SendMessage` to the SAME agent id with a procedural continuation (make one read-only call first; continue only after the `DISPATCH-BUDGET-GRANT` notice names the digest). Grants are repeatable and each is a recorded decision. A fresh dispatch for the same outcome is the exception, named by a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`) and by the checkpointed outcome it does not continue. When the estimate already exceeds the base cap, plan the grant in the package (`budgetRationale`) instead of discovering it at the checkpoint. The rule text is `roles/elephant.md` EL-25a and EL-13b.
+ 
++The generator reminds the dispatcher at build time and never refuses (D196): `DBG-CHECKPOINTED-OWNER` names another started, unfinished slice of the same item with the grant-and-resume commands and the release route (`slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`); `DBG-ESTIMATE-ABOVE-BASE` fires when `estimatedToolCalls` exceeds the base cap and `budgetRationale` does not say a grant is planned; `DBG-ESTIMATE-NEEDS-SPLIT` asks for a split along independent criteria when the estimate exceeds twice the base cap plus one grant step of 30.
++
+ ## The dispatch-record artifact is not automatic — verify the prompt actually carries it
+ 
+ An `agent()` call is an ordinary subagent invocation: nothing about the
+diff --git a/roles/elephant.md b/roles/elephant.md
+index d984862c0..ffa176dda 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -237,7 +237,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+ 
+ ### EL-25a (MUST) — Outcome-sized work and resource checkpoints
+ 
+-- **Rule:** Assign a complete independently verifiable outcome to one Goldfish owner, including analysis, test cases, implementation, targeted checks and fixes. File count, tool-use estimate or remaining token budget alone does not force a horizontal split or early handback. Use checkpoints to preserve the same outcome, owner, attempt history, evidence and next action when resources tighten. Split only into coherent vertical sub-outcomes that can each be independently verified or when a real dependency/ownership boundary requires it. An exhausted budget blocks or checkpoints that same outcome; it does not create a successor identity that resets limits. **Standard procedure:** (1) brief the whole independently verifiable outcome once; when the honest estimate exceeds the base cap, put the reason in the briefing package (`budgetRationale`) so the grant is planned, not requested after the failure (the generator refuses an estimate above the cap without it and never raises the tier on its own); (2) a checkpoint is neither a failure nor a new task: read the report and the actual diff and evidence, record a grant of up to 30 calls with a reason (`dispatch-budget-grant.mjs`) and resume the SAME agent with `SendMessage` to its id, so nothing is re-read; grants are repeatable without a lifetime limit; (3) a successor dispatch (new id) is allowed only for a genuinely new vertical outcome with its own criteria, or, with a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`), when the agent is lost or has run itself into a corner, never as budget recovery, and its briefing names the checkpointed outcome it does not continue; (4) never commit a checkpoint under the original dispatch's trailer to release the reservation and then dispatch afresh for the same outcome: that is the successor route with an extra step.
++- **Rule:** Assign a complete independently verifiable outcome to one Goldfish owner, including analysis, test cases, implementation, targeted checks and fixes. File count, tool-use estimate or remaining token budget alone does not force a horizontal split or early handback. Use checkpoints to preserve the same outcome, owner, attempt history, evidence and next action when resources tighten. Split only into coherent vertical sub-outcomes that can each be independently verified or when a real dependency/ownership boundary requires it. An exhausted budget blocks or checkpoints that same outcome; it does not create a successor identity that resets limits. **Standard procedure:** (1) brief the whole independently verifiable outcome once; when the honest estimate exceeds the base cap, put the reason in the briefing package (`budgetRationale`) so the grant is planned, not requested after the failure (the generator refuses an estimate above the cap without it and never raises the tier on its own); (2) a checkpoint is neither a failure nor a new task: read the report and the actual diff and evidence, record a grant of up to 30 calls with a reason (`dispatch-budget-grant.mjs`) and resume the SAME agent with `SendMessage` to its id, so nothing is re-read; grants are repeatable without a lifetime limit; (3) a successor dispatch (new id) is allowed only for a genuinely new vertical outcome with its own criteria, or, with a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`), when the agent is lost or has run itself into a corner, never as budget recovery, and its briefing names the checkpointed outcome it does not continue; (4) never commit a checkpoint under the original dispatch's trailer to release the reservation and then dispatch afresh for the same outcome: that is the successor route with an extra step; (5) the briefing generator warns, never refuses, when another slice of the same item is started and unfinished (`DBG-CHECKPOINTED-OWNER`) or when the estimate exceeds the base cap without a planned grant (`DBG-ESTIMATE-ABOVE-BASE`, `DBG-ESTIMATE-NEEDS-SPLIT`); to release a slice instead of continuing it, `slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`.
+ - **Why:** Preparation defects and late test discovery are expensive; slicing analysis, tests and implementation into separate default owners loses context without improving independent acceptance. Lived example (2026-10-29): one outcome was worked as seven successor dispatches, four of which ended at the 40-call cap having only read the same large files again, and about a day of wall-clock went into briefings; the rules above were already canon and nothing refused the successor route.
+ - **Check:** The dispatch ledger names one outcome and owner through targeted-green or a typed block. Any split identifies the independent criteria, evidence mapping and dependency that justify it; any checkpoint keeps the same owner and recovery pointer.
+ 

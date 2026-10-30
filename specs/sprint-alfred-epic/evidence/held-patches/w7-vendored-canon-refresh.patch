@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/docs/adr/0014-critic-contract.md b/plugins/pipeline-core/docs/adr/0014-critic-contract.md
+index 107f5256e..2285142e1 100644
+--- a/plugins/pipeline-core/docs/adr/0014-critic-contract.md
++++ b/plugins/pipeline-core/docs/adr/0014-critic-contract.md
+@@ -94,6 +94,14 @@ ADR-0003 and this ADR. Operative detail: `policies/model-policy.md` MP-07 and
+ amendment: the model route of `goldfish-mechanic` (Ruling 158 also moves it to Haiku at effort `medium`);
+ that is an agent-route change tracked in the same backlog item, not an ADR-0014 decision.
+ 
++### Amendment — the project-state record role and the bindings command (2026-10-28)
++
++**Context:** a feature-course range that contained the project state file and handover files could not be briefed admissibly: the canon admitted exclusion bindings only for a retained prior result or a finding-disposition record, and no command derived the bindings.
++
++**Decision:** one narrow role, project-state record, admissible only for the file the project calibration names as its handover/state file and a `pipeline-handover*.md` file in the same directory, as an exclusion binding only (blob SHA-256 and mode verified, bytes never emitted, never read). One deriving command, `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (schema `pipeline.critic-correction-input-bindings.v1`). The forbidden-material rule for handover, state and history is unchanged.
++
++**Consequences:** the dispatch preflight refusal for a range with such paths and no bindings follows as a separate slice. The Critic still never reads those paths. Operative detail: `templates/prompts/critic-review.md`, `harness/review-protocol.md` §2.2, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`.
++
+ ## Consequences
+ 
+ Findings are reproducible and tied to the actual diff. Disclosure makes unavoidable context contamination visible instead of pretending it does not exist. The trajectory check prevents claimed-but-unexecuted verification from passing as evidence.
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index cff7668a7..de202cd10 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -658,6 +658,7 @@ whatever ref
+ | 4 | `pipeline-state.mjs approve-push` | Agent |
+ | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
+ | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
++| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds the push-approval record into one local commit once the remote is proven to hold the signed commit (D161) | Agent |
+ | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
+ | 7 | `gh release create` (tag + release) | Agent |
+ 
+@@ -684,7 +685,13 @@ narrowing.
+   names and voids the approval. Verify has to run *before* the approval, and the
+   state record's write is committed *after* the push -- not by this push
+   itself (which only ever pushes the already-signed `HEAD`, unchanged), but by
+-  the **next** `push-prepare.mjs` run, automatically. This is finding 7c of
++  the close step, `push-prepare.mjs --close` (D161), run as the LAST step after
++  the signed push. It folds immediately, leaving the tree clean, but only after
++  a bounded read-only `git ls-remote` shows the remote holds `forCommit` at the
++  record's destination; otherwise it refuses and writes nothing. The fold
++  commit stays unpushed until the next signed push. If the close step is
++  skipped, the **next** `push-prepare.mjs` run still folds it, automatically
++  (the earlier behavior, unchanged). This is finding 7c of
+   `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
+   as of NVA-PUSHFOLD-1
+   (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,
+diff --git a/plugins/pipeline-core/roles/critic.md b/plugins/pipeline-core/roles/critic.md
+index 5b9df4ce4..5b5d195d3 100644
+--- a/plugins/pipeline-core/roles/critic.md
++++ b/plugins/pipeline-core/roles/critic.md
+@@ -37,7 +37,7 @@ You are the **Critic** — an independent verifier in a fresh context, read-only
+ <!-- CRITIC-FAIL-CLOSED: reference-only-stop -->
+ 
+ - **Permitted dispatch material:** references only to the spec, an enumerated diff or archived diff snapshot, guardrails/constraints, machine evidence, and minimal dispatch metadata (project, rigor/risk class, ruleset SHA, and required model/matrix row). A reference is not permission to accept copied content or a substitute source.
+-- **Forbidden material:** handover, state, history, session or chat narrative, implementor explanation, prior verdict, summary, expectation, or any nonreferenced replacement source — including the same material copied into a filename, reference label, or metadata field.
++- **Forbidden material:** handover, state, history, session or chat narrative, implementor explanation, prior verdict, summary, expectation, or any nonreferenced replacement source — including the same material copied into a filename, reference label, or metadata field. A bound project-state record exclusion (`harness/review-protocol.md` §2.2) is a binding, not readable material, so this bullet is unchanged in meaning.
+ - **Mandatory boundary check:** resolve every required reference before substantive review. If a required artifact is missing, unreadable, ambiguous, outside the declared boundary, or accompanied by forbidden material, report only `Briefing violation: <input category> — correct dispatch references required; substantive review stopped.` Do not read the prohibited content, search for a substitute, consume a narrative, continue the review, or issue a substantive pass/fail judgment.
+ - **Why:** a missing or contaminated input cannot be repaired by reviewer inference without destroying the independent, reproducible review boundary.
+ 

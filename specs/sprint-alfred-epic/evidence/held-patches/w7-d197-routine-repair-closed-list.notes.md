@@ -35,6 +35,8 @@ heal; slice-cancel budget (with --started); slice-cancel integrated-elsewhere; s
 
 The briefed `rg` over `lib/guard/command-catalogue.mjs` and `lib/guard/shell-grammar.mjs` found no generic rule admitting `node <plugin-root>/scripts/*.mjs`. Admission there is per exact script (resume-hint, repair-map, readiness scripts, each one exact argv shape); `session-authority-repair.mjs` and `slice-queue.mjs` are not named in either file or in `guard-lifecycle-ready.mjs`, so how a ready session admits them was not found within budget. Therefore it is NOT shown that `routine-repair.mjs list|run` is admitted. No guard change is in the patch (kernel path outside the write scope). If refused, the needed change is exactly two argv shapes in `command-catalogue.mjs`: `node <plugin-root>/scripts/routine-repair.mjs list` (args length 1) and `node <plugin-root>/scripts/routine-repair.mjs run <kind> ...` with `--root <this root>` and `--reason`, plus its test.
 
+Elephant addendum (2026-10-30): probed live in this session, `node <clone>/plugins/pipeline-core/scripts/routine-repair.mjs list` was admitted by the guard and printed the closed list. A plain `node <script> <args>` call is admitted like `session-authority-repair.mjs` is, so no catalogue shape is needed for `list`. `run` is a mutating call and is still unprobed; it is checked after the install.
+
 ## Deviations
 
 - Test-first order not kept: lib and CLI were written before the test file, so there is no RED run against original code; the no-op proof is the substitute.
