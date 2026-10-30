@@ -1,0 +1,98 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index dcd46c269..f70e1386f 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -116,18 +116,19 @@ function readSubagentHandbackMessage(input) {
+       text = bytes.toString("utf8");
+     } finally { closeSync(fd); }
+   } catch (error) { return error?.code === "ENOENT" ? { ok: false, code: "NGHR-CLAUDE-STOP-NO-TRANSCRIPT" } : unsafe; }
+-  let lastAssistant = null;
++  // The latest handback of the whole child transcript counts, not only one in the last assistant record: a child often writes
++  // further assistant records after its handback (PF-70 root cause, 2026-10-30), and that later prose is not the contract.
++  let message = null;
+   for (const line of text.split("\n")) {
+     if (line.trim() === "") continue;
+     let record;
+     try { record = JSON.parse(line); } catch { return unsafe; }
+-    if (record?.type === "assistant" || record?.message?.role === "assistant") lastAssistant = record;
+-  }
+-  const content = lastAssistant?.message?.content;
+-  if (!Array.isArray(content)) return none;
+-  let message = null;
+-  for (const block of content) {
+-    if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
++    if (record?.type !== "assistant" && record?.message?.role !== "assistant") continue;
++    const content = record?.message?.content;
++    if (!Array.isArray(content)) continue;
++    for (const block of content) {
++      if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
++    }
+   }
+   return message === null ? none : { ok: true, message };
+ }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 3dc80179c..78c38e628 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -514,6 +514,33 @@ const cases = [
+     assert.equal(facts.commits, 0);
+     assert.deepEqual(diagEntries(commonDir), []);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
++  // PF-70 root cause (2026-10-30): the child often writes one more assistant record after its SubagentHandback (a closing text
++  // while its own background work drains). The stop must still find the handback, not validate that later text as the contract.
++  { id: "NGHF18b", name: "A handback followed by a later text-only assistant record is still found and completes the dispatch", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const transcript = stopInput(binding, "x").transcript_path;
++    const records = [
++      { type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding) } }] } },
++      { type: "user", message: { role: "user", content: [{ type: "tool_result", content: "handed back" }] } },
++      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Waiting for my background run to finish." }] } },
++    ];
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), records.map((record) => `${JSON.stringify(record)}\n`).join(""));
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, "Waiting for my background run to finish.") }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result)}`);
++    assert.equal(facts.commits, 1);
++    assert.deepEqual(diagEntries(commonDir), []);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF18c", name: "Of two handbacks the later one counts: an earlier checkpoint followed by a success completes the dispatch", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const transcript = stopInput(binding, "x").transcript_path;
++    const handback = (outcome) => ({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome, report: `${outcome} report.` }) } }] } });
++    const records = [handback("checkpoint"), { type: "user", message: { role: "user", content: [{ type: "text", text: "grant" }] } }, handback("succeeded"),
++      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Done." }] } }];
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), records.map((record) => `${JSON.stringify(record)}\n`).join(""));
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result)}`);
++    assert.equal(facts.commits, 1);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
+   { id: "NGHF19", name: "An outcome other than succeeded and checkpoint still writes the stop-failure diagnostic and is not finalized", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+     writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+     const transcript = stopInput(binding, "x").transcript_path;
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index f60a169b2..ce9b839fe 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -515,13 +515,21 @@ test("(ix) SubagentHandback: a last_assistant_message that is prose, not a contr
+   assertCommittedOnceAtStop(fx, "toolu_pf61_prose");
+ });
+ 
+-test("(x) SubagentHandback: an invalid or foreign handback, or any record other than the last handback, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
++// PF-70 (PO decision 2026-10-30, "the last handback counts"): a child that writes more after its handback was refused
++// with NGHR-FINAL-JSON although its work was finished. The later prose is not the contract; the latest handback of the
++// whole transcript is, and the host commit still checks candidate, paths and working tree against it.
++test("(ix-b) SubagentHandback: a handback followed by later assistant prose and a tool result is still host-committed exactly once (PF-70)", () => {
++  const fx = launchedBackground("handback-then-prose", "toolu_pf70_after");
++  fx.stopVariant = withTranscript([userRecord("Do the task."), handbackRecord(finalText(fx)), userRecord("handed back"), proseRecord("Afterwards I said more.")], undefined);
++  assertCommittedOnceAtStop(fx, "toolu_pf70_after");
++});
++
++test("(x) SubagentHandback: an invalid or foreign handback, or a last handback that is not a contract, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
+   const fx = launchedBackground("handback-refused", "toolu_pf61_refused");
+   const id = "toolu_pf61_refused";
+   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { dispatchId: "FOREIGN-DISPATCH" }))], undefined), "foreign dispatchId");
+   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { candidateCommit: "0".repeat(40) }))], undefined), "foreign candidate");
+   assertRefusedAtStop(fx, id, withTranscript([handbackRecord("All done, nothing to see.")], undefined), "prose handback");
+-  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), proseRecord("Afterwards I said more.")], undefined), "an earlier handback followed by a later assistant record");
+   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), handbackRecord("not a contract")], "x"), "only the LAST handback counts");
+   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx), "Task")], undefined), "a valid contract carried by another tool name");
+   assertRefusedAtStop(fx, id, withTranscript([proseRecord("Working."), userRecord(finalText(fx))], undefined), "a valid contract in a user record");
