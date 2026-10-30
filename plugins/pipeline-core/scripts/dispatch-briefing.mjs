@@ -118,7 +118,7 @@ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/publi
 const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
 const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
 const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
-const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+const { inspectNativeGoldfishItemDelivery, observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
 const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
@@ -326,6 +326,18 @@ function defaultQueueRows(root) {
   try {
     const governed = resolveGovernedItemQueue({ root });
     return governed.status === "required" ? governed.normalized.slices : [];
+  } catch { return []; }
+}
+
+/**
+ * D196 (R1): slices of the governed item course that were started and have not finished. The queue stores no started state
+ * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); a started slice is a native pending state without a terminal
+ * record (phase "active"), which is also what a budget checkpoint leaves (the reservation stays live). A fault yields none (warn only).
+ */
+function defaultStartedOwners(root) {
+  try {
+    const observed = inspectNativeGoldfishItemDelivery({ root });
+    return observed.status === "observed" ? observed.items.filter((entry) => entry.phase === "active").map((entry) => ({ dispatchId: entry.dispatchId, itemId: entry.itemId })) : [];
   } catch { return []; }
 }
 
@@ -716,6 +728,14 @@ export function generateDispatchBinding(options, deps = {}) {
     }
   }
 
+  // D196 (R1): warn, never refuse, when another slice of this item is started and unfinished (a running or budget-checkpointed owner).
+  const startedOwners = (() => { try { const found = (deps.startedOwners ?? defaultStartedOwners)(root); return Array.isArray(found) ? found : []; } catch { return []; } })()
+    .filter((entry) => entry && entry.itemId === itemId && entry.dispatchId !== dispatchId && typeof entry.dispatchId === "string")
+    .map((entry) => entry.dispatchId).sort();
+  for (const owner of startedOwners) {
+    warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent with SendMessage. A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });
+  }
+
   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
   // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
   const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
@@ -999,6 +1019,12 @@ export function buildDispatchBriefing(options, deps = {}) {
   const generated = bind(pkg.agentType);
   const budget = skeletonToolBudget(generated.skeleton);
   const decision = budgetDecision(pkg, budget);
+  // D196 (R4): warnings only. An estimate above the base cap with no planned grant, and one far above a single grant step.
+  const estimateWarnings = [];
+  if (Number.isSafeInteger(pkg.estimatedToolCalls) && Number.isSafeInteger(budget) && pkg.estimatedToolCalls > budget) {
+    if (!/grant/iu.test(String(pkg.budgetRationale ?? ""))) estimateWarnings.push({ code: "DBG-ESTIMATE-ABOVE-BASE", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the base cap ${budget} and budgetRationale does not say a grant is planned; repair: name the planned grant in budgetRationale (the word grant), or lower the estimate` });
+    if (pkg.estimatedToolCalls > 2 * (budget + 30)) estimateWarnings.push({ code: "DBG-ESTIMATE-NEEDS-SPLIT", message: `estimatedToolCalls ${pkg.estimatedToolCalls} is more than twice the base cap ${budget} plus one grant step of 30; repair: split the outcome along independent criteria into slices with disjoint scopes` });
+  }
   const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
   if (options.out !== undefined) {
     const target = resolve(root, options.out);
@@ -1019,7 +1045,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 

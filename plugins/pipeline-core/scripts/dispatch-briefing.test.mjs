@@ -1631,3 +1631,85 @@ test("D195 the package route admits check command:<id> to the same admission as 
   assert.equal(refused.ok, false);
   assert.equal(refused.code, "DBG-CHECK-COMMAND-UNKNOWN", refused.message);
 });
+
+// --- D196 (R1, R4): warn about a started unfinished owner of the same item; lint the estimate (warnings only, never a refusal) ---
+
+const startedOwner = (over = {}) => ({ dispatchId: "ALF-T0", itemId: SLICE_ITEM, ...over });
+const warningCodes = (result) => result.warnings.map((entry) => entry.code);
+
+test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINTED-OWNER with the grant-and-resume procedure; the build still succeeds with its dispatchCall", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => [startedOwner()] }));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(result.dispatchCall, "the dispatchCall is still printed");
+  const warning = result.warnings.find((entry) => entry.code === "DBG-CHECKPOINTED-OWNER");
+  assert.ok(warning, JSON.stringify(result.warnings));
+  assert.match(warning.message, /ALF-T0/u);
+  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.30> --reason/u);
+  assert.match(warning.message, /SendMessage/u);
+  assert.match(warning.message, /elephant-restart, owner-lost, context-poisoned or new-vertical-outcome/u);
+  assert.match(warning.message, /slice-queue\.mjs cancel ALF-T0 --started --reason "<why>" --class budget/u);
+  const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { startedOwners: () => [startedOwner()] }));
+  assert.equal(binding.ok, true, JSON.stringify(binding));
+  assert.ok(warningCodes(binding).includes("DBG-CHECKPOINTED-OWNER"), "the binding route warns too");
+});
+
+test("D196 R1: a started slice of another item, the same dispatch id, or no started slice gives no warning", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  for (const owners of [[startedOwner({ itemId: "other.item" })], [startedOwner({ dispatchId: "ALF-T1" })], []]) {
+    const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => owners }));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"), JSON.stringify(owners));
+  }
+});
+
+test("D196 R1: a finished or cancelled slice of the same item gives no warning (queue rows carry no started state)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const rows = [cancelledRow("budget"), cancelledRow("superseded", { id: "ALF-T9" })];
+  const result = runDispatchBriefing(argv, withRows(fx, rows, { startedOwners: () => [] }));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
+});
+
+test("D196 R1: an unreadable started-owner reader never refuses the build", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const result = runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => { throw new Error("unreadable"); } }));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
+});
+
+test("D196 R4: an estimate above the base cap whose rationale does not say a grant is planned warns DBG-ESTIMATE-ABOVE-BASE; grant wording silences it; D193 still refuses a missing rationale", async () => {
+  const { runDispatchBriefing } = await lib();
+  const base = packageFixture();
+  const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
+  const within = packageFixture({ estimatedToolCalls: cap });
+  assert.ok(!warningCodes(runDispatchBriefing(within.argv, depsOf(within.fx))).includes("DBG-ESTIMATE-ABOVE-BASE"));
+  const plain = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "one test-first cycle that needs a few calls more than the base cap" });
+  const plainResult = runDispatchBriefing(plain.argv, depsOf(plain.fx));
+  assert.equal(plainResult.ok, true, JSON.stringify(plainResult));
+  assert.ok(warningCodes(plainResult).includes("DBG-ESTIMATE-ABOVE-BASE"), JSON.stringify(plainResult.warnings));
+  assert.ok(!warningCodes(plainResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"));
+  const planned = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "a budget grant of 20 calls is planned at the checkpoint" });
+  const plannedResult = runDispatchBriefing(planned.argv, depsOf(planned.fx));
+  assert.equal(plannedResult.ok, true, JSON.stringify(plannedResult));
+  assert.ok(!warningCodes(plannedResult).includes("DBG-ESTIMATE-ABOVE-BASE"), JSON.stringify(plannedResult.warnings));
+  const none = packageFixture({ estimatedToolCalls: cap + 1 });
+  assert.equal(runDispatchBriefing(none.argv, depsOf(none.fx)).code, "DBG-PACKAGE-BUDGET-EXCEEDED");
+});
+
+test("D196 R4: an estimate above twice the base cap plus one grant step warns DBG-ESTIMATE-NEEDS-SPLIT without refusing", async () => {
+  const { runDispatchBriefing } = await lib();
+  const base = packageFixture();
+  const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
+  const edge = packageFixture({ estimatedToolCalls: 2 * (cap + 30), budgetRationale: "a grant is planned" });
+  assert.ok(!warningCodes(runDispatchBriefing(edge.argv, depsOf(edge.fx))).includes("DBG-ESTIMATE-NEEDS-SPLIT"), "the edge itself is not above the factor");
+  const far = packageFixture({ estimatedToolCalls: 2 * (cap + 30) + 1, budgetRationale: "a grant is planned" });
+  const farResult = runDispatchBriefing(far.argv, depsOf(far.fx));
+  assert.equal(farResult.ok, true, JSON.stringify(farResult));
+  assert.ok(warningCodes(farResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"), JSON.stringify(farResult.warnings));
+  assert.match(farResult.warnings.find((entry) => entry.code === "DBG-ESTIMATE-NEEDS-SPLIT").message, /independent criteria/u);
+});
