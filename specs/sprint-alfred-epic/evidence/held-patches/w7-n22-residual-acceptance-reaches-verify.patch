@@ -1,0 +1,617 @@
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 3c70c8b1d..23341465a 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -187,7 +187,7 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
+   }
+   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId,
+     candidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree } },
+-  { readConsumedCandidateReceiptFn: () => consumed });
++  { ...deps, readConsumedCandidateReceiptFn: () => consumed });
+   let range;
+   try {
+     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
+@@ -271,7 +271,9 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+   let receipt;
+   try { receipt = JSON.parse(readFileSync(target, "utf8")); } catch { fail("CVL-RECEIPT-UNAVAILABLE", "Private Critic/Verify lifecycle receipt is unavailable."); }
+   const carrying = receipt?.schema === CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA;
+-  const residualRecord = receipt?.schema === CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA;
++  // N22: a carry-forward receipt (v2) over a residual-accepted Critic receipt also carries `residualAcceptance`.
++  const residualRecord = receipt?.schema === CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA
++    || (carrying && receipt?.residualAcceptance !== undefined);
+   const keys = ["schema", "id", "candidate", "critic", "verify", ...(carrying ? ["carryForward"] : []), ...(residualRecord ? ["residualAcceptance"] : [])];
+   if (!exact(receipt, keys) || (![CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA,
+     CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA, CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA].includes(receipt.schema))
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index 1d3c80c2f..d503aa382 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -288,3 +288,94 @@ test("a consumed Critic carries only across exact immutable evidence registratio
+   assert.throws(() => inspectConsumedCriticEvidenceCarryForward({ ...input,
+     targetCandidate: mixed }, deps), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
+ });
++
++// N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
++// reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
++import * as readiness from "./critic-verify-readiness.mjs";
++function privateAcceptance(receipt, findings, over = {}) {
++  const receiptSha = sha256(canonicalJson(consumed(receipt).receipt));
++  const record = { schema: "pipeline.critic-residual-acceptance.v1", mode: "chat-attributed-unattested",
++    forCommit: receipt.candidate.commit, forTree: receipt.candidate.tree,
++    candidate: { commit: receipt.candidate.commit, tree: receipt.candidate.tree },
++    criticReceiptSha256: receiptSha,
++    findings: findings.map(f => ({ id: residualFindingId(f), severity: f.severity })).sort((a, b) => a.id.localeCompare(b.id)),
++    approvedBy: "PO", approvedAt: "2026-10-30T10:00:00.000Z", criticalProof: null, ...over };
++  return { receiptSha, record };
++}
++test("N22 the private acceptance bound to the Critic candidate carries a failed all-minor receipt to a later evidence-only target", t => {
++  const root = fixture(t);
++  const git = (args) => execFileSync("git", ["-C", root, ...args],
++    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  const featureId = "carry-feature";
++  const manifestPath = `specs/${featureId}/lifecycle.json`;
++  const evidencePath = `specs/${featureId}/evidence/review.json`;
++  const manifest = (artifacts) => ({ schema: "pipeline.feature-package.v1",
++    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts });
++  git(["init", "--quiet"]);
++  mkdirSync(join(root, "specs", featureId, "evidence"), { recursive: true });
++  writeFileSync(join(root, "source.txt"), "reviewed source\n");
++  writeFileSync(join(root, manifestPath), `${JSON.stringify(manifest([]))}\n`);
++  git(["add", "."]);
++  git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "reviewed source"]);
++  const reviewed = { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
++  const findings = [finding("a", "minor")];
++  const receipt = critic({ reviewPass: false, findingCount: 1, candidate: { base: oid("f"), ...reviewed },
++    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } });
++  const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", result: "pass" })}\n`;
++  writeFileSync(join(root, evidencePath), evidenceBytes);
++  writeFileSync(join(root, manifestPath), `${JSON.stringify(manifest([{ class: "candidate-evidence", path: evidencePath,
++    sha256: sha256(evidenceBytes), authority: false, mutability: "immutable", retention: "retain" }]))}\n`);
++  git(["add", "."]);
++  git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "register immutable evidence"]);
++  const target = { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
++  const common = join(root, ".git");
++  const input = { repoRoot: root, gitCommonDir: common, featureId, criticPacketId: receipt.packetId, targetCandidate: target };
++  const base = { readConsumedCandidateReceiptFn: () => consumed(receipt), readOpenFindingsFn: () => findings };
++  assert.throws(() => inspectConsumedCriticEvidenceCarryForward(input, base), error => error.code === "CVL-CRITIC-FAILED");
++  const { receiptSha, record } = privateAcceptance(receipt, findings);
++  const written = readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record, consumption: null });
++  assert.equal(written.ok, true);
++  let seenState = null;
++  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: root, criticReceiptSha256: receiptSha,
++    authorizeFn: (arg) => { seenState = arg.state; return { authorized: true, mode: record.mode }; } });
++  assert.notEqual(loaded, null);
++  const carried = inspectConsumedCriticEvidenceCarryForward(input, { ...base, ...loaded });
++  assert.equal(carried.proof.criticReceiptSha256, receiptSha);
++  assert.deepEqual(seenState.residualAcceptance.lastAccepted, record);
++  const recorded = recordCriticVerifyLifecycle({ repoRoot: root, featureId, gitCommonDir: common, criticPacketId: receipt.packetId,
++    candidate: target, evidencePath: "evidence/verify.json", evidence: { ...evidence, candidate: target } }, { ...base, ...loaded });
++  assert.equal(recorded.receipt.residualAcceptance.basis, "po-acceptance-of-residual-minor-findings");
++  assert.equal(recorded.receipt.carryForward.proof.reviewedCandidate.commit, reviewed.commit);
++});
++test("N22 the loader is inert without a private record and writes refuse a replayed proof across records", t => {
++  const common = fixture(t);
++  const failed = critic({ reviewPass: false, findingCount: 1 });
++  const findings = [finding("a", "minor")];
++  const { receiptSha, record } = privateAcceptance(failed, findings);
++  assert.equal(readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha }), null);
++  const consumption = { proofSha256: sha("7"), kind: "accept-residual-critic-findings", consumedAt: "2026-10-30T10:00:00.000Z" };
++  assert.equal(readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record, consumption }).ok, true);
++  const other = privateAcceptance(critic({ reviewPass: false, findingCount: 1, verdictSha256: sha("4") }), findings);
++  const replay = readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: other.receiptSha, record: other.record, consumption });
++  assert.equal(replay.ok, false);
++  assert.equal(replay.code, "CRITICAL-PROOF-REPLAY");
++});
++test("N22 readiness admits a failed all-minor receipt through the private acceptance on a clean tree", t => {
++  const common = fixture(t);
++  const failed = critic({ reviewPass: false, findingCount: 1 });
++  const findings = [finding("a", "minor")];
++  const fullEvidence = { ...evidence, commit: candidate.commit, tree: candidate.tree,
++    verifyRun: { status: "passed", terminalSha256: sha("c") }, steps: [{ name: "configured-verify", exitCode: 0 }] };
++  const { receiptSha, record } = privateAcceptance(failed, findings);
++  const authorizeFn = () => ({ authorized: true, mode: record.mode });
++  readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record, consumption: null });
++  const base = { readConsumedCandidateReceiptFn: () => consumed(failed), readOpenFindingsFn: () => findings };
++  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha, authorizeFn });
++  recordCriticVerifyLifecycle({ gitCommonDir: common, criticPacketId: failed.packetId, candidate,
++    evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, { ...base, ...loaded });
++  const readLifecycle = (options, residualDeps) => readCriticVerifyLifecycle(options, { ...base, ...(residualDeps ?? {}) });
++  const admitted = inspectCriticBoundVerify({ repoRoot: common, gitCommonDir: common, head: candidate.commit, tree: candidate.tree,
++    worktreeState: "clean", evidencePath: "evidence/verify-latest.json", evidence: fullEvidence, readLifecycle, residualAuthorizeFn: authorizeFn });
++  assert.equal(admitted.code, "critic-bound-verify-valid");
++  assert.equal(admitted.privateLifecycleBound, true);
++});
+diff --git a/plugins/pipeline-core/lib/critic-verify-readiness.mjs b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+index 2d5694b60..888ceea40 100644
+--- a/plugins/pipeline-core/lib/critic-verify-readiness.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+@@ -1,36 +1,112 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Read-only final-candidate check: diagnostic Verify never asserts a Critic. */
+-import { lstatSync, readdirSync, readFileSync } from "node:fs";
+-import { join } from "node:path";
++import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
++import { join, resolve } from "node:path";
+ import { readCriticVerifyLifecycle } from "./critic-verify-lifecycle.mjs";
+ import { authorizeRecordedResidualAcceptanceByMode } from "./critical-action-authorization.mjs";
++import { canonicalJson, readConsumedCandidateReceipt, sha256 } from "../scripts/critic-packet-preflight.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const RECEIPT = /^[a-f0-9]{64}\.json$/u;
++const SHA = /^[a-f0-9]{64}$/u;
++const PACKET = /^[a-f0-9]{32}$/u;
+ 
+-// D190: a recorded PO acceptance of residual minor findings, read from the project state file. Inert
+-// (null) when no record is bound to this candidate, so the passing-receipt path is unchanged; the
+-// verifier re-checks the record in the configured approval mode (signature proof or chat waiver).
+-function residualAcceptanceDeps(repoRoot, candidate) {
+-  if (typeof repoRoot !== "string" || repoRoot.length === 0) return null;
++export const RESIDUAL_ACCEPTANCE_PRIVATE_SCHEMA = "pipeline.critic-residual-acceptance-record.v1";
++
++// N22: a PO acceptance of residual minor findings is a PRIVATE record, bound to the consumed Critic receipt's
++// own candidate and kept under the git common directory next to the Critic packets. The tracked project state
++// file is never written, so the checkout stays clean and the acceptance survives an evidence-only commit.
++export function residualAcceptanceRecordPath(gitCommonDir, criticReceiptSha256) {
++  if (typeof gitCommonDir !== "string" || gitCommonDir.length === 0 || !SHA.test(criticReceiptSha256 ?? "")) {
++    throw new Error("RESIDUAL-RECORD-INPUT");
++  }
++  return join(resolve(gitCommonDir), "agent-pipeline", "critic-residual-acceptance", `${criticReceiptSha256}.json`);
++}
++
++/**
++ * Persist the acceptance record together with its proof consumption entry (null in chat mode), atomically,
++ * file mode 0600 inside a 0700 directory. A proof already consumed by ANY private record is refused.
++ */
++export function writeResidualAcceptanceRecord({ gitCommonDir, criticReceiptSha256, record, consumption = null } = {}) {
++  let tmp = null;
+   try {
+-    const state = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline-state.json"), "utf8"));
+-    const record = state?.residualAcceptance?.lastAccepted;
+-    if (record === null || typeof record !== "object" || record.forCommit !== candidate.commit
+-      || record.forTree !== candidate.tree) return null;
++    const target = residualAcceptanceRecordPath(gitCommonDir, criticReceiptSha256);
++    if (record === null || typeof record !== "object" || record.criticReceiptSha256 !== criticReceiptSha256) {
++      return { ok: false, code: "RESIDUAL-RECORD-INPUT" };
++    }
++    const directory = join(target, "..");
++    mkdirSync(directory, { recursive: true, mode: 0o700 });
++    if (consumption !== null && consumption !== undefined) {
++      if (typeof consumption.proofSha256 !== "string") return { ok: false, code: "CRITICAL-PROOF-CONSUMPTION-INVALID" };
++      for (const name of readdirSync(directory).filter((entry) => RECEIPT.test(entry))) {
++        let existing;
++        try { existing = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
++        if (existing?.consumption?.proofSha256 === consumption.proofSha256) return { ok: false, code: "CRITICAL-PROOF-REPLAY" };
++      }
++    }
++    const bytes = Buffer.from(`${canonicalJson({ schema: RESIDUAL_ACCEPTANCE_PRIVATE_SCHEMA, record, consumption: consumption ?? null })}\n`, "utf8");
++    tmp = join(directory, `.${criticReceiptSha256}.${process.pid}.tmp`);
++    const fd = openSync(tmp, "wx", 0o600);
++    try { writeSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
++    renameSync(tmp, target);
++    tmp = null;
++    return { ok: true, path: target };
++  } catch {
++    return { ok: false, code: "RESIDUAL-RECORD-WRITE" };
++  } finally {
++    if (tmp !== null) { try { unlinkSync(tmp); } catch { /* nothing to remove */ } }
++  }
++}
++
++/**
++ * The one loader: the lifecycle deps `{ residualAcceptance, verifyResidualAcceptanceFn }` for a Critic receipt
++ * digest, or null when no private record exists (the passing-receipt path is then unchanged). The verifier
++ * re-checks the record in the configured approval mode through a state-shaped object, so the authorizers in
++ * critical-action-authorization.mjs stay as they are.
++ */
++export function loadResidualAcceptanceDeps({ gitCommonDir, projectDir = null, criticReceiptSha256,
++  authorizeFn = authorizeRecordedResidualAcceptanceByMode, now = () => new Date().toISOString() } = {}) {
++  try {
++    const stored = JSON.parse(readFileSync(residualAcceptanceRecordPath(gitCommonDir, criticReceiptSha256), "utf8"));
++    const record = stored?.record;
++    if (stored?.schema !== RESIDUAL_ACCEPTANCE_PRIVATE_SCHEMA || record === null || typeof record !== "object"
++      || record.criticReceiptSha256 !== criticReceiptSha256 || !OID.test(record.forCommit ?? "") || !OID.test(record.forTree ?? "")
++      || !Array.isArray(record.findings)) return null;
++    let projectState = {};
++    if (typeof projectDir === "string" && projectDir.length > 0) {
++      try { projectState = JSON.parse(readFileSync(join(projectDir, "project", "pipeline-state.json"), "utf8")); } catch { projectState = {}; }
++    }
++    const state = { ...projectState, residualAcceptance: { lastAccepted: record },
++      criticalProofConsumption: stored.consumption === null || stored.consumption === undefined ? [] : [stored.consumption] };
+     return {
+       residualAcceptance: { candidate: { commit: record.forCommit, tree: record.forTree },
+         criticReceiptSha256: record.criticReceiptSha256, findings: record.findings },
+-      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256, findings }) =>
+-        authorizeRecordedResidualAcceptanceByMode({ projectDir: repoRoot, state, candidate: bound,
+-          criticReceiptSha256, findings, now: new Date().toISOString() }),
++      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256: bondSha, findings }) =>
++        authorizeFn({ projectDir, state, candidate: bound, criticReceiptSha256: bondSha, findings, now: now() }),
+     };
+   } catch { return null; }
+ }
+ 
++/** The same loader keyed by consumed Critic packet id (the digest is that of the packet's consumed receipt). */
++export function loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir = null, criticPacketId,
++  readConsumedCandidateReceiptFn = readConsumedCandidateReceipt, authorizeFn, now } = {}) {
++  try {
++    if (typeof gitCommonDir !== "string" || !PACKET.test(criticPacketId ?? "")) return null;
++    const { receipt } = readConsumedCandidateReceiptFn({
++      controlRoot: join(resolve(gitCommonDir), "agent-pipeline", "critic-packets"), packetId: criticPacketId });
++    return loadResidualAcceptanceDeps({ gitCommonDir, projectDir, criticReceiptSha256: sha256(canonicalJson(receipt)),
++      ...(authorizeFn === undefined ? {} : { authorizeFn }), ...(now === undefined ? {} : { now }) });
++  } catch { return null; }
++}
++
++function lifecycleReceiptDigest(directory, id) {
++  try { return JSON.parse(readFileSync(join(directory, `${id}.json`), "utf8"))?.critic?.receiptSha256 ?? null; }
++  catch { return null; }
++}
++
+ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, tree, worktreeState,
+   evidencePath = "evidence/verify-latest.json", evidence, requireClean = true,
+-  readLifecycle = readCriticVerifyLifecycle } = {}) {
++  readLifecycle = readCriticVerifyLifecycle, residualAuthorizeFn } = {}) {
+   const base = { headEvidenceOk: false, currentCheckoutOk: false,
+     privateLifecycleBound: false, receiptId: null };
+   const candidate = { commit: head, tree };
+@@ -61,9 +137,12 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head,
+   } catch {
+     return { ...exact, code: "private-critic-binding-unavailable" };
+   }
+-  const residualDeps = residualAcceptanceDeps(repoRoot, candidate);
+   for (const id of ids) {
+     try {
++      // N22: the acceptance is read from the private record of THIS lifecycle receipt's Critic receipt.
++      const digest = lifecycleReceiptDigest(directory, id);
++      const residualDeps = digest === null ? null : loadResidualAcceptanceDeps({ gitCommonDir, projectDir: repoRoot,
++        criticReceiptSha256: digest, ...(residualAuthorizeFn === undefined ? {} : { authorizeFn: residualAuthorizeFn }) });
+       if (residualDeps === null) readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
+       else readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
+       return { ...exact, currentCheckoutOk: true, privateLifecycleBound: true,
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 0e106ae86..b7857513e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -534,6 +534,7 @@ import {
+ } from "./publication-close-journal.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+ import { readCriticVerifyLifecycle, residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
++import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
+ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -9312,12 +9313,6 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     console.error("Error: approve-residual-acceptance refused (CRITICAL-PROOF-FLAGS-PROOF-REQUIRED).");
+     return 2;
+   }
+-  const observed = gitCandidate(dir);
+-  if (!observed.ok) {
+-    console.error("Error: approve-residual-acceptance refused; the current candidate commit/tree could not be determined.");
+-    return 2;
+-  }
+-  const candidate = { commit: observed.commit, tree: observed.tree };
+   const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+   if (!common?.ok || typeof common.path !== "string") {
+     console.error("Error: approve-residual-acceptance refused (git common directory unavailable).");
+@@ -9339,6 +9334,12 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
+     return 2;
+   }
++  // N22: the acceptance is bound to the candidate the Critic reviewed, never to the checkout's current HEAD.
++  const candidate = { commit: receipt.candidate?.commit, tree: receipt.candidate?.tree };
++  if (typeof candidate.commit !== "string" || typeof candidate.tree !== "string") {
++    console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
++    return 2;
++  }
+   const { criticReceiptSha256, findings } = residualAcceptanceSubject({
+     receipt, findings: rawFindings,
+   });
+@@ -9408,18 +9409,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+   } else if (verified.waived !== undefined) {
+     record.criticalProofWaiver = verified.waived;
+   }
+-  const next = {
+-    ...base,
+-    schema: SCHEMA_ID,
+-    residualAcceptance: { lastAccepted: record },
+-    criticalProofConsumption: verified.proof === null
+-      ? consumed
+-      : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: approvedAt }],
+-    updatedAt: approvedAt,
+-  };
+-  const writeResult = writeState(dir, next, base);
+-  if (!stateWriteSucceeded(writeResult)) {
+-    console.error(`Error: approve-residual-acceptance refused (${writeResult.code}).`);
++  // N22: private record (record plus its proof consumption entry) under the git common directory; the
++  // tracked project state file is not written, so the checkout stays clean. A proof already consumed by any
++  // private record is refused there.
++  const stored = writeResidualAcceptanceRecord({
++    gitCommonDir: common.path, criticReceiptSha256, record,
++    consumption: verified.proof === null ? null : { proofSha256: verified.proof.proofSha256, kind, consumedAt: approvedAt },
++  });
++  if (!stored.ok) {
++    console.error(`Error: approve-residual-acceptance refused (${stored.code}).`);
+     return 2;
+   }
+   console.log(`Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 120343f96..3c76f227b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3341,19 +3341,23 @@ function c11Findings(list) {
+   return list.map((f) => ({ id: c11FindingId(f), severity: f.severity })).sort((a, b) => a.id.localeCompare(b.id));
+ }
+ 
++// N22: the acceptance lives in a private record under the git common directory (never in the tracked state
++// file); the shared loader turns it into the lifecycle deps.
++import * as c11Readiness from "../lib/critic-verify-readiness.mjs";
++function c11PrivatePath(fx) {
++  return join(fx.common, "agent-pipeline", "critic-residual-acceptance", `${fx.made.receiptSha256}.json`);
++}
++function c11Private(fx) {
++  return JSON.parse(readFileSync(c11PrivatePath(fx), "utf8"));
++}
+ function c11Lifecycle(fx, cand, findings) {
+-  const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+-  const accepted = state.residualAcceptance?.lastAccepted;
+-  const acceptance = accepted === undefined ? undefined : {
+-    schema: "pipeline.critic-residual-acceptance.v1", mode: accepted.criticalProofWaiver?.mode,
+-    candidate: accepted.candidate, criticReceiptSha256: accepted.criticReceiptSha256, findings: accepted.findings,
+-  };
++  const loaded = c11Readiness.loadResidualAcceptanceDeps({ gitCommonDir: fx.common, projectDir: fx.root,
++    criticReceiptSha256: fx.made.receiptSha256, authorizeFn: (input) => c11Authorize(input) });
+   const evidence = { schema: "pipeline.verify-evidence.v0", exitCode: 0, candidate: { ...cand }, verifyRun: { terminalSha256: "c".repeat(64) } };
+   return c11Record({ gitCommonDir: fx.common, criticPacketId: fx.made.receipt.packetId, candidate: cand, evidencePath: "evidence/verify.json", evidence }, {
+     readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt: fx.made.receipt }),
+     readOpenFindingsFn: () => findings,
+-    residualAcceptance: acceptance,
+-    verifyResidualAcceptanceFn: (input) => c11Authorize({ projectDir: fx.root, state, candidate: input.candidate ?? cand, criticReceiptSha256: input.criticReceiptSha256 ?? fx.made.receiptSha256, findings: input.findings ?? acceptance?.findings }),
++    ...(loaded ?? {}),
+   });
+ }
+ 
+@@ -3382,14 +3386,16 @@ c11Case("C11-a chat mode records an attended residual acceptance and the lifecyc
+     const made = c11Receipt(cand, c11Minor);
+     fx.made = made;
+     fx.deps.gitHead = () => ({ ok: true, commit: head });
+-    fx.deps.gitCandidate = () => ({ ok: true, ...cand });
++    // N22: the checkout has moved on (an evidence commit) since the Critic reviewed `cand`.
++    fx.deps.gitCandidate = () => ({ ok: true, commit: "8".repeat(40), tree: "7".repeat(40) });
+     fx.deps.readConsumedCandidateReceiptFn = () => ({ packet: made.packet, receipt: made.receipt });
+     const code = "ACCEPT-" + made.receiptSha256.slice(0, 8).toUpperCase();
+     const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => code };
++    const stateBefore = readFileSync(fx.statePathFile);
+     const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", made.receipt.packetId], deps));
+     assert.equal(outcome.result, 0, outcome.lines.join(" "));
+-    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+-    const accepted = state.residualAcceptance.lastAccepted;
++    assert.ok(stateBefore.equals(readFileSync(fx.statePathFile)), "the tracked state file must not be written");
++    const accepted = c11Private(fx).record;
+     assert.equal(accepted.forCommit, head);
+     assert.equal(accepted.forTree, cand.tree);
+     assert.deepEqual(accepted.candidate, cand);
+@@ -3408,12 +3414,15 @@ c11Case("C11-b signature mode records the acceptance and consumes the proof once
+     const flags = c11SignatureFiles(fx, c11Minor);
+     const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags], fx.deps));
+     assert.equal(outcome.result, 0, outcome.lines.join(" "));
+-    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+-    const accepted = state.residualAcceptance.lastAccepted;
++    const stored = c11Private(fx);
++    const accepted = stored.record;
+     assert.equal(accepted.criticReceiptSha256, fx.made.receiptSha256);
+     assert.deepEqual(accepted.findings, c11Findings(c11Minor));
+-    const consumed = (state.criticalProofConsumption ?? []).filter((entry) => entry.kind === C11_KIND);
+-    assert.equal(consumed.length, 1, "exactly one ledger entry of the kind");
++    assert.equal(stored.consumption.kind, C11_KIND, "the proof consumption entry travels with the private record");
++    assert.equal(stored.consumption.proofSha256, accepted.criticalProof.proofSha256);
++    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
++    assert.equal(state.residualAcceptance, undefined, "the tracked state file carries no acceptance");
++    assert.equal((state.criticalProofConsumption ?? []).length, 0, "the tracked state file carries no consumption");
+   } finally { fx.cleanup(); }
+ });
+ 
+@@ -3454,10 +3463,20 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
+     const argv = ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags];
+     assert.equal(capturedStderr(() => run(argv, fx.deps)).result, 0);
+     const before = readFileSync(fx.statePathFile);
++    const privateBefore = readFileSync(c11PrivatePath(fx));
+     const second = capturedStderr(() => run(argv, fx.deps));
+     assert.notEqual(second.result, 0);
+     assert.ok(second.lines.some((line) => line.includes("CRITICAL-PROOF-REPLAY")), second.lines.join(" "));
+     assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical after the replay");
++    assert.ok(privateBefore.equals(readFileSync(c11PrivatePath(fx))), "the private record must be identical after the replay");
++    // The replay is refused across private records: the same proof, offered for another receipt's record, is refused as well.
++    const stored = c11Private(fx);
++    const otherDir = join(fx.common, "agent-pipeline", "critic-residual-acceptance");
++    const replay = c11Readiness.writeResidualAcceptanceRecord({ gitCommonDir: fx.common, criticReceiptSha256: "9".repeat(64),
++      record: { ...stored.record, criticReceiptSha256: "9".repeat(64) }, consumption: stored.consumption });
++    assert.equal(replay.ok, false);
++    assert.equal(replay.code, "CRITICAL-PROOF-REPLAY");
++    assert.ok(!existsSync(join(otherDir, "9".repeat(64) + ".json")));
+   } finally { fx.cleanup(); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 4c457df8f..b5ca6af78 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -1864,13 +1864,19 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
+   if (findings.length === 0 || findings.some((finding) => finding?.severity !== "minor")) {
+     fail("critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker or major finding never");
+   }
++  // N22: the subject (and the request) bind the candidate the Critic reviewed, exactly as the writer does,
++  // never the checkout's current HEAD; the clean-tree observation stays the caller's precondition.
++  const reviewed = { commit: receipt.candidate?.commit, tree: receipt.candidate?.tree };
++  if (typeof reviewed.commit !== "string" || typeof reviewed.tree !== "string") {
++    fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
++  }
+   const subject = residualAcceptanceSubject({ receipt, findings });
+-  const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate, subject });
++  const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate: reviewed, subject });
+   if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
+     fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
+   }
+   args.subjectSha256 = computed;
+-  return subject;
++  return { subject, candidate: reviewed };
+ }
+ 
+ function residualAcceptanceConfirmationLines(kind, subject) {
+@@ -1894,10 +1900,15 @@ function residualAcceptanceConfirmationLines(kind, subject) {
+  * `authorize-critical` does -- has it, without re-reading or re-parsing the file.
+  */
+ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, dependencies }) {
+-  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+-  const subjectPreimage = args.kind === RESIDUAL_ACCEPTANCE_KIND
+-    ? resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies })
+-    : resolveSubjectPreimage({ args, repository, candidate });
++  let candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
++  let subjectPreimage;
++  if (args.kind === RESIDUAL_ACCEPTANCE_KIND) {
++    const resolved = resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies });
++    subjectPreimage = resolved.subject;
++    candidate = resolved.candidate;
++  } else {
++    subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
++  }
+   if (args.kind === "interruption-promotion" && subjectPreimage === null) {
+     fail("critical approval request is invalid: interruption-promotion requires the current baseline through --subject");
+   }
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index ea5179174..bf6c8fef1 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -6123,7 +6123,7 @@ import { residualFindingId as residualRouteFindingId } from "../lib/critic-verif
+ 
+ const RESIDUAL_ROUTE_KIND = "accept-residual-critic-findings";
+ const RESIDUAL_ROUTE_PACKET = "c".repeat(32);
+-const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET });
++const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET, candidate: Object.freeze({ ...CANDIDATE }) });
+ const RESIDUAL_ROUTE_MINOR = Object.freeze([
+   { severity: "minor", title: "wording of the refusal text", location: "plugins/pipeline-core/lib/example.mjs:10" },
+   { severity: "minor", title: "unused import", location: "plugins/pipeline-core/lib/example.mjs:2" },
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 6868c81fa..aacbcf4a7 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -75,6 +75,7 @@ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
++import { loadResidualAcceptanceDepsForPacket } from "../lib/critic-verify-readiness.mjs";
+ import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt,
+   readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+ import { ensureVerifyRunRecordsDirectory, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName, verifyWindowsRegisterCommon } from "./verify-journal.mjs";
+@@ -215,13 +216,15 @@ function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandida
+     fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a consumed Critic packet ID.");
+   }
+   const gitCommonDir = resolve(root, git(root, ["rev-parse", "--git-common-dir"]));
++  // N22: a PO residual acceptance (private record bound to the Critic receipt) is offered to the Critic readers.
++  const residualDeps = loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: root, criticPacketId }) ?? {};
+   if (criticPacketId !== null) {
+     try {
+       if (criticEvidenceFeatureId === null) {
+-        readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate });
++        readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate }, residualDeps);
+       } else {
+         inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir,
+-          featureId: criticEvidenceFeatureId, criticPacketId, targetCandidate: sourceCandidate });
++          featureId: criticEvidenceFeatureId, criticPacketId, targetCandidate: sourceCandidate }, residualDeps);
+       }
+     }
+     catch (error) { fail(`VEP-${error?.code ?? "CRITIC-INVALID"}`, error?.message ?? "Governed Verify Critic admission failed."); }
+@@ -244,7 +247,9 @@ function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandida
+   try {
+     const bound = readBoundConsumedCriticReceipt({ gitCommonDir,
+       criticPacketId: metadata.receipt.critic.packetId,
+-      candidate: metadata.receipt.carryForward?.proof.reviewedCandidate ?? sourceCandidate });
++      candidate: metadata.receipt.carryForward?.proof.reviewedCandidate ?? sourceCandidate },
++    loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: root,
++      criticPacketId: metadata.receipt.critic.packetId }) ?? {});
+     if (bound.criticReceiptSha256 !== metadata.receipt.critic.receiptSha256
+       || bound.critic.packetDigest !== metadata.receipt.critic.packetDigest
+       || bound.critic.verdictSha256 !== metadata.receipt.critic.verdictSha256
+@@ -591,7 +596,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+         candidate: evidence.candidate,
+         evidencePath: relative(root, target).replaceAll("\\", "/"),
+         evidence,
+-      });
++      }, loadResidualAcceptanceDepsForPacket({ gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
++        projectDir: root, criticPacketId: lifecyclePacketId }) ?? {});
+     } catch (error) {
+       fail(error?.code ?? "VEP-CRITIC-LIFECYCLE", error?.message ?? "Critic/Verify lifecycle receipt could not be persisted.");
+     }
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index e1f256e2c..06913eb40 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -19,7 +19,10 @@ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+-import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
++import { canonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
++import { residualFindingId } from "../lib/critic-verify-lifecycle.mjs";
++import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
++import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+@@ -404,6 +407,58 @@ test("Critic-bound candidate Verify checks the packet before replacing evidence
+   });
+ });
+ 
++// N22 end-to-end: a PO acceptance of a failed all-minor Critic receipt, stored privately and bound to the
++// Critic's own candidate, lets Critic-bound candidate Verify pass after an evidence-only commit.
++test("N22 candidate Verify admits a failed all-minor Critic receipt through the private acceptance after an evidence-only commit", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    const kind = "accept-residual-critic-findings";
++    const commit = (message) => git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
++    writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
++    git(root, ["add", "pipeline.user.yaml"]);
++    commit("chat approval mode");
++    const featureId = "carry-feature";
++    const minor = { gap: "wording of the refusal", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" };
++    const reviewed = await completedCriticPacket(root, { featureId, verdict: { findings: [minor], deliberately_not_flagged: ["fixture"],
++      trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: false } });
++    const evidencePath = `specs/${featureId}/evidence/review.json`;
++    const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", verdict: "pass" })}\n`;
++    writeFileSync(join(root, evidencePath), evidenceBytes);
++    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
++      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
++      state: "approved", artifacts: [{ class: "candidate-evidence", path: evidencePath,
++        sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
++        authority: false, mutability: "immutable", retention: "retain" }],
++    })}\n`);
++    git(root, ["add", `specs/${featureId}`]);
++    commit("register review evidence");
++    const options = { rootDir: root, mode: "candidate", criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId };
++    await assert.rejects(() => produceVerifyEvidence(options), error => error.code === "VEP-CVL-CRITIC-FAILED");
++    const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
++    const receipt = readConsumedCandidateReceipt({ controlRoot, packetId: reviewed.packetId }).receipt;
++    const open = readConsumedCandidateResult({ controlRoot, packetId: reviewed.packetId }).result.verdict.findings;
++    const receiptSha = sha256(canonicalJson(receipt));
++    const waiver = criticalProofWaiverFor(root, kind);
++    assert.equal(waiver.waived, true);
++    const record = { schema: "pipeline.critic-residual-acceptance.v1", mode: "chat-attributed-unattested",
++      forCommit: receipt.candidate.commit, forTree: receipt.candidate.tree,
++      candidate: { commit: receipt.candidate.commit, tree: receipt.candidate.tree }, criticReceiptSha256: receiptSha,
++      findings: open.map((finding) => ({ id: residualFindingId(finding), severity: finding.severity }))
++        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
++      approvedBy: "PO", approvedAt: "2026-10-30T10:00:00.000Z", criticalProof: null,
++      criticalProofWaiver: { ...waiver.waiver, kind, mode: "chat-attributed-unattested" },
++      humanApproval: { kind, mode: "chat-attributed-unattested" } };
++    assert.equal(writeResidualAcceptanceRecord({ gitCommonDir: join(root, ".git"), criticReceiptSha256: receiptSha, record, consumption: null }).ok, true);
++    const result = await produceVerifyEvidence(options);
++    assert.equal(result.status, "passed");
++    assert.equal(result.criticLifecycle.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
++    const ready = checkCurrentCriticBoundVerify(root);
++    assert.equal(ready.ok, true, JSON.stringify({ code: ready.code }));
++    assert.equal(ready.receiptId, result.criticLifecycle.receipt.id);
++    assert.equal(result.criticLifecycle.receipt.residualAcceptance.basis, "po-acceptance-of-residual-minor-findings");
++    assert.equal(result.criticLifecycle.receipt.carryForward.proof.reviewedCandidate.commit, reviewed.candidate);
++  });
++});
++
+ test("release reverify refuses changed candidates and tampered prior evidence", async () => {
+   await withFixture('node -e "process.exit(0)"', async (root) => {
+     const critic = await completedCriticPacket(root);
