@@ -13,7 +13,7 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **260 items:256 at75,3 at50,1 at25;4 below75;index74.5%** (`45d21da84` 10-30; was PF-95/PF-94, 2026-10-28
+contains **261 items:258 at75,2 at50,1 at25;3 below75;index74.6%** (`ed0e19839` 10-30; was PF-95/PF-94, 2026-10-28
 night: Glossover dead end (old batch, earlier course key) and Toolbox D69; bundle v3 (`35fb9c3a6`), v5
 (`fa30ba28a`: docs of the four verbs, export field `next`) and patch c22 (`6d0946341`: the takeover also moves
 the delivery-target origins entries, else `admit` ended in `CGB-CONFLICT`) installed in the stamp `20c50d267`
