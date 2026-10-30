@@ -1,0 +1,382 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index b2b335ef9..ae4e8e394 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -143,7 +143,7 @@ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs"
+ import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
+ import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
+ import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
+-import { inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
++import { formatArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+@@ -2263,9 +2263,8 @@ const architectureCurrency = inspectArchitecturePushCurrency({ projectDir: evide
+ if (!architectureCurrency.ok || architectureCurrency.stale) {
+   emit(2, [
+     "BLOCKED (guard-push architecture map): final candidate needs a current architecture map.",
+-    architectureCurrency.ok
+-      ? `${architectureCurrency.staleContracts.length} declared public contract(s) changed after their concept map.`
+-      : `Reason: ${architectureCurrency.reason}.`,
++    // The same text push-init and the Critic dispatch preflight print: each stale contract, its concept map, the sanctioned step.
++    ...formatArchitectureCurrencyRefusal(architectureCurrency),
+   ]);
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/architecture-push-currency.mjs b/plugins/pipeline-core/lib/architecture-push-currency.mjs
+index 7d0756c46..b621f41d8 100644
+--- a/plugins/pipeline-core/lib/architecture-push-currency.mjs
++++ b/plugins/pipeline-core/lib/architecture-push-currency.mjs
+@@ -15,6 +15,40 @@ function latest(rootDir, commit, file, run) {
+   return git(rootDir, ["log", "-1", "--format=%H", commit, "--", file], run);
+ }
+ 
++/**
++ * The one sanctioned step for a stale map (D208). There is no relief: a comment-only contract change and a
++ * map-only commit are exactly as stale as any other change, so the only way out is a covering map commit.
++ */
++export function architectureMapSanctionedStep(staleContracts = []) {
++  const targets = [...new Set(staleContracts.map((entry) => entry?.target).filter((target) => typeof target === "string"))];
++  const where = targets.length > 0 ? targets.join(", ") : "architecture/map/<concept>.md";
++  return `update the concept map in ${where} so it covers the contract change, commit it, then rebuild the candidate before Critic/Verify`
++    + " (a stale map stays stale whatever the change was: comment-only changes are not exempt)";
++}
++
++/**
++ * The one refusal text every caller shares (guard-push, push-init, the Critic dispatch preflight), so no caller
++ * can name only a count again. `lines` is the complete text; `reason` / `remedy` / `staleContracts` are the same
++ * content in the pieces a caller needs separately.
++ */
++export function describeArchitectureCurrencyRefusal(currency) {
++  if (!currency?.ok) {
++    const reason = `Reason: ${currency?.reason ?? "the architecture map currency could not be determined"}.`;
++    return { reason, remedy: null, staleContracts: [], lines: [reason] };
++  }
++  const staleContracts = (currency.staleContracts ?? []).map(({ contract, target, module }) => ({ contract, target, module }));
++  const reason = [
++    `${staleContracts.length} declared public contract(s) changed after their concept map:`,
++    ...staleContracts.map(({ contract, target }) => `  - ${contract} (concept map: ${target})`),
++  ].join("\n");
++  const remedy = `Sanctioned step: ${architectureMapSanctionedStep(staleContracts)}.`;
++  return { reason, remedy, staleContracts, lines: [...reason.split("\n"), remedy] };
++}
++
++export function formatArchitectureCurrencyRefusal(currency) {
++  return describeArchitectureCurrencyRefusal(currency).lines;
++}
++
+ export function inspectArchitecturePushCurrency({ projectDir, commit, checkpoint = false, deps = {} } = {}) {
+   const run = deps.run ?? spawnSync;
+   if (!projectDir || !OID.test(commit ?? "")) return { ok: false, reason: "candidate commit is invalid" };
+diff --git a/plugins/pipeline-core/lib/architecture-push-currency.test.mjs b/plugins/pipeline-core/lib/architecture-push-currency.test.mjs
+index 82a20ca9a..49023c5a7 100644
+--- a/plugins/pipeline-core/lib/architecture-push-currency.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-push-currency.test.mjs
+@@ -6,6 +6,9 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { test } from "node:test";
+ import { inspectArchitecturePushCurrency } from "./architecture-push-currency.mjs";
++import * as currencyModule from "./architecture-push-currency.mjs";
++import { drivePushInit } from "../scripts/push-init.mjs";
++import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
+ 
+ function fixture() {
+   const dir = mkdtempSync(join(tmpdir(), "architecture-push-currency-"));
+@@ -110,3 +113,93 @@ test("partial map fails closed while wildcard and append-only data do not stale
+     assert.equal(inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() }).stale, false);
+   } finally { rmSync(f.dir, { recursive: true, force: true }); }
+ });
++
++// N25 / D208: one shared formatter names each stale contract, its concept map and the sanctioned step for every caller.
++function staleFixture() {
++  const f = fixture();
++  mkdirSync(join(f.dir, "architecture", "map"), { recursive: true });
++  writeFileSync(join(f.dir, "architecture", "map", "index.md"), "# Map\n");
++  writeFileSync(join(f.dir, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
++  // What a Critic dispatch preflight reads from the candidate before the map check: manifest, governance, Spec.
++  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs"]) mkdirSync(join(f.dir, dir), { recursive: true });
++  writeFileSync(join(f.dir, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  writeFileSync(join(f.dir, "governance", "guidelines", "review.md"), "Review changed code.\n");
++  writeFileSync(join(f.dir, "governance", "policies", "checklist.md"), "- verify\n");
++  writeFileSync(join(f.dir, "specs", "spec.md"), "# Spec\n");
++  f.git("add", "."); f.git("commit", "-q", "-m", "adopt map");
++  // A comment-only change to the declared contract: D208 grants no relief, so the map is stale.
++  writeFileSync(join(f.dir, "src", "contract.mjs"), "// reworded comment only\nexport const value = 1;\n");
++  f.git("add", "."); f.git("commit", "-q", "-m", "comment-only contract change");
++  return f;
++}
++function refreshMap(f) {
++  writeFileSync(join(f.dir, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core, covers the comment change\n");
++  f.git("add", "."); f.git("commit", "-q", "-m", "refresh map");
++}
++
++test("the shared refusal formatter names every stale contract, its concept map and the sanctioned step", () => {
++  const f = staleFixture();
++  try {
++    assert.equal(typeof currencyModule.formatArchitectureCurrencyRefusal, "function", "the one shared formatter is exported next to the check");
++    const currency = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
++    assert.equal(currency.stale, true, "a comment-only contract change stays stale (no relief)");
++    const lines = currencyModule.formatArchitectureCurrencyRefusal(currency);
++    const text = lines.join("\n");
++    assert.match(text, /1 declared public contract\(s\) changed after their concept map/u);
++    assert.ok(lines.some((line) => line.includes("src/contract.mjs") && line.includes("architecture/map/core.md")), text);
++    assert.match(text, /update the concept map in architecture\/map\/core\.md/u);
++    assert.match(text, /commit it/u);
++    assert.match(text, /rebuild the candidate before Critic\/Verify/u);
++    const invalid = currencyModule.formatArchitectureCurrencyRefusal({ ok: false, reason: "candidate architecture map index is missing" });
++    assert.deepEqual(invalid, ["Reason: candidate architecture map index is missing."]);
++  } finally { rmSync(f.dir, { recursive: true, force: true }); }
++});
++
++test("ANCHOR (D208): a comment-only contract change after the map commit is red in push-init and in the Critic dispatch preflight, both naming contract and concept map, and both go green after a map commit", () => {
++  const f = staleFixture();
++  try {
++    const greenGate = () => ({ ok: true, report: { satisfiable: true, checks: [] } });
++    const greenPrepare = () => ({ ok: true, report: { ready: true, humanApproval: "chat", checks: [] }, lines: { authorize: [], approvePush: ["approve"], gitPush: "push" } });
++    const init = () => drivePushInit({ rootDir: f.dir, by: "tester", remote: "origin", destination: "refs/heads/main", assessPushGateSatisfiability: greenGate, pushPrepareReport: greenPrepare });
++    const preflight = (commit) => {
++      try {
++        preflightCriticDispatch({ root: f.dir, base: f.git("rev-list", "--max-parents=0", "HEAD"), candidate: commit, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"] });
++        return null;
++      } catch (error) { return error; }
++    };
++    const red = init();
++    assert.equal(red.outcome, "precondition-unmet", JSON.stringify(red));
++    const check = red.checks.find((entry) => entry.id === "architecture-map-currency");
++    assert.ok(check, JSON.stringify(red.checks));
++    assert.equal(check.ok, false);
++    assert.ok(check.message.includes("src/contract.mjs") && check.message.includes("architecture/map/core.md"), check.message);
++    assert.match(check.remedy, /commit it/u);
++    assert.ok(red.recovery.blockers.some((blocker) => blocker.id === "architecture-map-currency" && blocker.message.includes("architecture/map/core.md")));
++    const refusal = preflight(f.commit());
++    assert.equal(refusal?.code, "CDP-ARCHITECTURE-MAP-STALE", String(refusal));
++    assert.ok(refusal.details.reason.includes("src/contract.mjs") && refusal.details.reason.includes("architecture/map/core.md"), refusal.details.reason);
++    assert.deepEqual(refusal.details.staleContracts.map(({ contract, target }) => ({ contract, target })), [{ contract: "src/contract.mjs", target: "architecture/map/core.md" }]);
++    assert.match(refusal.details.repair, /rebuild the candidate before Critic\/Verify/u);
++    refreshMap(f);
++    const green = init();
++    assert.equal(green.outcome, "chat-ready", JSON.stringify(green));
++    assert.ok(green.steps.some((step) => step.id === "architecture-map-currency" && step.ok === true), "the green check is recorded as a step");
++    assert.equal(preflight(f.commit())?.code?.startsWith("CDP-ARCHITECTURE") ?? false, false, "the map commit clears the early refusal");
++  } finally { rmSync(f.dir, { recursive: true, force: true }); }
++});
++
++test("a never-adopted repository keeps push-init and the preflight free of any architecture line", () => {
++  const f = fixture();
++  try {
++    const result = drivePushInit({
++      rootDir: f.dir, by: "tester", remote: "origin", destination: "refs/heads/main",
++      assessPushGateSatisfiability: () => ({ ok: true, report: { satisfiable: true, checks: [] } }),
++      pushPrepareReport: () => ({ ok: true, report: { ready: true, humanApproval: "chat", checks: [] }, lines: { authorize: [], approvePush: ["approve"], gitPush: "push" } }),
++    });
++    assert.equal(result.outcome, "chat-ready", JSON.stringify(result));
++    assert.equal(result.steps.some((step) => /architecture/u.test(step.id)), false);
++    let code = null;
++    try { preflightCriticDispatch({ root: f.dir, base: f.git("rev-list", "--max-parents=0", "HEAD"), candidate: f.commit(), specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"] }); } catch (error) { code = error.code; }
++    assert.equal(String(code).startsWith("CDP-ARCHITECTURE"), false, String(code));
++  } finally { rmSync(f.dir, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 9e5ad8634..6e6c4768d 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -20,6 +20,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
+ import { spawnSync } from "node:child_process";
+ 
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+@@ -374,8 +375,21 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
+   sourceSpecSha256 = specReadback.sha256;
+   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
++  // N25 / D208: guard-push refuses a final candidate whose declared public contracts changed after their concept
++  // map, but only after Critic, Verify and the signatures were spent on it. Ask the same function here, before
++  // evidence is read and long before any packet exists. No relief: the map must be committed and the candidate
++  // rebuilt before review. It sits after the inventory/manifest/governance/spec readbacks so the Git-operation
++  // order those stages are pinned on is unchanged. Only the STALE verdict refuses, as in push-init; a structurally
++  // unverifiable map (`ok: false`) stays the final guard's refusal (the D208 decision names the stale map).
++  const architectureCurrency = inspectArchitecturePushCurrency({ projectDir: realRoot, commit: candidateCommit });
++  if (architectureCurrency.ok && architectureCurrency.stale) {
++    const refusal = describeArchitectureCurrencyRefusal(architectureCurrency);
++    fail("CDP-ARCHITECTURE-MAP-STALE",
++      `The candidate needs a current architecture map before a Critic review. ${refusal.lines.join(" ")}`,
++      { reason: refusal.lines.join("\n"), staleContracts: refusal.staleContracts, repair: refusal.remedy });
++  }
+   stage = "evidence";
+-  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
++  const evidenceReadback =evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
+   stage = "prior-evidence";
+   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
+   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 5af27b6ae..6fc165928 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1519,4 +1519,31 @@ test("session-critic-finalizer inspect-course-takeover --help prints the --reque
+   }
+ });
+ 
++// N25 / D208: the guard-push architecture currency check, asked before a Critic packet is prepared.
++test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming contract, concept map and the sanctioned step; a map commit then admits packet-ready; no relief for a comment-only change", () => {
++  const fx = fixture();
++  try {
++    mkdirSync(join(fx.root, "src"), { recursive: true });
++    mkdirSync(join(fx.root, "architecture", "map"), { recursive: true });
++    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 1;\n");
++    writeFileSync(join(fx.root, "architecture", "map", "index.md"), "# Map\n");
++    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
++    // Targeted commits: `commit()` stages everything, which would pull the untracked evidence files into the range.
++    const commitMap = (message) => { git(fx.root, ["add", "--", "src", "architecture"]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
++    commitMap("adopt map");
++    writeFileSync(join(fx.root, "src", "contract.mjs"), "// comment only\nexport const value = 1;\n");
++    const stale = commitMap("comment-only contract change");
++    const refusal = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: stale })), "CDP-ARCHITECTURE-MAP-STALE");
++    assert.ok(refusal.details.reason.includes("src/contract.mjs") && refusal.details.reason.includes("architecture/map/core.md"), refusal.details.reason);
++    assert.deepEqual(refusal.details.staleContracts.map(({ contract, target }) => ({ contract, target })), [{ contract: "src/contract.mjs", target: "architecture/map/core.md" }]);
++    assert.match(refusal.details.repair, /update the concept map in architecture\/map\/core\.md/u);
++    assert.match(refusal.details.repair, /rebuild the candidate before Critic\/Verify/u);
++    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core, covers the change\n");
++    const current = commitMap("refresh map");
++    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(current, git(fx.root, ["rev-parse", `${current}^{tree}`])))}\n`);
++    const admitted = preflightCriticDispatch(input(fx, { candidate: current }));
++    assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 466b32763..30c1cad84 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -111,6 +111,7 @@ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+ import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
+@@ -259,6 +260,20 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
+   };
+ }
+ 
++/**
++ * N25 / D208: the architecture-map currency guard-push applies to the pushed commit, asked early through the
++ * SAME function (`inspectArchitecturePushCurrency`, no second implementation). The pushed commit is HEAD (record
++ * commit R), not `--candidate` (substantive commit S): guard-push checks the commit being pushed. A root with no
++ * resolvable HEAD has no candidate to inspect, so the check does not apply (the final guard is unchanged and
++ * still refuses at push time). It deliberately does not go through the injected `run`, which stands in for the
++ * reconciliation subprocess only.
++ */
++function inspectHeadArchitectureCurrency(root) {
++  const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawnSync);
++  if (head === null || !/^[0-9a-f]{40,64}$/iu.test(head)) return { ok: true, applicable: false };
++  return inspectArchitecturePushCurrency({ projectDir: root, commit: head });
++}
++
+ /**
+  * Runs the one real subprocess step (check-doc-reconciliation.mjs, when present). Never
+  * throws: a spawn failure is folded into a typed `ok: false` result, matching
+@@ -294,7 +309,8 @@ export function buildReconciliationArgv({ scriptPath, base, candidate, root, rec
+ 
+ /**
+  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
+- * real subprocess step), `assessPushGateSatisfiability`/`satisfiabilityDeps` and
++ * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
++ * map currency check, N25), `assessPushGateSatisfiability`/`satisfiabilityDeps` and
+  * `pushPrepareReport`/`prepareDeps` (both default to the REAL imported functions) -- so
+  * tests can exercise every precondition-failure shape without a genuine git working tree
+  * carrying real evidence files, PO approval directories and trust anchors, mirroring
+@@ -310,6 +326,7 @@ export function drivePushInit({
+   pushPrepareReport = realPushPrepareReport,
+   prepareDeps = {},
+   assessPushHookBackstop = realAssessPushHookBackstop,
++  inspectArchitectureCurrency = inspectHeadArchitectureCurrency,
+ } = {}) {
+   const root = resolve(rootDir);
+   for (const [name, value] of [["by", by], ["remote", remote], ["destination", destination]]) {
+@@ -400,6 +417,28 @@ export function drivePushInit({
+     };
+   }
+ 
++  // Architecture map currency (N25 / D208) -- the check guard-push applies to the pushed commit, run here through
++  // the same function so a stale map is a failed check with a remedy BEFORE approval preparation, not a refusal
++  // after Critic, Verify, residual acceptance and the signature. It is HEAD-bound like push-prepare, hence it
++  // joins the R-bound checks after the S-bound reconciliation early return. A failed check also keeps
++  // `foldPendingApprovalWrite` off below, so preparation cannot commit onto a candidate that must be rebuilt.
++  // A never-adopted repository adds neither a check nor a step. Only the STALE verdict is a failed check here:
++  // a structurally unverifiable map (`ok: false`, e.g. a scaffold map with no concept yet) stays the final
++  // guard's refusal exactly as before, because an early refusal for it would change what existing greenfield
++  // preparation reports (the D208 decision names the stale map, not the unverifiable one).
++  const architectureCurrency = inspectArchitectureCurrency(root);
++  if (architectureCurrency?.ok === true && architectureCurrency.applicable !== false) {
++    const stale = architectureCurrency.stale === true;
++    steps.push({ id: "architecture-map-currency", inProcess: true, ok: !stale });
++    if (stale) {
++      const refusal = describeArchitectureCurrencyRefusal(architectureCurrency);
++      failedChecks.push({
++        id: "architecture-map-currency", ok: false, status: "architecture-map-stale",
++        message: refusal.reason, remedy: refusal.remedy, staleContracts: refusal.staleContracts,
++      });
++    }
++  }
++
+   // Layer 2 (full report) -- push-prepare.mjs, in-process.
+   const prepareArgv = ["--by", by, "--remote", remote, "--destination", destination];
+   const prepareOptions = failedChecks.length > 0 ? { foldPendingApprovalWrite: false } : {};
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 1f02e6811..15430861d 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -941,3 +941,48 @@ test("drivePushInit: a failed S-to-R reconciliation never invokes the R-bound pr
+     assert.equal(result.checks[0].id, "doc-reconciliation");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// N25 / D208: the final guard-push architecture currency check, asked early through the same function.
++test("drivePushInit (N25): a stale architecture map is its own failed check naming contract, concept map and remedy, and approval preparation cannot fold", () => {
++  const root = freshFixtureRoot();
++  try {
++    const staleContracts = [{ type: "architecture-map-stale", module: "core", target: "architecture/map/core.md", contract: "src/contract.mjs", contractCommit: "a".repeat(40), mapCommit: "b".repeat(40) }];
++    let prepareOptions = null;
++    const result = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      inspectArchitectureCurrency: () => ({ ok: true, applicable: true, stale: true, stalenessDebt: [], staleContracts }),
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(),
++      pushPrepareReport: (argv, deps, options) => { prepareOptions = options; return chatPrepareResult("chat"); },
++    });
++    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result));
++    const check = result.checks.find((entry) => entry.id === "architecture-map-currency");
++    assert.ok(check, JSON.stringify(result.checks));
++    assert.equal(check.ok, false);
++    assert.equal(check.status, "architecture-map-stale");
++    assert.ok(check.message.includes("src/contract.mjs") && check.message.includes("architecture/map/core.md"), check.message);
++    assert.match(check.remedy, /update the concept map in architecture\/map\/core\.md/u);
++    assert.deepEqual(prepareOptions, { foldPendingApprovalWrite: false }, "a stale map must not let preparation commit onto HEAD");
++    assert.ok(result.recovery.blockers.some((blocker) => blocker.id === "architecture-map-currency" && /src\/contract\.mjs/u.test(blocker.message)));
++    assert.equal(result.recovery.retryAction.argv.includes("--root"), true, "the retry is the same push-init invocation");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("drivePushInit (N25): only the stale verdict is an early check -- a structurally unverifiable map stays the final guard's refusal; a never-adopted repository adds no check and no step", () => {
++  const root = freshFixtureRoot();
++  try {
++    const unverifiable = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      inspectArchitectureCurrency: () => ({ ok: false, reason: "candidate architecture map has no concepts" }),
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
++    });
++    assert.equal(unverifiable.outcome, "chat-ready", JSON.stringify(unverifiable));
++    assert.equal(unverifiable.steps.some((step) => /architecture/u.test(step.id)), false);
++    const none = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      inspectArchitectureCurrency: () => ({ ok: true, applicable: false, commit: HEAD, tree: HEAD, stalenessDebt: [] }),
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
++    });
++    assert.equal(none.outcome, "chat-ready", JSON.stringify(none));
++    assert.equal(none.steps.some((step) => /architecture/u.test(step.id)), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
