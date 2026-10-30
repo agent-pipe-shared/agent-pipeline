@@ -1,0 +1,79 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index cea4dccbe..ad3333fa3 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1177,6 +1177,9 @@ const REGISTER_SCRIPT=fileURLToPath(new URL('../scripts/register-feature-package
+ export function staleApprovalRepair(code) {
+   if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
+     return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} no longer matches what the plan approval binds. If this checkout is a clone or a transfer of the approving one and the approved bytes are unchanged, only its device-local values differ: run node ${STATE_SCRIPT} rebind-approval (it re-checks every bound digest, takes no argument and asks for no new approval), then retry. If the approved bytes themselves changed, submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
++  // A transferred or copied clone arrives with the State file at mode 0644; name that repair, not the generic inspect.
++  if(code==='CVCT-FILE')
++    return `the State file .claude/pipeline-state.json is not a private regular file of its owner (a transferred or copied clone often arrives with mode 0644): on POSIX run chmod 600 .claude/pipeline-state.json in the repository root, on Windows give it an owner-only ACL, then retry; the plan approval itself stays valid`;
+   if(code==='CAC-REGISTRATION-INVALID')
+     return `the accepted-contract envelope of the plan approval is not registered in the feature manifest as the reader requires (the reason names the failing field); run node ${REGISTER_SCRIPT} --root <repository root> (it registers the envelope and prints the paths to commit), commit those paths, then retry`;
+   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
+diff --git a/plugins/pipeline-core/lib/pins/stale-approval-repair-names-rebind-approval.test.mjs b/plugins/pipeline-core/lib/pins/stale-approval-repair-names-rebind-approval.test.mjs
+index 1f64132a3..e08d474fd 100644
+--- a/plugins/pipeline-core/lib/pins/stale-approval-repair-names-rebind-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/stale-approval-repair-names-rebind-approval.test.mjs
+@@ -27,6 +27,13 @@ for (const code of ["CVCT-AUTHORITY-STALE", "CVCT-PROFILE-STALE"]) {
+   });
+ }
+ 
++test("SAR04 CVCT-FILE: the item-course repair names the State-file mode repair of a transferred clone, not the generic inspect", () => {
++  const text = staleApprovalRepair("CVCT-FILE");
++  assert.match(text, /chmod 600 \.claude\/pipeline-state\.json/u);
++  assert.match(text, /owner-only ACL/u);
++  assert.doesNotMatch(text, /rebind-approval|approve it again/u);
++});
++
+ test("SAR03 other codes do not name rebind-approval", () => {
+   assert.doesNotMatch(staleApprovalRepair("CVCT-APPROVAL-UNAVAILABLE"), /rebind-approval/u);
+   assert.doesNotMatch(configureVerifyRepair("CVCT-FILE"), /rebind-approval/u);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 32fb7548d..0e106ae86 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13767,6 +13767,15 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+ 
+ export function run(argv = process.argv.slice(2), deps = {}) {
+   const sub = argv[0];
++  // `<command> --help` (or -h) is a question about that command, never a run: before this, a lifecycle verb given --help executed.
++  // rebind-approval keeps its own usage text below; configure-verify is a command the list does not name.
++  if ((PIPELINE_STATE_COMMANDS.includes(sub) || sub === "configure-verify") && sub !== "rebind-approval" && argv.slice(1).some((arg) => arg === "--help" || arg === "-h")) {
++    console.log(`Usage: node pipeline-state.mjs ${sub} [flags]
++
++"${sub} --help" never runs the command. ${sub} validates its own flags and names what it needs when one is missing.
++All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
++    return 0;
++  }
+   const runStartedAt = Date.now();
+   let traceOutcome = "ok";
+   // This read-only command owns its exact explicit root; ambient projectDir
+diff --git a/plugins/pipeline-core/scripts/rebind-approval.test.mjs b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+index ce172b1fd..bc11288cc 100644
+--- a/plugins/pipeline-core/scripts/rebind-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+@@ -539,3 +539,22 @@ test("R7-5g: rebind-approval --help and -h answer the question and run nothing;
+   assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
+   assert.deepEqual([...privateSnapshot(clone.dir).keys()], [...privateBefore.keys()], "no receipt is written by --help, -h or a refused argument");
+ });
++
++test("R7-5h: every lifecycle verb answers --help and -h with its usage and runs nothing", () => {
++  const origin = approvedOrigin("allhelp");
++  const clone = cloneOf(origin, "allhelp");
++  const stateBefore = stateBytes(clone.dir); const privateBefore = privateSnapshot(clone.dir); const treeBefore = worktreeSnapshot(clone.dir);
++  for (const verb of ["submit-plan", "present-plan", "approve-plan", "reopen-design", "set-phase", "close-feature", "discard-feature",
++    "approve-push", "configure-verify", "materialize-architecture", "cancel-submitted-plan"]) {
++    for (const flag of ["--help", "-h"]) {
++      const result = invoke([verb, flag], clone.deps);
++      assert.equal(result.status, 0, `${verb} ${flag}: ${result.err}`);
++      assert.match(result.out, new RegExp(`Usage: node pipeline-state\\.mjs ${verb} `, "u"), `${verb} ${flag}`);
++    }
++    const mixed = invoke([verb, "--by", "someone", "--help"], clone.deps);
++    assert.equal(mixed.status, 0, `${verb} with --help after a flag: ${mixed.err}`);
++  }
++  assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
++  assert.deepEqual([...privateSnapshot(clone.dir)], [...privateBefore], "no private record is written");
++  assert.deepEqual([...worktreeSnapshot(clone.dir)], [...treeBefore], "the worktree is unchanged");
++});
