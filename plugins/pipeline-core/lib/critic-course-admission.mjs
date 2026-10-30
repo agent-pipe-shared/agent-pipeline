@@ -13,6 +13,7 @@ import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MODES = new Set(["full", "delta"]);
@@ -233,6 +234,47 @@ export function deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCo
   });
 }
 
+// The tracked export of one consumed session Critic review (session-critic-finalizer export): exactly these files under
+// specs/<feature>/evidence/critic/<packetId>/; the index schema mirrors SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA there.
+const CRITIC_EXPORT_FILES = ["index.json", "receipt.json", "report.md"];
+const CRITIC_EXPORT_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
+/**
+ * A commit that only adds exports of consumed Critic reviews is evidence, not unreviewed content (consumer finding N23,
+ * 2026-10-30: the export commit after a passed round broke the carry-forward and the lineage transport). Every changed
+ * path is a new export file of a feature in `featureIds`; each export directory holds exactly the three files; its index
+ * binds the receipt and report digests; and the receipt bytes are the canonical consumed receipt of that packet in this
+ * repository's private packet store, so nothing but the export of a review that really happened passes.
+ */
+export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = readConsumedCandidateReceipt) {
+  try {
+    const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
+    if (parents.length !== 2) return false;
+    const fields = gitBytes(root, ["diff", "--name-status", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
+    if (fields.length === 0 || fields.length % 2 !== 0) return false;
+    const exports = new Map();
+    for (let index = 0; index < fields.length; index += 2) {
+      const match = /^specs\/([^/]+)\/evidence\/critic\/([a-f0-9]{32})\/([^/]+)$/u.exec(fields[index + 1]);
+      if (fields[index] !== "A" || !match || !featureIds.includes(match[1]) || !CRITIC_EXPORT_FILES.includes(match[3])) return false;
+      const key = `specs/${match[1]}/evidence/critic/${match[2]}`;
+      if (!exports.has(key)) exports.set(key, { packetId: match[2], files: [] });
+      exports.get(key).files.push(match[3]);
+    }
+    const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
+    for (const [dir, { packetId, files }] of exports) {
+      if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
+      const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
+      const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
+      const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
+      if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
+        || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
+        || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
+        || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
+        || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
 function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
   try {
     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ")
@@ -292,14 +334,20 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
   } catch { return false; }
 }
 
-/** Classify only exact manifest-registration commits as budget-neutral. */
-export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit, candidateCommit }) {
+/**
+ * Classify only exact manifest-registration commits as budget-neutral. `admitCriticExports` also admits commits that
+ * only add exports of consumed Critic reviews; the Critic carry-forward passes it, course counters keep the default.
+ */
+export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit, candidateCommit, admitCriticExports = false,
+  readConsumedCandidateReceiptFn = readConsumedCandidateReceipt }) {
   const source = deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCommit, candidateCommit });
   const root = realpathSync(repoRoot);
   const evidenceOnly = [];
   const correction = [];
   for (const commit of source.rangeCommits) {
-    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId) ? evidenceOnly : correction).push(commit);
+    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+      || (admitCriticExports === true && criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn))
+      ? evidenceOnly : correction).push(commit);
   }
   return Object.freeze({
     ...source,
@@ -517,7 +565,7 @@ function evidenceCommitV2(root,commit,featureId){
 function transport(root,from,to,original,aliases){
  const aliasIds=aliases.map(a=>a.descriptor.aliasFeatureId),ids=[original,...aliasIds];
  for(const commit of range(root,from,to)){
-  if(ids.some(id=>evidenceCommitV2(root,commit,id)))continue;
+  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids))continue;
   const parents=gitBytes(root,['rev-list','--parents','-n','1',commit],'CCA-RANGE-READ').toString('utf8').trim().split(/\s+/u);if(parents.length!==2)fail('CCA-TRANSPORT');
   const changed=gitBytes(root,['diff','--name-only','-z',parents[1],commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
   const allowed=new Set();

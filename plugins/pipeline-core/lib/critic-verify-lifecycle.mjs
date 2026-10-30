@@ -192,7 +192,8 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
   try {
     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
       repoRoot, featureId, baseCommit: reviewedCandidate.commit,
-      candidateCommit: targetCandidate.commit,
+      candidateCommit: targetCandidate.commit, admitCriticExports: true,
+      ...(deps.readConsumedCandidateReceiptFn ? { readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn } : {}),
     });
   } catch { fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified."); }
   if (range.candidateTree !== targetCandidate.tree

@@ -13,6 +13,7 @@ import {
 } from "./critic-review-lineage.mjs";
 import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
 import { safePath, v2BindingCode } from "./critic-review-lineage-core.mjs";
+import * as lineageCore from "./critic-review-lineage-core.mjs";
 
 const H = (character) => character.repeat(64);
 const O = (character) => character.repeat(40);
@@ -873,5 +874,21 @@ check("PF-102 a diff round past round 2 needs no exception binding; malformed bi
   assert.equal(v2BindingCode(record(4, { deltaRequestSha256: null })), "CRL-V2-DELTA-BINDING", "a diff round must carry its delta request");
 });
 
-assert.equal(passed, 19);
-console.log(`${passed}/19 checks passed.`);
+// Consumer finding 2026-10-30: a full round (D204 fallback) over the whole feature range changed 357 paths, and the
+// 256 of identifier lists refused its lineage as CRL-V2-PACKET. Changed-path lists are bound by MAX_REVIEW_PATHS.
+check("a full round over more than 256 changed paths compiles, validates and admits its packet; the path bound still holds", () => {
+  const paths = Array.from({ length: 357 }, (_, index) => `src/module-${String(index).padStart(3, "0")}.ts`);
+  const packet = Object.freeze({ ...packet1, diffPaths: paths });
+  const record = compile({ packet });
+  assert.equal(record.diff.changedPaths.length, 357);
+  assert.equal(validateCriticReviewLineage(record).ok, true);
+  assert.equal(validateCriticLineagePacketAdmission(record, packet).ok, true);
+  const MAX_REVIEW_PATHS = lineageCore.MAX_REVIEW_PATHS;
+  const schema = JSON.parse(readFileSync(new URL("../scripts/critic-review-lineage.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.$defs.pathSet.maxItems, MAX_REVIEW_PATHS, "the schema states the same bound as the validators");
+  const over = Array.from({ length: MAX_REVIEW_PATHS + 1 }, (_, index) => `src/m${index}.ts`);
+  assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: over }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
+});
+
+assert.equal(passed, 20);
+console.log(`${passed}/20 checks passed.`);

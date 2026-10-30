@@ -761,7 +761,7 @@ test("D51-CARRY (e) exact-commit evidence behaves as before and records no carry
   assert.equal(actual.deterministicEvidenceSha256, sha256Canonical(fx.entries), JSON.stringify(actual));
 });
 // PF-94 c16: a REAL consumed course round (claim, session finalization in the owner store), reused by the delta-request slice.
-import { admitSessionCriticReview, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
+import { admitSessionCriticReview, exportSessionCriticEvidence, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
 import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
 import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
 import { addCriticReviewLineage } from "./feature-package-registration.mjs";
@@ -1293,5 +1293,33 @@ test("PF94 DOCS (d) the Critic skill documents continuing a course and the conti
   for (const needle of ["inspect-course-takeover", "supersede-course-takeover", "--add-review-lineage --packet", "--add-diagnostic-evidence", "--add-delta-request", "CGB-CONFLICT", "CGB-TAKEOVER-COURSE", "CGB-TAKEOVER-HISTORY", "CGB-TAKEOVER-OPEN", "FPR-LINEAGE-TRANSPORT", "CCA-TRANSPORT-SOURCE-DRIFT", "CCA-DELTA-REQUIRED", "CCA-REQUESTED-MODE"]) assert.ok(section.includes(needle), `skill section names ${needle}`);
   const cont = pf94Read("../skills/pipeline-start/references/implementation-continuation.md");
   assert.ok(cont.includes("Continuing a Critic course after the first round (PF-94)"));
+});
+// Consumer finding 2026-10-30 (N23 and the full-round path cap), through the real registration route of a consumed round.
+function exportConsumedRound(fx) {
+  writeFileSync(join(fx.root, "evidence", "critic-notes.md"), "# Critic notes\n\nNo findings.\n");
+  const exported = exportSessionCriticEvidence({ root: fx.root, packetId: fx.packetId, reportPath: "evidence/critic-notes.md",
+    outDir: `specs/${fx.featureId}/evidence/critic/${fx.packetId}` });
+  assert.equal(exported.status, "exported", JSON.stringify(exported));
+  return pf94CommitPaths(fx.root, exported.paths, "export the consumed review");
+}
+test("N23 the lineage of a consumed round registers after its own export commit; a commit beside the export still drifts", () => {
+  const fx = consumedCourseRoundFixture();
+  exportConsumedRound(fx);
+  const added = pf94Lineage(fx);
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const mixed = consumedCourseRoundFixture();
+  exportConsumedRound(mixed);
+  writeFileSync(join(mixed.root, "notes.txt"), "not evidence\n");
+  pf94CommitPaths(mixed.root, ["notes.txt"], "a commit that is not evidence");
+  const drifted = pf94Lineage(mixed);
+  assert.equal(drifted.code, "FPR-LINEAGE-TRANSPORT", JSON.stringify(drifted));
+});
+test("full round over 300 changed paths: the real route admits, finalizes and registers its lineage (consumer 357 paths)", () => {
+  const extra = Array.from({ length: 300 }, (_, index) => `src/many/file-${String(index).padStart(3, "0")}.mjs`);
+  const fx = consumedCourseRoundFixture({ extraCandidateFiles: extra });
+  const added = pf94Lineage(fx);
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+  assert.ok(lineage.diff.changedPaths.length > 300, String(lineage.diff.changedPaths.length));
 });
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

@@ -281,10 +281,13 @@ function criticPath(value) {
     && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
 }
 
-function criticSorted(values, valid, { allowEmpty = false } = {}) {
+// A full round (genesis or D204 fallback) covers the whole feature range, which a consumer measured at
+// 357 paths, so changed-path lists are not bound by the 256 of identifier lists. The lineage core reuses it.
+export const CRITIC_MAX_REVIEW_PATHS = 4096;
+function criticSorted(values, valid, { allowEmpty = false, maximum = 256 } = {}) {
   return Array.isArray(values)
     && (allowEmpty || values.length > 0)
-    && values.length <= 256
+    && values.length <= maximum
     && values.every(valid)
     && values.every((value, index) => index === 0 || values[index - 1] < value);
 }
@@ -317,7 +320,7 @@ function criticPackageCode(packages, coverage) {
     || !packages.every((row) => exactKeys(row, ["id", "subjectSha256", "changedPaths", "integrationEdges"])
       && CRITIC_SAFE_ID.test(row.id ?? "")
       && SHA256.test(row.subjectSha256 ?? "")
-      && criticSorted(row.changedPaths, criticPath)
+      && criticSorted(row.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
       && criticSorted(row.integrationEdges, (value) => CRITIC_SAFE_ID.test(value), { allowEmpty: true }))
     || !packages.every((row, index) => index === 0 || packages[index - 1].id < row.id)) {
     return "RE-CRITIC-PROJECTION-PACKAGES";
@@ -345,11 +348,11 @@ function criticProjectionRecordCode(record) {
     || !exactKeys(record.diff, ["base", "sha256", "changedPaths"])
     || !CRITIC_OID.test(record.diff.base ?? "")
     || !SHA256.test(record.diff.sha256 ?? "")
-    || !criticSorted(record.diff.changedPaths, criticPath)
+    || !criticSorted(record.diff.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
     || !exactKeys(record.references, ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"])
     || !Object.values(record.references).every((value) => SHA256.test(value))
     || !exactKeys(record.coverage, ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"])
-    || !criticSorted(record.coverage.changedPaths, criticPath)
+    || !criticSorted(record.coverage.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
     || !criticSorted(record.coverage.acceptanceIds, (value) => CRITIC_SAFE_ID.test(value))
     || !criticSorted(record.coverage.integrationEdges, (value) => CRITIC_SAFE_ID.test(value))
     || typeof record.coverage.complete !== "boolean"

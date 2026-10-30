@@ -289,6 +289,74 @@ test("a consumed Critic carries only across exact immutable evidence registratio
     targetCandidate: mixed }, deps), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
 });
 
+// N23 (consumer finding 2026-10-30): the tracked export of the consumed review sits between the reviewed and the
+// pushed candidate. It carries the Critic; a forged, extended or mixed export stays unreviewed content, and the
+// course counters (classification without the option) keep counting it as a correction.
+import * as courseAdmission from "./critic-course-admission.mjs";
+test("N23 the export commit of the consumed review carries the Critic; a forged, extended or mixed export does not", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const featureId = "carry-feature";
+  git(["init", "--quiet"]);
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  writeFileSync(join(root, "source.txt"), "reviewed source\n");
+  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
+    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const reviewed = commitAll("reviewed source");
+  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
+    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
+  const deps = { readConsumedCandidateReceiptFn: () => read };
+  const dir = `specs/${featureId}/evidence/critic/${read.receipt.packetId}`;
+  const exportAt = (base, message, { receiptBytes = canonicalJson(read.receipt), report = "# Critic notes\n\nNo findings.\n",
+    index = {}, extra = null, source = null } = {}) => {
+    git(["checkout", "--quiet", "--detach", base]);
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, "receipt.json"), receiptBytes);
+    writeFileSync(join(root, dir, "report.md"), report);
+    writeFileSync(join(root, dir, "index.json"), canonicalJson({ schema: "pipeline.session-critic-evidence-index.v1",
+      packetId: read.receipt.packetId, candidate: { commit: reviewed.commit, tree: reviewed.tree },
+      receiptSha256: sha256(receiptBytes), reportSha256: sha256(report), reviewPass: true, findingCount: 0, ...index }));
+    if (extra) writeFileSync(join(root, dir, extra), "extra\n");
+    if (source) writeFileSync(join(root, "source.txt"), source);
+    return commitAll(message);
+  };
+  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
+    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
+  const exported = exportAt(reviewed.commit, "export the consumed review");
+  assert.deepEqual(carry(exported).proof.evidenceOnlyCommits, [exported.commit]);
+  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, ["alias-feature", featureId], deps.readConsumedCandidateReceiptFn), true,
+    "the lineage transport admits the export under any course feature id");
+  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, ["alias-feature"], deps.readConsumedCandidateReceiptFn), false);
+  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, [featureId]), false,
+    "the production reader finds no consumed packet in this repository's private store");
+  assert.deepEqual(courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed.commit,
+    candidateCommit: exported.commit }).correctionCommits, [exported.commit], "course counters are unchanged without the option");
+  const forged = {
+    "reformatted receipt bytes": { receiptBytes: `${JSON.stringify(read.receipt)}\n` },
+    "report digest of another report": { index: { reportSha256: sha256("another report\n") } },
+    "foreign packet id in the index": { index: { packetId: "e".repeat(32) } },
+    "review verdict differs from the receipt": { index: { reviewPass: false } },
+    "an extra file in the export": { extra: "notes.md" },
+    "a source change in the same commit": { source: "changed with the export\n" },
+  };
+  for (const [name, variant] of Object.entries(forged)) {
+    assert.throws(() => carry(exportAt(reviewed.commit, name, variant)), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
+  }
+  git(["checkout", "--quiet", "--detach", exported.commit]);
+  writeFileSync(join(root, dir, "report.md"), "# Critic notes\n\nRewritten after the export.\n");
+  assert.throws(() => carry(commitAll("modify the exported report")), error => error.code === "CVL-CARRY-CONTENT-CHANGED",
+    "a later change to an exported file is not an export");
+  assert.throws(() => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"), featureId,
+    criticPacketId: read.receipt.packetId, targetCandidate: exported }, {}), error => error.code === "CVL-CRITIC-UNAVAILABLE",
+  "without a consumed packet in the private store nothing carries");
+});
+
 // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
 // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
 import * as readiness from "./critic-verify-readiness.mjs";

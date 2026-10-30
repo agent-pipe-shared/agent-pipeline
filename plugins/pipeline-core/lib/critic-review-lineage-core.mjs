@@ -12,6 +12,7 @@
  */
 import {
   REVIEW_LIMITS,
+  CRITIC_MAX_REVIEW_PATHS,
   canonicalJson,
   sha256Canonical,
 } from "./review-economy.mjs";
@@ -99,6 +100,8 @@ export const safePath = (value) => typeof value === "string"
   && PATH.test(value)
   && Buffer.byteLength(value, "utf8") <= 512
   && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+// Changed-path lists of one review are bound by CRITIC_MAX_REVIEW_PATHS (review-economy.mjs), not by the 256 of identifier lists.
+export const MAX_REVIEW_PATHS = CRITIC_MAX_REVIEW_PATHS;
 export const sortedUnique = (values, valid, { allowEmpty = false, maximum = 256 } = {}) => Array.isArray(values)
   && (allowEmpty || values.length > 0)
   && values.length <= maximum
@@ -134,7 +137,7 @@ export function packetCode(packet) {
     || !Number.isSafeInteger(packet.diff.bytes)
     || packet.diff.bytes < 0
     || !digest(packet.diff.sha256)
-    || !sortedUnique(packet.diffPaths, safePath)
+    || !sortedUnique(packet.diffPaths, safePath, { maximum: MAX_REVIEW_PATHS })
     || !object(packet.bindings)
     || !["requestSha256", "diffPathsSha256", "governanceSha256"].every((key) => digest(packet.bindings[key]))
     || !object(packet.request)) {
@@ -149,7 +152,7 @@ export function packageCode(packages, coverage) {
     (row) => exact(row, ["id", "subjectSha256", "changedPaths", "integrationEdges"])
       && identifier(row.id)
       && digest(row.subjectSha256)
-      && sortedUnique(row.changedPaths, safePath)
+      && sortedUnique(row.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
       && sortedUnique(row.integrationEdges, identifier, { allowEmpty: true }),
     (row) => row.id,
   );
@@ -166,7 +169,7 @@ export function packageCode(packages, coverage) {
 
 export function coverageCode(coverage) {
   if (!exact(coverage, ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"])
-    || !sortedUnique(coverage.changedPaths, safePath)
+    || !sortedUnique(coverage.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
     || !sortedUnique(coverage.acceptanceIds, identifier)
     || !sortedUnique(coverage.integrationEdges, identifier)
     || typeof coverage.complete !== "boolean"
@@ -295,7 +298,7 @@ function lineageCode(record) {
     || !exact(record.diff, ["base", "sha256", "changedPaths"])
     || !OID.test(record.diff.base)
     || !digest(record.diff.sha256)
-    || !sortedUnique(record.diff.changedPaths, safePath)
+    || !sortedUnique(record.diff.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
     || !exact(record.references, ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"])
     || !Object.values(record.references).every(digest)
     || coverageCode(record.coverage)

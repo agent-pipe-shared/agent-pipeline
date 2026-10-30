@@ -31,6 +31,7 @@ import {
   identifier,
   safePath,
   sortedUnique,
+  MAX_REVIEW_PATHS,
   same,
   recordCore,
   candidateCode,
@@ -136,10 +137,10 @@ function releaseScopeCode(scope) {
     || !exact(scope.reviewedRange, ["base", "head", "tree"])
     || ![scope.reviewedRange.base, scope.reviewedRange.head, scope.reviewedRange.tree].every((value) => OID.test(value))
     || !digest(scope.deltaSha256)
-    || !sortedUnique(scope.changedPaths, safePath)
+    || !sortedUnique(scope.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
     || !exact(scope.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
-    || !sortedUnique(scope.impactClosure.changedPaths, safePath)
-    || !sortedUnique(scope.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
+    || !sortedUnique(scope.impactClosure.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+    || !sortedUnique(scope.impactClosure.directConsequencePaths, safePath, { allowEmpty: true, maximum: MAX_REVIEW_PATHS })
     || !sortedUnique(scope.impactClosure.integrationEdges, identifier, { allowEmpty: true })
     || !same(scope.changedPaths, scope.impactClosure.changedPaths)
     || scope.impactClosureSha256 !== sha256Canonical(scope.impactClosure.integrationEdges)
@@ -186,8 +187,8 @@ export function compileReleaseCriticReviewScope(input) {
     || packetCode(input.packet)
     || !["broad-first", "correction", "broad-correction"].includes(input.mode)
     || !exact(input.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
-    || !sortedUnique(input.impactClosure.changedPaths, safePath)
-    || !sortedUnique(input.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
+    || !sortedUnique(input.impactClosure.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+    || !sortedUnique(input.impactClosure.directConsequencePaths, safePath, { allowEmpty: true, maximum: MAX_REVIEW_PATHS })
     || !sortedUnique(input.impactClosure.integrationEdges, identifier, { allowEmpty: true })
     || !same(input.impactClosure.changedPaths, input.packet.diffPaths)
     || invalidationCode(input.invalidation)) {
