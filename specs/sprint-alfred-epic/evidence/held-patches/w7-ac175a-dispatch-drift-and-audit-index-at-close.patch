@@ -1,0 +1,800 @@
+diff --git a/plugins/pipeline-core/lib/continuity-authority-drift.mjs b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+index 8064d64b1..653aed1a1 100644
+--- a/plugins/pipeline-core/lib/continuity-authority-drift.mjs
++++ b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+@@ -13,6 +13,36 @@ export const CONTINUITY_AUTHORITY_DRIFT_ROUTE = "continuity-authority-revision-p
+ const HEX64 = /^[0-9a-f]{64}$/u;
+ const ROLES = ["prd", "spec"];
+ 
++/**
++ * The sanctioned recovery both the bootstrap advisory and the dispatch refusal name (same code, same route; no new
++ * verb). `-plan` is read-only and takes exactly `--proposal-file <repo-relative-json>`; the human revision approval is
++ * consumed by `-apply`, not here.
++ */
++export const CONTINUITY_AUTHORITY_DRIFT_RECOVERY_COMMAND =
++  "node <plugin-root>/scripts/pipeline-state.mjs continuity-authority-revision-plan --proposal-file <repo-relative proposal json>";
++
++/**
++ * Dispatch-time reading of a drift projection (pure): the sources whose bytes no longer match the recorded digest
++ * ("changed") and the ones that could not be compared ("unobservable"), each as `{ role, path }`. Anything that is not a
++ * well-formed projection yields no sources, so a malformed value can never turn into a refusal.
++ */
++export function continuityAuthorityDriftSources(projection) {
++  const artifacts = Array.isArray(projection?.artifacts) ? projection.artifacts : [];
++  const pick = (state) => artifacts
++    .filter((entry) => entry && entry.state === state && typeof entry.path === "string" && typeof entry.role === "string")
++    .map((entry) => ({ role: entry.role, path: entry.path }));
++  return { changed: pick("changed"), unobservable: pick("unobservable") };
++}
++
++/** The refusal text naming each drifted source and the sanctioned recovery; paths are the repo-relative ones State records. */
++export function continuityAuthorityDriftRefusalText(changed, unobservable = []) {
++  const list = changed.map((entry) => `${entry.role} ${entry.path}`).join(", ");
++  const unseen = unobservable.length === 0 ? "" : ` (${unobservable.map((entry) => `${entry.role} ${entry.path}`).join(", ")} could not be compared at all)`;
++  return `the continuity record binds source digests that no longer match the checkout: ${list} changed since they were recorded${unseen}; a dispatch built now would work from authority bytes the approved plan never saw. `
++    + `repair: record the new authority through the recovery the bootstrap names (${CONTINUITY_AUTHORITY_DRIFT_CODE}, route ${CONTINUITY_AUTHORITY_DRIFT_ROUTE}): run ${CONTINUITY_AUTHORITY_DRIFT_RECOVERY_COMMAND} in the project root (read-only plan; its apply step takes the human revision approval), `
++    + "or restore the recorded bytes of the changed file(s); then build this briefing again";
++}
++
+ function observeSafely(observeSha256, path) {
+   try {
+     const value = observeSha256(path);
+diff --git a/plugins/pipeline-core/scripts/audit-index.mjs b/plugins/pipeline-core/scripts/audit-index.mjs
+index 9c48d4b8e..dbe487832 100644
+--- a/plugins/pipeline-core/scripts/audit-index.mjs
++++ b/plugins/pipeline-core/scripts/audit-index.mjs
+@@ -4,18 +4,39 @@
+ // gate digests behind a change, with every step that cannot be evidenced named
+ // explicitly as missing (never silently omitted).
+ //
+-// Pure and read-only: it hashes files the caller names, runs no git command and
+-// writes nothing. Transcript text is deliberately not included (data
+-// minimisation); only digests and presence are indexed.
++// `buildAuditIndex` is pure and read-only: it hashes files the caller names, runs
++// no git command and writes nothing. Transcript text is deliberately not included
++// (data minimisation); only digests and presence are indexed.
++//
++// AC-175 part A (D209/D210) adds, on top of that, a read-only collector
++// (`collectAuditIndex`, verb `collect`) that gathers a feature's own records, a
++// sanitized auditor manifest (paths and digests only, screened with the
++// repository's public-evidence privacy screen) and the one writer
++// (`writeAuditIndexEvidence`) the close course calls on the feature-close-prepared
++// transition. The index reports; it never blocks: a missing source is a named
++// missing step, never a refusal.
+ 
+ import { createHash } from "node:crypto";
+-import { readFileSync, statSync } from "node:fs";
+-import { isAbsolute, resolve, sep } from "node:path";
++import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
++import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { hasPrivateTransferContent } from "../lib/bound-artifact-transfer.mjs";
++import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
++import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ 
+ export const AUDIT_INDEX_SCHEMA = "pipeline.audit-index.v1";
++export const AUDIT_INDEX_MANIFEST_SCHEMA = "pipeline.audit-index-manifest.v1";
++export const AUDIT_INDEX_FILE = "audit-index.json";
+ 
+ const COMMIT_RE = /^[0-9a-f]{40}$/;
++const HEX64 = /^[0-9a-f]{64}$/u;
++const SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u;
++// What a manifest or collected path may look like: repository-relative, plain characters only. Anything else
++// (absolute, drive letter, home, space, control character) never enters the index.
++const REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
++const MAX_JSON_BYTES = 1024 * 1024;
++const MAX_CANDIDATE_EVIDENCE = 8;
+ 
+ function sha256Of(bytes) {
+   return createHash("sha256").update(bytes).digest("hex");
+@@ -41,7 +62,13 @@ function entries(rootDir, list, idKey) {
+   return (Array.isArray(list) ? list : [])
+     .map((item) => {
+       const spec = typeof item === "string" ? { [idKey]: item, path: item } : item;
+-      return { [idKey]: String(spec?.[idKey] ?? spec?.path ?? ""), path: spec?.path ?? null, ...digestRelative(rootDir, spec?.path) };
++      let digest = digestRelative(rootDir, spec?.path);
++      // A record that binds a digest (a dispatch record's Critic receipt, an approval's PRD/Spec bytes) is compared with
++      // the file: present bytes that differ are named, not trusted.
++      if (digest.status === "present" && typeof spec?.expectedSha256 === "string" && spec.expectedSha256 !== digest.sha256) {
++        digest = { status: "digest-mismatch", sha256: digest.sha256 };
++      }
++      return { [idKey]: String(spec?.[idKey] ?? spec?.path ?? ""), path: spec?.path ?? null, ...digest };
+     })
+     .sort((a, b) => (a[idKey] < b[idKey] ? -1 : a[idKey] > b[idKey] ? 1 : 0));
+ }
+@@ -51,10 +78,11 @@ function entries(rootDir, list, idKey) {
+  * @param {string} input.rootDir repository root
+  * @param {string[]} [input.sources] repo-relative source/spec/approval paths
+  * @param {string} [input.commit] 40-hex commit id
+- * @param {{id:string,path:string}[]} [input.gates] gate evidence files
++ * @param {{id:string,path:string,expectedSha256?:string}[]} [input.gates] gate evidence files
++ * @param {{step:string,reason:string}[]} [input.missing] steps the caller could not even name a file for
+  * @returns {object} index; `complete` is true only when no step is missing
+  */
+-export function buildAuditIndex({ rootDir, sources, commit, gates } = {}) {
++export function buildAuditIndex({ rootDir, sources, commit, gates, missing } = {}) {
+   if (typeof rootDir !== "string" || rootDir === "") throw new TypeError("rootDir is required");
+   const sourceEntries = entries(rootDir, sources, "path");
+   const gateEntries = entries(rootDir, gates, "id");
+@@ -73,6 +101,9 @@ export function buildAuditIndex({ rootDir, sources, commit, gates } = {}) {
+   for (const g of gateEntries) {
+     if (g.status !== "present") missingSteps.push({ step: `gate:${g.id}`, reason: g.status });
+   }
++  for (const m of Array.isArray(missing) ? missing : []) {
++    if (typeof m?.step === "string" && typeof m?.reason === "string") missingSteps.push({ step: m.step, reason: m.reason });
++  }
+ 
+   return {
+     schema: AUDIT_INDEX_SCHEMA,
+@@ -84,7 +115,219 @@ export function buildAuditIndex({ rootDir, sources, commit, gates } = {}) {
+   };
+ }
+ 
++const isRepoPath = (value) => typeof value === "string" && value.length <= 240 && REPO_PATH.test(value)
++  && value.split("/").every((part) => part !== "." && part !== "..");
++const hex64 = (value) => (typeof value === "string" && HEX64.test(value) ? value : undefined);
++
++/** A small JSON file under the root, or a typed reason; never throws and never reads outside the root. */
++function readSmallJson(rootDir, rel) {
++  if (!isRepoPath(rel)) return { status: "refused", value: null };
++  const root = resolve(rootDir);
++  const abs = resolve(root, rel);
++  if (!abs.startsWith(root + sep)) return { status: "refused", value: null };
++  try {
++    const info = statSync(abs);
++    if (!info.isFile()) return { status: "missing", value: null };
++    if (info.size > MAX_JSON_BYTES) return { status: "invalid", value: null };
++    return { status: "present", value: JSON.parse(readFileSync(abs, "utf8")) };
++  } catch (error) {
++    return { status: error?.code === "ENOENT" || error?.code === "ENOTDIR" ? "missing" : "invalid", value: null };
++  }
++}
++
++const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++
++/**
++ * Gathers a feature's own records into `buildAuditIndex` inputs (read-only, no git): the PRD, Spec and Result the State
++ * binds, the plan approval's PRD/Spec digests, the dispatch records of the feature's delivery course, the Critic receipt
++ * each record binds and the passing candidate Verify evidence of the feature package. Whatever cannot be found is a named
++ * entry of `missing`, whatever would not be a clean repository-relative path never enters the index.
++ */
++export function collectAuditIndexInputs({ rootDir, featureId, state } = {}) {
++  const sources = [];
++  const gates = [];
++  const missing = [];
++  const feature = isObject(state) ? state.activeFeature : null;
++  if (!isObject(feature) || feature.id !== featureId) {
++    missing.push({ step: "feature", reason: "not-active" });
++    return { sources, gates, missing };
++  }
++  const addSource = (path, step) => {
++    if (isRepoPath(path)) sources.push(path);
++    else missing.push({ step, reason: path === undefined || path === null ? "not-declared" : "path-not-repo-relative" });
++  };
++  const approval = isObject(state.planApproval?.poGateAuthority) ? state.planApproval.poGateAuthority : null;
++  const authority = isObject(state.continuity?.authority) ? state.continuity.authority : {};
++  const planPath = feature.planPath;
++  const specPath = approval?.specPath ?? authority.spec?.path;
++  const resultPath = authority.result?.path ?? null;
++
++  addSource(planPath, "source:prd");
++  addSource(specPath, "source:spec");
++  if (resultPath === null) missing.push({ step: "source:result", reason: "not-bound" });
++  else addSource(resultPath, "source:result");
++
++  if (approval === null) missing.push({ step: "gate:plan-approval", reason: "missing" });
++  else {
++    if (isRepoPath(planPath)) gates.push({ id: "plan-approval:plan", path: planPath, expectedSha256: hex64(approval.planSha256) });
++    if (isRepoPath(specPath)) gates.push({ id: "plan-approval:spec", path: specPath, expectedSha256: hex64(approval.specSha256) });
++  }
++
++  if (isRepoPath(planPath)) {
++    const directory = dirname(planPath);
++    const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
++    const course = readSmallJson(rootDir, coursePath);
++    if (course.status === "missing") missing.push({ step: "dispatch-records", reason: "no-delivery-course" });
++    else if (course.status !== "present" || !Array.isArray(course.value?.slices)) missing.push({ step: "dispatch-records", reason: "delivery-course-unreadable" });
++    else if (course.value.feature !== featureId) missing.push({ step: "dispatch-records", reason: "delivery-course-foreign" });
++    else {
++      sources.push(coursePath);
++      const ids = course.value.slices
++        .filter((slice) => isObject(slice) && typeof slice.id === "string" && SLICE_ID.test(slice.id) && slice.state !== "cancelled" && slice.state !== "deferred")
++        .map((slice) => slice.id)
++        .sort();
++      for (const id of ids) {
++        const recordPath = `evidence/dispatch-record-${id}.json`;
++        gates.push({ id: `dispatch:${id}`, path: recordPath });
++        const record = readSmallJson(rootDir, recordPath);
++        if (record.status !== "present" || !isObject(record.value)) continue;
++        const receipt = record.value.criticEvidence;
++        if (isObject(receipt)) {
++          if (isRepoPath(receipt.path)) gates.push({ id: `critic:${id}`, path: receipt.path, expectedSha256: hex64(receipt.sha256) });
++          else missing.push({ step: `gate:critic:${id}`, reason: "path-not-repo-relative" });
++        } else if (record.value.criticRequired !== undefined) {
++          missing.push({ step: `gate:critic:${id}`, reason: "missing" });
++        }
++      }
++    }
++  }
++
++  if (!isRepoPath(resultPath)) missing.push({ step: "gate:verify", reason: "no-result-bound" });
++  else {
++    const directory = dirname(resultPath);
++    const manifest = readSmallJson(rootDir, directory === "." ? "lifecycle.json" : `${directory}/lifecycle.json`);
++    if (manifest.status === "missing") missing.push({ step: "gate:verify", reason: "no-feature-package" });
++    else {
++      const candidates = (manifest.status === "present" && Array.isArray(manifest.value?.artifacts) ? manifest.value.artifacts : [])
++        .filter((artifact) => isObject(artifact) && artifact.class === "candidate-evidence" && isRepoPath(artifact.path))
++        .slice(0, MAX_CANDIDATE_EVIDENCE);
++      const passing = candidates.find((artifact) => {
++        const evidence = readSmallJson(rootDir, artifact.path);
++        return evidence.status === "present" && isObject(evidence.value) && evidence.value.schema === "pipeline.verify-evidence.v0" && evidence.value.exitCode === 0;
++      });
++      if (passing) gates.push({ id: "verify", path: passing.path, expectedSha256: hex64(passing.sha256) });
++      else missing.push({ step: "gate:verify", reason: candidates.length === 0 ? "no-candidate-evidence" : "no-passing-candidate-evidence" });
++    }
++  }
++  return { sources, gates, missing };
++}
++
++/**
++ * The sanctioned auditor manifest (D152 clause): paths and digests of the PRESENT entries only. No file body, no absolute
++ * path, no free text. Each entry must be a plain repository-relative path and pass the repository's public-evidence privacy
++ * screen (`hasPrivateTransferContent`); an entry that does not is counted in `held`, never listed.
++ */
++export function buildAuditManifest(index) {
++  const entriesOut = [];
++  let held = 0;
++  const take = (kind, id, path, sha256, status) => {
++    if (status !== "present" || typeof sha256 !== "string") return;
++    const entry = { kind, id: String(id), path, sha256 };
++    if (isRepoPath(path) && HEX64.test(sha256) && !hasPrivateTransferContent(Buffer.from(JSON.stringify(entry), "utf8"))) entriesOut.push(entry);
++    else held += 1;
++  };
++  for (const s of Array.isArray(index?.sources) ? index.sources : []) take("source", s?.path, s?.path, s?.sha256, s?.status);
++  for (const g of Array.isArray(index?.gates) ? index.gates : []) take("gate", g?.id, g?.path, g?.sha256, g?.status);
++  entriesOut.sort((a, b) => (a.kind + a.id < b.kind + b.id ? -1 : a.kind + a.id > b.kind + b.id ? 1 : 0));
++  return { schema: AUDIT_INDEX_MANIFEST_SCHEMA, entries: entriesOut, held };
++}
++
++/** Collect the feature's records, build the index and attach the sanitized manifest. Never throws for a missing source. */
++export function collectAuditIndex({ rootDir, featureId, state, commit } = {}) {
++  const inputs = collectAuditIndexInputs({ rootDir, featureId, state });
++  const index = buildAuditIndex({ rootDir, sources: inputs.sources, gates: inputs.gates, commit, missing: inputs.missing });
++  return { ...index, manifest: buildAuditManifest(index) };
++}
++
++/**
++ * The one writer: the index as `audit-index.json` in a private directory (the coordinator-private close evidence
++ * directory when the close course calls it). An index the privacy screen rejects is held and not written. The result
++ * names the file and its digest, never a directory.
++ */
++export function writeAuditIndexEvidence({ directory, index } = {}) {
++  const text = `${JSON.stringify(index, null, 2)}\n`;
++  if (hasPrivateTransferContent(Buffer.from(text, "utf8"))) return { status: "held", code: "BT-PRIVACY" };
++  const target = join(ensurePrivateDirectory(directory), AUDIT_INDEX_FILE);
++  writePrivateJsonAtomic(target, index);
++  return {
++    status: "written",
++    file: AUDIT_INDEX_FILE,
++    sha256: sha256Of(readFileSync(target)),
++    complete: index.complete === true,
++    missingSteps: Array.isArray(index.missingSteps) ? index.missingSteps.length : 0,
++  };
++}
++
++/**
++ * The summary of an index already written into `directory`, read back from its own bytes (null when there is none or it is
++ * unreadable). A replay of the close transition reports the file it wrote the first time instead of re-collecting against a
++ * later State, which would overwrite earlier evidence under a different digest.
++ */
++export function readAuditIndexEvidence({ directory } = {}) {
++  try {
++    const bytes = readFileSync(join(resolve(directory), AUDIT_INDEX_FILE));
++    const index = JSON.parse(bytes.toString("utf8"));
++    if (!isObject(index) || index.schema !== AUDIT_INDEX_SCHEMA) return null;
++    return {
++      status: "written",
++      file: AUDIT_INDEX_FILE,
++      sha256: sha256Of(bytes),
++      complete: index.complete === true,
++      missingSteps: Array.isArray(index.missingSteps) ? index.missingSteps.length : 0,
++    };
++  } catch {
++    return null;
++  }
++}
++
++function readStateForCollect(rootDir) {
++  try {
++    const authority = resolveProjectAuthorityPaths({ rootDir });
++    const rel = authority.status === "ready" ? authority.state : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
++    const value = JSON.parse(readFileSync(join(rootDir, rel), "utf8"));
++    return isObject(value) ? value : null;
++  } catch {
++    return null;
++  }
++}
++
++function refuseCollect(code, message) {
++  process.stdout.write(`${JSON.stringify({ schema: "pipeline.audit-index.refusal.v1", ok: false, code, message }, null, 2)}\n`);
++  process.exitCode = 2;
++}
++
++function collectMain(argv) {
++  const flags = { "--root": "root", "--feature-id": "featureId", "--commit": "commit" };
++  const values = {};
++  for (let i = 0; i < argv.length; i += 2) {
++    const key = flags[argv[i]];
++    if (key === undefined || typeof argv[i + 1] !== "string" || argv[i + 1] === "" || Object.hasOwn(values, key)) {
++      return refuseCollect("AUDIT-INDEX-ARGS", "collect takes --root <dir> --feature-id <id> [--commit <40-hex>], each once");
++    }
++    values[key] = argv[i + 1];
++  }
++  if (!FEATURE_ID.test(values.featureId ?? "")) return refuseCollect("AUDIT-INDEX-ARGS", "collect needs --feature-id <the feature id>");
++  let rootDir;
++  try { rootDir = realpathSync(resolve(values.root ?? process.cwd())); } catch { return refuseCollect("AUDIT-INDEX-ARGS", "--root cannot be resolved to a directory"); }
++  const state = readStateForCollect(rootDir);
++  if (state === null) return refuseCollect("AUDIT-INDEX-STATE-UNREADABLE", "the project State could not be read under --root; repair: run this from the project root or pass --root");
++  const index = collectAuditIndex({ rootDir, featureId: values.featureId, state, commit: values.commit });
++  // A report, not a gate: exit 0 whenever the index was generated; `complete` carries the verdict.
++  process.stdout.write(`${JSON.stringify(index, null, 2)}\n`);
++}
++
+ export function main(argv = process.argv.slice(2)) {
++  if (argv[0] === "collect") return collectMain(argv.slice(1));
+   const args = { sources: [], gates: [], root: process.cwd(), commit: undefined };
+   for (let i = 0; i < argv.length; i += 2) {
+     const [flag, value] = [argv[i], argv[i + 1]];
+diff --git a/plugins/pipeline-core/scripts/audit-index.test.mjs b/plugins/pipeline-core/scripts/audit-index.test.mjs
+index 47602d643..484b4966f 100644
+--- a/plugins/pipeline-core/scripts/audit-index.test.mjs
++++ b/plugins/pipeline-core/scripts/audit-index.test.mjs
+@@ -1,11 +1,15 @@
+ // SPDX-License-Identifier: SUL-1.0
+-import { test } from "node:test";
++import { test, after } from "node:test";
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { AUDIT_INDEX_SCHEMA, buildAuditIndex } from "./audit-index.mjs";
++import * as auditModule from "./audit-index.mjs";
++import { hasPrivateTransferContent } from "../lib/bound-artifact-transfer.mjs";
+ 
+ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+ const sha = (text) => createHash("sha256").update(text).digest("hex");
+@@ -76,3 +80,266 @@ test("output is deterministic regardless of input order", () => {
+ test("rootDir is required", () => {
+   assert.throws(() => buildAuditIndex({}), TypeError);
+ });
++
++// ---------------------------------------------------------------------------------------------
++// AC-175 part A (D209/D210): the collector that gathers a feature's own records, the sanitized
++// auditor manifest, the evidence writer the close course calls, and the dispatch-time drift check.
++// ---------------------------------------------------------------------------------------------
++// A POSIX home-directory shaped absolute path, assembled so no host-path literal sits in the source.
++const privateAbsolute = (name) => ["", "home", "someone", name].join("/");
++const tempRoots = [];
++after(() => { for (const root of tempRoots) rmSync(root, { recursive: true, force: true }); });
++
++function featureFixture() {
++  const root = mkdtempSync(join(tmpdir(), "audit-collect-"));
++  tempRoots.push(root);
++  const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
++  put("specs/feat/plan.md", "prd body");
++  put("specs/feat/spec.md", "spec body");
++  put("specs/feat/result.md", "result body");
++  const criticBody = '{"critic":"pass"}';
++  put("evidence/critic-S1.json", criticBody);
++  put("evidence/dispatch-record-S1.json", JSON.stringify({ taskId: "S1", criticEvidence: { path: "evidence/critic-S1.json", sha256: sha(criticBody) } }));
++  put("evidence/dispatch-record-S2.json", JSON.stringify({ taskId: "S2", criticSkip: { reason: "mechanical" } }));
++  put("specs/feat/slice-queue.json", JSON.stringify({ feature: "feat", slices: [{ id: "S1", state: "ready" }, { id: "S2", state: "ready" }, { id: "S3", state: "cancelled" }] }));
++  const verifyBody = JSON.stringify({ schema: "pipeline.verify-evidence.v0", exitCode: 0 });
++  put("specs/feat/verify.json", verifyBody);
++  put("specs/feat/lifecycle.json", JSON.stringify({ artifacts: [
++    { class: "result", path: "specs/feat/result.md", sha256: sha("result body") },
++    { class: "candidate-evidence", path: "specs/feat/verify.json", sha256: sha(verifyBody) },
++  ] }));
++  const state = {
++    activeFeature: { id: "feat", planPath: "specs/feat/plan.md", phase: "implementation" },
++    planApproval: { poGateAuthority: { planPath: "specs/feat/plan.md", planSha256: sha("prd body"), specPath: "specs/feat/spec.md", specSha256: sha("spec body") } },
++    continuity: { authority: {
++      prd: { path: "specs/feat/plan.md", sha256: sha("prd body") },
++      spec: { path: "specs/feat/spec.md", sha256: sha("spec body") },
++      result: { path: "specs/feat/result.md", sha256: sha("result body") },
++    } },
++  };
++  return { root, state, put };
++}
++
++test("collect: a complete feature yields sources, approval, dispatch, Critic and Verify digests and is complete", () => {
++  const { root, state } = featureFixture();
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  assert.equal(index.schema, AUDIT_INDEX_SCHEMA);
++  assert.deepEqual(index.sources.map((s) => s.path), ["specs/feat/plan.md", "specs/feat/result.md", "specs/feat/slice-queue.json", "specs/feat/spec.md"]);
++  assert.deepEqual(index.gates.map((g) => g.id), ["critic:S1", "dispatch:S1", "dispatch:S2", "plan-approval:plan", "plan-approval:spec", "verify"]);
++  assert.ok(index.gates.every((g) => g.status === "present" && /^[0-9a-f]{64}$/u.test(g.sha256)));
++  assert.deepEqual(index.missingSteps, []);
++  assert.equal(index.complete, true);
++});
++
++test("collect: every absent source is a named missing step, never a refusal and never silent", () => {
++  const { root, state } = featureFixture();
++  rmSync(join(root, "specs/feat/slice-queue.json"));
++  rmSync(join(root, "specs/feat/lifecycle.json"));
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const steps = index.missingSteps.map((m) => `${m.step}=${m.reason}`);
++  assert.ok(steps.includes("dispatch-records=no-delivery-course"), steps.join(","));
++  assert.ok(steps.includes("gate:verify=no-feature-package"), steps.join(","));
++  assert.equal(index.complete, false);
++});
++
++test("collect: a Critic receipt whose bytes drifted, a required Critic without evidence and a cancelled slice", () => {
++  const { root, state, put } = featureFixture();
++  put("evidence/critic-S1.json", '{"critic":"changed"}');
++  put("evidence/dispatch-record-S2.json", JSON.stringify({ taskId: "S2", criticRequired: { appliedRow: "T1" } }));
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const steps = index.missingSteps.map((m) => `${m.step}=${m.reason}`);
++  assert.ok(steps.includes("gate:critic:S1=digest-mismatch"), steps.join(","));
++  assert.ok(steps.includes("gate:critic:S2=missing"), steps.join(","));
++  assert.ok(!steps.some((s) => s.includes("S3")), "a cancelled slice is not a missing step");
++});
++
++test("collect: a feature that is not the active one is a missing step, not a throw", () => {
++  const { root, state } = featureFixture();
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "other", state, commit: COMMIT });
++  assert.ok(index.missingSteps.some((m) => m.step === "feature" && m.reason === "not-active"));
++  assert.equal(index.complete, false);
++});
++
++test("collect: a recorded absolute or private-looking path never reaches the index, it becomes a missing step", () => {
++  const { root, state, put } = featureFixture();
++  put("evidence/dispatch-record-S1.json", JSON.stringify({ taskId: "S1", criticEvidence: { path: privateAbsolute("critic.json"), sha256: "a".repeat(64) } }));
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const text = JSON.stringify(index);
++  assert.ok(!text.includes(privateAbsolute("")), text);
++  assert.equal(hasPrivateTransferContent(Buffer.from(text)), false);
++  assert.ok(index.missingSteps.some((m) => m.step === "gate:critic:S1" && m.reason === "path-not-repo-relative"));
++});
++
++test("manifest: paths and digests of present entries only, no body, no absolute path, screened", () => {
++  const { root, state } = featureFixture();
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const manifest = index.manifest;
++  assert.equal(manifest.schema, "pipeline.audit-index-manifest.v1");
++  assert.equal(manifest.entries.length, index.sources.length + index.gates.length);
++  for (const entry of manifest.entries) assert.deepEqual(Object.keys(entry).sort(), ["id", "kind", "path", "sha256"]);
++  const text = JSON.stringify(manifest);
++  assert.ok(!text.includes("prd body") && !text.includes("critic\":\"pass"), "no file body");
++  assert.equal(hasPrivateTransferContent(Buffer.from(text)), false);
++  assert.equal(manifest.held, 0);
++});
++
++test("manifest: an entry the private screen or the path shape rejects is counted as held, never listed", () => {
++  const manifest = auditModule.buildAuditManifest({
++    sources: [{ path: "specs/ok.md", status: "present", sha256: "a".repeat(64) }, { path: "specs/has space.md", status: "present", sha256: "b".repeat(64) }],
++    gates: [{ id: "g", path: privateAbsolute("x.json"), status: "present", sha256: "c".repeat(64) }, { id: "m", path: "evidence/missing.json", status: "missing", sha256: null }],
++  });
++  assert.deepEqual(manifest.entries.map((e) => e.path), ["specs/ok.md"]);
++  assert.equal(manifest.held, 2);
++});
++
++test("evidence writer: writes audit-index.json into a private directory and names it; a private index is held, not written", () => {
++  const { root, state } = featureFixture();
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const directory = join(root, ".git", "agent-pipeline", "close", "evidence");
++  const written = auditModule.writeAuditIndexEvidence({ directory, index });
++  assert.equal(written.status, "written");
++  assert.equal(written.file, "audit-index.json");
++  assert.equal(written.complete, true);
++  assert.equal(written.sha256, sha(readFileSync(join(directory, "audit-index.json"))));
++  assert.ok(!JSON.stringify(written).includes(root), "the result names the file, not an absolute path");
++  const heldDirectory = join(root, ".git", "agent-pipeline", "close-held", "evidence");
++  const held = auditModule.writeAuditIndexEvidence({ directory: heldDirectory, index: { ...index, sources: [{ path: privateAbsolute("x.md"), status: "present", sha256: "a".repeat(64) }] } });
++  assert.equal(held.status, "held");
++  assert.equal(held.code, "BT-PRIVACY");
++  assert.equal(existsSync(join(heldDirectory, "audit-index.json")), false);
++});
++
++test("evidence reader: reports the index already written from its own bytes, and null when there is none", () => {
++  const { root, state } = featureFixture();
++  const index = auditModule.collectAuditIndex({ rootDir: root, featureId: "feat", state, commit: COMMIT });
++  const directory = join(root, ".git", "agent-pipeline", "close-read", "evidence");
++  assert.equal(auditModule.readAuditIndexEvidence({ directory }), null);
++  const written = auditModule.writeAuditIndexEvidence({ directory, index });
++  assert.deepEqual(auditModule.readAuditIndexEvidence({ directory }), written);
++});
++
++test("collect verb: reads the State and prints one index, exit 0 even when steps are missing", () => {
++  const { root, state } = featureFixture();
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", ...state }));
++  rmSync(join(root, "specs/feat/lifecycle.json"));
++  const run = spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), "audit-index.mjs"), "collect", "--root", root, "--feature-id", "feat", "--commit", COMMIT], { encoding: "utf8" });
++  assert.equal(run.status, 0, run.stdout + run.stderr);
++  const index = JSON.parse(run.stdout);
++  assert.equal(index.schema, AUDIT_INDEX_SCHEMA);
++  assert.equal(index.complete, false);
++  assert.ok(index.missingSteps.some((m) => m.step === "gate:verify"));
++  assert.equal(index.manifest.schema, "pipeline.audit-index-manifest.v1");
++  assert.ok(!run.stdout.includes(root), "no absolute path in the output");
++});
++
++test("collect verb: no readable State is a typed refusal with exit 2", () => {
++  const root = mkdtempSync(join(tmpdir(), "audit-collect-empty-"));
++  tempRoots.push(root);
++  const run = spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), "audit-index.mjs"), "collect", "--root", root, "--feature-id", "feat"], { encoding: "utf8" });
++  assert.equal(run.status, 2, run.stdout + run.stderr);
++  assert.equal(JSON.parse(run.stdout).code, "AUDIT-INDEX-STATE-UNREADABLE");
++});
++
++// ---- dispatch-time continuity drift (D209/D210): built like dispatch-briefing.test.mjs, lazily imported ----
++const dispatchLib = () => import("./dispatch-briefing.mjs");
++const DISPATCH_COMMIT = "1".repeat(40);
++const DISPATCH_TREE = "2".repeat(40);
++const RULESET = "ab".repeat(32);
++const ROW_TEXT = "Original Alfred item sample-slug is delivered as its own original acceptance states, on the integrated candidate";
++
++function dispatchFixture() {
++  const root = mkdtempSync(join(tmpdir(), "audit-dispatch-"));
++  tempRoots.push(root);
++  const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
++  const spec = ["# Fixture spec", "", "## Acceptance criteria", "", "| # | Criterion | Evidence |", "| --- | --- | --- |",
++    `| AC-2 | ${ROW_TEXT} | backlog/items/2026-01-02-sample-slug.md |`, ""].join("\n");
++  put("specs/feat-x/spec.md", spec);
++  put("backlog/items/2026-01-02-sample-slug.md", "---\nschema: pipeline.backlog-item.v1\nid: pipeline.sample-slug\nstatus: open\n---\nBody.\n");
++  const agentsDir = join(root, "agents-fixture");
++  put("agents-fixture/goldfish-implementor.md", "---\nname: goldfish-implementor\nmodel: sonnet\neffort: medium\nmaxTurns: 50\n---\nFixture agent body.\n");
++  return { root, agentsDir, put };
++}
++
++const dispatchDeps = (fx, over = {}) => ({
++  agentsDir: fx.agentsDir,
++  observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: RULESET } } }),
++  git: (_root, args) => (args[0] === "status" ? "" : args[1] === "HEAD^{tree}" ? DISPATCH_TREE : DISPATCH_COMMIT),
++  resolveBaseline: () => ({ status: "ready", entries: [] }),
++  defaultSpecPath: () => null,
++  queueRow: () => null,
++  settledPending: () => null,
++  claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: "medium" }),
++  ...over,
++});
++
++const dispatchArgv = (fx) => ["binding", "--root", fx.root, "--dispatch-id", "ALF-T1", "--item", "sample-slug", "--agent-type", "goldfish-implementor",
++  "--model-id", "claude-sonnet-5-5", "--check", "plugins/x/y.test.mjs", "--path", "plugins/x/y.mjs", "--spec", "specs/feat-x/spec.md"];
++
++const driftProjection = (artifacts) => ({
++  schema: "pipeline.continuity-authority-drift.v1", status: "drift", featureId: "feat-x", revision: 3, advisory: true,
++  artifacts,
++  recovery: { kind: "repair-required", code: "CONTINUITY-AUTHORITY-DRIFT", route: "continuity-authority-revision-plan", mutation: false, requiresConfirmation: false, guidance: "g" },
++});
++const art = (role, path, state) => ({ role, path, recordedSha256: "a".repeat(64), observedSha256: state === "unobservable" ? null : "b".repeat(64), state });
++
++test("dispatch drift: a drifted continuity source refuses the build with a typed code, each drifted path and the sanctioned recovery", async () => {
++  const { runDispatchBriefing } = await dispatchLib();
++  const fx = dispatchFixture();
++  const drift = driftProjection([art("prd", "docs/prd.md", "changed"), art("spec", "docs/spec.md", "changed")]);
++  const result = runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx, { observeContinuityDrift: () => drift }));
++  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 400));
++  assert.equal(result.code, "DBG-CONTINUITY-AUTHORITY-DRIFT");
++  assert.match(result.message, /docs\/prd\.md/u);
++  assert.match(result.message, /docs\/spec\.md/u);
++  assert.match(result.message, /continuity-authority-revision-plan/u);
++  assert.match(result.message, /--proposal-file/u);
++  assert.ok(!result.message.includes(fx.root), "no absolute path in the refusal");
++});
++
++test("dispatch drift: only the changed source is named", async () => {
++  const { runDispatchBriefing } = await dispatchLib();
++  const fx = dispatchFixture();
++  const drift = driftProjection([art("prd", "docs/prd.md", "match"), art("spec", "docs/spec.md", "changed")]);
++  const result = runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx, { observeContinuityDrift: () => drift }));
++  assert.equal(result.code, "DBG-CONTINUITY-AUTHORITY-DRIFT");
++  assert.match(result.message, /docs\/spec\.md/u);
++  assert.doesNotMatch(result.message, /docs\/prd\.md/u);
++});
++
++test("dispatch drift: no continuity record, no drift and a failing observer leave the output byte-identical", async () => {
++  const { runDispatchBriefing } = await dispatchLib();
++  const fx = dispatchFixture();
++  const baseline = JSON.stringify(runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx)));
++  assert.equal(JSON.parse(baseline).ok, true, baseline.slice(0, 400));
++  assert.equal(JSON.stringify(runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx, { observeContinuityDrift: () => null }))), baseline);
++  assert.equal(JSON.stringify(runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx, { observeContinuityDrift: () => { throw new Error("boom"); } }))), baseline);
++});
++
++test("dispatch drift: a source that cannot be observed is a warning, not a refusal", async () => {
++  const { runDispatchBriefing } = await dispatchLib();
++  const fx = dispatchFixture();
++  const drift = driftProjection([art("prd", "docs/prd.md", "unobservable"), art("spec", "docs/spec.md", "match")]);
++  const result = runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx, { observeContinuityDrift: () => drift }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  const warning = result.warnings.find((w) => w.code === "DBG-CONTINUITY-AUTHORITY-UNOBSERVABLE");
++  assert.ok(warning, JSON.stringify(result.warnings));
++  assert.match(warning.message, /docs\/prd\.md/u);
++});
++
++test("dispatch drift: the default observer reads the real State of the root", async () => {
++  const { runDispatchBriefing } = await dispatchLib();
++  const fx = dispatchFixture();
++  fx.put("docs/prd.md", "prd now");
++  fx.put("docs/spec.md", "spec now");
++  const continuity = { revision: 3, featureId: "feat-x", authority: {
++    prd: { path: "docs/prd.md", sha256: sha("prd then") }, spec: { path: "docs/spec.md", sha256: sha("spec now") }, result: null },
++  queueHead: { nextAction: "work", dispatch: null }, blocker: null, decisionTxn: null };
++  fx.put(".claude/pipeline-state.json", JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "feat-x", planPath: "docs/prd.md", phase: "implementation" }, continuity }));
++  const result = runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx));
++  assert.equal(result.code, "DBG-CONTINUITY-AUTHORITY-DRIFT", JSON.stringify(result).slice(0, 400));
++  assert.match(result.message, /docs\/prd\.md/u);
++  assert.doesNotMatch(result.message, /docs\/spec\.md/u);
++  fx.put("docs/prd.md", "prd then");
++  assert.equal(runDispatchBriefing(dispatchArgv(fx), dispatchDeps(fx)).ok, true, "matching bytes dispatch");
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index a5f50aa5a..e33e3ad94 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -19,6 +19,7 @@ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+ import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
++import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
+ import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+@@ -843,6 +844,28 @@ function preparedAuditReadback(root, common, coordinator, continuityRequest) {
+   }
+ }
+ 
++/**
++ * AC-175 part A (D209/D210): the generated audit index is written next to the close evidence on the feature-close-prepared
++ * transition and named in the close result. It is evidence only: a missing source is a missing step INSIDE the index, and any
++ * fault here becomes `{ status: "unavailable" }` in the result. It can never refuse, delay or change the close.
++ */
++function closeAuditIndex(root, common, coordinator, { replay = false } = {}) {
++  try {
++    const directory = join(publicationClosePaths(common, coordinator.lifecycleId).directory, "evidence");
++    // A replay reports the index the first apply wrote; it never overwrites earlier evidence from a later State.
++    if (replay) {
++      const existing = readAuditIndexEvidence({ directory });
++      if (existing !== null) return existing;
++    }
++    let commit;
++    try { commit = git(root, ["rev-parse", "HEAD"]); } catch { commit = undefined; }
++    const index = collectAuditIndex({ rootDir: root, featureId: coordinator.featureId, state: stateSnapshot(root).state, commit });
++    return writeAuditIndexEvidence({ directory, index });
++  } catch {
++    return { status: "unavailable", code: "CLOSE-AUDIT-INDEX-UNAVAILABLE" };
++  }
++}
++
+ async function applyTransition(values, suppliedDigest) {
+   const root = physicalRoot(values.root);
+   const common = gitCommonDir(root);
+@@ -865,6 +888,7 @@ async function applyTransition(values, suppliedDigest) {
+         const request = continuityCloseRequest(root, stateSnapshot(root), values.continuityCloseRequest);
+         preparedAuditReadback(root, common, prior.coordinator, request);
+         result.nextAction = featureCloseAction(values, prior.coordinator);
++        result.auditIndex = closeAuditIndex(root, common, prior.coordinator, { replay: true });
+       }
+       return result;
+     }
+@@ -911,6 +935,7 @@ async function applyTransition(values, suppliedDigest) {
+   };
+   if (next.phase === "feature-close-prepared") {
+     result.nextAction = featureCloseAction(values, next);
++    result.auditIndex = closeAuditIndex(root, common, next);
+   }
+   return result;
+ }
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 5b9f8589d..e81d0195f 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -395,6 +395,7 @@ function processFixture(name, options = {}) {
+     ["--continuity-close-request", paths.closeRequest],
+   );
+   assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms"));
++  if (options.afterPrepared) options.afterPrepared({ prepared, invokeAction, root });
+ 
+   const coordinatorSha256 = prepared.applied.stateSha256;
+   const closedState = {
+@@ -450,6 +451,7 @@ function processFixture(name, options = {}) {
+     root,
+     lifecycle,
+     transition,
++    prepared,
+     candidateOid,
+     candidateTree,
+     evidenceDirectory: started.evidenceDirectory,
+@@ -457,6 +459,49 @@ function processFixture(name, options = {}) {
+   };
+ }
+ 
++// AC-175 part A (D209/D210): the close course writes the generated audit index next to the close evidence on the
++// feature-close-prepared transition, names it in the close result, and lists a missing source instead of refusing.
++test("process: feature-close-prepared writes the audit index next to the close evidence and names it in the result", () => {
++  const f = processFixture("audit-index");
++  const named = f.prepared.applied.auditIndex;
++  assert.ok(named, "the close result names the audit index");
++  assert.equal(named.status, "written");
++  assert.equal(named.file, "audit-index.json");
++  const bytes = readFileSync(join(f.evidenceDirectory, "audit-index.json"));
++  assert.equal(named.sha256, digest(bytes));
++  const index = JSON.parse(bytes);
++  assert.equal(index.schema, "pipeline.audit-index.v1");
++  assert.deepEqual(index.sources.map((s) => s.path), ["specs/feature/prd.md", "specs/feature/result.md", "specs/feature/spec.md"]);
++  assert.ok(index.sources.every((s) => s.status === "present" && /^[0-9a-f]{64}$/u.test(s.sha256)));
++  assert.equal(index.commit.status, "present");
++  assert.equal(index.complete, false, "the fixture has no Verify receipt or delivery course");
++  assert.ok(index.missingSteps.some((m) => m.step === "gate:verify"), JSON.stringify(index.missingSteps));
++  assert.equal(named.complete, false);
++  assert.equal(named.missingSteps, index.missingSteps.length);
++  const text = bytes.toString("utf8");
++  assert.ok(!text.includes(f.root), "no absolute path in the index");
++  assert.equal(index.manifest.schema, "pipeline.audit-index-manifest.v1");
++});
++
++test("process: a replayed feature-close-prepared apply still names the audit index and the close is never refused for a missing source", () => {
++  let again;
++  let first;
++  processFixture("audit-index-replay", {
++    afterPrepared({ prepared, invokeAction: replay, root }) {
++      first = prepared.applied.auditIndex;
++      // A source moves after the close was prepared: a re-collection would now record a different index under another digest.
++      const prd = join(root, "specs/feature/prd.md");
++      const original = readFileSync(prd);
++      appendFileSync(prd, "edited after the close was prepared\n");
++      try { again = replay(prepared.planned.nextAction); } finally { writeFileSync(prd, original); }
++    },
++  });
++  assert.equal(again.status, "replayed");
++  assert.deepEqual(again.auditIndex, first, "a replay reports the index the first apply wrote, with the same digest");
++  assert.equal(again.auditIndex.status, "written");
++  assert.equal(again.auditIndex.file, "audit-index.json");
++});
++
+ test("process: registered package digest drift blocks close preparation before any transition", () => {
+   const f = processFixture("package-drift", {
+     beforePrepared({ root, paths }) {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index b22bd4d7f..30e4125ac 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -129,7 +129,8 @@ const { observeCurrentPlanApprovalForCalibration } = cliHelp ? {} : await import
+ const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+ const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+ const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
+-const { observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
++const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
++const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
+ const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
+ const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
+ const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+@@ -741,6 +742,20 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   }
+ 
++  // AC-175 part A (D209/D210): the bootstrap already observes continuity-source drift; a dispatch built on moved authority bytes
++  // is an open recovery, not a silent pass. The same projection (observeContinuityAuthorityDrift), the same recovery, no new verb.
++  // A project without a State or continuity, a malformed record, a failing observer and a current record all yield null here, so
++  // none of them changes any output byte. A source that cannot be compared at all is a warning (bootstrap's fail-open reading).
++  const continuityDrift = (() => {
++    try { return (deps.observeContinuityDrift ?? ((rootDir) => observeContinuityAuthorityDrift({ rootDir })))(root) ?? null; } catch { return null; }
++  })();
++  const driftSources = continuityAuthorityDriftSources(continuityDrift);
++  if (driftSources.changed.length > 0) {
++    soft("DBG-CONTINUITY-AUTHORITY-DRIFT", continuityAuthorityDriftRefusalText(driftSources.changed, driftSources.unobservable));
++  } else if (driftSources.unobservable.length > 0) {
++    warnings.push({ code: "DBG-CONTINUITY-AUTHORITY-UNOBSERVABLE", message: `the continuity record binds digests for ${driftSources.unobservable.map((entry) => `${entry.role} ${entry.path}`).join(", ")}, which could not be compared with the checkout (missing, unsafe or not a single regular file); the dispatch was not checked against them. See the bootstrap advisory continuityAuthorityDrift` });
++  }
++
+   // D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise repeats that stop
+   // unless it carries a recon note that corrects the premise. Other classes, other items and a repository without a queue
+   // are not touched, and nothing in the output changes unless a note is given.
