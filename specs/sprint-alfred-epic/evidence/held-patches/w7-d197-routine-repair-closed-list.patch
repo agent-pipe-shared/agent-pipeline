@@ -1,0 +1,535 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 1168de3e6..709a7297e 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3617,6 +3617,12 @@
+       "invariantPinned": "The session-authority repair CLI diagnoses a broken registry or lock, names a repair that actually runs, and leaves no state behind on a refused operation",
+       "nonOverlapNote": "Unique CLI suite for session-authority-repair.mjs (PF-55, D52)"
+     },
++    {
++      "name": "routine-repair-tests",
++      "file": "plugins/pipeline-core/lib/routine-repair.test.mjs",
++      "invariantPinned": "The routine-repair verb runs only the closed D194 list (heal, slice-cancel for budget or integrated-elsewhere, stop-failure-aside, move-aside for two named findings), records every run in the ledger, refuses everything else with RR-OUTSIDE-LIST and the original tool's command, and never deletes",
++      "nonOverlapNote": "Unique suite for lib/routine-repair.mjs and scripts/routine-repair.mjs (D194, D197); session-authority-repair-tests keeps the delegated heal and move-aside behaviour"
++    },
+     {
+       "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
+       "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+new file mode 100644
+index 000000000..e941a0718
+--- /dev/null
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -0,0 +1,199 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// D194 / D197: the runner-neutral core of the routine-repair verb. ONE closed list of the repairs the Elephant runs without
++// asking the human; each is retained aside (never deleted), recorded in a ledger line, and requires a reason. Everything else is
++// refused RR-OUTSIDE-LIST with the original tool's own command, because the human decides it. Runner adapters only translate:
++// none carries its own list. The CLI is scripts/routine-repair.mjs.
++import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
++import { createHash, randomBytes } from "node:crypto";
++import { spawnSync } from "node:child_process";
++import { isAbsolute, join, relative, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++export const ROUTINE_REPAIR_RECORD_SCHEMA = "pipeline.routine-repair-record.v1";
++export const ROUTINE_REPAIR_LIST_SCHEMA = "pipeline.routine-repair-list.v1";
++const SAR = fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url));
++const SLICE_QUEUE = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
++
++/** The closed list (D194). Frozen; nothing registers into it at runtime. */
++export const ROUTINE_REPAIRS = Object.freeze([
++  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
++  Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
++  Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
++  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
++]);
++const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
++const SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const STOP_FAILURE_NAME = /^stop-failure-[a-f0-9]{32}\.json$/u;
++
++const short = (error) => String(error?.reason ?? error?.message ?? error).replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 240);
++export const validRoutineReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
++const stamp = (now) => new Date(now()).toISOString().replace(/[^0-9]/gu, "");
++
++/**
++ * The stop-failure rule shared by `heal` (legacy directory) and `stop-failure-aside` (current diagnostics directory): a record moves
++ * aside (never deleted) unless it is a symlink, is not a valid pipeline.native-goldfish-host-stop-failure.v1 record, or its dispatch
++ * has an unsettled pending state (a pending file with no authority-terminal record for its digest, or one that cannot be read).
++ * The pending state of both namespaces lives in `pendingDir` (run/native-goldfish-host-commit).
++ */
++export function moveStopFailuresAside({ sourceDir, pendingDir, asideDir }) {
++  const retired = [], kept = [];
++  if (!existsSync(sourceDir)) return { retired, kept };
++  const candidates = readdirSync(sourceDir).filter((name) => STOP_FAILURE_NAME.test(name));
++  if (!candidates.length) return { retired, kept };
++  const pendingNames = existsSync(pendingDir) ? readdirSync(pendingDir) : [];
++  const unsettled = new Set(); let pendingProblem = null;
++  for (const name of pendingNames.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
++    try {
++      const bytes = readFileSync(join(pendingDir, name));
++      const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
++      if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
++      if (!pendingNames.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
++    } catch (error) { pendingProblem = `pending state ${name} cannot be read (${short(error)}), so in-flight cannot be decided`; }
++  }
++  for (const name of candidates) {
++    const path = join(sourceDir, name);
++    let record;
++    try {
++      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
++      record = JSON.parse(readFileSync(path, "utf8"));
++    } catch (error) { kept.push({ name, reason: `unreadable or malformed: ${short(error)}` }); continue; }
++    if (record === null || typeof record !== "object" || Array.isArray(record) || record.schema !== "pipeline.native-goldfish-host-stop-failure.v1" || typeof record.dispatchId !== "string") { kept.push({ name, reason: "not a native-goldfish-host-stop-failure.v1 record" }); continue; }
++    if (pendingProblem !== null) { kept.push({ name, reason: pendingProblem }); continue; }
++    if (unsettled.has(record.dispatchId)) { kept.push({ name, reason: `dispatch ${record.dispatchId} has an unsettled pending state` }); continue; }
++    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
++    renameSync(path, join(asideDir, name));
++    retired.push({ name, dispatchId: record.dispatchId, code: record.code ?? null, observedAt: record.observedAt ?? null });
++  }
++  return { retired, kept };
++}
++
++const refuse = (code, reason, next) => ({ ok: false, status: "refused", code, reason, ...(next ? { next } : {}) });
++
++/** The typed next step of an outside-list refusal: the human decides, with the original tool's own command. */
++function humanStep(kind, args = {}) {
++  const sar = (verb) => `node ${SAR} ${verb} --root <root>`;
++  if (kind === "release-lock") return `${sar("release-lock")} --no-pipeline-running --reason "<why>"`;
++  if (kind === "take-over") return `${sar("take-over")} --from <session> --no-other-session-running --reason "<why>" --class <class>`;
++  if (kind === "slice-cancel" || kind === "cancel") return `node ${SLICE_QUEUE} cancel <slice id> --reason "<why>" --class <class>${args.started ? " --started" : ""}`;
++  return `${sar("inspect")} (it names the exact repair command for each finding)`;
++}
++const outside = (what, kind, args) => refuse("RR-OUTSIDE-LIST", `${what} is not on the closed routine-repair list (${ROUTINE_REPAIRS.map((row) => row.kind).join(", ")})`, `this repair is decided by the human; the original tool's own command: ${humanStep(kind, args)}`);
++
++/** Validates a request and returns the plan; mutates nothing. */
++export function planRoutineRepair({ kind, reason, root, sliceId, cancelClass, started } = {}) {
++  if (typeof kind !== "string" || !KINDS.has(kind)) return outside(`repair kind ${JSON.stringify(String(kind).slice(0, 40))}`, kind);
++  if (!validRoutineReason(reason)) return refuse("RR-REASON-REQUIRED", "a routine repair is recorded with its reason: pass --reason \"<one line, at most 500 characters>\"");
++  if (typeof root !== "string" || root === "") return refuse("RR-ARGS", "--root <root> is required");
++  if (kind === "slice-cancel") {
++    if (typeof sliceId !== "string" || !SLICE_ID.test(sliceId)) return refuse("RR-ARGS", "slice-cancel needs one <slice id>");
++    const allowed = ROUTINE_REPAIRS.find((row) => row.kind === kind).classes;
++    if (!allowed.includes(cancelClass)) return outside(`cancel class ${JSON.stringify(String(cancelClass).slice(0, 40))}`, kind, { started });
++  }
++  return { ok: true, kind, reason: reason.trim(), root, ...(kind === "slice-cancel" ? { sliceId, cancelClass, started: started === true } : {}) };
++}
++
++/** Sorted finding names of one inspect result, each classified; used only by move-aside. */
++export function classifyInspectFindings(inspect) {
++  const rows = [];
++  const text = (...parts) => parts.filter((part) => typeof part === "string" && part !== "").join(" ");
++  const add = (source, haystack) => {
++    const found = ROUTINE_REPAIRS.find((row) => row.kind === "move-aside").findings.find((name) => haystack.includes(name));
++    rows.push({ source, finding: found ?? (haystack.slice(0, 120) || source), allowed: found !== undefined });
++  };
++  if (inspect?.lock?.status === "held") add("lock", text("registry-lock-held", inspect.lock.owner));
++  for (const row of inspect?.reservations ?? []) if (row?.sliceId && row.settled === null) add("reservation", `open-item-reservation:${row.sliceId}`);
++  if (inspect?.registry?.status === "unreadable") add("registry", text("registry-unreadable", inspect.registry.reason));
++  for (const row of inspect?.registry?.producers ?? []) {
++    if (row?.status === "ok") continue;
++    add(`producer:${row?.producerId}`, text(row?.status, row?.code, row?.reason, ...(row?.drifted ?? [])));
++  }
++  if (inspect?.registry?.read?.status === "refused") add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
++  return rows;
++}
++
++const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
++
++function defaultSpawn(script, args, cwd) {
++  const r = spawnSync(process.execPath, [script, ...args], { cwd, encoding: "utf8", shell: false, maxBuffer: 1 << 26 });
++  return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
++}
++
++function commonDirOf(root) {
++  const r = spawnSync("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8", shell: false });
++  if (r.status !== 0) return null;
++  const dir = r.stdout.trim();
++  return isAbsolute(dir) ? dir : resolve(root, dir);
++}
++
++const abandonedRel = (name) => `agent-pipeline/session-authority-abandoned/${name}`;
++
++/**
++ * Runs one routine repair and records it. Returns { exit, result }: exit 0 done, 2 refused. `deps` (tests only): spawn(script, args, cwd),
++ * now(). The ledger line is appended for every run whose repository resolves, refusals included.
++ */
++export function runRoutineRepair(request, deps = {}) {
++  const now = deps.now ?? Date.now;
++  const spawn = deps.spawn ?? defaultSpawn;
++  const plan = planRoutineRepair(request);
++  const reasonText = validRoutineReason(request?.reason) ? request.reason.trim() : null;
++  let root = null, commonDir = null;
++  if (typeof request?.root === "string" && request.root !== "") {
++    try { root = resolve(request.root); commonDir = commonDirOf(root); } catch { commonDir = null; }
++  }
++  const moved = [], retained = [];
++  let result;
++  if (!plan.ok) result = plan;
++  else if (commonDir === null) result = refuse("RR-ROOT", "--root is not a git repository");
++  else {
++    try { result = execute(plan, { root, commonDir, spawn, now, moved, retained }); }
++    catch (error) { result = refuse("RR-FAILED", short(error)); }
++  }
++  const code = result.ok ? (result.code ?? "done") : result.code;
++  let ledgerError = null;
++  if (commonDir !== null) {
++    const record = { schema: ROUTINE_REPAIR_RECORD_SCHEMA, kind: typeof request?.kind === "string" ? request.kind.slice(0, 40) : null, reason: reasonText, at: new Date(now()).toISOString(), result: code, moved, retained };
++    try {
++      const path = join(commonDir, "agent-pipeline", "routine-repair-ledger.jsonl");
++      mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
++      appendFileSync(path, `${JSON.stringify(record)}\n`, { mode: 0o600 });
++    } catch (error) { ledgerError = short(error); }
++  }
++  if (ledgerError !== null) return { exit: 2, result: { schema: ROUTINE_REPAIR_RECORD_SCHEMA, status: "refused", code: "RR-LEDGER-FAILED", reason: `the repair ran (${code}) but its ledger line could not be written: ${ledgerError}`, moved, retained } };
++  const { ok, ...rest } = result;
++  return { exit: ok ? 0 : 2, result: { schema: ROUTINE_REPAIR_RECORD_SCHEMA, status: ok ? "done" : "refused", code, ...rest, moved, retained, ledger: "agent-pipeline/routine-repair-ledger.jsonl" } };
++}
++
++function delegated(label, run, ctx) {
++  const json = parseJson(run.stdout);
++  for (const name of json?.retained ?? []) if (typeof name === "string") ctx.retained.push(abandonedRel(name));
++  const ok = run.status === 0;
++  return { ok, code: ok ? (json?.status ?? "done") : (json?.code ?? `RR-DELEGATE-EXIT-${run.status}`), delegate: label, ...(ok ? {} : { reason: json?.reason ?? String(run.stderr).slice(0, 240) }), ...(ok || !json?.repair ? {} : { next: json.repair }) };
++}
++
++function execute(plan, ctx) {
++  const { root, commonDir, spawn, now } = ctx;
++  if (plan.kind === "heal") return delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
++  if (plan.kind === "slice-cancel") {
++    const args = ["cancel", plan.sliceId, "--reason", plan.reason, "--class", plan.cancelClass, "--root", root, ...(plan.started ? ["--started"] : [])];
++    return delegated("slice-queue cancel", spawn(SLICE_QUEUE, args, root), ctx);
++  }
++  if (plan.kind === "stop-failure-aside") {
++    const asideName = `${stamp(now)}-${randomBytes(4).toString("hex")}-stop-failure`;
++    const sourceDir = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    const asideDir = join(commonDir, "agent-pipeline", "session-authority-abandoned", asideName);
++    const { retired, kept } = moveStopFailuresAside({ sourceDir, pendingDir: join(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit"), asideDir });
++    for (const row of retired) ctx.moved.push({ from: relative(commonDir, join(sourceDir, row.name)).split("\\").join("/"), to: `${abandonedRel(asideName)}/${row.name}` });
++    for (const row of kept) ctx.retained.push(relative(commonDir, join(sourceDir, row.name)).split("\\").join("/"));
++    return { ok: true, code: retired.length ? "moved-aside" : "nothing-to-move", retiredStopFailures: retired, keptStopFailures: kept };
++  }
++  // move-aside: only for a registry that holds nothing but the two named findings.
++  const inspectRun = spawn(SAR, ["inspect", "--root", root], root);
++  const inspect = parseJson(inspectRun.stdout);
++  if (inspectRun.status !== 0 || inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no finding can be classified", `node ${SAR} inspect --root <root>`);
++  const findings = classifyInspectFindings(inspect);
++  if (!findings.length) return refuse("RR-OUTSIDE-LIST", "inspect reports no blocking finding, so there is nothing for move-aside to repair", humanStep("move-aside"));
++  const other = findings.find((row) => !row.allowed);
++  if (other) return refuse("RR-OUTSIDE-LIST", `finding ${other.finding} (${other.source}) is not on the closed list for move-aside (${ROUTINE_REPAIRS.find((row) => row.kind === "move-aside").findings.join(", ")})`, `this repair is decided by the human; the original tool's own command: ${humanStep("inspect")}`);
++  return delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx);
++}
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+new file mode 100644
+index 000000000..2abeca692
+--- /dev/null
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -0,0 +1,182 @@
++// SPDX-License-Identifier: SUL-1.0
++// D194 / D197: the closed routine-repair list. ONE shared table of the four kinds and the refusals, run against a real temporary git
++// repository. Delegated tools (heal, slice-queue cancel, move-aside, inspect) are replaced by a recording stub because their own suites
++// own their behaviour; the stop-failure-aside repair and the ledger are real.
++import test from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { join, relative } from "node:path";
++import { fileURLToPath } from "node:url";
++import { ROUTINE_REPAIRS, classifyInspectFindings, planRoutineRepair, runRoutineRepair } from "./routine-repair.mjs";
++
++const here = fileURLToPath(new URL(".", import.meta.url));
++const CLI = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
++const scratchParent = join(here, "../../../scratch/routine-repair-fixtures");
++const hex = (char, length) => char.repeat(length);
++
++function withRepo(run) {
++  mkdirSync(scratchParent, { recursive: true });
++  const root = mkdtempSync(join(scratchParent, "repo-"));
++  try {
++    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
++    return run(root, join(root, ".git", "agent-pipeline"));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++const diagDir = (ap) => join(ap, "run", "native-goldfish-host-diagnostics");
++const commitDir = (ap) => join(ap, "run", "native-goldfish-host-commit");
++function writeStopFailure(ap, id, dispatchId, { schema = "pipeline.native-goldfish-host-stop-failure.v1" } = {}) {
++  mkdirSync(diagDir(ap), { recursive: true });
++  const name = `stop-failure-${hex(id, 32)}.json`;
++  writeFileSync(join(diagDir(ap), name), JSON.stringify({ schema, dispatchId, code: "NGH-STOP", observedAt: "2026-10-30T00:00:00Z" }));
++  return name;
++}
++function writePending(ap, dispatchId, { settled = false } = {}) {
++  mkdirSync(commitDir(ap), { recursive: true });
++  const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId } }));
++  writeFileSync(join(commitDir(ap), `pending-claude-${hex("a", 64)}.json`), bytes);
++  if (settled) writeFileSync(join(commitDir(ap), `authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`), "{}");
++}
++function files(dir) {
++  if (!existsSync(dir)) return [];
++  return readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) => !e.isDirectory()).map((e) => relative(dir, join(e.parentPath, e.name)));
++}
++const ledger = (ap) => (existsSync(join(ap, "routine-repair-ledger.jsonl")) ? readFileSync(join(ap, "routine-repair-ledger.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line)) : []);
++
++// A recording stand-in for the delegated tools.
++function stub(inspectResult) {
++  const calls = [];
++  const spawn = (script, args) => {
++    calls.push({ tool: script.split(/[\\/]/u).pop(), args });
++    if (args[0] === "inspect") return { status: 0, stdout: `${JSON.stringify(inspectResult)}\n`, stderr: "" };
++    if (args[0] === "cancel") return { status: 0, stdout: `${JSON.stringify({ status: "ok", state: "cancelled" })}\n`, stderr: "" };
++    return { status: 0, stdout: `${JSON.stringify({ status: args[0] === "heal" ? "healed" : "moved-aside", retained: ["20261030-aaaa-delegated"] })}\n`, stderr: "" };
++  };
++  return { calls, spawn };
++}
++const emptyInspect = { lock: { status: "absent" }, reservations: [], registry: { status: "present", producers: [], read: { status: "ok" } } };
++const inspectWith = (producer) => ({ ...emptyInspect, registry: { status: "present", producers: [producer], read: { status: "ok" } } });
++
++// The ONE shared table. `expect.calls` is the delegated tool + first argv word list; `stopFailures` marks the real repair.
++const TABLE = [
++  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
++  { id: "slice-cancel budget", request: { kind: "slice-cancel", sliceId: "S-1", cancelClass: "budget", started: true, reason: "budget exhausted" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["S-1", "--class", "budget", "--started"] } },
++  { id: "slice-cancel integrated-elsewhere", request: { kind: "slice-cancel", sliceId: "S-2", cancelClass: "integrated-elsewhere", reason: "landed in another commit" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["integrated-elsewhere"] } },
++  { id: "stop-failure-aside", request: { kind: "stop-failure-aside", reason: "diagnostic of a settled dispatch" }, setup: (ap) => { writeStopFailure(ap, "1", "D-1"); }, expect: { exit: 0, code: "moved-aside", calls: [], moved: 1 } },
++  { id: "move-aside unknown-registry-entry", request: { kind: "move-aside", reason: "unindexed registry entry" }, inspect: inspectWith({ producerId: "p", status: "reconcile-refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "unknown-registry-entry" }), expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]], argvHas: ["--no-goldfish-running"] } },
++  { id: "move-aside native-managed-unknown-native-entry", request: { kind: "move-aside", reason: "unknown native entry" }, inspect: inspectWith({ producerId: "p", status: "reconcile-refused", code: "native-managed-unknown-native-entry", reason: "x" }), expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]] } },
++  // Refusals.
++  { id: "refuse: kind outside the list", request: { kind: "release-lock", reason: "r" }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [], nextHas: "release-lock" } },
++  { id: "refuse: unknown kind", request: { kind: "delete-everything", reason: "r" }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [], nextHas: "decided by the human" } },
++  { id: "refuse: wrong cancel class", request: { kind: "slice-cancel", sliceId: "S-3", cancelClass: "wrong-premise", reason: "r" }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [], nextHas: "slice-queue.mjs cancel" } },
++  { id: "refuse: missing reason", request: { kind: "heal" }, expect: { exit: 2, code: "RR-REASON-REQUIRED", calls: [] } },
++  { id: "refuse: blank reason", request: { kind: "stop-failure-aside", reason: "   " }, expect: { exit: 2, code: "RR-REASON-REQUIRED", calls: [] } },
++  { id: "refuse: move-aside with another finding", request: { kind: "move-aside", reason: "r" }, inspect: inspectWith({ producerId: "p", status: "drifted", drifted: ["ns"], inFlight: 1 }), expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]], reasonHas: "producer:p" } },
++  { id: "refuse: move-aside with one allowed and one other finding", request: { kind: "move-aside", reason: "r" }, inspect: { ...emptyInspect, lock: { status: "held", owner: "live" }, registry: { status: "present", producers: [{ producerId: "p", status: "reconcile-refused", reason: "unknown-registry-entry" }], read: { status: "ok" } } }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]] } },
++  { id: "refuse: move-aside with no finding", request: { kind: "move-aside", reason: "r" }, inspect: emptyInspect, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]] } },
++];
++
++for (const row of TABLE) {
++  test(`routine repair: ${row.id}`, () => withRepo((root, ap) => {
++    row.setup?.(ap);
++    const before = files(ap);
++    const { calls, spawn } = stub(row.inspect ?? emptyInspect);
++    const { exit, result } = runRoutineRepair({ root, ...row.request }, { spawn, now: () => Date.parse("2026-10-30T12:00:00Z") });
++    assert.equal(exit, row.expect.exit);
++    assert.equal(result.code, row.expect.code);
++    assert.deepEqual(calls.map((call) => [call.tool, call.args[0]]), row.expect.calls);
++    if (row.expect.argvHas) for (const word of row.expect.argvHas) assert.ok(calls.at(-1).args.includes(word), `argv has ${word}`);
++    if (row.expect.nextHas) assert.match(result.next, new RegExp(row.expect.nextHas.replace(/[.]/gu, "\\.")));
++    if (row.expect.reasonHas) assert.match(result.reason, new RegExp(row.expect.reasonHas));
++    if (row.expect.retained) assert.deepEqual(result.retained, row.expect.retained);
++    if (row.expect.moved !== undefined) assert.equal(result.moved.length, row.expect.moved);
++    // The ledger line: written for every run, with the shape D194 names and paths relative to the common dir.
++    const lines = ledger(ap);
++    assert.equal(lines.length, 1);
++    assert.equal(lines[0].schema, "pipeline.routine-repair-record.v1");
++    assert.equal(lines[0].kind, row.request.kind);
++    assert.equal(lines[0].result, row.expect.code);
++    assert.equal(lines[0].at, "2026-10-30T12:00:00.000Z");
++    assert.equal(lines[0].reason, row.request.reason?.trim() || null);
++    assert.ok([...lines[0].moved.flatMap((m) => [m.from, m.to]), ...lines[0].retained].every((p) => !p.startsWith("/") && !p.includes(root)));
++    // Nothing is ever deleted: every file that existed before still exists, in place or moved aside under its own name.
++    const after = files(ap);
++    for (const name of before) assert.ok(after.includes(name) || after.some((file) => file.endsWith(`/${name.split("/").pop()}`) && file.startsWith("session-authority-abandoned/")), `${name} kept`);
++  }));
++}
++
++test("stop-failure-aside moves the record aside under session-authority-abandoned and removes it from the diagnostics directory", () => withRepo((root, ap) => {
++  const name = writeStopFailure(ap, "2", "D-2");
++  const { exit, result } = runRoutineRepair({ kind: "stop-failure-aside", root, reason: "r" });
++  assert.equal(exit, 0);
++  assert.equal(files(diagDir(ap)).length, 0);
++  const moved = files(join(ap, "session-authority-abandoned"));
++  assert.equal(moved.length, 1);
++  assert.match(moved[0], new RegExp(`-stop-failure/${name.replace(".", "\\.")}$`));
++  assert.equal(result.moved[0].from, `agent-pipeline/run/native-goldfish-host-diagnostics/${name}`.replace(/^agent-pipeline\//u, "agent-pipeline/"));
++}));
++
++test("stop-failure-aside keeps the record of a dispatch with an unsettled pending state, and moves it once settled", () => withRepo((root, ap) => {
++  const name = writeStopFailure(ap, "3", "D-3");
++  writePending(ap, "D-3");
++  const first = runRoutineRepair({ kind: "stop-failure-aside", root, reason: "r" });
++  assert.equal(first.exit, 0);
++  assert.equal(first.result.code, "nothing-to-move");
++  assert.match(first.result.keptStopFailures[0].reason, /unsettled pending state/u);
++  assert.ok(existsSync(join(diagDir(ap), name)));
++  writePending(ap, "D-3", { settled: true });
++  const second = runRoutineRepair({ kind: "stop-failure-aside", root, reason: "r" });
++  assert.equal(second.result.code, "moved-aside");
++  assert.ok(!existsSync(join(diagDir(ap), name)));
++  assert.equal(ledger(ap).length, 2);
++}));
++
++test("stop-failure-aside never moves a symlink or a record of another schema", () => withRepo((root, ap) => {
++  mkdirSync(diagDir(ap), { recursive: true });
++  const target = join(root, "target.json");
++  writeFileSync(target, JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "D-4" }));
++  symlinkSync(target, join(diagDir(ap), `stop-failure-${hex("4", 32)}.json`));
++  writeStopFailure(ap, "5", "D-5", { schema: "something.else.v1" });
++  writeFileSync(join(diagDir(ap), `stop-failure-${hex("6", 32)}.json`), "{ not json");
++  const { exit, result } = runRoutineRepair({ kind: "stop-failure-aside", root, reason: "r" });
++  assert.equal(exit, 0);
++  assert.equal(result.code, "nothing-to-move");
++  assert.equal(result.keptStopFailures.length, 3);
++  assert.equal(files(diagDir(ap)).length, 3);
++  assert.ok(existsSync(target));
++  assert.equal(result.retained.length, 3);
++}));
++
++test("the closed list is frozen, names exactly four kinds, and plan refuses everything else without mutating", () => {
++  assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
++  assert.ok(Object.isFrozen(ROUTINE_REPAIRS) && ROUTINE_REPAIRS.every((row) => Object.isFrozen(row)));
++  assert.throws(() => ROUTINE_REPAIRS.push({ kind: "rm" }), TypeError);
++  assert.equal(planRoutineRepair({ kind: "rm", reason: "r", root: "x" }).code, "RR-OUTSIDE-LIST");
++  assert.equal(planRoutineRepair({ kind: "heal", reason: "r", root: "x" }).ok, true);
++});
++
++test("classifyInspectFindings allows only the two named findings", () => {
++  assert.deepEqual(classifyInspectFindings(emptyInspect), []);
++  assert.deepEqual(classifyInspectFindings(inspectWith({ producerId: "p", status: "unreadable", reason: "unknown-registry-entry" })).map((r) => r.allowed), [true]);
++  assert.deepEqual(classifyInspectFindings({ ...emptyInspect, reservations: [{ sliceId: "S", settled: null }] }).map((r) => r.allowed), [false]);
++});
++
++test("CLI: list prints the closed list, an unknown kind is refused outside the list, and a real run writes the ledger", () => withRepo((root, ap) => {
++  const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", shell: false });
++  const listed = run("list");
++  assert.equal(listed.status, 0);
++  assert.deepEqual(JSON.parse(listed.stdout).repairs.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside"]);
++  const unknown = run("run", "release-lock", "--root", root, "--reason", "r");
++  assert.equal(unknown.status, 2);
++  assert.equal(JSON.parse(unknown.stdout).code, "RR-OUTSIDE-LIST");
++  assert.equal(run("run", "stop-failure-aside", "--root", root).status, 2);
++  assert.equal(JSON.parse(run("run", "stop-failure-aside", "--root", root).stdout).code, "RR-REASON-REQUIRED");
++  writeStopFailure(ap, "7", "D-7");
++  const done = run("run", "stop-failure-aside", "--root", root, "--reason", "settled dispatch");
++  assert.equal(done.status, 0);
++  assert.equal(JSON.parse(done.stdout).code, "moved-aside");
++  const lines = ledger(ap);
++  assert.deepEqual(lines.map((line) => line.result), ["RR-OUTSIDE-LIST", "RR-REASON-REQUIRED", "RR-REASON-REQUIRED", "moved-aside"]);
++  assert.equal(run("list", "extra").status, 2);
++}));
+diff --git a/plugins/pipeline-core/scripts/routine-repair.mjs b/plugins/pipeline-core/scripts/routine-repair.mjs
+new file mode 100644
+index 000000000..4c227c70b
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/routine-repair.mjs
+@@ -0,0 +1,59 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// routine-repair.mjs list
++// routine-repair.mjs run <kind> --root <root> --reason "<one line>" [kind-specific flags]
++//
++// D194 / D197: the closed list of repairs the Elephant runs without asking the human. Two verbs only.
++//   list  Read-only. Prints the closed list as JSON.
++//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running
++//         Each run is retained aside (never deleted) and appended to <git-common-dir>/agent-pipeline/routine-repair-ledger.jsonl.
++//         A kind outside the list is refused RR-OUTSIDE-LIST with the original tool's own command; the human decides it.
++// Prints one JSON result. Exit 0: done. Exit 2: refused (typed RR-* code).
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { ROUTINE_REPAIRS, ROUTINE_REPAIR_LIST_SCHEMA, ROUTINE_REPAIR_RECORD_SCHEMA, runRoutineRepair } from "../lib/routine-repair.mjs";
++
++const VALUE_FLAGS = new Set(["root", "reason", "class"]);
++const BOOLEAN_FLAGS = new Set(["started", "no-goldfish-running"]);
++
++function parseRun(argv) {
++  const [kind, ...rest] = argv;
++  if (typeof kind !== "string" || kind.startsWith("--")) return { error: "usage: routine-repair.mjs run <kind> --root <root> --reason \"<one line>\"" };
++  const flags = {}, positional = [];
++  for (let index = 0; index < rest.length; index += 1) {
++    const token = rest[index];
++    if (!token.startsWith("--")) { positional.push(token); continue; }
++    const name = token.slice(2);
++    if (BOOLEAN_FLAGS.has(name)) { if (flags[name]) return { error: `--${name} given twice` }; flags[name] = true; continue; }
++    if (!VALUE_FLAGS.has(name)) return { error: `unknown argument ${token.slice(0, 40)}` };
++    const value = rest[index + 1];
++    if (typeof value !== "string" || value.startsWith("--") || Object.hasOwn(flags, name)) return { error: `--${name} needs one value` };
++    flags[name] = value; index += 1;
++  }
++  if (kind === "move-aside" && flags["no-goldfish-running"] !== true) return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs)" };
++  if (kind !== "move-aside" && flags["no-goldfish-running"]) return { error: "--no-goldfish-running belongs to move-aside only" };
++  if (kind !== "slice-cancel" && (flags.started || flags.class !== undefined)) return { error: "--class and --started belong to slice-cancel only" };
++  if (kind !== "slice-cancel" && positional.length) return { error: `unexpected argument ${positional[0].slice(0, 40)}` };
++  if (kind === "slice-cancel" && positional.length !== 1) return { error: "slice-cancel needs exactly one <slice id>" };
++  return { request: { kind, root: flags.root, reason: flags.reason, sliceId: positional[0], cancelClass: flags.class, started: flags.started === true } };
++}
++
++export function runRoutineRepairCli(argv, out = (text) => process.stdout.write(text), deps = {}) {
++  const emit = (value, code) => { out(`${JSON.stringify(value)}\n`); return code; };
++  const [verb, ...rest] = argv;
++  if (verb === "list" && rest.length === 0) return emit({ schema: ROUTINE_REPAIR_LIST_SCHEMA, repairs: ROUTINE_REPAIRS }, 0);
++  if (verb !== "run") return emit({ schema: ROUTINE_REPAIR_RECORD_SCHEMA, status: "refused", code: "RR-ARGS", reason: "usage: routine-repair.mjs list | run <kind> --root <root> --reason \"<one line>\"" }, 2);
++  const parsed = parseRun(rest);
++  if (parsed.error) {
++    // A kind the list does not know gets the typed outside-list answer, not a usage error.
++    if (typeof rest[0] === "string" && !rest[0].startsWith("--") && !ROUTINE_REPAIRS.some((row) => row.kind === rest[0])) {
++      const { result, exit } = runRoutineRepair({ kind: rest[0] }, deps);
++      return emit(result, exit);
++    }
++    return emit({ schema: ROUTINE_REPAIR_RECORD_SCHEMA, status: "refused", code: "RR-ARGS", reason: parsed.error }, 2);
++  }
++  const { result, exit } = runRoutineRepair(parsed.request, deps);
++  return emit(result, exit);
++}
++
++if (isDirectInvocation(import.meta.url)) process.exitCode = runRoutineRepairCli(process.argv.slice(2));
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index 0ff850bee..6bf375af7 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -36,11 +36,12 @@
+ //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
+ //
+ // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
+-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { createHash, randomBytes } from "node:crypto";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
+ import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+ import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+@@ -103,39 +104,10 @@ function parse(argv) {
+ 
+ // D181b: a finalizer stop-failure record written before the diagnostic moved out of the native Goldfish namespace sits in the old
+ // directory and makes the native inventory refuse. Heal moves it aside (never deletes) unless its dispatch may still be in flight.
+-const LEGACY_STOP_FAILURE_NAME = /^stop-failure-[a-f0-9]{32}\.json$/u;
++// The rule itself lives in lib/routine-repair.mjs (moveStopFailuresAside), shared with the routine-repair stop-failure-aside kind (D194).
+ function retireLegacyStopFailures(repository, asideDir) {
+   const directory = join(repository.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+-  const retired = [], kept = [];
+-  if (!existsSync(directory)) return { retired, kept };
+-  const names = readdirSync(directory);
+-  const candidates = names.filter((name) => LEGACY_STOP_FAILURE_NAME.test(name));
+-  if (!candidates.length) return { retired, kept };
+-  // Unsettled pending state: a pending file naming the dispatch with no authority-terminal record for its digest.
+-  const unsettled = new Set(); let pendingProblem = null;
+-  for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
+-    try {
+-      const bytes = readFileSync(join(directory, name));
+-      const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
+-      if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
+-      if (!names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
+-    } catch (error) { pendingProblem = `pending state ${name} cannot be read (${short(error)}), so in-flight cannot be decided`; }
+-  }
+-  for (const name of candidates) {
+-    const path = join(directory, name);
+-    let record;
+-    try {
+-      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
+-      record = JSON.parse(readFileSync(path, "utf8"));
+-    } catch (error) { kept.push({ name, reason: `unreadable or malformed: ${short(error)}` }); continue; }
+-    if (record === null || typeof record !== "object" || Array.isArray(record) || record.schema !== "pipeline.native-goldfish-host-stop-failure.v1" || typeof record.dispatchId !== "string") { kept.push({ name, reason: "not a native-goldfish-host-stop-failure.v1 record" }); continue; }
+-    if (pendingProblem !== null) { kept.push({ name, reason: pendingProblem }); continue; }
+-    if (unsettled.has(record.dispatchId)) { kept.push({ name, reason: `dispatch ${record.dispatchId} has an unsettled pending state` }); continue; }
+-    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
+-    renameSync(path, join(asideDir, name));
+-    retired.push({ name, dispatchId: record.dispatchId, code: record.code ?? null, observedAt: record.observedAt ?? null });
+-  }
+-  return { retired, kept };
++  return moveStopFailuresAside({ sourceDir: directory, pendingDir: directory, asideDir });
+ }
+ 
+ function producerReport(repository) {
