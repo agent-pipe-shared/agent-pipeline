@@ -409,8 +409,13 @@ export function transitionCode(parent, current) {
   const correctionDelta = current.course.correctionCommitCount - parent.course.correctionCommitCount;
   if (!Number.isSafeInteger(correctionDelta) || correctionDelta < 0) return "CRL-HISTORY-CORRECTIONS";
   if (correctionDelta > 0) {
+    // D204: an effective full round (a delta request that moved a trust boundary or is impact-ambiguous) reviews the whole
+    // feature range, so its diff starts at the course genesis base, never at an arbitrary commit.
+    const fallbackFull = current.request?.admissionCode === "RE-DELTA-FALLBACK-FULL" && current.request?.mode === "full"
+      && typeof current.courseBinding?.genesisCandidate?.base === "string"
+      && current.diff.base === current.courseBinding.genesisCandidate.base;
     if (current.correction === null
-      || current.diff.base !== parent.candidate.commit
+      || (current.diff.base !== parent.candidate.commit && !fallbackFull)
       || current.correction.commit !== current.candidate.commit) {
       return "CRL-HISTORY-CORRECTION-BINDING";
     }

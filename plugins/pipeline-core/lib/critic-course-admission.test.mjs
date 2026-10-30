@@ -11,6 +11,7 @@ import { runRegisterFeaturePackage } from "../scripts/register-feature-package.m
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+import { transitionCode as lineageTransitionCode } from "./critic-review-lineage-core.mjs";
 import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 
@@ -700,7 +701,8 @@ test("G18B (b) every CCA refusal code yields a non-null recovery or an explicit 
 });
 test("G18B (c) the three existing repairs keep their exact text and non-CCA input stays null", () => {
   const sha = (v) => hash(Buffer.from(v));
-  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "82c0cb9fd7335a83a67eb42e85f7f43cd33e413975da46e4008b6c093f331d32");
+  // QG-04 restatement (D204 item 4): the intent (this repair text is pinned byte for byte) stays; only the CCA-DETERMINISTIC-UNAVAILABLE text changed, from the two-commit route to the one evidence-only commit route that evidenceCommitV2 accepts.
+  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "bbf8dace263856677906db60acb2609c9de4690f968349ca7cfee1706be25df1");
   assert.equal(sha(criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED")), "5529bda66d4b0b02095cf06d726b032e7360a4692a00e859cb3801659162a4c4");
   assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "4deceb8240578c2c85665690fe09bbac7d3ef571c450e98a84ac597a8d016def");
   assert.equal(criticCourseRepair("CDP-COURSE-UNAVAILABLE"), null);
@@ -1084,6 +1086,99 @@ test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request 
   assert.equal(refused.compileCode, "CCA-DELTA-REQUIRED", JSON.stringify(refused));
   assert.ok(readFileSync(join(fx.root, fx.manifestPath)).equals(before), "step manifest is byte-identical");
   assert.deepEqual(readdirSync(join(fx.root, "specs", fx.featureId, "evidence")).filter((n) => n.startsWith("critic-lineage-")).sort(), lineageFilesBefore, "step no round 2 lineage file was written");
+});
+// D204 anchor: a follow-up round whose registered delta request moves a trust boundary (or is impact-ambiguous) is an effective FULL
+// round of the same course, end to end, from the consumer's state: TWO consumed registered rounds, then the fallback full round 3,
+// then an ordinary diff round 4 whose corrections are counted from the previous candidate.
+const d204Failing = (specPath) => ({ ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] });
+const d204Evidence = (fx, candidate, n) => {
+  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-d204-${n}.log`, diag = `specs/${fx.featureId}/evidence/diagnostic-d204-${n}.json`, captured = `evidence/${fx.featureId}-targeted-d204-${n}.log`;
+  const produced = produceCriticDiagnostic({ root: fx.root, candidate, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: captured });
+  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, captured)));
+  produced.targeted.log.path = logPath;
+  writeFileSync(join(fx.root, diag), JSON.stringify(produced));
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  for (const path of [logPath, diag]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  pf94CommitPaths(fx.root, [fx.manifestPath, logPath, diag], `register the diagnostic ${n} in one evidence commit`);
+  return diag;
+};
+const d204Correction = (fx, n) => { writeFileSync(join(fx.root, `src/fix${n}.mjs`), `export const fixed${n} = ${n};\n`); return pf94Commit(fx.root, `correction ${n}`); };
+const d204Delta = (fx, flag) => {
+  pf94WriteInput(fx);
+  if (flag) writeFileSync(join(fx.root, "delta-input.json"), JSON.stringify({ ...JSON.parse(readFileSync(join(fx.root, "delta-input.json"), "utf8")), [flag]: true }));
+  const delta = pf94Delta(fx);
+  assert.equal(delta.status, "delta-request-added", JSON.stringify(delta));
+  return { delta, registration: pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request") };
+};
+const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration }) => {
+  const specPath = `specs/${fx.featureId}/spec.md`, taskId = `feature-held-task-d204-${n}`, packetId = (0xd0 + n).toString(16).repeat(16);
+  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
+  const preflightInput = { root: fx.root, base, candidate, specPath, guardrailPaths: [], evidencePaths: [diagnostic], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, base, candidate) };
+  const preflight = preflightCriticDispatch(preflightInput);
+  assert.equal(preflight.status, "packet-ready", `round ${n} preflight: ${JSON.stringify(preflight)}`);
+  assert.equal(preflight.coordinatorOnly.courseAdmission.round, n);
+  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: `feature-held-review-d204-${n}`, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: d204Failing(specPath) };
+  assert.doesNotThrow(() => admitSessionCriticReview(request, {}), `round ${n} admit`);
+  let finalized;
+  assert.doesNotThrow(() => { finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin }); }, `round ${n} finalize`);
+  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
+  const lineageAdded = addCriticReviewLineage({ root: fx.root, packetId });
+  assert.equal(lineageAdded.status, "lineage-added", `round ${n} lineage: ${JSON.stringify(lineageAdded)}`);
+  const lineage = JSON.parse(readFileSync(join(fx.root, lineageAdded.lineagePath), "utf8"));
+  pf94CommitPaths(fx.root, lineageAdded.commitPaths, `register the lineage of round ${n}`);
+  return { preflight, lineage };
+};
+for (const [flag, reason] of [["trustBoundaryChanged", "trust-boundary-change"], ["impactAmbiguous", "impact-ambiguous"]]) {
+  test(`D204 ANCHOR ${flag}: two consumed rounds, then an effective full round 3 end to end, then an ordinary diff round 4`, () => {
+    const fx = pf94DeltaFixture();
+    const genesisBase = fx.courseRequest.baseCommit, c1 = fx.correctionCommit;
+    const diag1 = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
+    // Round 2: ordinary diff round (consumed, registered).
+    const d2 = d204Delta(fx, null);
+    assert.equal(d2.delta.nextRoundMode, "delta");
+    const r2 = d204Round(fx, { n: 2, base: fx.candidate, candidate: c1, diagnostic: diag1, delta: d2.delta, registration: d2.registration });
+    assert.equal(r2.lineage.request.admissionCode, "RE-DELTA-ADMITTED");
+    // Correction 2 moves the trust boundary: round 3 is an effective full round.
+    const c2 = d204Correction(fx, 2);
+    const diag2 = d204Evidence(fx, c2, 2);
+    const d3 = d204Delta(fx, flag);
+    assert.equal(d3.delta.nextRoundMode, "full", "stage 3: the registration result says the next round is an effective full round");
+    assert.equal(d3.delta.nextRoundReason, reason, "stage 3: ...and why");
+    const admission3 = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: c1, candidateCommit: c2, registrationCommit: d3.registration, requestedMode: "delta", deltaRequestPath: d3.delta.deltaRequestPath });
+    assert.deepEqual([admission3.decision.status, admission3.decision.mode, admission3.decision.code, admission3.decision.reason], ["admitted", "full", "RE-DELTA-FALLBACK-FULL", reason]);
+    const r3 = d204Round(fx, { n: 3, base: c1, candidate: c2, diagnostic: diag2, delta: d3.delta, registration: d3.registration });
+    assert.equal(r3.preflight.base.commit, genesisBase, "stage b: the packet reviews the whole feature range from the course genesis base");
+    assert.equal(r3.preflight.dispatch.reviewerInput.baseCommit, genesisBase);
+    assert.equal(r3.lineage.course.reviewRound, 3);
+    assert.equal(r3.lineage.diff.base, genesisBase, "stage c: the record covers the whole feature range");
+    assert.deepEqual([r3.lineage.request.mode, r3.lineage.request.admissionCode], ["full", "RE-DELTA-FALLBACK-FULL"], "stage c: effective full, from a requested delta");
+    assert.deepEqual([r3.lineage.invalidation.kind, r3.lineage.invalidation.reason], ["full-review-required", reason]);
+    // The history validator admits the genesis base only for an effective full round, and only the genesis base for it.
+    assert.equal(lineageTransitionCode(r2.lineage, r3.lineage), null, "the full round 3 follows round 2");
+    assert.equal(lineageTransitionCode(r2.lineage, { ...r3.lineage, diff: { ...r3.lineage.diff, base: fx.candidate } }), "CRL-HISTORY-CORRECTION-BINDING", "a full round starting anywhere but the genesis base is refused");
+    assert.equal(lineageTransitionCode(r2.lineage, { ...r3.lineage, request: { ...r3.lineage.request, admissionCode: "RE-DELTA-ADMITTED", mode: "delta" } }), "CRL-HISTORY-CORRECTION-BINDING", "a diff round may not start at the genesis base");
+    // Stage d/e: the next correction is an ordinary diff round whose parent is the full round; corrections are counted from each previous candidate.
+    const c3 = d204Correction(fx, 3);
+    d204Evidence(fx, c3, 3);
+    const d4 = d204Delta(fx, null);
+    assert.equal(d4.delta.nextRoundMode, "delta");
+    const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: c2, candidateCommit: c3, registrationCommit: d4.registration, requestedMode: "delta", deltaRequestPath: d4.delta.deltaRequestPath });
+    assert.deepEqual([next.decision.status, next.decision.mode, next.decision.code], ["admitted", "delta", "RE-DELTA-ADMITTED"], JSON.stringify(next.decision));
+    assert.equal(next.budgets.reviewRound, 4);
+    assert.equal(next.budgets.correctionCommitCount, 3, "stage d: three corrections, none recounted from the genesis base of the full round");
+  });
+}
+test("D204 the CCA-REQUESTED-MODE text states the fallback and the help texts describe the one-commit evidence route", () => {
+  const admissionSource = pf94Read("./critic-course-admission.mjs");
+  assert.ok(/RE-DELTA-FALLBACK-FULL/u.test(admissionSource) || /effective full/u.test(admissionSource), "the requested-mode text names the fallback");
+  for (const file of ["../scripts/register-feature-package.mjs", "../scripts/critic-diagnostic-evidence.mjs", "./critic-course-admission.mjs", "../skills/critic-review/SKILL.md"]) {
+    const text = pf94Read(file);
+    assert.ok(!/commit the (?:diagnostic )?artifact first/iu.test(text), `${file} must not describe the two-commit route`);
+  }
+  assert.ok(/one (?:evidence-only )?commit/iu.test(pf94Read("../scripts/register-feature-package.mjs")), "the register help describes the one-commit route");
+  assert.ok(pf94Read("../skills/critic-review/SKILL.md").includes("RE-DELTA-FALLBACK-FULL"), "the skill names the fallback");
 });
 test("PF94 DELTA (b) replay is idempotent, before and after the operator commit", () => {
   const fx = pf94DeltaFixture();

@@ -538,24 +538,28 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
   const edges = ["feature-delivery"];
   // Round N > 1 names the delta request that was registered for exactly this round candidate (base and commit of the packet).
-  let deltaRequestPath = null;
+  let deltaRequestPath = null, deltaRequestRecord = null;
+  // D204: the course base is the previous round's candidate; an effective full round (RE-DELTA-FALLBACK-FULL) has a packet base that is the course genesis base.
+  const courseBase = history.length > 0 ? history.at(-1).record.candidate.commit : packet.candidate.base;
   if (history.length > 0) {
     for (const entry of manifest.artifacts) {
       if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
       const present = inspect(root, entry.path);
       let record = null;
       try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
-      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === packet.candidate.base) { deltaRequestPath = entry.path; break; }
+      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === courseBase) { deltaRequestPath = entry.path; deltaRequestRecord = record; break; }
     }
     if (deltaRequestPath === null) return refused("FPR-LINEAGE-COMPILE", `no delta request is registered for the round candidate ${packet.candidate.commit} (base ${packet.candidate.base}), so the lineage of round ${round} cannot compile (CCA-DELTA-REQUIRED); round 2 and later need the delta request first (register-feature-package.mjs --add-delta-request)`, { compileCode: "CCA-DELTA-REQUIRED", packetId });
   }
   const compiled = compileRegisteredCriticReviewLineage({
-    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
+    courseRequest: { ...identityInput, baseCommit: courseBase, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
     packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
     packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
     coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
     correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
-    invalidation: { kind: "none", reason: null, evidenceSha256: null },
+    invalidation: deltaRequestRecord !== null && (deltaRequestRecord.trustBoundaryChanged === true || deltaRequestRecord.impactAmbiguous === true)
+      ? { kind: "full-review-required", reason: deltaRequestRecord.trustBoundaryChanged === true ? "trust-boundary-change" : "impact-ambiguous", evidenceSha256: null }
+      : { kind: "none", reason: null, evidenceSha256: null },
   });
   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
@@ -651,7 +655,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   if (!compiled.ok) {
     const code = String(compiled.code);
     const extra2 = { compileCode: code, manifestPath };
-    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), commit it, register it with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the manifest, then rerun this command`, extra2);
+    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), register it WITHOUT committing first with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun this command`, extra2);
     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
     if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (${code}); commit only the registration paths between the correction and this command`, extra2);
@@ -682,6 +686,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
     registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
     commitMessageHint: `chore(evidence): register the Critic delta request of round ${tail.round + 1} of ${featureId}`,
+    // D204: a request that moves a trust boundary or is impact-ambiguous is admitted as an effective FULL round of the same course.
+    nextRoundMode: input.trustBoundaryChanged === true || input.impactAmbiguous === true ? "full" : "delta",
+    nextRoundReason: input.trustBoundaryChanged === true ? "trust-boundary-change" : input.impactAmbiguous === true ? "impact-ambiguous" : null,
+    ...(input.trustBoundaryChanged === true || input.impactAmbiguous === true ? { nextRoundNote: "the next round is an effective FULL round (RE-DELTA-FALLBACK-FULL): it reviews the whole feature range from the course genesis base, because a diff cannot honestly cover this change; run the preflight with --delta-request as usual" } : {}),
     preflight,
     next: "commit commitPaths in one evidence-only commit (never the input file), then run critic-dispatch-preflight.mjs with the preflight arguments, replacing the registration commit by that commit",
   };

@@ -419,7 +419,7 @@ export function compileRegisteredCriticReviewLineage(input){try{
  const resolved=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input.courseRequest[k]])));if(!resolved.ok)throw Error(resolved.code);
  const parent=resolved.value.registeredHistory.at(-1)?.record??null;if((parent?.reviewId??null)!==input.parentReviewId)throw Error('CRL-V2-PARENT');
  const observedPacket=readConsumedCandidateResult({controlRoot:resolved.value.resolvedRepository.controlRoot,packetId:input.packetId}).packet;
- const actual=readConsumedCriticCourseResult({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:admission.source.candidate.commit,tree:admission.source.candidate.tree},expectedRange:{base:admission.source.candidate.base,commit:admission.source.candidate.commit,diffSha256:observedPacket.diff.sha256},expectedRecord:null});
+ const actual=readConsumedCriticCourseResult({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:admission.source.candidate.commit,tree:admission.source.candidate.tree},expectedRange:{base:admission.decision.code==='RE-DELTA-FALLBACK-FULL'?resolved.value.courseIdentity.genesisCandidate.base:admission.source.candidate.base,commit:admission.source.candidate.commit,diffSha256:observedPacket.diff.sha256},expectedRecord:null});
  if(!actual.ok)return actual;const {packet,receipt,result}=actual.value;
  if(packetCode(packet))throw Error('CRL-V2-PACKET');
  const {decision,...sourceSubject}=admission,courseSourceSha256=sha256Canonical(sourceSubject),courseDecisionSha256=sha256Canonical(decision);

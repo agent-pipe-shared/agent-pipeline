@@ -136,8 +136,14 @@ ok("RE17 delta derives stable sorted invariant impact", JSON.stringify(admittedD
 ok("RE18 unknown changed path refuses fallback full", admitReviewAttempt({ ...delta, changedPaths: ["src/unknown.mjs"] }).mode === null);
 ok("RE19 map digest drift refuses fallback full", admitReviewAttempt({ ...delta, pathInvariantMapSha256: B }).mode === null);
 ok("RE20 prior receipt omission refuses fallback full", admitReviewAttempt({ ...delta, priorReceipt: null }).mode === null);
-ok("RE21 new trust boundary refuses fallback full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === null);
-ok("RE22 ambiguous impact refuses fallback full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === null);
+// QG-04 restatement (D204): RE21/RE22 used to pin a refusal of a moved trust boundary / ambiguous impact. The intent (a delta is never admitted for such a request, no flag is re-declared) stays; the outcome is an effective FULL round, not a refusal.
+const tbFallback = admitReviewAttempt({ ...delta, trustBoundaryChanged: true });
+ok("RE21 new trust boundary is admitted as an effective full round, never as a delta", tbFallback.ok === true && tbFallback.mode === "full" && tbFallback.code === "RE-DELTA-FALLBACK-FULL" && tbFallback.reason === "trust-boundary-change");
+const ambFallback = admitReviewAttempt({ ...delta, impactAmbiguous: true });
+ok("RE22 ambiguous impact is admitted as an effective full round, never as a delta", ambFallback.ok === true && ambFallback.mode === "full" && ambFallback.code === "RE-DELTA-FALLBACK-FULL" && ambFallback.reason === "impact-ambiguous");
+ok("RE22b fallback still demands valid structural bindings and names the failing one", (() => { const r = admitReviewAttempt({ ...delta, trustBoundaryChanged: true, priorReceipt: null }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
+ok("RE22c fallback needs the coordinator impact confirmation", (() => { const r = admitReviewAttempt({ ...delta, impactAmbiguous: true, coordinatorImpactConfirmed: false }); return r.ok === false && r.binding === "coordinatorImpactConfirmed"; })());
+ok("RE22d a delta with an invalid prior receipt stays refused and names it", (() => { const r = admitReviewAttempt({ ...delta, priorReceipt: { id: "x", sha256: "nope" } }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
 ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
 // D190: the old cap now gates only a FULL request; a diff round past it is admitted.
 ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);

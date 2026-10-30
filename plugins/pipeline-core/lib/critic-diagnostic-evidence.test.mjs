@@ -113,12 +113,13 @@ test("D167-PF78 (4) the shared predicate agrees with the producer for a table of
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 // D41: the evidence route is printed by the help of the producer and the registrar, not only by the refusal text.
+// D204 (QG-04 restatement): the route is produce, register before committing, ONE evidence-only commit, rerun the
+// preflight. The older two-commit wording named a commit form the admission refuses.
 const ROUTE_STEPS = [
   /critic-diagnostic-evidence\.mjs/u,
-  /commit/iu,
   /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u,
-  /commit the manifest/iu,
-  /critic-dispatch-preflight\.mjs[^\n]*--registration-commit/u,
+  /ONE evidence-only commit/u,
+  /critic-dispatch-preflight\.mjs[^\n]*--registration-commit <that commit>/u,
 ];
 function assertRouteInOrder(text) {
   let from = 0;
@@ -130,7 +131,7 @@ function assertRouteInOrder(text) {
   }
 }
 for (const script of ["critic-diagnostic-evidence.mjs", "register-feature-package.mjs"]) {
-  test(`D41 ${script} --help prints the five-step evidence route and exits 0`, () => {
+  test(`D41 ${script} --help prints the four-step evidence route and exits 0`, () => {
     const result = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts", script), "--help"], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assertRouteInOrder(result.stdout);
@@ -225,19 +226,30 @@ function d2RequireBindingsText(text) {
 }
 test("D2 text (1) the diagnostic evidence route names the derive step and the request field and keeps the old step", () => {
   const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
-  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
+  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <that commit>\./u); // D204: one evidence-only commit
   d2RequireBindingsText(text);
 });
 test("D2 text (2) the registration route names the derive step and the request field and keeps both old steps", () => {
   const text = REGISTER_FEATURE_PACKAGE_HELP;
-  assert.match(text, /5\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
+  assert.match(text, /4\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <that commit>\./u); // D204: one evidence-only commit
   assert.match(text, /7\. Rerun critic-dispatch-preflight\.mjs with the arguments the verb prints\./u);
   d2RequireBindingsText(text);
   assert.ok((text.match(/critic-correction-input-bindings\.mjs derive/gu) ?? []).length >= 2);
 });
+import { criticCourseRepair } from "./critic-course-admission.mjs";
+test("D204 every diagnostic-evidence route text names one evidence-only commit and none teaches a commit before registration", () => {
+  const registration = readFileSync(join(D2_PLUGIN, "lib/feature-package-registration.mjs"), "utf8").split("\n").find((l) => l.includes('"FPR-DELTA-NO-DIAGNOSTIC"'));
+  assert.ok(registration, "FPR-DELTA-NO-DIAGNOSTIC text present");
+  const texts = { registration, unavailable: criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE"), failed: criticCourseRepair("CCA-DETERMINISTIC-FAILED"), producer: CRITIC_DIAGNOSTIC_EVIDENCE_HELP, registrar: REGISTER_FEATURE_PACKAGE_HELP };
+  for (const [name, text] of Object.entries(texts)) {
+    assert.match(text, /one evidence-only commit/iu, name);
+    assert.doesNotMatch(text, /commit it, register it|register it, commit the manifest/u, name);
+  }
+});
 test("D2 text (3) the push hint names the derive step and the request field and keeps the old hint", () => {
   const src = readFileSync(join(D2_PLUGIN, "scripts/push-prepare.mjs"), "utf8");
-  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base <merge base"));
+  // The hint interpolates the merge base (${first}) since the late-review-unit change; the anchor follows that spelling.
+  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD"));
   assert.ok(line, "hint line present");
   assert.ok(line.includes("then Verify that exact candidate"));
   d2RequireBindingsText(line);

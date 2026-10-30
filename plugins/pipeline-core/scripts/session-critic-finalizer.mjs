@@ -284,7 +284,7 @@ function featureReservationFor(options,preflight,root,controlRoot,packetId,prefl
   const course=preflight.coordinatorOnly.courseAdmission;
   const context=options.preflightInput.courseContext??{featureId:course.featureId,registrationCommit:preflight.candidate.commit,
     acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
-  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
+  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
     registrationCommit:context.registrationCommit,requestedMode:context.deltaRequestPath===null?"full":"delta",
     acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath};
   return reserveFeatureCriticReviewUnitOwnership({repoRoot:root,controlRoot,packetId,preflightSha256,courseInput,

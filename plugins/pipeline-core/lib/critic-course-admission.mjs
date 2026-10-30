@@ -36,17 +36,17 @@ const fail = (code) => { throw new CriticCourseAdmissionError(code); };
 // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
 // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
 const REPAIRS = Object.freeze({
-  "CCA-DETERMINISTIC-UNAVAILABLE": "No registered Critic diagnostic evidence binds the candidate. Produce it with scripts/critic-diagnostic-evidence.mjs, commit the evidence files under specs/<id>/evidence/, then register them: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>. Commit the manifest, then rerun critic-dispatch-preflight.mjs.",
+  "CCA-DETERMINISTIC-UNAVAILABLE": "No registered Critic diagnostic evidence binds the candidate. Produce it with scripts/critic-diagnostic-evidence.mjs, leave the evidence files uncommitted under specs/<id>/evidence/ and register them: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> (registration reads the working tree). Then commit the artifact, its log and the manifest in one evidence-only commit (the only form the admission accepts), and rerun critic-dispatch-preflight.mjs with --registration-commit naming it.",
   "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
 });
 /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
 const REPAIRS_EXTRA = {};
 Object.assign(REPAIRS_EXTRA, {
-  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it, commit the manifest, then rerun critic-dispatch-preflight.mjs.",
+  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it WITHOUT committing first (--add-diagnostic-evidence), commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun critic-dispatch-preflight.mjs with --registration-commit naming it.",
   "CCA-DETERMINISTIC-SELECTION": "The delta request names a different set of diagnostic evidence than the one registered. Regenerate the delta request from the currently registered diagnostic evidence paths, then rerun critic-dispatch-preflight.mjs.",
   "CCA-DELTA-REQUIRED": "A retained review exists, so the next review must be a delta. Prepare and register a delta request for the candidate, then rerun critic-dispatch-preflight.mjs with its path.",
-  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is a delta. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
+  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is requested as a delta. A delta request that moves a trust boundary or is impact-ambiguous is admitted by the admission itself as an effective full round of the same course (RE-DELTA-FALLBACK-FULL): register it with register-feature-package.mjs --add-delta-request and pass --delta-request, never a full request. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
 });
 const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
 /** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
@@ -583,7 +583,7 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
  const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
- const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
+ const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,...(admission.reason?{reason:admission.reason}:{}),affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
 // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
 // otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).
 function introducingCommit(root,base,candidate,manifestPath,path){
@@ -624,7 +624,9 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  const allCorrections=new Set();
  for(let index=0;index<history.length;index++){
   const record=history[index].record;
-  if(index>0)for(const oid of range(resolved.resolvedRepository.repoRoot,record.diff.base,record.candidate.commit)){if(!evidenceCommitV2(resolved.resolvedRepository.repoRoot,oid,resolved.courseIdentity.originalFeatureId))allCorrections.add(oid);}
+  // D204: count each round's corrections from the PREVIOUS round's candidate (identical to diff.base for a diff round); a full-fallback
+  // record's diff.base is the course genesis base, which would recount every earlier correction.
+  if(index>0)for(const oid of range(resolved.resolvedRepository.repoRoot,history[index-1].record.candidate.commit,record.candidate.commit)){if(!evidenceCommitV2(resolved.resolvedRepository.repoRoot,oid,resolved.courseIdentity.originalFeatureId))allCorrections.add(oid);}
   if(record.course.reviewRound!==index+1||record.course.correctionCommitCount!==allCorrections.size)fail('CCA-HISTORIC-COUNTER-BINDING');
  }
  const previousCount=allCorrections.size;
@@ -633,7 +635,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  if(pass&&!continuation)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
  // Source-owned immutable consumed history fixes the batch's next round.
  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
- // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.
+ // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above. Every later review is REQUESTED as a delta; D204: a delta request that moves a trust boundary or is impact-ambiguous is admitted as an effective full round (RE-DELTA-FALLBACK-FULL, the admission decides, the request never re-declares a flag).
  if(history.length && source.correctionCommits.length===0)fail('CCA-CORRECTION-RANGE');
  source.reviewUnit=featureReviewUnit(input,resolved);
  const evidence=deterministic(resolved.resolvedRepository.repoRoot,input.registrationCommit,resolved.courseIdentity.originalFeatureId,source.candidate,evidencePaths);

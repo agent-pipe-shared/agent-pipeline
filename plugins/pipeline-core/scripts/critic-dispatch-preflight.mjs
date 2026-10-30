@@ -384,6 +384,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   // declared round number, controls whether another model invocation is due.
   // Keep this read-only: the later session gate still owns packet/launch.
   let courseAdmission = null;
+  let reviewBase = { commit: baseCommit, tree: baseTree };
   const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
   const featureId = featureMatch?.[1] ?? null;
   if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
@@ -418,11 +419,15 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     // the historical four-round format, and the current one-full plus three-DIFF
     // policy can produce a packet-ready result for this registered batch.
     const round = admission.budgets?.reviewRound;
+    // D204: a round > 1 is requested as a delta; the admission may turn it into an effective FULL round (RE-DELTA-FALLBACK-FULL) when the
+    // registered delta request moves a trust boundary or is impact-ambiguous. That is the only full round accepted after round 1.
+    const fallbackFull = Number.isSafeInteger(round) && round > 1 && context.deltaRequestPath !== null
+      && admission.decision.mode === "full" && admission.decision.code === "RE-DELTA-FALLBACK-FULL";
     const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
     // D190: no round count refuses a diff round; the mode must still match the round.
     if (expectedMode === null
       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
-      || admission.decision.mode !== expectedMode
+      || (admission.decision.mode !== expectedMode && !fallbackFull)
       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
       const BUDGET_NEXT_STEP = "Critic budget spent (one full review plus at most three correction-diff reviews per declared batch): do not dispatch another Critic; the next step is Elephant self-verification, which cannot become PASS, or an explicit PO decision.";
       fail("CDP-COURSE-BUDGET", `Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch. ${BUDGET_NEXT_STEP}`,
@@ -437,7 +442,13 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     const { decision, ...subject } = admission;
     courseAdmission = Object.freeze({ featureId: context.featureId,
       sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
-      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount });
+      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount,
+      ...(fallbackFull ? { fallbackFull: true, reason: admission.decision.reason ?? null, courseBase: baseCommit ?? baseTree } : {}) });
+    // D204: the effective full round reviews the WHOLE feature range, course genesis base .. candidate (not the correction range).
+    if (fallbackFull) {
+      const genesisBase = admission.courseIdentity.genesisCandidate.base;
+      reviewBase = { commit: genesisBase, tree: git(realRoot, ["rev-parse", `${genesisBase}^{tree}`]) };
+    }
   }
 
   if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
@@ -460,7 +471,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     // authority: it launches one fresh Critic and then hands the closed result
     // to the runner-neutral durable finalizer. Native transports are optional.
     status: "packet-ready",
-    ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
+    ...(scope === null ? { base: { commit: reviewBase.commit, tree: reviewBase.tree } } : { reviewScope: scope, sourceCoverage }),
     candidate: { commit: candidateCommit, tree: candidateTree },
     ...(reviewAdmission === null ? {} : { reviewAdmission }),
     ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
@@ -474,7 +485,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
       spawnAuthorized: false, requiredNextGate: "session-critic-dispatch",
       reviewerInput: {
-        ...(scope === null ? { baseCommit } : { reviewScope: scope }),
+        ...(scope === null ? { baseCommit: reviewBase.commit } : { reviewScope: scope }),
         candidateCommit,
         candidateTree,
         rulesetSha: candidateCommit,

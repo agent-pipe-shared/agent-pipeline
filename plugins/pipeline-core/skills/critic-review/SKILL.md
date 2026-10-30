@@ -126,10 +126,14 @@ schema fails schema admission. Recompute the candidate binding for each review
 and let preflight validate the concrete artifact before dispatch.
 
 **Diagnostic evidence route (in this order):** produce the artifact with
-`scripts/critic-diagnostic-evidence.mjs`, commit the artifact, register it with
+`scripts/critic-diagnostic-evidence.mjs`, register it (uncommitted; registration reads the
+working tree) with
 `scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>`,
-commit the manifest, then rerun `scripts/critic-dispatch-preflight.mjs` with
-`--registration-commit` naming that manifest commit. Script paths resolve under
+commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun
+`scripts/critic-dispatch-preflight.mjs` with `--registration-commit` naming that commit.
+A delta request that moves a trust boundary or is impact-ambiguous is admitted as an
+effective full round of the same course (`RE-DELTA-FALLBACK-FULL`, the whole feature range
+is reviewed); the next correction is an ordinary diff round again. Script paths resolve under
 the plugin root the bootstrap prints, never a machine-specific path.
 
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
@@ -189,8 +193,8 @@ refusal before a packet is reserved. Order:
 3. `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` BEFORE
    the next correction commit; commit the manifest and the lineage file it names.
 4. Make the correction commit.
-5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), commit it, register it with
-   `--add-diagnostic-evidence <path>`, commit the manifest.
+5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), register it with
+   `--add-diagnostic-evidence <path>`, commit artifact, log and manifest in one evidence-only commit.
 6. Write the input JSON and run `register-feature-package.mjs --root <root> --add-delta-request <input.json>`
    (keys: `changedBehaviorClaims`, `pathInvariantMap` with exactly the changed paths,
    `coordinatorImpactConfirmed`, `trustBoundaryChanged`, `impactAmbiguous`).

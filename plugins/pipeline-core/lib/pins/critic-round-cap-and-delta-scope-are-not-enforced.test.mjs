@@ -81,9 +81,14 @@ test("AC2 follow-up must be delta mode with bound base/head/tree range", () => {
 test("AC2 follow-up wider than the delta is refused (unmapped path, boundary change, ambiguity)", () => {
   const wide = delta({ changedPaths: [p, "src/other.mjs"] });
   assert.equal(admitReviewAttempt(wide).code, "RE-DELTA-UNKNOWN-PATH");
-  assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true })).code, "RE-DELTA-BINDINGS-INVALID");
-  assert.equal(admitReviewAttempt(delta({ impactAmbiguous: true })).code, "RE-DELTA-BINDINGS-INVALID");
+  // QG-04 restatement (D204): the intent (never a DIFF round for a moved boundary or ambiguous impact) stays; the outcome is an effective FULL round.
+  for (const flag of ["trustBoundaryChanged", "impactAmbiguous"]) {
+    const r = admitReviewAttempt(delta({ [flag]: true }));
+    assert.equal(r.code, "RE-DELTA-FALLBACK-FULL", flag);
+    assert.equal(r.mode, "full", flag);
+  }
   assert.equal(admitReviewAttempt(delta({ pathInvariantMapSha256: H("9") })).code, "RE-DELTA-BINDINGS-INVALID");
+  assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true, priorReceipt: { id: "x", sha256: "bad" } })).code, "RE-DELTA-BINDINGS-INVALID");
 });
 
 test("AC2 dispatch preflight carries the typed course-budget refusal", () => {

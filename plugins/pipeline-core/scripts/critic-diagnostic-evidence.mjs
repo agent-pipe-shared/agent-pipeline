@@ -36,11 +36,10 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
   "",
   "Evidence route (run in this order):",
   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs (this script).",
-  "  2. Commit the produced artifact and its log.",
-  "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
-  "  4. Commit the manifest the registration names.",
-  "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
-  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+  "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+  "  3. Commit the artifact, its log and the manifest the registration names in ONE evidence-only commit (the only form the admission accepts).",
+  "  4. Rerun critic-dispatch-preflight.mjs with --registration-commit <that commit>.",
+  "  5. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
   "",
 ].join("\n");
 if (isDirectInvocation(import.meta.url)) {

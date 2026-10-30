@@ -428,7 +428,8 @@ function registerBatch(input) {
     return result;
   });
 }
-function reservationFile(mode, ordinal) { return mode === "full" || ordinal === 2 ? `${mode}-admission.json` : `delta-${ordinal}-admission.json`; }
+// D204: a full round after round 1 (the fallback of a delta request that moves a trust boundary) carries its number, so it never reuses the round-1 file.
+function reservationFile(mode, ordinal) { return (mode === "full" && ordinal === 1) || (mode === "delta" && ordinal === 2) ? `${mode}-admission.json` : `${mode}-${ordinal}-admission.json`; }
 function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
   const p = join(dir, reservationFile(mode, ordinal));
   if (!existsSync(p)) return null;
@@ -442,12 +443,14 @@ function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
 const MAX_BATCH_DELTA_ORDINAL = 4096;
 function reservations(dir) {
   // Round 2 is stored as delta-admission.json (reservationFile); later rounds carry their number.
-  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^delta-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
+  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^(?:delta|full)-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
   if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET", `A reservation file of this batch carries a round number above ${MAX_BATCH_DELTA_ORDINAL}; the batch directory is corrupt. Nothing is deleted.`);
   const full = reservationAt(dir, "full");
   const rows = full ? [full] : [];
   for (let ordinal = 2; ordinal <= Math.max(1, ...ordinals); ordinal++) {
-    const r = reservationAt(dir, "delta", ordinal);
+    const asDelta = reservationAt(dir, "delta", ordinal), asFull = reservationAt(dir, "full", ordinal);
+    if (asDelta && asFull) fail("CGB-HELD");
+    const r = asDelta ?? asFull;
     if (r) { if (rows.length !== ordinal - 1) fail("CGB-HELD"); rows.push(r); }
   }
   return rows;
@@ -919,7 +922,11 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
     const c = context(input.repoRoot,input.controlRoot,true);
     return transaction(c, () => {
       const observed = actualPacket(c,input.packetId,true), packet = observed.packet;
-      if (packet.request.sessionBinding?.preflightSha256 !== input.preflightSha256 || !eq(packet.candidate,projection.source.candidate)
+      // D204: the effective full round (RE-DELTA-FALLBACK-FULL) reviews genesis base .. candidate while the course source keeps the correction range.
+      const rangeMatches = projection.decision.code === "RE-DELTA-FALLBACK-FULL"
+        ? packet.candidate.base === identity.genesisCandidate.base && packet.candidate.commit === projection.source.candidate.commit && packet.candidate.tree === projection.source.candidate.tree
+        : eq(packet.candidate, projection.source.candidate);
+      if (packet.request.sessionBinding?.preflightSha256 !== input.preflightSha256 || !rangeMatches
         || !packet.references.some(r => r.kind === "spec" && r.path === unitRef.specPath)) fail("CGB-FEATURE-COURSE");
       const courseKey = identity.courseKey, target = {kind:"feature-course",courseKey};
       let owned = featureOwnership(c,courseKey,work);
