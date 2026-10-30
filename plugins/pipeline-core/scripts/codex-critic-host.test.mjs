@@ -9,7 +9,7 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { canonical, createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
-import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
@@ -3037,7 +3037,9 @@ async function signedPreparedCriticFixture(dutyId, root, childRoot) {
   // removed by cleanup -> activate() failed with domain-source-input) while a leftover lifetime blocks the registry initialization.
   // Each fixture therefore works in its own copy of the candidate repository (same HEAD, so the commit and tree match request.json).
   const sourceRoot = root;
-  root = mkdtempSync(join(tmpdir(), "codex-critic-host-family-fixture-"));
+  // The authority walk refuses a group/world-writable ancestor such as the shared tmpdir, so the copy lives beneath
+  // the owned checkout's scratch/ like every other session-authority fixture.
+  root = mkdtempSync(join(nativeContractFixtureParent(), "codex-critic-host-family-fixture-"));
   cpSync(sourceRoot, root, { recursive: true, verbatimSymlinks: true });
   rmSync(join(root, ".git", "agent-pipeline"), { recursive: true, force: true });
   const commonDir = join(root, ".git");
@@ -3238,12 +3240,15 @@ await checkAsync("active native PREPARE retains original private signed route an
    const isolated = await import(new URL(`./codex-critic-host.mjs?custody=${dutyId}`,import.meta.url));
    assert.equal(isolated.readNativeCriticPreparedContext(output),null,"isolated producer has no original result WeakMap");
    const factory = isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports});
-   const restored = await factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
-   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(restored),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
+   // QG-04 restatement (821cd35c1, 2026-10-25): persisted JSON no longer reconstructs a prepared family context; an
+   // isolated producer must reprepare (pinned the same way in codex-critic-actual-baseline.test.mjs). Finalization keeps
+   // running on the original in-process context, and a copied context stays refused in the isolated module.
+   await assert.rejects(factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/CRITIC-FAMILY-REPREPARE-REQUIRED/);
+   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(context),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
    const familyReturnPath=join(root,`family-${dutyId}-return.json`),familyReceiptPath=join(root,`family-${dutyId}-receipt.json`);
    writeJson(familyReturnPath,launched.value.hostReturn);
-   const final = isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
-     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:restored});
+   const final = finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
+     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:context});
    assert.equal(final.reviewPass,true); assert.equal(f.launches(),1);
    assert.equal(readJsonBounded(familyReceiptPath).value.route.requestedModel,route.model);
   } finally { f.cleanup(); }
@@ -3291,17 +3296,21 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
    const invalid=await invokeCodexNativeCriticHost(input,{...deps,familyContext:structuredClone(context)});assert.equal(invalid.status,"unavailable");assert.equal(f.launches(),0);
    const reviewed=await invokeCodexNativeCriticHost(input,deps);if(custodyError)throw custodyError;if(reviewed.status!=="reviewed"&&f.admissionError())throw f.admissionError();assert.equal(reviewed.status,"reviewed",JSON.stringify(reviewed));assert.equal(f.launches(),1);
    const captured=readNativeCriticCapturedReturn(context);writeJson(`${prefix}-return.json`,captured);
-   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));const restored=await isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
+   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));await assert.rejects(isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/CRITIC-FAMILY-REPREPARE-REQUIRED/); // QG-04 (821cd35c1): reprepare, finalize on the original context
    const reviewFingerprintBeforeFinalize=captureRepositoryFingerprint(review,reviewArtifacts);
    const protectedBeforeFinalize={candidate:captureRepositoryFingerprint(repo).sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
     "observer.private":captureRepositoryFingerprint(observers.find(o=>o.name==="private").root).sha256,
     "observer.shared":captureRepositoryFingerprint(observers.find(o=>o.name==="shared").root).sha256};
-   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||JSON.stringify(protectedBeforeFinalize)!==JSON.stringify(prepared.bindings.protectedBefore)){
-    const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
+   // QG-04 restatement: the native host records its own authority lifetimes and session-authority members in the
+   // candidate's .git/agent-pipeline, so the bare candidate fingerprint legitimately moves; finalize accounts for those
+   // registered publications (expectedOriginalPublicationFingerprint) and fails on anything else, so only the review
+   // checkout, the ruleset and the observers are pre-checked here, and finalize below must still report reviewPass.
+   const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
+   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||changed(prepared.bindings.protectedBefore,protectedBeforeFinalize).some(key=>key!=="candidate")){
     const detailChanges=Object.fromEntries(Object.keys(reviewFingerprintAtPrepare.detail).filter(key=>JSON.stringify(reviewFingerprintAtPrepare.detail[key])!==JSON.stringify(reviewFingerprintBeforeFinalize.detail[key])).map(key=>[key,{before:reviewFingerprintAtPrepare.detail[key],after:reviewFingerprintBeforeFinalize.detail[key]}]));
     assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(prepared.bindings.protectedBefore,protectedBeforeFinalize))}`);
    }
-   const final=isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:restored});assert.equal(final.reviewPass,true);
+   const final=finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:context});assert.equal(final.reviewPass,true);
    const replay=await invokeCodexNativeCriticHost(input,deps);assert.equal(replay.status,"unavailable");assert.equal(f.launches(),1);
   }finally{f.cleanup();}
  }

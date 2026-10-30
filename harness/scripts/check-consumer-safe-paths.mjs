@@ -145,6 +145,9 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/guardrails/git.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*)", reason: vendoredCanonAllowlistReason("guardrails/git.md") },
   { file: "plugins/pipeline-core/guardrails/security.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*", reason: vendoredCanonAllowlistReason("guardrails/security.md") },
   { file: "plugins/pipeline-core/roles/critic.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/critic.md") },
+  // Project-state record exclusion (2026-10-28): the vendored role and ADR-0014 cite §2.2 the same way they cite §2.1.
+  { file: "plugins/pipeline-core/roles/critic.md", match: "harness/review-protocol.md` §2.2) is a binding", reason: vendoredCanonAllowlistReason("roles/critic.md") },
+  { file: "plugins/pipeline-core/docs/adr/0014-critic-contract.md", match: "harness/review-protocol.md` §2.2, `roles/critic.md`", reason: vendoredCanonAllowlistReason("docs/adr/0014-critic-contract.md") },
   { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
   { file: "plugins/pipeline-core/roles/elephant.md", match: "`+`harness/`", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
   { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/review-protocol.md` §2.1 trigger decision table", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") },
