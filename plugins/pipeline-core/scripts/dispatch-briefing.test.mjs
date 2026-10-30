@@ -1327,6 +1327,36 @@ test("W2-R2 an escalation flag where the route already equals the pin changes no
   assert.equal(lower.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
 });
 
+// 2026-10-30: a package could not carry the escalation act, so a deep-tier package above the route effort had no generator route at all
+// (the flag exists only on the direct binding). The package key reaches the same binding check: parity with the flag for every value.
+test("a briefing package carries effortEscalation exactly like the flag: admitted with the same warning, unknown refused, absent contradicts", async () => {
+  const { runDispatchBriefing } = await lib();
+  const deep = { agentType: "goldfish-deep" };
+  for (const act of ["MP-05", "MP-07"]) {
+    const { fx, argv } = packageFixture({ ...deep, effortEscalation: act });
+    const built = runDispatchBriefing(argv, depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+    assert.equal(built.ok, true, JSON.stringify(built).slice(0, 400));
+    const parsed = parseNativeGoldfishBriefing(built.text);
+    assert.equal(parsed.ok, true, parsed.code);
+    assert.equal(parsed.binding.effort, "xhigh", "the binding records the effort the agent definition really runs");
+    const warning = built.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION");
+    assert.ok(warning && warning.message.includes(act), JSON.stringify(built.warnings));
+    const flag = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", act]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+    assert.equal(flag.binding.effort, parsed.binding.effort, `${act}: package and flag bind the same effort`);
+    assert.equal(flag.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION").message, warning.message, `${act}: same warning`);
+  }
+  const unknown = packageFixture({ ...deep, effortEscalation: "because" });
+  const refused = runDispatchBriefing(unknown.argv, depsOf(unknown.fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(refused.code, "DBG-EFFORT-ESCALATION-UNKNOWN", refused.message);
+  assert.match(refused.message, /"effortEscalation"/u, "the repair names the package key");
+  const empty = packageFixture({ ...deep, effortEscalation: "" });
+  assert.equal(runDispatchBriefing(empty.argv, depsOf(empty.fx, { claudeRoute: claudeRouteOf("medium") })).code, "DBG-PACKAGE-FIELD-TYPE");
+  const absent = packageFixture(deep);
+  const contradiction = runDispatchBriefing(absent.argv, depsOf(absent.fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(contradiction.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
+  assert.match(contradiction.message, /"effortEscalation"/u, "the contradiction names the package key as a repair");
+});
+
 test("W2-R2 an unreadable Claude route is announced and the agent definition's effort stays the briefed one", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

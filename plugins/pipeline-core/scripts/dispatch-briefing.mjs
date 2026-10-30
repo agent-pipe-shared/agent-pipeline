@@ -75,7 +75,7 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
 build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
   Required strings: id, item, agentType, modelId, check, title, ac, goal.
   Required non-empty string arrays: paths, context, targeted.
-  Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
+  Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation (MP-05|MP-07, as the flag).
   Optional string arrays: newFiles (files the dispatch creates: exempt from the must-exist check AND added to the write scope), forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
   Unknown keys are refused. --package is repository-relative. Only --out writes,
   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
@@ -839,7 +839,7 @@ export function generateDispatchBinding(options, deps = {}) {
   let effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
   let claudeRouteDuty = null;
   if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
-    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort), or omit the flag`);
+    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort; in a briefing package the key "effortEscalation"), or omit it`);
   }
   if (runner !== "codex") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
@@ -853,7 +853,7 @@ export function generateDispatchBinding(options, deps = {}) {
       claudeRouteDuty = taskRoute;
       warnings.push({ code: "DBG-EFFORT-ESCALATION", message: `${effortEscalation} escalation: agent definition ${agentType} pins effort ${resolved.effort}, above the ${routeEffort} the configured Claude route ${taskRoute} selects; the binding records ${resolved.effort}, the effort the run will really get` });
     } else {
-      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07), or pass the --agent-type whose definition matches the route`);
+      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07; in a briefing package the key "effortEscalation"), or pass the --agent-type whose definition matches the route`);
     }
   }
   let maxTurns;
@@ -1052,6 +1052,8 @@ function packageBindingOptions(root, pkg, agentType) {
     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
     // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
+    // The package carries the same escalation act as the --effort-escalation flag; the binding is its only validator.
+    ...(pkg.effortEscalation === undefined ? {} : { effortEscalation: pkg.effortEscalation }),
   };
 }
 

@@ -26,7 +26,9 @@ const GENERATOR_MARKER_LINE = /^<!-- pipeline-briefing-generator:v1 sha256=([a-f
 const GENERATOR_MARKER_ANY = /<!-- pipeline-briefing-generator:/gu;
 
 const REQUIRED_STRINGS = Object.freeze(["id", "item", "agentType", "modelId", "check", "title", "ac", "goal"]);
-const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner"]);
+// effortEscalation: the model-policy act (MP-05 or MP-07) that authorises an agent definition effort above its route effort; the
+// binding validates the closed value exactly as for the --effort-escalation flag (DBG-EFFORT-ESCALATION-UNKNOWN).
+const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation"]);
 // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
 export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
 const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
