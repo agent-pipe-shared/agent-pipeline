@@ -1,0 +1,116 @@
+diff --git a/harness/scripts/check-consumer-safe-paths.mjs b/harness/scripts/check-consumer-safe-paths.mjs
+index 0388f7fdf..9512a5504 100644
+--- a/harness/scripts/check-consumer-safe-paths.mjs
++++ b/harness/scripts/check-consumer-safe-paths.mjs
+@@ -145,6 +145,9 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
+   { file: "plugins/pipeline-core/guardrails/git.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*)", reason: vendoredCanonAllowlistReason("guardrails/git.md") },
+   { file: "plugins/pipeline-core/guardrails/security.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*", reason: vendoredCanonAllowlistReason("guardrails/security.md") },
+   { file: "plugins/pipeline-core/roles/critic.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/critic.md") },
++  // Project-state record exclusion (2026-10-28): the vendored role and ADR-0014 cite §2.2 the same way they cite §2.1.
++  { file: "plugins/pipeline-core/roles/critic.md", match: "harness/review-protocol.md` §2.2) is a binding", reason: vendoredCanonAllowlistReason("roles/critic.md") },
++  { file: "plugins/pipeline-core/docs/adr/0014-critic-contract.md", match: "harness/review-protocol.md` §2.2, `roles/critic.md`", reason: vendoredCanonAllowlistReason("docs/adr/0014-critic-contract.md") },
+   { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
+   { file: "plugins/pipeline-core/roles/elephant.md", match: "`+`harness/`", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
+   { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/review-protocol.md` §2.1 trigger decision table", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") },
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index 3b6ec28be..e3b2dbea7 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -9,7 +9,7 @@ import { spawnSync, execFileSync } from "node:child_process";
+ import { canonical, createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+ import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
+ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+-import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
+ import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
+@@ -3037,7 +3037,9 @@ async function signedPreparedCriticFixture(dutyId, root, childRoot) {
+   // removed by cleanup -> activate() failed with domain-source-input) while a leftover lifetime blocks the registry initialization.
+   // Each fixture therefore works in its own copy of the candidate repository (same HEAD, so the commit and tree match request.json).
+   const sourceRoot = root;
+-  root = mkdtempSync(join(tmpdir(), "codex-critic-host-family-fixture-"));
++  // The authority walk refuses a group/world-writable ancestor such as the shared tmpdir, so the copy lives beneath
++  // the owned checkout's scratch/ like every other session-authority fixture.
++  root = mkdtempSync(join(nativeContractFixtureParent(), "codex-critic-host-family-fixture-"));
+   cpSync(sourceRoot, root, { recursive: true, verbatimSymlinks: true });
+   rmSync(join(root, ".git", "agent-pipeline"), { recursive: true, force: true });
+   const commonDir = join(root, ".git");
+@@ -3238,12 +3240,15 @@ await checkAsync("active native PREPARE retains original private signed route an
+    const isolated = await import(new URL(`./codex-critic-host.mjs?custody=${dutyId}`,import.meta.url));
+    assert.equal(isolated.readNativeCriticPreparedContext(output),null,"isolated producer has no original result WeakMap");
+    const factory = isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports});
+-   const restored = await factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
+-   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(restored),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
++   // QG-04 restatement (821cd35c1, 2026-10-25): persisted JSON no longer reconstructs a prepared family context; an
++   // isolated producer must reprepare (pinned the same way in codex-critic-actual-baseline.test.mjs). Finalization keeps
++   // running on the original in-process context, and a copied context stays refused in the isolated module.
++   await assert.rejects(factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/CRITIC-FAMILY-REPREPARE-REQUIRED/);
++   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(context),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
+    const familyReturnPath=join(root,`family-${dutyId}-return.json`),familyReceiptPath=join(root,`family-${dutyId}-receipt.json`);
+    writeJson(familyReturnPath,launched.value.hostReturn);
+-   const final = isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
+-     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:restored});
++   const final = finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
++     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:context});
+    assert.equal(final.reviewPass,true); assert.equal(f.launches(),1);
+    assert.equal(readJsonBounded(familyReceiptPath).value.route.requestedModel,route.model);
+   } finally { f.cleanup(); }
+@@ -3291,17 +3296,21 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
+    const invalid=await invokeCodexNativeCriticHost(input,{...deps,familyContext:structuredClone(context)});assert.equal(invalid.status,"unavailable");assert.equal(f.launches(),0);
+    const reviewed=await invokeCodexNativeCriticHost(input,deps);if(custodyError)throw custodyError;if(reviewed.status!=="reviewed"&&f.admissionError())throw f.admissionError();assert.equal(reviewed.status,"reviewed",JSON.stringify(reviewed));assert.equal(f.launches(),1);
+    const captured=readNativeCriticCapturedReturn(context);writeJson(`${prefix}-return.json`,captured);
+-   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));const restored=await isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
++   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));await assert.rejects(isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/CRITIC-FAMILY-REPREPARE-REQUIRED/); // QG-04 (821cd35c1): reprepare, finalize on the original context
+    const reviewFingerprintBeforeFinalize=captureRepositoryFingerprint(review,reviewArtifacts);
+    const protectedBeforeFinalize={candidate:captureRepositoryFingerprint(repo).sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
+     "observer.private":captureRepositoryFingerprint(observers.find(o=>o.name==="private").root).sha256,
+     "observer.shared":captureRepositoryFingerprint(observers.find(o=>o.name==="shared").root).sha256};
+-   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||JSON.stringify(protectedBeforeFinalize)!==JSON.stringify(prepared.bindings.protectedBefore)){
+-    const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
++   // QG-04 restatement: the native host records its own authority lifetimes and session-authority members in the
++   // candidate's .git/agent-pipeline, so the bare candidate fingerprint legitimately moves; finalize accounts for those
++   // registered publications (expectedOriginalPublicationFingerprint) and fails on anything else, so only the review
++   // checkout, the ruleset and the observers are pre-checked here, and finalize below must still report reviewPass.
++   const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
++   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||changed(prepared.bindings.protectedBefore,protectedBeforeFinalize).some(key=>key!=="candidate")){
+     const detailChanges=Object.fromEntries(Object.keys(reviewFingerprintAtPrepare.detail).filter(key=>JSON.stringify(reviewFingerprintAtPrepare.detail[key])!==JSON.stringify(reviewFingerprintBeforeFinalize.detail[key])).map(key=>[key,{before:reviewFingerprintAtPrepare.detail[key],after:reviewFingerprintBeforeFinalize.detail[key]}]));
+     assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(prepared.bindings.protectedBefore,protectedBeforeFinalize))}`);
+    }
+-   const final=isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:restored});assert.equal(final.reviewPass,true);
++   const final=finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:context});assert.equal(final.reviewPass,true);
+    const replay=await invokeCodexNativeCriticHost(input,deps);assert.equal(replay.status,"unavailable");assert.equal(f.launches(),1);
+   }finally{f.cleanup();}
+  }
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 4dedf49c9..53716b6ff 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -4,7 +4,7 @@
+   "files": [
+     {
+       "path": "harness/review-protocol.md",
+-      "rawSha256": "4c305136a6c71dd5b02b524b37c3b5a423e1e0cee5fe984c3983853ee6c1157f"
++      "rawSha256": "f015d1fe97e9d27e7f68120d0fc3af53026e933a6422f706c093d024167b217c"
+     },
+     {
+       "path": "plugins/pipeline-core/agents/critic.md",
+@@ -32,15 +32,15 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "d440420c0fcc8f96225303ddff9f7bbd1dbdce0d622bcbdbbfda49612ed88ca7"
++      "rawSha256": "f14e829b9d240acff182909a59d7a363ef486e144f0b91c62158bd3f65d40fc2"
+     },
+     {
+       "path": "roles/critic.md",
+-      "rawSha256": "4429e56ee9c15afc8f5eeae66ee4db06bc85d8822e7c08090217cc268d287549"
++      "rawSha256": "005591b0b81193270aee601312903ee840636f681ecc374471d70b267ce6421a"
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "996419bde7cd9a52bf49eee43d232775602a61a79c7cf225a0654900faf29a74"
++      "rawSha256": "51f08086f3878285756918859d4c21da2b5ec1a34c98561eba6df287a9a526ad"
+     }
+   ]
+ }
