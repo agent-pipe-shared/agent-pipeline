@@ -561,7 +561,28 @@ const cases = [
     assert.doesNotMatch(decision.reason, /(?:^|[\s"'(=])(?:\/[A-Za-z0-9_.-]+){2,}|[A-Za-z]:\\/u);
     assert.equal(decision.reason.includes(ctx.root), false);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
-
+  // NGHF26-NGHF27 -- PF-70: a refusal thrown before the commit leaves its stage and slug reason in the result and the diagnostic.
+  ...[["NGHF26", "inspectAttempt", "attempt-inspection"], ["NGHF27", "prepareTerminal", "authority-terminal-prepare"]].map(([id, seam, stage]) => ({ id,
+    name: `A stop refused at ${stage} records the stage and the slug reason, and drops a reason that is not a slug`, run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+      writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+      const transcript = stopInput(binding, "x").transcript_path;
+      writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+        message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding) } }] } })}\n`);
+      const refuse = (reason) => ({ ...dependencies, [seam]: () => { throw Object.assign(new Error("refused"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason }); } });
+      const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, refuse("state-write-handle-unavailable"));
+      assert.equal(failed.code, "SDC-AUTHORITY-UNAVAILABLE", JSON.stringify(failed));
+      assert.equal(failed.stage, stage);
+      assert.equal(failed.causeReason, "state-write-handle-unavailable");
+      const [entry] = diagEntries(commonDir);
+      const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8"));
+      assert.equal(recorded.code, "SDC-AUTHORITY-UNAVAILABLE");
+      assert.equal(recorded.stage, stage);
+      assert.equal(recorded.reason, "state-write-handle-unavailable");
+      assert.equal(facts.commits, 0);
+      const unsafe = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, refuse(`${root}/private path`));
+      assert.equal(unsafe.causeReason, null, "a reason that is not a bounded slug never travels");
+      assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).reason, null);
+    }, "claude", 1, "goldfish-implementor", { background: true }) })),
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

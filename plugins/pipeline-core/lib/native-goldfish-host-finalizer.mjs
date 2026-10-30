@@ -24,6 +24,9 @@ import { resolveGitCommonDir } from "./po-key-directory.mjs";
 import { inspectNativeGoldfishDispatchAttempt, bindNativeGoldfishDispatchAttempt, writeNativeGoldfishAttemptTerminalAssociation, writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
 function fail(code, status = "recovery-required") { return { status, code, commit: null, record: null }; }
+// PF-70: a thrown refusal carries its slug reason (e.g. selected-state-invalid-json); only that bounded slug travels, never a message or path.
+function causeReason(error) { return typeof error?.reason === "string" && /^[a-z0-9][a-z0-9.-]{0,95}$/u.test(error.reason) ? error.reason : null; }
+function failAt(stage, error, fallback) { return { ...fail(error?.code ?? fallback), stage, causeReason: causeReason(error) }; }
 function physicalRoot(value) {
   try { return realpathSync(resolve(value)); } catch { return null; }
 }
@@ -183,7 +186,8 @@ function recordSubagentStopOutcome({ stop, dispatch }, result) {
     stopMkdir(directory, { recursive: true, mode: 0o700 });
     stopWrite(join(directory, name), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
       dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
-      code: result?.code ?? null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+      code: result?.code ?? null, stage: typeof result?.stage === "string" ? result.stage : null,
+      reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
   } catch { /* diagnostic only */ }
 }
 
@@ -318,11 +322,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   // PostToolUse-shaped selector, so it is handed exactly the identifiers of the launching call and nothing else.
   const attemptInput = state.completionRoute === NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE && input.hook_event_name === "SubagentStop"
     ? { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: state.sessionId, tool_use_id: state.toolUseId } : input;
-  try { observedAttempt = inspectNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input: attemptInput }); }
-  catch (error) { return fail(error.code ?? "NGHF-ATTEMPT-ADMISSION"); }
+  try { observedAttempt = (dependencies.inspectAttempt ?? inspectNativeGoldfishDispatchAttempt)({ repoRoot: physical, runner, input: attemptInput }); }
+  catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
 
-  try { prepareNativeGoldfishAuthorityTerminal({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}); }
-  catch(error) { return fail(error.code??"NGHF-AUTHORITY-RECOVERY"); }
+  try { (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}); }
+  catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
 
   let committed;
   try {
@@ -372,7 +376,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     return { attempt, terminalAssociation, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
       commit: committed.commit, record: { target: published.target, sha256: published.sha256,
         authorship: "host-observed-local" } };
-  } catch(error) { return { ...fail(`NGHF-${postCommitStage.toUpperCase()}-EXCEPTION`), causeCode:error?.code??null, causeMessage:error?.message??null, commit: committed.commit }; }
+  } catch(error) { return { ...fail(`NGHF-${postCommitStage.toUpperCase()}-EXCEPTION`), causeCode:error?.code??null, causeMessage:error?.message??null, stage:postCommitStage, causeReason:causeReason(error), commit: committed.commit }; }
 }
 
 // The published dispatch record is immutable and carries no item-check verdict, so the verdict is published beside it as

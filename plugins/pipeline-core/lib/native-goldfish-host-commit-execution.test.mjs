@@ -115,6 +115,25 @@ const cases = [
     const stopped = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-COMMIT-ADMISSION", commit: null, record: null });
     assert.match(stopped, /NGHF-COMMIT-ADMISSION/u);
   } },
+  { id: "NGHC07", name: "PF-70: a recorded stage and reason are read back and named in the stop notice; an older record without them reads as null", run: () => {
+    const commonDir = mkdtempSync(join(tmpdir(), "native-goldfish-diag-"));
+    try {
+      const diagnostics = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+      mkdirSync(diagnostics, { recursive: true });
+      writeFileSync(join(diagnostics, "stop-failure-ddd.json"), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "OLD-3",
+        toolUseId: "t3", status: "recovery-required", code: "NGHF-OLD", commit: null, observedAt: "2026-10-30T05:00:00.000Z" })}\n`);
+      assert.equal(hook.readNativeGoldfishStopFailure({ commonDir }).stage, null);
+      assert.equal(hook.readNativeGoldfishStopFailure({ commonDir }).reason, null);
+      writeFileSync(join(diagnostics, "stop-failure-eee.json"), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "NEW-4",
+        toolUseId: "t4", status: "recovery-required", code: "SDC-AUTHORITY-UNAVAILABLE", stage: "attempt-inspection", reason: "state-write-handle-unavailable",
+        commit: null, observedAt: "2026-10-30T06:30:18.650Z" })}\n`);
+      const failure = hook.readNativeGoldfishStopFailure({ commonDir });
+      assert.equal(failure.stage, "attempt-inspection");
+      assert.equal(failure.reason, "state-write-handle-unavailable");
+      const message = hook.nativeGoldfishHookMessage({ status: "not-applicable", code: "NGHF-NOT-APPLICABLE" }, { stopFailure: failure });
+      assert.match(message, /SDC-AUTHORITY-UNAVAILABLE; stage attempt-inspection, reason state-write-handle-unavailable/u);
+    } finally { rmSync(commonDir, { recursive: true, force: true }); }
+  } },
 ];
 
 const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

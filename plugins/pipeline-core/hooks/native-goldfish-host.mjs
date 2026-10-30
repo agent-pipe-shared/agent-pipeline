@@ -62,7 +62,8 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
       if (entry?.schema !== STOP_FAILURE_SCHEMA || typeof entry.code !== "string") continue;
       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
       if (!newest || observedAt > newest.observedAt) {
-        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt };
+        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+          stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null };
       }
     }
     return newest;
@@ -71,7 +72,9 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
 
 function stopFailureNotice(failure) {
   if (!failure || typeof failure.code !== "string") return null;
-  return `A background Goldfish host commit failed at its stop (${failure.code})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
+  // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
+  const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
+  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
 }
 
 export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
