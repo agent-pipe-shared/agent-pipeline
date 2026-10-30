@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index ad3333fa3..0cef9177d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -55,6 +55,12 @@ function fail(code) { return { ok: false, code }; }
+ export function heldDependencyRepair() {
+   return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
+ }
++// PO 2026-10-30 (D203): when the registry cannot be read (a producer refuses its reconcile), the refusal names the whole
++// repair route itself: inspect, then the routine heal, and when heal did not clear it and no Goldfish runs, move-aside.
++export function readinessUnavailableRepair() {
++  const routine = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
++  return `the session-authority registry could not be read; run node ${REPAIR_SCRIPT} inspect --root <root> to see which producer refuses, then node ${routine} run heal --root <root> --reason "<why>" and inspect again. If a producer is still reconcile-refused and no Goldfish runs, run node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted, and the next dispatch initializes it fresh), then dispatch again`;
++}
+ // PF-85 1a: a package may name the stopped slice it continues. Only a slice cancelled for a budget stop or a
+ // wrong premise can be continued; anything else is refused before the queue is written.
+ export function continuationPredecessorRefusal(continuationOf, sliceId, slices) {
+@@ -230,7 +236,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
+     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
+     if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+-      if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`};
++      if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
+       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
+     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 10754f1df..8c80bdaf9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1286,6 +1286,15 @@ const cases = [
+     namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
+     const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
+     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
++    // PO 2026-10-30: an unreadable registry (a producer refuses its reconcile) names inspect, the routine heal and the human move-aside.
++    assert.equal(typeof mod.readinessUnavailableRepair,"function","readinessUnavailableRepair is exported");
++    const unavailable=mod.readinessUnavailableRepair();
++    assert.match(unavailable,/session-authority-repair\.mjs inspect --root <root>/u);
++    assert.match(unavailable,/routine-repair\.mjs run heal --root <root> --reason/u);
++    assert.match(unavailable,/move-aside --no-goldfish-running/u);
++    assert.match(unavailable,/still reconcile-refused and no Goldfish runs, run [^\n]*move-aside/u);
++    assert.match(unavailable,/nothing is deleted/u);
++    assert.match(source,/integration readiness \$\{readiness\.status\}[^\n]*repair:readinessUnavailableRepair\(\)/u,"the readiness-unavailable refusal attaches the repair");
+   })}},
+ 
+   { id: "NGHS45", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
