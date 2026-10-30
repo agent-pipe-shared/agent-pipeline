@@ -1864,13 +1864,19 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
   if (findings.length === 0 || findings.some((finding) => finding?.severity !== "minor")) {
     fail("critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker or major finding never");
   }
+  // N22: the subject (and the request) bind the candidate the Critic reviewed, exactly as the writer does,
+  // never the checkout's current HEAD; the clean-tree observation stays the caller's precondition.
+  const reviewed = { commit: receipt.candidate?.commit, tree: receipt.candidate?.tree };
+  if (typeof reviewed.commit !== "string" || typeof reviewed.tree !== "string") {
+    fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
+  }
   const subject = residualAcceptanceSubject({ receipt, findings });
-  const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate, subject });
+  const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate: reviewed, subject });
   if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
     fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
   }
   args.subjectSha256 = computed;
-  return subject;
+  return { subject, candidate: reviewed };
 }
 
 function residualAcceptanceConfirmationLines(kind, subject) {
@@ -1894,10 +1900,15 @@ function residualAcceptanceConfirmationLines(kind, subject) {
  * `authorize-critical` does -- has it, without re-reading or re-parsing the file.
  */
 function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, dependencies }) {
-  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
-  const subjectPreimage = args.kind === RESIDUAL_ACCEPTANCE_KIND
-    ? resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies })
-    : resolveSubjectPreimage({ args, repository, candidate });
+  let candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+  let subjectPreimage;
+  if (args.kind === RESIDUAL_ACCEPTANCE_KIND) {
+    const resolved = resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies });
+    subjectPreimage = resolved.subject;
+    candidate = resolved.candidate;
+  } else {
+    subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
+  }
   if (args.kind === "interruption-promotion" && subjectPreimage === null) {
     fail("critical approval request is invalid: interruption-promotion requires the current baseline through --subject");
   }

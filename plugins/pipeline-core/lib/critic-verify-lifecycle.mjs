@@ -187,7 +187,7 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
   }
   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId,
     candidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree } },
-  { readConsumedCandidateReceiptFn: () => consumed });
+  { ...deps, readConsumedCandidateReceiptFn: () => consumed });
   let range;
   try {
     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
@@ -271,7 +271,9 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
   let receipt;
   try { receipt = JSON.parse(readFileSync(target, "utf8")); } catch { fail("CVL-RECEIPT-UNAVAILABLE", "Private Critic/Verify lifecycle receipt is unavailable."); }
   const carrying = receipt?.schema === CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA;
-  const residualRecord = receipt?.schema === CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA;
+  // N22: a carry-forward receipt (v2) over a residual-accepted Critic receipt also carries `residualAcceptance`.
+  const residualRecord = receipt?.schema === CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA
+    || (carrying && receipt?.residualAcceptance !== undefined);
   const keys = ["schema", "id", "candidate", "critic", "verify", ...(carrying ? ["carryForward"] : []), ...(residualRecord ? ["residualAcceptance"] : [])];
   if (!exact(receipt, keys) || (![CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA,
     CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA, CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA].includes(receipt.schema))

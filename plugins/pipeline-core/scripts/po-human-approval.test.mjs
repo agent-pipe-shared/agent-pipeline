@@ -6123,7 +6123,7 @@ import { residualFindingId as residualRouteFindingId } from "../lib/critic-verif
 
 const RESIDUAL_ROUTE_KIND = "accept-residual-critic-findings";
 const RESIDUAL_ROUTE_PACKET = "c".repeat(32);
-const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET });
+const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET, candidate: Object.freeze({ ...CANDIDATE }) });
 const RESIDUAL_ROUTE_MINOR = Object.freeze([
   { severity: "minor", title: "wording of the refusal text", location: "plugins/pipeline-core/lib/example.mjs:10" },
   { severity: "minor", title: "unused import", location: "plugins/pipeline-core/lib/example.mjs:2" },

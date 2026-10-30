@@ -3341,19 +3341,23 @@ function c11Findings(list) {
   return list.map((f) => ({ id: c11FindingId(f), severity: f.severity })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// N22: the acceptance lives in a private record under the git common directory (never in the tracked state
+// file); the shared loader turns it into the lifecycle deps.
+import * as c11Readiness from "../lib/critic-verify-readiness.mjs";
+function c11PrivatePath(fx) {
+  return join(fx.common, "agent-pipeline", "critic-residual-acceptance", `${fx.made.receiptSha256}.json`);
+}
+function c11Private(fx) {
+  return JSON.parse(readFileSync(c11PrivatePath(fx), "utf8"));
+}
 function c11Lifecycle(fx, cand, findings) {
-  const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
-  const accepted = state.residualAcceptance?.lastAccepted;
-  const acceptance = accepted === undefined ? undefined : {
-    schema: "pipeline.critic-residual-acceptance.v1", mode: accepted.criticalProofWaiver?.mode,
-    candidate: accepted.candidate, criticReceiptSha256: accepted.criticReceiptSha256, findings: accepted.findings,
-  };
+  const loaded = c11Readiness.loadResidualAcceptanceDeps({ gitCommonDir: fx.common, projectDir: fx.root,
+    criticReceiptSha256: fx.made.receiptSha256, authorizeFn: (input) => c11Authorize(input) });
   const evidence = { schema: "pipeline.verify-evidence.v0", exitCode: 0, candidate: { ...cand }, verifyRun: { terminalSha256: "c".repeat(64) } };
   return c11Record({ gitCommonDir: fx.common, criticPacketId: fx.made.receipt.packetId, candidate: cand, evidencePath: "evidence/verify.json", evidence }, {
     readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt: fx.made.receipt }),
     readOpenFindingsFn: () => findings,
-    residualAcceptance: acceptance,
-    verifyResidualAcceptanceFn: (input) => c11Authorize({ projectDir: fx.root, state, candidate: input.candidate ?? cand, criticReceiptSha256: input.criticReceiptSha256 ?? fx.made.receiptSha256, findings: input.findings ?? acceptance?.findings }),
+    ...(loaded ?? {}),
   });
 }
 
@@ -3382,14 +3386,16 @@ c11Case("C11-a chat mode records an attended residual acceptance and the lifecyc
     const made = c11Receipt(cand, c11Minor);
     fx.made = made;
     fx.deps.gitHead = () => ({ ok: true, commit: head });
-    fx.deps.gitCandidate = () => ({ ok: true, ...cand });
+    // N22: the checkout has moved on (an evidence commit) since the Critic reviewed `cand`.
+    fx.deps.gitCandidate = () => ({ ok: true, commit: "8".repeat(40), tree: "7".repeat(40) });
     fx.deps.readConsumedCandidateReceiptFn = () => ({ packet: made.packet, receipt: made.receipt });
     const code = "ACCEPT-" + made.receiptSha256.slice(0, 8).toUpperCase();
     const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => code };
+    const stateBefore = readFileSync(fx.statePathFile);
     const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", made.receipt.packetId], deps));
     assert.equal(outcome.result, 0, outcome.lines.join(" "));
-    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
-    const accepted = state.residualAcceptance.lastAccepted;
+    assert.ok(stateBefore.equals(readFileSync(fx.statePathFile)), "the tracked state file must not be written");
+    const accepted = c11Private(fx).record;
     assert.equal(accepted.forCommit, head);
     assert.equal(accepted.forTree, cand.tree);
     assert.deepEqual(accepted.candidate, cand);
@@ -3408,12 +3414,15 @@ c11Case("C11-b signature mode records the acceptance and consumes the proof once
     const flags = c11SignatureFiles(fx, c11Minor);
     const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags], fx.deps));
     assert.equal(outcome.result, 0, outcome.lines.join(" "));
-    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
-    const accepted = state.residualAcceptance.lastAccepted;
+    const stored = c11Private(fx);
+    const accepted = stored.record;
     assert.equal(accepted.criticReceiptSha256, fx.made.receiptSha256);
     assert.deepEqual(accepted.findings, c11Findings(c11Minor));
-    const consumed = (state.criticalProofConsumption ?? []).filter((entry) => entry.kind === C11_KIND);
-    assert.equal(consumed.length, 1, "exactly one ledger entry of the kind");
+    assert.equal(stored.consumption.kind, C11_KIND, "the proof consumption entry travels with the private record");
+    assert.equal(stored.consumption.proofSha256, accepted.criticalProof.proofSha256);
+    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+    assert.equal(state.residualAcceptance, undefined, "the tracked state file carries no acceptance");
+    assert.equal((state.criticalProofConsumption ?? []).length, 0, "the tracked state file carries no consumption");
   } finally { fx.cleanup(); }
 });
 
@@ -3454,10 +3463,20 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
     const argv = ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags];
     assert.equal(capturedStderr(() => run(argv, fx.deps)).result, 0);
     const before = readFileSync(fx.statePathFile);
+    const privateBefore = readFileSync(c11PrivatePath(fx));
     const second = capturedStderr(() => run(argv, fx.deps));
     assert.notEqual(second.result, 0);
     assert.ok(second.lines.some((line) => line.includes("CRITICAL-PROOF-REPLAY")), second.lines.join(" "));
     assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical after the replay");
+    assert.ok(privateBefore.equals(readFileSync(c11PrivatePath(fx))), "the private record must be identical after the replay");
+    // The replay is refused across private records: the same proof, offered for another receipt's record, is refused as well.
+    const stored = c11Private(fx);
+    const otherDir = join(fx.common, "agent-pipeline", "critic-residual-acceptance");
+    const replay = c11Readiness.writeResidualAcceptanceRecord({ gitCommonDir: fx.common, criticReceiptSha256: "9".repeat(64),
+      record: { ...stored.record, criticReceiptSha256: "9".repeat(64) }, consumption: stored.consumption });
+    assert.equal(replay.ok, false);
+    assert.equal(replay.code, "CRITICAL-PROOF-REPLAY");
+    assert.ok(!existsSync(join(otherDir, "9".repeat(64) + ".json")));
   } finally { fx.cleanup(); }
 });
 

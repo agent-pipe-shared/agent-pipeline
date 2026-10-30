@@ -75,6 +75,7 @@ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { loadResidualAcceptanceDepsForPacket } from "../lib/critic-verify-readiness.mjs";
 import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt,
   readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { ensureVerifyRunRecordsDirectory, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName, verifyWindowsRegisterCommon } from "./verify-journal.mjs";
@@ -215,13 +216,15 @@ function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandida
     fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a consumed Critic packet ID.");
   }
   const gitCommonDir = resolve(root, git(root, ["rev-parse", "--git-common-dir"]));
+  // N22: a PO residual acceptance (private record bound to the Critic receipt) is offered to the Critic readers.
+  const residualDeps = loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: root, criticPacketId }) ?? {};
   if (criticPacketId !== null) {
     try {
       if (criticEvidenceFeatureId === null) {
-        readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate });
+        readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate }, residualDeps);
       } else {
         inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir,
-          featureId: criticEvidenceFeatureId, criticPacketId, targetCandidate: sourceCandidate });
+          featureId: criticEvidenceFeatureId, criticPacketId, targetCandidate: sourceCandidate }, residualDeps);
       }
     }
     catch (error) { fail(`VEP-${error?.code ?? "CRITIC-INVALID"}`, error?.message ?? "Governed Verify Critic admission failed."); }
@@ -244,7 +247,9 @@ function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandida
   try {
     const bound = readBoundConsumedCriticReceipt({ gitCommonDir,
       criticPacketId: metadata.receipt.critic.packetId,
-      candidate: metadata.receipt.carryForward?.proof.reviewedCandidate ?? sourceCandidate });
+      candidate: metadata.receipt.carryForward?.proof.reviewedCandidate ?? sourceCandidate },
+    loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: root,
+      criticPacketId: metadata.receipt.critic.packetId }) ?? {});
     if (bound.criticReceiptSha256 !== metadata.receipt.critic.receiptSha256
       || bound.critic.packetDigest !== metadata.receipt.critic.packetDigest
       || bound.critic.verdictSha256 !== metadata.receipt.critic.verdictSha256
@@ -591,7 +596,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
         candidate: evidence.candidate,
         evidencePath: relative(root, target).replaceAll("\\", "/"),
         evidence,
-      });
+      }, loadResidualAcceptanceDepsForPacket({ gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
+        projectDir: root, criticPacketId: lifecyclePacketId }) ?? {});
     } catch (error) {
       fail(error?.code ?? "VEP-CRITIC-LIFECYCLE", error?.message ?? "Critic/Verify lifecycle receipt could not be persisted.");
     }

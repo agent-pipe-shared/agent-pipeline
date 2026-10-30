@@ -19,7 +19,10 @@ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
-import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
+import { canonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
+import { residualFindingId } from "../lib/critic-verify-lifecycle.mjs";
+import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
+import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
@@ -401,6 +404,58 @@ test("Critic-bound candidate Verify checks the packet before replacing evidence 
       mode: "candidate", criticReverifyReceiptId: first.criticLifecycle.receipt.id });
     assert.equal(rerun.status, "passed");
     assert.equal(rerun.criticLifecycle.receipt.critic.packetId, critic.packetId);
+  });
+});
+
+// N22 end-to-end: a PO acceptance of a failed all-minor Critic receipt, stored privately and bound to the
+// Critic's own candidate, lets Critic-bound candidate Verify pass after an evidence-only commit.
+test("N22 candidate Verify admits a failed all-minor Critic receipt through the private acceptance after an evidence-only commit", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const kind = "accept-residual-critic-findings";
+    const commit = (message) => git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+    writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
+    git(root, ["add", "pipeline.user.yaml"]);
+    commit("chat approval mode");
+    const featureId = "carry-feature";
+    const minor = { gap: "wording of the refusal", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" };
+    const reviewed = await completedCriticPacket(root, { featureId, verdict: { findings: [minor], deliberately_not_flagged: ["fixture"],
+      trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: false } });
+    const evidencePath = `specs/${featureId}/evidence/review.json`;
+    const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", verdict: "pass" })}\n`;
+    writeFileSync(join(root, evidencePath), evidenceBytes);
+    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
+      state: "approved", artifacts: [{ class: "candidate-evidence", path: evidencePath,
+        sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+        authority: false, mutability: "immutable", retention: "retain" }],
+    })}\n`);
+    git(root, ["add", `specs/${featureId}`]);
+    commit("register review evidence");
+    const options = { rootDir: root, mode: "candidate", criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId };
+    await assert.rejects(() => produceVerifyEvidence(options), error => error.code === "VEP-CVL-CRITIC-FAILED");
+    const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+    const receipt = readConsumedCandidateReceipt({ controlRoot, packetId: reviewed.packetId }).receipt;
+    const open = readConsumedCandidateResult({ controlRoot, packetId: reviewed.packetId }).result.verdict.findings;
+    const receiptSha = sha256(canonicalJson(receipt));
+    const waiver = criticalProofWaiverFor(root, kind);
+    assert.equal(waiver.waived, true);
+    const record = { schema: "pipeline.critic-residual-acceptance.v1", mode: "chat-attributed-unattested",
+      forCommit: receipt.candidate.commit, forTree: receipt.candidate.tree,
+      candidate: { commit: receipt.candidate.commit, tree: receipt.candidate.tree }, criticReceiptSha256: receiptSha,
+      findings: open.map((finding) => ({ id: residualFindingId(finding), severity: finding.severity }))
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      approvedBy: "PO", approvedAt: "2026-10-30T10:00:00.000Z", criticalProof: null,
+      criticalProofWaiver: { ...waiver.waiver, kind, mode: "chat-attributed-unattested" },
+      humanApproval: { kind, mode: "chat-attributed-unattested" } };
+    assert.equal(writeResidualAcceptanceRecord({ gitCommonDir: join(root, ".git"), criticReceiptSha256: receiptSha, record, consumption: null }).ok, true);
+    const result = await produceVerifyEvidence(options);
+    assert.equal(result.status, "passed");
+    assert.equal(result.criticLifecycle.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
+    const ready = checkCurrentCriticBoundVerify(root);
+    assert.equal(ready.ok, true, JSON.stringify({ code: ready.code }));
+    assert.equal(ready.receiptId, result.criticLifecycle.receipt.id);
+    assert.equal(result.criticLifecycle.receipt.residualAcceptance.basis, "po-acceptance-of-residual-minor-findings");
+    assert.equal(result.criticLifecycle.receipt.carryForward.proof.reviewedCandidate.commit, reviewed.candidate);
   });
 });
 

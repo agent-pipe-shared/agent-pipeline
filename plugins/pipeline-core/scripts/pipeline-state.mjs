@@ -534,6 +534,7 @@ import {
 } from "./publication-close-journal.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle, residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
+import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -9312,12 +9313,6 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     console.error("Error: approve-residual-acceptance refused (CRITICAL-PROOF-FLAGS-PROOF-REQUIRED).");
     return 2;
   }
-  const observed = gitCandidate(dir);
-  if (!observed.ok) {
-    console.error("Error: approve-residual-acceptance refused; the current candidate commit/tree could not be determined.");
-    return 2;
-  }
-  const candidate = { commit: observed.commit, tree: observed.tree };
   const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
   if (!common?.ok || typeof common.path !== "string") {
     console.error("Error: approve-residual-acceptance refused (git common directory unavailable).");
@@ -9336,6 +9331,12 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     return 2;
   }
   if (!receipt || !Array.isArray(rawFindings)) {
+    console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
+    return 2;
+  }
+  // N22: the acceptance is bound to the candidate the Critic reviewed, never to the checkout's current HEAD.
+  const candidate = { commit: receipt.candidate?.commit, tree: receipt.candidate?.tree };
+  if (typeof candidate.commit !== "string" || typeof candidate.tree !== "string") {
     console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
     return 2;
   }
@@ -9408,18 +9409,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
   } else if (verified.waived !== undefined) {
     record.criticalProofWaiver = verified.waived;
   }
-  const next = {
-    ...base,
-    schema: SCHEMA_ID,
-    residualAcceptance: { lastAccepted: record },
-    criticalProofConsumption: verified.proof === null
-      ? consumed
-      : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: approvedAt }],
-    updatedAt: approvedAt,
-  };
-  const writeResult = writeState(dir, next, base);
-  if (!stateWriteSucceeded(writeResult)) {
-    console.error(`Error: approve-residual-acceptance refused (${writeResult.code}).`);
+  // N22: private record (record plus its proof consumption entry) under the git common directory; the
+  // tracked project state file is not written, so the checkout stays clean. A proof already consumed by any
+  // private record is refused there.
+  const stored = writeResidualAcceptanceRecord({
+    gitCommonDir: common.path, criticReceiptSha256, record,
+    consumption: verified.proof === null ? null : { proofSha256: verified.proof.proofSha256, kind, consumedAt: approvedAt },
+  });
+  if (!stored.ok) {
+    console.error(`Error: approve-residual-acceptance refused (${stored.code}).`);
     return 2;
   }
   console.log(`Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`);
