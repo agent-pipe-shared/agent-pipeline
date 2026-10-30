@@ -1,0 +1,920 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 58dab5a60..8642ee90b 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -144,6 +144,7 @@ import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../l
+ import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
+ import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
+ import { formatArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
++import { classifyPublishedTagPush, RELEASE_TAG_REF } from "../lib/published-tag-push.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+@@ -1720,12 +1721,26 @@ function runDeployBranch(release, manifestResult, cmd) {
+ //
+ // Mirrors ruleset-freshness.mjs's `validTag` grammar exactly (same numeric definition --
+ // no leading zeros) so this hook and the channel resolver never drift into two different
+-// definitions of "release tag".
+-const RELEASE_TAG_NUMERIC = "(?:0|[1-9]\\d*)";
+-const RELEASE_TAG_REF = new RegExp(
+-  `^refs/tags/v${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}(?:-beta\\.${RELEASE_TAG_NUMERIC})?$`,
+-  "u",
+-);
++// definitions of "release tag". The grammar now lives in lib/published-tag-push.mjs (imported above), because the N27a
++// published-tag pass must read the SAME definition: one rule for "a release tag is never relaxed", not two.
++
++/**
++ * The tag ref this push writes, or null when it is not a tag push: an explicit refs/tags/ destination, or a bare name that
++ * git's own DWIM resolves to an existing local tag before any branch (refs/tags/<name> BEFORE refs/heads/<name>).
++ * Shared by the release-tag ancestry check and the N27a published-tag pass so both agree on what a tag push is.
++ */
++function resolvePushedTagRef(binding) {
++  if (!binding.ok) return null;
++  const { dst } = parseRefspec(binding.refspec, false);
++  if (!dst) return null;
++  if (dst.startsWith(TAG_REF_PREFIX)) return dst;
++  if (dst.startsWith(HEAD_REF_PREFIX)) return null; // explicit branch destination -- never a tag (AC-4).
++  const localTag = spawnSync(
++    "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", `${TAG_REF_PREFIX}${dst}`],
++    { timeout: 5000 },
++  );
++  return localTag.status === 0 ? `${TAG_REF_PREFIX}${dst}` : null; // no local tag by this name -- not a tag push here.
++}
+ 
+ /**
+  * `binding` is the module-level `pushBinding` (single, unambiguous remote+refspec).
+@@ -1739,26 +1754,11 @@ const RELEASE_TAG_REF = new RegExp(
+  * this function has to special-case.
+  */
+ function checkReleaseTagAncestry(binding, releaseSection) {
+-  if (!binding.ok) return;
+-  const { dst } = parseRefspec(binding.refspec, false);
+-  if (!dst) return;
+-
+-  let tagRef;
+-  if (dst.startsWith(TAG_REF_PREFIX)) {
+-    tagRef = dst;
+-  } else if (dst.startsWith(HEAD_REF_PREFIX)) {
+-    return; // explicit branch destination -- never a tag (AC-4).
+-  } else {
+-    // Bare name: git's own ref DWIM lookup for an unqualified push source checks
+-    // refs/tags/<name> BEFORE refs/heads/<name> (resolveImplicitPushDestination's own
+-    // docstring above records this precedence) -- mirror it instead of assuming branch.
+-    const localTag = spawnSync(
+-      "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", `${TAG_REF_PREFIX}${dst}`],
+-      { timeout: 5000 },
+-    );
+-    if (localTag.status !== 0) return; // no local tag by this name -- not a tag push here.
+-    tagRef = `${TAG_REF_PREFIX}${dst}`;
+-  }
++  // Bare name: git's own ref DWIM lookup for an unqualified push source checks refs/tags/<name> BEFORE
++  // refs/heads/<name> (resolveImplicitPushDestination's own docstring above records this precedence) --
++  // resolvePushedTagRef mirrors it instead of assuming branch.
++  const tagRef = resolvePushedTagRef(binding);
++  if (tagRef === null) return;
+   if (!RELEASE_TAG_REF.test(tagRef)) return; // AC-4: a non-release tag is unaffected.
+ 
+   // Defer entirely to the pre-existing deploy-trigger / deployApproval mechanism when
+@@ -1950,6 +1950,28 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
+   ]);
+ }
+ 
++// N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes
++// nothing new, so Verify evidence and an approval for that old commit can neither be met nor mean anything. The ONE predicate
++// is shared with the generated pre-push hook (lib/published-tag-push.mjs, which also states the trust assumption: a local
++// remote-tracking ref of the same remote is the record of publication). Release tags and every tag on an unpublished commit
++// keep the full gate below, unchanged; so does a tag that triggers a declared release adapter (a deployment is not nothing new).
++{
++  const publishedTagRef = resolvePushedTagRef(pushBinding);
++  const releaseTriggers = publishedTagRef !== null && hasRelease ? collectTriggerPatterns(releaseSection) : null;
++  // An unreadable trigger declaration fails TOWARD the gate (collectTriggerPatterns' own contract), never toward the pass.
++  const triggersReleaseAdapter = releaseTriggers !== null
++    && (releaseTriggers.uncertain || matchAdapters([publishedTagRef], releaseTriggers.byAdapter).length > 0);
++  if (publishedTagRef !== null && !triggersReleaseAdapter) {
++    const published = classifyPublishedTagPush({
++      projectDir: pushBinding.projectDir, remote: pushBinding.remote, tagRef: publishedTagRef, target: sourceCommit,
++    });
++    if (published.passes) {
++      if (invalidityNote) emit(1, [invalidityNote]);
++      allowExit();
++    }
++  }
++}
++
+ function portableCleanupBaselineFailure(binding, commit) {
+   const selectedState = projectStateRelPath(binding.projectDir);
+   let shown = spawnSync(
+diff --git a/plugins/pipeline-core/hooks/guard-push.test.mjs b/plugins/pipeline-core/hooks/guard-push.test.mjs
+index 7c46efbeb..85e749d85 100644
+--- a/plugins/pipeline-core/hooks/guard-push.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.test.mjs
+@@ -2598,6 +2598,34 @@ function freshRepoIn(parentDir, name) {
+   }
+ }
+ 
++// ---- PG-N27-TAG: a tag on an already published commit passes; every other tag stays gated (D206, N27a) ------------------
++// Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
++{
++  const { dir, head } = freshRepo("n27-tag");
++  writeManifest(dir, manifestPush({ approval: "required" }));
++  gitAt(dir, "remote", "add", "origin", "https://example.invalid/fixture.git");
++  gitAt(dir, "update-ref", "refs/remotes/origin/main", head);
++  writeFileSync(join(dir, "later.txt"), "unpublished\n");
++  gitAt(dir, "add", "later.txt");
++  gitAt(dir, "commit", "-q", "-m", "unpublished");
++  const unpublished = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
++  const EVIDENCE_MISSING = ["evidence/verify-latest.json missing"];
++  check("PG-N27-TAG-01 allow  rollback tag on a commit already on the same remote needs no Verify and no approval", `git push origin ${head}:refs/tags/rollback/2026-10-30-block1`, dir, ALLOW);
++  gitAt(dir, "tag", "rollback/2026-10-30-bare", head);
++  check("PG-N27-TAG-02 allow  the bare tag name resolves to the same published commit", "git push origin rollback/2026-10-30-bare", dir, ALLOW);
++  gitAt(dir, "tag", "-a", "-m", "annotated rollback", "rollback/2026-10-30-annotated", head);
++  check("PG-N27-TAG-03 allow  an annotated tag is peeled to the commit it targets", "git push origin rollback/2026-10-30-annotated", dir, ALLOW);
++  check("PG-N27-TAG-04 allow  a non-release tag on a published commit passes whatever its namespace", `git push origin ${head}:refs/tags/checkpoint-2026-10-30`, dir, ALLOW);
++  check("PG-N27-TAG-05 block  a rollback tag on an unpublished commit stays gated", `git push origin ${unpublished}:refs/tags/rollback/2026-10-30-unpublished`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++  check("PG-N27-TAG-06 block  a release tag stays gated even on a published commit", `git push origin ${head}:refs/tags/v1.2.3`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++  check("PG-N27-TAG-07 block  a beta release tag stays gated even on a published commit", `git push origin ${head}:refs/tags/v1.2.3-beta.1`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++  check("PG-N27-TAG-08 block  a release tag on an unpublished commit stays gated", `git push origin ${unpublished}:refs/tags/v2.0.0`, dir, BLOCK, { stderrIncludes: ["release tag 'refs/tags/v2.0.0'", "not reachable from refs/remotes/origin/main"] });
++  check("PG-N27-TAG-09 block  the pass is for tags: a branch push of a published commit stays gated", `git push origin ${head}:refs/heads/feature-published`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++  gitAt(dir, "update-ref", "refs/remotes/other/main", unpublished);
++  check("PG-N27-TAG-10 block  publication on ANOTHER remote does not count for this remote", `git push origin ${unpublished}:refs/tags/rollback/2026-10-30-other-remote`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++  check("PG-N27-TAG-11 block  a remote addressed by URL cannot be matched to a remote-tracking ref and stays gated", `git push https://example.invalid/fixture.git ${head}:refs/tags/rollback/2026-10-30-url`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
++}
++
+ // ---- Cleanup ----------------------------------------------------------------------------
+ for (const dir of ALL_DIRS) {
+   try {
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index fc5eb3df1..85529c278 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -275,6 +275,43 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
+   } catch { return false; }
+ }
+ 
++const CRITIC_EXPORT_PATH = /^specs\/([^/]+)\/evidence\/critic\/[a-f0-9]{32}\/[^/]+$/u;
++/**
++ * N27b / D206: which commits lie between a verified candidate and HEAD, and are all of them delivery tail? A commit is tail
++ * when it only changes the calibrated handover file(s) ("handover"), or only adds the export of a consumed Critic review
++ * ("critic-export", classified by `criticExportOnlyCommit` above -- no second classifier; the feature ids it is asked about
++ * are the ones the commit's own export paths name, and the receipt binding inside it stays the real proof). One commit is
++ * one kind: a commit mixing handover and export changes is not classified, and neither is a merge, a code change or an
++ * empty range. `ok` is true only when EVERY commit in `verifiedCommit..headCommit` is tail; `offending` names the first that
++ * is not. Never throws.
++ */
++export function classifyVerifiedDeliveryTail({ repoRoot, verifiedCommit, headCommit, handoverPaths, readReceipt = readConsumedCandidateReceipt }) {
++  const refuse = (reason, offending = null) => Object.freeze({ ok: false, reason, offending, commits: Object.freeze([]) });
++  try {
++    if (!OID.test(verifiedCommit) || !OID.test(headCommit) || verifiedCommit === headCommit) return refuse("not-a-range");
++    if (!Array.isArray(handoverPaths) || handoverPaths.some((path) => typeof path !== "string" || path === "")) return refuse("handover-unresolved");
++    const root = realpathSync(repoRoot);
++    gitBytes(root, ["merge-base", "--is-ancestor", verifiedCommit, headCommit], "CCA-RANGE-ANCESTRY");
++    const rangeCommits = gitBytes(root, ["rev-list", "--reverse", `${verifiedCommit}..${headCommit}`], "CCA-RANGE-READ")
++      .toString("utf8").trim().split("\n").filter(Boolean);
++    if (rangeCommits.length === 0 || rangeCommits.length > 512 || rangeCommits.some((oid) => !OID.test(oid))) return refuse("range-unreadable");
++    const handover = new Set(handoverPaths);
++    const commits = [];
++    for (const commit of rangeCommits) {
++      const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
++      if (parents.length !== 2) return refuse("merge-or-root-commit", commit);
++      const changed = gitBytes(root, ["diff", "--name-only", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ")
++        .toString("utf8").split("\0").filter(Boolean);
++      if (changed.length === 0) return refuse("empty-commit", commit);
++      if (changed.every((path) => handover.has(path))) { commits.push(Object.freeze({ commit, kind: "handover" })); continue; }
++      const featureIds = [...new Set(changed.map((path) => CRITIC_EXPORT_PATH.exec(path)?.[1]).filter(Boolean))];
++      if (featureIds.length > 0 && criticExportOnlyCommit(root, commit, featureIds, readReceipt)) { commits.push(Object.freeze({ commit, kind: "critic-export" })); continue; }
++      return refuse("not-delivery-tail", commit);
++    }
++    return Object.freeze({ ok: true, reason: null, offending: null, commits: Object.freeze(commits) });
++  } catch (error) { return refuse(String(error?.code ?? error?.message ?? "unreadable")); }
++}
++
+ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+   try {
+     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ")
+diff --git a/plugins/pipeline-core/lib/published-tag-push.mjs b/plugins/pipeline-core/lib/published-tag-push.mjs
+new file mode 100644
+index 000000000..b9e993ec5
+--- /dev/null
++++ b/plugins/pipeline-core/lib/published-tag-push.mjs
+@@ -0,0 +1,68 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * published-tag-push -- the ONE predicate both push gates use to decide that a TAG push needs no Verify evidence and no push
++ * approval (N27a / D206): hooks/guard-push.mjs (the agent's own push) and the generated pre-push hook
++ * (scripts/pre-push-hook-install.mjs renderImpl, which imports this module the way it imports the shared approval overlay).
++ *
++ * Why it exists: a consumer rule tags the pre-merge `main` commit `rollback/<date>-<block>` before a fast-forward. That commit
++ * is already published, so pushing the tag publishes nothing new; yet both gates asked for Verify evidence and an approval
++ * bound to that old commit, which can neither be met nor make sense.
++ *
++ * The rule (everything else keeps its gate exactly as before):
++ *   - the pushed ref is under refs/tags/, and is NOT a release tag (the strict grammar v<n>.<n>.<n>[-beta.<n>], or anything
++ *     else that starts like one: a release-looking name is never relaxed);
++ *   - the tag's target, peeled to a commit (an annotated tag object is peeled), is reachable from a remote-tracking ref of
++ *     the SAME remote: `refs/remotes/<remote>/*`.
++ *
++ * TRUST ASSUMPTION, stated rather than hidden: a local remote-tracking ref is taken as the record of what that remote holds.
++ * It is what a push or fetch wrote there; it is not a live query of the remote (no network is used). A stale or manually
++ * written remote-tracking ref therefore widens the pass only to commits a push or fetch once recorded -- never to a commit
++ * that was never on that remote through git. A remote addressed by URL, an unconfigured remote name and an option-shaped
++ * remote cannot be matched to a remote-tracking namespace, so they never pass (fail closed). Publication on another remote
++ * does not count. A release tag is never relaxed, published or not.
++ */
++import { spawnSync } from "node:child_process";
++
++const TAG_REF_PREFIX = "refs/tags/";
++const RELEASE_TAG_NUMERIC = "(?:0|[1-9]\\d*)";
++/** The strict release-tag grammar; mirrors ruleset-freshness.mjs's `validTag` (same numeric definition, no leading zeros). */
++export const RELEASE_TAG_REF = new RegExp(
++  `^refs/tags/v${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}(?:-beta\\.${RELEASE_TAG_NUMERIC})?$`,
++  "u",
++);
++const RELEASE_LOOKING_TAG_REF = /^refs\/tags\/v[0-9]/u;
++const REMOTE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
++const OID = /^[0-9a-f]{40}$|^[0-9a-f]{64}$/iu;
++
++/** True for every tag the relaxation must never touch: the release grammar and anything release-looking. */
++export function isGatedTagRef(tagRef) {
++  return typeof tagRef === "string" && (RELEASE_TAG_REF.test(tagRef) || RELEASE_LOOKING_TAG_REF.test(tagRef));
++}
++
++function git(projectDir, args) {
++  const result = spawnSync("git", ["-C", projectDir, ...args], { encoding: "utf8", timeout: 10000 });
++  return result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
++}
++
++/**
++ * @param {{projectDir: string, remote: string, tagRef: string, target: string}} input `target` is the pushed object (a commit
++ *   or an annotated tag object); `tagRef` the full ref name being written on the remote.
++ * @returns {{passes: boolean, code: string, reason: string, commit?: string}} `passes` is true only for PTP-PUBLISHED.
++ */
++export function classifyPublishedTagPush({ projectDir, remote, tagRef, target }) {
++  const refuse = (code, reason) => ({ passes: false, code, reason });
++  if (typeof tagRef !== "string" || !tagRef.startsWith(TAG_REF_PREFIX) || tagRef.length === TAG_REF_PREFIX.length) {
++    return refuse("PTP-NOT-A-TAG", "the pushed ref is not a tag");
++  }
++  if (isGatedTagRef(tagRef)) return refuse("PTP-RELEASE-TAG", "a release tag is never relaxed");
++  if (typeof remote !== "string" || !REMOTE_NAME.test(remote) || remote.includes("..")
++    || git(projectDir, ["config", "--get", `remote.${remote}.url`]) === null) {
++    return refuse("PTP-REMOTE-NOT-A-NAME", "the remote is not a configured remote name, so no remote-tracking namespace belongs to it");
++  }
++  if (typeof target !== "string" || target === "" || target.startsWith("-")) return refuse("PTP-COMMIT-UNRESOLVED", "the tag target is not a commit");
++  const commit = git(projectDir, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${target}^{commit}`]);
++  if (commit === null || !OID.test(commit)) return refuse("PTP-COMMIT-UNRESOLVED", "the tag target does not resolve to a commit locally");
++  const containing = git(projectDir, ["for-each-ref", "--count=1", "--format=%(refname)", "--contains", commit, `refs/remotes/${remote}/`]);
++  if (containing === null || containing === "") return refuse("PTP-UNPUBLISHED", "the tag target is not reachable from any remote-tracking ref of this remote");
++  return { passes: true, code: "PTP-PUBLISHED", reason: "the tag target is already reachable from a remote-tracking ref of this remote", commit };
++}
+diff --git a/plugins/pipeline-core/lib/published-tag-push.test.mjs b/plugins/pipeline-core/lib/published-tag-push.test.mjs
+new file mode 100644
+index 000000000..cde3b6dae
+--- /dev/null
++++ b/plugins/pipeline-core/lib/published-tag-push.test.mjs
+@@ -0,0 +1,94 @@
++// SPDX-License-Identifier: SUL-1.0
++// Pins lib/published-tag-push.mjs (N27a / D206): the one predicate guard-push and the generated pre-push hook share.
++// NOTE: this file needs registration in the project's Verify suite list (harness/scripts/verify.mjs) -- it is not run by Verify before that.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { after, test } from "node:test";
++
++import { classifyPublishedTagPush, isGatedTagRef, RELEASE_TAG_REF } from "./published-tag-push.mjs";
++
++const DIRS = [];
++after(() => { for (const dir of DIRS) rmSync(dir, { recursive: true, force: true }); });
++
++function repo() {
++  const dir = mkdtempSync(join(tmpdir(), "published-tag-push-"));
++  DIRS.push(dir);
++  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
++  git("init", "-q", "-b", "main");
++  git("config", "user.email", "goldfish@example.invalid");
++  git("config", "user.name", "Goldfish");
++  const commit = (name) => {
++    writeFileSync(join(dir, `${name}.txt`), `${name}\n`);
++    git("add", `${name}.txt`);
++    git("commit", "-q", "-m", name);
++    return git("rev-parse", "HEAD").stdout.trim();
++  };
++  const published = commit("published");
++  git("remote", "add", "origin", "https://example.invalid/fixture.git");
++  git("update-ref", "refs/remotes/origin/main", published);
++  const unpublished = commit("unpublished");
++  return { dir, git, published, unpublished };
++}
++
++const ask = (r, over) => classifyPublishedTagPush({ projectDir: r.dir, remote: "origin", tagRef: "refs/tags/rollback/2026-10-30-block1", target: r.published, ...over });
++
++test("a rollback tag on a commit reachable from a remote-tracking ref of the same remote passes", () => {
++  const r = repo();
++  const verdict = ask(r);
++  assert.equal(verdict.passes, true, JSON.stringify(verdict));
++  assert.equal(verdict.code, "PTP-PUBLISHED");
++  assert.equal(verdict.commit, r.published);
++});
++
++test("any non-release tag on a published commit passes, and an ancestor of the remote-tracking tip counts as published", () => {
++  const r = repo();
++  r.git("update-ref", "refs/remotes/origin/main", r.unpublished);
++  assert.equal(ask(r, { tagRef: "refs/tags/checkpoint-1", target: r.published }).passes, true);
++  assert.equal(ask(r, { target: r.unpublished }).passes, true, "a commit AT the remote-tracking tip is published");
++});
++
++test("an annotated tag object is peeled to its commit before reachability is asked", () => {
++  const r = repo();
++  r.git("tag", "-a", "-m", "annotated", "rollback/annotated", r.published);
++  const tagObject = r.git("rev-parse", "rollback/annotated").stdout.trim();
++  assert.notEqual(tagObject, r.published);
++  const verdict = ask(r, { target: tagObject });
++  assert.equal(verdict.passes, true, JSON.stringify(verdict));
++  assert.equal(verdict.commit, r.published);
++});
++
++test("every other tag stays gated: unpublished commit, release tags (published or not), another remote, a URL, a non-tag ref", () => {
++  const r = repo();
++  const gated = [
++    ["unpublished commit", { target: r.unpublished }, "PTP-UNPUBLISHED"],
++    ["release tag on a published commit", { tagRef: "refs/tags/v1.2.3" }, "PTP-RELEASE-TAG"],
++    ["beta release tag on a published commit", { tagRef: "refs/tags/v1.2.3-beta.1" }, "PTP-RELEASE-TAG"],
++    ["release tag on an unpublished commit", { tagRef: "refs/tags/v2.0.0", target: r.unpublished }, "PTP-RELEASE-TAG"],
++    ["a release-looking tag outside the strict grammar", { tagRef: "refs/tags/v1.2" }, "PTP-RELEASE-TAG"],
++    ["a branch ref", { tagRef: "refs/heads/feature" }, "PTP-NOT-A-TAG"],
++    ["a remote that is a URL", { remote: "https://example.invalid/fixture.git" }, "PTP-REMOTE-NOT-A-NAME"],
++    ["a remote that is not configured", { remote: "nowhere" }, "PTP-REMOTE-NOT-A-NAME"],
++    ["an option-shaped remote", { remote: "--upload-pack=x" }, "PTP-REMOTE-NOT-A-NAME"],
++    ["a target that is not a commit", { target: "0".repeat(40) }, "PTP-COMMIT-UNRESOLVED"],
++  ];
++  for (const [label, over, code] of gated) {
++    const verdict = ask(r, over);
++    assert.equal(verdict.passes, false, `${label}: ${JSON.stringify(verdict)}`);
++    assert.equal(verdict.code, code, label);
++  }
++  r.git("update-ref", "refs/remotes/other/main", r.unpublished);
++  assert.equal(ask(r, { target: r.unpublished }).passes, false, "publication on ANOTHER remote does not count");
++  assert.equal(ask(r, { target: r.unpublished, remote: "other" }).code, "PTP-REMOTE-NOT-A-NAME", "a remote-tracking ref without a configured remote is not a remote");
++});
++
++test("release-tag grammar: strict v<n>.<n>.<n>[-beta.<n>] is a release tag; the gate is wider than the grammar", () => {
++  assert.equal(RELEASE_TAG_REF.test("refs/tags/v1.2.3"), true);
++  assert.equal(RELEASE_TAG_REF.test("refs/tags/v1.2.3-beta.4"), true);
++  assert.equal(RELEASE_TAG_REF.test("refs/tags/v01.2.3"), false);
++  assert.equal(RELEASE_TAG_REF.test("refs/tags/rollback/v1.2.3"), false);
++  assert.equal(isGatedTagRef("refs/tags/v1.2"), true);
++  assert.equal(isGatedTagRef("refs/tags/rollback/v1.2.3"), false);
++});
+diff --git a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+index 40a9b7829..fd303e872 100644
+--- a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+@@ -287,6 +287,10 @@ export function renderImpl(pluginLibDir) {
+  *     classifyCheckpointPorcelain on the RAW porcelain text); any other dirt blocks. The
+  *     approval binds the remote NAME, so a push addressed by URL is never admitted here.
+  *     A failure to load the shared module is a fault and blocks like every other fault.
++ *   - (e) a TAG push whose target is already reachable from a remote-tracking ref of the SAME remote (N27a / D206, e.g. a
++ *     rollback tag on the pre-merge main commit) needs no Verify evidence and no approval for that old commit: decided by the
++ *     SAME shared predicate guard-push.mjs uses (lib/published-tag-push.mjs; reused, never copied). Release tags and every tag
++ *     on an unpublished commit stay gated exactly as above; a remote given as a URL never passes.
+  *
+  * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION
+  *   Every plugin PreToolUse guard (guard-push.mjs included) fails OPEN on unparseable
+@@ -459,6 +463,8 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+   // D206: an approval (and its consumption entry) lives in the private store under the git common directory;
+   // the tracked state record is only the legacy fallback. Reused from the shared owner, never copied.
+   const { withPrivateCriticalApprovals } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
++  // N27a / D206: the ONE predicate guard-push.mjs also uses for "a tag on an already published commit". Reused, never copied.
++  const { classifyPublishedTagPush } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
+   // The repository-relative path of the pipeline state record: the one place a push approval is
+   // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
+   const stateRelPathFor = () => {
+@@ -522,8 +528,18 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+       : { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true };
+   }
+ 
++  // N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes
++  // nothing new, so Verify evidence and an approval for that old commit are neither meetable nor meaningful. Release tags and
++  // every tag on an unpublished commit fall through to the gates below, unchanged. Skipped here is logged with its reason.
++  if (typeof remoteRef === "string" && remoteRef.startsWith("refs/tags/")) {
++    const published = classifyPublishedTagPush({ projectDir: projectRoot, remote, tagRef: remoteRef, target: commit });
++    if (published.passes) {
++      return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "tag on an already published commit (" + published.code + ")" };
++    }
++  }
++
+   const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
+-  const sourceTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
++  const sourceTree =treeResult.status === 0 ? treeResult.stdout.trim() : null;
+ 
+   // (a) verify evidence.
+   failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
+@@ -620,7 +636,7 @@ async function main() {
+       continue;
+     }
+     if (result.skipped) {
+-      recordLog(commonDir, { verdict: "allowed", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, note: "push gate not configured or off" });
++      recordLog(commonDir, { verdict: "allowed", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, note: result.note ?? "push gate not configured or off" });
+       continue;
+     }
+     const blocking = (result.failures.length > 0 && result.pushGateMode !== "warn")
+diff --git a/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+index 43576f9e1..baef24f29 100644
+--- a/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+@@ -581,6 +581,98 @@ test("HK7 the snapshot digest tracks the approval module and the installer, so a
+   assert.equal(stale.updateRequired, true);
+ });
+ 
++// ---- N27a / D206: a tag on an already published commit passes the generated hook; every other tag stays gated -------
++// Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
++function tagPushRepo(prefix) {
++  const repo = freshRepo(prefix);
++  writeManifest(repo.dir, { approval: "required" });
++  repo.git("remote", "add", "origin", "https://example.invalid/fixture.git");
++  repo.git("update-ref", "refs/remotes/origin/main", repo.head);
++  writeFileSync(join(repo.dir, "later.txt"), "unpublished\n");
++  repo.git("add", "later.txt");
++  repo.git("commit", "-q", "-m", "unpublished");
++  repo.unpublished = repo.git("rev-parse", "HEAD").stdout.trim();
++  repo.stdin = (ref, sha) => `${ref} ${sha} ${ref} ${ZERO40}\n`;
++  return repo;
++}
++
++test("N27a installed hook: a rollback tag on a commit already on the same remote passes with no Verify evidence and no approval, and the log says why", () => {
++  const repo = tagPushRepo("n27-rollback");
++  const ref = "refs/tags/rollback/2026-10-30-block1";
++  const result = runInstalledHook(repo.dir, repo.stdin(ref, repo.head));
++  assert.equal(result.code, 0, result.stderr);
++  assert.doesNotMatch(result.stderr, /verify-latest|approval/);
++  const last = readLog(repo.dir).at(-1);
++  assert.equal(last.verdict, "allowed");
++  assert.match(String(last.note), /published/);
++});
++
++test("N27a installed hook: an annotated tag object is peeled to the commit it targets", () => {
++  const repo = tagPushRepo("n27-annotated");
++  repo.git("tag", "-a", "-m", "annotated rollback", "rollback/2026-10-30-annotated", repo.head);
++  const tagObject = repo.git("rev-parse", "rollback/2026-10-30-annotated").stdout.trim();
++  assert.notEqual(tagObject, repo.head, "fixture: the tag object differs from the commit");
++  const result = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-annotated", tagObject));
++  assert.equal(result.code, 0, result.stderr);
++});
++
++test("N27a installed hook: every other tag push stays gated exactly as before", () => {
++  const repo = tagPushRepo("n27-gated");
++  const gated = [
++    ["a rollback tag on an unpublished commit", "refs/tags/rollback/2026-10-30-unpublished", repo.unpublished],
++    ["a release tag on a published commit", "refs/tags/v1.2.3", repo.head],
++    ["a beta release tag on a published commit", "refs/tags/v1.2.3-beta.1", repo.head],
++    ["a release tag on an unpublished commit", "refs/tags/v2.0.0", repo.unpublished],
++    ["a branch push of a published commit", "refs/heads/feature-published", repo.head],
++  ];
++  for (const [label, ref, sha] of gated) {
++    const result = runInstalledHook(repo.dir, repo.stdin(ref, sha));
++    assert.equal(result.code, 1, `${label}: ${result.stderr}`);
++    assert.match(result.stderr, /verify-latest\.json missing/, label);
++    assert.equal(readLog(repo.dir).at(-1).verdict, "blocked", label);
++  }
++});
++
++test("N27a installed hook: publication on another remote, or a remote addressed by URL, never counts", () => {
++  const repo = tagPushRepo("n27-remote");
++  repo.git("update-ref", "refs/remotes/other/main", repo.unpublished);
++  const other = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-other", repo.unpublished));
++  assert.equal(other.code, 1, other.stderr);
++  const url = "https://example.invalid/fixture.git";
++  const byUrl = runInstalledHook(repo.dir, repo.stdin("refs/tags/rollback/2026-10-30-url", repo.head), { remote: url, url });
++  assert.equal(byUrl.code, 1, byUrl.stderr);
++  assert.doesNotMatch(byUrl.stderr, /example\.invalid/, "a remote may carry credentials and must not reach a transcript (SEC-01)");
++});
++
++test("N27a the generated hook imports the shared published-tag predicate from the plugin library and the runtime snapshot carries it", () => {
++  const imported = new Set([...renderImpl(PLUGIN_LIB_DIR).matchAll(/join\(PLUGIN_LIB_DIR, "([a-z0-9-]+\.mjs)"\)/g)].map((m) => m[1]));
++  assert.ok(imported.has("published-tag-push.mjs"), "the generated hook must import the shared predicate guard-push also uses");
++  const inventory = JSON.parse(inspectGitHookSourceSnapshot({ pluginLibDir: PLUGIN_LIB_DIR }).manifestBytes).inventory.map((row) => row.path);
++  assert.ok(inventory.includes("lib/published-tag-push.mjs"), "lib/published-tag-push.mjs must be part of the runtime snapshot digest");
++});
++
++test("N27a an existing install made before the predicate is refreshed with the new bytes (impl and runtime snapshot)", () => {
++  const { dir } = freshRepo("n27-refresh");
++  assert.equal(applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
++  const markerPath = join(dir, ".git", "agent-pipeline", "pre-push-hook", "install-marker.json");
++  const marker = JSON.parse(readFileSync(markerPath, "utf8"));
++  const installed = readFileSync(marker.implPath, "utf8");
++  assert.match(installed, /published-tag-push\.mjs/, "a fresh install carries the predicate import");
++  const prior = installed.split("\n").filter((line) => !line.includes("published-tag-push.mjs")).join("\n");
++  assert.doesNotMatch(prior, /published-tag-push/);
++  writeFileSync(marker.implPath, prior);
++  marker.implSha256 = createHash("sha256").update(prior, "utf8").digest("hex");
++  writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
++  const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
++  assert.equal(plan.status, "ready-to-upgrade");
++  assert.equal(applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
++  const refreshed = readFileSync(marker.implPath, "utf8");
++  assert.match(refreshed, /published-tag-push\.mjs/);
++  const libDir = /const PLUGIN_LIB_DIR = ("[^"]+");/u.exec(refreshed);
++  assert.ok(libDir, "the refreshed hook names its plugin library directory");
++  assert.ok(existsSync(join(JSON.parse(libDir[1]), "published-tag-push.mjs")), "the runtime snapshot it names carries the predicate module");
++});
++
+ // The pre-PUSHSIG case, now the chat/standing variant: a repository whose push gate is
+ // `standing-approved` keeps admitting an exact checkpoint with no approval (design section 2).
+ test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (standing-approved variant)", () => {
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 30c1cad84..276f16c72 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -106,19 +106,23 @@
+  */
+ 
+ import { spawnSync } from "node:child_process";
+-import { existsSync } from "node:fs";
+-import { join, resolve } from "node:path";
++import { existsSync, readFileSync } from "node:fs";
++import { isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
++import { classifyVerifiedDeliveryTail } from "../lib/critic-course-admission.mjs";
++import { withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
++import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
++import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
+-import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
++import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
+ import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
+ import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
+ 
+@@ -255,7 +259,7 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
+       mutation: false,
+       requiresConfirmation: false,
+       executionBoundary: "local-process",
+-      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "chat-ready", "signature-required"] },
++      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "chat-ready", "signature-required", "deliver-verified-candidate"] },
+     },
+   };
+ }
+@@ -307,6 +311,71 @@ export function buildReconciliationArgv({ scriptPath, base, candidate, root, rec
+   return argv;
+ }
+ 
++const OID_TEXT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
++
++/** The calibrated handover file(s) (calibration `handover`: a path or a list of paths); the documented default when unreadable. */
++function calibratedHandoverPaths(root) {
++  const defaults = ["docs/state.md"];
++  try {
++    const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
++    if (!artifact?.exists) return defaults;
++    const declared = JSON.parse(readFileSync(artifact.path, "utf8"))?.handover;
++    const paths = (Array.isArray(declared) ? declared : [declared])
++      .filter((path) => typeof path === "string" && path !== "" && !isAbsolute(path) && !path.split(/[\\/]/u).includes(".."))
++      .map((path) => path.replaceAll("\\", "/").replace(/^\.\//u, ""));
++    return paths.length > 0 ? paths : defaults;
++  } catch { return defaults; }
++}
++
++/**
++ * Does the push approval name THIS commit at THIS destination? Read exactly the way the generated pre-push hook reads it
++ * (the tracked state record, with the private approval store laid over it), so an offer made here is a push the gates admit.
++ */
++function approvalBoundTo(root, commit, remote, destination) {
++  try {
++    const authority = resolveProjectAuthorityPaths({ rootDir: root });
++    const stateRelPath = authority.status === "ready"
++      ? authority.state
++      : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
++    const state = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(root, stateRelPath), "utf8")), root);
++    const approval = state?.pushApproval?.lastApproved;
++    return approval?.forCommit === commit && approval?.destination === destination
++      && (approval?.remote === undefined || approval?.remote === remote);
++  } catch { return false; }
++}
++
++/**
++ * N27b / D206: HEAD is ahead of the verified candidate only by delivery-tail commits (the calibrated handover file, the
++ * export of a consumed Critic review), so the verified commit itself is still deliverable. Eligible only when ALL hold:
++ * the commit named by evidence/verify-latest.json (green) is an ancestor of HEAD; the push approval names that exact
++ * commit and destination; every commit between is classified by `classifyVerifiedDeliveryTail` (the shared
++ * `criticExportOnlyCommit` classification, no second classifier); and the verified commit is not already on the remote's
++ * destination branch (the remote-tracking ref says so) -- once delivered, the later commits keep their own route and this
++ * is not offered again. Anything else is `{ eligible: false, reason }` and keeps today's refusal. Never throws, never mutates.
++ */
++export function assessVerifiedCandidateDelivery({ root, remote, destination, readReceipt, run = spawnSync } = {}) {
++  const no = (reason, offending = null) => ({ eligible: false, reason, ...(offending === null ? {} : { offending }) });
++  try {
++    const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], run);
++    if (head === null || !OID_TEXT.test(head)) return no("head-unresolved");
++    let evidence;
++    try { evidence = JSON.parse(readFileSync(join(resolveEvidenceProjectDir(root), VERIFY_EVIDENCE_DEFAULT_PATH), "utf8")); } catch { return no("verify-evidence-unreadable"); }
++    const verified = evidence?.commit;
++    if (evidence?.exitCode !== 0 || typeof verified !== "string" || !OID_TEXT.test(verified) || verified === head) return no("verify-evidence-not-a-delivery-candidate");
++    if (!approvalBoundTo(root, verified, remote, destination)) return no("approval-not-bound-to-the-verified-commit");
++    const branch = typeof destination === "string" && destination.startsWith("refs/heads/") ? destination.slice("refs/heads/".length) : null;
++    if (branch === null) return no("destination-is-not-a-branch");
++    const onRemote = run("git", ["-C", root, "merge-base", "--is-ancestor", verified, `refs/remotes/${remote}/${branch}`], { encoding: "utf8", timeout: 5000 });
++    if (onRemote?.status === 0) return no("verified-commit-already-delivered");
++    const tail = classifyVerifiedDeliveryTail({
++      repoRoot: root, verifiedCommit: verified, headCommit: head, handoverPaths: calibratedHandoverPaths(root),
++      ...(readReceipt === undefined ? {} : { readReceipt }),
++    });
++    if (!tail.ok) return no(`not-delivery-tail:${tail.reason}`, tail.offending);
++    return { eligible: true, verifiedCommit: verified, headCommit: head, approvalBound: true, laterCommits: tail.commits.map((entry) => ({ ...entry })) };
++  } catch { return no("assessment-unavailable"); }
++}
++
+ /**
+  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
+  * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
+@@ -327,6 +396,8 @@ export function drivePushInit({
+   prepareDeps = {},
+   assessPushHookBackstop = realAssessPushHookBackstop,
+   inspectArchitectureCurrency = inspectHeadArchitectureCurrency,
++  assessVerifiedCandidateDelivery: assessDelivery = assessVerifiedCandidateDelivery,
++  readCriticReceipt,
+ } = {}) {
+   const root = resolve(rootDir);
+   for (const [name, value] of [["by", by], ["remote", remote], ["destination", destination]]) {
+@@ -417,6 +488,29 @@ export function drivePushInit({
+     };
+   }
+ 
++  // Delivery of the verified candidate (N27b / D206). The ONLY failed check so far is Verify evidence bound to an earlier commit
++  // than HEAD, and HEAD is ahead of that verified commit by delivery-tail commits only (the calibrated handover, the export of
++  // a consumed Critic review): the verified commit itself is still deliverable under its own evidence and approval, so name that
++  // exact push instead of refusing. The later commits are NOT covered by it and keep their own route. Any other failed check,
++  // any other commit in between, an approval not bound to the verified commit, or a verified commit already on the remote keeps
++  // today's refusal below. The driver still executes nothing: the push is a command for the caller to run, and the gates judge it.
++  if (failedChecks.length === 1 && failedChecks[0].id === "verify-evidence-bound" && failedChecks[0].status === "stale-commit") {
++    const delivery = assessDelivery({ root, remote, destination, ...(readCriticReceipt === undefined ? {} : { readReceipt: readCriticReceipt }) });
++    if (delivery?.eligible === true) {
++      steps.push({ id: "verified-candidate-delivery", inProcess: true, ok: true });
++      const pushAction = { executable: "git", argv: ["-C", root, "push", remote, `${delivery.verifiedCommit}:${destination}`] };
++      return {
++        schema: SCHEMA, root, by, remote, destination, base, outcome: "deliver-verified-candidate", steps,
++        verifiedCommit: delivery.verifiedCommit, headCommit: delivery.headCommit, approvalBound: delivery.approvalBound === true,
++        laterCommits: delivery.laterCommits,
++        laterCommitsRoute: "The later commits (the handover and Critic-export commits listed above) are not delivered by this push and are not "
++          + "covered by its approval; they keep their own route: Verify evidence and a push approval bound to the new HEAD, then push-init again.",
++        pushAction,
++        gitPushLine: boundedCopySafeCommand({ executable: pushAction.executable, argv: pushAction.argv }).command,
++      };
++    }
++  }
++
+   // Architecture map currency (N25 / D208) -- the check guard-push applies to the pushed commit, run here through
+   // the same function so a stale map is a failed check with a remedy BEFORE approval preparation, not a refusal
+   // after Critic, Verify, residual acceptance and the signature. It is HEAD-bound like push-prepare, hence it
+@@ -512,7 +606,7 @@ export function main(args = process.argv.slice(2), {
+     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
+   });
+   write(`${JSON.stringify(result, null, 2)}\n`);
+-  return ["chat-ready", "signature-required", "checkpoint-ready"].includes(result.outcome) ? 0 : 1;
++  return ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome) ? 0 : 1;
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) process.exit(main());
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 15430861d..0a2bad4a2 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -40,6 +40,9 @@ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../lib/windows-owned-authority-backend.mjs";
++import { chmodSync } from "node:fs";
++import { renderImpl, renderShim } from "./pre-push-hook-install.mjs";
++import { canonicalJson as packetCanonicalJson } from "./critic-packet-preflight.mjs";
+ 
+ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+ const SCRATCH = join(REPO_ROOT, "scratch");
+@@ -986,3 +989,222 @@ test("drivePushInit (N25): only the stale verdict is an early check -- a structu
+     assert.equal(none.steps.some((step) => /architecture/u.test(step.id)), false);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// ---------------------------------------------------------------------------
++// N27b / D206: delivery of the verified candidate when HEAD is ahead only by handover or Critic-export commits.
++// ---------------------------------------------------------------------------
++
++const VERIFIED = "c".repeat(40);
++const DELIVERY_ELIGIBLE = {
++  eligible: true, verifiedCommit: VERIFIED, headCommit: HEAD, approvalBound: true,
++  laterCommits: [{ commit: "d".repeat(40), kind: "handover" }, { commit: "e".repeat(40), kind: "critic-export" }],
++};
++const staleVerifiedDeps = () => satisfiabilityDepsAllGreen({
++  readFile: (path) => {
++    if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
++    if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(VERIFIED));
++    if (path === "/fake/calibration.json") return JSON.stringify({ verify: "node harness/scripts/verify.mjs" });
++    throw new Error(`unexpected read: ${path}`);
++  },
++});
++
++test("drivePushInit (N27b): a stale verified candidate that the delivery assessment accepts returns the typed outcome naming the exact push of the verified commit", () => {
++  const root = freshFixtureRoot();
++  try {
++    let prepareCalls = 0;
++    const asked = [];
++    const result = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: staleVerifiedDeps(),
++      assessVerifiedCandidateDelivery: (input) => { asked.push(input); return DELIVERY_ELIGIBLE; },
++      pushPrepareReport: () => { prepareCalls += 1; throw new Error("must not run: the verified commit is not HEAD"); },
++    });
++    assert.equal(result.outcome, "deliver-verified-candidate", JSON.stringify(result));
++    assert.equal(asked.length, 1);
++    assert.equal(asked[0].remote, "origin");
++    assert.equal(asked[0].destination, "refs/heads/main");
++    assert.equal(prepareCalls, 0);
++    assert.equal(result.verifiedCommit, VERIFIED);
++    assert.equal(result.headCommit, HEAD);
++    assert.deepEqual(result.pushAction, { executable: "git", argv: ["-C", resolve(root), "push", "origin", `${VERIFIED}:refs/heads/main`] });
++    assert.ok(result.gitPushLine.includes(`push origin ${VERIFIED}:refs/heads/main`), result.gitPushLine);
++    assert.deepEqual(result.laterCommits.map((entry) => entry.kind), ["handover", "critic-export"]);
++    assert.match(result.laterCommitsRoute, /keep their own route/u);
++    assert.equal(result.checks, undefined, "an accepted delivery is not a failed precondition");
++    assert.equal(result.recovery, undefined);
++    assert.equal(result.signatureCommand, undefined, "the driver still never presents a signature for a commit it did not prepare");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("drivePushInit (N27b): without an accepted delivery assessment, or with any OTHER failed check, today's precondition refusal is unchanged", () => {
++  const root = freshFixtureRoot();
++  try {
++    const ineligible = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: staleVerifiedDeps(), prepareDeps: prepareDepsAllGreen(),
++      assessVerifiedCandidateDelivery: () => ({ eligible: false, reason: "a code commit lies between" }),
++    });
++    assert.equal(ineligible.outcome, "precondition-unmet", JSON.stringify(ineligible));
++    assert.equal(ineligible.checks.some((check) => check.id === "verify-evidence-bound" && check.status === "stale-commit"), true, JSON.stringify(ineligible.checks));
++    const other = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: { ...staleVerifiedDeps(), exists: (path) => path.endsWith("trust-policy.json") }, prepareDeps: prepareDepsAllGreen(),
++      assessVerifiedCandidateDelivery: () => DELIVERY_ELIGIBLE,
++    });
++    assert.equal(other.outcome, "precondition-unmet", "a missing threat model also blocks the push of the verified commit: not offered");
++    assert.equal(other.checks.some((check) => check.id === "push-threat-model-materialized"), true);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("push-init CLI (N27b): the delivery outcome is a ready-to-act result and exits 0; the retry action lists it among the outcomes a retry may reach", () => {
++  const args = ["--root", "/fixture", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
++  let stdout = "";
++  const status = main(args, { write: (value) => { stdout += value; }, writeError: () => {}, drive: () => ({ schema: "pipeline.push-init.v1", outcome: "deliver-verified-candidate" }) });
++  assert.equal(status, 0, stdout);
++  const root = freshFixtureRoot();
++  try {
++    const refused = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: staleVerifiedDeps(), prepareDeps: prepareDepsAllGreen(),
++      assessVerifiedCandidateDelivery: () => ({ eligible: false }),
++    });
++    assert.ok(refused.recovery.retryAction.expected.outcomes.includes("deliver-verified-candidate"), JSON.stringify(refused.recovery.retryAction.expected));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++// The anchor: one replay of the consumer sequence in a temporary repository with a local bare remote and the REAL generated
++// pre-push hook as the gate. Trust assumption: a commit reachable from the local remote-tracking refs of the same remote
++// counts as published (what a push or fetch recorded there).
++const EXPORT_PACKET = "a".repeat(32);
++function deliveryRepo(label, { codeCommitBetween = false } = {}) {
++  const base = mkdtempSync(join(SCRATCH, `push-init-delivery-${label}-`));
++  const remote = join(base, "remote.git");
++  const root = join(base, "work");
++  const sh = (cwd, ...args) => {
++    const r = spawnSync("git", args, { cwd, encoding: "utf8" });
++    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
++    return r.stdout.trim();
++  };
++  mkdirSync(remote); mkdirSync(root);
++  sh(remote, "init", "-q", "--bare", "-b", "main");
++  sh(root, "init", "-q", "-b", "main");
++  sh(root, "config", "user.email", "goldfish@example.invalid");
++  sh(root, "config", "user.name", "Goldfish");
++  const commitFile = (path, text, message) => {
++    mkdirSync(dirname(join(root, path)), { recursive: true });
++    writeFileSync(join(root, path), text);
++    sh(root, "add", path);
++    sh(root, "commit", "-q", "-m", message);
++    return sh(root, "rev-parse", "HEAD");
++  };
++  writeFileSync(join(root, ".git", "info", "exclude"), "/.claude/\n/evidence/\n");
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
++  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "fixture", handover: "docs/state.md", verify: "node verify.mjs" }));
++  const preMerge = commitFile("README.md", "fixture\n", "init");
++  sh(root, "remote", "add", "origin", remote);
++  sh(root, "push", "-q", "origin", "main");
++  // The generated hook, from the live library, as the git-level gate (the hook is installed after the bootstrap push).
++  const hookDir = join(root, ".git", "agent-pipeline", "pre-push-hook");
++  mkdirSync(hookDir, { recursive: true });
++  const implPath = join(hookDir, "impl.mjs");
++  writeFileSync(implPath, renderImpl(join(REPO_ROOT, "plugins", "pipeline-core", "lib")));
++  writeFileSync(join(root, ".git", "hooks", "pre-push"), renderShim(implPath));
++  chmodSync(join(root, ".git", "hooks", "pre-push"), 0o755);
++  const approve = (forCommit, destination) => {
++    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", pushApproval: { lastApproved: { forCommit, destination, remote: "origin" } } }));
++  };
++  const verify = (commit) => {
++    mkdirSync(join(root, "evidence"), { recursive: true });
++    writeFileSync(join(root, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit }));
++  };
++  const verified = commitFile("src/feature.txt", "reviewed feature\n", "feat: the verified candidate");
++  verify(verified); approve(verified, "refs/heads/staging");
++  const push = (...refspecs) => spawnSync("git", ["-C", root, "push", "origin", ...refspecs], { encoding: "utf8", timeout: 60000 });
++  const staging = push(`${verified}:refs/heads/staging`);
++  const record = { stagingPush: staging };
++  if (codeCommitBetween) commitFile("src/extra.txt", "an unreviewed code change\n", "fix: a code commit after the candidate");
++  commitFile("docs/state.md", "handover after the staging push\n", "docs: handover");
++  const tree = sh(root, "rev-parse", `${verified}^{tree}`);
++  const receipt = { packetId: EXPORT_PACKET, candidate: { commit: verified, tree }, reviewPass: true, findingCount: 0 };
++  const receiptBytes = packetCanonicalJson(receipt);
++  const report = "# Critic\n\nNo findings.\n";
++  const exportDir = `specs/anchor-feature/evidence/critic/${EXPORT_PACKET}`;
++  mkdirSync(join(root, exportDir), { recursive: true });
++  writeFileSync(join(root, exportDir, "receipt.json"), receiptBytes);
++  writeFileSync(join(root, exportDir, "report.md"), report);
++  writeFileSync(join(root, exportDir, "index.json"), packetCanonicalJson({
++    schema: "pipeline.session-critic-evidence-index.v1", packetId: EXPORT_PACKET, candidate: receipt.candidate,
++    receiptSha256: createHash("sha256").update(receiptBytes).digest("hex"), reportSha256: createHash("sha256").update(report).digest("hex"),
++    reviewPass: true, findingCount: 0,
++  }));
++  sh(root, "add", exportDir);
++  sh(root, "commit", "-q", "-m", "docs: export the consumed Critic review");
++  return {
++    base, root, remote, preMerge, verified, sh, push, record, approve, verify, receipt,
++    head: sh(root, "rev-parse", "HEAD"),
++    readCriticReceipt: () => ({ receipt }),
++    drive: (extra = {}) => drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      assessPushHookBackstop: () => ({ blocking: true, backed: true }),
++      inspectArchitectureCurrency: () => ({ ok: true, applicable: false }),
++      readCriticReceipt: () => ({ receipt }),
++      satisfiabilityDeps: satisfiabilityDepsAllGreen({
++        resolveHeadCommit: () => sh(root, "rev-parse", "HEAD"),
++        readFile: (path) => {
++          if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
++          if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(verified));
++          if (path === "/fake/calibration.json") return JSON.stringify({ verify: "node harness/scripts/verify.mjs" });
++          throw new Error(`unexpected read: ${path}`);
++        },
++      }),
++      prepareDeps: prepareDepsAllGreen({ gitHead: () => sh(root, "rev-parse", "HEAD") }),
++      ...extra,
++    }),
++  };
++}
++
++test("N27 anchor: staging push, handover and Critic-export commits, rollback tag, then push-init for main names the verified-commit push and that push passes", () => {
++  const repo = deliveryRepo("anchor");
++  try {
++    assert.equal(repo.record.stagingPush.status, 0, `staging push of the verified candidate must pass the hook: ${repo.record.stagingPush.stderr}`);
++    // The rollback tag on the pre-merge main commit: already published, so no Verify and no approval for that old commit.
++    repo.sh(repo.root, "tag", "rollback/2026-10-30-block1", repo.preMerge);
++    const tag = repo.push("refs/tags/rollback/2026-10-30-block1");
++    assert.equal(tag.status, 0, `the rollback tag must pass the generated hook without an operator route: ${tag.stderr}`);
++    assert.equal(spawnSync("git", ["--git-dir", repo.remote, "rev-parse", "refs/tags/rollback/2026-10-30-block1^{commit}"], { encoding: "utf8" }).stdout.trim(), repo.preMerge);
++    // The approval for main is bound to the verified candidate; HEAD has moved on by two evidence-only commits.
++    repo.approve(repo.verified, "refs/heads/main");
++    const result = repo.drive();
++    assert.equal(result.outcome, "deliver-verified-candidate", JSON.stringify(result, null, 2));
++    assert.equal(result.verifiedCommit, repo.verified);
++    assert.equal(result.headCommit, repo.head);
++    assert.deepEqual(result.laterCommits.map((entry) => entry.kind), ["handover", "critic-export"]);
++    const delivered = spawnSync(result.pushAction.executable, result.pushAction.argv, { encoding: "utf8", timeout: 60000 });
++    assert.equal(delivered.status, 0, `the named push of the verified commit must pass the generated hook: ${delivered.stderr}`);
++    assert.equal(spawnSync("git", ["--git-dir", repo.remote, "rev-parse", "refs/heads/main"], { encoding: "utf8" }).stdout.trim(), repo.verified);
++    // No circle: once the verified commit is on the remote, the later commits keep their own route and push-init no longer offers it.
++    const again = repo.drive({ prepareDeps: prepareDepsAllGreen({ gitHead: () => repo.head }) });
++    assert.notEqual(again.outcome, "deliver-verified-candidate", JSON.stringify(again, null, 2));
++  } finally { rmSync(repo.base, { recursive: true, force: true }); }
++});
++
++test("N27 negative pins: a code commit between the verified candidate and HEAD keeps stale-commit; a release tag stays refused, published or not", () => {
++  const repo = deliveryRepo("negative", { codeCommitBetween: true });
++  try {
++    repo.approve(repo.verified, "refs/heads/main");
++    const result = repo.drive();
++    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result, null, 2));
++    assert.equal(result.checks.some((check) => check.id === "verify-evidence-bound" && check.status === "stale-commit"), true, JSON.stringify(result.checks));
++    assert.equal(result.pushAction, undefined);
++    repo.sh(repo.root, "tag", "v1.2.3", repo.head);
++    const unpublished = repo.push("refs/tags/v1.2.3");
++    assert.notEqual(unpublished.status, 0, "a release tag on an unpublished commit stays refused");
++    assert.match(unpublished.stderr, /BLOCKED \(agent-pipeline pre-push hook\)/);
++    repo.sh(repo.root, "tag", "v1.2.4", repo.preMerge);
++    const published = repo.push("refs/tags/v1.2.4");
++    assert.notEqual(published.status, 0, "a release tag stays gated even on a published commit");
++    repo.sh(repo.root, "tag", "rollback/2026-10-30-unpublished", repo.head);
++    assert.notEqual(repo.push("refs/tags/rollback/2026-10-30-unpublished").status, 0, "a rollback tag on an unpublished commit stays refused");
++  } finally { rmSync(repo.base, { recursive: true, force: true }); }
++});
