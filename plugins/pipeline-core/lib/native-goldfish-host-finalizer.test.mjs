@@ -514,6 +514,33 @@ const cases = [
     assert.equal(facts.commits, 0);
     assert.deepEqual(diagEntries(commonDir), []);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
+  // PF-70 root cause (2026-10-30): the child often writes one more assistant record after its SubagentHandback (a closing text
+  // while its own background work drains). The stop must still find the handback, not validate that later text as the contract.
+  { id: "NGHF18b", name: "A handback followed by a later text-only assistant record is still found and completes the dispatch", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const transcript = stopInput(binding, "x").transcript_path;
+    const records = [
+      { type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding) } }] } },
+      { type: "user", message: { role: "user", content: [{ type: "tool_result", content: "handed back" }] } },
+      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Waiting for my background run to finish." }] } },
+    ];
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), records.map((record) => `${JSON.stringify(record)}\n`).join(""));
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, "Waiting for my background run to finish.") }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result)}`);
+    assert.equal(facts.commits, 1);
+    assert.deepEqual(diagEntries(commonDir), []);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF18c", name: "Of two handbacks the later one counts: an earlier checkpoint followed by a success completes the dispatch", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const transcript = stopInput(binding, "x").transcript_path;
+    const handback = (outcome) => ({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome, report: `${outcome} report.` }) } }] } });
+    const records = [handback("checkpoint"), { type: "user", message: { role: "user", content: [{ type: "text", text: "grant" }] } }, handback("succeeded"),
+      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Done." }] } }];
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), records.map((record) => `${JSON.stringify(record)}\n`).join(""));
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result)}`);
+    assert.equal(facts.commits, 1);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF19", name: "An outcome other than succeeded and checkpoint still writes the stop-failure diagnostic and is not finalized", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
     writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
     const transcript = stopInput(binding, "x").transcript_path;

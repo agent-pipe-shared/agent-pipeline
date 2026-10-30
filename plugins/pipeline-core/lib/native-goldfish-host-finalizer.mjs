@@ -116,18 +116,19 @@ function readSubagentHandbackMessage(input) {
       text = bytes.toString("utf8");
     } finally { closeSync(fd); }
   } catch (error) { return error?.code === "ENOENT" ? { ok: false, code: "NGHR-CLAUDE-STOP-NO-TRANSCRIPT" } : unsafe; }
-  let lastAssistant = null;
+  // The latest handback of the whole child transcript counts, not only one in the last assistant record: a child often writes
+  // further assistant records after its handback (PF-70 root cause, 2026-10-30), and that later prose is not the contract.
+  let message = null;
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     let record;
     try { record = JSON.parse(line); } catch { return unsafe; }
-    if (record?.type === "assistant" || record?.message?.role === "assistant") lastAssistant = record;
-  }
-  const content = lastAssistant?.message?.content;
-  if (!Array.isArray(content)) return none;
-  let message = null;
-  for (const block of content) {
-    if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
+    if (record?.type !== "assistant" && record?.message?.role !== "assistant") continue;
+    const content = record?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
+    }
   }
   return message === null ? none : { ok: true, message };
 }

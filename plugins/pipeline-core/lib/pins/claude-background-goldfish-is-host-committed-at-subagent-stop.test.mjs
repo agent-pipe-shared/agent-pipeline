@@ -515,13 +515,21 @@ test("(ix) SubagentHandback: a last_assistant_message that is prose, not a contr
   assertCommittedOnceAtStop(fx, "toolu_pf61_prose");
 });
 
-test("(x) SubagentHandback: an invalid or foreign handback, or any record other than the last handback, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
+// PF-70 (PO decision 2026-10-30, "the last handback counts"): a child that writes more after its handback was refused
+// with NGHR-FINAL-JSON although its work was finished. The later prose is not the contract; the latest handback of the
+// whole transcript is, and the host commit still checks candidate, paths and working tree against it.
+test("(ix-b) SubagentHandback: a handback followed by later assistant prose and a tool result is still host-committed exactly once (PF-70)", () => {
+  const fx = launchedBackground("handback-then-prose", "toolu_pf70_after");
+  fx.stopVariant = withTranscript([userRecord("Do the task."), handbackRecord(finalText(fx)), userRecord("handed back"), proseRecord("Afterwards I said more.")], undefined);
+  assertCommittedOnceAtStop(fx, "toolu_pf70_after");
+});
+
+test("(x) SubagentHandback: an invalid or foreign handback, or a last handback that is not a contract, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
   const fx = launchedBackground("handback-refused", "toolu_pf61_refused");
   const id = "toolu_pf61_refused";
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { dispatchId: "FOREIGN-DISPATCH" }))], undefined), "foreign dispatchId");
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { candidateCommit: "0".repeat(40) }))], undefined), "foreign candidate");
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord("All done, nothing to see.")], undefined), "prose handback");
-  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), proseRecord("Afterwards I said more.")], undefined), "an earlier handback followed by a later assistant record");
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), handbackRecord("not a contract")], "x"), "only the LAST handback counts");
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx), "Task")], undefined), "a valid contract carried by another tool name");
   assertRefusedAtStop(fx, id, withTranscript([proseRecord("Working."), userRecord(finalText(fx))], undefined), "a valid contract in a user record");
