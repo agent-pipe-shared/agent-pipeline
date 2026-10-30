@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "59e1eac50e7eec5421cbdb73130b6f836fb4c488",
-    "tree": "8f960970e3aa6c2a5eef5da269961b76bc59b527"
+    "commit": "5dcb18cf650e91efc65bf860d80d742cd7006477",
+    "tree": "30a75ed9ca0576096da477c81c21ee9acb9a26b8"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -484,6 +484,8 @@
         "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
+        "verify-phase:harness/scripts/verify.mjs:greenfield-comparison-citation-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:greenfield-public-comparison-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-approval-unverified-tests",
@@ -536,6 +538,8 @@
         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-skill-catalog-tests",
+        "verify-phase:harness/scripts/verify.mjs:housekeeping-tests",
         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
@@ -693,6 +697,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-greenfield-lifecycle-not-walkable-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-guard-refuses-every-in-repo-read-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-close-feature-names-reconcile-order-and-close-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-evidence-fails-after-host-update-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-shared-namespace-rejects-fresh-repository-identity-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-codex-bootstrap-in-the-typed-next-action-tests",
@@ -806,6 +811,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-project-calibration-retains-new-project-placeholder-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-project-resource-budget-headroom-is-not-reported-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-protected-baseline-rejects-canonical-discarded-idle-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-push-approval-doc-names-the-transport-credential-route-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-push-classifier-deny-list-does-not-converge-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-push-classifier-does-not-model-powershell-backtick-escapes-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-push-classifier-misreads-backslash-escaped-quotes-tests",
@@ -992,6 +998,7 @@
         "verify-phase:harness/scripts/verify.mjs:role-route-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:routine-repair-tests",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
