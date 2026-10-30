@@ -36,16 +36,22 @@
 //   * A3: no catalog-bound read authority exists (sessionReadScopeRoots binds no skill path), so a replaced file identity
 //     cannot leave a stale authority behind and the read decision is made per call on the physical file.
 //   * A4: the route is real guard code, not a static skill allowlist or a synthetic catalog (source scan).
-// NOT PROVEN BY THIS PIN (stays with the item, deferred past 0.7.0, D57 Q3 / D63): the installed Codex host readback of the
-// actual route and the authenticated host-catalog identity half. No case here claims them.
+// RESTATED AGAIN 2026-10-30 (QG-04; PO decision D210 builds the catalog half): the authenticated host skill-catalog carrier now
+// exists (lib/host-skill-catalog.mjs). It is a sealed private record written ONLY by the host readback (writeHostSkillCatalog)
+// and read by the passive read policy; a valid entry adds one thing over D96, a bounded search inside that ONE declared skill
+// directory (A1b). Drift and forgery invalidate it (A3b, A3c); the session read roots still bind nothing (A2b-roots, A3), a catalog
+// handed in through the tool input binds nothing, and the unlisted/credential/transcript/alias refusals above are unchanged. A4 keeps
+// its original assertion verbatim and adds the checkable half of the new premise (the route reads the typed private record, not an
+// allowlist). Still NOT PROVEN BY THIS PIN: the INSTALLED Codex host readback of the actual route (native host, item AC-147).
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
 import { sessionReadScopeRoots } from "../guard/read-scope.mjs";
+import { writeHostSkillCatalog } from "../host-skill-catalog.mjs";
 
 // Host fact: fixtures live under the repository scratch/, never the OS temp dir.
 const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
@@ -215,12 +221,62 @@ test("A3 no catalog-bound read authority exists to go stale: a skill catalog han
   assert.doesNotMatch(gone.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, "a removed file is not refused as outside the root");
 }));
 
+// The catalog route (D210). The undeclared sibling is removed before the REAL host readback so it is genuinely not declared.
+const declareSkillCreatorOnly = (f) => {
+  const otherDir = dirname(f.other);
+  rmSync(otherDir, { recursive: true, force: true });
+  const readback = writeHostSkillCatalog({ rootDir: f.project, runner: "codex", homeDir: f.home });
+  assert.equal(readback.status, "written", JSON.stringify(readback));
+  mkdirSync(otherDir, { recursive: true });
+  writeFileSync(f.other, "# undeclared\n");
+  return { skillDir: dirname(f.skill), otherDir };
+};
+
+test("A1b a declared skill directory is searched through ordinary bounded reads once the host readback wrote the catalog; the undeclared sibling directory and the skill tree stay refused", () => withFixture((f) => {
+  const { skillDir, otherDir } = declareSkillCreatorOnly(f);
+  for (const command of [`rg -n skill ${fwd(skillDir)}`, `rg --files ${fwd(skillDir)}`, `rg -n skill ${fwd(skillDir)} | head -5`]) {
+    const r = verdict(bash(command), f.project);
+    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+  }
+  for (const directory of [otherDir, join(f.home, ".codex", "skills", ".system"), join(f.home, ".codex", "skills"), join(f.home, ".codex", "sessions")]) {
+    const r = verdict(bash(`rg -n skill ${fwd(directory)}`), f.project);
+    assert.equal(r.exitCode, 2, `${directory}\n${r.text}`);
+    assert.match(r.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  }
+}));
+
+test("A3b a replaced declared file invalidates the catalog-bound directory search until the next host readback", () => withFixture((f) => {
+  const { skillDir } = declareSkillCreatorOnly(f);
+  assert.equal(verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project).exitCode, 0);
+  writeFileSync(f.skill, "# replaced content\n");
+  const stale = verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project);
+  assert.equal(stale.exitCode, 2, stale.text);
+  assert.match(stale.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  assert.equal(verdict(readTool(f.skill), f.project).exitCode, 0, "the file itself still reads by its own name (D96)");
+  assert.equal(writeHostSkillCatalog({ rootDir: f.project, runner: "codex", homeDir: f.home }).status, "written");
+  assert.equal(verdict(bash(`rg -n skill ${fwd(skillDir)}`), f.project).exitCode, 0);
+}));
+
+test("A3c a runner without a declaration surface leaves the guard exactly as D96/D108 decided", () => withFixture((f) => {
+  for (const runner of ["claude", "antigravity"]) {
+    const readback = writeHostSkillCatalog({ rootDir: f.project, runner, homeDir: f.home });
+    assert.equal(readback.status, "unavailable");
+  }
+  const r = verdict(bash(`rg -n skill ${fwd(dirname(f.skill))}`), f.project);
+  assert.equal(r.exitCode, 2, r.text);
+  assert.equal(verdict(bash(`cat ${fwd(f.skill)}`), f.project).exitCode, 0);
+}));
+
 test("A4 the admission route is real guard code, not a static skill allowlist or a synthetic catalog: neither read-boundary module names a skill, a SKILL.md or a catalog", () => {
   // QG-04 restatement, bounded to D96: with no catalog route to prove, the checkable half of "a static allowlist or synthetic
   // catalog alone is insufficient" is that the boundary carries none. The installed-host readback of the actual route is NOT
   // proven here; it stays native-host and deferred past 0.7.0 (item triage 2026-10-17, D57 Q3 / D63).
+  // D210 (2026-10-30): the assertion is unchanged and still holds, because the policy reads the declaration only through the
+  // typed carrier module; the added half below pins that import and the absence of any literal skill name in it.
   for (const rel of ["../guard/read-scope.mjs", "../passive-read-policy.mjs"]) {
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
     assert.doesNotMatch(src, /SKILL\.md|skill-creator|skill_catalog|hostSkillCatalog/iu, `${rel} must not carry a skill allowlist or catalog`);
   }
+  const policy = readFileSync(fileURLToPath(new URL("../passive-read-policy.mjs", import.meta.url)), "utf8");
+  assert.match(policy, /from "\.\/host-skill-catalog\.mjs"/u, "the declaration comes from the typed private carrier");
 });

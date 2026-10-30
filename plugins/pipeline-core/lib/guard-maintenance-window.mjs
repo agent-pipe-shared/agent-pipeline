@@ -681,6 +681,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Actual signed-hook and family-consent/host import closure (GMWKC01).
   // These decision dependencies cannot be changed through a maintenance window.
   "plugins/pipeline-core/lib/passive-read-policy.mjs",
+  // D210: the passive read policy imports this declaration carrier (sealed private host skill-catalog record).
+  "plugins/pipeline-core/lib/host-skill-catalog.mjs",
   "plugins/pipeline-core/lib/intake-material-reference.mjs",
   "plugins/pipeline-core/scripts/check-private-identifiers.mjs",
   "plugins/pipeline-core/lib/model-family-authority.mjs",

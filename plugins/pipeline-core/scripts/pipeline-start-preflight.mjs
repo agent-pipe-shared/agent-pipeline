@@ -36,6 +36,7 @@ import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedT
 import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
+import { writeHostSkillCatalog } from "../lib/host-skill-catalog.mjs";
 import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
 import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
 import {
@@ -2294,6 +2295,27 @@ export function observeSubagentModelEnv({ env = process.env } = {}) {
 }
 
 /**
+ * D210 (AC-147 catalog half, AC-209): the host readback that is the ONLY writer of the sealed private host skill-catalog record
+ * (lib/host-skill-catalog.mjs). It observes what the active runner declares and publishes it, so the passive read policy can admit
+ * a bounded search inside exactly one declared skill directory. Typed result `pipeline.host-skill-catalog-readback.v1`:
+ * `written`, `unchanged`, or `unavailable` (a runner with no declaration surface, no repository, or a failed write).
+ * Like `nodeSandbox` it rides beside the typed envelope, never inside it, so the pinned key set and the payload budget stay as
+ * they were; it never decides `status`, `nextAction` or the exit code. Returns `undefined` outside an active governed
+ * repository (no readback expected, nothing is written there).
+ */
+export function observeHostSkillCatalogReadback({
+  rootDir = process.cwd(), env = process.env, read = readFileSync, homeDir = homedir(),
+  observeGovernanceScopeFn = observeGovernanceScope, writeFn = writeHostSkillCatalog,
+} = {}) {
+  try {
+    if (observeGovernanceScopeFn({ rootDir })?.state !== "active") return undefined;
+    return writeFn({ rootDir: resolve(rootDir), runner: resolveActiveRunner({ env, rootDir, read }), homeDir });
+  } catch {
+    return { schema: "pipeline.host-skill-catalog-readback.v1", status: "unavailable", code: "HSC-READBACK-FAILED", entries: 0 };
+  }
+}
+
+/**
  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
  * called with no options, writes the same one compact line. `environmentReadiness` is an
  * optional seam the async process entry (`runEntry`, below) fills; an exported function must
@@ -2314,6 +2336,7 @@ export function main(options = {}) {
     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
+    ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
   };
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
@@ -2359,6 +2382,8 @@ async function runEntry(argv = process.argv.slice(2)) {
     environmentReadiness,
     agyStartHint,
     nodeSandbox: observeNodeSandboxProbe(),
+    // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
+    hostSkillCatalog: observeHostSkillCatalogReadback(),
     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
     ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv() } : {}),
     ...(role === undefined ? {} : { role }),

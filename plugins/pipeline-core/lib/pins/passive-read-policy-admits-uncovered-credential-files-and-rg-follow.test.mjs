@@ -211,6 +211,8 @@ test("RED mirror: without .git-credentials/.pypirc in the basename rule they are
   writeFileSync(mirrorPath, mirrorSource(join(libDir, "passive-read-policy.mjs"), [
     ['"./machine-plane.mjs"', JSON.stringify(pathToFileURL(join(libDir, "machine-plane.mjs")).href)],
     ['"./po-key-directory.mjs"', JSON.stringify(pathToFileURL(join(libDir, "po-key-directory.mjs")).href)],
+    // D210 (2026-10-30): the policy now imports the host skill-catalog carrier; the mirror needs the same absolute anchor.
+    ['"./host-skill-catalog.mjs"', JSON.stringify(pathToFileURL(join(libDir, "host-skill-catalog.mjs")).href)],
     // PO decision D109 (2026-10-22; QG-04 restatement): the basename rule gained more names, and the four basename-only home
     // entries are now ALSO matched by path (a second line of defence, so the original defect needs both mutated). The mirror
     // re-introduces the original defect exactly as before: neither the basename alternatives nor the path entries name them.

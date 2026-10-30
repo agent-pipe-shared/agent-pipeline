@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { declaredSkillDirectories } from "./host-skill-catalog.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
@@ -307,6 +308,20 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
   return true;
 }
 
+// PO decision D210 (AC-147 catalog half, AC-209): a recursive search INSIDE one directory the host declared (the sealed private
+// record of lib/host-skill-catalog.mjs, written only by the host readback and verified here against the current filesystem) is
+// the one thing a valid declaration adds over D96/D108. The directory must contain the operand under BOTH identities, the
+// operand spells no `..`, and the credential and whole-tree secret screens above and below still decide. Parents of the declared
+// directory, undeclared siblings and the session trees never match. Any lookup failure means "not declared" (the D108 refusal).
+function insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, lookup) {
+  if (raw.split(/[\\/]/u).includes("..")) return false;
+  let declared;
+  try { declared = lookup({ rootDir, homeDir }); } catch { return false; }
+  return Array.isArray(declared) && declared.some((entry) => typeof entry?.directory === "string"
+    && within(entry.directory, physical)
+    && (within(entry.directory, lexical) || (typeof entry.lexicalDirectory === "string" && within(entry.lexicalDirectory, lexical))));
+}
+
 /**
  * This check is for passive path operands only. Callers still need a closed
  * command-specific grammar; a read option that executes or writes must never
@@ -314,7 +329,7 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
  */
 export function isAllowedPassiveReadTarget(raw, {
   rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
-  additionalRecursiveRoots = [],
+  additionalRecursiveRoots = [], declaredDirectories = declaredSkillDirectories,
   realpath = realpathSync.native ?? realpathSync, stat = statSync,
   repoKeyDirectory = resolveRepoScopedDirectory,
   machinePlaneRead = readMachinePlane,
@@ -451,7 +466,8 @@ export function isAllowedPassiveReadTarget(raw, {
       // A recursive search must not sweep a host-wide runner session or skill collection (it holds other
       // sessions' content); an exact file in one keeps its existing lane.
       if (recursive && observed.isDirectory()
-        && touchesSessionCollection(homeDir, identities, realpath)) return false;
+        && touchesSessionCollection(homeDir, identities, realpath)
+        && !insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, declaredDirectories)) return false;
     } catch { return false; }
   }
   if (recursive || (directoryListing && inAdditional)) {

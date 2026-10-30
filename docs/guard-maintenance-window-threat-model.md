@@ -457,12 +457,15 @@ signed quality verifier. Both tables retain exact call-site counts and the
 scanner still refuses unclassified imports or spawn edges.
 
 The transitive authority closure additionally protects exactly
-`lib/passive-read-policy.mjs`, `lib/intake-material-reference.mjs`,
+`lib/passive-read-policy.mjs`, `lib/host-skill-catalog.mjs`,
+`lib/intake-material-reference.mjs`,
 `scripts/check-private-identifiers.mjs`, `lib/model-family-authority.mjs`,
 `lib/model-family-execution.mjs`, `lib/model-family-invocation.mjs`,
 `lib/model-family-runtime-host.mjs`, `lib/model-family-route-source.mjs`,
 `lib/model-family-host-store.mjs`, and `lib/model-family-latest-selection.mjs`.
-These modules determine passive-read admission, intake references, privacy
+These modules determine passive-read admission (including the sealed host
+skill-catalog record that names the one declared skill directory a bounded
+search may enter, D210), intake references, privacy
 refusal, verified family assignment authority, sealed invocation selection and
 host storage/readback. The same paths remain protected through both project
 and installed-plugin anchors. A window cannot rewrite a dependency while

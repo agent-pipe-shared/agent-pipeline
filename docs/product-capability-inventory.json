@@ -536,6 +536,7 @@
         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-skill-catalog-tests",
         "verify-phase:harness/scripts/verify.mjs:housekeeping-tests",
         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",

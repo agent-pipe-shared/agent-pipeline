@@ -4278,6 +4278,12 @@
       },
       "invariantPinned": "PO-only discard denials remain human-terminal across supported transports, planner admission, and closed unsupported or missing-read boundaries.",
       "nonOverlapNote": "Eight actual per-case completion IDs cover refusal transport and pre-state denial; no actual discard, native attestation, or signer interaction is claimed."
+    },
+    {
+      "name": "host-skill-catalog-tests",
+      "file": "plugins/pipeline-core/lib/host-skill-catalog.test.mjs",
+      "invariantPinned": "The host skill-catalog carrier is a sealed private record written only by the host readback; a valid entry admits only a bounded search inside that one declared directory, drift and forgery invalidate it, and a runner without a declaration surface leaves the D108 refusal unchanged.",
+      "nonOverlapNote": "Unit-level carrier and policy admission tests; the guard-level skill pins (lifecycle-read-scope-blocks-host-declared-system-skill, declared-system-skill-read-requires-human-override) drive the same carrier through evaluateLifecycleReadyGuard."
     }
   ]
 }
