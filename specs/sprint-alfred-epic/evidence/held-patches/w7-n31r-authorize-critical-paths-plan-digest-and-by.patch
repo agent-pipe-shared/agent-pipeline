@@ -1,0 +1,169 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 19bd8ee46..db7bb7fab 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -223,7 +223,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
+     ["pipeline-state-calibration-recovery-tests","plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs","top-level-assertions",69],
+     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
+-    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",14],
++    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",17],
+     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
+     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
+     ["project-onboarding-temp-root-tests","plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs","top-level-assertions",20],
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index d845d9b21..a29941ab9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -683,6 +683,44 @@ test("N30: without a readable candidate the completion says why it has no signin
+   assert.match(completion.nextAction, /feature-package-reconcile/u);
+ });
+ 
++// ---- N31 remainder (D212): the reconcile plan and its digest can be read again after the bootstrap apply ----
++// The close-feature skill says to take the signing command again from a fresh continuity-result-bootstrap-plan once a
++// commit moved the candidate; that read must answer with the pending reconcile instead of refusing.
++
++test("N31r: a read-only bootstrap plan after the apply prints the pending reconcile plan, its planSha256 and both commands, and writes nothing", () => {
++  const f = fixture("n31r-reread"); const { manifestPath } = registerPackageWithoutResultAuthority(f);
++  const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
++  const p = plan(f);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  const before = readFileSync(f.statePath); const manifestBefore = readFileSync(join(f.root, manifestPath));
++  const reread = invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps);
++  assert.equal(reread.status, 0, reread.err);
++  assert.deepEqual(readFileSync(f.statePath), before, "the read writes no State");
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBefore, "the read writes no manifest");
++  const value = JSON.parse(reread.out);
++  assert.equal(value.schema, "pipeline.continuity-result-reconcile-pending.v1");
++  assert.equal(value.status, "reconcile-preview"); assert.equal(value.manifest, manifestPath);
++  assert.equal(value.planSha256, completion.planSha256, "the same plan digest the apply printed");
++  assert.equal(value.signatureCommand.subjectSha256, completion.signatureCommand.subjectSha256);
++  assert.deepEqual(value.reconcileCommand.argv, completion.reconcileCommand.argv);
++  assert.equal(value.mutated, false);
++});
++
++test("N31r: the reconcile command marks --by as the PO's own value and names where each proof path comes from", () => {
++  const f = fixture("n31r-by"); registerPackageWithoutResultAuthority(f);
++  const p = plan(f);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) });
++  assert.equal(applied.status, 0, applied.err);
++  const placeholders = JSON.parse(applied.out).completion.reconcileCommand.placeholders;
++  const by = placeholders.find((entry) => entry.flag === "--by");
++  assert.equal(by.token, "<po-name>");
++  assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
++  for (const [flag, field] of [["--proof-request", "requestPath"], ["--proof-authority", "authorityPath"], ["--proof", "proofPath"]]) {
++    assert.match(placeholders.find((entry) => entry.flag === flag).from, new RegExp(field, "u"), `${flag} names the ${field} the signing terminal prints`);
++  }
++});
++
+ const argv0 = (argv) => argv[1];
+ 
+ test("N29 negatives: two Result entries, a Result at another path and a PRD without authority stay refused with a typed detail", () => {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 3ff327def..39286b604 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -6093,10 +6093,10 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+   const root = realpathSync(resolve(dir));
+   const approvalKind = "feature-package-reconcile";
+   const placeholders = [
+-    { flag: "--by", token: "<by>", from: "the name of the person who ran the signing step" },
+-    { flag: "--proof-request", token: "<proof-request>", from: "externalPaths.request in the signing step's output" },
+-    { flag: "--proof-authority", token: "<proof-authority>", from: "externalPaths.authority in the signing step's output" },
+-    { flag: "--proof", token: "<proof>", from: "externalPaths.proof in the signing step's output" },
++    { flag: "--by", token: "<po-name>", from: "the PO's own name, supplied by the PO who ran the signing step; never the agent (EL-36)" },
++    { flag: "--proof-request", token: "<proof-request>", from: "requestPath (externalPaths.request) in the signing step's output" },
++    { flag: "--proof-authority", token: "<proof-authority>", from: "authorityPath (externalPaths.authority) in the signing step's output" },
++    { flag: "--proof", token: "<proof>", from: "proofPath (externalPaths.proof) in the signing step's output" },
+   ];
+   const reconcileCommand = {
+     executable: process.execPath,
+@@ -6500,6 +6500,15 @@ function runResultBootstrapCommand(sub, rest, deps) {
+             nextAction: completion.nextAction }, null, 2));
+           return 0;
+         }
++        // N31r (D212): once the Result is bound, the read answers with the pending
++        // reconcile so its digest and commands can be taken again after a commit.
++        if (completion.state === "reconciliation-pending") {
++          console.log(JSON.stringify({ schema: "pipeline.continuity-result-reconcile-pending.v1", status: completion.preview.status,
++            manifest: completion.manifest, preview: completion.preview, planSha256: completion.planSha256,
++            signatureCommand: completion.signatureCommand ?? null, ...(completion.signatureUnavailable ? { signatureUnavailable: completion.signatureUnavailable } : {}),
++            reconcileCommand: completion.reconcileCommand ?? null, nextAction: completion.nextAction, mutated: false }, null, 2));
++          return 0;
++        }
+       }
+       console.error(`Error: Result bootstrap plan refused (${planned.code}${resultBootstrapPackageDetailText(planned.detail)}); zero mutation.`); return 2;
+     }
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index e17586fb9..cff72aeda 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -511,6 +511,12 @@ export function formatHumanApprovalCliResult(result, { humanFacing = process.std
+     const proofPath = result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"
+       ? result.externalPaths?.proof ?? null
+       : result.paths?.proof ?? null;
++    // N31r (D212): a non-push critical kind keeps its request and authority in the PO
++    // key directory, which an agent cannot list; the follow-on command needs all three.
++    if (result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY" && result.action?.kind !== undefined && result.action.kind !== "push") {
++      return JSON.stringify({ ok: true, code: result.code, proofPath,
++        requestPath: result.externalPaths?.request ?? null, authorityPath: result.externalPaths?.authority ?? null }) + "\n";
++    }
+     return JSON.stringify({ ok: true, code: result.code, proofPath }) + "\n";
+   }
+   return JSON.stringify(result, null, 2) + "\n";
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+index 00d7f7369..d6f27ce1a 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+@@ -52,5 +52,18 @@ test("G31: human-facing critical authorization names the external proof", () =>
+   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
+ });
+ 
+-if (cases.length !== 4) throw new Error("signing handoff case count drift");
++test("N31r: human-facing critical authorization of a non-push kind names the request, proof and authority paths the reconcile needs", () => {
++  const result = { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
++    action: { kind: "feature-package-reconcile" },
++    paths: { request: "/keys/request.json", proof: "/keys/proof.json", signer: "/keys/signer.json" },
++    externalPaths: { request: "/keys/request.json", proof: "/keys/proof.json", authority: "/keys/authority.json" } };
++  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: true })),
++    { ok: true, code: result.code, proofPath: "/keys/proof.json", requestPath: "/keys/request.json", authorityPath: "/keys/authority.json" });
++  const push = { ...result, action: { kind: "push" } };
++  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(push, { humanFacing: true })),
++    { ok: true, code: result.code, proofPath: "/keys/proof.json" }, "the push output stays as it was");
++  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
++});
++
++if (cases.length !== 5) throw new Error("signing handoff case count drift");
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 7144fb37a..ada0300fb 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -92,7 +92,7 @@ A feature whose State carries `continuity` closes in this order. Every step is f
+ 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+ 3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, `signatureCommand` and `reconcileCommand`.
+ 4. Sign the reconcile (PO only, in the PO's own terminal): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
+-5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders (`<by>`, `<proof-request>`, `<proof-authority>`, `<proof>`) with the name and the `externalPaths` the signing step printed.
++5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders. `<po-name>` is the PO's own name, supplied by the PO, never by the agent. `<proof-request>`, `<proof-authority>` and `<proof>` are the `requestPath`, `authorityPath` and `proofPath` the signing terminal printed.
+ 6. Write the Continuity close request (below) and plan `close-coordinator.mjs plan-transition ... --phase feature-close-prepared --architecture-impact <impact> --continuity-close-request <request>`; apply the returned action.
+ 7. Run the State-writer action that apply returns (`pipeline-state.mjs close-feature ...` with `--continuity-close-request`), as shown in Step 2.
+ 
+@@ -115,7 +115,7 @@ Spellings are taken from each script's own parser or help; `<...>` is a value.
+ |---|---|
+ | `pipeline-state.mjs feature-package-status` | --root <dir> --manifest <repo-relative-path> |
+ | `pipeline-state.mjs feature-package-reconcile` | --root --manifest --plan-sha256 <sha256> --by <name> --proof-request <abs-path> --proof-authority <abs-path> --proof <abs-path> |
+-| `pipeline-state.mjs continuity-result-bootstrap-plan` | (none) |
++| `pipeline-state.mjs continuity-result-bootstrap-plan` | (none); read-only; once the Result is bound and the package is stale it prints the pending reconcile (`planSha256`, `signatureCommand`, `reconcileCommand`) |
+ | `pipeline-state.mjs continuity-result-bootstrap-apply` | --feature-id --expected-revision --expected-state-sha256 --expected-post-state-sha256 --updated-at --plan-sha256 --activate (use the returned action) |
+ | `pipeline-state.mjs close-feature` | --by --architecture-impact --coordinator-lifecycle --coordinator-sha256 --continuity-close-request |
+ | `close-coordinator.mjs inspect` | --root --lifecycle |
+@@ -123,7 +123,7 @@ Spellings are taken from each script's own parser or help; `<...>` is a value.
+ | `close-coordinator.mjs apply-start` | the plan-start flags plus --plan-sha256 --activate |
+ | `close-coordinator.mjs plan-transition` | --root --lifecycle --actor --phase [--architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --authorized] |
+ | `close-coordinator.mjs apply-transition` | the plan-transition flags plus --plan-sha256 --activate |
+-| `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`) |
++| `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`); in the terminal it prints `proofPath`, plus `requestPath` and `authorityPath` for every kind except push |
+ 
+ A commit message goes in a file: `git commit -F <msgfile> -- <paths>` after `git add -- <paths>` (the refusals for several `-m`
+ flags and for a message with parentheses name this form); a Pipeline-owned file commits with `scripts/commit-pipeline-owned.mjs`.
