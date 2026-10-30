@@ -1,0 +1,675 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index bac290189..7e6e7d9ae 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -123,6 +123,8 @@ import {
+ } from "./project-authority.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { discoverRepository } from "./worktree-lifecycle.mjs";
++import { observeCompletedUninstallJournals, readUninstallRetainedMetadata } from "./project-uninstall.mjs";
++import { uninstallWorkspacePath } from "./project-uninstall-workspace.mjs";
+ import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
+ import { readMachinePlane } from "./machine-plane.mjs";
+ import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
+@@ -539,9 +541,220 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(),
+   }
+ }
+ 
++// ---------------------------------------------------------------------------
++// Reinstall after `project-uninstall` (W7-REINSTALL-AFTER-UNINSTALL; backlog
++// 2026-10-30-no-route-back-to-install-after-project-uninstall, decision D206).
++//
++// The uninstall is content-preserving: it strips only the owned projection
++// keys from the generated manifests/calibration (and the .codex agent files)
++// and moves the plan-state file into its private retained store. Its journal
++// records each stripped file's postimage digest. A project whose files still
++// equal those postimages is "uninstalled": the route back is to re-insert the
++// owned keys from the CURRENT source through the existing runtime-projection
++// generator (the same one a fresh onboarding uses), bound to the journal digest
++// and the source digest. A file the user changed since is a typed conflict and
++// is never overwritten; the retained state file is restored, never dropped.
++// ---------------------------------------------------------------------------
++const REINSTALL_AFTER_UNINSTALL = "after-uninstall";
++const UNINSTALL_RESTORABLE_STATE = /(?:^|\/)pipeline-state\.json$/u;
++
++/** The completed uninstall journal of this root whose owned-key postimages still describe the files on disk, or null. */
++function observeUninstalledState(root, fs) {
++  let repository; let journals;
++  try {
++    repository = discoverRepository(root, { spawn: fs.spawnSync });
++    journals = observeCompletedUninstallJournals({ rootDir: root, commonDir: repository.commonDir });
++  } catch { return null; }
++  for (const entry of journals) {
++    const states = entry.journal.actions.filter((action) => action.kind === "owned-keys" && !uninstallWorkspacePath(action)).map((action) => {
++      let current = null;
++      try { const path = safePath(root, action.path, fs); if (fs.existsSync(path)) current = readBoundPhysicalFile(path, fs); } catch { current = null; }
++      const actualSha256 = current === null ? null : sha256(current);
++      return { action, path: action.path, current, expectedSha256: action.afterSha256, actualSha256, state: actualSha256 === null ? "missing" : actualSha256 === action.afterSha256 ? "match" : "edited" };
++    });
++    if (states.some((entryState) => entryState.state === "match")) return { repository, entry, states };
++  }
++  return null;
++}
++
++function reinstallProjectionBaselines(root, intent, fs) {
++  const baselines = currentRuntimeBaselines(root, intent, fs);
++  for (const mirror of loadRuntimeProjectionV3OwnedKeys().neutralAuthorityMirrors ?? []) {
++    const path = safePath(root, mirror.path, fs);
++    if (fs.existsSync(path)) baselines[mirror.path] = { status: "present", bytes: decodeUtf8Strict(readBoundPhysicalFile(path, fs), mirror.path) };
++  }
++  return baselines;
++}
++
++/**
++ * The generator replaces owned values in place; the uninstall removed them. Put the owned anchors back (never a value) so the
++ * existing generator can write the values from the source: the human_facing child under `language:`, a `modelRouting:` block
++ * before the key that follows it in a fresh manifest, and no emptied `session:` stub (the generator owns that whole block).
++ */
++function reseedStrippedYaml(stripped, fresh) {
++  const eol = stripped.includes("\r\n") ? "\r\n" : "\n";
++  const lines = stripped.split(/(?<=\n)/u);
++  const isTop = (line) => /^[A-Za-z_][\w-]*:/u.test(line);
++  const keyLine = (key) => lines.findIndex((line) => line.replace(/[\r\n]+$/u, "") === `${key}:`);
++  const blockEnd = (start) => { let end = start + 1; while (end < lines.length && !(lines[end].replace(/[\r\n]+$/u, "").length > 0 && !/^[ \t#]/u.test(lines[end]))) end += 1; return end; };
++  const session = keyLine("session");
++  if (session !== -1 && !lines.slice(session + 1, blockEnd(session)).some((line) => line.replace(/[\r\n]+$/u, "").length > 0 && !line.startsWith("#"))) lines.splice(session, 1);
++  const language = keyLine("language");
++  if (language !== -1 && !lines.slice(language + 1, blockEnd(language)).some((line) => /^ {2}human_facing:\s*(?:de|en)/u.test(line))) lines.splice(language + 1, 0, `  human_facing: en${eol}`);
++  if (keyLine("modelRouting") === -1) {
++    const order = fresh.split(/\r?\n/u).filter(isTop).map((line) => line.slice(0, line.indexOf(":")));
++    const following = order.slice(order.indexOf("modelRouting") + 1).filter((key) => !["criticExport", "runnerRoutes", "session"].includes(key));
++    let at = lines.length;
++    for (const key of following) { const found = lines.findIndex((line) => isTop(line) && line.startsWith(`${key}:`)); if (found !== -1) { at = found; break; } }
++    // An appended block follows the last content line directly: the generator's own trailing separator is what the uninstall cut.
++    if (at === lines.length) while (lines.length > 0 && lines.at(-1).trim() === "") lines.pop();
++    if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
++    lines.splice(at, 0, `modelRouting:${eol}`);
++  }
++  return lines.join("");
++}
++
++function reseedStrippedToml(stripped, keys) {
++  const eol = stripped.includes("\r\n") ? "\r\n" : "\n";
++  const lines = stripped.split(/(?<=\n)/u);
++  const section = lines.findIndex((line) => /^\s*\[/u.test(line));
++  const head = section === -1 ? lines : lines.slice(0, section);
++  const present = new Set(head.map((line) => line.match(/^\s*([A-Za-z_][\w-]*)\s*=/u)?.[1]).filter(Boolean));
++  const missing = keys.filter((key) => !present.has(key));
++  if (missing.length === 0) return stripped;
++  const at = section === -1 ? lines.length : section;
++  if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
++  lines.splice(at, 0, ...missing.map((key) => `${key} = ""${eol}`));
++  return lines.join("");
++}
++
++function replaceFileBytes(fs, path, bytes, mode) {
++  const temporary = `${path}.reinstall-${randomBytes(6).toString("hex")}`;
++  try {
++    fs.writeFileSync(temporary, bytes, { flag: "wx", mode });
++    fs.renameSync(temporary, path);
++  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
++}
++
++/**
++ * Build the typed plan (and the byte-exact writes behind it) for a project the uninstall left behind. Returns null when
++ * this root has no recognisable uninstalled state, so every other reinstall disposition stays exactly as it was.
++ */
++function buildReinstallAfterUninstall(root, fs) {
++  let sourceBytes; let intent;
++  try {
++    sourceBytes = readBoundPhysicalFile(safePath(root, SOURCE, fs), fs);
++    intent = parseYaml(decodeUtf8Strict(sourceBytes, SOURCE));
++    if (!validatePipelineUserV3(intent).ok) return null;
++  } catch { return null; }
++  const observed = observeUninstalledState(root, fs);
++  if (observed === null) return null;
++  const { repository, entry, states } = observed;
++  const uninstall = { planSha256: entry.planSha256, journalSha256: entry.journalSha256 };
++  const refuse = (status, diagnostics, extra = {}) => ({ plan: { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, root, status, uninstall, diagnostics, ...extra }, writes: [], restores: [] });
++  const conflicts = states.filter((entryState) => entryState.state !== "match").map((entryState) => ({
++    path: entryState.path,
++    code: entryState.state === "edited" ? "reinstall_postimage_edited" : "reinstall_postimage_missing",
++    expectedSha256: entryState.expectedSha256,
++    actualSha256: entryState.actualSha256,
++  }));
++  if (conflicts.length > 0) {
++    return refuse("conflict", conflicts.map((conflict) => diagnostic(`$.targets.${conflict.path}`, conflict.code,
++      `${conflict.path} no longer equals the bytes the uninstall left, so the reinstall will not overwrite it`,
++      "restore the file to its post-uninstall bytes or move your change aside, then run plan-reinstall again")), { conflicts });
++  }
++  const retainedState = []; const restores = []; const notes = [];
++  for (const [index, action] of entry.journal.actions.entries()) {
++    if (action.kind !== "retained-metadata") continue;
++    const row = { path: action.path, retainedSha256: action.beforeSha256 };
++    if (!UNINSTALL_RESTORABLE_STATE.test(action.path)) {
++      retainedState.push({ ...row, disposition: "left-retained" });
++      notes.push(diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_marker_left", `${action.path} is a transient onboarding marker and stays in the private retained store`, "onboarding asks for it again when it is needed"));
++      continue;
++    }
++    const retained = readUninstallRetainedMetadata({ controls: entry.controls, index });
++    if (retained === null || retained.sha256 !== action.beforeSha256) {
++      return refuse("conflict", [diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_state_unavailable", `the retained copy of ${action.path} is missing or changed, so its closed features cannot be restored`, "restore the private retained copy named by the uninstall journal, then run plan-reinstall again")], { conflicts: [{ path: action.path, code: "reinstall_retained_state_unavailable", expectedSha256: action.beforeSha256, actualSha256: retained?.sha256 ?? null }] });
++    }
++    let current = null;
++    try { const path = safePath(root, action.path, fs); if (fs.existsSync(path)) current = readBoundPhysicalFile(path, fs); } catch { current = null; }
++    if (current === null) { retainedState.push({ ...row, disposition: "restore" }); restores.push({ path: action.path, bytes: retained.bytes, sha256: retained.sha256, mode: (retained.mode ?? 0o600) & 0o777 }); }
++    else if (sha256(current) === action.beforeSha256) retainedState.push({ ...row, disposition: "already-restored" });
++    else {
++      retainedState.push({ ...row, disposition: "kept-current" });
++      notes.push(diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_state_superseded", `${action.path} exists again with different bytes, so the retained copy is not restored over it`, "the retained copy stays in the private store named by the uninstall journal"));
++    }
++  }
++  let projection; let writes;
++  try {
++    const owned = loadRuntimeProjectionV3OwnedKeys();
++    const formats = new Map([...owned.targets.map((target) => [target.path, target]), ...(owned.neutralAuthorityMirrors ?? []).map((mirror) => [mirror.path, { ...owned.targets.find((target) => target.path === mirror.mirrorOf), path: mirror.path, format: mirror.format }])]);
++    const fresh = freshBaselines(intent, { rootDir: root, fs })[".claude/pipeline.yaml"].bytes;
++    const baselines = reinstallProjectionBaselines(root, intent, fs);
++    for (const entryState of states) {
++      const target = formats.get(entryState.path);
++      const bytes = decodeUtf8Strict(entryState.current, entryState.path);
++      baselines[entryState.path] = { status: "present", bytes: target?.format === "yaml" ? reseedStrippedYaml(bytes, fresh) : target?.projection === "codex-custom-agent-v3" ? reseedStrippedToml(bytes, target.ownedKeys) : bytes };
++    }
++    projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines });
++    if (projection.status !== "ready") throw new Error(`projection ${projection.status}`);
++    writes = states.map((entryState) => {
++      const target = projection.targets.find((candidate) => candidate.path === entryState.path);
++      if (typeof target?.after?.bytes !== "string") throw new Error(`no regenerated bytes for ${entryState.path}`);
++      return { path: entryState.path, beforeSha256: entryState.actualSha256, beforeBytes: entryState.current, afterBytes: target.after.bytes, mode: fs.lstatSync(safePath(root, entryState.path, fs)).mode & 0o777 };
++    });
++  } catch (error) {
++    return refuse("unrepairable", [diagnostic("$.projection", "reinstall_projection_unavailable", `the current source cannot be regenerated over the stripped files: ${String(error.message).split("\n")[0]}`, "repair the source or the stripped file named above through its owning workflow")]);
++  }
++  const targets = writes.map((write) => ({ path: write.path, before: describe(write.beforeBytes), after: describe(write.afterBytes) }));
++  const binding = { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, root, commonDir: repository.commonDir, uninstall, source: { path: SOURCE, sha256: sha256(sourceBytes) }, targets, retainedState };
++  const planSha256 = sha256(JSON.stringify(stable(binding)));
++  return {
++    plan: { ...binding, status: "ready", planSha256, mutation: false, diagnostics: notes, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-reinstall", "--root", root, "--plan-sha256", planSha256, "--activate"], true, true, REINSTALL_PLAN_SCHEMA, ["applied"]) },
++    writes,
++    restores,
++    intent,
++  };
++}
++
++function applyReinstallAfterUninstall(built, fs, runner) {
++  const { plan, writes, restores } = built; const root = plan.root;
++  const written = []; const created = [];
++  try {
++    for (const write of writes) {
++      const path = safePath(root, write.path, fs);
++      if (sha256(readBoundPhysicalFile(path, fs)) !== write.beforeSha256) throw new Error(`preimage changed: ${write.path}`);
++      replaceFileBytes(fs, path, write.afterBytes, write.mode); written.push({ path, previous: write.beforeBytes, mode: write.mode });
++    }
++    for (const restore of restores) {
++      const path = safePath(root, restore.path, fs);
++      fs.mkdirSync(dirname(path), { recursive: true });
++      fs.writeFileSync(path, restore.bytes, { flag: "wx", mode: restore.mode }); created.push(path);
++    }
++    // Read back: the files on disk must now be a fixpoint of the source under the same generator.
++    const settled = planRuntimeProjectionV3(built.intent, { source: SOURCE, baselines: reinstallProjectionBaselines(root, built.intent, fs) });
++    if (settled.status !== "ready" || settled.targets.some((target) => target.changed && writes.some((write) => write.path === target.path))) throw new Error("the regenerated files are not a fixpoint of the source");
++  } catch (error) {
++    const failures = [];
++    for (const path of created.reverse()) try { fs.unlinkSync(path); } catch (rollbackError) { failures.push(rollbackError); }
++    for (const entryWritten of written.reverse()) try { replaceFileBytes(fs, entryWritten.path, entryWritten.previous, entryWritten.mode); } catch (rollbackError) { failures.push(rollbackError); }
++    return { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, status: failures.length ? "rollback-failed" : "rolled-back", root, diagnostics: [diagnostic("$.transaction", failures.length ? "reinstall_rollback_failed" : "reinstall_apply_failed", error.message, "inspect the project files named above before retrying")] };
++  }
++  const result = { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, status: "applied", root, uninstall: plan.uninstall, changes: writes.map((write) => write.path), restoredState: restores.map((restore) => ({ path: restore.path, sha256: restore.sha256 })), retainedState: plan.retainedState };
++  if (typeof runner === "string" && runner.length > 0) {
++    // The hooks, runner permissions and enrollment the uninstall also removed follow through the ordinary lifecycle:
++    // the observation below names the controlling action that comes next.
++    const postInspection = inspectProjectOnboardingV3({ rootDir: root, deps: fs, intent: "onboarding", runner });
++    return { ...result, postInspection, nextAction: postInspection.nextAction ?? null };
++  }
++  return result;
++}
++
+ /**
+  * Reinstall is deliberately an authority-only transaction.  It never treats
+  * legacy calibration, skills, hooks, docs, or runner directories as owned.
++ * The one extension is the typed "after-uninstall" case above: a project that
++ * `project-uninstall` stripped is regenerated from its source, never quarantined.
+  */
+ export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+   const fs = deps(overrides); let root;
+@@ -554,11 +767,11 @@ export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps:
+     intent = parseYaml(decodeUtf8Strict(source, SOURCE));
+     if (!validatePipelineUserV3(intent).ok) throw new Error("invalid V3 source");
+     projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines: currentRuntimeBaselines(root, intent, fs) });
+-  } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unowned", "the V3 source cannot prove a current owned projection", "use the source-owning recovery route")] }; }
++  } catch { return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unowned","the V3 source cannot prove a current owned projection", "use the source-owning recovery route")] }; }
+   const expected = projection.targets.find((target) => target.path === ".claude/pipeline.yaml")?.after?.bytes;
+   let manifest;
+-  try { manifest = readBoundPhysicalFile(manifestPath, fs); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unavailable", "the generated manifest is unavailable", "use the manifest repair route")] }; }
+-  if (typeof expected !== "string" || Buffer.compare(manifest, Buffer.from(expected, "utf8")) !== 0) return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unowned", "the existing manifest is not the current generated V3 projection", "repair or preserve it through its owning workflow")] };
++  try { manifest = readBoundPhysicalFile(manifestPath, fs); } catch { return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unavailable", "the generated manifest is unavailable", "use the manifest repair route")] }; }
++  if (typeof expected !== "string" || Buffer.compare(manifest, Buffer.from(expected, "utf8")) !== 0) return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unowned", "the existing manifest is not the current generated V3 projection", "repair or preserve it through its owning workflow")] };
+   let repository;
+   try { repository = discoverRepository(root, { spawn: fs.spawnSync }); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "private-store-unavailable", root, diagnostics: [diagnostic("$.repository", "reinstall_private_store_unavailable", "the physical Git common directory is unavailable", "restore local Git capability before retrying")] }; }
+   const targets = [{ path: SOURCE, before: describe(source) }, { path: ".claude/pipeline.yaml", before: describe(manifest) }];
+@@ -567,11 +780,16 @@ export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps:
+   return { ...binding, status: "ready", planSha256, mutation: false, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-reinstall", "--root", root, "--plan-sha256", planSha256, "--activate"], true, true, REINSTALL_PLAN_SCHEMA, ["applied"]) };
+ }
+ 
+-export function applyProjectOnboardingReinstall({ rootDir = process.cwd(), planSha256, activate = false, deps: overrides = {} } = {}) {
++export function applyProjectOnboardingReinstall({ rootDir = process.cwd(), planSha256, activate = false, runner = null, deps: overrides = {} } = {}) {
+   const fs = deps(overrides);
+   if (!activate || !SHA256_RE.test(planSha256 ?? "")) return { schema: REINSTALL_PLAN_SCHEMA, status: "activation-required" };
+   const plan = planProjectOnboardingReinstall({ rootDir, deps: fs });
+   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: REINSTALL_PLAN_SCHEMA, status: "invalid-plan", root: plan.root };
++  if (plan.case === REINSTALL_AFTER_UNINSTALL) {
++    const built = buildReinstallAfterUninstall(plan.root, fs);
++    if (built === null || built.plan.status !== "ready" || built.plan.planSha256 !== planSha256) return { schema: REINSTALL_PLAN_SCHEMA, status: "invalid-plan", root: plan.root };
++    return applyReinstallAfterUninstall(built, fs, runner);
++  }
+   const archive = join(plan.commonDir, "agent-pipeline", "reinstall-quarantine", planSha256);
+   const moved = [];
+   try {
+@@ -4492,6 +4710,26 @@ export function planProjectOnboardingSourceRecoveryV4({
+       }],
+     });
+   }
++  // The source is current, but a project that project-uninstall stripped is not: name the route back instead of sending the
++  // caller to the inspection that sent it here.
++  if (observeUninstalledState(root, fs) !== null) {
++    return sourceRecoveryResult({
++      status: "unrepairable",
++      root,
++      category: "current-authority",
++      sourceSha256: inspected.sourceSha256,
++      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", root], runner, intent ?? "onboarding"), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
++      diagnostics: [{
++        ...lifecycleDiagnostic(
++          "$.source",
++          "source_is_current",
++          "the V3 source is current; the project was stripped by project-uninstall",
++          "run plan-reinstall, which regenerates the stripped projections from this source",
++        ),
++        repairCommand: { available: true, reason: "project_uninstalled", guidance: "run the journal-bound reinstall plan (plan-reinstall) and apply it" },
++      }],
++    });
++  }
+   return sourceRecoveryResult({
+     status: "unrepairable",
+     root,
+@@ -4606,6 +4844,23 @@ export function planProjectOnboardingManifestRepairV4({
+   // this writer must never treat that as permission to mask or replace a
+   // malformed canonical project manifest.
+   const canonicalManifest = loadManifest(root);
++  if (canonicalManifest.status !== "ok" && !canonicalManifest.repair?.available && observeUninstalledState(root, fs) !== null) {
++    // Not an owner-repair dead end: project-uninstall stripped the owned keys and its journal knows how to put them back.
++    return {
++      ...manifestRepairResult({
++        status: "unrepairable",
++        root,
++        source: { path: SOURCE, sha256: inspection.sourceSha256 },
++        diagnostics: [lifecycleDiagnostic(
++          "$.authority.manifest",
++          "canonical_manifest_stripped_by_uninstall",
++          "the canonical project manifest is invalid because project-uninstall stripped its owned keys",
++          "run plan-reinstall (node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-reinstall --root <project-dir>); it regenerates the manifest from the current source",
++        )],
++      }),
++      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", root], runner, sessionIntent ?? "onboarding"), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
++    };
++  }
+   if (canonicalManifest.status !== "ok") {
+     // A schema-less-but-otherwise-valid canonical manifest (backlog:
+     // a-schema-less-project-pipeline-yaml-has-no-known-repair-path) is a normalizing repair,
+@@ -4623,7 +4878,7 @@ export function planProjectOnboardingManifestRepairV4({
+         "$.authority.manifest",
+         "canonical_manifest_requires_owner_repair",
+         "the canonical project manifest is absent or invalid",
+-        "repair project/pipeline.yaml through its owning authority workflow before repairing a runtime projection",
++        "no command rewrites an existing invalid project/pipeline.yaml: edit it by hand, then re-check it with: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-manifest-repair --root <project-dir>; a manifest that project-uninstall stripped is regenerated by: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-reinstall --root <project-dir>",
+       );
+     return manifestRepairResult({
+       status: "unrepairable",
+@@ -5259,6 +5514,13 @@ function v4InspectionWithoutFirstIntakeBoundary(rootDir, fs, intent = "onboardin
+         }
+         const manifest = loadManifest(legacy.root);
+         if (manifest.status !== "ok") {
++          // A project that project-uninstall stripped has a route back, bound to the uninstall journal: the manifest
++          // repair below is unrepairable for it by design (the manifest is not absent, it is stripped).
++          if (observeUninstalledState(legacy.root, fs) !== null) {
++            return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
++              nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", legacy.root], runner, intent), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
++              diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is invalid because project-uninstall stripped its owned keys", "review the journal-bound reinstall plan: plan-reinstall regenerates it from the current source")] });
++          }
+           return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
+             nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], runner, intent), false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
+             diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "review the digest-bound manifest-only repair plan")] });
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 4d62ec0c6..4e4beee4a 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
+ import { spawn, spawnSync } from "node:child_process";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import {
+-  chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
++  chmodSync, closeSync, copyFileSync, cpSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
+   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
+ } from "node:fs";
+ import { tmpdir, devNull } from "node:os";
+@@ -14,6 +14,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
+ import {observeOnboardingEnrollmentHistory,KickoffError} from "./onboarding-continuity.mjs";
+ import { SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
+ import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
++import { createProjectUninstallController } from "./project-uninstall.mjs";
++import { fixture as projectUninstallFixture } from "./project-uninstall.fixture.mjs";
+ import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
+ import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+@@ -164,7 +166,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
+ // direct parent retains custody of all case completions.
+ const SHARD_COUNT = 6;
+ const CHUNK_COUNT = 2;
+-const EXPECTED_CASE_COUNT = 228;
++const EXPECTED_CASE_COUNT = 240;
+ const CASES_PER_CHILD = EXPECTED_CASE_COUNT / (SHARD_COUNT * CHUNK_COUNT);
+ // Bound each independent chunk without truncating slower Git fixtures. Sized from a measured
+ // native-Windows run of all 216 cases with no deadline (2026-10-05, working tree and HEAD): the
+@@ -303,7 +305,7 @@ export function validateShardReceipt(value, index, selectedChunk, expectedCases)
+   assert.equal(value.shard, index);
+   assert.equal(value.chunk, selectedChunk);
+   assert.equal(value.declaredCount, EXPECTED_CASE_COUNT);
+-  assert.equal(expectedCases.length, CASES_PER_CHILD, "each child must own exactly 18 callbacks");
++  assert.equal(expectedCases.length, CASES_PER_CHILD, "each child must own exactly 20 callbacks");
+   assert.deepEqual(value.assignedIndices, expectedCases.map((entry) => entry.index));
+   assert.ok(Array.isArray(value.results));
+   assert.equal(value.results.length, expectedCases.length, "every assigned callback must finish");
+@@ -10741,11 +10743,219 @@ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
+   }},
+ ];
+ for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)if(entry.standalone!==true)test(entry.name,entry.run);
++
++// Reinstall after project-uninstall (W7-REINSTALL-AFTER-UNINSTALL; backlog item
++// 2026-10-30-no-route-back-to-install-after-project-uninstall, decision D206).
++// Twelve callbacks so the closed partition (SHARD_COUNT x CHUNK_COUNT = 12) keeps
++// an integer CASES_PER_CHILD: 228 + 12 = 240 = 12 x 20.
++const RIU_OWNED_PATHS = [".claude/pipeline.json", ".claude/pipeline.yaml", "project/pipeline.json", "project/pipeline.yaml"];
++const RIU_STATE = { schema: "pipeline.state.v0", activeFeature: { id: "riu-fixture", planPath: "specs/riu-fixture/prd.md", phase: "design" }, planApproved: false, closedFeatures: [{ id: "closed-before-uninstall" }] };
++const riuOnboardedRoot = ({ withState = false } = {}) => {
++  const path = root();
++  const portable = planProjectOnboardingV3({ rootDir: path, runner: "claude" });
++  assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true }).status, "applied");
++  const base = spawnSync("git", ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-m", "test: fixture base", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
++  assert.equal(base.status, 0, base.stderr);
++  const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, runner: "claude", operation: "runtime" });
++  const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
++  assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, runner: "claude", operation: "runtime", planSha256: digest, activate: true }).status, "intake-required");
++  let stateBytes = null;
++  if (withState) { stateBytes = `${JSON.stringify(RIU_STATE)}\n`; writeFileSync(join(path, "project/pipeline-state.json"), stateBytes); }
++  return { path, stateBytes };
++};
++// The consumer sequence: onboard, project-uninstall plan, project-uninstall apply.
++const riuUninstalledRoot = (options) => {
++  const onboarded = riuOnboardedRoot(options);
++  const before = Object.fromEntries(RIU_OWNED_PATHS.map((relative) => [relative, readFileSync(join(onboarded.path, relative), "utf8")]));
++  const controller = createProjectUninstallController({ hostStateRoot: join(onboarded.path, "unused-host") });
++  const uninstallPlan = controller.plan({ rootDir: onboarded.path });
++  assert.deepEqual(uninstallPlan.conflicts, []);
++  const uninstalled = controller.apply(uninstallPlan, { activate: true, planSha256: uninstallPlan.planSha256 });
++  assert.equal(uninstalled.status, "uninstalled");
++  return { ...onboarded, before, uninstallPlan, journalPath: uninstalled.journalPath };
++};
++const riuInspect = (path, runner = "claude") => inspectProjectOnboardingV3Core({ rootDir: path, runner, intent: "bootstrap" });
++const riuRead = (path, relative) => readFileSync(join(path, relative), "utf8");
++const riuInvalidateManifests = (path) => {
++  for (const relative of [".claude/pipeline.yaml", "project/pipeline.yaml"]) {
++    const text = riuRead(path, relative);
++    assert.ok(text.includes("    mode: blocking"));
++    writeFileSync(join(path, relative), text.replace("    mode: blocking", "    mode: not-a-mode"));
++  }
++  const loaded = loadManifest(path);
++  assert.equal(loaded.status, "invalid");
++  assert.notEqual(loaded.repair?.available, true);
++};
++// Follow the controlling actions the way an operator does: run each non-mutating one, take the action it names next.
++const riuFollow = (path, first) => {
++  const verbs = [first.argv[1]]; let action = first;
++  for (let step = 0; step < 6 && action.mutation !== true; step += 1) {
++    const verb = action.argv[1];
++    const out = verb === "plan-reinstall" ? planProjectOnboardingReinstall({ rootDir: path })
++      : verb === "plan-manifest-repair" ? planProjectOnboardingManifestRepairV4({ rootDir: path, runner: "claude" })
++        : verb === "plan-source-recovery" ? planProjectOnboardingSourceRecoveryV4({ rootDir: path, runner: "claude" })
++          : verb === "inspect" ? riuInspect(path) : null;
++    assert.ok(out !== null, `unexpected controlling verb ${verb}`);
++    const next = out.nextAction ?? out.applyAction ?? null;
++    if (next === null) return { verbs, terminal: out, action: null };
++    verbs.push(next.argv[1]); action = next;
++  }
++  return { verbs, terminal: null, action };
++};
++const REINSTALL_AFTER_UNINSTALL_CASES = [
++  { name: "RIU-01 anchor: after project-uninstall inspect names the reinstall route and its apply regenerates exactly the pre-uninstall projections", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const inspected = riuInspect(f.path);
++      assert.equal(inspected.status, "partial"); assert.equal(inspected.diagnostics[0].code, "manifest_invalid");
++      assert.equal(inspected.nextAction.argv[1], "plan-reinstall"); assert.equal(inspected.nextAction.mutation, false);
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      assert.equal(plan.status, "ready", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall"); assert.equal(plan.mutation, false);
++      assert.equal(plan.uninstall.planSha256, f.uninstallPlan.planSha256);
++      assert.deepEqual(plan.targets.map((target) => target.path).sort(), RIU_OWNED_PATHS);
++      for (const key of ["--root", "--plan-sha256", "--activate"]) assert.ok(plan.applyAction.argv.includes(key));
++      assert.equal(plan.applyAction.argv[1], "apply-reinstall"); assert.equal(plan.applyAction.argv.includes("--runner"), false); assert.equal(plan.applyAction.mutation, true);
++      assert.equal(riuRead(f.path, ".claude/pipeline.yaml").includes("modelRouting"), false, "the plan must not write");
++      const applied = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" });
++      assert.equal(applied.status, "applied", JSON.stringify(applied));
++      assert.deepEqual([...applied.changes].sort(), RIU_OWNED_PATHS);
++      for (const relative of RIU_OWNED_PATHS) assert.equal(riuRead(f.path, relative), f.before[relative], relative);
++      assert.equal(loadManifest(f.path).status, "ok");
++      const after = riuInspect(f.path);
++      assert.equal(after.diagnostics.some((entry) => entry.code === "manifest_invalid"), false, JSON.stringify(after));
++      assert.notEqual(after.nextAction?.argv?.[1], "plan-reinstall"); assert.notEqual(after.nextAction?.argv?.[1], "plan-manifest-repair");
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-02 the retained state with closedFeatures is restored by the reinstall and its private copy is kept", run: () => {
++    const f = riuUninstalledRoot({ withState: true }); try {
++      assert.equal(existsSync(join(f.path, "project/pipeline-state.json")), false);
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      assert.equal(plan.status, "ready", JSON.stringify(plan));
++      assert.deepEqual(plan.retainedState.map((entry) => [entry.path, entry.disposition]), [["project/pipeline-state.json", "restore"]]);
++      const applied = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" });
++      assert.equal(applied.status, "applied", JSON.stringify(applied));
++      assert.deepEqual(applied.restoredState.map((entry) => entry.path), ["project/pipeline-state.json"]);
++      assert.equal(riuRead(f.path, "project/pipeline-state.json"), f.stateBytes);
++      assert.deepEqual(JSON.parse(riuRead(f.path, "project/pipeline-state.json")).closedFeatures, RIU_STATE.closedFeatures);
++      assert.ok(readdirSync(join(dirname(f.journalPath), "retained")).some((name) => name.startsWith("metadata-")), "the private retained copy stays");
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-03 a file the user edited after the uninstall is a typed conflict and is never overwritten", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const edited = `${riuRead(f.path, "project/pipeline.yaml")}# user edit after uninstall\n`;
++      writeFileSync(join(f.path, "project/pipeline.yaml"), edited);
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      assert.equal(plan.status, "conflict", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall");
++      assert.deepEqual(plan.conflicts.map((entry) => [entry.path, entry.code]), [["project/pipeline.yaml", "reinstall_postimage_edited"]]);
++      assert.equal(plan.applyAction ?? null, null);
++      assert.equal(plan.diagnostics[0].code, "reinstall_postimage_edited");
++      assert.equal(riuRead(f.path, "project/pipeline.yaml"), edited);
++      const refused = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: "0".repeat(64), activate: true, runner: "claude" });
++      assert.equal(refused.status, "invalid-plan");
++      assert.equal(riuRead(f.path, "project/pipeline.yaml"), edited); assert.equal(riuRead(f.path, ".claude/pipeline.yaml").includes("modelRouting"), false);
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-04 an uninstall journal that belongs to another root is ignored", run: () => {
++    const other = riuUninstalledRoot(); const own = riuOnboardedRoot(); try {
++      cpSync(join(other.path, ".git/pipeline-uninstall"), join(own.path, ".git/pipeline-uninstall"), { recursive: true });
++      riuInvalidateManifests(own.path);
++      const inspected = riuInspect(own.path);
++      assert.equal(inspected.nextAction.argv[1], "plan-manifest-repair");
++      const plan = planProjectOnboardingReinstall({ rootDir: own.path });
++      assert.notEqual(plan.case, "after-uninstall"); assert.equal(plan.uninstall, undefined);
++    } finally { dispose(other.path); dispose(own.path); }
++  } },
++  { name: "RIU-05 a merely invalid manifest without a journal keeps the owner-repair route and its refusal names the command", run: () => {
++    const f = riuOnboardedRoot(); try {
++      riuInvalidateManifests(f.path);
++      assert.equal(riuInspect(f.path).nextAction.argv[1], "plan-manifest-repair");
++      const repair = planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" });
++      assert.equal(repair.status, "unrepairable"); assertDiagnostic(repair, "canonical_manifest_requires_owner_repair");
++      assert.match(repair.diagnostics[0].guidance, /project-onboarding-v3\.mjs/u); assert.match(repair.diagnostics[0].guidance, /plan-manifest-repair/u);
++      assert.equal(riuFollow(f.path, riuInspect(f.path).nextAction).terminal?.status, "unrepairable");
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-06 plan-manifest-repair in the uninstalled state names the reinstall route instead of an owner-repair dead end", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const repair = planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" });
++      assert.equal(repair.status, "unrepairable"); assert.equal(repair.diagnostics[0].code, "canonical_manifest_stripped_by_uninstall");
++      assert.equal(repair.nextAction.argv[1], "plan-reinstall"); assert.equal(repair.nextAction.mutation, false);
++      assert.match(repair.diagnostics[0].guidance, /plan-reinstall/u);
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-07 plan-source-recovery in the uninstalled state names the reinstall route instead of sending back to inspect", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const recovery = planProjectOnboardingSourceRecoveryV4({ rootDir: f.path, runner: "claude" });
++      assert.equal(recovery.status, "unrepairable"); assert.equal(recovery.diagnostics[0].code, "source_is_current");
++      assert.equal(recovery.nextAction.argv[1], "plan-reinstall");
++      assert.doesNotMatch(recovery.diagnostics[0].guidance, /rerun the V4 lifecycle inspection/u);
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-08 no controlling action returned by inspect, manifest repair, reinstall or source recovery leads back to inspect without a mutation", run: () => {
++    const f = riuUninstalledRoot(); try {
++      for (const first of [riuInspect(f.path).nextAction, planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" }).nextAction, planProjectOnboardingSourceRecoveryV4({ rootDir: f.path, runner: "claude" }).nextAction]) {
++        const walked = riuFollow(f.path, first);
++        assert.equal(new Set(walked.verbs).size, walked.verbs.length, `circle: ${walked.verbs.join(" > ")}`);
++        assert.equal(walked.verbs.slice(1).includes("inspect"), false, walked.verbs.join(" > "));
++        assert.equal(walked.action?.argv?.[1], "apply-reinstall", walked.verbs.join(" > "));
++      }
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-09 the lifecycle guard admits the reinstall plan action from inspect and the apply action from the plan", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const route = riuInspect(f.path).nextAction;
++      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction(route), f.path, { runner: "claude" }), true);
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction(plan.applyAction), f.path, { runner: "claude" }), true);
++      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction({ ...plan.applyAction, argv: plan.applyAction.argv.filter((token) => token !== "--activate") }), f.path, { runner: "claude" }), false);
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-10 the apply refuses without activation, on a stale digest and after the planned files drifted, and writes nothing", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      const stripped = Object.fromEntries(RIU_OWNED_PATHS.map((relative) => [relative, riuRead(f.path, relative)]));
++      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: false }).status, "activation-required");
++      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: "f".repeat(64), activate: true }).status, "invalid-plan");
++      writeFileSync(join(f.path, ".claude/pipeline.json"), `${stripped[".claude/pipeline.json"]}\n`);
++      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true }).status, "invalid-plan");
++      for (const relative of RIU_OWNED_PATHS) if (relative !== ".claude/pipeline.json") assert.equal(riuRead(f.path, relative), stripped[relative], relative);
++    } finally { dispose(f.path); }
++  } },
++  { name: "RIU-11 the same builder serves a Codex-enabled source: foreign bytes survive and the regenerated projections are a fixpoint of the source", run: () => {
++    const cleanups = []; const f = projectUninstallFixture({ after: (run) => cleanups.push(run) }, { hooks: false });
++    try {
++      const owned = [".claude/pipeline.json", ".claude/pipeline.yaml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml"];
++      const uninstallPlan = f.controller.plan({ rootDir: f.root }); assert.deepEqual(uninstallPlan.conflicts, []);
++      assert.equal(f.controller.apply(uninstallPlan, { activate: true, planSha256: uninstallPlan.planSha256 }).status, "uninstalled");
++      const stripped = Object.fromEntries(owned.map((relative) => [relative, riuRead(f.root, relative)]));
++      const plan = planProjectOnboardingReinstall({ rootDir: f.root });
++      assert.equal(plan.status, "ready", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall");
++      for (const relative of owned) assert.ok(plan.targets.some((target) => target.path === relative), relative);
++      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.root, planSha256: plan.planSha256, activate: true, runner: "codex" }).status, "applied");
++      assert.match(riuRead(f.root, ".claude/pipeline.yaml"), /unowned_language_sentinel: exact/u); assert.match(riuRead(f.root, ".claude/pipeline.yaml"), /foreign: keep-exact/u);
++      assert.match(riuRead(f.root, ".codex/agents/implementor.toml"), /# foreign comment/u);
++      assert.notEqual(riuRead(f.root, ".claude/pipeline.yaml"), stripped[".claude/pipeline.yaml"]);
++      const again = planProjectOnboardingReinstall({ rootDir: f.root });
++      assert.notEqual(again.case, "after-uninstall", "an applied reinstall leaves nothing for the same journal to regenerate");
++    } finally { for (const run of cleanups) run(); }
++  } },
++  { name: "RIU-12 after the reinstall the old journal no longer controls: a later invalid manifest falls back to the owner-repair route", run: () => {
++    const f = riuUninstalledRoot(); try {
++      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
++      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" }).status, "applied");
++      riuInvalidateManifests(f.path);
++      const inspected = riuInspect(f.path);
++      assert.equal(inspected.nextAction.argv[1], "plan-manifest-repair");
++      assert.notEqual(planProjectOnboardingReinstall({ rootDir: f.path }).case, "after-uninstall");
++      assert.equal(planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" }).diagnostics[0].code, "canonical_manifest_requires_owner_repair");
++    } finally { dispose(f.path); }
++  } },
++];
++for (const entry of REINSTALL_AFTER_UNINSTALL_CASES) test(entry.name, entry.run);
+ Object.freeze(ONBOARDING_TEST_CASES);
+ export const ONBOARDING_CASE_IDS = Object.freeze(ONBOARDING_TEST_CASES.map((entry) => entry.id).sort());
+ if (DIRECT_INVOCATION) {
+-  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 228 stable callbacks");
+-  if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 18 callbacks");
++  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 240 stable callbacks");
++  if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 20 callbacks");
+ }
+ 
+ if (ORCHESTRATING_SHARDS) {
+@@ -10763,7 +10973,7 @@ if (ORCHESTRATING_SHARDS) {
+   if (failed.length === 0) {
+     assert.equal(results.length, SHARD_COUNT * CHUNK_COUNT, "all 12 child receipts are required");
+     const completion = recorder.snapshot();
+-    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 228 callbacks must be reported");
++    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 240 callbacks must be reported");
+     assert.equal(completion.terminal, true, "the parent must emit the terminal completion record");
+     const classes = new Set(results.flatMap((result) => result.coverage));
+     assert.ok(classes.size > 0, "B8 corpus must reach at least one real session command");
+diff --git a/plugins/pipeline-core/lib/project-uninstall.mjs b/plugins/pipeline-core/lib/project-uninstall.mjs
+index 8b66b846d..f887731e9 100644
+--- a/plugins/pipeline-core/lib/project-uninstall.mjs
++++ b/plugins/pipeline-core/lib/project-uninstall.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Source target: plugins/pipeline-core/lib/project-uninstall.mjs
+-import {closeSync,constants,fstatSync,fsyncSync,mkdirSync,openSync,readSync,readdirSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
++import {closeSync,constants,fstatSync,fsyncSync,mkdirSync,openSync,readSync,readdirSync,realpathSync,renameSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
+ import {dirname,join,relative,resolve,sep} from 'node:path';
+ import {homedir} from 'node:os';
+ import {randomBytes} from 'node:crypto';
+@@ -27,6 +27,27 @@ function validJournal(journal,{root,controls,planSha256}){
+  const publicActions=journal.actions.map(({afterBytes,...entry})=>entry);if(canonical(publicActions)!==canonical(journal.plan.footprint.actions))return false;
+  return journal.actions.every(entry=>typeof entry.path==='string'&&!entry.path.startsWith('/')&&!entry.path.includes('\\')&&!entry.path.split('/').some(p=>!p||p==='.'||p==='..')&&['owned-keys','retained-metadata'].includes(entry.kind)&&(entry.kind==='retained-metadata'?entry.afterBytes===null:typeof entry.afterBytes==='string'&&footprintSha256(entry.afterBytes)===entry.afterSha256));
+ }
++// Read-only observation of the completed uninstall journals that belong to one root (the route back to an install, W7-REINSTALL).
++// The journal is the only record of what the uninstall stripped and retained; this reader adds no mutation and never widens what
++// the uninstall removes. A journal counts only when it validates exactly as resume() validates it, its owner root is this root,
++// and every stage through 'complete' finished. Newest first, so a later uninstall outranks an earlier one.
++export function observeCompletedUninstallJournals({rootDir,commonDir}){
++ const base=join(commonDir,'pipeline-uninstall'),found=[];let scopes;
++ try{scopes=readdirSync(base).sort();}catch{return found;}
++ for(const scopeKey of scopes){let plans;try{plans=readdirSync(join(base,scopeKey)).sort();}catch{continue;}
++  for(const planSha256 of plans){if(!/^[a-f0-9]{64}$/.test(planSha256))continue;
++   const controls=join(base,scopeKey,planSha256),path=join(controls,'journal.json');
++   try{const raw=readPhysicalFootprint(path,{max:4194304});if(!raw||(process.platform!=='win32'&&raw.mode!==0o600))continue;
++    const journal=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw.bytes));
++    if(typeof journal?.controls!=='string'||realpathSync(journal.controls)!==realpathSync(controls)||!validJournal(journal,{root:rootDir,controls:journal.controls,planSha256}))continue;
++    if(journal.completed.length!==PROJECT_UNINSTALL_FAULT_STAGES.length-1)continue;
++    found.push({planSha256,scopeKey,controls:journal.controls,journalSha256:raw.sha256,journal,modifiedMs:statSync(path).mtimeMs});}catch{continue;}}}
++ return found.sort((a,b)=>b.modifiedMs-a.modifiedMs||(a.planSha256<b.planSha256?-1:1));
++}
++// The private retained copy of a state file the uninstall moved aside (retained-metadata action number `index` of the journal).
++export function readUninstallRetainedMetadata({controls,index}){
++ try{const row=readPhysicalFootprint(join(controls,'retained','metadata-'+index),{max:4194304});return row?{bytes:row.bytes,sha256:row.sha256,mode:row.mode}:null;}catch{return null;}
++}
+ function ensurePrivate(path){const existing=physicalFootprintPath(path,{missing:true});if(!existing){physicalFootprintPath(dirname(path),{missing:true,directory:true});mkdirSync(path,{recursive:true,mode:0o700});if(process.platform==='win32'&&hardenWindowsPrivateDirectory(path).status!=='secure')footprintFail('PU-PRIVATE-MODE');}const st=physicalFootprintPath(path,{directory:true});if(process.platform==='win32'?assessWindowsPrivatePath(path).status!=='secure':(st.mode&0o777)!==0o700)footprintFail('PU-PRIVATE-MODE');}
+ function sync(path){let fd;try{fd=openSync(path,'r');fsyncSync(fd);}catch(e){if(process.platform!=='win32'||!['EACCES','EPERM','EINVAL','EISDIR','ENOTSUP'].includes(e.code))throw e;}finally{if(fd!==undefined)closeSync(fd);}}
+ function replace(path,bytes,{beforeSha256,mode=0o600,absent=false}={}){const before=readPhysicalFootprint(path);if(absent?before!==null:before?.sha256!==beforeSha256)footprintFail('PU-CAS');physicalFootprintPath(dirname(path),{directory:true});const temporary=path+'.uninstall-'+randomBytes(8).toString('hex');try{writeFileSync(temporary,bytes,{flag:'wx',mode});sync(temporary);const current=readPhysicalFootprint(path);if(absent?current!==null:current?.sha256!==beforeSha256)footprintFail('PU-CAS');renameSync(temporary,path);sync(dirname(path));}finally{if(physicalFootprintPath(temporary,{missing:true}))unlinkSync(temporary);}}
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+index 74c641786..e7ddef17d 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+@@ -897,7 +897,7 @@ export function main(args = process.argv.slice(2), {
+     }
+     else if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
+     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
+-    else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
++    else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, runner: options.runner, deps });
+     else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, deps });
+     else if (options.command === "apply-partial-authority") output = applyProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps });
+     else if (options.command === "adopt-remote-plan") output = planProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, deps });
+@@ -1132,6 +1132,9 @@ export function main(args = process.argv.slice(2), {
+   if (output.schema === "pipeline.onboarding-intake-spec-marker-plan.v1") return ["repair-required", "already-current"].includes(output.status) ? 0 : 1;
+   if (output.schema === "pipeline.onboarding-intake-spec-marker-apply.v1") return ["applied", "already-current"].includes(output.status) ? 0 : 1;
+   if (output.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) return 0;
++  // apply-reinstall: "applied" is the success outcome of both the quarantine reinstall and the after-uninstall regeneration;
++  // it is not an inspection resting status, so without this line a successful apply exited 1.
++  if (output.schema === "pipeline.project-onboarding-reinstall-plan.v1" && output.status === "applied") return 0;
+   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
+   // `runtime-attestation-required` is a legitimate resting point for an
+   // inspect/plan command: it names what the caller still needs before it can
