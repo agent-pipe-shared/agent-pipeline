@@ -17,7 +17,7 @@ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} f
 import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -605,7 +605,7 @@ test("PF94 c19 takeover refuses only the SAME course key; another key keeps the 
     const same=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:c.courseKey,courseHistoryRegistered:false});
     assert.equal(same.originKind,"feature-course");
     assert.equal(same.refusalCode,"CGB-TAKEOVER-COURSE");
-    assert.ok(same.repair.includes("--add-review-lineage"),same.repair);
+    assert.ok(same.repair.includes("delta mode")&&!same.repair.includes("--add-review-lineage"),same.repair);
     assert.equal(thrown(()=>CGB.supersedeFeatureCourseTakeover({...c.base,courseKey:c.courseKey,courseHistoryRegistered:false,digestSha256:same.digestSha256,reason:"r"}))?.code,"CGB-TAKEOVER-COURSE");
     assert.equal(CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
     assert.equal(CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false}).refusalCode,"CGB-TAKEOVER-OPEN");
@@ -637,5 +637,82 @@ test("a CGB-BUDGET refusal names its reason: a correction on a batch without an 
  const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
  assert.throws(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent:null,correction}),e=>e.code==="CGB-BUDGET"&&/no admitted round yet/u.test(e.message)&&/full review/u.test(e.message));
  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+// W7 course takeover of an unregistrable round: a feature-course batch whose only packet is really admitted and consumed (no stand-ins).
+function consumedCourseRound(fx){
+  const logPath="specs/course-feature/evidence/targeted.log",jsonPath="specs/course-feature/evidence/diagnostic.json";
+  const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/course-feature/spec.md",guardrailPaths:[".claude/pipeline.yaml"],
+    command:[process.execPath,"-e","process.exit(0)"],logPath:"evidence/feature-consumed.log"});
+  const log=readFileSync(join(fx.root,"evidence/feature-consumed.log"));
+  writeFileSync(join(fx.root,logPath),log);diagnostic.targeted.log.path=logPath;
+  const bytes=`${JSON.stringify(diagnostic)}\n`;writeFileSync(join(fx.root,jsonPath),bytes);
+  const manifestPath=join(fx.root,"specs/course-feature/lifecycle.json"),manifest=JSON.parse(readFileSync(manifestPath));
+  for(const [path,content] of [[logPath,log],[jsonPath,bytes]])manifest.artifacts.push({class:"candidate-evidence",path,sha256:sha256(content),authority:false,mutability:"immutable",retention:"retain"});
+  writeFileSync(manifestPath,`${JSON.stringify(manifest)}\n`);
+  git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
+  git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
+  const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
+  const courseContext={featureId:"course-feature",registrationCommit,acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+  const request={preflightInput:{root:fx.root,base:fx.base,candidate:fx.candidate,specPath:"specs/course-feature/spec.md",guardrailPaths:[],evidencePaths:[jsonPath],priorCriticEvidencePath:null,courseContext},
+    taskId:fx.taskId,projectId:"pipeline",sessionId:"feature-consumed",packetId:"d".repeat(32),
+    route:{routeId:"session-critic",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh"},allowCallerAuthoredFallback:true};
+  assert.equal(admitSessionCriticReview(request).status,"admitted");
+  const verdict={findings:[],deliberately_not_flagged:["scope"],trajectory_verdict:"consistent",trajectory_evidence:"controlled fixture inspected",briefing_violations:[],pass:false};
+  assert.equal(finalizeSessionCriticReview({...request,verdict,allowCallerAuthoredFallback:true}).status,"completed");
+  const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
+  const courseKey=readCriticCourseAdmission({repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null}).courseIdentity.courseKey;
+  return {controlRoot,courseKey,base:{repoRoot:fx.root,controlRoot,logicalWorkIds:["AC-1","AC-2"]}};
+}
+test("W7 round takeover (1) inspect decides by the tail above the registered lineage: no tail -> COURSE, unconsumed tail -> OPEN, inconsistent input -> SHAPE",()=>{
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),thrown=fn=>{try{fn();}catch(e){return e;}return null;};
+    const key={...c.base,courseKey:c.courseKey};
+    const noTail=CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:true,registeredRounds:1});
+    assert.equal(noTail.refusalCode,"CGB-TAKEOVER-COURSE");
+    assert.ok(noTail.repair.includes("delta mode")&&noTail.repair.includes("no unregistered round"),noTail.repair);
+    assert.equal(noTail.scope,"batch");assert.deepEqual(noTail.tailOrdinals,[]);
+    const open=CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:0});
+    assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");assert.equal(open.scope,"batch");assert.deepEqual(open.tailOrdinals,[]);
+    assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:true,registeredRounds:0}))?.code,"CGB-SHAPE");
+    assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:1}))?.code,"CGB-SHAPE");
+    assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:-1}))?.code,"CGB-SHAPE");
+    assert.equal(thrown(()=>CGB.supersedeFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:0,digestSha256:open.digestSha256,reason:"r"}))?.code,"CGB-TAKEOVER-OPEN");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("W7 round takeover (2) a consumed tail round is retired alone: lower rounds, registration and indexes stay, replay is idempotent, nothing is deleted",()=>{
+  const fx=fixture({feature:true});try{
+    const c=consumedCourseRound(fx);
+    const input={...c.base,courseKey:c.courseKey,courseHistoryRegistered:false,registeredRounds:0};
+    const whole=CGB.inspectFeatureCourseTakeover(input);
+    assert.equal(whole.refusalCode,null,JSON.stringify(whole));assert.equal(whole.scope,"round");assert.deepEqual(whole.tailOrdinals,[1]);
+    // Shift the really consumed packet to round 2 and put a stand-in (unconsumed) round 1 below it, so round 1 plays the registered lineage.
+    const store=join(c.controlRoot,"generic-batches"),batchDir=join(store,whole.batchRef.batchId);
+    const write=(name,value)=>{rmSync(join(batchDir,name),{force:true});writeFileSync(join(batchDir,name),canonicalJson(value),{mode:0o600});};
+    const real=JSON.parse(readFileSync(join(batchDir,"full-admission.json")));
+    write("full-admission.json",{...real,packetId:"f".repeat(32),memberSha256:"7".repeat(64)});
+    write("delta-admission.json",{...real,mode:"delta",ordinal:2});
+    const one={...input,courseHistoryRegistered:true,registeredRounds:1};
+    const round=CGB.inspectFeatureCourseTakeover(one);
+    assert.equal(round.refusalCode,null,JSON.stringify(round));assert.equal(round.scope,"round");assert.deepEqual(round.tailOrdinals,[2]);
+    const before={logical:readdirSync(join(store,"logical")).sort(),origins:readdirSync(join(store,"origins")).sort()};
+    const memberFiles=readdirSync(join(batchDir,"members")).sort();
+    const done=CGB.supersedeFeatureCourseTakeover({...one,digestSha256:round.digestSha256,reason:"round 2 can no longer be registered"});
+    assert.equal(done.status,"superseded");assert.equal(done.replay,false);
+    const moved=join(store,"superseded",round.digestSha256);
+    assert.ok(existsSync(join(moved,"audit.json")));
+    const audit=JSON.parse(readFileSync(join(moved,"audit.json")));
+    assert.equal(audit.scope,"round");assert.deepEqual(audit.tailOrdinals,[2]);
+    assert.equal(existsSync(join(batchDir,"delta-admission.json")),false);assert.equal(existsSync(join(batchDir,"full-admission.json")),true);
+    assert.equal(existsSync(join(moved,"rounds","delta-admission.json")),true);
+    assert.deepEqual(readdirSync(join(moved,"rounds","members")).sort(),memberFiles);
+    assert.deepEqual(readdirSync(join(batchDir,"members")),[]);
+    assert.ok(existsSync(join(batchDir,"registration.json")));
+    assert.deepEqual({logical:readdirSync(join(store,"logical")).sort(),origins:readdirSync(join(store,"origins")).sort()},before);
+    // The retired round is gone: asking again finds no unregistered round.
+    assert.equal(CGB.inspectFeatureCourseTakeover(one).refusalCode,"CGB-TAKEOVER-COURSE");
+    const replay=CGB.supersedeFeatureCourseTakeover({...one,digestSha256:round.digestSha256,reason:"round 2 can no longer be registered"});
+    assert.equal(replay.replay,true);
+    assert.equal(existsSync(join(batchDir,"full-admission.json")),true);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

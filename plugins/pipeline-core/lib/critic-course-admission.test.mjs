@@ -1173,7 +1173,7 @@ test("PF94 DOCS (a) the register-feature-package help lists every flag, the delt
 });
 test("PF94 DOCS (b) the lineage refusals name the late-lineage repair and keep their old text", () => {
   const source = pf94Read("./feature-package-registration.mjs");
-  const sentence = "if correction commits already follow this round the lineage cannot be registered any more; retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path";
+  const sentence = "if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round";
   assert.equal(source.split(sentence).length - 1, 2, "both FPR-LINEAGE-TRANSPORT/COMPILE reason texts carry the sentence");
   assert.ok(source.includes("so the lineage of round N must be registered BEFORE the next correction commit"));
   assert.ok(source.includes("the lineage of round N must be registered before the next correction commit"));

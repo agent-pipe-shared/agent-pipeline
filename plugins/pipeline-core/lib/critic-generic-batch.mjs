@@ -740,7 +740,7 @@ const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer 
 const TAKEOVER_REPAIR = {
   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
-  "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key); its lineage cannot be reset. If its packet is consumed and its lineage is not registered, run register-feature-package.mjs --root <repo> --add-review-lineage --packet <packetId> BEFORE the next correction commit; otherwise continue the course in delta mode.",
+  "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key) and it has no unregistered round to retire; its registered lineage cannot be reset. Continue the course in delta mode from the last registered round.",
   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
   "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first.",
 };
@@ -765,10 +765,14 @@ function originEntriesOf(c, batchRef) {
     .filter(e => eq(e.value.batchRef, batchRef))
     .map(e => ({ kind: e.value.identity.kind, file: e.file }));
 }
-function takeoverState(c, courseKey, work, courseHistoryRegistered) {
+function packetConsumed(c, packetId) {
+  try { readConsumedSessionAdmission({ controlRoot: c.controlRoot, packetId }); return true; } catch { return false; }
+}
+function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRounds = null) {
   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
-    originTargets: null, originEntries: [], packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true };
+    originTargets: null, originEntries: [], packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
+    registeredRounds, scope: "batch", tailOrdinals: [] };
   const done = refusalCode => ({ facts, refusalCode });
   if (!hits.length) return done("CGB-TAKEOVER-NONE");
   const batchRef = ref(hits[0].value.batchRef);
@@ -780,24 +784,38 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered) {
   if (!eq(r.value.declaredScope.logicalWorkIds, work)) return done("CGB-TAKEOVER-PARTIAL");
   const rows = reservations(r.dir);
   facts.packetIds = rows.map(x => x.packetId);
-  facts.allPacketsConsumed = rows.length > 0 && rows.every(x => {
-    try { readConsumedSessionAdmission({ controlRoot: c.controlRoot, packetId: x.packetId }); return true; } catch { return false; }
-  });
-  if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) return done("CGB-TAKEOVER-COURSE");
+  facts.allPacketsConsumed = rows.length > 0 && rows.every(x => packetConsumed(c, x.packetId));
+  if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) {
+    // Same course key: only the rounds above the registered lineage (the unregistrable tail) may be retired; without the count, nothing is.
+    if (registeredRounds === null) return done("CGB-TAKEOVER-COURSE");
+    const tail = rows.filter(x => x.ordinal > registeredRounds);
+    if (tail.length === 0) return done("CGB-TAKEOVER-COURSE");
+    if (!tail.every(x => packetConsumed(c, x.packetId))) return done("CGB-TAKEOVER-OPEN");
+    facts.scope = "round"; facts.tailOrdinals = tail.map(x => x.ordinal);
+    return done(null);
+  }
   if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
   if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
   return done(null);
 }
 const TAKEOVER_KEYS = ["repoRoot", "controlRoot", "courseKey", "logicalWorkIds", "courseHistoryRegistered"];
+// registeredRounds is optional (absent: the same course key is never retired, as before); when given it is a non-negative integer that agrees with courseHistoryRegistered.
+function takeoverRounds(input, extraKeys = []) {
+  const withRounds = Object.hasOwn(input ?? {}, "registeredRounds");
+  shape(input, [...TAKEOVER_KEYS, ...extraKeys, ...(withRounds ? ["registeredRounds"] : [])]);
+  if (!SHA.test(input.courseKey) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
+  if (!withRounds) return null;
+  if (!Number.isInteger(input.registeredRounds) || input.registeredRounds < 0 || input.courseHistoryRegistered !== (input.registeredRounds > 0)) fail("CGB-SHAPE");
+  return input.registeredRounds;
+}
 /** PF-94: read-only account of who owns a feature review unit's work ids and whether a takeover is admissible. */
 export function inspectFeatureCourseTakeover(input) {
   return invoke(() => {
-    shape(input, TAKEOVER_KEYS);
-    if (!SHA.test(input.courseKey) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
+    const rounds = takeoverRounds(input);
     const work = logical(input.logicalWorkIds);
     const c = context(input.repoRoot, input.controlRoot); unlocked(c);
-    const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
-    const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered); unlocked(c);
+    const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds);
+    const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds); unlocked(c);
     if (!eq(first, second)) fail("CGB-STALE");
     return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-inspection.v1", ...first.facts, refusalCode: first.refusalCode,
       repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode], digestSha256: sha256Canonical(first) });
@@ -806,8 +824,8 @@ export function inspectFeatureCourseTakeover(input) {
 /** PF-94: audited, append-only retirement of the old batch's index entries; nothing is deleted. */
 export function supersedeFeatureCourseTakeover(input) {
   return invoke(() => {
-    shape(input, [...TAKEOVER_KEYS, "digestSha256", "reason"]);
-    if (!SHA.test(input.courseKey) || !SHA.test(input.digestSha256) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
+    const rounds = takeoverRounds(input, ["digestSha256", "reason"]);
+    if (!SHA.test(input.digestSha256)) fail("CGB-SHAPE");
     if (typeof input.reason !== "string" || input.reason.trim().length === 0 || input.reason.length > 256 || /[\\/\u0000-\u001f]/u.test(input.reason)) fail("CGB-TAKEOVER-REASON");
     const work = logical(input.logicalWorkIds);
     const c = context(input.repoRoot, input.controlRoot);
@@ -821,22 +839,46 @@ export function supersedeFeatureCourseTakeover(input) {
         audit = stableJson(auditPath);
         if (audit.digestSha256 !== input.digestSha256 || audit.courseKey !== input.courseKey || !eq(audit.logicalWorkIds, work)) fail("CGB-TAKEOVER-STALE");
       } else {
-        const state = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
+        const state = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds);
         if (sha256Canonical(state) !== input.digestSha256) fail("CGB-TAKEOVER-STALE");
         if (state.refusalCode !== null) fail(state.refusalCode, TAKEOVER_REPAIR[state.refusalCode]);
         createDirectory(join(c.root, "superseded")); createDirectory(dir);
+        if (state.facts.scope === "round") {
+          // Only the unregistrable tail rounds move: their reservation files and the member files those reservations name. Registration, indexes and lower rounds stay.
+          const regDir = join(c.root, state.facts.batchRef.batchId);
+          const tail = reservations(regDir).filter(x => state.facts.tailOrdinals.includes(x.ordinal));
+          const roundMoves = tail.flatMap(x => [{ from: reservationFile(x.mode, x.ordinal), to: reservationFile(x.mode, x.ordinal) },
+            { from: `members/${x.memberSha256}.json`, to: `members/${x.memberSha256}.json` },
+            { from: `members/${x.memberSha256}.complete.json`, to: `members/${x.memberSha256}.complete.json` }]);
+          audit = { schema: "pipeline.critic-feature-course-takeover-audit.v1", digestSha256: input.digestSha256, courseKey: input.courseKey, reason: input.reason,
+            batchRef: state.facts.batchRef, registrationSchema: state.facts.registrationSchema, originKind: state.facts.originKind, logicalWorkIds: work, moves: [],
+            scope: "round", tailOrdinals: state.facts.tailOrdinals, roundMoves, at: new Date().toISOString() };
+          durable(auditPath, audit);
+        } else {
         const moves = [...work.map(id => ({ kind: "logical", file: `${sha256Canonical(id)}.json` })), ...state.facts.originEntries.map(e => ({ kind: "origins", file: e.file }))];
         audit = { schema: "pipeline.critic-feature-course-takeover-audit.v1", digestSha256: input.digestSha256, courseKey: input.courseKey, reason: input.reason,
           batchRef: state.facts.batchRef, registrationSchema: state.facts.registrationSchema, originKind: state.facts.originKind, logicalWorkIds: work, moves,
           at: new Date().toISOString() };
         durable(auditPath, audit);
+        }
       }
+      if (audit.scope === "round") {
+        // The audit was written first; finish what it names. Registration, indexes and rounds at or below the registered lineage are never touched.
+        createDirectory(join(dir, "rounds")); createDirectory(join(dir, "rounds", "members"));
+        const batchDir = join(c.root, audit.batchRef.batchId);
+        for (const m of audit.roundMoves) {
+          if (m.from !== m.to || !/^(?:(?:full|delta)(?:-[0-9]+)?-admission\.json|members\/[a-f0-9]{64}(?:\.complete)?\.json)$/u.test(m.from)) fail("CGB-TAKEOVER-STALE");
+          const from = join(batchDir, m.from);
+          if (existsSync(from)) renameSync(from, join(dir, "rounds", m.to));
+        }
+      } else {
       for (const kind of ["logical", "origins"]) createDirectory(join(dir, kind));
       // PF-95: a takeover audited before the origins fix names too few moves; on replay also retire every origins entry still owned by the old batch.
       const leftover = replay ? originEntriesOf(c, audit.batchRef).map(e => ({ kind: "origins", file: e.file })) : [];
       for (const m of [...audit.moves, ...leftover]) {
         const from = join(c.root, m.kind, m.file);
         if (existsSync(from)) renameSync(from, join(dir, m.kind, m.file));
+      }
       }
       if (!existsSync(completePath)) durable(completePath, { schema: "pipeline.critic-feature-course-takeover-complete.v1", digestSha256: input.digestSha256 });
       return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-result.v1", status: "superseded", replay, digestSha256: input.digestSha256, batchRef: audit.batchRef });
@@ -907,7 +949,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       if(retained) {
         if(retained.packetId!==input.packetId || retained.packetDigest!==packetDigest(packet)
           || retained.claimSha256!==packetDigest(observed.claim) || retained.preflightSha256!==input.preflightSha256
-          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET",`Round ${ordinal} of this batch is already reserved for packet ${retained.packetId}, and this request carries a different packet, claim, preflight, source or decision digest. A new commit (for example an evidence commit) changes those digests; resume the reserved packet, or finish it before asking for the same round again.`);
+          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET",`Round ${ordinal} of this batch is already reserved for packet ${retained.packetId}, and this request carries a different packet, claim, preflight, source or decision digest. A new commit (for example an evidence commit) changes those digests; resume the reserved packet, or finish it before asking for the same round again. If the reserved round can no longer be finished (its lineage cannot be registered because a commit follows the round candidate), retire it with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (they retire only the rounds above the registered lineage; nothing is deleted) and ask for the round again.`);
         return {reservation:retained,replay:true};
       }
       if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET",`The course asks for round ${ordinal}, but this batch holds ${prior.length} admitted round(s) and needs ${ordinal-1} before round ${ordinal}. An earlier round was reviewed outside this batch or its reservation is missing; register the missing round or take the batch over with the session-critic-finalizer verbs. Nothing is deleted.`);

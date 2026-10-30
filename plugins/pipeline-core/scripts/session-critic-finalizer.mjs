@@ -56,7 +56,7 @@ function takeoverTarget(root, featureId, supersede = false) {
   const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
   if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
-    courseHistoryRegistered: resolved.value.registeredHistory.length > 0 };
+    courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };
 }
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {

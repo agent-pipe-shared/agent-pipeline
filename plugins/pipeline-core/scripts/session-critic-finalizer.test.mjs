@@ -2209,3 +2209,30 @@ test("D1 walk (6) v1 and v2 requests accept the optional key and pass it to the 
     }
   } finally { cleanup(fx); }
 });
+
+test("W7 round takeover CLI: a consumed round whose lineage cannot be registered any more is retired by the verbs its refusal names, and each refusal text names a verb that admits", async () => {
+  const fx = featureCourseFixture();
+  try {
+    assert.equal(admitSessionCriticReview(fx.request).status, "admitted");
+    const verdictValue = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "controlled fixture inspected", briefing_violations: [], pass: false };
+    assert.equal(finalizeSessionCriticReview({ ...fx.request, verdict: verdictValue, allowCallerAuthoredFallback: true }).status, "completed");
+    fx.featureId = "held-feature";
+    // A non-evidence commit follows the round candidate: the lineage can no longer be registered.
+    writeFileSync(join(fx.root, "later-change.txt"), "a correction commit after the round\n");
+    commit(fx.root, "correction after the round");
+    // The fixture manifest is not a full approved package, so the registration verb is not driven here; its two refusal texts are pinned from the source.
+    const text = readFileSync(fileURLToPath(new URL("../lib/feature-package-registration.mjs", import.meta.url)), "utf8");
+    assert.equal(text.split("retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover").length - 1, 2, "both FPR-LINEAGE-TRANSPORT/COMPILE texts name the verbs");
+    // The registration refusal names the verbs, and the verbs admit.
+    assert.ok(text.includes("inspect-course-takeover") && text.includes("supersede-course-takeover"), text);
+    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
+    assert.equal(inspected.status, 0, JSON.stringify(inspected.out));
+    assert.equal(inspected.out.refusalCode, null, JSON.stringify(inspected.out));
+    assert.equal(inspected.out.allPacketsConsumed, true);
+    assert.equal(inspected.out.courseHistoryRegistered, false);
+    const done = takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round could not be registered; rerun it" });
+    assert.equal(done.status, 0, JSON.stringify(done.out));
+    assert.equal(done.out.status, "superseded");
+    assert.equal(takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round could not be registered; rerun it" }).out.replay, true);
+  } finally { cleanup(fx); }
+});
