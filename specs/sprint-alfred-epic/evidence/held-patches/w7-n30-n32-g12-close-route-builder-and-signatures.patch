@@ -1,0 +1,632 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index faeaa28ca..601540013 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -693,6 +693,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-greenfield-lifecycle-not-walkable-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-guard-refuses-every-in-repo-read-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-close-feature-names-reconcile-order-and-close-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-evidence-fails-after-host-update-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-shared-namespace-rejects-fresh-repository-identity-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-codex-bootstrap-in-the-typed-next-action-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 709a7297e..9e84f5cf6 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3563,6 +3563,12 @@
+       "invariantPinned": "The close coordinator cannot reach feature-close-prepared while a delivery-course dispatch record of the same feature requires a Critic and carries no matching Critic evidence; records of other features never block",
+       "nonOverlapNote": "Unique regression pin (ALF-W3B-CRITIC-CLOSE-GATE) driving the real coordinator process in its own fixture repository"
+     },
++    {
++      "name": "pin-close-feature-names-reconcile-order-and-close-evidence-tests",
++      "file": "plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs",
++      "invariantPinned": "The close-feature skill names the ordered feature-close route, the continuity-close request keys and the three closeEvidence rules, its signature table only names verbs and flags that exist in the scripts, and the two close-request refusals name the rule and the skill section",
++      "nonOverlapNote": "Unique source-text pin for N30-N32/G12 (D210); the reconcile signing command itself is pinned by the result-bootstrap suite"
++    },
+     {
+       "name": "pin-codex-readiness-process-root-registration-tests",
+       "file": "plugins/pipeline-core/lib/pins/codex-readiness-process-root-registration.test.mjs",
+diff --git a/plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs
+new file mode 100644
+index 000000000..c500d42cb
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs
+@@ -0,0 +1,102 @@
++// SPDX-License-Identifier: SUL-1.0
++// N31/N32/G12 (D210): the close-feature skill names the whole ordered route for a feature with active Continuity, the
++// continuity-close request schema and the three closeEvidence rules, and carries a signature table whose every verb
++// and flag exists in the script it names. The two refusal texts that fire on a wrong close request name the rule that
++// failed and point at that section. Source-text pins on purpose: no CLI with top-level effects is imported.
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++const read = (relative) => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
++const SKILL = read("../../skills/close-feature/SKILL.md");
++const BLOCK_SKILL = read("../../skills/close-block/SKILL.md");
++const SOURCES = {
++  "pipeline-state.mjs": read("../../scripts/pipeline-state.mjs"),
++  "close-coordinator.mjs": read("../../scripts/close-coordinator.mjs"),
++  "po-human-approval.mjs": read("../../scripts/po-human-approval.mjs"),
++};
++
++const ROUTE_HEADING = "## Closing a feature with active Continuity: the ordered route";
++const TABLE_HEADING = "## Command signatures";
++
++function section(heading) {
++  const start = SKILL.indexOf(heading);
++  assert.notEqual(start, -1, `close-feature SKILL.md carries the section "${heading}"`);
++  const next = SKILL.indexOf("\n## ", start + heading.length);
++  return SKILL.slice(start, next === -1 ? undefined : next);
++}
++
++test("the ordered route names every step, in order, with its command", () => {
++  const route = section(ROUTE_HEADING);
++  const steps = [
++    "close-coordinator.mjs plan-start",
++    "--phase checkpointed",
++    "continuity-result-bootstrap-plan",
++    "continuity-result-bootstrap-apply",
++    "authorize-critical",
++    "feature-package-reconcile",
++    "--phase feature-close-prepared",
++    "--continuity-close-request",
++    "pipeline-state.mjs close-feature",
++  ];
++  let at = -1;
++  for (const step of steps) {
++    const found = route.indexOf(step, at + 1);
++    assert.ok(found > at, `step "${step}" appears after the previous step in the ordered route`);
++    at = found;
++  }
++  assert.match(route, /signatureCommand/u, "the reconcile signing command is the one the bootstrap completion prints");
++  assert.match(route, /subjectSha256/u);
++});
++
++test("the route documents the continuity-close request schema and the three closeEvidence rules", () => {
++  const route = section(ROUTE_HEADING);
++  assert.match(route, /pipeline\.continuity-close\.v0/u);
++  for (const key of ["schema", "featureId", "expectedRevision", "result", "closeEvidence"]) assert.ok(route.includes(`\`${key}\``), `request key ${key} is named`);
++  assert.match(route, /\{ ?path, ?sha256 ?\}/u, "rule 1: closeEvidence is a { path, sha256 } binding");
++  assert.match(route, /regular (?:repository-relative )?file/u, "rule 1: of a regular repository-relative file");
++  assert.match(route, /repository-relative/u);
++  assert.match(route, /different from `?result/u, "rule 2: it differs from result");
++  assert.match(route, /unique across closed features/u, "rule 3: its path is unique across closed features");
++  assert.match(route, /combined Verify\/Critic receipt/u, "the usual choice is named");
++});
++
++test("every documented verb and flag of the signature table exists in the script that is named", () => {
++  const table = section(TABLE_HEADING);
++  const rows = [...table.matchAll(/^\| `([a-z-]+\.mjs) ([a-z-]+)`[^|]*\|([^|]*)\|/gmu)].map((m) => ({ script: m[1], verb: m[2], flags: [...m[3].matchAll(/--[a-z][a-z0-9-]*/gu)].map((f) => f[0]) }));
++  const required = [
++    ["pipeline-state.mjs", "feature-package-status"], ["pipeline-state.mjs", "feature-package-reconcile"],
++    ["pipeline-state.mjs", "continuity-result-bootstrap-plan"], ["pipeline-state.mjs", "continuity-result-bootstrap-apply"], ["pipeline-state.mjs", "close-feature"],
++    ["close-coordinator.mjs", "inspect"], ["close-coordinator.mjs", "plan-start"], ["close-coordinator.mjs", "apply-start"],
++    ["close-coordinator.mjs", "plan-transition"], ["close-coordinator.mjs", "apply-transition"], ["po-human-approval.mjs", "authorize-critical"],
++  ];
++  for (const [script, verb] of required) assert.ok(rows.some((row) => row.script === script && row.verb === verb), `the table has a row for ${script} ${verb}`);
++  for (const row of rows) {
++    const source = SOURCES[row.script];
++    assert.notEqual(source, undefined, `${row.script} is a known script`);
++    assert.ok(source.includes(`"${row.verb}"`) || source.includes(` ${row.verb} `) || source.includes(`.mjs ${row.verb}`), `${row.script} knows the verb ${row.verb}`);
++    for (const flag of row.flags) {
++      const name = flag.slice(2);
++      assert.ok(source.includes(flag) || source.includes(`"${name}"`), `${row.script} ${row.verb} knows ${flag}`);
++    }
++  }
++  const reconcile = rows.find((row) => row.verb === "feature-package-reconcile");
++  for (const flag of ["--root", "--manifest", "--plan-sha256", "--by", "--proof-request", "--proof-authority", "--proof"]) assert.ok(reconcile.flags.includes(flag), `reconcile row names ${flag}`);
++});
++
++test("close-block routes a feature close to the ordered route", () => {
++  assert.ok(BLOCK_SKILL.includes("close-feature"), "close-block names close-feature");
++  assert.match(BLOCK_SKILL, /ordered route/u);
++});
++
++test("the two refusal texts name the rule that failed and the skill section", () => {
++  for (const name of ["pipeline-state.mjs", "close-coordinator.mjs"]) {
++    const source = SOURCES[name];
++    assert.ok(source.includes("closeEvidence"), `${name}: the refusal names closeEvidence`);
++    assert.ok(source.includes("unique across closed features"), `${name}: the uniqueness rule`);
++    assert.ok(source.includes("close-feature skill"), `${name}: the pointer to the skill section`);
++    assert.ok(source.includes("the ordered route"), `${name}: the section is named`);
++  }
++  assert.ok(SOURCES["close-coordinator.mjs"].includes("not bound to the exact close-ready State"), "the original wording is kept");
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 2388daf8b..a5f50aa5a 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -364,7 +364,7 @@ function continuityCloseRequest(root, snapshot, path) {
+     if (path !== undefined) fail("CLOSE-CONTINUITY", "continuity close request is unexpected");
+     return null;
+   }
+-  if (!path) fail("CLOSE-CONTINUITY", "active Continuity requires an exact close request");
++  if (!path) fail("CLOSE-CONTINUITY", "active Continuity requires an exact close request (--continuity-close-request <repo-relative-json>; its keys, the closeEvidence rules and the whole order are in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\")");
+   const request = readJsonFile(root, path, "Continuity close request");
+   const value = request.value;
+   const continuity = snapshot.state.continuity;
+@@ -382,7 +382,10 @@ function continuityCloseRequest(root, snapshot, path) {
+     || result === null
+     || canonical(value.result) !== canonical(result)
+     || canonical(value.closeEvidence) === canonical(value.result)) {
+-    fail("CLOSE-CONTINUITY", "Continuity close request is not bound to the exact close-ready State");
++    fail("CLOSE-CONTINUITY", "Continuity close request is not bound to the exact close-ready State: the request keys are schema (pipeline.continuity-close.v0), featureId, expectedRevision, result and closeEvidence; "
++      + "result must equal the State's Result binding; closeEvidence is a { path, sha256 } binding of a regular repository-relative file, different from `result`, whose path is unique across closed features "
++      + "(the combined Verify/Critic receipt is the usual choice); and the State must be close-ready (queue head nextAction close, no dispatch, blocker or decision transaction). "
++      + "The whole order is in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\"");
+   }
+   for (const [label, binding] of [["Result", value.result], ["close evidence", value.closeEvidence]]) {
+     if (!binding || Object.keys(binding).sort().join("\0") !== "path\0sha256"
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 2a58df3ec..5b9f8589d 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -477,6 +477,30 @@ test("process: registered package digest drift blocks close preparation before a
+   assert.equal(f.refused.code, "CLOSE-PACKAGE");
+ });
+ 
++// N31/N32 (D210): the refusal for a Continuity close request that is not bound to the close-ready State names the rule
++// that failed (the three closeEvidence rules) and the skill section that carries the whole ordered route.
++test("process: a close request whose closeEvidence is the Result is refused with the closeEvidence rules and the skill section named", () => {
++  const f = processFixture("close-evidence-is-result", {
++    beforePrepared({ root, paths, state }) {
++      writeJson(join(root, paths.closeRequest), {
++        schema: "pipeline.continuity-close.v0",
++        featureId: state.activeFeature.id,
++        expectedRevision: state.continuity.revision,
++        result: state.continuity.authority.result,
++        closeEvidence: state.continuity.authority.result,
++      });
++    },
++    expectPreparedRefusal: "CLOSE-CONTINUITY",
++  });
++  assert.equal(f.refused.code, "CLOSE-CONTINUITY");
++  assert.match(f.refused.message, /closeEvidence/u);
++  assert.match(f.refused.message, /different from (?:the )?`?result/u);
++  assert.match(f.refused.message, /unique across closed features/u);
++  assert.match(f.refused.message, /regular repository-relative file/u);
++  assert.match(f.refused.message, /close-feature skill/u);
++  assert.match(f.refused.message, /not bound to the exact close-ready State/u, "the original wording stays, the rule text is appended");
++});
++
+ test("process: local close is read-only planned, replay-safe, candidate-bound and never pushes", () => {
+   const fixture = processFixture("local");
+   const originalTracked = readFileSync(fixture.trackedPath);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index 175e68989..d845d9b21 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -3,7 +3,8 @@
+ 
+ import assert from "node:assert/strict";
+ import { execFileSync, spawnSync } from "node:child_process";
+-import { createHash, createHmac } from "node:crypto";
++import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
++import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { afterEach, test } from "node:test";
+ import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+@@ -604,6 +605,86 @@ test("N29 anchor: a package whose Result entry has authority:false closes from c
+   assert.equal(closeCli(["inspect", "--root", root, "--lifecycle", lifecycle]).coordinator.phase, "checkpointed");
+ });
+ 
++// ---- N30 (D210): the completion prints the exact reconcile signing command and its subject digest ----
++// Like `push-init` does for a push. The digest is the one the verifier recomputes from { manifest, planSha256, candidate }
++// (pipeline-state.mjs verifyCriticalHumanProof); the printed reconcile command is admitted with a proof made for that digest.
++
++test("N30 anchor: the completion prints the signing command with the subject digest the verifier recomputes, and the printed reconcile command is admitted with a proof made for it", () => {
++  const f = fixture("n30-anchor"); const { manifestPath } = registerPackageWithoutResultAuthority(f);
++  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
++  const gitDeps = { gitCandidate: () => ({ ok: true, ...candidate }) };
++  const p = plan(f);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending");
++  const expectedSubject = { manifest: manifestPath, planSha256: completion.planSha256, candidate };
++  const expectedDigest = criticalActionSubjectSha256({ kind: "feature-package-reconcile", candidate, subject: expectedSubject });
++  const signature = completion.signatureCommand;
++  assert.equal(signature.kind, "feature-package-reconcile");
++  assert.equal(signature.subjectSha256, expectedDigest, "the printed digest is criticalActionSubjectSha256 over the verifier's preimage");
++  assert.deepEqual(signature.subject, expectedSubject); assert.deepEqual(signature.candidate, candidate);
++  assert.equal(signature.executable, "node");
++  const flag = (argv, name) => argv[argv.indexOf(name) + 1];
++  assert.equal(argv0(signature.argv), "authorize-critical");
++  assert.equal(flag(signature.argv, "--kind"), "feature-package-reconcile");
++  assert.equal(flag(signature.argv, "--subject-sha256"), expectedDigest);
++  assert.equal(flag(signature.argv, "--feature-id"), "feature");
++  assert.equal(flag(signature.argv, "--plan"), "specs/feature/prd_feature.md");
++  assert.equal(flag(signature.argv, "--spec"), "specs/feature/spec.md");
++  assert.equal(flag(signature.argv, "--repo-root"), realpathSync(f.root));
++  assert.equal(typeof signature.command, "string"); assert.equal(signature.requiresPoApproval, true);
++  assert.equal(signature.argv.includes("--directory"), false, "the approval directory is resolved by the signing step and never printed");
++  // The PO's terminal makes this proof; the test makes it the same way, for exactly the printed digest.
++  const expiresAt = flag(signature.argv, "--expires-at");
++  const keys = generateKeyPairSync("ed25519");
++  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
++  const authority = { keyReference: "test-key", publicKeySha256: hash(publicKey) };
++  const external = mkdtempSync(join(tmpdir(), "n30-external-")); roots.push(external);
++  const proofFiles = (digest, name) => {
++    const request = createCriticalActionApprovalRequest({ candidate, featureId: "feature", planBytes: readFileSync(join(f.root, "specs/feature/prd_feature.md")), specBytes: readFileSync(join(f.root, "specs/feature/spec.md")),
++      action: { kind: "feature-package-reconcile", subjectSha256: digest, expiresAt } });
++    const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey,
++      signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
++    const files = { request: join(external, `${name}-request.json`), authority: join(external, `${name}-authority.json`), proof: join(external, `${name}-proof.json`) };
++    writeFileSync(files.request, JSON.stringify(request)); writeFileSync(files.authority, JSON.stringify(authority)); writeFileSync(files.proof, JSON.stringify(proof));
++    return files;
++  };
++  mkdirSync(join(f.root, "project"), { recursive: true });
++  writeFileSync(join(f.root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["feature-package-reconcile"] }));
++  // The follow-on command is printed with named placeholders for the three files the signing step writes and the actor.
++  const reconcile = completion.reconcileCommand;
++  assert.equal(reconcile.executable, process.execPath); assert.equal(argv0(reconcile.argv), "feature-package-reconcile");
++  assert.equal(flag(reconcile.argv, "--manifest"), manifestPath); assert.equal(flag(reconcile.argv, "--plan-sha256"), completion.planSha256);
++  assert.deepEqual(reconcile.placeholders.map((entry) => entry.flag).sort(), ["--by", "--proof", "--proof-authority", "--proof-request"]);
++  const fill = (files) => reconcile.argv.map((entry) => {
++    const hit = reconcile.placeholders.find((placeholder) => placeholder.token === entry);
++    if (hit === undefined) return entry;
++    return { "--by": "PO", "--proof-request": files.request, "--proof-authority": files.authority, "--proof": files.proof }[hit.flag];
++  });
++  // A proof made for a DIFFERENT digest is refused, so the admission below is not vacuous.
++  const wrong = proofFiles("c".repeat(64), "wrong");
++  const refused = invoke(f.root, fill(wrong).slice(1), gitDeps);
++  assert.equal(refused.status, 2, refused.err); assert.match(refused.err, /FTP-RECONCILE-APPROVAL-REJECTED/);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false, "a refused reconcile leaves the package stale");
++  const good = proofFiles(expectedDigest, "good");
++  const admitted = invoke(f.root, fill(good).slice(1), gitDeps);
++  assert.equal(admitted.status, 0, admitted.err);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++});
++
++test("N30: without a readable candidate the completion says why it has no signing command and still names the reconcile verb", () => {
++  const f = fixture("n30-nocandidate"); registerPackageWithoutResultAuthority(f);
++  const p = plan(f);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: false, error: "no commit" }) }); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending");
++  assert.equal(completion.signatureCommand, null);
++  assert.match(completion.signatureUnavailable, /candidate/u);
++  assert.match(completion.nextAction, /feature-package-reconcile/u);
++});
++
++const argv0 = (argv) => argv[1];
++
+ test("N29 negatives: two Result entries, a Result at another path and a PRD without authority stay refused with a typed detail", () => {
+   const refusal = (name, mutate, state = null) => {
+     const f = fixture(name); registerPackageWithoutResultAuthority(f, mutate);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index ed2923265..3ff327def 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -545,7 +545,7 @@ import {
+   readHumanApprovalMode,
+ } from "../lib/critical-human-proof-policy.mjs";
+ import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+-import { criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
++import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import {
+   lifecycleDigest as closeCoordinatorDigest,
+   readCloseCoordinator,
+@@ -6081,7 +6081,58 @@ function planLegacyResultRepair(dir, state, manifestPath) {
+   };
+ }
+ 
+-function resultBootstrapCompletion(dir, state, packageBinding) {
++/**
++ * N30 (D210): the PO-bound reconcile approval names the exact subject it signs -- `{ manifest, planSha256, candidate }`
++ * under kind `feature-package-reconcile` (the preimage `verifyCriticalHumanProof` recomputes at reconcile time). The
++ * completion prints the signing command with that digest and the follow-on reconcile argv, so nobody recomputes the
++ * digest from the library by hand. It only renders: it never signs, never creates a proof and never runs either
++ * command. The candidate is the current HEAD commit and tree, read the same way the reconcile reads it, so a later
++ * commit changes the digest and the printed command has to be taken again from a fresh completion.
++ */
++function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
++  const root = realpathSync(resolve(dir));
++  const approvalKind = "feature-package-reconcile";
++  const placeholders = [
++    { flag: "--by", token: "<by>", from: "the name of the person who ran the signing step" },
++    { flag: "--proof-request", token: "<proof-request>", from: "externalPaths.request in the signing step's output" },
++    { flag: "--proof-authority", token: "<proof-authority>", from: "externalPaths.authority in the signing step's output" },
++    { flag: "--proof", token: "<proof>", from: "externalPaths.proof in the signing step's output" },
++  ];
++  const reconcileCommand = {
++    executable: process.execPath,
++    argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", root, "--manifest", manifest, "--plan-sha256", planSha256,
++      ...placeholders.flatMap((entry) => [entry.flag, entry.token])],
++    placeholders, requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind, executionBoundary: "host-authorized-wsl",
++  };
++  const unavailable = (reason) => ({ signatureCommand: null, signatureUnavailable: reason, reconcileCommand });
++  let observed;
++  try { observed = (deps.gitCandidate ?? defaultGitCandidate)(root); }
++  catch (error) { observed = { ok: false, error: error?.message ?? "candidate read failed" }; }
++  if (!observed?.ok) return unavailable(`the current candidate identity (commit and tree) could not be read (${observed?.error ?? "unknown"}); once HEAD is readable, rerun the bootstrap plan to get the signing command`);
++  const candidate = { commit: observed.commit, tree: observed.tree };
++  const featureId = state.activeFeature?.id;
++  const plan = state.activeFeature?.planPath;
++  const spec = state.continuity?.authority?.spec?.path;
++  if (![featureId, plan, spec].every((value) => typeof value === "string" && value.length > 0)) return unavailable("the active feature, its plan path or its Continuity spec binding is missing");
++  let subjectSha256; let expiresAt;
++  const subject = { manifest, planSha256, candidate };
++  try {
++    subjectSha256 = criticalActionSubjectSha256({ kind: approvalKind, candidate, subject });
++    expiresAt = new Date((Date.parse((deps.now ?? (() => new Date().toISOString()))()) || Date.now()) + 3_600_000).toISOString();
++  } catch (error) { return unavailable(`the subject digest could not be computed (${error?.message ?? "invalid subject"})`); }
++  try {
++    const rendered = authorizeCriticalActionCommand({ kind: approvalKind, repoRoot: root, featureId, plan, spec, subjectSha256, expiresAt });
++    return {
++      signatureCommand: {
++        ...rendered, kind: approvalKind, subjectSha256, subject, candidate, expiresAt,
++        requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false,
++      },
++      reconcileCommand,
++    };
++  } catch (error) { return unavailable(`the signing command could not be rendered (${error?.message ?? "invalid input"})`); }
++}
++
++function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
+   const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
+   if (packageBinding === null) {
+     try { lstatSync(resolve(dir, path)); }
+@@ -6102,13 +6153,15 @@ function resultBootstrapCompletion(dir, state, packageBinding) {
+   const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
+     ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
+   const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
++  const signing = pending ? reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps) : {};
+   return {
+     scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
+     manifest, preview,
+     planSha256: pending ? sha256CanonicalJson(preview) : null,
++    ...signing,
+     nextAction: preview.status === "legacy-repair-preview"
+-      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
+-      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start` : "resolve package drift through authenticated recovery",
++      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair; signatureCommand prints the signing command with its subject digest and reconcileCommand the command to run afterwards"
++      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start; the signing command and its subject digest are printed in signatureCommand (the PO runs it in their own terminal), the reconcile command to run afterwards in reconcileCommand, and the whole close order in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"` : "resolve package drift through authenticated recovery",
+     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
+       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
+       requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
+@@ -6410,7 +6463,7 @@ function recoverJournaledLegacyResultBootstrap(dir, current, apply, journal, loc
+   return { status: 0, receipt: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "recovered-legacy", featureId: apply.featureId,
+     revision: persisted.state.continuity.revision, stateSha256: newStateSha256,
+     result: persisted.state.continuity.authority.result, mutated: nextState !== null,
+-    completion: resultBootstrapCompletion(dir, persisted.state, registration) } };
++    completion: resultBootstrapCompletion(dir, persisted.state, registration, deps) } };
+ }
+ 
+ // NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
+@@ -6436,7 +6489,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     if (!planned.ok) {
+       const current = readStateRaw(deps.dir);
+       if (current.status === "ok" && current.state.continuity?.authority?.result !== null) {
+-        const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++        const completion = resultBootstrapCompletion(deps.dir, current.state, null, deps);
+         if (completion.preview?.status === "legacy-repair-preview") {
+           const journal = loadBootstrapJournal(deps.dir, deps);
+           if (!journal.ok || journal.journal !== null) {
+@@ -6483,7 +6536,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
+         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
+         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
+-      const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++      const completion = resultBootstrapCompletion(deps.dir, current.state, null, deps);
+       if (completion.state === "authenticated-recovery-required") { console.error(`Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: ${completion.preview.reason}; journal retained if present.`); return 2; }
+       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
+       console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion })); return 0;
+@@ -6527,7 +6580,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
+     const recovered = loadBootstrapJournal(deps.dir, deps);
+     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
+-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null) })); return 0;
++    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null, deps) })); return 0;
+   } finally { releaseContinuityLock(lock); }
+ }
+ 
+@@ -9012,7 +9065,7 @@ function runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps) {
+   if (!retireLegacyResultRepairJournal(privateState.paths)) return { ok: false, code: "FTP-LEGACY-REPAIR-RETIRE" };
+   return { ok: true, receipt: { schema: FEATURE_PACKAGE_RECONCILE_SCHEMA, status: "legacy-repaired", manifest,
+     planSha256, result: persisted.state.continuity.authority.result,
+-    completion: resultBootstrapCompletion(root, persisted.state, registration) } };
++    completion: resultBootstrapCompletion(root, persisted.state, registration, deps) } };
+ }
+ 
+ /**
+@@ -13038,7 +13091,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       if (requiresContinuityClose) {
+         const closeRequest = readContinuityRequest(dir, closeValues["continuity-close-request"]);
+         if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
+-          console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");
++          console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence. "
++            + "The request is { schema: \"pipeline.continuity-close.v0\", featureId, expectedRevision, result, closeEvidence }; closeEvidence is a { path, sha256 } binding of a regular repository-relative file, "
++            + "different from `result`, whose path is unique across closed features (the combined Verify/Critic receipt is the usual choice). "
++            + "The whole order is in the close-feature skill, section \"Closing a feature with active Continuity: the ordered route\".");
+           return 2;
+         }
+         continuityClose = structuredClone(closeRequest.value);
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index b5ca6af78..e17586fb9 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -2039,8 +2039,9 @@ function interruptionPromotionConfirmationLines(kind, subjectPreimage) {
+  * project-onboarding-v3.mjs; this function never duplicates it.
+  *
+  * `--kind` is always `"push"`: this helper is specific to the push-approval
+- * ceremony (`references/push-approval.md`'s worked example), not a general
+- * `authorize-critical` renderer for `deploy`/`publication`.
++ * ceremony (`references/push-approval.md`'s worked example). The general
++ * `authorize-critical` renderer is `authorizeCriticalActionCommand()` below
++ * (N30); this function is its `kind: "push"` case.
+  *
+  * `launcher` defaults to this script's OWN resolved absolute path
+  * (`fileURLToPath(import.meta.url)`) so a caller can never relay a wrong or
+@@ -2054,11 +2055,43 @@ export function authorizeCriticalPushCommand({
+   repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
+   launcher = fileURLToPath(import.meta.url),
+ } = {}) {
+-  for (const [name, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
+-    if (typeof value !== "string" || value.length === 0) throw new TypeError(`authorizeCriticalPushCommand requires a non-empty ${name}`);
++  return renderAuthorizeCriticalCommand("authorizeCriticalPushCommand", {
++    kind: "push", repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
++  });
++}
++
++/**
++ * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
++ * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
++ */
++export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile"]);
++
++/**
++ * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
++ * case of this one (same rendering, same argv, same refusal wording under its own name), so a second signing route
++ * -- the feature-close reconcile -- prints its exact command from ONE definition instead of a hand-formatted copy.
++ * It renders; it never executes, signs or reads a key.
++ */
++export function authorizeCriticalActionCommand({
++  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
++  launcher = fileURLToPath(import.meta.url),
++} = {}) {
++  return renderAuthorizeCriticalCommand("authorizeCriticalActionCommand", {
++    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
++  });
++}
++
++function renderAuthorizeCriticalCommand(name, {
++  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
++}) {
++  if (!AUTHORIZE_CRITICAL_COMMAND_KINDS.includes(kind)) {
++    throw new TypeError(`${name} requires a known kind (${AUTHORIZE_CRITICAL_COMMAND_KINDS.join(", ")})`);
++  }
++  for (const [field, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
++    if (typeof value !== "string" || value.length === 0) throw new TypeError(`${name} requires a non-empty ${field}`);
+   }
+   if (directory !== null && (typeof directory !== "string" || directory.length === 0)) {
+-    throw new TypeError("authorizeCriticalPushCommand requires directory to be null or a non-empty string");
++    throw new TypeError(`${name} requires directory to be null or a non-empty string`);
+   }
+   const argv = [
+     launcher, "authorize-critical",
+@@ -2069,7 +2102,7 @@ export function authorizeCriticalPushCommand({
+     "--feature-id", featureId,
+     "--plan", plan,
+     "--spec", spec,
+-    "--kind", "push",
++    "--kind", kind,
+     "--subject-sha256", subjectSha256,
+     "--expires-at", expiresAt,
+   );
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index bf6c8fef1..b2e128178 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test, { after } from "node:test";
+ 
+-import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
++import { authorizeCriticalActionCommand, authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
+ import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
+ import { run as runApprovalGate } from "./po-approval-gate.mjs";
+ import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+@@ -4557,6 +4557,29 @@ test("GF-105: authorizeCriticalPushCommand omits the configured private director
+   assert.ok(built.copyCommand);
+ });
+ 
++// N30 (D210): the kind-parametric sibling. The push builder delegates to it, so the push signing route is
++// byte-compatible (same argv, same rendering) and the reconcile signing command comes from one definition.
++test("N30: authorizeCriticalActionCommand renders the exact feature-package-reconcile authorize-critical argv and the push builder delegates to it byte-identically", () => {
++  const reconcile = authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture() });
++  assert.equal(reconcile.executable, "node");
++  assert.equal(reconcile.argv[0], OWN_SCRIPT_PATH);
++  assert.deepEqual(reconcile.argv.slice(1), [
++    "authorize-critical", "--repo-root", "/repo root", "--feature-id", "cyb-6",
++    "--plan", "specs/x y/prd.md", "--spec", "specs/x/spec.md",
++    "--kind", "feature-package-reconcile", "--subject-sha256", "a".repeat(64), "--expires-at", "2026-08-10T12:00:00.000Z",
++  ]);
++  const viaAction = authorizeCriticalActionCommand({ kind: "push", ...pushCommandFixture() });
++  assert.deepEqual(viaAction, authorizeCriticalPushCommand(pushCommandFixture()), "the push builder is the kind=push case of the generic one");
++  const withDirectory = authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture({ directory: "/po dir" }) });
++  assert.deepEqual(withDirectory.argv.slice(1, 6), ["authorize-critical", "--repo-root", "/repo root", "--directory", "/po dir"]);
++});
++
++test("N30: authorizeCriticalActionCommand refuses an unknown kind and a missing value under its own name, while the push builder keeps its own message", () => {
++  assert.throws(() => authorizeCriticalActionCommand({ kind: "not-a-kind", ...pushCommandFixture() }), /authorizeCriticalActionCommand requires a known kind/u);
++  assert.throws(() => authorizeCriticalActionCommand({ kind: "feature-package-reconcile", ...pushCommandFixture({ plan: "" }) }), /authorizeCriticalActionCommand requires a non-empty plan/u);
++  assert.throws(() => authorizeCriticalPushCommand(pushCommandFixture({ plan: "" })), /authorizeCriticalPushCommand requires a non-empty plan/u);
++});
++
+ test("GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory", () => {
+   for (const field of ["launcher", "repoRoot", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
+     assert.throws(
+diff --git a/plugins/pipeline-core/skills/close-block/SKILL.md b/plugins/pipeline-core/skills/close-block/SKILL.md
+index fd59a91e4..131d41ce8 100644
+--- a/plugins/pipeline-core/skills/close-block/SKILL.md
++++ b/plugins/pipeline-core/skills/close-block/SKILL.md
+@@ -69,7 +69,9 @@ independent sequence and must not advance when its coordinator phase is stale.
+    `feature-close-prepared` (then execute only its returned, separately
+    confirmed State-writer action, including any continuity close request) →
+    complete the ritual's tracked Result/backlog/handover/HISTORY/telemetry/
+-   retrospective effects → bind them as `tracked-close-finalized` → create the
++   retrospective effects (a feature with active Continuity first follows the
++   ordered route in `close-feature`: bootstrap, reconcile signature, close
++   request) → bind them as `tracked-close-finalized` → create the
+    one final tracked commit → `candidate-frozen` → persist exact private
+    Verify/Security evidence → `final-verify-green`.
+ 4. After `final-verify-green`, a no-push close uses confirmed descriptor-bound
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index f7d062cd4..7144fb37a 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -83,6 +83,51 @@ Without separately authorized publication, confirmed descriptor-bound cleanup
+ may end at `closed-local`. Publication, readback, release and promotion are
+ separate coordinator transitions and are never implied by this skill.
+ 
++## Closing a feature with active Continuity: the ordered route
++
++A feature whose State carries `continuity` closes in this order. Every step is first a read-only plan, then an
++`--activate` apply of the returned action after confirmation; nothing below signs or pushes on its own.
++
++1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
++2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
++3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, `signatureCommand` and `reconcileCommand`.
++4. Sign the reconcile (PO only, in the PO's own terminal): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
++5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders (`<by>`, `<proof-request>`, `<proof-authority>`, `<proof>`) with the name and the `externalPaths` the signing step printed.
++6. Write the Continuity close request (below) and plan `close-coordinator.mjs plan-transition ... --phase feature-close-prepared --architecture-impact <impact> --continuity-close-request <request>`; apply the returned action.
++7. Run the State-writer action that apply returns (`pipeline-state.mjs close-feature ...` with `--continuity-close-request`), as shown in Step 2.
++
++The close request is one JSON file in the repository, schema `pipeline.continuity-close.v0`, with exactly the keys `schema`,
++`featureId`, `expectedRevision` (the State's Continuity revision), `result` (the State's Result binding, `{ path, sha256 }`) and
++`closeEvidence`. The rules for `closeEvidence`:
++
++- it is a `{ path, sha256 }` binding of a regular repository-relative file (no symlink, not empty, hash equal to the file);
++- it is different from `result`;
++- its path is unique across closed features: a path already claimed by a closed feature is refused.
++
++The usual choice is the combined Verify/Critic receipt of the feature. The State must also be close-ready: queue head `nextAction`
++`close`, no dispatch, no blocker, no decision transaction.
++
++## Command signatures
++
++Spellings are taken from each script's own parser or help; `<...>` is a value.
++
++| Command | Flags |
++|---|---|
++| `pipeline-state.mjs feature-package-status` | --root <dir> --manifest <repo-relative-path> |
++| `pipeline-state.mjs feature-package-reconcile` | --root --manifest --plan-sha256 <sha256> --by <name> --proof-request <abs-path> --proof-authority <abs-path> --proof <abs-path> |
++| `pipeline-state.mjs continuity-result-bootstrap-plan` | (none) |
++| `pipeline-state.mjs continuity-result-bootstrap-apply` | --feature-id --expected-revision --expected-state-sha256 --expected-post-state-sha256 --updated-at --plan-sha256 --activate (use the returned action) |
++| `pipeline-state.mjs close-feature` | --by --architecture-impact --coordinator-lifecycle --coordinator-sha256 --continuity-close-request |
++| `close-coordinator.mjs inspect` | --root --lifecycle |
++| `close-coordinator.mjs plan-start` | --root --lifecycle --actor --close-intent <durable-stop or runtime-transfer> |
++| `close-coordinator.mjs apply-start` | the plan-start flags plus --plan-sha256 --activate |
++| `close-coordinator.mjs plan-transition` | --root --lifecycle --actor --phase [--architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --authorized] |
++| `close-coordinator.mjs apply-transition` | the plan-transition flags plus --plan-sha256 --activate |
++| `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`) |
++
++A commit message goes in a file: `git commit -F <msgfile> -- <paths>` after `git add -- <paths>` (the refusals for several `-m`
++flags and for a message with parentheses name this form); a Pipeline-owned file commits with `scripts/commit-pipeline-owned.mjs`.
++
+ ## Explicitly out of scope
+ 
+ **No feature-wide cost aggregation.** Step 1 only appends the CURRENT session's usage row (exactly
