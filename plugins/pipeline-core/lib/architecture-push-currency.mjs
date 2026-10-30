@@ -15,6 +15,40 @@ function latest(rootDir, commit, file, run) {
   return git(rootDir, ["log", "-1", "--format=%H", commit, "--", file], run);
 }
 
+/**
+ * The one sanctioned step for a stale map (D208). There is no relief: a comment-only contract change and a
+ * map-only commit are exactly as stale as any other change, so the only way out is a covering map commit.
+ */
+export function architectureMapSanctionedStep(staleContracts = []) {
+  const targets = [...new Set(staleContracts.map((entry) => entry?.target).filter((target) => typeof target === "string"))];
+  const where = targets.length > 0 ? targets.join(", ") : "architecture/map/<concept>.md";
+  return `update the concept map in ${where} so it covers the contract change, commit it, then rebuild the candidate before Critic/Verify`
+    + " (a stale map stays stale whatever the change was: comment-only changes are not exempt)";
+}
+
+/**
+ * The one refusal text every caller shares (guard-push, push-init, the Critic dispatch preflight), so no caller
+ * can name only a count again. `lines` is the complete text; `reason` / `remedy` / `staleContracts` are the same
+ * content in the pieces a caller needs separately.
+ */
+export function describeArchitectureCurrencyRefusal(currency) {
+  if (!currency?.ok) {
+    const reason = `Reason: ${currency?.reason ?? "the architecture map currency could not be determined"}.`;
+    return { reason, remedy: null, staleContracts: [], lines: [reason] };
+  }
+  const staleContracts = (currency.staleContracts ?? []).map(({ contract, target, module }) => ({ contract, target, module }));
+  const reason = [
+    `${staleContracts.length} declared public contract(s) changed after their concept map:`,
+    ...staleContracts.map(({ contract, target }) => `  - ${contract} (concept map: ${target})`),
+  ].join("\n");
+  const remedy = `Sanctioned step: ${architectureMapSanctionedStep(staleContracts)}.`;
+  return { reason, remedy, staleContracts, lines: [...reason.split("\n"), remedy] };
+}
+
+export function formatArchitectureCurrencyRefusal(currency) {
+  return describeArchitectureCurrencyRefusal(currency).lines;
+}
+
 export function inspectArchitecturePushCurrency({ projectDir, commit, checkpoint = false, deps = {} } = {}) {
   const run = deps.run ?? spawnSync;
   if (!projectDir || !OID.test(commit ?? "")) return { ok: false, reason: "candidate commit is invalid" };

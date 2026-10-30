@@ -941,3 +941,48 @@ test("drivePushInit: a failed S-to-R reconciliation never invokes the R-bound pr
     assert.equal(result.checks[0].id, "doc-reconciliation");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// N25 / D208: the final guard-push architecture currency check, asked early through the same function.
+test("drivePushInit (N25): a stale architecture map is its own failed check naming contract, concept map and remedy, and approval preparation cannot fold", () => {
+  const root = freshFixtureRoot();
+  try {
+    const staleContracts = [{ type: "architecture-map-stale", module: "core", target: "architecture/map/core.md", contract: "src/contract.mjs", contractCommit: "a".repeat(40), mapCommit: "b".repeat(40) }];
+    let prepareOptions = null;
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      inspectArchitectureCurrency: () => ({ ok: true, applicable: true, stale: true, stalenessDebt: [], staleContracts }),
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(),
+      pushPrepareReport: (argv, deps, options) => { prepareOptions = options; return chatPrepareResult("chat"); },
+    });
+    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result));
+    const check = result.checks.find((entry) => entry.id === "architecture-map-currency");
+    assert.ok(check, JSON.stringify(result.checks));
+    assert.equal(check.ok, false);
+    assert.equal(check.status, "architecture-map-stale");
+    assert.ok(check.message.includes("src/contract.mjs") && check.message.includes("architecture/map/core.md"), check.message);
+    assert.match(check.remedy, /update the concept map in architecture\/map\/core\.md/u);
+    assert.deepEqual(prepareOptions, { foldPendingApprovalWrite: false }, "a stale map must not let preparation commit onto HEAD");
+    assert.ok(result.recovery.blockers.some((blocker) => blocker.id === "architecture-map-currency" && /src\/contract\.mjs/u.test(blocker.message)));
+    assert.equal(result.recovery.retryAction.argv.includes("--root"), true, "the retry is the same push-init invocation");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit (N25): only the stale verdict is an early check -- a structurally unverifiable map stays the final guard's refusal; a never-adopted repository adds no check and no step", () => {
+  const root = freshFixtureRoot();
+  try {
+    const unverifiable = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      inspectArchitectureCurrency: () => ({ ok: false, reason: "candidate architecture map has no concepts" }),
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
+    });
+    assert.equal(unverifiable.outcome, "chat-ready", JSON.stringify(unverifiable));
+    assert.equal(unverifiable.steps.some((step) => /architecture/u.test(step.id)), false);
+    const none = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      inspectArchitectureCurrency: () => ({ ok: true, applicable: false, commit: HEAD, tree: HEAD, stalenessDebt: [] }),
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
+    });
+    assert.equal(none.outcome, "chat-ready", JSON.stringify(none));
+    assert.equal(none.steps.some((step) => /architecture/u.test(step.id)), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

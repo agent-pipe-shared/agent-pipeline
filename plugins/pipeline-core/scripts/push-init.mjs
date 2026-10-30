@@ -111,6 +111,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
@@ -260,6 +261,20 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
 }
 
 /**
+ * N25 / D208: the architecture-map currency guard-push applies to the pushed commit, asked early through the
+ * SAME function (`inspectArchitecturePushCurrency`, no second implementation). The pushed commit is HEAD (record
+ * commit R), not `--candidate` (substantive commit S): guard-push checks the commit being pushed. A root with no
+ * resolvable HEAD has no candidate to inspect, so the check does not apply (the final guard is unchanged and
+ * still refuses at push time). It deliberately does not go through the injected `run`, which stands in for the
+ * reconciliation subprocess only.
+ */
+function inspectHeadArchitectureCurrency(root) {
+  const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawnSync);
+  if (head === null || !/^[0-9a-f]{40,64}$/iu.test(head)) return { ok: true, applicable: false };
+  return inspectArchitecturePushCurrency({ projectDir: root, commit: head });
+}
+
+/**
  * Runs the one real subprocess step (check-doc-reconciliation.mjs, when present). Never
  * throws: a spawn failure is folded into a typed `ok: false` result, matching
  * onboarding-init.mjs's own `runOnboardingStep()` idiom for the identical reason -- the
@@ -294,7 +309,8 @@ export function buildReconciliationArgv({ scriptPath, base, candidate, root, rec
 
 /**
  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
- * real subprocess step), `assessPushGateSatisfiability`/`satisfiabilityDeps` and
+ * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
+ * map currency check, N25), `assessPushGateSatisfiability`/`satisfiabilityDeps` and
  * `pushPrepareReport`/`prepareDeps` (both default to the REAL imported functions) -- so
  * tests can exercise every precondition-failure shape without a genuine git working tree
  * carrying real evidence files, PO approval directories and trust anchors, mirroring
@@ -310,6 +326,7 @@ export function drivePushInit({
   pushPrepareReport = realPushPrepareReport,
   prepareDeps = {},
   assessPushHookBackstop = realAssessPushHookBackstop,
+  inspectArchitectureCurrency = inspectHeadArchitectureCurrency,
 } = {}) {
   const root = resolve(rootDir);
   for (const [name, value] of [["by", by], ["remote", remote], ["destination", destination]]) {
@@ -398,6 +415,28 @@ export function drivePushInit({
       schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
       recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
     };
+  }
+
+  // Architecture map currency (N25 / D208) -- the check guard-push applies to the pushed commit, run here through
+  // the same function so a stale map is a failed check with a remedy BEFORE approval preparation, not a refusal
+  // after Critic, Verify, residual acceptance and the signature. It is HEAD-bound like push-prepare, hence it
+  // joins the R-bound checks after the S-bound reconciliation early return. A failed check also keeps
+  // `foldPendingApprovalWrite` off below, so preparation cannot commit onto a candidate that must be rebuilt.
+  // A never-adopted repository adds neither a check nor a step. Only the STALE verdict is a failed check here:
+  // a structurally unverifiable map (`ok: false`, e.g. a scaffold map with no concept yet) stays the final
+  // guard's refusal exactly as before, because an early refusal for it would change what existing greenfield
+  // preparation reports (the D208 decision names the stale map, not the unverifiable one).
+  const architectureCurrency = inspectArchitectureCurrency(root);
+  if (architectureCurrency?.ok === true && architectureCurrency.applicable !== false) {
+    const stale = architectureCurrency.stale === true;
+    steps.push({ id: "architecture-map-currency", inProcess: true, ok: !stale });
+    if (stale) {
+      const refusal = describeArchitectureCurrencyRefusal(architectureCurrency);
+      failedChecks.push({
+        id: "architecture-map-currency", ok: false, status: "architecture-map-stale",
+        message: refusal.reason, remedy: refusal.remedy, staleContracts: refusal.staleContracts,
+      });
+    }
   }
 
   // Layer 2 (full report) -- push-prepare.mjs, in-process.

@@ -1519,4 +1519,31 @@ test("session-critic-finalizer inspect-course-takeover --help prints the --reque
   }
 });
 
+// N25 / D208: the guard-push architecture currency check, asked before a Critic packet is prepared.
+test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming contract, concept map and the sanctioned step; a map commit then admits packet-ready; no relief for a comment-only change", () => {
+  const fx = fixture();
+  try {
+    mkdirSync(join(fx.root, "src"), { recursive: true });
+    mkdirSync(join(fx.root, "architecture", "map"), { recursive: true });
+    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 1;\n");
+    writeFileSync(join(fx.root, "architecture", "map", "index.md"), "# Map\n");
+    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
+    // Targeted commits: `commit()` stages everything, which would pull the untracked evidence files into the range.
+    const commitMap = (message) => { git(fx.root, ["add", "--", "src", "architecture"]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
+    commitMap("adopt map");
+    writeFileSync(join(fx.root, "src", "contract.mjs"), "// comment only\nexport const value = 1;\n");
+    const stale = commitMap("comment-only contract change");
+    const refusal = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: stale })), "CDP-ARCHITECTURE-MAP-STALE");
+    assert.ok(refusal.details.reason.includes("src/contract.mjs") && refusal.details.reason.includes("architecture/map/core.md"), refusal.details.reason);
+    assert.deepEqual(refusal.details.staleContracts.map(({ contract, target }) => ({ contract, target })), [{ contract: "src/contract.mjs", target: "architecture/map/core.md" }]);
+    assert.match(refusal.details.repair, /update the concept map in architecture\/map\/core\.md/u);
+    assert.match(refusal.details.repair, /rebuild the candidate before Critic\/Verify/u);
+    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core, covers the change\n");
+    const current = commitMap("refresh map");
+    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(current, git(fx.root, ["rev-parse", `${current}^{tree}`])))}\n`);
+    const admitted = preflightCriticDispatch(input(fx, { candidate: current }));
+    assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

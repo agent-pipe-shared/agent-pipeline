@@ -143,7 +143,7 @@ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs"
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
 import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
 import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
-import { inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+import { formatArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
@@ -2266,9 +2266,8 @@ const architectureCurrency = inspectArchitecturePushCurrency({ projectDir: evide
 if (!architectureCurrency.ok || architectureCurrency.stale) {
   emit(2, [
     "BLOCKED (guard-push architecture map): final candidate needs a current architecture map.",
-    architectureCurrency.ok
-      ? `${architectureCurrency.staleContracts.length} declared public contract(s) changed after their concept map.`
-      : `Reason: ${architectureCurrency.reason}.`,
+    // The same text push-init and the Critic dispatch preflight print: each stale contract, its concept map, the sanctioned step.
+    ...formatArchitectureCurrencyRefusal(architectureCurrency),
   ]);
 }
 

@@ -20,6 +20,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
@@ -374,8 +375,21 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
   sourceSpecSha256 = specReadback.sha256;
   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
+  // N25 / D208: guard-push refuses a final candidate whose declared public contracts changed after their concept
+  // map, but only after Critic, Verify and the signatures were spent on it. Ask the same function here, before
+  // evidence is read and long before any packet exists. No relief: the map must be committed and the candidate
+  // rebuilt before review. It sits after the inventory/manifest/governance/spec readbacks so the Git-operation
+  // order those stages are pinned on is unchanged. Only the STALE verdict refuses, as in push-init; a structurally
+  // unverifiable map (`ok: false`) stays the final guard's refusal (the D208 decision names the stale map).
+  const architectureCurrency = inspectArchitecturePushCurrency({ projectDir: realRoot, commit: candidateCommit });
+  if (architectureCurrency.ok && architectureCurrency.stale) {
+    const refusal = describeArchitectureCurrencyRefusal(architectureCurrency);
+    fail("CDP-ARCHITECTURE-MAP-STALE",
+      `The candidate needs a current architecture map before a Critic review. ${refusal.lines.join(" ")}`,
+      { reason: refusal.lines.join("\n"), staleContracts: refusal.staleContracts, repair: refusal.remedy });
+  }
   stage = "evidence";
-  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
+  const evidenceReadback =evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
   stage = "prior-evidence";
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
