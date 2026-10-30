@@ -1,0 +1,618 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 0e85b9276..34c9d0431 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -36,17 +36,17 @@ const fail = (code) => { throw new CriticCourseAdmissionError(code); };
+ // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+ // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
+ const REPAIRS = Object.freeze({
+-  "CCA-DETERMINISTIC-UNAVAILABLE": "No registered Critic diagnostic evidence binds the candidate. Produce it with scripts/critic-diagnostic-evidence.mjs, commit the evidence files under specs/<id>/evidence/, then register them: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>. Commit the manifest, then rerun critic-dispatch-preflight.mjs.",
++  "CCA-DETERMINISTIC-UNAVAILABLE": "No registered Critic diagnostic evidence binds the candidate. Produce it with scripts/critic-diagnostic-evidence.mjs, leave the evidence files uncommitted under specs/<id>/evidence/ and register them: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> (registration reads the working tree). Then commit the artifact, its log and the manifest in one evidence-only commit (the only form the admission accepts), and rerun critic-dispatch-preflight.mjs with --registration-commit naming it.",
+   "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
+   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
+ });
+ /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
+ const REPAIRS_EXTRA = {};
+ Object.assign(REPAIRS_EXTRA, {
+-  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it, commit the manifest, then rerun critic-dispatch-preflight.mjs.",
++  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it WITHOUT committing first (--add-diagnostic-evidence), commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun critic-dispatch-preflight.mjs with --registration-commit naming it.",
+   "CCA-DETERMINISTIC-SELECTION": "The delta request names a different set of diagnostic evidence than the one registered. Regenerate the delta request from the currently registered diagnostic evidence paths, then rerun critic-dispatch-preflight.mjs.",
+   "CCA-DELTA-REQUIRED": "A retained review exists, so the next review must be a delta. Prepare and register a delta request for the candidate, then rerun critic-dispatch-preflight.mjs with its path.",
+-  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is a delta. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
++  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is requested as a delta. A delta request that moves a trust boundary or is impact-ambiguous is admitted by the admission itself as an effective full round of the same course (RE-DELTA-FALLBACK-FULL): register it with register-feature-package.mjs --add-delta-request and pass --delta-request, never a full request. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
+ });
+ const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
+ /** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
+@@ -583,7 +583,7 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
+  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
+  const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
+  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
+- const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
++ const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,...(admission.reason?{reason:admission.reason}:{}),affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
+ // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
+ // otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).
+ function introducingCommit(root,base,candidate,manifestPath,path){
+@@ -624,7 +624,9 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  const allCorrections=new Set();
+  for(let index=0;index<history.length;index++){
+   const record=history[index].record;
+-  if(index>0)for(const oid of range(resolved.resolvedRepository.repoRoot,record.diff.base,record.candidate.commit)){if(!evidenceCommitV2(resolved.resolvedRepository.repoRoot,oid,resolved.courseIdentity.originalFeatureId))allCorrections.add(oid);}
++  // D204: count each round's corrections from the PREVIOUS round's candidate (identical to diff.base for a diff round); a full-fallback
++  // record's diff.base is the course genesis base, which would recount every earlier correction.
++  if(index>0)for(const oid of range(resolved.resolvedRepository.repoRoot,history[index-1].record.candidate.commit,record.candidate.commit)){if(!evidenceCommitV2(resolved.resolvedRepository.repoRoot,oid,resolved.courseIdentity.originalFeatureId))allCorrections.add(oid);}
+   if(record.course.reviewRound!==index+1||record.course.correctionCommitCount!==allCorrections.size)fail('CCA-HISTORIC-COUNTER-BINDING');
+  }
+  const previousCount=allCorrections.size;
+@@ -633,7 +635,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  if(pass&&!continuation)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
+  // Source-owned immutable consumed history fixes the batch's next round.
+  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
+- // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.
++ // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above. Every later review is REQUESTED as a delta; D204: a delta request that moves a trust boundary or is impact-ambiguous is admitted as an effective full round (RE-DELTA-FALLBACK-FULL, the admission decides, the request never re-declares a flag).
+  if(history.length && source.correctionCommits.length===0)fail('CCA-CORRECTION-RANGE');
+  source.reviewUnit=featureReviewUnit(input,resolved);
+  const evidence=deterministic(resolved.resolvedRepository.repoRoot,input.registrationCommit,resolved.courseIdentity.originalFeatureId,source.candidate,evidencePaths);
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 310c41e71..d0a14e797 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -11,6 +11,7 @@ import { runRegisterFeaturePackage } from "../scripts/register-feature-package.m
+ import { tmpdir } from "node:os";
+ import { join, dirname } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
++import { transitionCode as lineageTransitionCode } from "./critic-review-lineage-core.mjs";
+ import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+ 
+@@ -700,7 +701,8 @@ test("G18B (b) every CCA refusal code yields a non-null recovery or an explicit
+ });
+ test("G18B (c) the three existing repairs keep their exact text and non-CCA input stays null", () => {
+   const sha = (v) => hash(Buffer.from(v));
+-  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "82c0cb9fd7335a83a67eb42e85f7f43cd33e413975da46e4008b6c093f331d32");
++  // QG-04 restatement (D204 item 4): the intent (this repair text is pinned byte for byte) stays; only the CCA-DETERMINISTIC-UNAVAILABLE text changed, from the two-commit route to the one evidence-only commit route that evidenceCommitV2 accepts.
++  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "bbf8dace263856677906db60acb2609c9de4690f968349ca7cfee1706be25df1");
+   assert.equal(sha(criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED")), "5529bda66d4b0b02095cf06d726b032e7360a4692a00e859cb3801659162a4c4");
+   assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "4deceb8240578c2c85665690fe09bbac7d3ef571c450e98a84ac597a8d016def");
+   assert.equal(criticCourseRepair("CDP-COURSE-UNAVAILABLE"), null);
+@@ -1085,6 +1087,99 @@ test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request
+   assert.ok(readFileSync(join(fx.root, fx.manifestPath)).equals(before), "step manifest is byte-identical");
+   assert.deepEqual(readdirSync(join(fx.root, "specs", fx.featureId, "evidence")).filter((n) => n.startsWith("critic-lineage-")).sort(), lineageFilesBefore, "step no round 2 lineage file was written");
+ });
++// D204 anchor: a follow-up round whose registered delta request moves a trust boundary (or is impact-ambiguous) is an effective FULL
++// round of the same course, end to end, from the consumer's state: TWO consumed registered rounds, then the fallback full round 3,
++// then an ordinary diff round 4 whose corrections are counted from the previous candidate.
++const d204Failing = (specPath) => ({ ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] });
++const d204Evidence = (fx, candidate, n) => {
++  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-d204-${n}.log`, diag = `specs/${fx.featureId}/evidence/diagnostic-d204-${n}.json`, captured = `evidence/${fx.featureId}-targeted-d204-${n}.log`;
++  const produced = produceCriticDiagnostic({ root: fx.root, candidate, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: captured });
++  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, captured)));
++  produced.targeted.log.path = logPath;
++  writeFileSync(join(fx.root, diag), JSON.stringify(produced));
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  for (const path of [logPath, diag]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  pf94CommitPaths(fx.root, [fx.manifestPath, logPath, diag], `register the diagnostic ${n} in one evidence commit`);
++  return diag;
++};
++const d204Correction = (fx, n) => { writeFileSync(join(fx.root, `src/fix${n}.mjs`), `export const fixed${n} = ${n};\n`); return pf94Commit(fx.root, `correction ${n}`); };
++const d204Delta = (fx, flag) => {
++  pf94WriteInput(fx);
++  if (flag) writeFileSync(join(fx.root, "delta-input.json"), JSON.stringify({ ...JSON.parse(readFileSync(join(fx.root, "delta-input.json"), "utf8")), [flag]: true }));
++  const delta = pf94Delta(fx);
++  assert.equal(delta.status, "delta-request-added", JSON.stringify(delta));
++  return { delta, registration: pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request") };
++};
++const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration }) => {
++  const specPath = `specs/${fx.featureId}/spec.md`, taskId = `feature-held-task-d204-${n}`, packetId = (0xd0 + n).toString(16).repeat(16);
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const preflightInput = { root: fx.root, base, candidate, specPath, guardrailPaths: [], evidencePaths: [diagnostic], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, base, candidate) };
++  const preflight = preflightCriticDispatch(preflightInput);
++  assert.equal(preflight.status, "packet-ready", `round ${n} preflight: ${JSON.stringify(preflight)}`);
++  assert.equal(preflight.coordinatorOnly.courseAdmission.round, n);
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: `feature-held-review-d204-${n}`, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: d204Failing(specPath) };
++  assert.doesNotThrow(() => admitSessionCriticReview(request, {}), `round ${n} admit`);
++  let finalized;
++  assert.doesNotThrow(() => { finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin }); }, `round ${n} finalize`);
++  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
++  const lineageAdded = addCriticReviewLineage({ root: fx.root, packetId });
++  assert.equal(lineageAdded.status, "lineage-added", `round ${n} lineage: ${JSON.stringify(lineageAdded)}`);
++  const lineage = JSON.parse(readFileSync(join(fx.root, lineageAdded.lineagePath), "utf8"));
++  pf94CommitPaths(fx.root, lineageAdded.commitPaths, `register the lineage of round ${n}`);
++  return { preflight, lineage };
++};
++for (const [flag, reason] of [["trustBoundaryChanged", "trust-boundary-change"], ["impactAmbiguous", "impact-ambiguous"]]) {
++  test(`D204 ANCHOR ${flag}: two consumed rounds, then an effective full round 3 end to end, then an ordinary diff round 4`, () => {
++    const fx = pf94DeltaFixture();
++    const genesisBase = fx.courseRequest.baseCommit, c1 = fx.correctionCommit;
++    const diag1 = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
++    // Round 2: ordinary diff round (consumed, registered).
++    const d2 = d204Delta(fx, null);
++    assert.equal(d2.delta.nextRoundMode, "delta");
++    const r2 = d204Round(fx, { n: 2, base: fx.candidate, candidate: c1, diagnostic: diag1, delta: d2.delta, registration: d2.registration });
++    assert.equal(r2.lineage.request.admissionCode, "RE-DELTA-ADMITTED");
++    // Correction 2 moves the trust boundary: round 3 is an effective full round.
++    const c2 = d204Correction(fx, 2);
++    const diag2 = d204Evidence(fx, c2, 2);
++    const d3 = d204Delta(fx, flag);
++    assert.equal(d3.delta.nextRoundMode, "full", "stage 3: the registration result says the next round is an effective full round");
++    assert.equal(d3.delta.nextRoundReason, reason, "stage 3: ...and why");
++    const admission3 = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: c1, candidateCommit: c2, registrationCommit: d3.registration, requestedMode: "delta", deltaRequestPath: d3.delta.deltaRequestPath });
++    assert.deepEqual([admission3.decision.status, admission3.decision.mode, admission3.decision.code, admission3.decision.reason], ["admitted", "full", "RE-DELTA-FALLBACK-FULL", reason]);
++    const r3 = d204Round(fx, { n: 3, base: c1, candidate: c2, diagnostic: diag2, delta: d3.delta, registration: d3.registration });
++    assert.equal(r3.preflight.base.commit, genesisBase, "stage b: the packet reviews the whole feature range from the course genesis base");
++    assert.equal(r3.preflight.dispatch.reviewerInput.baseCommit, genesisBase);
++    assert.equal(r3.lineage.course.reviewRound, 3);
++    assert.equal(r3.lineage.diff.base, genesisBase, "stage c: the record covers the whole feature range");
++    assert.deepEqual([r3.lineage.request.mode, r3.lineage.request.admissionCode], ["full", "RE-DELTA-FALLBACK-FULL"], "stage c: effective full, from a requested delta");
++    assert.deepEqual([r3.lineage.invalidation.kind, r3.lineage.invalidation.reason], ["full-review-required", reason]);
++    // The history validator admits the genesis base only for an effective full round, and only the genesis base for it.
++    assert.equal(lineageTransitionCode(r2.lineage, r3.lineage), null, "the full round 3 follows round 2");
++    assert.equal(lineageTransitionCode(r2.lineage, { ...r3.lineage, diff: { ...r3.lineage.diff, base: fx.candidate } }), "CRL-HISTORY-CORRECTION-BINDING", "a full round starting anywhere but the genesis base is refused");
++    assert.equal(lineageTransitionCode(r2.lineage, { ...r3.lineage, request: { ...r3.lineage.request, admissionCode: "RE-DELTA-ADMITTED", mode: "delta" } }), "CRL-HISTORY-CORRECTION-BINDING", "a diff round may not start at the genesis base");
++    // Stage d/e: the next correction is an ordinary diff round whose parent is the full round; corrections are counted from each previous candidate.
++    const c3 = d204Correction(fx, 3);
++    d204Evidence(fx, c3, 3);
++    const d4 = d204Delta(fx, null);
++    assert.equal(d4.delta.nextRoundMode, "delta");
++    const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: c2, candidateCommit: c3, registrationCommit: d4.registration, requestedMode: "delta", deltaRequestPath: d4.delta.deltaRequestPath });
++    assert.deepEqual([next.decision.status, next.decision.mode, next.decision.code], ["admitted", "delta", "RE-DELTA-ADMITTED"], JSON.stringify(next.decision));
++    assert.equal(next.budgets.reviewRound, 4);
++    assert.equal(next.budgets.correctionCommitCount, 3, "stage d: three corrections, none recounted from the genesis base of the full round");
++  });
++}
++test("D204 the CCA-REQUESTED-MODE text states the fallback and the help texts describe the one-commit evidence route", () => {
++  const admissionSource = pf94Read("./critic-course-admission.mjs");
++  assert.ok(/RE-DELTA-FALLBACK-FULL/u.test(admissionSource) || /effective full/u.test(admissionSource), "the requested-mode text names the fallback");
++  for (const file of ["../scripts/register-feature-package.mjs", "../scripts/critic-diagnostic-evidence.mjs", "./critic-course-admission.mjs", "../skills/critic-review/SKILL.md"]) {
++    const text = pf94Read(file);
++    assert.ok(!/commit the (?:diagnostic )?artifact first/iu.test(text), `${file} must not describe the two-commit route`);
++  }
++  assert.ok(/one (?:evidence-only )?commit/iu.test(pf94Read("../scripts/register-feature-package.mjs")), "the register help describes the one-commit route");
++  assert.ok(pf94Read("../skills/critic-review/SKILL.md").includes("RE-DELTA-FALLBACK-FULL"), "the skill names the fallback");
++});
+ test("PF94 DELTA (b) replay is idempotent, before and after the operator commit", () => {
+   const fx = pf94DeltaFixture();
+   pf94WriteInput(fx);
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index 562edb5c1..864e94a29 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -113,12 +113,13 @@ test("D167-PF78 (4) the shared predicate agrees with the producer for a table of
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ // D41: the evidence route is printed by the help of the producer and the registrar, not only by the refusal text.
++// D204 (QG-04 restatement): the route is produce, register before committing, ONE evidence-only commit, rerun the
++// preflight. The older two-commit wording named a commit form the admission refuses.
+ const ROUTE_STEPS = [
+   /critic-diagnostic-evidence\.mjs/u,
+-  /commit/iu,
+   /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u,
+-  /commit the manifest/iu,
+-  /critic-dispatch-preflight\.mjs[^\n]*--registration-commit/u,
++  /ONE evidence-only commit/u,
++  /critic-dispatch-preflight\.mjs[^\n]*--registration-commit <that commit>/u,
+ ];
+ function assertRouteInOrder(text) {
+   let from = 0;
+@@ -130,7 +131,7 @@ function assertRouteInOrder(text) {
+   }
+ }
+ for (const script of ["critic-diagnostic-evidence.mjs", "register-feature-package.mjs"]) {
+-  test(`D41 ${script} --help prints the five-step evidence route and exits 0`, () => {
++  test(`D41 ${script} --help prints the four-step evidence route and exits 0`, () => {
+     const result = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts", script), "--help"], { encoding: "utf8" });
+     assert.equal(result.status, 0, result.stderr);
+     assertRouteInOrder(result.stdout);
+@@ -225,19 +226,30 @@ function d2RequireBindingsText(text) {
+ }
+ test("D2 text (1) the diagnostic evidence route names the derive step and the request field and keeps the old step", () => {
+   const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
+-  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
++  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <that commit>\./u); // D204: one evidence-only commit
+   d2RequireBindingsText(text);
+ });
+ test("D2 text (2) the registration route names the derive step and the request field and keeps both old steps", () => {
+   const text = REGISTER_FEATURE_PACKAGE_HELP;
+-  assert.match(text, /5\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
++  assert.match(text, /4\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <that commit>\./u); // D204: one evidence-only commit
+   assert.match(text, /7\. Rerun critic-dispatch-preflight\.mjs with the arguments the verb prints\./u);
+   d2RequireBindingsText(text);
+   assert.ok((text.match(/critic-correction-input-bindings\.mjs derive/gu) ?? []).length >= 2);
+ });
++import { criticCourseRepair } from "./critic-course-admission.mjs";
++test("D204 every diagnostic-evidence route text names one evidence-only commit and none teaches a commit before registration", () => {
++  const registration = readFileSync(join(D2_PLUGIN, "lib/feature-package-registration.mjs"), "utf8").split("\n").find((l) => l.includes('"FPR-DELTA-NO-DIAGNOSTIC"'));
++  assert.ok(registration, "FPR-DELTA-NO-DIAGNOSTIC text present");
++  const texts = { registration, unavailable: criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE"), failed: criticCourseRepair("CCA-DETERMINISTIC-FAILED"), producer: CRITIC_DIAGNOSTIC_EVIDENCE_HELP, registrar: REGISTER_FEATURE_PACKAGE_HELP };
++  for (const [name, text] of Object.entries(texts)) {
++    assert.match(text, /one evidence-only commit/iu, name);
++    assert.doesNotMatch(text, /commit it, register it|register it, commit the manifest/u, name);
++  }
++});
+ test("D2 text (3) the push hint names the derive step and the request field and keeps the old hint", () => {
+   const src = readFileSync(join(D2_PLUGIN, "scripts/push-prepare.mjs"), "utf8");
+-  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base <merge base"));
++  // The hint interpolates the merge base (${first}) since the late-review-unit change; the anchor follows that spelling.
++  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD"));
+   assert.ok(line, "hint line present");
+   assert.ok(line.includes("then Verify that exact candidate"));
+   d2RequireBindingsText(line);
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 6f0160f09..e5f5375a0 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -428,7 +428,8 @@ function registerBatch(input) {
+     return result;
+   });
+ }
+-function reservationFile(mode, ordinal) { return mode === "full" || ordinal === 2 ? `${mode}-admission.json` : `delta-${ordinal}-admission.json`; }
++// D204: a full round after round 1 (the fallback of a delta request that moves a trust boundary) carries its number, so it never reuses the round-1 file.
++function reservationFile(mode, ordinal) { return (mode === "full" && ordinal === 1) || (mode === "delta" && ordinal === 2) ? `${mode}-admission.json` : `${mode}-${ordinal}-admission.json`; }
+ function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
+   const p = join(dir, reservationFile(mode, ordinal));
+   if (!existsSync(p)) return null;
+@@ -442,12 +443,14 @@ function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
+ const MAX_BATCH_DELTA_ORDINAL = 4096;
+ function reservations(dir) {
+   // Round 2 is stored as delta-admission.json (reservationFile); later rounds carry their number.
+-  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^delta-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
++  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^(?:delta|full)-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
+   if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET", `A reservation file of this batch carries a round number above ${MAX_BATCH_DELTA_ORDINAL}; the batch directory is corrupt. Nothing is deleted.`);
+   const full = reservationAt(dir, "full");
+   const rows = full ? [full] : [];
+   for (let ordinal = 2; ordinal <= Math.max(1, ...ordinals); ordinal++) {
+-    const r = reservationAt(dir, "delta", ordinal);
++    const asDelta = reservationAt(dir, "delta", ordinal), asFull = reservationAt(dir, "full", ordinal);
++    if (asDelta && asFull) fail("CGB-HELD");
++    const r = asDelta ?? asFull;
+     if (r) { if (rows.length !== ordinal - 1) fail("CGB-HELD"); rows.push(r); }
+   }
+   return rows;
+@@ -919,7 +922,11 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+     const c = context(input.repoRoot,input.controlRoot,true);
+     return transaction(c, () => {
+       const observed = actualPacket(c,input.packetId,true), packet = observed.packet;
+-      if (packet.request.sessionBinding?.preflightSha256 !== input.preflightSha256 || !eq(packet.candidate,projection.source.candidate)
++      // D204: the effective full round (RE-DELTA-FALLBACK-FULL) reviews genesis base .. candidate while the course source keeps the correction range.
++      const rangeMatches = projection.decision.code === "RE-DELTA-FALLBACK-FULL"
++        ? packet.candidate.base === identity.genesisCandidate.base && packet.candidate.commit === projection.source.candidate.commit && packet.candidate.tree === projection.source.candidate.tree
++        : eq(packet.candidate, projection.source.candidate);
++      if (packet.request.sessionBinding?.preflightSha256 !== input.preflightSha256 || !rangeMatches
+         || !packet.references.some(r => r.kind === "spec" && r.path === unitRef.specPath)) fail("CGB-FEATURE-COURSE");
+       const courseKey = identity.courseKey, target = {kind:"feature-course",courseKey};
+       let owned = featureOwnership(c,courseKey,work);
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index 1667b58ed..e616912f5 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -409,8 +409,13 @@ export function transitionCode(parent, current) {
+   const correctionDelta = current.course.correctionCommitCount - parent.course.correctionCommitCount;
+   if (!Number.isSafeInteger(correctionDelta) || correctionDelta < 0) return "CRL-HISTORY-CORRECTIONS";
+   if (correctionDelta > 0) {
++    // D204: an effective full round (a delta request that moved a trust boundary or is impact-ambiguous) reviews the whole
++    // feature range, so its diff starts at the course genesis base, never at an arbitrary commit.
++    const fallbackFull = current.request?.admissionCode === "RE-DELTA-FALLBACK-FULL" && current.request?.mode === "full"
++      && typeof current.courseBinding?.genesisCandidate?.base === "string"
++      && current.diff.base === current.courseBinding.genesisCandidate.base;
+     if (current.correction === null
+-      || current.diff.base !== parent.candidate.commit
++      || (current.diff.base !== parent.candidate.commit && !fallbackFull)
+       || current.correction.commit !== current.candidate.commit) {
+       return "CRL-HISTORY-CORRECTION-BINDING";
+     }
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.mjs b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+index da2ff5855..6cffdbb18 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+@@ -419,7 +419,7 @@ export function compileRegisteredCriticReviewLineage(input){try{
+  const resolved=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input.courseRequest[k]])));if(!resolved.ok)throw Error(resolved.code);
+  const parent=resolved.value.registeredHistory.at(-1)?.record??null;if((parent?.reviewId??null)!==input.parentReviewId)throw Error('CRL-V2-PARENT');
+  const observedPacket=readConsumedCandidateResult({controlRoot:resolved.value.resolvedRepository.controlRoot,packetId:input.packetId}).packet;
+- const actual=readConsumedCriticCourseResult({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:admission.source.candidate.commit,tree:admission.source.candidate.tree},expectedRange:{base:admission.source.candidate.base,commit:admission.source.candidate.commit,diffSha256:observedPacket.diff.sha256},expectedRecord:null});
++ const actual=readConsumedCriticCourseResult({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:admission.source.candidate.commit,tree:admission.source.candidate.tree},expectedRange:{base:admission.decision.code==='RE-DELTA-FALLBACK-FULL'?resolved.value.courseIdentity.genesisCandidate.base:admission.source.candidate.base,commit:admission.source.candidate.commit,diffSha256:observedPacket.diff.sha256},expectedRecord:null});
+  if(!actual.ok)return actual;const {packet,receipt,result}=actual.value;
+  if(packetCode(packet))throw Error('CRL-V2-PACKET');
+  const {decision,...sourceSubject}=admission,courseSourceSha256=sha256Canonical(sourceSubject),courseDecisionSha256=sha256Canonical(decision);
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index c2cb19a64..f196b5542 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -538,24 +538,28 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
+   const edges = ["feature-delivery"];
+   // Round N > 1 names the delta request that was registered for exactly this round candidate (base and commit of the packet).
+-  let deltaRequestPath = null;
++  let deltaRequestPath = null, deltaRequestRecord = null;
++  // D204: the course base is the previous round's candidate; an effective full round (RE-DELTA-FALLBACK-FULL) has a packet base that is the course genesis base.
++  const courseBase = history.length > 0 ? history.at(-1).record.candidate.commit : packet.candidate.base;
+   if (history.length > 0) {
+     for (const entry of manifest.artifacts) {
+       if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
+       const present = inspect(root, entry.path);
+       let record = null;
+       try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
+-      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === packet.candidate.base) { deltaRequestPath = entry.path; break; }
++      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === courseBase) { deltaRequestPath = entry.path; deltaRequestRecord = record; break; }
+     }
+     if (deltaRequestPath === null) return refused("FPR-LINEAGE-COMPILE", `no delta request is registered for the round candidate ${packet.candidate.commit} (base ${packet.candidate.base}), so the lineage of round ${round} cannot compile (CCA-DELTA-REQUIRED); round 2 and later need the delta request first (register-feature-package.mjs --add-delta-request)`, { compileCode: "CCA-DELTA-REQUIRED", packetId });
+   }
+   const compiled = compileRegisteredCriticReviewLineage({
+-    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
++    courseRequest: { ...identityInput, baseCommit: courseBase, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
+     packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
+     packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
+     coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
+     correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
+-    invalidation: { kind: "none", reason: null, evidenceSha256: null },
++    invalidation: deltaRequestRecord !== null && (deltaRequestRecord.trustBoundaryChanged === true || deltaRequestRecord.impactAmbiguous === true)
++      ? { kind: "full-review-required", reason: deltaRequestRecord.trustBoundaryChanged === true ? "trust-boundary-change" : "impact-ambiguous", evidenceSha256: null }
++      : { kind: "none", reason: null, evidenceSha256: null },
+   });
+   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
+   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+@@ -651,7 +655,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+   if (!compiled.ok) {
+     const code = String(compiled.code);
+     const extra2 = { compileCode: code, manifestPath };
+-    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), commit it, register it with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the manifest, then rerun this command`, extra2);
++    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), register it WITHOUT committing first with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun this command`, extra2);
+     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
+     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
+     if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (${code}); commit only the registration paths between the correction and this command`, extra2);
+@@ -682,6 +686,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
+     registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
+     commitMessageHint: `chore(evidence): register the Critic delta request of round ${tail.round + 1} of ${featureId}`,
++    // D204: a request that moves a trust boundary or is impact-ambiguous is admitted as an effective FULL round of the same course.
++    nextRoundMode: input.trustBoundaryChanged === true || input.impactAmbiguous === true ? "full" : "delta",
++    nextRoundReason: input.trustBoundaryChanged === true ? "trust-boundary-change" : input.impactAmbiguous === true ? "impact-ambiguous" : null,
++    ...(input.trustBoundaryChanged === true || input.impactAmbiguous === true ? { nextRoundNote: "the next round is an effective FULL round (RE-DELTA-FALLBACK-FULL): it reviews the whole feature range from the course genesis base, because a diff cannot honestly cover this change; run the preflight with --delta-request as usual" } : {}),
+     preflight,
+     next: "commit commitPaths in one evidence-only commit (never the input file), then run critic-dispatch-preflight.mjs with the preflight arguments, replacing the registration commit by that commit",
+   };
+diff --git a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+index f25727e3a..6424cae04 100644
+--- a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+@@ -81,9 +81,14 @@ test("AC2 follow-up must be delta mode with bound base/head/tree range", () => {
+ test("AC2 follow-up wider than the delta is refused (unmapped path, boundary change, ambiguity)", () => {
+   const wide = delta({ changedPaths: [p, "src/other.mjs"] });
+   assert.equal(admitReviewAttempt(wide).code, "RE-DELTA-UNKNOWN-PATH");
+-  assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true })).code, "RE-DELTA-BINDINGS-INVALID");
+-  assert.equal(admitReviewAttempt(delta({ impactAmbiguous: true })).code, "RE-DELTA-BINDINGS-INVALID");
++  // QG-04 restatement (D204): the intent (never a DIFF round for a moved boundary or ambiguous impact) stays; the outcome is an effective FULL round.
++  for (const flag of ["trustBoundaryChanged", "impactAmbiguous"]) {
++    const r = admitReviewAttempt(delta({ [flag]: true }));
++    assert.equal(r.code, "RE-DELTA-FALLBACK-FULL", flag);
++    assert.equal(r.mode, "full", flag);
++  }
+   assert.equal(admitReviewAttempt(delta({ pathInvariantMapSha256: H("9") })).code, "RE-DELTA-BINDINGS-INVALID");
++  assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true, priorReceipt: { id: "x", sha256: "bad" } })).code, "RE-DELTA-BINDINGS-INVALID");
+ });
+ 
+ test("AC2 dispatch preflight carries the typed course-budget refusal", () => {
+diff --git a/plugins/pipeline-core/lib/review-economy.mjs b/plugins/pipeline-core/lib/review-economy.mjs
+index 0d2b7b4b7..eb364a54a 100644
+--- a/plugins/pipeline-core/lib/review-economy.mjs
++++ b/plugins/pipeline-core/lib/review-economy.mjs
+@@ -200,20 +200,28 @@ export function admitReviewAttempt(input) {
+   if (input.requestedMode !== "delta") {
+     return { ok: false, mode: null, code: "RE-FOLLOWUP-DELTA-REQUIRED", affectedInvariantIds: [] };
+   }
+-  const bindingsValid = SHA40.test(input.base ?? "") && SHA40.test(input.head ?? "") && SHA40.test(input.tree ?? "")
+-    && Array.isArray(input.changedPaths) && input.changedPaths.length > 0
+-    && input.changedPaths.every((path) => validRepoPath(path))
+-    && Array.isArray(input.changedBehaviorClaims) && input.changedBehaviorClaims.length > 0
+-    && input.changedBehaviorClaims.every((claim) => typeof claim === "string" && SAFE_ID.test(claim))
+-    && isObject(input.priorReceipt) && exactKeys(input.priorReceipt, ["id", "sha256"])
+-    && SAFE_ID.test(input.priorReceipt.id ?? "") && SHA256.test(input.priorReceipt.sha256 ?? "")
+-    && validPathInvariantMap(input.pathInvariantMap)
+-    && SHA256.test(input.pathInvariantMapSha256 ?? "")
+-    && sha256Canonical(input.pathInvariantMap) === input.pathInvariantMapSha256
+-    && input.coordinatorImpactConfirmed === true
+-    && input.trustBoundaryChanged === false
+-    && input.impactAmbiguous === false;
+-  if (!bindingsValid) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", affectedInvariantIds: [] };
++  // D204: the structural bindings are checked one by one so a refusal names the first one that failed. A moved trust boundary or an
++  // ambiguous impact is not a malformed request, it is a request a diff cannot honestly cover: it is admitted as an effective FULL round.
++  const structural = [
++    ["base", () => SHA40.test(input.base ?? "")],
++    ["head", () => SHA40.test(input.head ?? "")],
++    ["tree", () => SHA40.test(input.tree ?? "")],
++    ["changedPaths", () => Array.isArray(input.changedPaths) && input.changedPaths.length > 0 && input.changedPaths.every((path) => validRepoPath(path))],
++    ["changedBehaviorClaims", () => Array.isArray(input.changedBehaviorClaims) && input.changedBehaviorClaims.length > 0
++      && input.changedBehaviorClaims.every((claim) => typeof claim === "string" && SAFE_ID.test(claim))],
++    ["priorReceipt", () => isObject(input.priorReceipt) && exactKeys(input.priorReceipt, ["id", "sha256"])
++      && SAFE_ID.test(input.priorReceipt.id ?? "") && SHA256.test(input.priorReceipt.sha256 ?? "")],
++    ["pathInvariantMap", () => validPathInvariantMap(input.pathInvariantMap)],
++    ["pathInvariantMapSha256", () => SHA256.test(input.pathInvariantMapSha256 ?? "") && sha256Canonical(input.pathInvariantMap) === input.pathInvariantMapSha256],
++    ["coordinatorImpactConfirmed", () => input.coordinatorImpactConfirmed === true],
++    ["trustBoundaryChanged", () => typeof input.trustBoundaryChanged === "boolean"],
++    ["impactAmbiguous", () => typeof input.impactAmbiguous === "boolean"],
++  ];
++  const failed = structural.find(([, valid]) => !valid());
++  if (failed) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", binding: failed[0], affectedInvariantIds: [] };
++  if (input.trustBoundaryChanged === true || input.impactAmbiguous === true) {
++    return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-FULL", reason: input.trustBoundaryChanged === true ? "trust-boundary-change" : "impact-ambiguous", affectedInvariantIds: [] };
++  }
+   const unknown = input.changedPaths.filter((path) => !Object.hasOwn(input.pathInvariantMap, path));
+   if (unknown.length > 0) return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", affectedInvariantIds: [] };
+   return {
+diff --git a/plugins/pipeline-core/lib/review-economy.test.mjs b/plugins/pipeline-core/lib/review-economy.test.mjs
+index e32e23299..13456fcf4 100644
+--- a/plugins/pipeline-core/lib/review-economy.test.mjs
++++ b/plugins/pipeline-core/lib/review-economy.test.mjs
+@@ -136,8 +136,14 @@ ok("RE17 delta derives stable sorted invariant impact", JSON.stringify(admittedD
+ ok("RE18 unknown changed path refuses fallback full", admitReviewAttempt({ ...delta, changedPaths: ["src/unknown.mjs"] }).mode === null);
+ ok("RE19 map digest drift refuses fallback full", admitReviewAttempt({ ...delta, pathInvariantMapSha256: B }).mode === null);
+ ok("RE20 prior receipt omission refuses fallback full", admitReviewAttempt({ ...delta, priorReceipt: null }).mode === null);
+-ok("RE21 new trust boundary refuses fallback full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === null);
+-ok("RE22 ambiguous impact refuses fallback full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === null);
++// QG-04 restatement (D204): RE21/RE22 used to pin a refusal of a moved trust boundary / ambiguous impact. The intent (a delta is never admitted for such a request, no flag is re-declared) stays; the outcome is an effective FULL round, not a refusal.
++const tbFallback = admitReviewAttempt({ ...delta, trustBoundaryChanged: true });
++ok("RE21 new trust boundary is admitted as an effective full round, never as a delta", tbFallback.ok === true && tbFallback.mode === "full" && tbFallback.code === "RE-DELTA-FALLBACK-FULL" && tbFallback.reason === "trust-boundary-change");
++const ambFallback = admitReviewAttempt({ ...delta, impactAmbiguous: true });
++ok("RE22 ambiguous impact is admitted as an effective full round, never as a delta", ambFallback.ok === true && ambFallback.mode === "full" && ambFallback.code === "RE-DELTA-FALLBACK-FULL" && ambFallback.reason === "impact-ambiguous");
++ok("RE22b fallback still demands valid structural bindings and names the failing one", (() => { const r = admitReviewAttempt({ ...delta, trustBoundaryChanged: true, priorReceipt: null }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
++ok("RE22c fallback needs the coordinator impact confirmation", (() => { const r = admitReviewAttempt({ ...delta, impactAmbiguous: true, coordinatorImpactConfirmed: false }); return r.ok === false && r.binding === "coordinatorImpactConfirmed"; })());
++ok("RE22d a delta with an invalid prior receipt stays refused and names it", (() => { const r = admitReviewAttempt({ ...delta, priorReceipt: { id: "x", sha256: "nope" } }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
+ ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
+ // D190: the old cap now gates only a FULL request; a diff round past it is admitted.
+ ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index 8aeab0a6d..4ae4edd48 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -36,11 +36,10 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
+   "",
+   "Evidence route (run in this order):",
+   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs (this script).",
+-  "  2. Commit the produced artifact and its log.",
+-  "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+-  "  4. Commit the manifest the registration names.",
+-  "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
+-  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
++  "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
++  "  3. Commit the artifact, its log and the manifest the registration names in ONE evidence-only commit (the only form the admission accepts).",
++  "  4. Rerun critic-dispatch-preflight.mjs with --registration-commit <that commit>.",
++  "  5. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+   "",
+ ].join("\n");
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 44f18b5a1..9e5ad8634 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -384,6 +384,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   // declared round number, controls whether another model invocation is due.
+   // Keep this read-only: the later session gate still owns packet/launch.
+   let courseAdmission = null;
++  let reviewBase = { commit: baseCommit, tree: baseTree };
+   const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
+   const featureId = featureMatch?.[1] ?? null;
+   if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
+@@ -418,11 +419,15 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     // the historical four-round format, and the current one-full plus three-DIFF
+     // policy can produce a packet-ready result for this registered batch.
+     const round = admission.budgets?.reviewRound;
++    // D204: a round > 1 is requested as a delta; the admission may turn it into an effective FULL round (RE-DELTA-FALLBACK-FULL) when the
++    // registered delta request moves a trust boundary or is impact-ambiguous. That is the only full round accepted after round 1.
++    const fallbackFull = Number.isSafeInteger(round) && round > 1 && context.deltaRequestPath !== null
++      && admission.decision.mode === "full" && admission.decision.code === "RE-DELTA-FALLBACK-FULL";
+     const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
+     // D190: no round count refuses a diff round; the mode must still match the round.
+     if (expectedMode === null
+       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
+-      || admission.decision.mode !== expectedMode
++      || (admission.decision.mode !== expectedMode && !fallbackFull)
+       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
+       const BUDGET_NEXT_STEP = "Critic budget spent (one full review plus at most three correction-diff reviews per declared batch): do not dispatch another Critic; the next step is Elephant self-verification, which cannot become PASS, or an explicit PO decision.";
+       fail("CDP-COURSE-BUDGET", `Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch. ${BUDGET_NEXT_STEP}`,
+@@ -437,7 +442,13 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     const { decision, ...subject } = admission;
+     courseAdmission = Object.freeze({ featureId: context.featureId,
+       sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
+-      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount });
++      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount,
++      ...(fallbackFull ? { fallbackFull: true, reason: admission.decision.reason ?? null, courseBase: baseCommit ?? baseTree } : {}) });
++    // D204: the effective full round reviews the WHOLE feature range, course genesis base .. candidate (not the correction range).
++    if (fallbackFull) {
++      const genesisBase = admission.courseIdentity.genesisCandidate.base;
++      reviewBase = { commit: genesisBase, tree: git(realRoot, ["rev-parse", `${genesisBase}^{tree}`]) };
++    }
+   }
+ 
+   if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
+@@ -460,7 +471,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     // authority: it launches one fresh Critic and then hands the closed result
+     // to the runner-neutral durable finalizer. Native transports are optional.
+     status: "packet-ready",
+-    ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
++    ...(scope === null ? { base: { commit: reviewBase.commit, tree: reviewBase.tree } } : { reviewScope: scope, sourceCoverage }),
+     candidate: { commit: candidateCommit, tree: candidateTree },
+     ...(reviewAdmission === null ? {} : { reviewAdmission }),
+     ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
+@@ -474,7 +485,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+       mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
+       spawnAuthorized: false, requiredNextGate: "session-critic-dispatch",
+       reviewerInput: {
+-        ...(scope === null ? { baseCommit } : { reviewScope: scope }),
++        ...(scope === null ? { baseCommit: reviewBase.commit } : { reviewScope: scope }),
+         candidateCommit,
+         candidateTree,
+         rulesetSha: candidateCommit,
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 2b47017e6..10c53ec0e 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -55,10 +55,10 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "",
+   "Critic diagnostic evidence route (run in this order):",
+   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
+-  "  2. Commit the produced artifact and its log.",
+-  "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+-  "  4. Commit the manifest the registration names.",
+-  "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
++  "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
++  "  3. Commit the artifact, its log and the manifest the registration names in ONE evidence-only commit (the only form the admission accepts).",
++  "  4. Rerun critic-dispatch-preflight.mjs with --registration-commit <that commit>.",
++  "  5. A delta request that moves a trust boundary or is impact-ambiguous is admitted as an effective FULL round of the same course (RE-DELTA-FALLBACK-FULL); the verb says so.",
+   "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+   "",
+   "Critic course lineage route (PF-94; register round N BEFORE the next correction commit):",
+@@ -69,7 +69,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "Critic delta request route (PF-94) for round 2 and later (run in this order):",
+   "  1. The lineage of the last round is registered and committed (route above).",
+   "  2. Make the correction commit.",
+-  "  3. Produce and commit the diagnostic for it, then register it (--add-diagnostic-evidence, route above) and commit the manifest.",
++  "  3. Produce the diagnostic for it, register it (--add-diagnostic-evidence, route above), then commit artifact, log and manifest in one evidence-only commit.",
+   "  4. Write the input JSON with exactly these keys and nothing else:",
+   "     changedBehaviorClaims   list of claim ids the correction changes",
+   "     pathInvariantMap        object: every changed path maps to its list of invariant ids",
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index c59204bb0..f39884cec 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -284,7 +284,7 @@ function featureReservationFor(options,preflight,root,controlRoot,packetId,prefl
+   const course=preflight.coordinatorOnly.courseAdmission;
+   const context=options.preflightInput.courseContext??{featureId:course.featureId,registrationCommit:preflight.candidate.commit,
+     acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+-  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
++  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
+     registrationCommit:context.registrationCommit,requestedMode:context.deltaRequestPath===null?"full":"delta",
+     acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath};
+   return reserveFeatureCriticReviewUnitOwnership({repoRoot:root,controlRoot,packetId,preflightSha256,courseInput,
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 523dc21cc..761dbed0c 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -126,10 +126,14 @@ schema fails schema admission. Recompute the candidate binding for each review
+ and let preflight validate the concrete artifact before dispatch.
+ 
+ **Diagnostic evidence route (in this order):** produce the artifact with
+-`scripts/critic-diagnostic-evidence.mjs`, commit the artifact, register it with
++`scripts/critic-diagnostic-evidence.mjs`, register it (uncommitted; registration reads the
++working tree) with
+ `scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>`,
+-commit the manifest, then rerun `scripts/critic-dispatch-preflight.mjs` with
+-`--registration-commit` naming that manifest commit. Script paths resolve under
++commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun
++`scripts/critic-dispatch-preflight.mjs` with `--registration-commit` naming that commit.
++A delta request that moves a trust boundary or is impact-ambiguous is admitted as an
++effective full round of the same course (`RE-DELTA-FALLBACK-FULL`, the whole feature range
++is reviewed); the next correction is an ordinary diff round again. Script paths resolve under
+ the plugin root the bootstrap prints, never a machine-specific path.
+ 
+ **Closed bootstrap role:** this skill is itself an authoritative Critic role
+@@ -189,8 +193,8 @@ refusal before a packet is reserved. Order:
+ 3. `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` BEFORE
+    the next correction commit; commit the manifest and the lineage file it names.
+ 4. Make the correction commit.
+-5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), commit it, register it with
+-   `--add-diagnostic-evidence <path>`, commit the manifest.
++5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), register it with
++   `--add-diagnostic-evidence <path>`, commit artifact, log and manifest in one evidence-only commit.
+ 6. Write the input JSON and run `register-feature-package.mjs --root <root> --add-delta-request <input.json>`
+    (keys: `changedBehaviorClaims`, `pathInvariantMap` with exactly the changed paths,
+    `coordinatorImpactConfirmed`, `trustBoundaryChanged`, `impactAmbiguous`).
