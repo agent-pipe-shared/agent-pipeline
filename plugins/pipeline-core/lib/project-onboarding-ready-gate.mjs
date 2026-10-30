@@ -5,6 +5,8 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  CLEANUP_RECOVERY_DEFERRED_GUIDANCE,
+  CLEANUP_RECOVERY_DEFERRED_MESSAGE,
   expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
@@ -369,8 +371,31 @@ export function validForeignCleanupResidueWarning(value, root) {
     && value.archiveActions.every((action) => validOrphanArchiveApplyAction(action, root));
 }
 
+// D48 (project-onboarding-v3.mjs): a ready result whose cleanup recovery only lacks a session-power-controlled
+// invocation carries one typed `cleanup_recovery_deferred` warning. It has no action, so its closed shape is the
+// exact producer text; the gate refused it and locked every governed write behind a ready inspection (2026-10-30).
+export function validCleanupRecoveryDeferredWarning(value) {
+  return exactKeys(value, ["path", "code", "message", "guidance", "severity"])
+    && value.path === "$.authority.sessionCleanup"
+    && value.code === "cleanup_recovery_deferred"
+    && value.severity === "warning"
+    && value.message === CLEANUP_RECOVERY_DEFERRED_MESSAGE
+    && value.guidance === CLEANUP_RECOVERY_DEFERRED_GUIDANCE;
+}
+
+// Every warning code the gate admits on a ready result, with its closed-shape validator. Its key set must equal the
+// producer's READY_RESULT_WARNING_CODES (pinned by project-onboarding-ready-gate.test.mjs).
+const READY_WARNING_VALIDATORS = Object.freeze({
+  cleanup_recovery_deferred: (entry) => validCleanupRecoveryDeferredWarning(entry),
+  cleanup_residue_foreign: (entry, root) => validForeignCleanupResidueWarning(entry, root),
+});
+export const READY_GATE_WARNING_CODES = Object.freeze(Object.keys(READY_WARNING_VALIDATORS).sort());
+
 function validReadyDiagnostics(value, root) {
-  return Array.isArray(value) && value.every((entry) => validForeignCleanupResidueWarning(entry, root));
+  return Array.isArray(value)
+    && value.filter((entry) => validCleanupRecoveryDeferredWarning(entry)).length <= 1
+    && value.every((entry) => Object.hasOwn(READY_WARNING_VALIDATORS, entry?.code)
+      && READY_WARNING_VALIDATORS[entry.code](entry, root));
 }
 
 function validReadyNextAction(value, root) {

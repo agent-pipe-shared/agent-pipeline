@@ -12,11 +12,15 @@ import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
   PROJECT_ONBOARDING_READY_GATE_SCHEMA,
   ProjectOnboardingReadyError,
+  READY_GATE_WARNING_CODES,
   requireProjectOnboardingReady,
   validForeignCleanupResidueWarning,
 } from "./project-onboarding-ready-gate.mjs";
 import { planOrphanDescriptorArchive } from "./session-cleanup-recovery.mjs";
 import {
+  CLEANUP_RECOVERY_DEFERRED_GUIDANCE,
+  CLEANUP_RECOVERY_DEFERRED_MESSAGE,
+  READY_RESULT_WARNING_CODES,
   expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
@@ -1059,4 +1063,55 @@ test("a ready observation carrying exactly the foreign-residue warnings passes t
         && error.lifecycleStatus === null, label);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// 2026-10-30, live in a consumer: the producer's D48 `cleanup_recovery_deferred` warning on a ready result was refused
+// as PORG-INVALID-OBSERVATION, which locked every governed write (git add included) behind a ready inspection.
+test("a ready observation carrying the exact deferred-cleanup warning passes the gate; a tampered or doubled one does not", () => {
+  const path = root();
+  try {
+    const rootDir = realpathSync(path);
+    const gate = (diagnostics) => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "claude",
+      inspect: () => ({ ...readyResultWithPushApprovalKeys(path, "session", "claude"), diagnostics }),
+    });
+    const deferred = {
+      path: "$.authority.sessionCleanup",
+      code: "cleanup_recovery_deferred",
+      message: CLEANUP_RECOVERY_DEFERRED_MESSAGE,
+      guidance: CLEANUP_RECOVERY_DEFERRED_GUIDANCE,
+      severity: "warning",
+    };
+    for (const diagnostics of [[deferred], [deferred, foreignResidueWarning(rootDir)], [foreignResidueWarning(rootDir), deferred]]) {
+      assert.equal(gate(diagnostics).status, "ready", JSON.stringify(diagnostics.map((entry) => entry.code)));
+    }
+    const invalid = {
+      "two deferred warnings": [deferred, deferred],
+      "another message": [{ ...deferred, message: "the session-cleanup binding is created later" }],
+      "another guidance": [{ ...deferred, guidance: "" }],
+      "another path": [{ ...deferred, path: "$.authority" }],
+      "an error severity": [{ ...deferred, severity: "error" }],
+      "no severity": [{ path: deferred.path, code: deferred.code, message: deferred.message, guidance: deferred.guidance }],
+      "an extra action": [{ ...deferred, nextAction: null }],
+    };
+    for (const [label, diagnostics] of Object.entries(invalid)) {
+      assert.throws(() => gate(diagnostics), (error) => error instanceof ProjectOnboardingReadyError
+        && error.code === "PORG-INVALID-OBSERVATION", label);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// The class behind the 2026-10-30 lock: a warning code the producer can put on a ready result but the gate does not
+// admit. The producer routes every ready warning through pushReadyWarning (closed READY_RESULT_WARNING_CODES); the gate
+// admits exactly READY_GATE_WARNING_CODES. Both sets must be equal, and no other write path to the warnings may exist.
+test("the ready gate admits exactly the warning codes the producer can put on a ready result, and the producer has no other warning path", () => {
+  assert.deepEqual([...READY_GATE_WARNING_CODES], [...READY_RESULT_WARNING_CODES].sort());
+  const producer = readFileSync(fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url)), "utf8");
+  const pushes = producer.match(/\.warnings\.push\(/gu) ?? [];
+  assert.equal(pushes.length, 1, "only pushReadyWarning itself may push onto a ready observation's warnings");
+  const literals = [...producer.matchAll(/"\$\.authority\.sessionCleanup",\s*"([a-z_]+)"/gu)].map((match) => match[1]);
+  const ready = literals.filter((code) => READY_RESULT_WARNING_CODES.includes(code));
+  assert.deepEqual([...new Set(ready)].sort(), [...READY_RESULT_WARNING_CODES].sort(), "every admitted code is still produced");
 });

@@ -1695,6 +1695,21 @@ function lifecycleDiagnostic(path, code, message, guidance = "") {
   return { path, code, message: String(message).replace(/[\r\n]+/gu, " "), guidance: String(guidance).replace(/[\r\n]+/gu, " ") };
 }
 
+// The closed set of warning codes a ready result may carry. The ready gate (project-onboarding-ready-gate.mjs) must
+// admit exactly this set; its test pins the equality. 2026-10-30, live in a consumer: the producer emitted
+// `cleanup_recovery_deferred` on a ready result that the gate did not know, which locked every governed write.
+export const READY_RESULT_WARNING_CODES = Object.freeze(["cleanup_recovery_deferred", "cleanup_residue_foreign"]);
+export const CLEANUP_RECOVERY_DEFERRED_MESSAGE = "the session-cleanup binding is created at the next session-power-controlled invocation; a governed dispatch does not need it";
+export const CLEANUP_RECOVERY_DEFERRED_GUIDANCE = "nothing has to be repaired for dispatch";
+
+// The only way a warning reaches a ready result; a code outside READY_RESULT_WARNING_CODES is a producer defect.
+function pushReadyWarning(observation, warning) {
+  if (!READY_RESULT_WARNING_CODES.includes(warning?.code)) {
+    throw new Error(`ready-result warning code is not in READY_RESULT_WARNING_CODES: ${String(warning?.code)}`);
+  }
+  observation.warnings.push(warning);
+}
+
 function emptyRuntime(status = "not-observed") {
   return { status, sourceSha256: null, targetsSha256: null, barrierSha256: null, readbackSha256: null };
 }
@@ -1912,7 +1927,7 @@ function partialCleanupRecoveryResult(args) {
     || FOREIGN_RESIDUE_KEPT_CODES.has(result.diagnostics?.[0]?.code)) return result;
   const warning = foreignDescriptorResidueWarning({ root, deps });
   if (warning === null) return result;
-  observation.warnings.push(warning);
+  pushReadyWarning(observation, warning);
   return null;
 }
 
@@ -1961,12 +1976,12 @@ export function partialCleanupRecoveryResultCore({
         if (observation !== null
           && error?.code === "SDC-AUTHORITY-UNAVAILABLE"
           && error?.reason === "continuity-invocation-unbound") {
-          observation.warnings.push({
+          pushReadyWarning(observation, {
             ...lifecycleDiagnostic(
               "$.authority.sessionCleanup",
               "cleanup_recovery_deferred",
-              "the session-cleanup binding is created at the next session-power-controlled invocation; a governed dispatch does not need it",
-              "nothing has to be repaired for dispatch",
+              CLEANUP_RECOVERY_DEFERRED_MESSAGE,
+              CLEANUP_RECOVERY_DEFERRED_GUIDANCE,
             ),
             severity: "warning",
           });
@@ -2015,7 +2030,7 @@ export function partialCleanupRecoveryResultCore({
       if (warning === null) {
         nextAction = cleanupHumanRecoveryAction(root);
       } else {
-        observation.warnings.push(warning);
+        pushReadyWarning(observation, warning);
       }
     }
     if (nextAction !== null) {

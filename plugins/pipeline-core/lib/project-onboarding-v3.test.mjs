@@ -1307,6 +1307,9 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(deferred.diagnostics[0].severity, "warning");
     assert.match(deferred.diagnostics[0].message, /next session-power-controlled invocation/u);
     assert.match(deferred.diagnostics[0].message, /governed dispatch does not need it/u);
+    // Producer-to-gate contract (2026-10-30, live in a consumer): the ready gate must admit this exact producer result.
+    // Each side passed alone with hand-built fixtures, while every governed write stayed locked as PORG-INVALID-OBSERVATION.
+    assert.equal(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => deferred }).status, "ready");
     for (const error of [
       new KickoffError("SDC-AUTHORITY-UNAVAILABLE", unboundMessage, { reason: "another-reason" }),
       new KickoffError("SDC-AUTHORITY-UNAVAILABLE", unboundMessage),
