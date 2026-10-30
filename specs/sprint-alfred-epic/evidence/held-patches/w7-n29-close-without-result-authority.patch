@@ -1,0 +1,381 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index 69a1dc823..8fa296ddb 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -342,17 +342,29 @@ function sameJsonValue(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  * order, same candidate, same schema, same every other byte. Exported so a violation is
+  * directly provable (a hand-built postimage that also changes a second field) without
+  * needing a real filesystem race to trigger it.
++ *
++ * `options.liftResultAuthorityPath` (default none: strictly digest-only) admits ONE further change, for
++ * the single entry whose path it names: a `result`-class entry may move `authority` from `false` to
++ * `true` together with its fence-proven digest move. A package registered by an earlier build can carry
++ * its Result without authority, and Continuity binds that very Result (N29). Nothing else widens: no
++ * other class, no lowering, no other key, no authority move without a digest move.
+  */
+-export function reconcileNoDriftOk(preimageValue, postimageValue) {
++export function reconcileNoDriftOk(preimageValue, postimageValue, options = {}) {
+   if (!object(preimageValue) || !object(postimageValue)) return false;
+   if (!Array.isArray(preimageValue.artifacts) || !Array.isArray(postimageValue.artifacts)
+     || preimageValue.artifacts.length !== postimageValue.artifacts.length) return false;
++  const liftPath = typeof options?.liftResultAuthorityPath === "string" ? options.liftResultAuthorityPath : null;
+   for (let i = 0; i < preimageValue.artifacts.length; i++) {
+     const before = preimageValue.artifacts[i]; const after = postimageValue.artifacts[i];
+     if (!object(before) || !object(after)) return false;
+     const beforeKeys = Object.keys(before).sort(); const afterKeys = Object.keys(after).sort();
+     if (beforeKeys.join("\0") !== afterKeys.join("\0")) return false;
+-    for (const key of beforeKeys) if (key !== "sha256" && !sameJsonValue(before[key], after[key])) return false;
++    const lifted = liftPath !== null && before.class === "result" && before.path === liftPath
++      && before.authority === false && after.authority === true && before.sha256 !== after.sha256;
++    for (const key of beforeKeys) {
++      if (key === "sha256" || (key === "authority" && lifted)) continue;
++      if (!sameJsonValue(before[key], after[key])) return false;
++    }
+   }
+   const { artifacts: _pa, ...preRest } = preimageValue;
+   const { artifacts: _qa, ...postRest } = postimageValue;
+@@ -427,6 +439,11 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
+   catch { return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: ["FTP-MANIFEST: invalid JSON"] }; }
+   const id = value?.feature?.id;
+   const nextArtifacts = []; const changes = [];
++  // N29: a package registered by an earlier build can carry its Result without authority while Continuity
++  // binds that very Result. The fence-proven digest move of that SOLE result entry also lifts its authority,
++  // in this same PO-bound plan and nowhere else; with any other result entry present nothing is lifted.
++  const resultEntries = (Array.isArray(value.artifacts) ? value.artifacts : []).filter((entry) => entry?.class === "result");
++  let liftedPath = null;
+   for (const [index, artifact] of (Array.isArray(value.artifacts) ? value.artifacts : []).entries()) {
+     const label = `FTP-RECONCILE-${index}`;
+     const rel = packageRelative(id, artifact?.path);
+@@ -435,19 +452,22 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
+     const currentBytes = readFileSync(join(root, file));
+     const currentSha256 = digest(currentBytes);
+     if (currentSha256 === artifact.sha256) { nextArtifacts.push(artifact); continue; }
++    let lift = false;
+     if (artifact.class === "result") {
+       const fence = checkResultReconciliationFence(resultAuthority, artifact, currentBytes, currentSha256);
+       if (!fence.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: fence.reason, findings: fence.findings };
++      lift = artifact.authority === false && resultEntries.length === 1;
+     }
+-    nextArtifacts.push({ ...artifact, sha256: currentSha256 });
+-    changes.push({ path: artifact.path, class: artifact.class, operation: "reconcile-digest", from: artifact.sha256, to: currentSha256 });
++    if (lift) liftedPath = artifact.path;
++    nextArtifacts.push({ ...artifact, sha256: currentSha256, ...(lift ? { authority: true } : {}) });
++    changes.push({ path: artifact.path, class: artifact.class, operation: "reconcile-digest", from: artifact.sha256, to: currentSha256, ...(lift ? { authority: { from: false, to: true } } : {}) });
+   }
+   if (changes.length === 0) {
+     return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: checked.receipt.state, to: checked.receipt.state, changes: [] };
+   }
+   const nextValue = { ...value, artifacts: nextArtifacts };
+-  if (!reconcileNoDriftOk(value, nextValue)) {
+-    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "reconcile-drift", findings: ["FTP-RECONCILE-DRIFT: a reconcile plan may only change artifact digest fields"] };
++  if (!reconcileNoDriftOk(value, nextValue, liftedPath === null ? {} : { liftResultAuthorityPath: liftedPath })) {
++    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "reconcile-drift", findings: ["FTP-RECONCILE-DRIFT: a reconcile plan may only change artifact digest fields (and lift the authority of the one Result entry Continuity binds)"] };
+   }
+   return {
+     schema: "pipeline.feature-package-transition-plan.v1",
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 2af3da01c..2388daf8b 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -213,7 +213,9 @@ function authorityFromState(root, snapshot, { requireResult = false } = {}) {
+   }
+   const resultPath = snapshot.state.continuity?.authority?.result?.path ?? null;
+   const result = resultPath === null ? null : safeFile(root, resultPath, "Implementation Result");
+-  if (requireResult && result === null) fail("CLOSE-RESULT", "feature close requires a bound Implementation Result");
++  if (requireResult && result === null) {
++    fail("CLOSE-RESULT", `feature close requires a bound Implementation Result: Continuity authority.result is null. Bind it first with the Result bootstrap: run \`node ${STATE_WRITER} continuity-result-bootstrap-plan\` in the project root ${root} (working directory or CLAUDE_PROJECT_DIR; that verb takes no --root flag), apply the action it returns and, when its completion names a feature-package-reconcile plan, apply that too; then run this feature-close-prepared transition again on the same lifecycle (plan-start is not restarted)`);
++  }
+   return {
+     feature,
+     authority: {
+@@ -516,7 +518,10 @@ async function transitionPlan(values) {
+     catch (error) { if (error?.code !== "ENOENT") fail("CLOSE-PACKAGE", "registered feature package path is unreadable"); }
+     if (hasRegisteredManifest) {
+       const checked = validateFeaturePackage(root, registeredManifest);
+-      if (!checked.ok) fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}`);
++      if (!checked.ok) {
++        const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
++        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the PO-bound feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256), then plan this transition again on the same lifecycle` : ""}`);
++      }
+       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
+       for (const [kind, path, digest] of [
+         ["prd", observed.feature.planPath, observed.authority.prdSha256],
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index 7eccd514d..175e68989 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -2,14 +2,15 @@
+ // SPDX-License-Identifier: SUL-1.0
+ 
+ import assert from "node:assert/strict";
+-import { execFileSync } from "node:child_process";
++import { execFileSync, spawnSync } from "node:child_process";
+ import { createHash, createHmac } from "node:crypto";
+ import { afterEach, test } from "node:test";
+-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { run } from "./pipeline-state.mjs";
+-import { planFeaturePackageReconcile, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { planFeaturePackageReconcile, reconcileNoDriftOk, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+@@ -506,3 +507,158 @@ test("controlled METHOD: catalogue-present Source companion closes exact Result
+   assert.equal(validateFeaturePackage(f.root, "specs/feature/lifecycle.json").ok, false);
+   await runtime.dispose();
+ });
++
++// ---- N29 (D206): a feature whose registered package carries its Result without authority can be closed ----
++// The package below is the consumer state: registered by an earlier build, state implementing, the Result entry
++// present with authority:false and mutability:immutable. Ordinary packages (authority:true) are pinned above.
++
++const CLOSE_CLI = fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url));
++
++function closeCli(args, expectedStatus = 0) {
++  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
++  const r = spawnSync(process.execPath, [CLOSE_CLI, ...args], { encoding: "utf8", shell: false, env });
++  assert.equal(r.status, expectedStatus, r.stderr || r.stdout);
++  return JSON.parse(r.stdout);
++}
++
++function closeAction(action, expectedStatus = 0) {
++  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
++  const r = spawnSync(action.executable, action.argv, { encoding: "utf8", shell: false, env });
++  assert.equal(r.status, expectedStatus, r.stderr || r.stdout);
++  return JSON.parse(r.stdout);
++}
++
++function registerPackageWithoutResultAuthority(f, mutate = () => {}) {
++  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(f.root, "specs/feature", name), `${name}\n`);
++  const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(f.root, path))), authority, mutability, retention: "active" });
++  const manifest = {
++    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++    artifacts: [
++      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"),
++      artifact("spec", "specs/feature/spec.md", true, "immutable"),
++      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++      artifact("result", "specs/feature/result.md", false, "immutable"),
++      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++    ], candidate: null, supersedes: null,
++  };
++  mutate(manifest, { artifact, f });
++  const manifestPath = "specs/feature/lifecycle.json";
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  return { manifestPath, manifest };
++}
++
++const reconcileDeps = { featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) };
++
++test("N29 anchor: a package whose Result entry has authority:false closes from checkpointed through bootstrap and reconcile without restarting", () => {
++  const f = fixture("n29-anchor"); const { manifestPath, manifest } = registerPackageWithoutResultAuthority(f);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true, "the consumer package is valid for the registering build's validator");
++  const root = realpathSync(f.root); const lifecycle = "close-n29";
++  // The close lifecycle is taken to checkpointed exactly as the consumer did.
++  const start = closeCli(["plan-start", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]);
++  assert.equal(closeAction(start.nextAction).status, "applied");
++  const checkpoint = closeCli(["plan-transition", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "checkpointed"]);
++  assert.equal(closeAction(checkpoint.nextAction).phase, "checkpointed");
++  const transitionArgs = ["plan-transition", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "architecture-conforms"];
++  // (1) CLOSE-RESULT names the next step and the unmet condition.
++  const noResult = closeCli(transitionArgs, 2);
++  assert.equal(noResult.code, "CLOSE-RESULT");
++  assert.match(noResult.message, /continuity-result-bootstrap-plan/); assert.match(noResult.message, /Implementation Result/);
++  assert.match(noResult.message, /continuity/i); assert.match(noResult.message, /same lifecycle|without restarting|no plan-start/i);
++  // (3) The bootstrap admits the package, records the pending lift, and keeps the registered manifest bytes.
++  const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const p = plan(f);
++  assert.equal(p.preimage.package.path, manifestPath); assert.equal(p.preimage.package.resultAuthorityLift, true);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending"); assert.equal(completion.preview.status, "reconcile-preview");
++  assert.equal(completion.preview.changes.length, 1);
++  assert.equal(completion.preview.changes[0].class, "result"); assert.deepEqual(completion.preview.changes[0].authority, { from: false, to: true });
++  assert.equal(completion.preview.requiredAuthority, "po");
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++  const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++  assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
++  // Continuity now binds the Result; make the State close-ready the way the close fixtures do.
++  const stateValue = JSON.parse(readFileSync(f.statePath));
++  stateValue.continuity.queueHead.nextAction = "close"; writeFileSync(f.statePath, JSON.stringify(stateValue, null, 2) + "\n");
++  mkdirSync(join(f.root, "evidence")); writeFileSync(join(f.root, "evidence/close.txt"), "closed resources\n");
++  writeFileSync(join(f.root, "evidence/close-request.json"), `${JSON.stringify({ schema: "pipeline.continuity-close.v0", featureId: "feature", expectedRevision: stateValue.continuity.revision,
++    result: stateValue.continuity.authority.result, closeEvidence: { path: "evidence/close.txt", sha256: hash(readFileSync(join(f.root, "evidence/close.txt"))) } }, null, 2)}\n`);
++  const closeArgs = [...transitionArgs, "--continuity-close-request", "evidence/close-request.json"];
++  // Until the reconcile is applied the package is stale, and the refusal names the reconcile verb.
++  const stale = closeCli(closeArgs, 2);
++  assert.equal(stale.code, "CLOSE-PACKAGE"); assert.match(stale.message, /feature-package-reconcile/);
++  // The reconcile step the completion names: PO-bound, driven here as the other reconcile tests drive it.
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], reconcileDeps);
++  assert.equal(reconciled.status, 0, reconciled.err);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  const after = JSON.parse(readFileSync(join(f.root, manifestPath)));
++  const expected = structuredClone(manifest);
++  const resultEntry = expected.artifacts.find((entry) => entry.class === "result");
++  resultEntry.authority = true; resultEntry.sha256 = hash(readFileSync(f.resultPath));
++  assert.deepEqual(after, expected, "only the result entry's authority and digest change; every other key and entry is untouched");
++  assert.equal(after.artifacts.find((entry) => entry.class === "result").mutability, "immutable");
++  // (4) The SAME lifecycle continues: the result, close-request and package gates pass; the next gate is the
++  // candidate-bound Critic/Verify audit every registered package needs (a separate route, not this defect).
++  const proceeds = closeCli(closeArgs, 2);
++  assert.equal(proceeds.code, "CLOSE-QUALIFICATION-REQUIRED");
++  assert.equal(closeCli(["inspect", "--root", root, "--lifecycle", lifecycle]).coordinator.phase, "checkpointed");
++});
++
++test("N29 negatives: two Result entries, a Result at another path and a PRD without authority stay refused with a typed detail", () => {
++  const refusal = (name, mutate, state = null) => {
++    const f = fixture(name); registerPackageWithoutResultAuthority(f, mutate);
++    if (state !== null) { const s = JSON.parse(readFileSync(f.statePath)); state(s); writeFileSync(f.statePath, JSON.stringify(s, null, 2) + "\n"); }
++    const stateBytes = readFileSync(f.statePath); const resultBytes = readFileSync(f.resultPath);
++    const refused = invoke(f.root, ["continuity-result-bootstrap-plan"]);
++    assert.equal(refused.status, 2, name); assert.match(refused.err, /PS-RESULT-BOOTSTRAP-PACKAGE/, name); assert.match(refused.err, /zero mutation/, name);
++    assert.deepEqual(readFileSync(f.statePath), stateBytes, name); assert.deepEqual(readFileSync(f.resultPath), resultBytes, name); assert.equal(existsSync(f.journalPath), false, name);
++    return refused.err;
++  };
++  const twoResults = refusal("n29-two", (manifest, { artifact, f }) => {
++    writeFileSync(join(f.root, "specs/feature/result-extra.md"), "extra\n");
++    manifest.artifacts.push(artifact("result", "specs/feature/result-extra.md", false, "immutable"));
++  });
++  assert.match(twoResults, /condition=entry-duplicate/); assert.match(twoResults, /class=result/); assert.match(twoResults, /path=specs\/feature\/result\.md/);
++  const wrongPath = refusal("n29-path", (manifest, { artifact, f }) => {
++    writeFileSync(join(f.root, "specs/feature/result-copy.md"), readFileSync(f.resultPath));
++    manifest.artifacts.find((entry) => entry.class === "result").path = "specs/feature/result-copy.md";
++    manifest.artifacts.find((entry) => entry.class === "result").sha256 = hash(readFileSync(join(f.root, "specs/feature/result-copy.md")));
++  });
++  assert.match(wrongPath, /condition=path-mismatch/); assert.match(wrongPath, /class=result/);
++  const staleDigest = refusal("n29-digest", (manifest) => { manifest.artifacts.find((entry) => entry.class === "result").sha256 = h("f"); });
++  assert.match(staleDigest, /condition=(?:digest-mismatch|manifest-invalid)/);
++  const prdNoAuthority = refusal("n29-prd", (manifest) => { manifest.artifacts.find((entry) => entry.class === "prd").authority = false; });
++  assert.match(prdNoAuthority, /condition=manifest-invalid/);
++  // A draft package that names the PRD without authority reaches the entry check itself.
++  const draftPrd = refusal("n29-prd-draft", (manifest) => {
++    manifest.state = "draft"; manifest.artifacts = manifest.artifacts.filter((entry) => entry.class === "prd"); manifest.artifacts[0].authority = false;
++  });
++  assert.match(draftPrd, /condition=authority-false/); assert.match(draftPrd, /class=prd/);
++  const draftNoSpec = refusal("n29-spec-missing", (manifest) => {
++    manifest.state = "draft"; manifest.artifacts = manifest.artifacts.filter((entry) => entry.class === "prd");
++  });
++  assert.match(draftNoSpec, /condition=entry-missing/); assert.match(draftNoSpec, /class=spec/);
++});
++
++test("N29: the reconcile plan lifts authority only on the Result entry Continuity binds, and the no-drift check admits nothing wider", () => {
++  const before = { schema: "s", state: "implementing", artifacts: [
++    { class: "prd", path: "p", sha256: h("1"), authority: true, mutability: "mutable", retention: "active" },
++    { class: "result", path: "r", sha256: h("2"), authority: false, mutability: "immutable", retention: "active" },
++  ] };
++  const lifted = structuredClone(before); lifted.artifacts[1].authority = true; lifted.artifacts[1].sha256 = h("3");
++  assert.equal(reconcileNoDriftOk(before, lifted), false, "default stays digest-only");
++  assert.equal(reconcileNoDriftOk(before, lifted, { liftResultAuthorityPath: "r" }), true);
++  assert.equal(reconcileNoDriftOk(before, lifted, { liftResultAuthorityPath: "other" }), false);
++  const noDigest = structuredClone(lifted); noDigest.artifacts[1].sha256 = h("2");
++  assert.equal(reconcileNoDriftOk(before, noDigest, { liftResultAuthorityPath: "r" }), false, "the lift rides on the fence-proven digest move only");
++  const prdBefore = structuredClone(before); prdBefore.artifacts[0].authority = false;
++  const prdLift = structuredClone(before); prdLift.artifacts[0].sha256 = h("9");
++  assert.equal(reconcileNoDriftOk(prdBefore, prdLift, { liftResultAuthorityPath: "p" }), false, "a PRD is never lifted");
++  const demoted = structuredClone(lifted); const demotedBefore = structuredClone(before); demotedBefore.artifacts[1].authority = true;
++  demoted.artifacts[1].authority = false;
++  assert.equal(reconcileNoDriftOk(demotedBefore, demoted, { liftResultAuthorityPath: "r" }), false, "authority is never lowered");
++  const other = structuredClone(lifted); other.artifacts[1].mutability = "mutable";
++  assert.equal(reconcileNoDriftOk(before, other, { liftResultAuthorityPath: "r" }), false, "no other key moves");
++  const state = structuredClone(lifted); state.state = "verifying";
++  assert.equal(reconcileNoDriftOk(before, state, { liftResultAuthorityPath: "r" }), false, "no manifest key moves");
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b7857513e..fe28cf09b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -5984,24 +5984,58 @@ function resultBootstrapNextState(state, result, updatedAt) {
+   return next;
+ }
+ 
++// A refused registered package names the class, the path and the condition that failed (N29), so the
++// operator reads which entry to repair instead of a bare code. `class` is "manifest" for a whole-file
++// condition, otherwise the artifact class the bootstrap looked for; `path` is the manifest path for a
++// whole-file condition, otherwise the path the bootstrap expected that entry to bind.
++const RESULT_BOOTSTRAP_PACKAGE_CONDITIONS = Object.freeze(["manifest-unsafe", "manifest-invalid", "feature-id-mismatch",
++  "entry-missing", "entry-duplicate", "authority-false", "path-mismatch", "digest-mismatch"]);
++function resultBootstrapPackageRefusal(klass, path, condition) {
++  return { ok: false, detail: { class: klass, path, condition } };
++}
++
+ function resultBootstrapPackage(dir, state, prd, spec, resultPath) {
+   const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+   const manifest = physicalRebindFile(dir, path);
+   if (manifest === null) {
+     // A missing manifest is the legacy unregistered course. An unsafe present
+     // manifest must never be mistaken for that course.
+-    try { lstatSync(resolve(dir, path)); return { ok: false }; }
+-    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : { ok: false }; }
++    try { lstatSync(resolve(dir, path)); return resultBootstrapPackageRefusal("manifest", path, "manifest-unsafe"); }
++    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : resultBootstrapPackageRefusal("manifest", path, "manifest-unsafe"); }
+   }
+   const checked = validateFeaturePackage(dir, path);
+-  if (!checked.ok || checked.receipt?.featureId !== state.activeFeature.id) return { ok: false };
++  if (!checked.ok) return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid");
++  if (checked.receipt?.featureId !== state.activeFeature.id) return resultBootstrapPackageRefusal("manifest", path, "feature-id-mismatch");
+   let value;
+-  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return { ok: false }; }
++  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid"); }
++  if (!Array.isArray(value?.artifacts)) return resultBootstrapPackageRefusal("manifest", path, "manifest-invalid");
++  let resultAuthorityLift = false;
+   for (const [kind, observed] of [["prd", prd], ["spec", spec], ["result", resultPath]]) {
+-    const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
+-    if (entries.length !== 1 || entries[0].path !== observed.path || entries[0].sha256 !== observed.sha256) return { ok: false };
++    const ofClass = value.artifacts.filter((entry) => entry.class === kind);
++    const authoritative = ofClass.filter((entry) => entry.authority === true);
++    if (authoritative.length > 1) return resultBootstrapPackageRefusal(kind, observed.path, "entry-duplicate");
++    if (authoritative.length === 1) {
++      if (authoritative[0].path !== observed.path) return resultBootstrapPackageRefusal(kind, observed.path, "path-mismatch");
++      if (authoritative[0].sha256 !== observed.sha256) return resultBootstrapPackageRefusal(kind, observed.path, "digest-mismatch");
++      continue;
++    }
++    if (ofClass.length === 0) return resultBootstrapPackageRefusal(kind, observed.path, "entry-missing");
++    // No authoritative entry. Only the Result may be registered that way: a package from an earlier build can
++    // carry it with authority:false. Then it must be the ONLY result-class entry, at the canonical Result path,
++    // bound to the observed bytes; the lift of its authority rides the PO-bound reconcile the bootstrap
++    // completion already names for the digest move. PRD and Spec stay strict.
++    if (kind !== "result") return resultBootstrapPackageRefusal(kind, observed.path, "authority-false");
++    if (ofClass.length > 1) return resultBootstrapPackageRefusal(kind, observed.path, "entry-duplicate");
++    if (ofClass[0].path !== observed.path) return resultBootstrapPackageRefusal(kind, observed.path, "path-mismatch");
++    if (ofClass[0].sha256 !== observed.sha256) return resultBootstrapPackageRefusal(kind, observed.path, "digest-mismatch");
++    resultAuthorityLift = true;
+   }
+-  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256 } };
++  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256, ...(resultAuthorityLift ? { resultAuthorityLift: true } : {}) } };
++}
++
++function resultBootstrapPackageDetailText(detail) {
++  return RESULT_BOOTSTRAP_PACKAGE_CONDITIONS.includes(detail?.condition)
++    ? ` class=${detail.class} path=${detail.path} condition=${detail.condition}` : "";
+ }
+ 
+ function planLegacyResultRepair(dir, state, manifestPath) {
+@@ -6056,7 +6090,7 @@ function resultBootstrapCompletion(dir, state, packageBinding) {
+     planSha256: pending ? sha256CanonicalJson(preview) : null,
+     nextAction: preview.status === "legacy-repair-preview"
+       ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
+-      : preview.status === "reconcile-preview" ? "obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it" : "resolve package drift through authenticated recovery",
++      : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start` : "resolve package drift through authenticated recovery",
+     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
+       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
+       requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
+@@ -6097,7 +6131,7 @@ function buildResultBootstrapPlan(dir, existing, updatedAt) {
+   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
+   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
+   const registration = resultBootstrapPackage(dir, state, prd, spec, resultPath);
+-  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE" };
++  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE", detail: registration.detail };
+   const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
+   if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
+   const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
+@@ -6396,7 +6430,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+           return 0;
+         }
+       }
+-      console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2;
++      console.error(`Error: Result bootstrap plan refused (${planned.code}${resultBootstrapPackageDetailText(planned.detail)}); zero mutation.`); return 2;
+     }
+     const writer = fileURLToPath(import.meta.url);
+     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
