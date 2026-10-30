@@ -137,6 +137,32 @@ test("P5 a genuinely missing in-root Read is labelled GUARD-READ-TARGET-MISSING 
   assert.doesNotMatch(blocked.text, /GUARD-READ-TARGET-MISSING/u);
 }));
 
+// 2026-10-30 consumer finding: rg -l / rg -i / several paths / head -n with a missing in-root path were refused as an
+// unsupported command ("a flag ... it does not admit"), so the agent re-spelled flags that were fine.
+test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET-MISSING; a real flag fault stays unsupported", () => withFixture((path) => {
+  for (const command of [
+    "rg -l apply docs/missing.md",
+    "rg -n -i apply docs/missing.md",
+    "rg -n apply docs/2026-09-21-a.md docs/missing.md",
+    "rg -n apply docs/nope/deeper.md",
+    "grep -n -i apply docs/missing.md",
+    "head -n 5 docs/missing.md",
+    "tail -n 5 docs/missing.md",
+  ]) {
+    const r = run(bash(command), path);
+    assert.equal(r.exitCode, 2, command);
+    assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}\n${r.text}`);
+    assert.deepEqual(denialProblems(r.text), [], `${command}\n${r.text}`);
+  }
+  for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md"]) {
+    const r = run(bash(command), path);
+    assert.equal(r.exitCode, 2, command);
+    assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}: the missing path is not the only fault\n${r.text}`);
+  }
+  // The rg pattern is never treated as a path: an existing target keeps the command admitted.
+  assert.equal(run(bash("rg -n docs/missing.md docs/2026-09-21-a.md"), path).exitCode, 0);
+}));
+
 test("UNSATISFIED U1 native Grep on an exact in-repo file with a glob filter is admitted (A1: Grep with glob filters)", () => withFixture((path) => {
   const r = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "docs", "2026-09-21-a.md"), glob: "*.md" } }, path);
   assert.equal(r.exitCode, 0, r.text);

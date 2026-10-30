@@ -7,8 +7,8 @@
 // Every case runs through the real guard (evaluateLifecycleReadyGuard) or the real read policy; nothing is mocked.
 // K3 (PO decision 2026-10-14, Critic finding F1 of batch C5): AP10-AP14 declare and pin the two further admission lanes this item's patch
 // carries -- `git show <rev>:<path> | head -N` and `stat -c|--format` with the two fixed formats -- admitted shapes and fail-closed shapes.
-// ALF-C-P1-10D (C5 correction round, findings C5D-F1 and C5D-C1): AP3 keeps a repeated rg -g/--glob REFUSED (SEC-11 examiner in
-// hooks/guard-lifecycle-ready.test.mjs), and AP15 pins that every stat format-bearing spelling is routed into the closed stat lane.
+// ALF-C-P1-10D (C5 correction round, findings C5D-F1 and C5D-C1): AP3 kept a repeated rg -g/--glob REFUSED (SEC-11 examiner in
+// hooks/guard-lifecycle-ready.test.mjs; restated 2026-10-30 after G23 admitted repeated BOUNDED globs, see AP3), and AP15 pins that every stat format-bearing spelling is routed into the closed stat lane.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -103,33 +103,28 @@ test("AP3 the rg flags the item names (--no-heading, -m N) on an in-repo target 
     const r = verdict(bash(command), path);
     assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
   }
-  // SEC-11 (examiner: hooks/guard-lifecycle-ready.test.mjs "recursive rg keeps default hidden/ignore semantics; globs may expose private
-  // paths"): a recursive rg carries at most ONE bounded basename glob. A second glob is refused whichever spelling carries it, and the
-  // refusal holds at the guard entry, at the single-command predicate and in the bounded `| head` pipeline.
+  // QG-04 restatement (2026-10-30): was "a second glob is refused whichever spelling carries it". Commit 6db0d31f8 (2026-10-24, G23,
+  // lib/guard/g23-read-help.test.mjs) admitted REPEATED bounded basename globs and left this pin red. SEC-11 intent unchanged: every
+  // glob stays a bounded basename filter, so hidden, credential and parent paths stay unreachable. Repeated bounded globs are admitted
+  // at the guard entry, the single-command predicate and the bounded `| head` pipeline; a repeated glob carrying an unbounded pattern
+  // is refused at all three.
   for (const command of [
     `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
     `rg -l -S lifecycle plugins -g "*.mjs" -g "*.md"`,
-    `rg -n apply docs/state.md --glob "*.md" --glob "*.txt"`,
-    `rg -n apply docs/state.md -g "*.md" --glob "*.txt"`,
     `rg -l -S lifecycle plugins -g "*.mjs" -g "*.md" | head -n 180`,
     `rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180`,
   ]) {
-    const r = verdict(bash(command), path);
-    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
-    if (command.includes(" | ")) {
-      const parsed = parseGuardCommand(command, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
-      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, `pipeline lane: ${command}`);
-    }
+    assert.equal(verdict(bash(command), path).exitCode, 0, command);
   }
-  for (const argv of [
-    ["-n", "--no-heading", "authorize-commit", "scratch", "-g", "*.md", "-g", "*.txt", "-g", "*.ps1"],
-    ["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", "*.md"],
-    ["-n", "apply", "docs/state.md", "--glob", "*.md", "--glob", "*.txt"],
-    ["-n", "apply", "docs/state.md", "-g", "*.md", "--glob", "*.txt"],
-  ]) {
-    assert.equal(isBoundedSingleRg(argv, path), false, `single-command predicate: rg ${argv.join(" ")}`);
+  for (const bad of [".*", "../*.md", "**/*.md", "!*.md"]) {
+    const command = `rg -l -S lifecycle plugins -g "*.mjs" -g "${bad}"`;
+    assert.equal(verdict(bash(command), path).exitCode, 2, command);
+    assert.equal(verdict(bash(`${command} | head -n 180`), path).exitCode, 2, `${command} | head -n 180`);
+    assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(`${command} | head -n 180`, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM }), path), false, bad);
+    assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", bad], path), false, `single-command predicate: ${bad}`);
   }
-  // Control: the same search with ONE glob is admitted, so the refusal above is the repetition and nothing broader.
+  assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", "*.md"], path), true);
+  // Control: one glob stays admitted.
   assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs"], path), true);
   const oneGlob = `rg -l -S lifecycle plugins -g "*.mjs" | head -n 180`;
   assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(oneGlob, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM }), path), true);

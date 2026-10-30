@@ -592,7 +592,58 @@ export function isMissingSingleReadTarget(parsed, root) {
     const args = argv[0] === "-n" ? argv.slice(1) : argv;
     if (args.length === 2 && args[0] !== "" && !args[0].startsWith("-")) target = args[1];
   }
-  return target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root);
+  if (target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root)) return true;
+  return missingOperandIsTheOnlyFault(name, executable, argv, root);
+}
+
+// 2026-10-30 (consumer finding): any other admitted shape (rg -l, rg -i, several paths, head -n 5 ...) with a missing
+// in-root path fell through to GUARD-READ-COMMAND-UNSUPPORTED, which tells the agent to re-spell flags that were fine.
+// Label selection only, by asking the grammar itself: the missing path is the fault when putting an existing in-root
+// stand-in (its nearest existing directory, else a file in it) in place of every missing operand makes the grammar admit
+// the command. The rg/grep pattern (the first operand) is never replaced, so a bad pattern is never reported as a path.
+const QP4_MISSING_DIAGNOSED = new Set(["rg", "grep", "cat", "wc", "stat", "file", "head", "tail"]);
+const shellWord = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
+
+function existingInRootStandIns(raw, root) {
+  let ancestor = resolve(resolve(passiveCandidate(raw, root)), "..");
+  while (!existsDirectory(ancestor)) ancestor = resolve(ancestor, "..");
+  const standIns = [relative(resolve(root), ancestor) || "."];
+  try {
+    const file = readdirSync(ancestor, { withFileTypes: true }).filter((entry) => entry.isFile() && !entry.name.startsWith("."))
+      .map((entry) => entry.name).sort()[0];
+    if (file !== undefined) standIns.push(relative(resolve(root), join(ancestor, file)));
+  } catch { /* the directory stand-in alone */ }
+  return standIns;
+}
+
+function existsDirectory(path) {
+  try { return statSync(path).isDirectory(); } catch { return false; }
+}
+
+function missingOperandIsTheOnlyFault(name, executable, argv, root) {
+  if (!QP4_MISSING_DIAGNOSED.has(name)) return false;
+  const endOfOptions = argv.indexOf("--");
+  let patternSeen = !["rg", "grep"].includes(name);
+  const missing = [];
+  argv.forEach((token, index) => {
+    if (typeof token !== "string" || ((endOfOptions === -1 || index < endOfOptions) && token.startsWith("-"))) return;
+    if (!patternSeen) { patternSeen = true; return; }
+    if (qp4MissingInRootTarget(token, root)) missing.push(index);
+  });
+  // An option's value (head -n 5) is no path: also try with every word that directly follows an option left as written.
+  const afterOption = missing.filter((index) => !(index > 0 && /^-[^-]/u.test(argv[index - 1]) && (endOfOptions === -1 || index - 1 < endOfOptions)));
+  for (const set of [missing, afterOption]) {
+    if (set.length === 0) continue;
+    const choices = set.map((index) => existingInRootStandIns(argv[index], root));
+    for (let pick = 0; pick < 2; pick += 1) {
+      const words = argv.map((token, index) => {
+        const at = set.indexOf(index);
+        return at === -1 ? token : choices[at][Math.min(pick, choices[at].length - 1)];
+      });
+      if (isReadOnlyDiagnosticCommand([executable, ...words.map(shellWord)].join(" "), root)) return true;
+    }
+  }
+  return false;
 }
 
 // ALF-C-P15-01C (AC-239, PO decision U3): native Read of ONE exact file under a WSL UNC share
