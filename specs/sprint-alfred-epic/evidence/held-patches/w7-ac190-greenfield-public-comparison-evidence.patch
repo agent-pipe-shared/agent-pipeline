@@ -1,0 +1,1106 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index f83c472cf..e4a5c23ab 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -484,6 +484,8 @@
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
++        "verify-phase:harness/scripts/verify.mjs:greenfield-comparison-citation-check-tests",
++        "verify-phase:harness/scripts/verify.mjs:greenfield-public-comparison-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-devplan-approval-unverified-tests",
+diff --git a/evidence/greenfield-public/README.md b/evidence/greenfield-public/README.md
+new file mode 100644
+index 000000000..988622cce
+--- /dev/null
++++ b/evidence/greenfield-public/README.md
+@@ -0,0 +1,82 @@
++# Published greenfield run observations (second run)
++
++Public, sanitized, counted evidence for runner comparisons (AC-190, D209). A release note or retro
++that says one runner's greenfield course is faster, cheaper or more reliable than another's cites a
++comparison file from this folder by path and sha256, and nothing else.
++
++Sources: only the committed, already sanitized material in
++`specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/` (its README, finding ledger and
++copied reports). No raw runner store, transcript or session was read. Values are therefore
++reported-unverified numbers taken from those reports, not independent measurements.
++
++## Files
++
++| File | Content | sha256 |
++|---|---|---|
++| `observations-claude-second-run.json` | Claude pipeline run, plus the shared control | `66280e5370c8990440562c4613d86b0d4ef23a2f57ffb83635ee62e5d9c2797f` |
++| `observations-codex-second-run.json` | Codex pipeline run, plus the shared control | `ecdd5eeaf72c01d6509332bdc4d0c5d52987bcbc8388b5895090e00f92ae603a` |
++| `observations-antigravity-second-run.json` | Antigravity pipeline run, plus the shared control | `f6eacad0ce3ffbbf61e247c68464854bd0c365b3689930b172ff80b9779f8577` |
++| `comparison-second-run.json` | Comparison generated from the Codex file by the real command | `80c1e8720f64e47a8ae67dd330737e0d00e7d97ed0a02358ac79d18811e69acf` |
++
++Each observation file is a `pipeline.greenfield-public-observations.v1` input: canonical JSON, one
++trailing newline, two cases. Pipeline versions named: `0.7.0+claude.20261025134513.977dad8` (Claude),
++`0.7.0+codex.20261025134513.977dad8` (Codex), `0.7.0` (Antigravity; its report prints no build stamp).
++The control case is a Codex run on 2026-10-24 with the Pipeline declined; it carries no Pipeline version.
++
++Regenerate the comparison (the output file must not exist yet):
++
++```
++node plugins/pipeline-core/scripts/greenfield-public-comparison.mjs --input evidence/greenfield-public/observations-codex-second-run.json --input-sha256 ecdd5eeaf72c01d6509332bdc4d0c5d52987bcbc8388b5895090e00f92ae603a --output evidence/greenfield-public/comparison-second-run.json
++```
++
++## What is in a case
++
++Runner, Pipeline version, window (UTC), main-agent turns and tool calls, token counters, active and
++wait milliseconds, coverage and method, result as reported, the ordered phases reached, the typed
++refusal codes with counts, and the sha256 of the original report and of its sanitized derivative.
++A value the reports do not state, or state only rounded, is `null`; it is never estimated.
++
++## Limits (read before citing)
++
++- One input per comparison. The command takes exactly one `--input`, so every observation file carries
++  its runner's pipeline case plus the same control case, and only the Codex file was compared. The
++  published comparison is therefore Codex with the Pipeline against Codex without it. A comparison across
++  Claude, Codex and Antigravity needs a multi-input command and is not published yet.
++- The pair in the comparison is `unresolved`: the windows, the task briefs and the counting methods
++  differ, and causal inference is `unsupported`. The numbers are descriptive only.
++- Task identity: the task digest is the sha256 of the label below, declared by the publisher from the
++  shared product description in the reports. The original briefs are not in the committed material, so
++  equal digests assert the label, not byte-identical briefs.
++
++Task identity label: `voxel-showcase-scene-single-file-greenfield-v1`
++
++- Counts are main-agent only. Subagent and runtime-guardian usage is excluded; the turn and tool counting
++  rules differ between the reports, which is why each case names its own method.
++- Instants: Claude's report gives minutes and Antigravity's seconds; both are padded with zero
++  milliseconds. The Antigravity report prints no date; 2026-10-25 is taken from the name of the
++  committed evidence folder. The Claude and Codex dates match their build stamp.
++- Claude `outputTokens` is the sum of the report's per-phase rows (595678); the report's prose total is
++  rounded and differs, and is not used. Claude and Antigravity `waitMs` is `null` because their reported
++  wait plus active time exceeds the reported wall interval; Codex `waitMs` is the wall interval minus
++  active time (it matches the report's rounded wait).
++- `rulesetSha256` is `null` everywhere: no ruleset digest is printed in the reports.
++- Refusal codes are only those the reports name, counted as named in each report's event listing. This is
++  not a refusal census; absent codes mean "not named", not "did not happen".
++- Phases are the reports' analytic phases, not Pipeline state marks. `verify` means verification was
++  attempted; none of the three Pipeline runs completed Verify, Critic or acceptance.
++- Results are as the reports state them: `stopped-reported` where the report ends the run on purpose,
++  otherwise `unknown`. Nothing here is a quality, cost or product-acceptance claim.
++
++## Citing
++
++Mark each runner comparison claim with an HTML comment that starts with the word `runner-comparison`
++and carries `path=` and `sha256=` of a `comparison-*.json` file in this folder. The checker refuses a
++claim that cites no file, a path outside this folder, a missing file or a digest that does not match:
++
++```
++node scripts/check-greenfield-comparison-citations.mjs docs/your-retro.md
++```
++
++Example claim, itself checked: Codex with the Pipeline needed 6080.7 s of active time and 252 outer tool
++calls, Codex without it 888.9 s and 40, in runs whose windows and counting methods differ; no cause is
++inferred. <!-- runner-comparison path=evidence/greenfield-public/comparison-second-run.json sha256=80c1e8720f64e47a8ae67dd330737e0d00e7d97ed0a02358ac79d18811e69acf -->
+diff --git a/evidence/greenfield-public/comparison-second-run.json b/evidence/greenfield-public/comparison-second-run.json
+new file mode 100644
+index 000000000..d59cc89c9
+--- /dev/null
++++ b/evidence/greenfield-public/comparison-second-run.json
+@@ -0,0 +1 @@
++{"assurance":{"cost":"unknown-no-billing-source","native":"unavailable","numericReproduction":"timestamp-and-counter-arithmetic-only","originalCustody":"unavailable","quality":"unknown-no-controlled-product-proof","screening":"deterministic-public-projection-screen-only"},"cases":[{"caseId":"codex-no-pipeline-control","categoryShares":{"denominator":94801,"shares":{"inputTokens":0.6620499783757555,"outputTokens":0.3379500216242445},"status":"arithmetic-from-reported-counters"},"coverage":{"methodId":"second-run-codex-control-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1","rawSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1"},"fidelityEvidence":"digest-claims-unverified-original-not-read","intervals":{"beforeCodeMs":null,"throughInitialBuildMs":null,"wallMs":904221},"metricEvidence":"reported-unverified","metrics":{"activeMs":888941,"cacheReadTokens":2477568,"cacheWriteTokens":null,"inputTokens":62763,"outputTokens":32038,"tools":40,"turns":3,"waitMs":15280},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"no-pipeline","pipelineVersion":null,"refusalCodes":[],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-24T07:04:43.123Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-24T06:49:38.902Z","toolEnd":40,"toolStart":1,"turnEnd":3,"turnStart":1}},{"caseId":"codex-pipeline-second-run","categoryShares":{"denominator":1042978,"shares":{"inputTokens":0.8450715163694728,"outputTokens":0.1549284836305272},"status":"arithmetic-from-reported-counters"},"coverage":{"methodId":"second-run-codex-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b","rawSha256":"2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b"},"fidelityEvidence":"digest-claims-unverified-original-not-read","intervals":{"beforeCodeMs":null,"throughInitialBuildMs":null,"wallMs":6985469},"metricEvidence":"reported-unverified","metrics":{"activeMs":6080669,"cacheReadTokens":54721152,"cacheWriteTokens":null,"inputTokens":881391,"outputTokens":161587,"tools":252,"turns":11,"waitMs":904800},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"pipeline","pipelineVersion":"0.7.0+codex.20261025134513.977dad8","refusalCodes":[{"code":"PCI-ROOT-MISMATCH","count":1},{"code":"VEP-PROJECT-IDENTITY","count":1}],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-25T15:53:26.356Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-25T13:57:00.887Z","toolEnd":252,"toolStart":1,"turnEnd":11,"turnStart":1}}],"comparisonId":"greenfield-second-run-codex","conclusions":"descriptive-only-no-ROI-or-security-or-regression-guarantee","inputSha256":"ecdd5eeaf72c01d6509332bdc4d0c5d52987bcbc8388b5895090e00f92ae603a","pairs":[{"caseIds":["codex-no-pipeline-control","codex-pipeline-second-run"],"causalInference":"unsupported","pipelineDifference":true,"reasons":["different-window-start","different-window-end","different-window-turnEnd","different-window-toolEnd","incomplete-coverage","different-or-unknown-method"],"rulesetDifference":false,"runnerDifference":false,"sameWindow":"unresolved"}],"schema":"pipeline.greenfield-public-comparison.v1"}
+diff --git a/evidence/greenfield-public/observations-antigravity-second-run.json b/evidence/greenfield-public/observations-antigravity-second-run.json
+new file mode 100644
+index 000000000..b3280d550
+--- /dev/null
++++ b/evidence/greenfield-public/observations-antigravity-second-run.json
+@@ -0,0 +1 @@
++{"cases":[{"caseId":"antigravity-pipeline-second-run","coverage":{"methodId":"second-run-antigravity-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"85af6ba8511c9e46c0e00f6a5df6aa2136cdd0929c0f86f80f21764a285462ba","rawSha256":"8cd6df142b3000c100d45c0ff904993b9f385b5eaf0722547000a9165534fbf4"},"metrics":{"activeMs":6432000,"cacheReadTokens":44071473,"cacheWriteTokens":null,"inputTokens":2712335,"outputTokens":195243,"tools":420,"turns":359,"waitMs":null},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"pipeline","pipelineVersion":"0.7.0","refusalCodes":[{"code":"AGY-NATIVE-ARTIFACT-MISSING","count":1},{"code":"ARCHITECTURE-MATERIALIZATION-REQUIRED","count":1},{"code":"CAC-REGISTRATION-INVALID","count":1},{"code":"CGB-HELD","count":1},{"code":"CGB-REFERENCE","count":1},{"code":"CLOSE-QUALIFICATION-REQUIRED","count":5},{"code":"DBB-BASE-CAP-MISSING","count":1},{"code":"DISPATCH-MODEL-MISSING","count":1},{"code":"DISPATCH-WRITE-CARRIER-REQUIRED","count":1},{"code":"GIT-03-DISPATCH-MALFORMED","count":3},{"code":"GS-11","count":1},{"code":"GUARD-CROSS-REPO-MUTATION","count":1},{"code":"GUARD-DEVPLAN-SHELL","count":2},{"code":"GUARD-GATE-STRENGTH-SHELL","count":3},{"code":"GUARD-OPERATOR-UNAPPROVED","count":1},{"code":"GUARD-READ-SCOPE-OUTSIDE-ROOT","count":1},{"code":"GUARD-READ-TARGET","count":6},{"code":"SCF-INTERNAL","count":1},{"code":"SCF-REQUEST-FILE","count":2},{"code":"VEP-CVL-CARRY-CONTENT-CHANGED","count":1}],"result":"stopped-reported","rulesetSha256":null,"runner":"antigravity","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-25T16:06:48.000Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-25T13:56:57.000Z","toolEnd":420,"toolStart":1,"turnEnd":359,"turnStart":1}},{"caseId":"codex-no-pipeline-control","coverage":{"methodId":"second-run-codex-control-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1","rawSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1"},"metrics":{"activeMs":888941,"cacheReadTokens":2477568,"cacheWriteTokens":null,"inputTokens":62763,"outputTokens":32038,"tools":40,"turns":3,"waitMs":15280},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"no-pipeline","pipelineVersion":null,"refusalCodes":[],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-24T07:04:43.123Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-24T06:49:38.902Z","toolEnd":40,"toolStart":1,"turnEnd":3,"turnStart":1}}],"comparisonId":"greenfield-second-run-antigravity","schema":"pipeline.greenfield-public-observations.v1"}
+diff --git a/evidence/greenfield-public/observations-claude-second-run.json b/evidence/greenfield-public/observations-claude-second-run.json
+new file mode 100644
+index 000000000..22a6bdf1c
+--- /dev/null
++++ b/evidence/greenfield-public/observations-claude-second-run.json
+@@ -0,0 +1 @@
++{"cases":[{"caseId":"claude-pipeline-second-run","coverage":{"methodId":"second-run-claude-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"471e5f7e7c65209b263c4ab382f75f159f0dfc30ae268d05dfad1de1e013fa12","rawSha256":"98251d764d5b8d95c45e9a7a54f41e86dd821e5b96faf59f5c1346f0764d3541"},"metrics":{"activeMs":8460000,"cacheReadTokens":null,"cacheWriteTokens":null,"inputTokens":null,"outputTokens":595678,"tools":303,"turns":553,"waitMs":null},"phasesReached":["onboarding","design","vertical-slice","implementation"],"pipeline":"pipeline","pipelineVersion":"0.7.0+claude.20261025134513.977dad8","refusalCodes":[{"code":"ARCHITECTURE-DESIGN-SCOPE-MISMATCH","count":1},{"code":"CAC-REGISTRATION-INVALID","count":1},{"code":"CVCT-FILE","count":2},{"code":"DBG-CHECK-NOT-TEST","count":1},{"code":"DBG-GENERATED-DIGEST-MISMATCH","count":1},{"code":"DBG-ITEM-SLUG","count":1},{"code":"DBG-MODEL-FAMILY","count":1},{"code":"DISPATCH-RECORD-WRITE-FAILED","count":1},{"code":"GUARD-DEVPLAN-SHELL","count":1},{"code":"GUARD-OPERATOR-UNAPPROVED","count":1},{"code":"GUARD-PARSE-UNSUPPORTED","count":1},{"code":"GUARD-POWERSHELL-GRAMMAR","count":1},{"code":"GUARD-READ-TARGET","count":1},{"code":"GUARD-READ-TARGET-MISSING","count":1}],"result":"stopped-reported","rulesetSha256":null,"runner":"claude","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-25T16:43:00.000Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-25T13:57:00.000Z","toolEnd":303,"toolStart":1,"turnEnd":553,"turnStart":1}},{"caseId":"codex-no-pipeline-control","coverage":{"methodId":"second-run-codex-control-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1","rawSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1"},"metrics":{"activeMs":888941,"cacheReadTokens":2477568,"cacheWriteTokens":null,"inputTokens":62763,"outputTokens":32038,"tools":40,"turns":3,"waitMs":15280},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"no-pipeline","pipelineVersion":null,"refusalCodes":[],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-24T07:04:43.123Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-24T06:49:38.902Z","toolEnd":40,"toolStart":1,"turnEnd":3,"turnStart":1}}],"comparisonId":"greenfield-second-run-claude","schema":"pipeline.greenfield-public-observations.v1"}
+diff --git a/evidence/greenfield-public/observations-codex-second-run.json b/evidence/greenfield-public/observations-codex-second-run.json
+new file mode 100644
+index 000000000..a390b86e6
+--- /dev/null
++++ b/evidence/greenfield-public/observations-codex-second-run.json
+@@ -0,0 +1 @@
++{"cases":[{"caseId":"codex-pipeline-second-run","coverage":{"methodId":"second-run-codex-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b","rawSha256":"2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b"},"metrics":{"activeMs":6080669,"cacheReadTokens":54721152,"cacheWriteTokens":null,"inputTokens":881391,"outputTokens":161587,"tools":252,"turns":11,"waitMs":904800},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"pipeline","pipelineVersion":"0.7.0+codex.20261025134513.977dad8","refusalCodes":[{"code":"PCI-ROOT-MISMATCH","count":1},{"code":"VEP-PROJECT-IDENTITY","count":1}],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-25T15:53:26.356Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-25T13:57:00.887Z","toolEnd":252,"toolStart":1,"turnEnd":11,"turnStart":1}},{"caseId":"codex-no-pipeline-control","coverage":{"methodId":"second-run-codex-control-main-transcript","status":"partial-reported"},"fidelity":{"derivativeSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1","rawSha256":"ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1"},"metrics":{"activeMs":888941,"cacheReadTokens":2477568,"cacheWriteTokens":null,"inputTokens":62763,"outputTokens":32038,"tools":40,"turns":3,"waitMs":15280},"phasesReached":["onboarding","design","implementation","verify"],"pipeline":"no-pipeline","pipelineVersion":null,"refusalCodes":[],"result":"unknown","rulesetSha256":null,"runner":"codex","taskSha256":"b293dc5da4844664b95062a8cbb104daad43af255d24129fcd91a7657cd3c98b","window":{"denominator":"input-output","end":"2026-10-24T07:04:43.123Z","firstCode":null,"includesAnalysis":false,"initialBuild":null,"phase":"full","start":"2026-10-24T06:49:38.902Z","toolEnd":40,"toolStart":1,"turnEnd":3,"turnStart":1}}],"comparisonId":"greenfield-second-run-codex","schema":"pipeline.greenfield-public-observations.v1"}
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 3491e07de..68d6adfbe 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4284,6 +4284,18 @@
+       "file": "plugins/pipeline-core/lib/host-skill-catalog.test.mjs",
+       "invariantPinned": "The host skill-catalog carrier is a sealed private record written only by the host readback; a valid entry admits only a bounded search inside that one declared directory, drift and forgery invalidate it, and a runner without a declaration surface leaves the D108 refusal unchanged.",
+       "nonOverlapNote": "Unit-level carrier and policy admission tests; the guard-level skill pins (lifecycle-read-scope-blocks-host-declared-system-skill, declared-system-skill-read-requires-human-override) drive the same carrier through evaluateLifecycleReadyGuard."
++    },
++    {
++      "name": "greenfield-public-comparison-tests",
++      "file": "plugins/pipeline-core/lib/greenfield-public-comparison.test.mjs",
++      "invariantPinned": "A runner comparison is built only from a bounded, canonical, screened public observation input bound by sha256 (schema, optional pipelineVersion/phasesReached/refusalCodes, public path scope, publish compare-and-swap, locale-independent order), and the first published second-run observation set and comparison validate, reproduce and carry no private identifier or absolute path.",
++      "nonOverlapNote": "Unique unit and committed-evidence suite for the greenfield public comparison library, its command and evidence/greenfield-public; the citation checker has its own suite."
++    },
++    {
++      "name": "greenfield-comparison-citation-check-tests",
++      "file": "scripts/check-greenfield-comparison-citations.test.mjs",
++      "invariantPinned": "Every runner comparison claim a release or retro marks must cite a published comparison file by repo-relative path and matching sha256; unknown, private, missing, mismatching, unscreened or non-comparison citations are refused with a typed GFC code.",
++      "nonOverlapNote": "Unique suite for scripts/check-greenfield-comparison-citations.mjs; the cited files themselves are validated by greenfield-public-comparison-tests."
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/greenfield-public-comparison.mjs b/plugins/pipeline-core/lib/greenfield-public-comparison.mjs
+index 405e0e438..49f3fb882 100644
+--- a/plugins/pipeline-core/lib/greenfield-public-comparison.mjs
++++ b/plugins/pipeline-core/lib/greenfield-public-comparison.mjs
+@@ -43,8 +43,35 @@ function readBound(rootDir,path,expectedSha256){
+     return {root,full,bytes,stat:before};
+   }finally{closeSync(fd);}
+ }
++// Additive v1 fields (AC-190): a case may name its Pipeline version, the ordered phases it reached
++// and the typed refusal codes it hit. All three are optional; an input without them stays valid.
++const CASE_REQUIRED=['caseId','runner','pipeline','rulesetSha256','taskSha256','window','metrics','coverage','result','fidelity'];
++const CASE_OPTIONAL=['pipelineVersion','phasesReached','refusalCodes'];
++const VERSION=/^\d+\.\d+\.\d+(?:\+[A-Za-z0-9][A-Za-z0-9.-]{0,95})?$/u;
++const PHASE=/^[a-z][a-z0-9-]{0,31}$/u;
++const REFUSAL=/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
++const MAX_PHASES=16,MAX_REFUSAL_CODES=64;
++const known=(v,required,optional)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&required.every(k=>Object.hasOwn(v,k))&&Object.keys(v).every(k=>required.includes(k)||optional.includes(k));
++function validOptional(row){
++  if(Object.hasOwn(row,'pipelineVersion')){
++    const v=row.pipelineVersion;
++    if(!(v===null||(typeof v==='string'&&VERSION.test(v)))||(row.pipeline==='no-pipeline'&&v!==null))return false;
++  }
++  if(Object.hasOwn(row,'phasesReached')){
++    const p=row.phasesReached;
++    if(!Array.isArray(p)||p.length>MAX_PHASES||!p.every(x=>typeof x==='string'&&PHASE.test(x))||new Set(p).size!==p.length)return false;
++  }
++  if(Object.hasOwn(row,'refusalCodes')){
++    const r=row.refusalCodes;
++    if(!Array.isArray(r)||r.length>MAX_REFUSAL_CODES)return false;
++    if(!r.every(e=>exact(e,['code','count'])&&typeof e.code==='string'&&e.code.length<=64&&REFUSAL.test(e.code)&&Number.isSafeInteger(e.count)&&e.count>=1))return false;
++    // Strictly ascending by code unit: sorted and duplicate-free in one comparison.
++    for(let i=1;i<r.length;i++)if(!(r[i-1].code<r[i].code))return false;
++  }
++  return true;
++}
+ function validCase(row){
+-  if(!exact(row,['caseId','runner','pipeline','rulesetSha256','taskSha256','window','metrics','coverage','result','fidelity']))return false;
++  if(!known(row,CASE_REQUIRED,CASE_OPTIONAL)||!validOptional(row))return false;
+   if(!id(row.caseId)||!['claude','codex','antigravity'].includes(row.runner)||!['pipeline','no-pipeline'].includes(row.pipeline)||!SHA.test(row.taskSha256)||!(row.rulesetSha256===null||SHA.test(row.rulesetSha256)))return false;
+   if(row.pipeline==='no-pipeline'&&row.rulesetSha256!==null)return false;
+   const w=row.window;
+@@ -97,7 +124,8 @@ export function buildGreenfieldPublicComparison({inputHandle}={}){
+   try{
+     const before=readBound(context.source.root,context.inputPath,context.inputSha256);
+     if(!before.bytes.equals(context.source.bytes))throw Error('GPC-CAS');
+-    const cases=context.input.cases.slice().sort((a,b)=>a.caseId.localeCompare(b.caseId)).map(summarize),pairs=[];
++    // Code-unit order, not localeCompare: the published digest must not depend on the process locale.
++    const cases=context.input.cases.slice().sort((a,b)=>a.caseId<b.caseId?-1:a.caseId>b.caseId?1:0).map(summarize),pairs=[];
+     for(let i=0;i<cases.length;i++)for(let j=i+1;j<cases.length;j++){
+       const a=cases[i],b=cases[j],reasons=[];
+       for(const k of ['taskSha256'])if(a[k]!==b[k])reasons.push('different-task');
+diff --git a/plugins/pipeline-core/lib/greenfield-public-comparison.test.mjs b/plugins/pipeline-core/lib/greenfield-public-comparison.test.mjs
+new file mode 100644
+index 000000000..6a2f8419f
+--- /dev/null
++++ b/plugins/pipeline-core/lib/greenfield-public-comparison.test.mjs
+@@ -0,0 +1,587 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-190 (D209): runner comparisons rest on published, sanitized observation inputs.
++// Cases are written from the backlog item "Greenfield comparisons need reproducible public
++// evidence" (comparison cites public evidence only; each evidence file names the Pipeline
++// version, the runner and the measured values and carries no private identifier or machine
++// path), never from the implementation. Fixtures mirror the real input shape.
++import {test, describe} from 'node:test';
++import assert from 'node:assert/strict';
++import {createHash} from 'node:crypto';
++import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, realpathSync, existsSync, rmSync} from 'node:fs';
++import {tmpdir} from 'node:os';
++import {join, resolve} from 'node:path';
++import {
++  GREENFIELD_INPUT_SCHEMA,
++  GREENFIELD_COMPARISON_SCHEMA,
++  readGreenfieldPublicComparisonInput,
++  buildGreenfieldPublicComparison,
++  publishGreenfieldPublicComparison
++} from './greenfield-public-comparison.mjs';
++import {screenPublicTransferArtifact} from './bound-artifact-transfer.mjs';
++import {runGreenfieldPublicComparison} from '../scripts/greenfield-public-comparison.mjs';
++
++const sha = bytes => createHash('sha256').update(bytes).digest('hex');
++const canonical = v => v === null || typeof v !== 'object' ? JSON.stringify(v)
++  : Array.isArray(v) ? '[' + v.map(canonical).join(',') + ']'
++    : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
++const A = 'a'.repeat(64);
++
++function row(caseId, over = {}) {
++  return {
++    caseId, runner: 'claude', pipeline: 'pipeline', rulesetSha256: null, taskSha256: A,
++    window: {
++      start: '2026-10-25T10:00:00.000Z', end: '2026-10-25T11:00:00.000Z', firstCode: null, initialBuild: null,
++      turnStart: 1, turnEnd: 10, toolStart: 1, toolEnd: 20, phase: 'full', includesAnalysis: false, denominator: 'input-output'
++    },
++    metrics: {turns: 10, tools: 20, inputTokens: 100, outputTokens: 50, cacheReadTokens: null, cacheWriteTokens: null, activeMs: 1800000, waitMs: 600000},
++    coverage: {status: 'complete-reported', methodId: 'method-a'}, result: 'unknown',
++    fidelity: {rawSha256: null, derivativeSha256: null},
++    ...over
++  };
++}
++const input = (cases = [row('case-a'), row('case-b', {runner: 'codex'})], over = {}) =>
++  ({schema: GREENFIELD_INPUT_SCHEMA, comparisonId: 'fixture-comparison', cases, ...over});
++
++function fixtureRoot() {
++  const root = mkdtempSync(join(realpathSync(tmpdir()), 'gfpc-'));
++  mkdirSync(join(root, 'docs'));
++  mkdirSync(join(root, 'evidence', 'greenfield-public'), {recursive: true});
++  mkdirSync(join(root, 'scratch'));
++  return root;
++}
++function put(root, path, value) {
++  const bytes = Buffer.from(typeof value === 'string' ? value : canonical(value) + '\n');
++  writeFileSync(join(root, path), bytes);
++  return sha(bytes);
++}
++function readOf(root, value, path = 'docs/in.json') {
++  const digest = put(root, path, value);
++  return {digest, result: readGreenfieldPublicComparisonInput({rootDir: root, inputPath: path, inputSha256: digest})};
++}
++const heldCode = (root, value) => readOf(root, value).result;
++
++describe('schema validation (v1, no new fields)', () => {
++  test('a valid v1 input without refusalCodes, phasesReached or pipelineVersion reads, builds and publishes', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      assert.equal(result.status, 'read');
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      assert.equal(built.status, 'built');
++      const published = publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      assert.equal(published.status, 'published');
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      assert.equal(out.schema, GREENFIELD_COMPARISON_SCHEMA);
++      assert.equal(sha(readFileSync(join(root, 'evidence/greenfield-public/out.json'))), published.reportSha256);
++      assert.equal(out.conclusions, 'descriptive-only-no-ROI-or-security-or-regression-guarantee');
++      for (const pair of out.pairs) assert.equal(pair.causalInference, 'unsupported');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('structural violations are held with the typed schema code', () => {
++    const root = fixtureRoot();
++    try {
++      const cases = [
++        ['one case only', input([row('case-a')])],
++        ['unknown top-level key', {...input(), extra: 1}],
++        ['wrong schema id', input(undefined, {schema: 'pipeline.greenfield-public-observations.v0'})],
++        ['unknown runner', input([row('case-a'), row('case-b', {runner: 'gemini'})])],
++        ['unknown case key', input([row('case-a'), {...row('case-b'), note: 'x'}])],
++        ['no-pipeline run carrying a ruleset digest', input([row('case-a'), row('case-b', {pipeline: 'no-pipeline', rulesetSha256: A})])],
++        ['window end not after start', input([row('case-a'), row('case-b', {window: {...row('x').window, end: '2026-10-25T10:00:00.000Z'}})])],
++        ['activeMs plus waitMs above the wall interval', input([row('case-a'), row('case-b', {metrics: {...row('x').metrics, activeMs: 3000000, waitMs: 1000000}})])],
++        ['instant without milliseconds', input([row('case-a'), row('case-b', {window: {...row('x').window, start: '2026-10-25T10:00:00Z'}})])],
++        ['negative metric', input([row('case-a'), row('case-b', {metrics: {...row('x').metrics, tools: -1}})])],
++        ['half-open turn boundary', input([row('case-a'), row('case-b', {window: {...row('x').window, turnEnd: null}})])]
++      ];
++      for (const [label, value] of cases) {
++        const r = heldCode(root, value);
++        assert.equal(r.status, 'held', label);
++        assert.equal(r.code, 'GPC-SCHEMA', label);
++      }
++      assert.equal(heldCode(root, input([row('case-a'), row('case-a', {runner: 'codex'})])).code, 'GPC-DUPLICATE');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('bytes that are not the canonical serialization are held', () => {
++    const root = fixtureRoot();
++    try {
++      const pretty = JSON.stringify(input(), null, 2) + '\n';
++      assert.equal(readOf(root, pretty).result.code, 'GPC-CANONICAL');
++      assert.equal(readOf(root, canonical(input())).result.code, 'GPC-CANONICAL');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('additive fields: pipelineVersion, phasesReached, refusalCodes', () => {
++  const extra = {
++    pipelineVersion: '0.7.0+claude.20261025134513.977dad8',
++    phasesReached: ['onboarding', 'design', 'implementation'],
++    refusalCodes: [{code: 'CAC-REGISTRATION-INVALID', count: 1}, {code: 'GUARD-READ-TARGET', count: 6}]
++  };
++  const withExtra = over => input([row('case-a', {...extra, ...over}), row('case-b', {runner: 'codex'})]);
++
++  test('valid fields are accepted and carried into the published comparison unchanged', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, withExtra({}));
++      assert.equal(result.status, 'read');
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      assert.equal(built.status, 'built');
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      const a = out.cases.find(c => c.caseId === 'case-a');
++      assert.deepEqual(a.refusalCodes, extra.refusalCodes);
++      assert.deepEqual(a.phasesReached, extra.phasesReached);
++      assert.equal(a.pipelineVersion, extra.pipelineVersion);
++      const b = out.cases.find(c => c.caseId === 'case-b');
++      assert.equal(Object.hasOwn(b, 'refusalCodes'), false);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('empty lists are valid and mean "none reached / none refused"', () => {
++    const root = fixtureRoot();
++    try {
++      assert.equal(readOf(root, withExtra({phasesReached: [], refusalCodes: []})).result.status, 'read');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('malformed values are held as GPC-SCHEMA', () => {
++    const root = fixtureRoot();
++    try {
++      const bad = [
++        ['refusal codes not sorted', {refusalCodes: [{code: 'GUARD-READ-TARGET', count: 1}, {code: 'CAC-REGISTRATION-INVALID', count: 1}]}],
++        ['refusal code repeated', {refusalCodes: [{code: 'GUARD-READ-TARGET', count: 1}, {code: 'GUARD-READ-TARGET', count: 2}]}],
++        ['refusal code not typed (lowercase)', {refusalCodes: [{code: 'guard-read-target', count: 1}]}],
++        ['refusal code without a hyphen part', {refusalCodes: [{code: 'GUARD', count: 1}]}],
++        ['refusal count zero', {refusalCodes: [{code: 'GUARD-READ-TARGET', count: 0}]}],
++        ['refusal count fractional', {refusalCodes: [{code: 'GUARD-READ-TARGET', count: 1.5}]}],
++        ['refusal entry with extra key', {refusalCodes: [{code: 'GUARD-READ-TARGET', count: 1, path: 'x'}]}],
++        ['refusal codes not an array', {refusalCodes: {code: 'GUARD-READ-TARGET', count: 1}}],
++        ['phase repeated', {phasesReached: ['design', 'design']}],
++        ['phase id with uppercase', {phasesReached: ['Design']}],
++        ['phases not an array', {phasesReached: 'design'}],
++        ['version is free text', {pipelineVersion: 'latest'}],
++        ['version carries a path', {pipelineVersion: '0.7.0+a/b'}]
++      ];
++      for (const [label, over] of bad) {
++        const r = heldCode(root, withExtra(over));
++        assert.equal(r.status, 'held', label);
++        assert.equal(r.code, 'GPC-SCHEMA', label);
++      }
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('a no-pipeline run cannot name a Pipeline version', () => {
++    const root = fixtureRoot();
++    try {
++      const control = row('case-b', {runner: 'codex', pipeline: 'no-pipeline', pipelineVersion: '0.7.0'});
++      assert.equal(heldCode(root, input([row('case-a'), control])).code, 'GPC-SCHEMA');
++      const ok = row('case-b', {runner: 'codex', pipeline: 'no-pipeline', pipelineVersion: null});
++      assert.equal(heldCode(root, input([row('case-a'), ok])).status, 'read');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('private-identifier and absolute-path screen', () => {
++  test('machine paths, drive paths and credential-shaped text in the input are held before any parsing', () => {
++    const root = fixtureRoot();
++    try {
++      const probes = [
++        // Built at run time so this file itself never carries a literal machine path.
++        ['posix home path', ['', 'home', 'someone', 'project', 'notes.md'].join('/')],
++        ['macOS user path', ['', 'Users', 'someone', 'notes.md'].join('/')],
++        ['windows drive path', ['C:', 'Users', 'someone', 'notes.md'].join('\\')],
++        ['file url', 'file:' + '//' + '/srv/data/notes.md'],
++        ['credential assignment', 'password=hunter2'],
++        ['bare absolute path', ' /var/lib/data/x.json']
++      ];
++      for (const [label, text] of probes) {
++        const r = heldCode(root, {...input(), note: text});
++        assert.deepEqual([label, r.status, r.code], [label, 'held', 'GPC-PUBLIC-SCREEN']);
++      }
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('a clean fixture passes the same screen', () => {
++    assert.equal(screenPublicTransferArtifact(Buffer.from(canonical(input()) + '\n')).status, 'screened');
++  });
++});
++
++describe('public path scope and physical path safety', () => {
++  test('input and output paths outside docs/, evidence/ and public/ are held', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'scratch/in.json', input());
++      assert.equal(readGreenfieldPublicComparisonInput({rootDir: root, inputPath: 'scratch/in.json', inputSha256: digest}).code, 'GPC-PUBLIC-SCOPE');
++      const {result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      const out = publishGreenfieldPublicComparison({rootDir: root, outputPath: 'scratch/out.json', built});
++      assert.equal(out.code, 'GPC-PUBLIC-SCOPE');
++      assert.equal(existsSync(join(root, 'scratch/out.json')), false);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('traversal, absolute, backslash and dot segments are held as GPC-PATH', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'docs/in.json', input());
++      for (const p of ['docs/../scratch/in.json', '/docs/in.json', 'docs\\in.json', 'docs/./in.json', 'docs//in.json', '']) {
++        const r = readGreenfieldPublicComparisonInput({rootDir: root, inputPath: p, inputSha256: digest});
++        assert.deepEqual([p, r.status, r.code], [p, 'held', 'GPC-PATH']);
++      }
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('a symlinked input is held as GPC-PHYSICAL', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'docs/real.json', input());
++      symlinkSync(join(root, 'docs/real.json'), join(root, 'docs/link.json'));
++      const r = readGreenfieldPublicComparisonInput({rootDir: root, inputPath: 'docs/link.json', inputSha256: digest});
++      assert.deepEqual([r.status, r.code], ['held', 'GPC-PHYSICAL']);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('a root that is not its own real path is held as GPC-ROOT', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'docs/in.json', input());
++      symlinkSync(root, root + '-link');
++      const r = readGreenfieldPublicComparisonInput({rootDir: root + '-link', inputPath: 'docs/in.json', inputSha256: digest});
++      rmSync(root + '-link');
++      assert.deepEqual([r.status, r.code], ['held', 'GPC-ROOT']);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('input digest binding', () => {
++  test('a wrong or malformed digest holds the read', () => {
++    const root = fixtureRoot();
++    try {
++      put(root, 'docs/in.json', input());
++      for (const d of ['b'.repeat(64), 'xyz', '', undefined]) {
++        const r = readGreenfieldPublicComparisonInput({rootDir: root, inputPath: 'docs/in.json', inputSha256: d});
++        assert.deepEqual([String(d), r.status, r.code], [String(d), 'held', 'GPC-DIGEST']);
++      }
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('the comparison records the digest of the exact input bytes it was built from', () => {
++    const root = fixtureRoot();
++    try {
++      const {digest, result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      assert.equal(out.inputSha256, digest);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('an input changed after the read is held at build and never reaches the output', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      put(root, 'docs/in.json', input([row('case-a'), row('case-b', {runner: 'codex', result: 'failed-reported'})]));
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      assert.deepEqual([built.status, built.code], ['held', 'GPC-DIGEST']);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('build and publish accept only source-minted handles', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      assert.equal(buildGreenfieldPublicComparison({inputHandle: {...result.handle}}).code, 'GPC-HANDLE');
++      assert.equal(buildGreenfieldPublicComparison({}).code, 'GPC-HANDLE');
++      const forged = {status: 'built', reportSha256: A, byteLength: 10};
++      assert.equal(publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built: forged}).code, 'GPC-HANDLE');
++      assert.equal(existsSync(join(root, 'evidence/greenfield-public/out.json')), false);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('publish compare-and-swap', () => {
++  test('an input changed between build and publish is held and nothing is written', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      put(root, 'docs/in.json', input([row('case-a'), row('case-b', {runner: 'codex', result: 'stopped-reported'})]));
++      const out = publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      assert.deepEqual([out.status, out.code], ['held', 'GPC-DIGEST']);
++      assert.equal(existsSync(join(root, 'evidence/greenfield-public/out.json')), false);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('an existing output is preserved byte for byte (exclusive create)', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      writeFileSync(join(root, 'evidence/greenfield-public/out.json'), 'previous\n');
++      const out = publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      assert.deepEqual([out.status, out.code], ['held', 'GPC-PUBLICATION-UNAVAILABLE']);
++      assert.equal(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'), 'previous\n');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('the parent must already exist and the leaf must be a plain .json name', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      assert.equal(publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/new-dir/out.json', built}).status, 'held');
++      assert.equal(existsSync(join(root, 'evidence/new-dir')), false);
++      assert.equal(publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.txt', built}).code, 'GPC-PATH');
++      assert.equal(publishGreenfieldPublicComparison({rootDir: root, outputPath: 'out.json', built}).code, 'GPC-PATH');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('the published bytes hash to the digest the build reported', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input());
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      const out = publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const bytes = readFileSync(join(root, 'evidence/greenfield-public/out.json'));
++      assert.equal(sha(bytes), built.reportSha256);
++      assert.equal(out.byteLength, bytes.length);
++      assert.equal(bytes.toString('utf8'), canonical(JSON.parse(bytes.toString('utf8'))) + '\n');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('comparison semantics', () => {
++  test('different runners, windows or methods leave the pair unresolved with named reasons', () => {
++    const root = fixtureRoot();
++    try {
++      const b = row('case-b', {runner: 'codex', coverage: {status: 'partial-reported', methodId: 'method-b'}, window: {...row('x').window, end: '2026-10-25T11:30:00.000Z'}});
++      const {result} = readOf(root, input([row('case-a'), b]));
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      assert.equal(out.pairs.length, 1);
++      assert.equal(out.pairs[0].sameWindow, 'unresolved');
++      assert.ok(out.pairs[0].reasons.includes('different-window-end'));
++      assert.ok(out.pairs[0].reasons.includes('incomplete-coverage'));
++      assert.ok(out.pairs[0].reasons.includes('different-or-unknown-method'));
++      assert.equal(out.pairs[0].runnerDifference, true);
++      assert.equal(out.assurance.cost, 'unknown-no-billing-source');
++      assert.equal(out.assurance.originalCustody, 'unavailable');
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('identical declared windows, task and complete method are declared matching', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input([row('case-a'), row('case-b', {runner: 'codex'})]));
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      assert.equal(out.pairs[0].sameWindow, 'declared-matching');
++      assert.deepEqual(out.pairs[0].reasons, []);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('category shares are arithmetic on reported counters, unknown when a counter is missing', () => {
++    const root = fixtureRoot();
++    try {
++      const unknown = row('case-b', {runner: 'codex', metrics: {...row('x').metrics, inputTokens: null}});
++      const {result} = readOf(root, input([row('case-a'), unknown]));
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      const a = out.cases.find(c => c.caseId === 'case-a'), b = out.cases.find(c => c.caseId === 'case-b');
++      assert.equal(a.categoryShares.denominator, 150);
++      assert.equal(a.categoryShares.shares.inputTokens, 100 / 150);
++      assert.equal(b.categoryShares.status, 'unknown');
++      assert.equal(a.intervals.wallMs, 3600000);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++
++  test('case order is by code unit, independent of the process locale (reproducible digest)', () => {
++    const root = fixtureRoot();
++    try {
++      const {result} = readOf(root, input([row('a1'), row('B1', {runner: 'codex'}), row('a-2', {runner: 'antigravity'})]));
++      const built = buildGreenfieldPublicComparison({inputHandle: result.handle});
++      publishGreenfieldPublicComparison({rootDir: root, outputPath: 'evidence/greenfield-public/out.json', built});
++      const out = JSON.parse(readFileSync(join(root, 'evidence/greenfield-public/out.json'), 'utf8'));
++      assert.deepEqual(out.cases.map(c => c.caseId), ['B1', 'a-2', 'a1']);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('CLI', () => {
++  const run = (root, argv) => {
++    let out = '';
++    const code = runGreenfieldPublicComparison(argv, {stdout: {write: s => { out += s; }}, rootDir: root});
++    return {code, json: JSON.parse(out)};
++  };
++  test('the exact flag shape publishes and exits 0', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'docs/in.json', input());
++      const r = run(root, ['--input', 'docs/in.json', '--input-sha256', digest, '--output', 'evidence/greenfield-public/out.json']);
++      assert.equal(r.code, 0);
++      assert.equal(r.json.status, 'published');
++      assert.equal(sha(readFileSync(join(root, 'evidence/greenfield-public/out.json'))), r.json.reportSha256);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++  test('any other flag shape is held as GPC-ARGS and a bad digest as GPC-DIGEST, both exit 2', () => {
++    const root = fixtureRoot();
++    try {
++      const digest = put(root, 'docs/in.json', input());
++      assert.deepEqual(run(root, ['--input', 'docs/in.json']).json, {status: 'held', code: 'GPC-ARGS'});
++      assert.equal(run(root, ['--input-sha256', digest, '--input', 'docs/in.json', '--output', 'evidence/greenfield-public/out.json']).code, 2);
++      const bad = run(root, ['--input', 'docs/in.json', '--input-sha256', 'c'.repeat(64), '--output', 'evidence/greenfield-public/out.json']);
++      assert.deepEqual([bad.code, bad.json.code], [2, 'GPC-DIGEST']);
++      assert.equal(existsSync(join(root, 'evidence/greenfield-public/out.json')), false);
++    } finally { rmSync(root, {recursive: true, force: true}); }
++  });
++});
++
++describe('the first published set (greenfield second run)', () => {
++  const root = realpathSync(resolve(import.meta.dirname, '../../..'));
++  const dir = 'evidence/greenfield-public';
++  const files = {
++    claude: `${dir}/observations-claude-second-run.json`,
++    codex: `${dir}/observations-codex-second-run.json`,
++    antigravity: `${dir}/observations-antigravity-second-run.json`
++  };
++  const comparisonPath = `${dir}/comparison-second-run.json`;
++  const readmePath = `${dir}/README.md`;
++  const bytesOf = p => readFileSync(join(root, p));
++  const ledger = JSON.parse(bytesOf('specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/findings.json'));
++  const ledgerRow = key => ledger.reports.find(r => r.runner === key);
++  const ledgerKey = {claude: 'claude', codex: 'codex', antigravity: 'agy'};
++  const VERSIONS = {
++    claude: '0.7.0+claude.20261025134513.977dad8',
++    codex: '0.7.0+codex.20261025134513.977dad8',
++    antigravity: '0.7.0'
++  };
++  const CASE_IDS = ['antigravity-pipeline-second-run', 'claude-pipeline-second-run', 'codex-no-pipeline-control', 'codex-pipeline-second-run'];
++  const caseOf = (parsed, runner) => parsed.cases.find(c => c.pipeline === 'pipeline' && c.runner === runner);
++
++  test('the three observation files, the comparison and the README exist', () => {
++    for (const p of [...Object.values(files), comparisonPath, readmePath]) assert.ok(existsSync(join(root, p)), p);
++  });
++
++  for (const runner of ['claude', 'codex', 'antigravity']) {
++    test(`${runner}: validates against the schema, names version, runner and measured values`, () => {
++      const bytes = bytesOf(files[runner]);
++      const r = readGreenfieldPublicComparisonInput({rootDir: root, inputPath: files[runner], inputSha256: sha(bytes)});
++      assert.equal(r.status, 'read', JSON.stringify(r));
++      const parsed = JSON.parse(bytes.toString('utf8'));
++      assert.equal(parsed.schema, GREENFIELD_INPUT_SCHEMA);
++      const c = caseOf(parsed, runner);
++      assert.ok(c, 'the runner pipeline case');
++      assert.equal(c.pipelineVersion, VERSIONS[runner]);
++      assert.ok(Array.isArray(c.phasesReached) && c.phasesReached.length > 0);
++      assert.ok(Array.isArray(c.refusalCodes));
++      assert.ok(c.metrics.turns > 0 && c.metrics.tools > 0 && c.metrics.outputTokens > 0 && c.metrics.activeMs > 0);
++      const control = parsed.cases.find(x => x.pipeline === 'no-pipeline');
++      assert.ok(control && control.pipelineVersion === null && control.rulesetSha256 === null);
++    });
++
++    test(`${runner}: fidelity digests equal the ledger entries and the committed report bytes`, () => {
++      const c = caseOf(JSON.parse(bytesOf(files[runner])), runner);
++      const entry = ledgerRow(ledgerKey[runner]);
++      assert.equal(c.fidelity.rawSha256, entry.originalSha256);
++      assert.equal(c.fidelity.derivativeSha256, entry.sha256);
++      assert.equal(sha(bytesOf(entry.derivative)), entry.sha256);
++    });
++  }
++
++  test('the no-pipeline control is the same row in all three files and is bound to the ledger', () => {
++    const rows = Object.values(files).map(p => JSON.parse(bytesOf(p)).cases.find(c => c.pipeline === 'no-pipeline'));
++    assert.deepEqual(rows[1], rows[0]);
++    assert.deepEqual(rows[2], rows[0]);
++    const entry = ledgerRow('control');
++    assert.equal(rows[0].fidelity.rawSha256, entry.originalSha256);
++    assert.equal(rows[0].fidelity.derivativeSha256, entry.sha256);
++    assert.equal(sha(bytesOf(entry.derivative)), entry.sha256);
++  });
++
++  test('every task digest is the digest of the label printed in the README', () => {
++    const readme = bytesOf(readmePath).toString('utf8');
++    const label = /^Task identity label: `([^`]+)`$/mu.exec(readme)?.[1];
++    assert.ok(label, 'README prints the task identity label');
++    for (const p of Object.values(files)) for (const c of JSON.parse(bytesOf(p)).cases) assert.equal(c.taskSha256, sha(Buffer.from(label)));
++  });
++
++  // Consumer repository names come from the sanitized reports themselves (their first line ends in the
++  // analysed repository name), so this file never has to spell one.
++  const consumerNames = ledger.reports.map(r => {
++    const first = bytesOf(r.derivative).toString('utf8').split('\n', 1)[0];
++    return first.trim().split(/\s+/u).pop().replace(/[^A-Za-z0-9_]/gu, '');
++  });
++
++  test('the consumer names derived from the reports are real names (guards the derivation itself)', () => {
++    assert.equal(consumerNames.length, 4);
++    for (const name of consumerNames) assert.match(name, /^[A-Za-z0-9]+(?:_[A-Za-z0-9]+){2,}$/u);
++  });
++
++  test('published files hold no private identifier, person, account, machine or consumer name, and no absolute path', () => {
++    for (const p of [...Object.values(files), comparisonPath]) {
++      const bytes = bytesOf(p);
++      assert.equal(screenPublicTransferArtifact(bytes).status, 'screened', p);
++      // Closed vocabulary: every string value is a typed id, instant, digest, version, code or enumeration.
++      const allowed = [
++        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u, /^[a-f0-9]{64}$/u, /^0\.7\.0(?:\+(?:claude|codex)\.\d{14}\.[0-9a-f]{7})?$/u,
++        /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u, /^pipeline\.greenfield-public-(?:observations|comparison)\.v1$/u
++      ];
++      const known = new Set([
++        ...CASE_IDS, 'onboarding', 'design', 'vertical-slice', 'implementation', 'verify',
++        ...['start', 'end', 'turnStart', 'turnEnd', 'toolStart', 'toolEnd', 'phase', 'includesAnalysis', 'denominator'].map(k => 'different-window-' + k), 'claude', 'codex', 'antigravity', 'pipeline', 'no-pipeline', 'full', 'input-output', 'input-output-cache',
++        'complete-reported', 'partial-reported', 'unknown', 'succeeded-reported', 'failed-reported', 'stopped-reported',
++        'second-run-claude-main-transcript', 'second-run-codex-main-transcript', 'second-run-antigravity-main-transcript',
++        'second-run-codex-control-main-transcript', 'declared-matching', 'unresolved', 'arithmetic-from-reported-counters',
++        'reported-unverified', 'digest-claims-unverified-original-not-read', 'deterministic-public-projection-screen-only',
++        'unavailable', 'timestamp-and-counter-arithmetic-only', 'unknown-no-billing-source', 'unknown-no-controlled-product-proof',
++        'unsupported', 'descriptive-only-no-ROI-or-security-or-regression-guarantee',
++        'different-task', 'incomplete-coverage', 'different-or-unknown-method', 'unknown-boundaries'
++      ]);
++      const walk = (v, key) => {
++        if (typeof v === 'string') {
++          const ok = known.has(v) || allowed.some(re => re.test(v))
++            || (key === 'comparisonId' && /^greenfield-second-run-[a-z0-9-]+$/u.test(v));
++          assert.ok(ok, `${p}: unexpected string value under ${key}`);
++        } else if (Array.isArray(v)) v.forEach(x => walk(x, key));
++        else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, k);
++      };
++      walk(JSON.parse(bytes.toString('utf8')), '$');
++    }
++    for (const p of [...Object.values(files), comparisonPath, readmePath]) {
++      const text = bytesOf(p).toString('utf8');
++      assert.equal(screenPublicTransferArtifact(Buffer.from(text)).status, 'screened', p);
++      for (const name of consumerNames) assert.ok(!text.includes(name), `${p}: carries a consumer repository name`);
++      assert.doesNotMatch(text, /[A-Za-z0-9._+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/u, p);
++      assert.doesNotMatch(text, /\/home\/|\/Users\/|[A-Za-z]:\\|\\\\|file:\/\//u, p);
++      assert.doesNotMatch(text, /<runtime-id>|\.system_generated|brain\//u, p);
++    }
++  });
++
++  test('the committed comparison is exactly what the library rebuilds from its input (reproducible, digest-bound)', () => {
++    const inputBytes = bytesOf(files.codex);
++    const committed = bytesOf(comparisonPath);
++    const r = readGreenfieldPublicComparisonInput({rootDir: root, inputPath: files.codex, inputSha256: sha(inputBytes)});
++    assert.equal(r.status, 'read');
++    const built = buildGreenfieldPublicComparison({inputHandle: r.handle});
++    assert.equal(built.status, 'built');
++    assert.equal(built.reportSha256, sha(committed));
++    const parsed = JSON.parse(committed.toString('utf8'));
++    assert.equal(parsed.schema, GREENFIELD_COMPARISON_SCHEMA);
++    assert.equal(parsed.inputSha256, sha(inputBytes));
++    assert.deepEqual(parsed.cases.map(c => c.caseId), ['codex-no-pipeline-control', 'codex-pipeline-second-run']);
++    assert.equal(parsed.pairs[0].causalInference, 'unsupported');
++  });
++
++  test('the README names the Pipeline versions, states the limits and lists every published file', () => {
++    const readme = bytesOf(readmePath).toString('utf8');
++    for (const v of Object.values(VERSIONS)) assert.ok(readme.includes(v), v);
++    for (const p of [...Object.values(files), comparisonPath]) assert.ok(readme.includes(p.split('/').pop()), p);
++    assert.match(readme, /not a (?:full )?refusal census/iu);
++    assert.match(readme, /one input per comparison/iu);
++  });
++});
+diff --git a/scripts/check-greenfield-comparison-citations.mjs b/scripts/check-greenfield-comparison-citations.mjs
+new file mode 100644
+index 000000000..b3d4681ed
+--- /dev/null
++++ b/scripts/check-greenfield-comparison-citations.mjs
+@@ -0,0 +1,119 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: a release note or retro may claim that one runner's greenfield course differs from another's
++// only by citing a PUBLISHED comparison file by path and sha256 (AC-190 / D209; backlog item
++// "Greenfield comparisons need reproducible public evidence").
++//
++// Usage (from the repository root):
++//   node scripts/check-greenfield-comparison-citations.mjs <repo-relative-markdown-file>
++//
++// A runner comparison claim is MARKED with one HTML comment on the claim's line:
++//   <!-- runner-comparison path=evidence/greenfield-public/comparison-<name>.json sha256=<64 lowercase hex> -->
++// Every marked claim must cite a file that (1) is a repo-relative path inside evidence/greenfield-public/
++// named comparison-*.json, (2) exists as a plain file, (3) hashes to the cited digest, (4) passes the
++// public screen and (5) is a pipeline.greenfield-public-comparison.v1 document. Claims that are not
++// marked are not seen: marking is the author's declaration, this tool does not read prose.
++//
++// Output: one JSON line {status, claims, findings:[{code, line}]}. Findings never echo a cited path.
++// Exit: 0 every marked claim cites, 1 at least one finding, 2 usage error or unreadable markdown.
++// Codes: GFC-ARGS, GFC-MARKDOWN-UNAVAILABLE, GFC-NO-CITATION, GFC-MARKER-MALFORMED, GFC-PATH-INVALID,
++//        GFC-PATH-NOT-PUBLISHED, GFC-SHA-INVALID, GFC-NOT-FOUND, GFC-SHA-MISMATCH, GFC-NOT-SCREENED,
++//        GFC-NOT-A-COMPARISON.
++import {createHash} from 'node:crypto';
++import {lstatSync, readFileSync, realpathSync} from 'node:fs';
++import {join, resolve} from 'node:path';
++import {pathToFileURL} from 'node:url';
++import {GREENFIELD_COMPARISON_SCHEMA} from '../plugins/pipeline-core/lib/greenfield-public-comparison.mjs';
++import {screenPublicTransferArtifact} from '../plugins/pipeline-core/lib/bound-artifact-transfer.mjs';
++
++const MAX_MARKDOWN_BYTES = 262144;
++const MAX_COMPARISON_BYTES = 65536;
++const MARKER = /<!--[ \t]*runner-comparison(?=[ \t]|-->)([^>]*?)-->/gu;
++const SAFE_PATH = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
++const PUBLISHED = /^evidence\/greenfield-public\/comparison-[A-Za-z0-9][A-Za-z0-9._-]*\.json$/u;
++const SHA = /^[a-f0-9]{64}$/u;
++
++const held = (code, line = 0) => ({status: 'held', claims: 0, findings: [{code, line}]});
++
++function plainFile(root, path, maxBytes) {
++  let cursor = root;
++  const parts = path.split('/');
++  for (let i = 0; i < parts.length; i += 1) {
++    cursor = join(cursor, parts[i]);
++    const info = lstatSync(cursor);
++    if (info.isSymbolicLink()) return null;
++    if (i < parts.length - 1 ? !info.isDirectory() : (!info.isFile() || info.size > maxBytes)) return null;
++  }
++  return cursor;
++}
++
++function parseAttributes(text) {
++  const out = {};
++  for (const token of text.trim().split(/\s+/u).filter(Boolean)) {
++    const eq = token.indexOf('=');
++    const key = eq < 0 ? token : token.slice(0, eq);
++    if (eq < 0 || !['path', 'sha256'].includes(key) || Object.hasOwn(out, key)) return null;
++    out[key] = token.slice(eq + 1);
++  }
++  return out;
++}
++
++function judgeCitation(root, attributes) {
++  if (attributes === null) return 'GFC-MARKER-MALFORMED';
++  if (!attributes.path || !attributes.sha256) return 'GFC-NO-CITATION';
++  const {path, sha256} = attributes;
++  if (path.length > 240 || !SAFE_PATH.test(path)) return 'GFC-PATH-INVALID';
++  if (!PUBLISHED.test(path)) return 'GFC-PATH-NOT-PUBLISHED';
++  if (!SHA.test(sha256)) return 'GFC-SHA-INVALID';
++  let bytes;
++  try {
++    const file = plainFile(root, path, MAX_COMPARISON_BYTES);
++    if (file === null) return 'GFC-NOT-FOUND';
++    bytes = readFileSync(file);
++  } catch { return 'GFC-NOT-FOUND'; }
++  if (createHash('sha256').update(bytes).digest('hex') !== sha256) return 'GFC-SHA-MISMATCH';
++  if (screenPublicTransferArtifact(bytes).status !== 'screened') return 'GFC-NOT-SCREENED';
++  try {
++    if (JSON.parse(bytes.toString('utf8'))?.schema !== GREENFIELD_COMPARISON_SCHEMA) return 'GFC-NOT-A-COMPARISON';
++  } catch { return 'GFC-NOT-A-COMPARISON'; }
++  return null;
++}
++
++export function checkGreenfieldComparisonCitations({rootDir, markdownPath} = {}) {
++  let root;
++  try { root = realpathSync(resolve(rootDir)); } catch { return held('GFC-MARKDOWN-UNAVAILABLE'); }
++  if (typeof markdownPath !== 'string' || markdownPath.length > 240 || !SAFE_PATH.test(markdownPath) || !markdownPath.endsWith('.md')) {
++    return held('GFC-MARKDOWN-UNAVAILABLE');
++  }
++  let text;
++  try {
++    const file = plainFile(root, markdownPath, MAX_MARKDOWN_BYTES);
++    if (file === null) return held('GFC-MARKDOWN-UNAVAILABLE');
++    text = readFileSync(file, 'utf8');
++  } catch { return held('GFC-MARKDOWN-UNAVAILABLE'); }
++  const findings = [];
++  let claims = 0;
++  text.split('\n').forEach((lineText, index) => {
++    for (const match of lineText.matchAll(MARKER)) {
++      claims += 1;
++      const code = judgeCitation(root, parseAttributes(match[1]));
++      if (code !== null) findings.push({code, line: index + 1});
++    }
++  });
++  return {status: findings.length === 0 ? 'ok' : 'held', claims, findings};
++}
++
++export function runCitationCheck(argv, {stdout = process.stdout, rootDir = process.cwd()} = {}) {
++  if (argv.length !== 1 || typeof argv[0] !== 'string') {
++    stdout.write(JSON.stringify(held('GFC-ARGS')) + '\n');
++    return 2;
++  }
++  const result = checkGreenfieldComparisonCitations({rootDir, markdownPath: argv[0]});
++  stdout.write(JSON.stringify(result) + '\n');
++  if (result.findings.some(f => f.code === 'GFC-MARKDOWN-UNAVAILABLE')) return 2;
++  return result.status === 'ok' ? 0 : 1;
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
++  process.exitCode = runCitationCheck(process.argv.slice(2));
++}
+diff --git a/scripts/check-greenfield-comparison-citations.test.mjs b/scripts/check-greenfield-comparison-citations.test.mjs
+new file mode 100644
+index 000000000..8bfa34f65
+--- /dev/null
++++ b/scripts/check-greenfield-comparison-citations.test.mjs
+@@ -0,0 +1,179 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-190 (D209): a release or retro may claim one runner's greenfield course differs from another's
++// only by citing a published comparison file by path and sha256. Cases come from the backlog item
++// "Greenfield comparisons need reproducible public evidence" (a comparison cites public evidence
++// files only), not from the checker's code.
++import {test, describe} from 'node:test';
++import assert from 'node:assert/strict';
++import {createHash} from 'node:crypto';
++import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, realpathSync, rmSync} from 'node:fs';
++import {tmpdir} from 'node:os';
++import {join, resolve} from 'node:path';
++import {checkGreenfieldComparisonCitations, runCitationCheck} from './check-greenfield-comparison-citations.mjs';
++
++const sha = bytes => createHash('sha256').update(bytes).digest('hex');
++const PUBLIC = 'evidence/greenfield-public';
++const COMPARISON = `${PUBLIC}/comparison-fixture.json`;
++const comparisonBytes = Buffer.from(JSON.stringify({schema: 'pipeline.greenfield-public-comparison.v1', comparisonId: 'fixture', cases: [], pairs: []}) + '\n');
++const marker = (path, digest) => `<!-- runner-comparison path=${path} sha256=${digest} -->`;
++
++function fixtureRoot() {
++  const root = mkdtempSync(join(realpathSync(tmpdir()), 'gfcc-'));
++  mkdirSync(join(root, PUBLIC), {recursive: true});
++  mkdirSync(join(root, 'docs'));
++  mkdirSync(join(root, 'scratch'));
++  writeFileSync(join(root, COMPARISON), comparisonBytes);
++  writeFileSync(join(root, `${PUBLIC}/observations-fixture.json`), '{"schema":"pipeline.greenfield-public-observations.v1"}\n');
++  writeFileSync(join(root, 'scratch/private.json'), comparisonBytes);
++  return root;
++}
++const doc = (root, lines, name = 'docs/retro.md') => { writeFileSync(join(root, name), lines.join('\n') + '\n'); return name; };
++const codes = result => result.findings.map(f => f.code);
++const withRoot = fn => { const root = fixtureRoot(); try { return fn(root); } finally { rmSync(root, {recursive: true, force: true}); } };
++
++describe('claim markers and citations', () => {
++  test('a marked claim citing a published comparison by path and sha256 passes', () => withRoot(root => {
++    const md = doc(root, ['# Retro', 'Codex was slower with the Pipeline in this run. ' + marker(COMPARISON, sha(comparisonBytes))]);
++    const r = checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md});
++    assert.deepEqual([r.status, r.claims, r.findings], ['ok', 1, []]);
++  }));
++
++  test('a document without any marked claim passes with zero claims', () => withRoot(root => {
++    const md = doc(root, ['# Retro', 'No runner comparison is made here.']);
++    const r = checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md});
++    assert.deepEqual([r.status, r.claims], ['ok', 0]);
++  }));
++
++  test('several claims are checked independently and each finding names its line', () => withRoot(root => {
++    const md = doc(root, [
++      'good ' + marker(COMPARISON, sha(comparisonBytes)),
++      'text',
++      'bad digest ' + marker(COMPARISON, 'd'.repeat(64)),
++      'bare <!-- runner-comparison -->'
++    ]);
++    const r = checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md});
++    assert.equal(r.status, 'held');
++    assert.equal(r.claims, 3);
++    assert.deepEqual(r.findings.map(f => [f.line, f.code]), [[3, 'GFC-SHA-MISMATCH'], [4, 'GFC-NO-CITATION']]);
++  }));
++
++  test('a marker with only a path or only a digest is a missing citation', () => withRoot(root => {
++    const md = doc(root, [
++      `a <!-- runner-comparison path=${COMPARISON} -->`,
++      `b <!-- runner-comparison sha256=${sha(comparisonBytes)} -->`
++    ]);
++    assert.deepEqual(codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md})), ['GFC-NO-CITATION', 'GFC-NO-CITATION']);
++  }));
++});
++
++describe('unknown and private paths are refused with a typed code', () => {
++  test('paths outside the published folder or not named comparison-*.json are not published', () => withRoot(root => {
++    for (const p of ['scratch/private.json', 'docs/comparison-x.json', `${PUBLIC}/observations-fixture.json`, 'specs/x/comparison-x.json', `${PUBLIC}/sub/comparison-x.json`]) {
++      const md = doc(root, ['claim ' + marker(p, sha(comparisonBytes))]);
++      assert.deepEqual([p, ...codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md}))], [p, 'GFC-PATH-NOT-PUBLISHED']);
++    }
++  }));
++
++  test('absolute, drive, url, backslash and traversal paths are invalid paths', () => withRoot(root => {
++    const bad = [
++      ['', 'tmp', 'x', 'comparison-x.json'].join('/'),
++      ['C:', 'x', 'comparison-x.json'].join('\\'),
++      'file:' + '//host/x/comparison-x.json',
++      `${PUBLIC}\\comparison-fixture.json`,
++      `${PUBLIC}/../../scratch/private.json`,
++      `./${COMPARISON}`
++    ];
++    for (const p of bad) {
++      const md = doc(root, ['claim ' + marker(p, sha(comparisonBytes))]);
++      assert.deepEqual([p, ...codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md}))], [p, 'GFC-PATH-INVALID']);
++    }
++  }));
++
++  test('a missing file, a symlink and a directory are not found', () => withRoot(root => {
++    symlinkSync(join(root, COMPARISON), join(root, `${PUBLIC}/comparison-link.json`));
++    mkdirSync(join(root, `${PUBLIC}/comparison-dir.json`));
++    for (const p of [`${PUBLIC}/comparison-missing.json`, `${PUBLIC}/comparison-link.json`, `${PUBLIC}/comparison-dir.json`]) {
++      const md = doc(root, ['claim ' + marker(p, sha(comparisonBytes))]);
++      assert.deepEqual([p, ...codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md}))], [p, 'GFC-NOT-FOUND']);
++    }
++  }));
++
++  test('a malformed digest and a digest of other bytes are different typed findings', () => withRoot(root => {
++    const md = doc(root, [
++      'short ' + marker(COMPARISON, 'abc'),
++      'upper ' + marker(COMPARISON, sha(comparisonBytes).toUpperCase()),
++      'other ' + marker(COMPARISON, sha(Buffer.from('other')))
++    ]);
++    assert.deepEqual(codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md})), ['GFC-SHA-INVALID', 'GFC-SHA-INVALID', 'GFC-SHA-MISMATCH']);
++  }));
++
++  test('a file with the right name and digest that is not a comparison document is refused', () => withRoot(root => {
++    const fake = Buffer.from('{"schema":"pipeline.greenfield-public-observations.v1"}\n');
++    writeFileSync(join(root, `${PUBLIC}/comparison-fake.json`), fake);
++    writeFileSync(join(root, `${PUBLIC}/comparison-text.json`), 'not json\n');
++    const md = doc(root, [
++      'a ' + marker(`${PUBLIC}/comparison-fake.json`, sha(fake)),
++      'b ' + marker(`${PUBLIC}/comparison-text.json`, sha(Buffer.from('not json\n')))
++    ]);
++    assert.deepEqual(codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md})), ['GFC-NOT-A-COMPARISON', 'GFC-NOT-A-COMPARISON']);
++  }));
++});
++
++describe('malformed markers and unscreened files', () => {
++  test('an unknown or repeated attribute makes the marker malformed', () => withRoot(root => {
++    const d = sha(comparisonBytes);
++    const md = doc(root, [
++      `a <!-- runner-comparison path=${COMPARISON} sha256=${d} note=x -->`,
++      `b <!-- runner-comparison path=${COMPARISON} path=${COMPARISON} sha256=${d} -->`,
++      `c <!-- runner-comparison ${COMPARISON} -->`
++    ]);
++    assert.deepEqual(codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md})), ['GFC-MARKER-MALFORMED', 'GFC-MARKER-MALFORMED', 'GFC-MARKER-MALFORMED']);
++  }));
++
++  test('a comparison file that carries a machine path fails the public screen even with the right digest', () => withRoot(root => {
++    const dirty = Buffer.from(JSON.stringify({schema: 'pipeline.greenfield-public-comparison.v1', note: ['', 'home', 'someone', 'x'].join('/')}) + '\n');
++    writeFileSync(join(root, `${PUBLIC}/comparison-dirty.json`), dirty);
++    const md = doc(root, ['claim ' + marker(`${PUBLIC}/comparison-dirty.json`, sha(dirty))]);
++    assert.deepEqual(codes(checkGreenfieldComparisonCitations({rootDir: root, markdownPath: md})), ['GFC-NOT-SCREENED']);
++  }));
++});
++
++describe('the markdown input itself', () => {
++  test('a missing, escaping or non-markdown file is unavailable', () => withRoot(root => {
++    for (const p of ['docs/missing.md', '../outside.md', 'docs/retro.txt', ['', 'tmp', 'x.md'].join('/')]) {
++      const r = checkGreenfieldComparisonCitations({rootDir: root, markdownPath: p});
++      assert.deepEqual([p, r.status, ...codes(r)], [p, 'held', 'GFC-MARKDOWN-UNAVAILABLE']);
++    }
++  }));
++});
++
++describe('command line', () => {
++  const run = (root, argv) => {
++    let out = '';
++    const code = runCitationCheck(argv, {stdout: {write: s => { out += s; }}, rootDir: root});
++    return {code, json: JSON.parse(out)};
++  };
++  test('exit 0 when every claim cites, 1 on findings, 2 on usage errors', () => withRoot(root => {
++    const good = doc(root, ['x ' + marker(COMPARISON, sha(comparisonBytes))], 'docs/good.md');
++    const bad = doc(root, ['x ' + marker(COMPARISON, 'e'.repeat(64))], 'docs/bad.md');
++    assert.equal(run(root, [good]).code, 0);
++    const r = run(root, [bad]);
++    assert.equal(r.code, 1);
++    assert.equal(r.json.findings[0].code, 'GFC-SHA-MISMATCH');
++    assert.deepEqual(run(root, []).json, {status: 'held', findings: [{code: 'GFC-ARGS', line: 0}], claims: 0});
++    assert.equal(run(root, []).code, 2);
++    assert.equal(run(root, [good, bad]).code, 2);
++    assert.equal(run(root, ['docs/missing.md']).code, 2);
++  }));
++});
++
++describe('the repository own published set', () => {
++  const root = realpathSync(resolve(import.meta.dirname, '..'));
++  test('the evidence README states its comparison claim with a citation that checks out', () => {
++    const r = checkGreenfieldComparisonCitations({rootDir: root, markdownPath: `${PUBLIC}/README.md`});
++    assert.deepEqual([r.status, r.findings], ['ok', []]);
++    assert.ok(r.claims >= 1);
++    const cited = /path=(\S+) sha256=([a-f0-9]{64})/u.exec(readFileSync(join(root, `${PUBLIC}/README.md`), 'utf8'));
++    assert.equal(sha(readFileSync(join(root, cited[1]))), cited[2]);
++  });
++});
