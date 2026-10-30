@@ -1781,3 +1781,120 @@ test("D196 R1 default reader: an unsettled pending state of a ready queue slice 
     assert.deepEqual(defaultStartedOwners(dir, []), [], "no live queue row: no owner, whatever the pending states say");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// --- `probe`: every dispatch-time check in dry-run, all failures at once (backlog: first dispatch in a consumer repository) ---
+
+const probeDepsOf = (fx, over = {}) => depsOf(fx, {
+  observePlanApproval: () => ({ status: "eligible" }),
+  registryLock: () => ({ status: "absent" }),
+  startedOwners: () => [],
+  // the probe must never take the registry lock: any use of this acquirer fails the case
+  acquireRegistryLock: () => { throw new Error("the probe must not take the registry lock"); },
+  ...over,
+});
+const probeArgvOf = (fx) => ["probe", "--root", fx.root, "--package", "scratch/pkg.json"];
+const QUEUE_ROW = { id: "ALF-T1", state: "ready", delivery: { itemId: "pipeline.sample-slug" }, writeScope: [CHECK, PATH_A] };
+
+const PROBE_TABLE = [
+  { name: "a package field problem", pkg: { goal: undefined }, check: "package-fields", code: "DBG-PACKAGE-FIELD-MISSING", repair: /repair: /u },
+  { name: "a named path that does not exist", pkg: { paths: [PATH_A, "plugins/x/new.mjs"] }, check: "package-paths", code: "DBG-PACKAGE-PATH-MISSING", repair: /newFiles/u },
+  { name: "the D193 estimate above the tier cap without a grant route", pkg: { estimatedToolCalls: 200 }, check: "tool-budget", code: "DBG-PACKAGE-BUDGET-EXCEEDED", repair: /budgetRationale/u },
+  { name: "a governed queue row that is not ready", deps: { queueRow: () => ({ ...QUEUE_ROW, state: "cancelled" }) }, check: "binding", code: "DBG-QUEUE-ROW-NOT-READY", repair: /new --dispatch-id/u },
+  { name: "a queue row with another write scope", deps: { queueRow: () => ({ ...QUEUE_ROW, writeScope: [CHECK, PATH_A, "plugins/x/wider.mjs"] }) }, check: "binding", code: "DBG-QUEUE-ROW-DRIFT", repair: /Rebind with exactly that scope/u },
+  { name: "a wrong-premise item without a recon note", deps: { queueRows: () => [{ id: "OLD-1", state: "cancelled", cancelClass: "wrong-premise", delivery: { itemId: "pipeline.sample-slug" } }], integratedSliceIds: () => [] }, check: "binding", code: "DBG-RECON-REQUIRED", repair: /recon note/u },
+  { name: "a write scope that overlaps a running dispatch", deps: { runningDispatches: () => [{ dispatchId: "OTHER-1", writeScope: [PATH_A], record: "dispatch-record-OTHER-1.json", verdict: "alive" }] }, check: "binding", code: "DBG-SCOPE-OVERLAP", repair: /disjoint/u },
+  { name: "a stale plan approval", deps: { observePlanApproval: () => ({ status: "unavailable", code: "CVCT-FILE" }) }, check: "plan-approval", code: "CVCT-FILE", repair: /chmod 600/u },
+  { name: "a registry lock held by a dead owner", deps: { registryLock: () => ({ status: "held", owner: "dead", pid: 4242, ageSeconds: 9 }) }, check: "registry-lock", code: "DBG-PROBE-REGISTRY-LOCK-HELD", repair: /routine-repair\.mjs run heal --root .+ --reason "/u, message: /pid 4242/u },
+];
+
+for (const entry of PROBE_TABLE) {
+  test(`probe: ${entry.name} fails alone and is reported with its repair`, async () => {
+    const { runDispatchBriefing } = await lib();
+    const { fx } = packageFixture(entry.pkg ?? {});
+    const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, entry.deps ?? {}));
+    assert.equal(result.schema, "pipeline.dispatch-readiness-probe.v1", JSON.stringify(result));
+    assert.equal(result.ready, false);
+    assert.equal(result.findings.length, 1, JSON.stringify(result.findings));
+    const [finding] = result.findings;
+    assert.equal(finding.code, entry.code);
+    assert.equal(finding.check, entry.check);
+    assert.match(finding.repair, entry.repair);
+    if (entry.message) assert.match(finding.message, entry.message);
+    assert.equal(Object.hasOwn(result, "dispatchCall"), false, "no dispatch call while a check fails");
+  });
+}
+
+test("probe: a lock held by a live owner is a finding that names the wait route, not the heal", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture();
+  const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, { registryLock: () => ({ status: "held", owner: "live", pid: 77, ageSeconds: 2 }) }));
+  assert.equal(result.ready, false);
+  assert.equal(result.findings[0].check, "registry-lock");
+  assert.match(result.findings[0].message, /pid 77/u);
+  assert.doesNotMatch(result.findings[0].repair, /run heal/u);
+  assert.match(result.findings[0].repair, /session-authority-repair\.mjs wait/u);
+});
+
+test("probe: a lock that cannot be observed is reported as skipped, never as passed", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture();
+  const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, { registryLock: () => null }));
+  assert.equal(result.ready, false);
+  assert.equal(result.findings.length, 1);
+  assert.equal(result.findings[0].kind, "skipped");
+  assert.equal(result.findings[0].check, "registry-lock");
+});
+
+test("probe: three failing checks together are all reported in one answer", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture({ estimatedToolCalls: 200 });
+  const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, {
+    queueRow: () => ({ ...QUEUE_ROW, state: "cancelled" }),
+    observePlanApproval: () => ({ status: "unavailable", code: "CVCT-AUTHORITY-STALE" }),
+    registryLock: () => ({ status: "held", owner: "dead", pid: 9, ageSeconds: 99 }),
+  }));
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.findings.map((finding) => finding.check).sort(), ["binding", "plan-approval", "registry-lock", "tool-budget"]);
+  for (const finding of result.findings) {
+    assert.equal(typeof finding.code, "string");
+    assert.equal(typeof finding.message, "string");
+    assert.ok(finding.repair.length > 0, finding.check);
+  }
+  assert.match(result.findings.find((finding) => finding.check === "plan-approval").repair, /rebind-approval/u);
+});
+
+test("probe: a ready package prints the dispatch call and keeps warnings apart from findings", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture();
+  const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  assert.equal(result.schema, "pipeline.dispatch-readiness-probe.v1");
+  assert.equal(result.ready, true, JSON.stringify(result.findings));
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.dispatchCall.tool, "Agent");
+  assert.equal(result.dispatchCall.subagent_type, "pipeline-core:goldfish-implementor");
+  assert.equal(result.dispatchCall.model, "sonnet");
+  assert.ok(Array.isArray(result.warnings));
+  assert.ok(result.warnings.some((warning) => warning.code === "DBG-PACKAGE-ESTIMATE-LOW"), "a warning stays a warning and does not flip ready");
+});
+
+test("probe: writes no file and never takes the registry lock", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture();
+  const before = directorySnapshot(fx.root);
+  const result = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  assert.equal(result.ready, true, JSON.stringify(result.findings));
+  assert.deepEqual(directorySnapshot(fx.root), before);
+  const failing = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, { observePlanApproval: () => ({ status: "unavailable", code: "CVCT-FILE" }), registryLock: () => ({ status: "held", owner: "dead", pid: 1, ageSeconds: 1 }) }));
+  assert.equal(failing.ready, false);
+  assert.deepEqual(directorySnapshot(fx.root), before);
+});
+
+test("probe: refuses a missing --package and names probe in the usage text", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx } = packageFixture();
+  const refused = runDispatchBriefing(["probe", "--root", fx.root], probeDepsOf(fx));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-FLAG-MISSING");
+  const help = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
+  assert.match(help.stdout, /dispatch-briefing\.mjs probe --package/u);
+});

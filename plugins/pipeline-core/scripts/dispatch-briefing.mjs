@@ -56,6 +56,10 @@ const USAGE = `Usage:
   node <plugin-root>/scripts/dispatch-briefing.mjs --help | -h
   node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]...
   node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
+  node <plugin-root>/scripts/dispatch-briefing.mjs probe --package <package.json> [--root <directory>]
+
+probe runs every dispatch-time check of that package in dry-run (package fields, binding refusals, plan approval, registry lock),
+  writes no file, takes no lock, reserves no slice, and prints ALL failures at once as JSON, each with its repair; exit 0 when ready, 2 otherwise.
 
 binding prints a native dispatch binding and briefing skeleton as JSON; it writes no file.
   Required: --dispatch-id, --item, --agent-type, --model-id, --check.
@@ -119,7 +123,8 @@ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/publi
 const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
 const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
 const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
-const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue, staleApprovalRepair } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+const { observeCurrentPlanApprovalForCalibration } = cliHelp ? {} : await import("./pipeline-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
 const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
@@ -226,7 +231,7 @@ function preflightInputFor(runner, root) {
 /** Strict flag parse: unknown, repeated and valueless flags are refusals, never ignored. */
 export function parseBindingArgv(argv) {
   if (!Array.isArray(argv) || argv[0] !== "binding") {
-    refuse("DBG-SUBCOMMAND", `the subcommands are "binding" and "build"; got ${JSON.stringify(argv?.[0] ?? null)}`);
+    refuse("DBG-SUBCOMMAND", `the subcommands are "binding", "build" and "probe"; got ${JSON.stringify(argv?.[0] ?? null)}`);
   }
   const values = { paths: [] };
   for (let index = 1; index < argv.length; index++) {
@@ -620,6 +625,9 @@ export function generateDispatchBinding(options, deps = {}) {
   const snapshotPluginRoot = deps.snapshotPluginRoot ?? snapshotPhysicalPluginRoot;
   const agentsDir = deps.agentsDir ?? DEFAULT_AGENTS_DIR;
   const warnings = [];
+  // The readiness probe passes a collector: a refusal whose following steps need no value it would have produced is then recorded
+  // and the generator goes on. Without a collector (every other caller) this IS refuse, so the refusals are unchanged.
+  const soft = deps.softRefusals ? (code, message) => { deps.softRefusals.push({ code, message }); } : refuse;
 
   const { dispatchId, item, agentType, modelId, check } = options;
   const runner = options.runner ?? "claude";
@@ -637,7 +645,7 @@ export function generateDispatchBinding(options, deps = {}) {
   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
     refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
   }
-  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
+  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
   if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
   const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...options.paths])].sort();
 
@@ -655,9 +663,9 @@ export function generateDispatchBinding(options, deps = {}) {
       registered = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].map((entry) => entry.id);
     } catch (error) { why = ` (${String(error?.message ?? error).slice(0, 160)})`; }
     if (registered === null || !registered.includes(commandId)) {
-      refuse("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
+      soft("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
     }
-    if (allowedPaths.includes(commandCheckPath)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
+    if (allowedPaths.includes(commandCheckPath)) soft("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
   }
 
   // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
@@ -724,12 +732,12 @@ export function generateDispatchBinding(options, deps = {}) {
   // the drift later under another name, so the binding refuses now and names the row's exact scope.
   const row = (deps.queueRow ?? defaultQueueRow)(root, dispatchId);
   if (row && row.delivery?.status !== "unbound-legacy") {
-    if (row.state !== "ready") refuse("DBG-QUEUE-ROW-NOT-READY", `slice ${dispatchId} is ${row.state} in the governed queue and cannot be rebound; choose a new --dispatch-id`);
-    if (row.delivery?.itemId !== itemId) refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} belongs to item ${row.delivery?.itemId} in the governed queue, not ${itemId}; choose a new --dispatch-id`);
+    if (row.state !== "ready") soft("DBG-QUEUE-ROW-NOT-READY", `slice ${dispatchId} is ${row.state} in the governed queue and cannot be rebound; choose a new --dispatch-id`);
+    if (row.delivery?.itemId !== itemId) soft("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} belongs to item ${row.delivery?.itemId} in the governed queue, not ${itemId}; choose a new --dispatch-id`);
     const scope = [...(row.writeScope ?? [])].sort();
     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
-      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${commandId !== null || checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} (or --check command:<registered id> for a repository without a unit-test runner) and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
+      soft("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${commandId !== null || checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} (or --check command:<registered id> for a repository without a unit-test runner) and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
     }
   }
 
@@ -746,7 +754,7 @@ export function generateDispatchBinding(options, deps = {}) {
     const readNote = options.reconNote === undefined ? null : readRepoFile(root, options.reconNote);
     if (readNote === null || readNote.toString("utf8").trim() === "") {
       const fault = options.reconNote === undefined ? "none was given" : `${options.reconNote} is not a non-empty regular file under --root`;
-      refuse("DBG-RECON-REQUIRED", `slice ${dispatchId} re-dispatches item ${itemId}, whose earlier attempt ${wrongPremise.join(", ")} the governed queue cancelled as wrong-premise (${CANCEL_CLASS_HELP["wrong-premise"]}); a new briefing built on the same premise repeats that stop, so it must carry a recon note and ${fault}. repair: write a recon note (what the earlier attempt assumed, what the code or Spec actually shows, the corrected premise) under ${RECON_NOTE_PREFIXES.join(" or ")}, add it to the briefing package as "reconNote": "<repository-relative path>" (for the binding command: --recon-note <path>), and regenerate the briefing. This duty ends once a slice of item ${itemId} has been delivered (integrated into the candidate): after that no recon note is needed for this item`);
+      soft("DBG-RECON-REQUIRED", `slice ${dispatchId} re-dispatches item ${itemId}, whose earlier attempt ${wrongPremise.join(", ")} the governed queue cancelled as wrong-premise (${CANCEL_CLASS_HELP["wrong-premise"]}); a new briefing built on the same premise repeats that stop, so it must carry a recon note and ${fault}. repair: write a recon note (what the earlier attempt assumed, what the code or Spec actually shows, the corrected premise) under ${RECON_NOTE_PREFIXES.join(" or ")}, add it to the briefing package as "reconNote": "<repository-relative path>" (for the binding command: --recon-note <path>), and regenerate the briefing. This duty ends once a slice of item ${itemId} has been delivered (integrated into the candidate): after that no recon note is needed for this item`);
     }
   }
 
@@ -767,7 +775,7 @@ export function generateDispatchBinding(options, deps = {}) {
     const pairs = [];
     for (const path of allowedPaths) for (const theirs of entry.writeScope) if (scopesOverlap([path], [theirs])) pairs.push(path === theirs ? path : `${path} (against ${theirs})`);
     if (pairs.length === 0) continue;
-    refuse("DBG-SCOPE-OVERLAP", `the write scope of ${dispatchId} overlaps the write scope of running dispatch ${entry.dispatchId} (${entry.record ?? "open dispatch record"}, owner ${entry.verdict ?? "unknown"}) on ${pairs.join(", ")}; two dispatches writing the same paths in one checkout overwrite each other. repair, one of: bind this dispatch with a write scope disjoint from ${entry.dispatchId} (drop or narrow the overlapping --path); wait until ${entry.dispatchId} has a terminal dispatch record and bind again; if ${entry.dispatchId} is abandoned, finalize its record with a terminal outcome through the sanctioned dispatch-record writer; or run this dispatch in its own worktree`);
+    soft("DBG-SCOPE-OVERLAP", `the write scope of ${dispatchId} overlaps the write scope of running dispatch ${entry.dispatchId} (${entry.record ?? "open dispatch record"}, owner ${entry.verdict ?? "unknown"}) on ${pairs.join(", ")}; two dispatches writing the same paths in one checkout overwrite each other. repair, one of: bind this dispatch with a write scope disjoint from ${entry.dispatchId} (drop or narrow the overlapping --path); wait until ${entry.dispatchId} has a terminal dispatch record and bind again; if ${entry.dispatchId} is abandoned, finalize its record with a terminal outcome through the sanctioned dispatch-record writer; or run this dispatch in its own worktree`);
   }
   if (unreadable.length > 0) {
     warnings.push({ code: "DBG-RUNNING-SCOPE-UNKNOWN", message: `the write scope of running dispatch(es) ${unreadable.map((entry) => entry.dispatchId).join(", ")} could not be read (no governed queue row and no generated briefing under scratch/), so this binding was not checked against them; confirm the scopes are disjoint before dispatching` });
@@ -1038,6 +1046,31 @@ export function parseBuildArgv(argv) {
   return values;
 }
 
+/** The binding options one closed package yields for an agent type (shared by build and probe). */
+function packageBindingOptions(root, pkg, agentType) {
+  return {
+    root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
+    // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
+    check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
+  };
+}
+
+/** The tool-layer parameters of the Claude Agent call (tool, subagent_type, model family), or null for a Codex dispatch or an unbound tier. */
+function dispatchCallBase(pkg, boundTier) {
+  const family = ["opus", "sonnet", "haiku", "fable"].find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
+  return pkg.runner === "codex" || typeof boundTier !== "string" ? null : { tool: "Agent", subagent_type: `pipeline-core:${boundTier}`, model: family };
+}
+
+/** The D196 (R4) estimate warnings of build, as a pure function of the package and the binding's tool budget. */
+function estimateWarningsOf(pkg, budget) {
+  const estimateWarnings = [];
+  if (Number.isSafeInteger(pkg.estimatedToolCalls) && Number.isSafeInteger(budget) && pkg.estimatedToolCalls > budget) {
+    if (!/grant/iu.test(String(pkg.budgetRationale ?? ""))) estimateWarnings.push({ code: "DBG-ESTIMATE-ABOVE-BASE", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the base cap ${budget} and budgetRationale does not say a grant is planned; repair: name the planned grant in budgetRationale (the word grant), or lower the estimate` });
+    if (pkg.estimatedToolCalls > 2 * (budget + 30)) estimateWarnings.push({ code: "DBG-ESTIMATE-NEEDS-SPLIT", message: `estimatedToolCalls ${pkg.estimatedToolCalls} is more than twice the base cap ${budget} plus one grant step of 30; repair: split the outcome along independent criteria into slices with disjoint scopes` });
+  }
+  return estimateWarnings;
+}
+
 /** Renders the complete briefing of one closed package (PO decision D78); writes only the --out file. */
 export function buildDispatchBriefing(options, deps = {}) {
   let root;
@@ -1049,21 +1082,13 @@ export function buildDispatchBriefing(options, deps = {}) {
   validateBriefingPackage(pkg);
   assertPackagePathsExist(root, pkg, deps.pathExists);
   const calibration = resolveBriefingCalibration(root, deps.calibration);
-  const bind = (agentType) => generateDispatchBinding({
-    root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
-    // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
-    check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
-  }, deps);
+  const bind = (agentType) => generateDispatchBinding(packageBindingOptions(root, pkg, agentType), deps);
   // Test-first budget (D193, PO 2026-10-29): an estimate above the tier cap is refused unless the package plans a grant; the tier is never raised silently.
   const generated = bind(pkg.agentType);
   const budget = skeletonToolBudget(generated.skeleton);
   const decision = budgetDecision(pkg, budget);
   // D196 (R4): warnings only. An estimate above the base cap with no planned grant, and one far above a single grant step.
-  const estimateWarnings = [];
-  if (Number.isSafeInteger(pkg.estimatedToolCalls) && Number.isSafeInteger(budget) && pkg.estimatedToolCalls > budget) {
-    if (!/grant/iu.test(String(pkg.budgetRationale ?? ""))) estimateWarnings.push({ code: "DBG-ESTIMATE-ABOVE-BASE", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the base cap ${budget} and budgetRationale does not say a grant is planned; repair: name the planned grant in budgetRationale (the word grant), or lower the estimate` });
-    if (pkg.estimatedToolCalls > 2 * (budget + 30)) estimateWarnings.push({ code: "DBG-ESTIMATE-NEEDS-SPLIT", message: `estimatedToolCalls ${pkg.estimatedToolCalls} is more than twice the base cap ${budget} plus one grant step of 30; repair: split the outcome along independent criteria into slices with disjoint scopes` });
-  }
+  const estimateWarnings = estimateWarningsOf(pkg, budget);
   const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
   if (options.out !== undefined) {
     const target = resolve(root, options.out);
@@ -1073,11 +1098,9 @@ export function buildDispatchBriefing(options, deps = {}) {
   // The Claude Agent call the dispatcher makes next, so the tool-layer parameters need not be derived from the contract (MP-29):
   // the tier of the (possibly raised) binding, the model family of the package's model id, the briefing passed verbatim.
   const boundTier = generated.binding?.agentType;
-  const family = ["opus", "sonnet", "haiku", "fable"].find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
-  const dispatchCall = pkg.runner === "codex" || typeof boundTier !== "string" ? null : {
-    tool: "Agent",
-    subagent_type: `pipeline-core:${boundTier}`,
-    model: family,
+  const base = dispatchCallBase(pkg, boundTier);
+  const dispatchCall = base === null ? null : {
+    ...base,
     prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
     // D183: a Claude Agent dispatch may carry this two-line pointer prompt instead of the full text; guard-dispatch hands the child the verified file bytes.
     ...(options.out === undefined || boundTier === undefined ? {} : { promptPointer: renderPointerPrompt({ text: rendered.text, path: options.out }) }),
@@ -1088,9 +1111,120 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
 }
 
+export const DISPATCH_PROBE_SCHEMA = "pipeline.dispatch-readiness-probe.v1";
+const PROBE_FLAGS = Object.freeze({ "--root": "root", "--package": "package" });
+
+/** `probe --package <repo-relative json> [--root <dir>]`; the same strict flag rules as `build`. */
+export function parseProbeArgv(argv) {
+  const values = {};
+  for (let index = 1; index < argv.length; index++) {
+    const token = argv[index];
+    if (typeof token !== "string" || !Object.hasOwn(PROBE_FLAGS, token)) refuse("DBG-FLAG-UNKNOWN", `unknown probe argument ${JSON.stringify(token)}; probe takes --package and --root`);
+    const value = argv[index + 1];
+    if (typeof value !== "string" || value === "" || value.startsWith("--")) refuse("DBG-FLAG-VALUE", `flag ${token} needs a value`);
+    index++;
+    const key = PROBE_FLAGS[token];
+    if (Object.hasOwn(values, key)) refuse("DBG-FLAG-REPEATED", `flag ${token} may be given once`);
+    values[key] = value;
+  }
+  if (values.package === undefined) refuse("DBG-FLAG-MISSING", "required flag --package is missing; repair: name the package JSON file, repository-relative");
+  if (!validRepoPath(values.package)) refuse("DBG-PATH-INVALID", `package path ${JSON.stringify(values.package)} must be repository-relative without .., ., .git or backslash segments`);
+  return values;
+}
+
+/** The text a refusal message carries from its first "repair" on, or the whole message when it names no labelled repair. */
+function repairOf(message) {
+  const at = String(message).indexOf("repair");
+  return at === -1 ? String(message) : String(message).slice(at);
+}
+
+/**
+ * Readiness probe (backlog: the first dispatch in a consumer repository): the checks a dispatch of one package meets, in dry-run,
+ * ALL failures collected instead of the first. Read-only by construction: it writes no file, never takes the session-authority
+ * registry lock (it only reads it) and never reserves a slice. Where a binding refusal needs a value the later steps use, it is
+ * recorded as the one finding of the binding and the checks that depend on it are named under `skipped`.
+ */
+export function probeDispatchReadiness(options, deps = {}) {
+  let root;
+  try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+  const findings = [];
+  const skipped = [];
+  const find = (check, code, message, repair, kind = "failure") => { findings.push({ code, check, message, repair, kind }); };
+  const failWith = (check, error) => {
+    const known = error instanceof BriefingRefusal || error instanceof BriefingPackageRefusal;
+    const message = String(error?.message ?? error);
+    find(check, known ? error.code : "DBG-INTERNAL", message, repairOf(message));
+  };
+  const fieldsOk = (() => {
+    const bytes = readRepoFile(root, options.package);
+    if (!bytes) { find("package-fields", "DBG-PACKAGE-UNREADABLE", `package ${options.package} is not a readable regular file under --root`, "repair: write the package there"); return null; }
+    try { return validateBriefingPackage(JSON.parse(bytes.toString("utf8"))); } catch (error) {
+      if (error instanceof SyntaxError) find("package-fields", "DBG-PACKAGE-UNREADABLE", `package ${options.package} is not valid JSON`, "repair: fix its JSON");
+      else failWith("package-fields", error);
+      return null;
+    }
+  })();
+  const pkg = fieldsOk;
+  let calibration = null;
+  let generated = null;
+  let decision = null;
+  let warnings = [];
+  if (pkg === null) skipped.push("package-paths", "calibration", "binding", "tool-budget", "render");
+  else {
+    try { assertPackagePathsExist(root, pkg, deps.pathExists); } catch (error) { failWith("package-paths", error); }
+    try { calibration = resolveBriefingCalibration(root, deps.calibration); } catch (error) { failWith("calibration", error); }
+    const softRefusals = [];
+    try { generated = generateDispatchBinding(packageBindingOptions(root, pkg, pkg.agentType), { ...deps, softRefusals }); } catch (error) { failWith("binding", error); }
+    for (const refusal of softRefusals) find("binding", refusal.code, refusal.message, repairOf(refusal.message));
+    if (generated === null) skipped.push("tool-budget", "render");
+    else {
+      const budget = skeletonToolBudget(generated.skeleton);
+      try { decision = budgetDecision(pkg, budget); } catch (error) { failWith("tool-budget", error); }
+      warnings = [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
+      if (decision !== null && calibration !== null && findings.length === 0) {
+        try { renderGoldfishBriefing(pkg, generated, calibration, decision); } catch (error) { failWith("render", error); }
+      } else if (findings.length > 0 || decision === null || calibration === null) skipped.push("render");
+    }
+  }
+
+  // The plan approval the item course needs (read-only reader; the refusal code and the repair of the dispatch itself).
+  try {
+    const approval = (deps.observePlanApproval ?? observeCurrentPlanApprovalForCalibration)({ rootDir: root });
+    if (approval?.status !== "eligible") {
+      const code = typeof approval?.code === "string" ? approval.code : `PLAN-APPROVAL-${String(approval?.status ?? "UNKNOWN").toUpperCase()}`;
+      find("plan-approval", code, `the current plan approval is ${approval?.status ?? "unreadable"} (${code}${approval?.detail ? `: ${approval.detail}` : ""})`, approval?.repair ?? staleApprovalRepair(code));
+    }
+  } catch (error) {
+    find("plan-approval", "DBG-PROBE-APPROVAL-UNREADABLE", `the plan approval could not be read: ${String(error?.message ?? error).slice(0, 200)}`, "repair: read node <plugin-root>/scripts/pipeline-state.mjs inspect");
+  }
+
+  // The registry lock is only READ here (never taken): a holder is a finding, a lock that cannot be observed is reported as skipped.
+  let lock = null;
+  try { lock = (deps.registryLock ?? defaultRegistryLock)(root); } catch { lock = null; }
+  if (lock === null || lock === undefined) {
+    find("registry-lock", "DBG-PROBE-LOCK-UNOBSERVED", "the session-authority registry lock could not be observed, so this check was skipped, not passed", "repair: run the probe again inside the repository checkout, or read node <plugin-root>/scripts/session-authority-repair.mjs", "skipped");
+  } else if (lock.status === "held") {
+    const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
+    const message = `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s)`;
+    const repair = lock.owner === "dead"
+      ? `repair: its owner is not alive; run node ${fileURLToPath(new URL("./routine-repair.mjs", import.meta.url))} run heal --root ${root} --reason "retire the registry lock of a dead owner before dispatching"`
+      : `repair: wait for the owner, node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} wait --root ${root} --timeout 120; if the owner is gone or cannot be judged run the same script with release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+    find("registry-lock", "DBG-PROBE-REGISTRY-LOCK-HELD", message, repair);
+  }
+
+  const ready = findings.length === 0;
+  const base = ready && pkg !== null ? dispatchCallBase(pkg, generated?.binding?.agentType) : null;
+  return {
+    schema: DISPATCH_PROBE_SCHEMA, ok: ready, ready, findings, warnings,
+    ...(skipped.length === 0 ? {} : { skipped }),
+    ...(ready ? { dispatchCall: base === null ? null : { ...base, prompt: `the briefing file that build --package ${options.package} --out scratch/<briefing>.md writes, verbatim including its final newline` } } : {}),
+  };
+}
+
 /** Argv in, result object out; never throws for a refusal. */
 export function runDispatchBriefing(argv, deps = {}) {
   try {
+    if (Array.isArray(argv) && argv[0] === "probe") return probeDispatchReadiness(parseProbeArgv(argv), deps);
     if (Array.isArray(argv) && argv[0] === "build") return buildDispatchBriefing(parseBuildArgv(argv), deps);
     return generateDispatchBinding(parseBindingArgv(argv), deps);
   } catch (error) {
