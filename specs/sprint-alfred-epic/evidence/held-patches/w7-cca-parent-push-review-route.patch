@@ -1,0 +1,380 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 9bcc0ac91..0e85b9276 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -60,6 +60,52 @@ export function criticCourseRepair(code) {
+ }
+ const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
++/**
++ * The one derivation of the base a Critic preflight accepts for a feature with registered course history: the candidate of the
++ * last registered round. Shared by the preflight's CCA-PARENT refusal and by push-init's remedy, so the two cannot disagree.
++ * Features without registered history, or whose history cannot be read, are absent from the result.
++ */
++export function deriveRegisteredCourseBases({ repoRoot, candidateCommit }) {
++  let root;
++  try { root = realpathSync(repoRoot); } catch { return []; }
++  let names;
++  try { names = execFileSync("git", ["-C", root, "ls-tree", "--name-only", "-z", candidateCommit, "specs/"], { encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 }).toString("utf8").split("\0").filter(Boolean); } catch { return []; }
++  const rows = [];
++  for (const name of names) {
++    const featureId = name.slice("specs/".length);
++    if (!FEATURE_ID.test(featureId)) continue;
++    try {
++      // The same retained-lineage reader the runtime admission uses (retainedV2), so the base named here is the one it accepts.
++      const retained = retainedV2(root, featureId, candidateCommit).rows.map((row) => row.record).sort((a, b) => a.course.reviewRound - b.course.reviewRound);
++      if (retained.length > 0) rows.push({ featureId, lastRegisteredRound: retained.length, lastRegisteredCandidate: retained.at(-1).candidate.commit });
++    } catch { /* a feature without a readable course contributes no base */ }
++  }
++  return rows.sort((a, b) => a.featureId.localeCompare(b.featureId));
++}
++
++/** CCA-PARENT detail for one feature, or null when the feature has no registered history. */
++export function criticCourseParentDetail({ repoRoot, featureId, candidateCommit, givenBase }) {
++  const row = deriveRegisteredCourseBases({ repoRoot, candidateCommit }).find((entry) => entry.featureId === featureId);
++  if (!row) return null;
++  return Object.freeze({ lastRegisteredRound: row.lastRegisteredRound, lastRegisteredCandidate: row.lastRegisteredCandidate, expectedBase: row.lastRegisteredCandidate, givenBase });
++}
++
++/** The route that admits from a CCA-PARENT state; every step is followed to an admitted dispatch by the preflight test fixture. ${PIPELINE_PLUGIN_ROOT} is a literal placeholder. */
++export function criticCourseParentRepair({ detail, candidate, specPath }) {
++  const scripts = "${PIPELINE_PLUGIN_ROOT}/scripts";
++  return Object.freeze({
++    route: "delta-from-last-registered-round",
++    decidedBy: "Coordinator",
++    reason: `The feature already has a registered Critic course through round ${detail.lastRegisteredRound}; the next review is a diff round whose base is the last registered round's candidate ${detail.expectedBase}, not ${detail.givenBase}. A round that passed but is not registered as lineage is retired by the takeover (steps 1-2) and reviewed again inside that diff. Step 3 needs the diagnostic evidence of the candidate registered first (register-feature-package.mjs --add-diagnostic-evidence).`,
++    steps: Object.freeze([
++      Object.freeze({ step: 1, command: `node ${scripts}/session-critic-finalizer.mjs inspect-course-takeover --root <root> --request scratch/takeover-inspect.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"} (the verb's --help prints the shape). Copy the printed digestSha256. If it reports CGB-TAKEOVER-COURSE there is no unregistered round: skip step 2." }),
++      Object.freeze({ step: 2, command: `node ${scripts}/session-critic-finalizer.mjs supersede-course-takeover --root <root> --request scratch/takeover-supersede.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest from step 1>\",\"reason\":\"<short reason>\"}. It retires only the rounds above the registered lineage." }),
++      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file lists changedBehaviorClaims, pathInvariantMap, coordinatorImpactConfirmed, trustBoundaryChanged and impactAmbiguous; run it once to read the changed paths a map must cover." }),
++      Object.freeze({ step: 4, command: `node ${scripts}/critic-dispatch-preflight.mjs --root <root> --base ${detail.expectedBase} --candidate ${candidate} --spec ${specPath} --evidence <evidence> --registration-commit <registration commit of step 3> --delta-request <delta request path printed by step 3> --correction-input-bindings <bindings file>`, note: "<bindings file>: node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-correction-input-bindings.mjs derive --root <root> --base <expectedBase> --head <candidate> --out <file under scratch/>." }),
++    ]),
++  });
++}
++
+ function gitBytes(root, args, code) {
+   try {
+     return execFileSync("git", ["-C", root, ...args], {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 7ae1503f2..44f18b5a1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -31,7 +31,7 @@ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+ } from "../lib/requirement-traceability.mjs";
+-import { criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
++import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+ 
+ export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
+@@ -263,7 +263,10 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path,
+     const candidate = { commit: candidateCommit, tree: candidateTree };
+     if (value?.schema === "pipeline.verify-evidence.v0") diagnostic = inspectCriticVerifyDiagnostic(value, candidate);
+     else if (value?.schema === CRITIC_DIAGNOSTIC_SCHEMA) diagnostic = validateCriticDiagnostic(value, { root, candidate, spec, guardrails });
+-    else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
++    else {
++      const reason = `${path} carries schema ${JSON.stringify(typeof value?.schema === "string" ? value.schema : null)}; security evidence is not admitted here. The admitted evidence schemas are pipeline.verify-evidence.v0 (Verify evidence of mode critic) and ${CRITIC_DIAGNOSTIC_SCHEMA} (scripts/critic-diagnostic-evidence.mjs)`;
++      fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`, { reason, admittedSchemas: ["pipeline.verify-evidence.v0", CRITIC_DIAGNOSTIC_SCHEMA] });
++    }
+   } catch (error) {
+     if (error instanceof CriticDispatchPreflightError) throw error;
+     const diagnosticCode = error.code ?? "CDI-INVALID";
+@@ -271,7 +274,10 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path,
+       const requiredGuardrailPaths = guardrails.map((entry) => entry.path);
+       fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths });
+     }
+-    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode });
++    const reason = value?.schema === "pipeline.verify-evidence.v0"
++      ? `A Verify evidence of mode critic is required (${diagnosticCode}); ${path} is not one. Produce it for the exact candidate: node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <evidence file>`
++      : `${path} is not a valid Critic diagnostic evidence (${diagnosticCode}); produce one with node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, or pass a Verify evidence of mode critic (verify-evidence-producer.mjs --root <root> --mode critic --out <evidence file>)`;
++    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode, reason });
+   }
+   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
+ }
+@@ -294,12 +300,14 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+   try {
+   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
+-    fail("CDP-INPUT", "root and candidate are required.");
++    const missing = [...(typeof root !== "string" || root.length === 0 ? ["--root"] : []), ...(typeof candidate !== "string" ? ["--candidate"] : [])];
++    const reason = missing.length === 1 ? `${missing[0]} is required` : `${missing.join(" and ")} are required`;
++    fail("CDP-INPUT", reason, { reason, missingFlags: missing });
+   }
+   const realRoot = realpathSync(root);
+   stage = "paths";
+   const scope = reviewScope === null ? null : currentArtifactScope(reviewScope);
+-  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.");
++  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.", { reason: "--base is required for an exact-range review (a current-artifact review gives a review scope instead)", missingFlags: ["--base"] });
+   if (scope !== null && base !== null) fail("CDP-SCOPE-MIXED", "Current-artifact scope cannot include a review base.");
+   stage = "candidate";
+   const rangeBase = scope === null ? resolveBase(realRoot, base) : null;
+@@ -395,9 +403,14 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+       deltaRequestPath: context.deltaRequestPath });
+     if (admission?.decision?.status !== "admitted") {
+       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+-      const repair = criticCourseRepair(admission?.decision?.code);
++      let repair = criticCourseRepair(admission?.decision?.code);
++      // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
++      const parentDetail = admission?.decision?.code === "CCA-PARENT"
++        ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
++      if (parentDetail !== null) repair = criticCourseParentRepair({ detail: parentDetail, candidate: candidateCommit, specPath: spec });
+       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
++        ...(parentDetail === null ? {} : { detail: parentDetail }),
+         ...(repair === null ? {} : { repair }),
+         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
+     }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 2dc2bf830..5af27b6ae 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1351,4 +1351,172 @@ test("CCI preflight (7) projectStateOptional lets an unreadable calibration mean
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// ===== CCA-PARENT push-review route (backlog 2026-10-30): consumer lineage shape, followed repair, base derivation, refusal texts =====
++import { admitSessionCriticReview as parentAdmit, finalizeSessionCriticReview as parentFinalize, runSessionCriticFinalizerCli as parentFinalizerCli } from "./session-critic-finalizer.mjs";
++import { addCriticReviewLineage as parentAddLineage, addCriticDeltaRequest as parentAddDelta } from "../lib/feature-package-registration.mjs";
++import * as parentAdmissionLib from "../lib/critic-course-admission.mjs";
++import * as parentPushPrepare from "./push-prepare.mjs";
++const PARENT_GUARDRAILS = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
++const PARENT_PASS = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
++const PARENT_FAIL = { ...PARENT_PASS, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: "specs/held-feature/spec.md:1", spec_ref: "AC-1" }] };
++const parentOrigin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
++const parentCommitPaths = (root, paths, message) => { git(root, ["add", "--", ...paths]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++function parentBindings(root, base, head) {
++  const path = `scratch/correction-input-bindings-${head.slice(0, 12)}.json`;
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  writeFileSync(join(root, path), `${JSON.stringify(deriveCriticCorrectionInputBindings({ repoRoot: root, base, head, projectStateOptional: true }), null, 2)}\n`);
++  return path;
++}
++function parentRegisterDiagnostic(root, featureId, candidate, tag) {
++  const specPath = `specs/${featureId}/spec.md`, manifestPath = `specs/${featureId}/lifecycle.json`;
++  const logPath = `specs/${featureId}/evidence/targeted-${tag}.log`, diagnosticPath = `specs/${featureId}/evidence/diagnostic-${tag}.json`, capturedPath = `evidence/${featureId}-targeted-${tag}.log`;
++  const produced = produceCriticDiagnostic({ root, candidate, specPath, guardrailPaths: PARENT_GUARDRAILS, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++  writeFileSync(join(root, logPath), readFileSync(join(root, capturedPath)));
++  produced.targeted.log.path = logPath;
++  writeFileSync(join(root, diagnosticPath), JSON.stringify(produced));
++  const manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
++  for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const registration = parentCommitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`);
++  return { diagnosticPath, registration };
++}
++function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"]) {
++  const base = { changedBehaviorClaims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false };
++  writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
++  const first = parentAddDelta({ root, inputPath: "delta-input.json" });
++  assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
++  writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: Object.fromEntries(first.changedPaths.map((path) => [path, ["inv-one"]])) }));
++  const added = parentAddDelta({ root, inputPath: "delta-input.json" });
++  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
++  return { added, registration: parentCommitPaths(root, added.commitPaths, "register the delta request") };
++}
++function parentRound(root, { featureId, taskId, packetId, base, candidate, registrationCommit, deltaRequestPath, diagnosticPath, verdict }) {
++  const specPath = `specs/${featureId}/spec.md`;
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: [specPath] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  mkdirSync(join(root, "evidence"), { recursive: true });
++  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const preflightInput = { root, base, candidate, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath },
++    ...(deltaRequestPath === null ? {} : { correctionInputBindings: parentBindings(root, base, candidate) }) };
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: `session-${packetId.slice(0, 4)}`, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict };
++  parentAdmit(request, {});
++  const finalized = parentFinalize(request, { readOriginalSourceReturnFn: parentOrigin });
++  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
++}
++/** The consumer's shape: rounds 1 and 2 registered as lineage, round 3 passed but not registered, correction commits after it. */
++function parentLineageFixture() {
++  const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = `${prefix}/spec.md`, manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
++  const root = mkdtempSync(join(tmpdir(), "cdp-parent-"));
++  git(root, ["init", "-q", "-b", "main"]);
++  mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
++  writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
++  writeFileSync(join(root, ".gitignore"), "/evidence/\n/scratch/\n");
++  commit(root, "base");
++  mkdirSync(join(root, prefix, "design"), { recursive: true }); mkdirSync(join(root, prefix, "evidence"), { recursive: true });
++  writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\n");
++  const unit = { schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior", specPath, logicalWorkIds: ["scope-one", "scope-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null };
++  writeFileSync(join(root, unitPath), JSON.stringify(unit));
++  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `${prefix}/${rel}`; writeFileSync(join(root, path), `${klass}\n`);
++    return { class: klass, path, sha256: sha256(readFileSync(join(root, path))), authority, mutability, retention };
++  });
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", candidate: null, supersedes: null, artifacts: [
++    { class: "spec", path: specPath, sha256: sha256(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: sha256(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }, ...topo] };
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const genesis = commit(root, "declare feature review unit");
++  writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
++  manifest.artifacts[0].sha256 = sha256(readFileSync(join(root, specPath)));
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const c1 = commit(root, "integrate feature behavior");
++  const d1 = parentRegisterDiagnostic(root, featureId, c1, "r1");
++  parentRound(root, { featureId, taskId: "parent-task-1", packetId: "9a".repeat(16), base: genesis, candidate: c1, registrationCommit: d1.registration, deltaRequestPath: null, diagnosticPath: d1.diagnosticPath, verdict: PARENT_FAIL });
++  const l1 = parentAddLineage({ root, packetId: "9a".repeat(16) });
++  assert.equal(l1.status, "lineage-added", JSON.stringify(l1)); parentCommitPaths(root, l1.commitPaths, "register lineage of round 1");
++  const correct = (name) => { mkdirSync(join(root, "src"), { recursive: true }); writeFileSync(join(root, `src/${name}.mjs`), `export const ${name} = 1;\n`); return commit(root, `correction ${name}`); };
++  const c2 = correct("fix2"); const d2 = parentRegisterDiagnostic(root, featureId, c2, "r2"); const q2 = parentDeltaRequest(root);
++  parentRound(root, { featureId, taskId: "parent-task-2", packetId: "9b".repeat(16), base: c1, candidate: c2, registrationCommit: q2.registration, deltaRequestPath: q2.added.deltaRequestPath, diagnosticPath: d2.diagnosticPath, verdict: PARENT_FAIL });
++  const l2 = parentAddLineage({ root, packetId: "9b".repeat(16) });
++  assert.equal(l2.status, "lineage-added", JSON.stringify(l2)); parentCommitPaths(root, l2.commitPaths, "register lineage of round 2");
++  const c3 = correct("fix3"); const d3 = parentRegisterDiagnostic(root, featureId, c3, "r3"); const q3 = parentDeltaRequest(root);
++  parentRound(root, { featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
++  // Round 3 passed but its lineage is never registered; correction commits follow it.
++  const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
++  return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
++}
++test("CCA-PARENT a push review of a feature with course history names the last registered round and a repair that is followed to an admitted dispatch", () => {
++  const fx = parentLineageFixture();
++  try {
++    const base = { root: fx.root, base: fx.genesis, candidate: fx.c4, specPath: fx.specPath, guardrailPaths: [], evidencePaths: [fx.evidence4], priorCriticEvidencePath: null, correctionInputBindings: parentBindings(fx.root, fx.genesis, fx.c4) };
++    const refused = preflightCriticDispatch(base);
++    assert.equal(refused.status, "refused", JSON.stringify(refused));
++    assert.equal(refused.code, "CCA-PARENT");
++    assert.deepEqual(refused.detail, { lastRegisteredRound: 2, lastRegisteredCandidate: fx.c2, expectedBase: fx.c2, givenBase: fx.genesis });
++    assert.notEqual(refused.repair.route, "none", JSON.stringify(refused.repair));
++    const steps = refused.repair.steps;
++    assert.ok(steps.every((step) => step.command.includes("${PIPELINE_PLUGIN_ROOT}/scripts/")), JSON.stringify(steps));
++    assert.match(steps[0].command, /session-critic-finalizer\.mjs inspect-course-takeover --root <root> --request scratch\/takeover-inspect\.json/u);
++    assert.match(steps[1].command, /session-critic-finalizer\.mjs supersede-course-takeover/u);
++    assert.match(steps[2].command, /register-feature-package\.mjs --root <root> --add-delta-request <input\.json>/u);
++    assert.match(steps[3].command, new RegExp(`critic-dispatch-preflight\\.mjs --root <root> --base ${fx.c2} --candidate ${fx.c4} --spec ${fx.specPath}`, "u"));
++    assert.match(steps[3].command, /--delta-request <delta request path printed by step 3>/u);
++    // Follow it: step 1 inspect, step 2 supersede (retires only the unregistered round 3), step 3 delta request, step 4 preflight.
++    mkdirSync(join(fx.root, "scratch"), { recursive: true });
++    writeFileSync(join(fx.root, "scratch/takeover-inspect.json"), JSON.stringify({ schema: "pipeline.session-critic-course-takeover-inspect-request.v1", featureId: fx.featureId }));
++    const inspected = parentFinalizerCli(["inspect-course-takeover", "--root", fx.root, "--request", "scratch/takeover-inspect.json"]);
++    assert.equal(inspected.exitCode, 0, JSON.stringify(inspected));
++    assert.equal(inspected.output.refusalCode, null, JSON.stringify(inspected.output));
++    writeFileSync(join(fx.root, "scratch/takeover-supersede.json"), JSON.stringify({ schema: "pipeline.session-critic-course-takeover-supersede-request.v1", featureId: fx.featureId, digestSha256: inspected.output.digestSha256, reason: "retire the unregistered round 3" }));
++    const superseded = parentFinalizerCli(["supersede-course-takeover", "--root", fx.root, "--request", "scratch/takeover-supersede.json"]);
++    assert.equal(superseded.exitCode, 0, JSON.stringify(superseded));
++    const delta = parentDeltaRequest(fx.root, ["fix-three-and-four"]);
++    assert.equal(delta.added.preflight.baseCommit, fx.c2);
++    const argv = steps[3].command.replace(/^node \S+ /u, "").replace("<root>", fx.root).replace("<delta request path printed by step 3>", delta.added.deltaRequestPath)
++      .replace("<evidence>", fx.evidence4).replace("<registration commit of step 3>", delta.registration).replace("<bindings file>", parentBindings(fx.root, fx.c2, fx.c4)).split(" ");
++    const parsed = parseCriticDispatchPreflightArgs(argv);
++    const admitted = preflightCriticDispatch(parsed);
++    assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
++    assert.equal(admitted.base.commit, fx.c2);
++    assert.equal(admitted.coordinatorOnly.courseAdmission.round, 3);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++test("CCA-PARENT push-init names the base the preflight accepts for a feature with registered course history, and says the Verify evidence is of mode critic", () => {
++  const fx = parentLineageFixture();
++  try {
++    const bases = parentAdmissionLib.deriveRegisteredCourseBases({ repoRoot: fx.root, candidateCommit: fx.head });
++    assert.deepEqual(bases, [{ featureId: fx.featureId, lastRegisteredRound: 2, lastRegisteredCandidate: fx.c2 }]);
++    const remedy = parentPushPrepare.criticBoundVerifyRemedy(fx.root, fx.head);
++    assert.ok(remedy.includes(`--base ${fx.c2}`), remedy);
++    assert.ok(remedy.includes(fx.featureId), remedy);
++    assert.match(remedy, /Verify evidence must be of mode critic/u);
++    assert.match(remedy, /verify-evidence-producer\.mjs/u);
++    const plain = fixture();
++    try { assert.match(parentPushPrepare.criticBoundVerifyRemedy(plain.root, plain.candidate), /<merge base of HEAD with the publication target>/u); } finally { rmSync(plain.root, { recursive: true, force: true }); }
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++test("CDP-INPUT names the missing flag; CDP-EVIDENCE-SCHEMA names the admitted schemas; CDP-EVIDENCE-MODE says a Verify evidence of mode critic is required and how to produce it", () => {
++  assert.throws(() => preflightCriticDispatch({ candidate: "HEAD", base: "HEAD", specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: [] }), (error) => error.code === "CDP-INPUT" && error.message === "--root is required" && error.details.reason === "--root is required");
++  assert.throws(() => preflightCriticDispatch({ root: "/", base: "HEAD", specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: [] }), (error) => error.code === "CDP-INPUT" && error.message === "--candidate is required");
++  const fx = fixture();
++  try {
++    writeFileSync(join(fx.root, "evidence/security.json"), JSON.stringify({ schema: "pipeline.security-evidence.v0", candidate: { commit: fx.candidate, tree: fx.tree } }));
++    assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/security.json"] })), (error) => error.code === "CDP-EVIDENCE-SCHEMA"
++      && /security evidence is not admitted/u.test(error.details.reason) && error.details.reason.includes("pipeline.verify-evidence.v0") && error.details.reason.includes("pipeline.critic-diagnostic-evidence.v1"));
++    const failed = verifyValue(fx.candidate, fx.tree); failed.selection = { ...failed.selection, selectionSha256: "f".repeat(64) };
++    writeFileSync(join(fx.root, "evidence/verify.json"), JSON.stringify(failed));
++    assert.throws(() => preflightCriticDispatch(input(fx)), (error) => error.code === "CDP-EVIDENCE-MODE"
++      && /Verify evidence of mode critic is required/u.test(error.details.reason) && /verify-evidence-producer\.mjs --root <root> --mode critic/u.test(error.details.reason));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++test("session-critic-finalizer inspect-course-takeover --help prints the --request file shape with keys and one example", () => {
++  for (const verb of ["inspect-course-takeover", "supersede-course-takeover"]) {
++    const result = spawnSync(process.execPath, [fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url)), verb, "--help"], { encoding: "utf8" });
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /--request/u);
++    assert.match(result.stdout, verb === "inspect-course-takeover" ? /keys: schema, featureId\b/u : /keys: schema, featureId, digestSha256, reason/u);
++    assert.match(result.stdout, /example: \{"schema":"pipeline\.session-critic-course-takeover-(inspect|supersede)-request\.v1","featureId":"<feature>"/u);
++  }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 04a45b95a..efd9279ef 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -54,6 +54,7 @@ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pip
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
++import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+ 
+@@ -693,6 +694,19 @@ export function foldPendingPushApprovalWrite(dir, deps = {}, options = {}) {
+   return { folded: true };
+ }
+ 
++/**
++ * The remedy for a missing Critic/Verify binding. A feature with registered course history is refused CCA-PARENT for the merge base:
++ * the base the preflight accepts there is the last registered round's candidate (the same derivation the preflight uses).
++ */
++export function criticBoundVerifyRemedy(dir, headCommit) {
++  let bases = [];
++  try { bases = deriveRegisteredCourseBases({ repoRoot: dir, candidateCommit: headCommit }); } catch { bases = []; }
++  const publicationBase = "<merge base of HEAD with the publication target>";
++  const first = bases.length > 0 ? bases[0].lastRegisteredCandidate : publicationBase;
++  const registered = bases.map((row) => ` Feature ${row.featureId} has a registered Critic course through round ${row.lastRegisteredRound}: its preflight base is ${row.lastRegisteredCandidate} (the last registered round's candidate), not the merge base (CCA-PARENT); add --spec specs/${row.featureId}/spec.md and the course selectors of the CCA-PARENT repair.`).join("");
++  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).`;
++}
++
+ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   const dir = deps.dir ?? projectDir();
+   const parsed = parseArgs(argv);
+@@ -749,8 +763,8 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+         message: review.ok ? "independent Critic and Verify bind this exact candidate"
+           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
+         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
+-          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value)."
+-          : "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
++          ? criticBoundVerifyRemedy(dir, headCommit)
++          :"complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
+       });
+     }
+     if (securityGateActive) {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 58f6ecd11..c59204bb0 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -38,6 +38,19 @@ function takeoverRequestRepair(supersede) {
+     ? `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA}, featureId, digestSha256, reason; ${TAKEOVER_REQUEST_FILE_TEXT}`
+     : `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA}, featureId; ${TAKEOVER_REQUEST_FILE_TEXT}`;
+ }
++/** `<verb> --help`: the --request file shape, its keys and one example. */
++export function takeoverVerbHelp(verb) {
++  const supersede = verb === "supersede-course-takeover";
++  const example = supersede
++    ? { schema: SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA, featureId: "<feature>", digestSha256: "<digest printed by inspect-course-takeover>", reason: "<short reason>" }
++    : { schema: SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA, featureId: "<feature>" };
++  return [
++    `Usage: session-critic-finalizer.mjs ${verb} --root <repository-root> --request <repo-relative request.json>`,
++    `The request file ${TAKEOVER_REQUEST_FILE_TEXT.replace(/^the file /u, "")}; the operator types only the feature id.`,
++    `keys: ${Object.keys(example).join(", ")}`,
++    `example: ${JSON.stringify(example)}`,
++  ].join("\n");
++}
+ function takeoverTarget(root, featureId, supersede = false) {
+   if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
+   const run = (args) => {
+@@ -987,6 +1000,8 @@ if (isDirectInvocation(import.meta.url)) {
+   const argv = process.argv.slice(2);
+   if (argv.length === 1 && argv[0] === "--help") {
+     process.stdout.write(`${CLI_HELP}\n`);
++  } else if (argv.length === 2 && argv[1] === "--help" && (argv[0] === "inspect-course-takeover" || argv[0] === "supersede-course-takeover")) {
++    process.stdout.write(`${takeoverVerbHelp(argv[0])}\n`);
+   } else {
+     const result = runSessionCriticFinalizerCli(argv);
+     process.stdout.write(`${JSON.stringify(result.output)}\n`);
