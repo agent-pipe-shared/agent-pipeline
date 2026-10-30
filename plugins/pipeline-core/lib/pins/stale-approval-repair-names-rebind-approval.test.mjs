@@ -27,6 +27,13 @@ for (const code of ["CVCT-AUTHORITY-STALE", "CVCT-PROFILE-STALE"]) {
   });
 }
 
+test("SAR04 CVCT-FILE: the item-course repair names the State-file mode repair of a transferred clone, not the generic inspect", () => {
+  const text = staleApprovalRepair("CVCT-FILE");
+  assert.match(text, /chmod 600 \.claude\/pipeline-state\.json/u);
+  assert.match(text, /owner-only ACL/u);
+  assert.doesNotMatch(text, /rebind-approval|approve it again/u);
+});
+
 test("SAR03 other codes do not name rebind-approval", () => {
   assert.doesNotMatch(staleApprovalRepair("CVCT-APPROVAL-UNAVAILABLE"), /rebind-approval/u);
   assert.doesNotMatch(configureVerifyRepair("CVCT-FILE"), /rebind-approval/u);

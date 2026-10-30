@@ -1177,6 +1177,9 @@ const REGISTER_SCRIPT=fileURLToPath(new URL('../scripts/register-feature-package
 export function staleApprovalRepair(code) {
   if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
     return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} no longer matches what the plan approval binds. If this checkout is a clone or a transfer of the approving one and the approved bytes are unchanged, only its device-local values differ: run node ${STATE_SCRIPT} rebind-approval (it re-checks every bound digest, takes no argument and asks for no new approval), then retry. If the approved bytes themselves changed, submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
+  // A transferred or copied clone arrives with the State file at mode 0644; name that repair, not the generic inspect.
+  if(code==='CVCT-FILE')
+    return `the State file .claude/pipeline-state.json is not a private regular file of its owner (a transferred or copied clone often arrives with mode 0644): on POSIX run chmod 600 .claude/pipeline-state.json in the repository root, on Windows give it an owner-only ACL, then retry; the plan approval itself stays valid`;
   if(code==='CAC-REGISTRATION-INVALID')
     return `the accepted-contract envelope of the plan approval is not registered in the feature manifest as the reader requires (the reason names the failing field); run node ${REGISTER_SCRIPT} --root <repository root> (it registers the envelope and prints the paths to commit), commit those paths, then retry`;
   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;

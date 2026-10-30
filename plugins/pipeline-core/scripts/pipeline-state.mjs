@@ -13767,6 +13767,15 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
 
 export function run(argv = process.argv.slice(2), deps = {}) {
   const sub = argv[0];
+  // `<command> --help` (or -h) is a question about that command, never a run: before this, a lifecycle verb given --help executed.
+  // rebind-approval keeps its own usage text below; configure-verify is a command the list does not name.
+  if ((PIPELINE_STATE_COMMANDS.includes(sub) || sub === "configure-verify") && sub !== "rebind-approval" && argv.slice(1).some((arg) => arg === "--help" || arg === "-h")) {
+    console.log(`Usage: node pipeline-state.mjs ${sub} [flags]
+
+"${sub} --help" never runs the command. ${sub} validates its own flags and names what it needs when one is missing.
+All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
+    return 0;
+  }
   const runStartedAt = Date.now();
   let traceOutcome = "ok";
   // This read-only command owns its exact explicit root; ambient projectDir

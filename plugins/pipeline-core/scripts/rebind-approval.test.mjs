@@ -539,3 +539,22 @@ test("R7-5g: rebind-approval --help and -h answer the question and run nothing; 
   assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
   assert.deepEqual([...privateSnapshot(clone.dir).keys()], [...privateBefore.keys()], "no receipt is written by --help, -h or a refused argument");
 });
+
+test("R7-5h: every lifecycle verb answers --help and -h with its usage and runs nothing", () => {
+  const origin = approvedOrigin("allhelp");
+  const clone = cloneOf(origin, "allhelp");
+  const stateBefore = stateBytes(clone.dir); const privateBefore = privateSnapshot(clone.dir); const treeBefore = worktreeSnapshot(clone.dir);
+  for (const verb of ["submit-plan", "present-plan", "approve-plan", "reopen-design", "set-phase", "close-feature", "discard-feature",
+    "approve-push", "configure-verify", "materialize-architecture", "cancel-submitted-plan"]) {
+    for (const flag of ["--help", "-h"]) {
+      const result = invoke([verb, flag], clone.deps);
+      assert.equal(result.status, 0, `${verb} ${flag}: ${result.err}`);
+      assert.match(result.out, new RegExp(`Usage: node pipeline-state\\.mjs ${verb} `, "u"), `${verb} ${flag}`);
+    }
+    const mixed = invoke([verb, "--by", "someone", "--help"], clone.deps);
+    assert.equal(mixed.status, 0, `${verb} with --help after a flag: ${mixed.err}`);
+  }
+  assert.deepEqual(stateBytes(clone.dir), stateBefore, "State is unchanged");
+  assert.deepEqual([...privateSnapshot(clone.dir)], [...privateBefore], "no private record is written");
+  assert.deepEqual([...worktreeSnapshot(clone.dir)], [...treeBefore], "the worktree is unchanged");
+});
