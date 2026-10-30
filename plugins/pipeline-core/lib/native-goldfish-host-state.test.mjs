@@ -1449,7 +1449,53 @@ const cases = [
     }
   }},
 
+  { id: "NGHS54", name: "D195: a command check runs exactly the registered command; the row records the command id and the exact command string", run: () => fixture(({root})=>{
+    const h=commandCheckHarness(root),candidate=h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
+    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
+    assert.equal(observed.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(observed));
+    const [row]=observed.evidence.results;
+    assert.equal(row.commandId,'make-check');assert.equal(row.command,'node check.mjs');assert.equal(row.status,0);assert.equal(row.args,undefined);assert.equal(row.path,'project/pipeline.json');
+    assert.ok(observed.evidence.files.some(file=>file.path==='project/pipeline.json'),'the calibration digest binds the run');
+    assert.equal(inspectGovernedItemDeliveryChecks({root,handle:observed.handle,candidate,itemDelivery:h.delivery('make-check')}).verdict,'passed');
+  })},
+  { id: "NGHS55", name: "D195: a failing registered command fails the check", run: () => fixture(({root})=>{
+    const h=commandCheckHarness(root),candidate=h.calibrate([{id:'make-check',command:'node check.mjs'}],3);
+    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
+    assert.equal(observed.code,'SQ-TARGETED-CHECKS-FAILED',JSON.stringify(observed));
+    assert.equal(observed.evidence.results[0].status,3);assert.equal(observed.evidence.verdict,'failed');
+  })},
+  { id: "NGHS56", name: "D195: a command id that is no longer registered is refused item-check-command-unregistered", run: () => fixture(({root})=>{
+    const h=commandCheckHarness(root);h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
+    const candidate=h.calibrate([{id:'other-check',command:'node check.mjs'}],0);
+    const refused=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
+    assert.equal(refused.status,'refused',JSON.stringify(refused));assert.match(refused.reason,/item-check-command-unregistered/);
+  })},
+  { id: "NGHS57", name: "D195: a delivery that changes the calibration path of a command check is refused at first delivery; the .test form is not asked", run: () => fixture(({root})=>{
+    const h=commandCheckHarness(root),base=h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
+    const candidate=h.calibrate([{id:'make-check',command:'node check.mjs'},{id:'weaker',command:'node -e 0'}],0);
+    const refused=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate,baseCommit:base.commit});
+    assert.equal(refused.status,'refused',JSON.stringify(refused));assert.match(refused.reason,/native-item-check-source-amendment-required/);
+    const untouched=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate,baseCommit:candidate.commit});
+    assert.equal(untouched.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(untouched));
+  })},
+
 ];
+
+/** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
+function commandCheckHarness(root){
+  const name=root.split('/').pop();
+  const git=(...args)=>assert.equal(spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args]).status,0,args.join(' '));
+  const calibrate=(baseline,exitCode)=>{
+    mkdirSync(join(root,'project'),{recursive:true});
+    writeFileSync(join(root,'project/pipeline.json'),JSON.stringify({project:name,verify:'node check.mjs',verifyImpact:{schema:'pipeline.project-verify-impact.v1',baseline,areas:[]}}));
+    writeFileSync(join(root,'check.mjs'),`process.exit(${exitCode});\n`);writeFileSync(join(root,'dependency.txt'),'dependency\n');
+    git('add','project/pipeline.json','check.mjs','dependency.txt');git('commit','-q','-m','calibrate');
+    return inspectSignedDescriptorCustodyRepository(root).candidate;
+  };
+  const delivery=id=>({schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-A',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:1,endByte:20,excerptSha256:'b'.repeat(64)},
+    checks:[{id:'unit',path:'project/pipeline.json',command:id,dependencies:['check.mjs','dependency.txt','project/pipeline.json']}]});
+  return {calibrate,delivery};
+}
 
 function governedRegistryFixture({root,commit}){
   const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});

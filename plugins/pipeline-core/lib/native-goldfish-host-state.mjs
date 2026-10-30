@@ -25,6 +25,7 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
+import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
 import { fileURLToPath } from "node:url";
@@ -870,7 +871,7 @@ export function completeNativeGoldfishAuthority({repository,terminalHandle}){
   if(completed.status!=='integration-pending')return completed;
   const inventory=nativeAuthorityScan(owner),pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
   if(!pending?.binding.itemDelivery)return completed;
-  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate});
+  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate,baseCommit:pending.binding.candidateCommit});
   if(checks.status!=='observed')return {...completed,checkStatus:checks};
   return withSessionAuthorityBoundary({repository},boundary=>{
     const current=nativeManagedCurrentOwner(repository);
@@ -1278,9 +1279,19 @@ function itemCheckSnapshot(root,itemDelivery,candidate) {
 }
 /** Actual bounded targeted execution. Raw caller results cannot construct the
  * opaque observation handle consumed by either real delivery adapter. */
-export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}={}) {
+export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,baseCommit}={}) {
   try {
     const before=itemCheckSnapshot(root,itemDelivery,candidate),results=[];
+    // D195: a command check is registered in the calibration (its path). First delivery (baseCommit given) refuses a delivery that changed it,
+    // the recheck route refuses the same through native-item-check-source-amendment-required; the registry is re-read at execution time.
+    const commandChecks=itemDelivery.checks.filter(check=>check.command!==undefined);
+    if(commandChecks.length&&baseCommit!==undefined) {
+      const diff=spawnSync('git',['-C',before.repository.primaryRoot,'diff','--name-only','-z',baseCommit,candidate.commit],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
+      if(diff.error||diff.status!==0)throw nativeManagedFault('item-check-delivery-diff-unavailable');
+      const delivered=String(diff.stdout).split('\0');
+      if(commandChecks.some(check=>delivered.includes(check.path)))throw nativeManagedFault('native-item-check-source-amendment-required');
+    }
+    const registry=commandChecks.length?readConsumerVerifyConfiguration(before.repository.primaryRoot):null;
     const checkEnv=agyHostGitEnvironment();
     // The outer Verify recorder fd belongs to its direct suite, not a nested
     // child. No inherited descriptor is advertised when it is not passed.
@@ -1290,6 +1301,14 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}=
     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
     delete checkEnv.NODE_TEST_CONTEXT;
     for(const check of itemDelivery.checks) {
+      if(check.command!==undefined) {
+        const entry=[...registry.baseline,...registry.areas.flatMap(area=>area.commands)].find(row=>row.id===check.command);
+        if(!entry)throw nativeManagedFault('item-check-command-unregistered');
+        const ran=spawnSync(entry.command,{cwd:before.repository.primaryRoot,env:checkEnv,shell:true,timeout:60000,maxBuffer:1024*1024});
+        results.push({id:check.id,path:check.path,commandId:check.command,command:entry.command,status:ran.status,signal:ran.signal,error:ran.error?.code??null,
+          stdoutSha256:digest(ran.stdout??Buffer.alloc(0)),stderrSha256:digest(ran.stderr??Buffer.alloc(0))});
+        continue;
+      }
       const run=spawnSync(process.execPath,['--test',resolve(root,check.path)],{cwd:before.repository.primaryRoot,env:checkEnv,shell:false,timeout:60000,maxBuffer:1024*1024});
       results.push({id:check.id,path:check.path,executable:process.execPath,args:['--test',check.path],status:run.status,signal:run.signal,error:run.error?.code??null,
         stdoutSha256:digest(run.stdout??Buffer.alloc(0)),stderrSha256:digest(run.stderr??Buffer.alloc(0))});

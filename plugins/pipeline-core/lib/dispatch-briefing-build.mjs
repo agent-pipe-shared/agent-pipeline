@@ -144,7 +144,9 @@ export function budgetDecision(pkg, budget) {
 /** Every path the package names: the write scope, the binding check and each file named in a targeted command. */
 export function namedPackagePaths(pkg) {
   const fromTargeted = pkg.targeted.flatMap((command) => [...command.matchAll(NAMED_PATH)].map((match) => match[1]));
-  return [...new Set([...pkg.paths, pkg.check, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
+  // D195: a `command:<id>` check names a registered command, not a file, so it is not a path that must exist.
+  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [pkg.check];
+  return [...new Set([...pkg.paths, ...checkPath, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
 }
 
 /** A named path must exist unless the package declares it new; a wrong briefed path costs a whole dispatch. */

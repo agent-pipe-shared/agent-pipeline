@@ -111,6 +111,20 @@ const cases = [
       assert.equal(validateNativeGoldfishFinal(JSON.stringify({ ...final, outcome }), { binding, allowCheckpoint: true }).code, "NGHR-FINAL-SHAPE", outcome);
     assert.equal(validateNativeGoldfishFinal(finalText, { binding, allowCheckpoint: true }).final.outcome, "succeeded");
   }],
+  ["NGHR09 D195: the item delivery briefing admits the additive command form {id,path,command,dependencies}; the .test form is unchanged", () => {
+    const locator = { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/unit/spec.md", sourceSha256: "a".repeat(64),
+      criterionId: "AC-1", startByte: 10, endByte: 20, excerptSha256: "b".repeat(64) };
+    const briefing = check => ({ schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-1", itemId: "AC-1", criterionLocator: locator, checks: [check] });
+    const good = { id: "check-one", path: "project/pipeline.json", command: "make-check", dependencies: ["src/change.js", "project/pipeline.json"] };
+    assert.equal(validateItemDeliveryBriefing(briefing(good)).ok, true);
+    for (const bad of [{ ...good, command: "bad id" }, { ...good, command: "" }, { ...good, command: "-x" }, { ...good, command: 7 },
+      { id: good.id, command: good.command, dependencies: good.dependencies }, { ...good, path: "/abs/project/pipeline.json" },
+      { ...good, dependencies: ["src/change.js"] }, { ...good, extra: true }])
+      assert.equal(validateItemDeliveryBriefing(briefing(bad)).code, "NGHR-ITEM-DELIVERY-SHAPE", JSON.stringify(bad));
+    // The 3-key form still demands a .test file, with or without a command-looking path.
+    assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "project/pipeline.json", dependencies: ["project/pipeline.json"] })).code, "NGHR-ITEM-DELIVERY-SHAPE");
+    assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "src/change.test.mjs", dependencies: ["src/change.test.mjs"] })).ok, true);
+  }],
 
 ];
 

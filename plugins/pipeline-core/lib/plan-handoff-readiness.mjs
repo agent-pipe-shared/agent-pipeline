@@ -31,10 +31,11 @@ import { spawnSync } from 'node:child_process';
 import { observeGovernanceScope } from './governance-scope.mjs';
 import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from './critic-accepted-contract.mjs';
 import { validateItemDeliveryBriefing } from './native-goldfish-host-return.mjs';
+import { readConsumerVerifyConfiguration } from './consumer-verify.mjs';
 
 export const PLAN_HANDOFF_CODES = Object.freeze([
   'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-SPEC-UNREADABLE',
-  'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-UNAVAILABLE',
+  'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-CHECK-UNREGISTERED', 'PLR-HANDOFF-UNAVAILABLE',
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;
@@ -45,6 +46,8 @@ const ADMITTED_CRITERION_STATUSES = Object.freeze(['explicit-actual-independent-
 // A path-like token ending in a test-file suffix. The class includes `.` so `tests/../x.test.js` is captured whole
 // (and then refused by the shape rule) instead of being truncated to a harmless-looking tail.
 const CHECK_TOKEN = /[A-Za-z0-9_./-]+\.test\.(?:mjs|cjs|js)(?![A-Za-z0-9_-]|\.[A-Za-z0-9_])/gu;
+// D195: `command:<id>` names a command the project calibration registers under verifyImpact (the additive check form).
+const COMMAND_TOKEN = /(?<![A-Za-z0-9_./:-])command:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})/gu;
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const refuse = (code, message, extra = {}) => ({ ok: false, code, message, ...extra });
@@ -94,6 +97,7 @@ const HANDOFF_REPAIRS = Object.freeze({
   'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
   'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
   'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
+  'PLR-HANDOFF-CHECK-UNREGISTERED': 'register the named command id in the project calibration under verifyImpact.baseline (or an area) as {"id": "<id>", "command": "<the real verify command>"} and commit it, or edit the Spec to name a registered command id or a .test file, commit it',
   'PLR-HANDOFF-UNAVAILABLE': 'confirm `git --version` and `git status` succeed in the project root and the governance observation is readable, then retry; this check fails closed on any fault',
 });
 
@@ -119,7 +123,7 @@ export function planHandoffRefusal(verb, verdict) {
 
 /**
  * @param {{rootDir: string, specPath: string, expectedSpecSha256: string}} input
- * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}}} [deps]
+ * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}, readConsumerVerify?: (rootDir: string) => {baseline: {id: string}[], areas: {commands: {id: string}[]}[]}}} [deps]
  * @returns {{ok: true, skipped: true, code: 'PLR-NO-GOVERNANCE'}
  *   | {ok: true, code: 'PLR-HANDOFF-READY', admittedCriteria: string[], checks: {path: string, state: 'present'|'absent'}[]}
  *   | {ok: false, code: string, message: string, path?: string}}
@@ -170,6 +174,18 @@ export function inspectPlanDeliveryHandoff(input, deps = {}) {
       const state = checkState(root, path);
       if (state === null) return refuse('PLR-HANDOFF-CHECK-UNADMITTED', 'a test path named in the Spec is a symlink or has a non-file or non-directory component', { path });
       checks.push({ path, state });
+    }
+    const commandIds = [...new Set([...source.matchAll(COMMAND_TOKEN)].map((match) => match[1].replace(/[.:]+$/u, '')).filter((id) => id !== ''))].sort();
+    if (commandIds.length > 0) {
+      let registered;
+      try {
+        const configuration = (deps?.readConsumerVerify ?? readConsumerVerifyConfiguration)(root);
+        registered = new Set([...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].map((entry) => entry.id));
+      } catch { return refuse('PLR-HANDOFF-CHECK-UNREGISTERED', 'the Spec names a command:<id> check but the project calibration verifyImpact cannot be read', { path: `command:${commandIds[0]}` }); }
+      for (const id of commandIds) {
+        if (!registered.has(id)) return refuse('PLR-HANDOFF-CHECK-UNREGISTERED', 'a command:<id> check named in the Spec is not registered in the project calibration verifyImpact', { path: `command:${id}` });
+      }
+      for (const id of commandIds) checks.push({ command: id, state: 'registered' });
     }
     return { ok: true, code: 'PLR-HANDOFF-READY', admittedCriteria: admitted.map((entry) => entry.id), checks };
   } catch { return unavailable('unexpected fault'); }

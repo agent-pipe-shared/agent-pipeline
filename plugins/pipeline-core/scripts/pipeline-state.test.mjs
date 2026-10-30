@@ -3252,6 +3252,29 @@ handoffCase("R6 the inspection fails closed, and the criterion scan is exported 
   assert.equal(parsed.status, "no-explicit-criterion", JSON.stringify(parsed));
 });
 
+handoffCase("R7 D195: a command:<id> token must be registered in the calibration (PLR-HANDOFF-CHECK-UNREGISTERED); a registered one is ready with a command entry", () => {
+  const registered = { readConsumerVerify: () => ({ baseline: [{ id: "make-check", command: "make check" }], areas: [] }) };
+  withHandoffFixture({ specText: handoffSpec("- check: command:make-check") }, (fixture) => {
+    const result = fixture.inspect({}, registered);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.code, "PLR-HANDOFF-READY");
+    assert.deepEqual(result.checks, [{ command: "make-check", state: "registered" }]);
+  });
+  withHandoffFixture({ specText: handoffSpec("- check: command:absent-id") }, (fixture) => {
+    const result = fixture.inspect({}, registered);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PLR-HANDOFF-CHECK-UNREGISTERED");
+    assert.ok(handoff.PLAN_HANDOFF_CODES.includes("PLR-HANDOFF-CHECK-UNREGISTERED"));
+    assert.match(handoff.planHandoffRefusal("submit-plan", result), /verifyImpact/u);
+    const unreadable = fixture.inspect({}, { readConsumerVerify: () => { throw new Error("VEP-NO-CALIBRATION"); } });
+    assert.equal(unreadable.code, "PLR-HANDOFF-CHECK-UNREGISTERED");
+  });
+  withHandoffFixture({ specText: handoffSpec("- tests/orders.test.js", "- check: command:make-check") }, (fixture) => {
+    const result = fixture.inspect({}, registered);
+    assert.deepEqual(result.checks.map((entry) => entry.path ?? entry.command), ["tests/orders.test.js", "make-check"]);
+  });
+});
+
 assert.deepEqual(handoffFailures, [], `AC-264 plan-readiness hand-off cases failed: ${handoffFailures.join(" | ")}`);
 console.log("AC-264 plan-readiness hand-off R1-R6 complete.");
 

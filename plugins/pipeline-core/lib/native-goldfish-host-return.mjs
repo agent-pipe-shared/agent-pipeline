@@ -166,6 +166,14 @@ export function observeCodexGoldfishReturn(input, pending) {
   return final.ok ? { ...final, runner: "codex", assurance: "host-observed-subagent-start-stop-and-session-route" } : final;
 }
 
+const COMMAND_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+/** D195: a check is either the 3-key .test form or the additive 4-key command form (path = the calibration that registers the command). */
+function validCheckForm(check){
+  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
+    return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
+      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
+  return exact(check,['id','path','dependencies'])&&/\.test\.(?:mjs|cjs|js)$/u.test(check.path);
+}
 /** Typed selection data; original approval and actual source bytes are checked
  * independently by the authenticated continuation writer. */
 export function validateItemDeliveryBriefing(value) {
@@ -180,8 +188,8 @@ export function validateItemDeliveryBriefing(value) {
     ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
-    ||value.checks.some(check=>!exact(check,['id','path','dependencies'])||!ID.test(check.id??'')||!normalizedPath(check.path)
-      ||!/\.test\.(?:mjs|cjs|js)$/u.test(check.path)||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
+    ||value.checks.some(check=>!validCheckForm(check)||!ID.test(check.id??'')||!normalizedPath(check.path)
+      ||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
       ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
   return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};
 }

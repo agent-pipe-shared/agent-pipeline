@@ -63,6 +63,8 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
   --runner claude|codex defaults to claude; the selected model must match its role route.
   --effort-escalation MP-05|MP-07 admits an agent definition effort ABOVE its Claude route effort (otherwise a contradiction is refused).
   --check is included in the write scope. Paths are repository-relative.
+  --check command:<id> (D195) names a command the project calibration registers under verifyImpact (baseline or an area) instead of a
+    .test file; the calibration becomes a dependency of the check and is not writable by the dispatch.
   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
 
 build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
@@ -114,7 +116,8 @@ const { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } = cli
 const { dispatchBudgetLineForRole, parseDispatchSlice } = cliHelp ? {} : await import("../lib/dispatch-policy.mjs");
 const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/public-core-observation.mjs");
 const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
-const { resolveProjectAuthorityPaths } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
 const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
@@ -156,6 +159,9 @@ const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const SHA = /^[a-f0-9]{64}$/u;
 const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const MAX_CRITERION_BYTES = 4096;
+// D195: the additive check spelling `command:<id>`; <id> is a command id registered in the project calibration (consumer-verify VERIFY_ID).
+const COMMAND_CHECK_PREFIX = "command:";
+const VERIFY_COMMAND_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const CRITERION_ID_FORMS = "AC-<n> or AC-E<epic>-<story>-<nn>";
 // The bold bullet item (`- **<id>:** text`, marker `-`, `+` or `*`, at column 0) and the indented lines that continue it;
 // both mirror the host parser's `markdown-acceptance-bullet-item.v1` rendering exactly.
@@ -533,7 +539,11 @@ export function assertBindingInvariants(binding) {
   const checks = binding?.itemDelivery?.checks;
   if (!Array.isArray(checks) || checks.length !== 1 || !Array.isArray(binding.allowedPaths)) refuse("DBG-BINDING-INVALID", "the binding must carry exactly one item-delivery check");
   const [check] = checks;
-  if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
+  if (check.command !== undefined) {
+    // D195: the calibration the command is registered in is a dependency, never a write path (the command stays human-approved).
+    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} that registers command ${check.command} must not be among the allowed paths`);
+    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of command check ${check.command}`);
+  } else if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
     refuse("DBG-CHECK-NOT-IN-PATHS", `check ${check.path} is not among the allowed paths`);
   }
   if (!binding.allowedPaths.every((path) => check.dependencies.includes(path))) refuse("DBG-BINDING-INVALID", "every allowed path must be a dependency of the check");
@@ -586,17 +596,35 @@ export function generateDispatchBinding(options, deps = {}) {
   if (options.criterion !== undefined && !isCriterionId(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be ${CRITERION_ID_FORMS}`);
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
-  for (const path of [check, ...options.paths]) {
+  const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
+  for (const path of [...(commandId === null ? [check] : []), ...options.paths]) {
     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
   }
   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
     refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
   }
-  if (!/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file`);
-  const allowedPaths = [...new Set([check, ...options.paths])].sort();
+  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
+  if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
+  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...options.paths])].sort();
 
   let root;
   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+
+  // D195: a command check is bound to the calibration file that registers it; the id must be registered at this commit.
+  let commandCheckPath = null;
+  if (commandId !== null) {
+    commandCheckPath = (deps.calibrationRelPath ?? ((rootDir) => resolveAuthorityArtifactPath("calibration", { rootDir }).relPath))(root);
+    let registered = null;
+    let why = "";
+    try {
+      const configuration = (deps.readConsumerVerify ?? readConsumerVerifyConfiguration)(root);
+      registered = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].map((entry) => entry.id);
+    } catch (error) { why = ` (${String(error?.message ?? error).slice(0, 160)})`; }
+    if (registered === null || !registered.includes(commandId)) {
+      refuse("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
+    }
+    if (allowedPaths.includes(commandCheckPath)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
+  }
 
   // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
   const specPath = options.spec ?? defaultSpecPath(root);
@@ -667,7 +695,7 @@ export function generateDispatchBinding(options, deps = {}) {
     const scope = [...(row.writeScope ?? [])].sort();
     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
-      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
+      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${commandId !== null || checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} (or --check command:<registered id> for a repository without a unit-test runner) and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
     }
   }
 
@@ -876,7 +904,9 @@ export function generateDispatchBinding(options, deps = {}) {
       sliceId: dispatchId,
       itemId,
       criterionLocator: locator,
-      checks: [{ id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }],
+      checks: [commandId === null
+        ? { id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }
+        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
     },
   };
   assertBindingInvariants(binding);

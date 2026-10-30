@@ -1560,3 +1560,74 @@ test("D180b PF-61 reader does not double-count the same file name present in bot
   const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
   assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-SAME"], JSON.stringify(found));
 });
+
+// D195: a check may name a registered consumer Verify command id (additive form); the .test form is unchanged.
+const REGISTERED = () => ({ baseline: [{ id: "make-check", command: "make check" }], areas: [{ id: "docs", paths: ["docs"], commands: [{ id: "docs-lint", command: "make docs" }] }] });
+test("D195 command:<id> of a registered command builds the 4-key check; the calibration is a dependency and not a write path", async () => {
+  const { runDispatchBriefing, assertBindingInvariants } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const [check] = result.binding.itemDelivery.checks;
+  assert.deepEqual(Object.keys(check).sort(), ["command", "dependencies", "id", "path"]);
+  assert.equal(check.command, "make-check");
+  assert.ok(check.dependencies.includes(check.path), "the calibration path is a dependency");
+  assert.ok(!result.binding.allowedPaths.includes(check.path), "the calibration path is not writable by the Goldfish");
+  assert.deepEqual(result.binding.allowedPaths, [PATH_A]);
+  assert.ok(result.binding.allowedPaths.every((path) => check.dependencies.includes(path)), "every allowed path is a dependency");
+  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
+  const area = runDispatchBriefing(argvOf(fx, { "--check": "command:docs-lint" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(area.ok, true, "a command registered under an area is registered too");
+  const broken = structuredClone(result.binding);
+  broken.allowedPaths = [...broken.allowedPaths, broken.itemDelivery.checks[0].path].sort();
+  assert.throws(() => assertBindingInvariants(broken), (error) => error.code === "DBG-CHECK-COMMAND-PATH-WRITABLE");
+});
+test("D195 an unregistered command id is refused DBG-CHECK-COMMAND-UNKNOWN with a runnable repair naming verifyImpact.baseline", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:absent-id" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "DBG-CHECK-COMMAND-UNKNOWN", result.message);
+  assert.match(result.message, /absent-id/u);
+  assert.match(result.message, /verifyImpact\.baseline/u);
+  const bad = runDispatchBriefing(argvOf(fx, { "--check": "command:-bad id" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(bad.ok, false);
+  assert.ok(["DBG-CHECK-COMMAND-UNKNOWN", "DBG-PATH-INVALID"].includes(bad.code), bad.code);
+  const unreadable = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }), depsOf(fx, { readConsumerVerify: () => { throw new Error("VEP-NO-CALIBRATION: no project calibration found."); } }));
+  assert.equal(unreadable.code, "DBG-CHECK-COMMAND-UNKNOWN");
+});
+test("D195 the calibration cannot be named as a write path of a command check", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }, ["--path", "project/pipeline.json"]), depsOf(fx, { readConsumerVerify: REGISTERED, calibrationRelPath: () => "project/pipeline.json" }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "DBG-CHECK-COMMAND-PATH-WRITABLE", result.message);
+});
+test("D195 the .test form is unchanged: 3 keys, the check is a write path, a non-test check is still refused", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { readConsumerVerify: () => { throw new Error("must not be read for the .test form"); } }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  const [check] = result.binding.itemDelivery.checks;
+  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "id", "path"]);
+  assert.equal(check.path, CHECK);
+  assert.ok(result.binding.allowedPaths.includes(CHECK));
+  const notTest = runDispatchBriefing(argvOf(fx, { "--check": PATH_A }), depsOf(fx));
+  assert.equal(notTest.code, "DBG-CHECK-NOT-TEST");
+});
+
+test("D195 the package route admits check command:<id> to the same admission as the --check flag form", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ check: "command:make-check", targeted: ["`make check` (green)"] });
+  const result = runDispatchBriefing(argv, depsOf(fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const parsed = parseNativeGoldfishBriefing(result.text);
+  assert.equal(parsed.ok, true, parsed.code);
+  const [check] = parsed.binding.itemDelivery.checks;
+  assert.equal(check.command, "make-check");
+  assert.deepEqual(parsed.binding.allowedPaths, [PATH_A]);
+  const unknown = packageFixture({ check: "command:absent-id", targeted: ["`make check` (green)"] });
+  const refused = runDispatchBriefing(unknown.argv, depsOf(unknown.fx, { readConsumerVerify: REGISTERED }));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-CHECK-COMMAND-UNKNOWN", refused.message);
+});
