@@ -1,0 +1,440 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 34c9d0431..fc5eb3df1 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -13,6 +13,7 @@ import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
+ import { discoverRepository } from "./worktree-lifecycle.mjs";
+ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+ import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
++import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MODES = new Set(["full", "delta"]);
+@@ -233,6 +234,47 @@ export function deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCo
+   });
+ }
+ 
++// The tracked export of one consumed session Critic review (session-critic-finalizer export): exactly these files under
++// specs/<feature>/evidence/critic/<packetId>/; the index schema mirrors SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA there.
++const CRITIC_EXPORT_FILES = ["index.json", "receipt.json", "report.md"];
++const CRITIC_EXPORT_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
++/**
++ * A commit that only adds exports of consumed Critic reviews is evidence, not unreviewed content (consumer finding N23,
++ * 2026-10-30: the export commit after a passed round broke the carry-forward and the lineage transport). Every changed
++ * path is a new export file of a feature in `featureIds`; each export directory holds exactly the three files; its index
++ * binds the receipt and report digests; and the receipt bytes are the canonical consumed receipt of that packet in this
++ * repository's private packet store, so nothing but the export of a review that really happened passes.
++ */
++export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = readConsumedCandidateReceipt) {
++  try {
++    const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
++    if (parents.length !== 2) return false;
++    const fields = gitBytes(root, ["diff", "--name-status", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
++    if (fields.length === 0 || fields.length % 2 !== 0) return false;
++    const exports = new Map();
++    for (let index = 0; index < fields.length; index += 2) {
++      const match = /^specs\/([^/]+)\/evidence\/critic\/([a-f0-9]{32})\/([^/]+)$/u.exec(fields[index + 1]);
++      if (fields[index] !== "A" || !match || !featureIds.includes(match[1]) || !CRITIC_EXPORT_FILES.includes(match[3])) return false;
++      const key = `specs/${match[1]}/evidence/critic/${match[2]}`;
++      if (!exports.has(key)) exports.set(key, { packetId: match[2], files: [] });
++      exports.get(key).files.push(match[3]);
++    }
++    const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
++    for (const [dir, { packetId, files }] of exports) {
++      if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
++      const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
++      const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
++      const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
++      if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
++        || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
++        || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
++        || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
++        || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
++    }
++    return true;
++  } catch { return false; }
++}
++
+ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+   try {
+     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ")
+@@ -292,14 +334,20 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+   } catch { return false; }
+ }
+ 
+-/** Classify only exact manifest-registration commits as budget-neutral. */
+-export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit, candidateCommit }) {
++/**
++ * Classify only exact manifest-registration commits as budget-neutral. `admitCriticExports` also admits commits that
++ * only add exports of consumed Critic reviews; the Critic carry-forward passes it, course counters keep the default.
++ */
++export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit, candidateCommit, admitCriticExports = false,
++  readConsumedCandidateReceiptFn = readConsumedCandidateReceipt }) {
+   const source = deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCommit, candidateCommit });
+   const root = realpathSync(repoRoot);
+   const evidenceOnly = [];
+   const correction = [];
+   for (const commit of source.rangeCommits) {
+-    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId) ? evidenceOnly : correction).push(commit);
++    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
++      || (admitCriticExports === true && criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn))
++      ? evidenceOnly : correction).push(commit);
+   }
+   return Object.freeze({
+     ...source,
+@@ -517,7 +565,7 @@ function evidenceCommitV2(root,commit,featureId){
+ function transport(root,from,to,original,aliases){
+  const aliasIds=aliases.map(a=>a.descriptor.aliasFeatureId),ids=[original,...aliasIds];
+  for(const commit of range(root,from,to)){
+-  if(ids.some(id=>evidenceCommitV2(root,commit,id)))continue;
++  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids))continue;
+   const parents=gitBytes(root,['rev-list','--parents','-n','1',commit],'CCA-RANGE-READ').toString('utf8').trim().split(/\s+/u);if(parents.length!==2)fail('CCA-TRANSPORT');
+   const changed=gitBytes(root,['diff','--name-only','-z',parents[1],commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
+   const allowed=new Set();
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index d0a14e797..57056604c 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -761,7 +761,7 @@ test("D51-CARRY (e) exact-commit evidence behaves as before and records no carry
+   assert.equal(actual.deterministicEvidenceSha256, sha256Canonical(fx.entries), JSON.stringify(actual));
+ });
+ // PF-94 c16: a REAL consumed course round (claim, session finalization in the owner store), reused by the delta-request slice.
+-import { admitSessionCriticReview, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
++import { admitSessionCriticReview, exportSessionCriticEvidence, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
+ import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
+ import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
+ import { addCriticReviewLineage } from "./feature-package-registration.mjs";
+@@ -1294,4 +1294,32 @@ test("PF94 DOCS (d) the Critic skill documents continuing a course and the conti
+   const cont = pf94Read("../skills/pipeline-start/references/implementation-continuation.md");
+   assert.ok(cont.includes("Continuing a Critic course after the first round (PF-94)"));
+ });
++// Consumer finding 2026-10-30 (N23 and the full-round path cap), through the real registration route of a consumed round.
++function exportConsumedRound(fx) {
++  writeFileSync(join(fx.root, "evidence", "critic-notes.md"), "# Critic notes\n\nNo findings.\n");
++  const exported = exportSessionCriticEvidence({ root: fx.root, packetId: fx.packetId, reportPath: "evidence/critic-notes.md",
++    outDir: `specs/${fx.featureId}/evidence/critic/${fx.packetId}` });
++  assert.equal(exported.status, "exported", JSON.stringify(exported));
++  return pf94CommitPaths(fx.root, exported.paths, "export the consumed review");
++}
++test("N23 the lineage of a consumed round registers after its own export commit; a commit beside the export still drifts", () => {
++  const fx = consumedCourseRoundFixture();
++  exportConsumedRound(fx);
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const mixed = consumedCourseRoundFixture();
++  exportConsumedRound(mixed);
++  writeFileSync(join(mixed.root, "notes.txt"), "not evidence\n");
++  pf94CommitPaths(mixed.root, ["notes.txt"], "a commit that is not evidence");
++  const drifted = pf94Lineage(mixed);
++  assert.equal(drifted.code, "FPR-LINEAGE-TRANSPORT", JSON.stringify(drifted));
++});
++test("full round over 300 changed paths: the real route admits, finalizes and registers its lineage (consumer 357 paths)", () => {
++  const extra = Array.from({ length: 300 }, (_, index) => `src/many/file-${String(index).padStart(3, "0")}.mjs`);
++  const fx = consumedCourseRoundFixture({ extraCandidateFiles: extra });
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  assert.ok(lineage.diff.changedPaths.length > 300, String(lineage.diff.changedPaths.length));
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index e616912f5..c0dde2b05 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -12,6 +12,7 @@
+  */
+ import {
+   REVIEW_LIMITS,
++  CRITIC_MAX_REVIEW_PATHS,
+   canonicalJson,
+   sha256Canonical,
+ } from "./review-economy.mjs";
+@@ -99,6 +100,8 @@ export const safePath = (value) => typeof value === "string"
+   && PATH.test(value)
+   && Buffer.byteLength(value, "utf8") <= 512
+   && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
++// Changed-path lists of one review are bound by CRITIC_MAX_REVIEW_PATHS (review-economy.mjs), not by the 256 of identifier lists.
++export const MAX_REVIEW_PATHS = CRITIC_MAX_REVIEW_PATHS;
+ export const sortedUnique = (values, valid, { allowEmpty = false, maximum = 256 } = {}) => Array.isArray(values)
+   && (allowEmpty || values.length > 0)
+   && values.length <= maximum
+@@ -134,7 +137,7 @@ export function packetCode(packet) {
+     || !Number.isSafeInteger(packet.diff.bytes)
+     || packet.diff.bytes < 0
+     || !digest(packet.diff.sha256)
+-    || !sortedUnique(packet.diffPaths, safePath)
++    || !sortedUnique(packet.diffPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+     || !object(packet.bindings)
+     || !["requestSha256", "diffPathsSha256", "governanceSha256"].every((key) => digest(packet.bindings[key]))
+     || !object(packet.request)) {
+@@ -149,7 +152,7 @@ export function packageCode(packages, coverage) {
+     (row) => exact(row, ["id", "subjectSha256", "changedPaths", "integrationEdges"])
+       && identifier(row.id)
+       && digest(row.subjectSha256)
+-      && sortedUnique(row.changedPaths, safePath)
++      && sortedUnique(row.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+       && sortedUnique(row.integrationEdges, identifier, { allowEmpty: true }),
+     (row) => row.id,
+   );
+@@ -166,7 +169,7 @@ export function packageCode(packages, coverage) {
+ 
+ export function coverageCode(coverage) {
+   if (!exact(coverage, ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"])
+-    || !sortedUnique(coverage.changedPaths, safePath)
++    || !sortedUnique(coverage.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+     || !sortedUnique(coverage.acceptanceIds, identifier)
+     || !sortedUnique(coverage.integrationEdges, identifier)
+     || typeof coverage.complete !== "boolean"
+@@ -295,7 +298,7 @@ function lineageCode(record) {
+     || !exact(record.diff, ["base", "sha256", "changedPaths"])
+     || !OID.test(record.diff.base)
+     || !digest(record.diff.sha256)
+-    || !sortedUnique(record.diff.changedPaths, safePath)
++    || !sortedUnique(record.diff.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+     || !exact(record.references, ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"])
+     || !Object.values(record.references).every(digest)
+     || coverageCode(record.coverage)
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.mjs b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+index 6cffdbb18..d784b3706 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.mjs
+@@ -31,6 +31,7 @@ import {
+   identifier,
+   safePath,
+   sortedUnique,
++  MAX_REVIEW_PATHS,
+   same,
+   recordCore,
+   candidateCode,
+@@ -136,10 +137,10 @@ function releaseScopeCode(scope) {
+     || !exact(scope.reviewedRange, ["base", "head", "tree"])
+     || ![scope.reviewedRange.base, scope.reviewedRange.head, scope.reviewedRange.tree].every((value) => OID.test(value))
+     || !digest(scope.deltaSha256)
+-    || !sortedUnique(scope.changedPaths, safePath)
++    || !sortedUnique(scope.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
+     || !exact(scope.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
+-    || !sortedUnique(scope.impactClosure.changedPaths, safePath)
+-    || !sortedUnique(scope.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
++    || !sortedUnique(scope.impactClosure.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
++    || !sortedUnique(scope.impactClosure.directConsequencePaths, safePath, { allowEmpty: true, maximum: MAX_REVIEW_PATHS })
+     || !sortedUnique(scope.impactClosure.integrationEdges, identifier, { allowEmpty: true })
+     || !same(scope.changedPaths, scope.impactClosure.changedPaths)
+     || scope.impactClosureSha256 !== sha256Canonical(scope.impactClosure.integrationEdges)
+@@ -186,8 +187,8 @@ export function compileReleaseCriticReviewScope(input) {
+     || packetCode(input.packet)
+     || !["broad-first", "correction", "broad-correction"].includes(input.mode)
+     || !exact(input.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
+-    || !sortedUnique(input.impactClosure.changedPaths, safePath)
+-    || !sortedUnique(input.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
++    || !sortedUnique(input.impactClosure.changedPaths, safePath, { maximum: MAX_REVIEW_PATHS })
++    || !sortedUnique(input.impactClosure.directConsequencePaths, safePath, { allowEmpty: true, maximum: MAX_REVIEW_PATHS })
+     || !sortedUnique(input.impactClosure.integrationEdges, identifier, { allowEmpty: true })
+     || !same(input.impactClosure.changedPaths, input.packet.diffPaths)
+     || invalidationCode(input.invalidation)) {
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index 6d7b5eb42..f34d0dcff 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -13,6 +13,7 @@ import {
+ } from "./critic-review-lineage.mjs";
+ import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
+ import { safePath, v2BindingCode } from "./critic-review-lineage-core.mjs";
++import * as lineageCore from "./critic-review-lineage-core.mjs";
+ 
+ const H = (character) => character.repeat(64);
+ const O = (character) => character.repeat(40);
+@@ -873,5 +874,21 @@ check("PF-102 a diff round past round 2 needs no exception binding; malformed bi
+   assert.equal(v2BindingCode(record(4, { deltaRequestSha256: null })), "CRL-V2-DELTA-BINDING", "a diff round must carry its delta request");
+ });
+ 
+-assert.equal(passed, 19);
+-console.log(`${passed}/19 checks passed.`);
++// Consumer finding 2026-10-30: a full round (D204 fallback) over the whole feature range changed 357 paths, and the
++// 256 of identifier lists refused its lineage as CRL-V2-PACKET. Changed-path lists are bound by MAX_REVIEW_PATHS.
++check("a full round over more than 256 changed paths compiles, validates and admits its packet; the path bound still holds", () => {
++  const paths = Array.from({ length: 357 }, (_, index) => `src/module-${String(index).padStart(3, "0")}.ts`);
++  const packet = Object.freeze({ ...packet1, diffPaths: paths });
++  const record = compile({ packet });
++  assert.equal(record.diff.changedPaths.length, 357);
++  assert.equal(validateCriticReviewLineage(record).ok, true);
++  assert.equal(validateCriticLineagePacketAdmission(record, packet).ok, true);
++  const MAX_REVIEW_PATHS = lineageCore.MAX_REVIEW_PATHS;
++  const schema = JSON.parse(readFileSync(new URL("../scripts/critic-review-lineage.schema.json", import.meta.url), "utf8"));
++  assert.equal(schema.$defs.pathSet.maxItems, MAX_REVIEW_PATHS, "the schema states the same bound as the validators");
++  const over = Array.from({ length: MAX_REVIEW_PATHS + 1 }, (_, index) => `src/m${index}.ts`);
++  assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: over }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
++});
++
++assert.equal(passed, 20);
++console.log(`${passed}/20 checks passed.`);
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 23341465a..05caf1e11 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -192,7 +192,8 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
+   try {
+     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
+       repoRoot, featureId, baseCommit: reviewedCandidate.commit,
+-      candidateCommit: targetCandidate.commit,
++      candidateCommit: targetCandidate.commit, admitCriticExports: true,
++      ...(deps.readConsumedCandidateReceiptFn ? { readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn } : {}),
+     });
+   } catch { fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified."); }
+   if (range.candidateTree !== targetCandidate.tree
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index d503aa382..976fa4fe2 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -289,6 +289,74 @@ test("a consumed Critic carries only across exact immutable evidence registratio
+     targetCandidate: mixed }, deps), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
+ });
+ 
++// N23 (consumer finding 2026-10-30): the tracked export of the consumed review sits between the reviewed and the
++// pushed candidate. It carries the Critic; a forged, extended or mixed export stays unreviewed content, and the
++// course counters (classification without the option) keep counting it as a correction.
++import * as courseAdmission from "./critic-course-admission.mjs";
++test("N23 the export commit of the consumed review carries the Critic; a forged, extended or mixed export does not", t => {
++  const root = fixture(t);
++  const git = (args) => execFileSync("git", ["-C", root, ...args],
++    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  const commitAll = (message) => {
++    git(["add", "-A"]);
++    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
++    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
++  };
++  const featureId = "carry-feature";
++  git(["init", "--quiet"]);
++  mkdirSync(join(root, "specs", featureId), { recursive: true });
++  writeFileSync(join(root, "source.txt"), "reviewed source\n");
++  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
++    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
++  const reviewed = commitAll("reviewed source");
++  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
++    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
++  const deps = { readConsumedCandidateReceiptFn: () => read };
++  const dir = `specs/${featureId}/evidence/critic/${read.receipt.packetId}`;
++  const exportAt = (base, message, { receiptBytes = canonicalJson(read.receipt), report = "# Critic notes\n\nNo findings.\n",
++    index = {}, extra = null, source = null } = {}) => {
++    git(["checkout", "--quiet", "--detach", base]);
++    mkdirSync(join(root, dir), { recursive: true });
++    writeFileSync(join(root, dir, "receipt.json"), receiptBytes);
++    writeFileSync(join(root, dir, "report.md"), report);
++    writeFileSync(join(root, dir, "index.json"), canonicalJson({ schema: "pipeline.session-critic-evidence-index.v1",
++      packetId: read.receipt.packetId, candidate: { commit: reviewed.commit, tree: reviewed.tree },
++      receiptSha256: sha256(receiptBytes), reportSha256: sha256(report), reviewPass: true, findingCount: 0, ...index }));
++    if (extra) writeFileSync(join(root, dir, extra), "extra\n");
++    if (source) writeFileSync(join(root, "source.txt"), source);
++    return commitAll(message);
++  };
++  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
++    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
++  const exported = exportAt(reviewed.commit, "export the consumed review");
++  assert.deepEqual(carry(exported).proof.evidenceOnlyCommits, [exported.commit]);
++  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, ["alias-feature", featureId], deps.readConsumedCandidateReceiptFn), true,
++    "the lineage transport admits the export under any course feature id");
++  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, ["alias-feature"], deps.readConsumedCandidateReceiptFn), false);
++  assert.equal(courseAdmission.criticExportOnlyCommit(root, exported.commit, [featureId]), false,
++    "the production reader finds no consumed packet in this repository's private store");
++  assert.deepEqual(courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed.commit,
++    candidateCommit: exported.commit }).correctionCommits, [exported.commit], "course counters are unchanged without the option");
++  const forged = {
++    "reformatted receipt bytes": { receiptBytes: `${JSON.stringify(read.receipt)}\n` },
++    "report digest of another report": { index: { reportSha256: sha256("another report\n") } },
++    "foreign packet id in the index": { index: { packetId: "e".repeat(32) } },
++    "review verdict differs from the receipt": { index: { reviewPass: false } },
++    "an extra file in the export": { extra: "notes.md" },
++    "a source change in the same commit": { source: "changed with the export\n" },
++  };
++  for (const [name, variant] of Object.entries(forged)) {
++    assert.throws(() => carry(exportAt(reviewed.commit, name, variant)), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
++  }
++  git(["checkout", "--quiet", "--detach", exported.commit]);
++  writeFileSync(join(root, dir, "report.md"), "# Critic notes\n\nRewritten after the export.\n");
++  assert.throws(() => carry(commitAll("modify the exported report")), error => error.code === "CVL-CARRY-CONTENT-CHANGED",
++    "a later change to an exported file is not an export");
++  assert.throws(() => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"), featureId,
++    criticPacketId: read.receipt.packetId, targetCandidate: exported }, {}), error => error.code === "CVL-CRITIC-UNAVAILABLE",
++  "without a consumed packet in the private store nothing carries");
++});
++
+ // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
+ // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
+ import * as readiness from "./critic-verify-readiness.mjs";
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index f196b5542..abe5bd521 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -526,7 +526,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   }
+   const identityInput = { repoRoot: root, featureId, baseCommit: packet.candidate.base, candidateCommit: packet.candidate.commit, registrationCommit: head, acceptedReference: null };
+   const resolved = resolveRegisteredCriticCourseIdentity(identityInput);
+-  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only, so the lineage of round N must be registered BEFORE the next correction commit; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: resolved.code, packetId });
++  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only (registrations, or the tracked export of a consumed review), so the lineage of round N must be registered BEFORE the next correction commit; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: resolved.code, packetId });
+   const claim = readConsumedCourseClaimBinding({ resolvedRepository: resolved.value.resolvedRepository, packetId, expectedCandidate: { commit: packet.candidate.commit, tree: packet.candidate.tree } });
+   if (!claim.ok) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, readerCode: claim.code ?? null });
+   const history = resolved.value.registeredHistory;
+@@ -658,7 +658,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), register it WITHOUT committing first with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun this command`, extra2);
+     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
+     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
+-    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (${code}); commit only the registration paths between the correction and this command`, extra2);
++    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command`, extra2);
+     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
+   }
+   const { descriptor, artifact } = compiled.value;
+diff --git a/plugins/pipeline-core/lib/review-economy.mjs b/plugins/pipeline-core/lib/review-economy.mjs
+index eb364a54a..9a9a14a3d 100644
+--- a/plugins/pipeline-core/lib/review-economy.mjs
++++ b/plugins/pipeline-core/lib/review-economy.mjs
+@@ -281,10 +281,13 @@ function criticPath(value) {
+     && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+ }
+ 
+-function criticSorted(values, valid, { allowEmpty = false } = {}) {
++// A full round (genesis or D204 fallback) covers the whole feature range, which a consumer measured at
++// 357 paths, so changed-path lists are not bound by the 256 of identifier lists. The lineage core reuses it.
++export const CRITIC_MAX_REVIEW_PATHS = 4096;
++function criticSorted(values, valid, { allowEmpty = false, maximum = 256 } = {}) {
+   return Array.isArray(values)
+     && (allowEmpty || values.length > 0)
+-    && values.length <= 256
++    && values.length <= maximum
+     && values.every(valid)
+     && values.every((value, index) => index === 0 || values[index - 1] < value);
+ }
+@@ -317,7 +320,7 @@ function criticPackageCode(packages, coverage) {
+     || !packages.every((row) => exactKeys(row, ["id", "subjectSha256", "changedPaths", "integrationEdges"])
+       && CRITIC_SAFE_ID.test(row.id ?? "")
+       && SHA256.test(row.subjectSha256 ?? "")
+-      && criticSorted(row.changedPaths, criticPath)
++      && criticSorted(row.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
+       && criticSorted(row.integrationEdges, (value) => CRITIC_SAFE_ID.test(value), { allowEmpty: true }))
+     || !packages.every((row, index) => index === 0 || packages[index - 1].id < row.id)) {
+     return "RE-CRITIC-PROJECTION-PACKAGES";
+@@ -345,11 +348,11 @@ function criticProjectionRecordCode(record) {
+     || !exactKeys(record.diff, ["base", "sha256", "changedPaths"])
+     || !CRITIC_OID.test(record.diff.base ?? "")
+     || !SHA256.test(record.diff.sha256 ?? "")
+-    || !criticSorted(record.diff.changedPaths, criticPath)
++    || !criticSorted(record.diff.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
+     || !exactKeys(record.references, ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"])
+     || !Object.values(record.references).every((value) => SHA256.test(value))
+     || !exactKeys(record.coverage, ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"])
+-    || !criticSorted(record.coverage.changedPaths, criticPath)
++    || !criticSorted(record.coverage.changedPaths, criticPath, { maximum: CRITIC_MAX_REVIEW_PATHS })
+     || !criticSorted(record.coverage.acceptanceIds, (value) => CRITIC_SAFE_ID.test(value))
+     || !criticSorted(record.coverage.integrationEdges, (value) => CRITIC_SAFE_ID.test(value))
+     || typeof record.coverage.complete !== "boolean"
+diff --git a/plugins/pipeline-core/scripts/critic-review-lineage.schema.json b/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
+index c2b00574d..239e3fdcb 100644
+--- a/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
++++ b/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
+@@ -447,7 +447,7 @@
+     "pathSet": {
+       "type": "array",
+       "minItems": 1,
+-      "maxItems": 256,
++      "maxItems": 4096,
+       "uniqueItems": true,
+       "items": {"$ref": "#/$defs/path"}
+     },
