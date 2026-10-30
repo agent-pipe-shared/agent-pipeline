@@ -1,0 +1,717 @@
+diff --git a/plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs b/plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs
+index c49bf8ec1..ebad030b2 100644
+--- a/plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs
+@@ -260,12 +260,29 @@ test("[pendingAsks compaction] routine inspect repeats no request text and is si
+ const ONBOARDING_INIT_CLI = fileURLToPath(new URL("../../scripts/onboarding-init.mjs", import.meta.url));
+ const COLLECT_INPUT_OUTPUT_BOUND = 19_000;
+ 
+-function driverOutput(runner) {
++// G15 / D210 (restates the fixture state, not the compaction intent): the Codex fresh first stop is now the ONE merged
++// pending ask (outcome "pending-asks"), no longer a collect-input outcome with sibling asks. `consentFirst` reaches a
++// state that still has a primary collect-input action plus sibling asks: only the merged ask's preceding
++// intake-consent-apply command (without the first project description) has run, so the driver publishes the
++// intake-capture collect-input beside the still-pending initial-answers ask.
++function driverOutput(runner, { consentFirst = false } = {}) {
+   const root = mkdtempTestScratch("alf-k15-root-");
+   const home = mkdtempTestScratch("alf-k15-home-");
++  const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
++  if (consentFirst) {
++    const first = spawnSync(process.execPath, [ONBOARDING_INIT_CLI, "--root", root, "--runner", runner], {
++      encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, env,
++    });
++    assert.equal(first.status, 0, first.stderr);
++    const consentArgv = JSON.parse(first.stdout).pendingAsks[0].precedingApplyAction.argv
++      .filter((value, index, all) => value !== "--text-file" && all[index - 1] !== "--text-file")
++      .map((value) => value === "<de|en>" ? "en" : value === "<PO_INTAKE_PROFILE>" ? "feature" : value);
++    const consent = spawnSync(process.execPath, consentArgv, { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, env });
++    assert.equal(consent.status, 0, consent.stderr);
++  }
+   const run = spawnSync(process.execPath, [ONBOARDING_INIT_CLI, "--root", root, "--runner", runner], {
+     encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024,
+-    env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
++    env,
+   });
+   rmSync(root, { recursive: true, force: true });
+   rmSync(home, { recursive: true, force: true });
+@@ -283,8 +300,8 @@ function assertAsksPrintedOnce({ stdout, parsed }, label) {
+ }
+ 
+ test("[pendingAsks compaction] the driver prints each published ask once for the collect-input outcome and stays within its size bound", () => {
+-  const codex = driverOutput("codex");
+-  assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex first stop is a collect-input outcome with sibling asks");
++  const codex = driverOutput("codex", { consentFirst: true });
++  assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex stop after consent is a collect-input outcome with sibling asks");
+   assertAsksPrintedOnce(codex, "codex/collect-input");
+   // The primary question stays reachable: in full in collectInput, by kind in final.nextAction.
+   assert.equal(codex.parsed.collectInput.kind, "collect-input");
+@@ -302,7 +319,7 @@ test("[pendingAsks compaction] the driver prints each published ask once for the
+ const COLLECT_INPUT_REFERENCE_BOUND = 15_000;
+ 
+ test("[pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference", async () => {
+-  const codex = driverOutput("codex");
++  const codex = driverOutput("codex", { consentFirst: true }); // G15 / D210: see driverOutput()
+   const { parsed, stdout } = codex;
+   assert.equal(parsed.outcome, "collect-input");
+   assert.equal(countOf(stdout, JSON.stringify(parsed.collectInput)), 1, "the full primary action is printed more than once");
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
+index 45104bfe4..a3f3529c7 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
+@@ -122,7 +122,10 @@ const MATRIX = [["claude", "signature"], ["claude", "chat"], ["codex", "signatur
+       // P2: the first round carries the approval question and its published action is admitted when answered.
+       const ask = firstAction(first);
+       assert.ok(ask, `first round published an action: ${first.outcome}`);
+-      assert.deepEqual(inputNames(ask), FIRST_ROUND);
++      // G15 / D210 (restates: the first round was exactly FIRST_ROUND): it keeps these inputs in order and now
++      // also carries the intake consent values (profile; off Claude the first project description).
++      assert.deepEqual(inputNames(ask).slice(0, FIRST_ROUND.length), FIRST_ROUND);
++      assert.equal(inputNames(ask).includes("profile"), true, "the intake consent values ride in the same first round");
+       assert.ok(ask.applyAction.argv.includes("--human-approval"));
+       const argv = fillFirst(ask, mode);
+       assert.equal(isSanctionedLifecycleCommand(quote([ask.applyAction.executable, ...argv]), root), true);
+diff --git a/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs b/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
+index 3c5cf3732..0c7257d4e 100644
+--- a/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
++++ b/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
+@@ -63,7 +63,10 @@ for (const runner of RUNNERS) {
+ 
+     // 2. The bundled ask carries the approved|declined question; the generated command requires it.
+     const ask = first.pendingAsks[0];
+-    assert.deepEqual(inputNames(ask), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++    // G15 / D210 (restates: the bundled ask ended at language): the first-answer round keeps its five inputs in
++    // order and now also carries the intake consent values (profile; off Claude the first project description).
++    assert.deepEqual(inputNames(ask).slice(0, 5), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++    assert.equal(inputNames(ask).includes("profile"), true, "the intake consent values ride in the same first round");
+     assert.ok(ask.applyAction.argv.includes("--advisor-export-consent"));
+     assert.ok(ask.applyAction.argv.includes("<approved|declined>"));
+     assert.equal(ask.applyAction.argv.some((value) => String(value).startsWith("--trust-anchor-")), false);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 7e6e7d9ae..1515e748d 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3146,6 +3146,29 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, in
+   };
+ }
+ 
++// G15 / D210: the first onboarding round is ONE PO turn on every runner. While intake consent is
++// unrecorded, collectInitialAnswersAction() also collects the still-unresolved intake values and
++// carries the existing intake-consent-apply command beside its own onboarding-init command; the two
++// sanctioned commands are chained by order (no new mutation verb): consent first, so the intake
++// record exists before the initial answers re-enter the driver, then the initial answers. Each
++// stays the command it is today (idempotent, fills only unresolved fields) and refuses on drift
++// by its own rules; a skipped or failed first command leaves the ordinary consent action published.
++export const INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE = "This same round also collects the intake consent, so the PO answers once before any project material: ask for explicit intake consent and the PO profile (epic|feature|mini) together with the answers above; the one de|en language answer fills the language placeholder of both commands, and the Git author is not asked again for consent. Execute the returned precedingApplyAction FIRST (it records consent and the typed intake values), then applyAction, each exactly once, and never without the PO's explicit consent; do not reconstruct either command. ";
++export const INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE = "Keep material capture separate: after consent is durably applied, the following intake-capture action takes the opaque native reference of the PO's next turn. ";
++export const INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE = `Also ask for the first project description in this same round: if it already exists in a regular file inside this repository use precedingExistingFileApplyAction with that file's repository-relative path and SHA-256; otherwise write the bytes once to ${INTAKE_TEXT_FILE} before precedingApplyAction. If the original project request was already supplied in this session, reuse its exact bytes (multiline, trailing whitespace) instead of asking again. `;
++
++function mergedIntakeConsentFields(consent, runner) {
++  const sharedLanguage = (action) => ({
++    ...action,
++    argv: action.argv.map((part) => part === INTAKE_LANGUAGE_PLACEHOLDER ? INITIAL_LANGUAGE_PLACEHOLDER : part),
++  });
++  return {
++    precedingApplyAction: sharedLanguage(consent.applyAction),
++    ...(runner === "claude" ? {} : { precedingExistingFileApplyAction: sharedLanguage(consent.existingFileApplyAction) }),
++    applyOrder: ["precedingApplyAction", "applyAction"],
++  };
++}
++
+ // Mirrors the private INTAKE_MAX_MATERIAL_BYTES bound enforced by
+ // applyOnboardingIntakeCapture() in onboarding-continuity.mjs (not exported
+ // there, so restated here rather than imported).
+@@ -5324,6 +5347,8 @@ function firstRestartIntakeBoundary(observed, fs) {
+     const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)(options);
+     let action = null;
+     if (checkpoint.status === "absent" || checkpoint.value?.consent === null) {
++      // G15 / D210: this consent action is replaced by the merged first-round ask when the pending
++      // initial answers are attached afterwards (withPendingAsksSurfacedOnNextAction()).
+       const firstAnswers = initialAnswersReceipt(observed.root, fs, observed.repository.mode);
+       action = observed.repository.mode === "host-managed" && firstAnswers === null
+         ? hostManagedFirstAnswersAction(observed.root, observed.runner, observed.repository, fs)
+@@ -7189,6 +7214,10 @@ function withPendingVerifyContractAsk(observed) {
+ function collectInitialAnswersAction(observed, fs) {
+   if (!observed.pushApprovalSetupAction) return null;
+   let answeredLanguage = null;
++  // G15 / D210: while intake consent is still unrecorded, the same round also collects the
++  // still-unresolved intake values (profile; off Claude the first project description). An
++  // unreadable checkpoint never merges: consent stays its own explicit action.
++  let openConsentCheckpoint = null;
+   try {
+     const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({
+       rootDir: observed.root,
+@@ -7198,9 +7227,14 @@ function collectInitialAnswersAction(observed, fs) {
+     if (checkpoint.status === "present" && ["de", "en"].includes(checkpoint.value.values.language)) {
+       answeredLanguage = checkpoint.value.values.language;
+     }
++    if (checkpoint.status === "absent" || (checkpoint.status === "present" && checkpoint.value.consent === null)) {
++      openConsentCheckpoint = checkpoint;
++    }
+   } catch {
+     // An unavailable private checkpoint never authorizes a guessed answer.
+   }
++  const mergedConsent = openConsentCheckpoint === null ? null
++    : intakeConsentAction(observed.root, observed.runner, openConsentCheckpoint, [], answeredLanguage);
+   const authorInputs = observed.authorIdentityAction?.inputs ?? [];
+   const trustSetupArgv = observed.trustAnchorGuidanceAction?.applyAction?.argv;
+   const trustSetup = trustSetupArgv?.[0] === ONBOARDING_INIT_DRIVER
+@@ -7213,6 +7247,8 @@ function collectInitialAnswersAction(observed, fs) {
+     { name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true },
+     ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
+     ...(trustSetup?.inputs ?? []),
++    // The language is asked once above and fills both commands; consent's other inputs follow.
++    ...(mergedConsent?.inputs ?? []).filter((input) => input.name !== "language"),
+   ];
+   const identityProvenance = gitIdentityProvenance(observed.root, fs);
+   const argv = [ONBOARDING_INIT_DRIVER, "--root", observed.root, "--runner", observed.runner];
+@@ -7250,7 +7286,7 @@ function collectInitialAnswersAction(observed, fs) {
+       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
+       advisorExportConsent: { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
+     },
+-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
++    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+     applyAction: commandAction(
+       argv,
+       true,
+@@ -7258,6 +7294,7 @@ function collectInitialAnswersAction(observed, fs) {
+       "pipeline.onboarding-init.v1",
+       ["ready", "collect-input", "pending-asks", "unsupported-next-action"],
+     ),
++    ...(mergedConsent === null ? {} : mergedIntakeConsentFields(mergedConsent, observed.runner)),
+     expected: { schema: "pipeline.onboarding-init.v1", outcomes: ["ready", "collect-input", "pending-asks", "unsupported-next-action"] },
+   };
+ }
+@@ -7277,11 +7314,20 @@ function withPendingAsksSurfacedOnNextAction(observed, fs) {
+     observed.projectAttributesGapAction,
+   ].filter(Boolean);
+   if (observed.nextAction == null) return observed;
++  // G15 / D210: a separate intake-consent question must never sit beside the merged first-round
++  // ask (Codex publishes it before its first restart): the merged ask already carries the same
++  // values, so the primary step becomes the read-only inspect and the driver stops on the one ask.
++  const consentSupersededByMergedRound = initialAnswersAction?.precedingApplyAction !== undefined
++    && observed.runtime?.firstRestartIntake?.status === "capture-required"
++    && observed.nextAction.kind === "collect-input"
++    && observed.nextAction.applyAction?.argv?.[1] === "intake-consent-apply";
+   // Keep the current genuine primary question. Once answered, the ordinary
+   // inspector exposes this read-only plan ahead of the next command. Other
+   // unresolved questions still stop the generic driver before any mutation.
+-  const nextAction = initialAnswersAction === null && publicAnchorPlan !== null
+-    && observed.nextAction.kind === "command" ? publicAnchorPlan : observed.nextAction;
++  const nextAction = consentSupersededByMergedRound
++    ? commandAction([ONBOARDING_SCRIPT, "inspect", "--root", observed.root, "--runner", observed.runner], false, false, SCHEMA, ["intake-required"])
++    : initialAnswersAction === null && publicAnchorPlan !== null
++      && observed.nextAction.kind === "command" ? publicAnchorPlan : observed.nextAction;
+   if (pendingAsks.length === 0 && nextAction === observed.nextAction) return observed;
+   return { ...observed, nextAction: { ...nextAction, ...(pendingAsks.length ? { pendingAsks } : {}) } };
+ }
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 4e4beee4a..13ba2ec9e 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -3023,8 +3023,17 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
+     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+     assert.equal(applied.result.status, "intake-required",
+       "uncaptured original input precedes the first Codex restart");
+-    assert.equal(applied.result.nextAction.kind, "collect-input",
+-      "the primary action captures original input before runtime initialization");
++    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
++    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
++    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
++    // first project description) as precedingApplyAction, so the original input is still captured
++    // before the first restart and no separate consent collect-input sits beside it.
++    assert.equal(applied.result.nextAction.kind, "command");
++    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
++      "the merged first round is the one question");
++    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
++      .precedingApplyAction.argv.includes("--text-file"), true,
++    "the merged round captures original input before runtime initialization");
+     assert.equal(applied.result.authorIdentityAction.kind, "collect-input");
+     assert.equal(applied.result.authorIdentityAction.mutation, false);
+     const fieldNames = applied.result.authorIdentityAction.inputs.map((input) => input.name).sort();
+@@ -3146,8 +3155,17 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
+     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+     assert.equal(applied.result.status, "intake-required",
+       "uncaptured original input precedes the first Codex restart");
+-    assert.equal(applied.result.nextAction.kind, "collect-input",
+-      "the primary action captures original input before runtime initialization");
++    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
++    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
++    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
++    // first project description) as precedingApplyAction, so the original input is still captured
++    // before the first restart and no separate consent collect-input sits beside it.
++    assert.equal(applied.result.nextAction.kind, "command");
++    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
++      "the merged first round is the one question");
++    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
++      .precedingApplyAction.argv.includes("--text-file"), true,
++    "the merged round captures original input before runtime initialization");
+     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
+     assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
+     assert.equal(applied.result.pushApprovalSetupAction.input.name, "humanApprovalMode");
+@@ -3225,8 +3243,17 @@ test("apply-portable-seed records baseline-only verification without a PO questi
+     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+     assert.equal(applied.result.status, "intake-required",
+       "uncaptured original input precedes the first Codex restart");
+-    assert.equal(applied.result.nextAction.kind, "collect-input",
+-      "the primary action captures original input before runtime initialization");
++    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
++    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
++    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
++    // first project description) as precedingApplyAction, so the original input is still captured
++    // before the first restart and no separate consent collect-input sits beside it.
++    assert.equal(applied.result.nextAction.kind, "command");
++    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
++      "the merged first round is the one question");
++    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
++      .precedingApplyAction.argv.includes("--text-file"), true,
++    "the merged round captures original input before runtime initialization");
+     assert.equal(Object.hasOwn(applied.result, "verifyContractAction"), false);
+     assert.equal(Object.hasOwn(applied.result, "verifyContractStatus"), false);
+     assert.equal(Object.hasOwn(applied.result, "pushGateSatisfiable"), false);
+@@ -7752,8 +7779,10 @@ test("a recognized read-only host control layout receives portable onboarding wi
+     assert.equal(postSeed.status, "intake-required");
+     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
+     assert.equal(postSeed.nextAction.kind, "command");
++    // G15 / D210 (restates the five first-round inputs): the unresolved intake consent values (profile and,
++    // on Codex, the first project description) are collected in the same first round.
+     assert.deepEqual(postSeed.nextAction.pendingAsks[0].inputs.map((input) => input.name),
+-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription"]);
+     const kickoff = completeKickoff(
+       path,
+       "Build one small HTML game from the supplied design",
+@@ -9303,24 +9332,25 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     const fresh = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+     assert.equal(fresh.status, "intake-required");
+     assert.equal(fresh.continuity.status, "absent-pristine");
+-    assert.equal(fresh.nextAction.kind, "collect-input");
++    // G15 / D210 (restates: the first Codex step is a separate consent collect-input carrying the author inputs):
++    // consent travels in the merged first-round ask and the primary step is the read-only inspect. The consent
++    // command is that ask's precedingApplyAction: the Git author is collected by the same ask (its own initial
++    // command applies it), the language shares the one <de|en> placeholder, and the argv shape is otherwise unchanged.
++    assert.equal(fresh.nextAction.kind, "command");
+     assert.deepEqual(fresh.nextAction.expected, { schema: "pipeline.project-onboarding.v4", statuses: ["intake-required"] });
+-    assert.ok(fresh.nextAction.inputs.some((input) => input.name === "gitAuthorName"));
+-    assert.deepEqual(fresh.nextAction.applyAction.argv, [
++    const mergedFresh = fresh.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined);
++    assert.ok(mergedFresh.inputs.some((input) => input.name === "gitAuthorName"));
++    assert.deepEqual(mergedFresh.precedingApplyAction.argv, [
+       ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
+-      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
+-      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
+-      "--language", "<PO_INTAKE_LANGUAGE>",
++      "--language", "<de|en>",
+       "--profile", "<PO_INTAKE_PROFILE>",
+       "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex",
+     ]);
+-    assert.equal(fresh.nextAction.applyAction.argv.includes("--text"), false,
++    assert.equal(mergedFresh.precedingApplyAction.argv.includes("--text"), false,
+       "the multiline-safe returned action uses exactly one of --text/--text-file");
+-    assert.deepEqual(fresh.nextAction.existingFileApplyAction.argv, [
++    assert.deepEqual(mergedFresh.precedingExistingFileApplyAction.argv, [
+       ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
+-      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
+-      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
+-      "--language", "<PO_INTAKE_LANGUAGE>", "--profile", "<PO_INTAKE_PROFILE>",
++      "--language", "<de|en>", "--profile", "<PO_INTAKE_PROFILE>",
+       "--text-file", "<existing-repository-file>", "--text-file-sha256", "<sha256-of-existing-file>",
+       "--activate", "--runner", "codex",
+     ]);
+@@ -9523,7 +9553,18 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+         return JSON.parse(output);
+       };
+ 
+-      const consent = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
++      const publishedFirst = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
++      // G15 / D210 (restates: the Codex first-restart boundary publishes a separate consent collect-input):
++      // on Codex the consent values travel in the merged first-round ask, whose precedingApplyAction is the
++      // unchanged consent command (sharing the one <de|en> language placeholder). Claude and Antigravity still
++      // publish the consent action here once the initial answers are in. The assertions below run unchanged.
++      const mergedFirst = publishedFirst.kind === "collect-input" ? null
++        : publishedFirst.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined);
++      const consent = mergedFirst === null ? publishedFirst : {
++        inputs: mergedFirst.inputs.filter((input) => ["language", "profile", "projectDescription"].includes(input.name)),
++        applyAction: { ...mergedFirst.precedingApplyAction,
++          argv: mergedFirst.precedingApplyAction.argv.map((value) => value === "<de|en>" ? "<PO_INTAKE_LANGUAGE>" : value) },
++      };
+       const consentNames = consent.inputs.map((input) => input.name);
+       assert.equal(consentNames.includes("gitAuthorName"), false, `${runner}: local Git already resolved the name`);
+       assert.equal(consentNames.includes("gitAuthorEmail"), false, `${runner}: local Git already resolved the email`);
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index c1428fd22..4b00a84e9 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -126,6 +126,9 @@ import {
+ } from "../lib/critical-human-proof-policy.mjs";
+ import {
+   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
++  INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE,
++  INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE,
++  INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE,
+   shellWord, intakeGitAuthor,
+ } from "../lib/project-onboarding-v3.mjs";
+ import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+@@ -1350,7 +1353,7 @@ function initialAnswersActionWithoutTrustAnchor(action) {
+   return {
+     ...action,
+     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
+-    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
++    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+     applyAction: { ...action.applyAction, argv },
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 62db3ad37..57b6b9921 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -306,9 +306,11 @@ function checkConvergenceCell(selectedCell) {
+         const first = driveOnboardingInit({ rootDir: root, runner, env });
+ 
+         assert.equal(first.schema, SCHEMA, label);
+-        assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
++        // G15 / D210 (restates: Codex stopped on a separate consent collect-input): every runner's first stop
++        // is the ONE merged pending ask; on Codex the primary step is the read-only inspect, not a consent action.
++        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
+         assert.equal(first.final?.status, runner === "codex" ? "intake-required" : "runtime-initialization-required", `${label}: runner-specific intake boundary must be explicit`);
+-        assert.equal(first.final?.nextAction?.kind, runner === "codex" ? "collect-input" : "command", `${label}: the primary action remains visible alongside pending asks`);
++        assert.equal(first.final?.nextAction?.kind, "command", `${label}: the primary action remains visible alongside pending asks`);
+         assert.ok(first.pendingAsks.length > 0, `${label}: the boundary must carry real asks`);
+         assertPinnedRunner(first, runner, label);
+         firstShapes.push({ schema: first.schema, outcome: first.outcome, status: first.final.status, nextActionKind: first.final.nextAction.kind });
+@@ -449,8 +451,9 @@ test("host-managed initial answers publish privately and never write reserved Gi
+     const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+     assert.equal(first.outcome, "pending-asks");
++    // G15 / D210 (restates the first-round inputs): the intake consent values ride in the same first round.
+     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
++      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
+     const sourcePath = join(root, "pipeline.user.yaml");
+     const sourceBefore = readFileSync(sourcePath);
+     const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
+@@ -489,8 +492,9 @@ test("host-managed first stop asks identity, approval and language before intake
+     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+     assert.equal(first.outcome, "pending-asks");
+     assert.equal(first.pendingAsks.length, 1);
++    // G15 / D210 (restates the first-round inputs): consent values are collected in this same first round.
+     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
++      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
+     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+   } finally {
+     dispose(root);
+@@ -798,10 +802,13 @@ function checkApprovalCell(selectedCell) {
+       }, runner);
+ 
+       const first = driveOnboardingInit({ rootDir: root, runner, env });
+-      assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
++      // G15 / D210 (restates: Codex stopped on collect-input and the first round omitted consent values).
++      assert.equal(first.outcome, "pending-asks", runner);
+       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
+       const initialAsk = first.pendingAsks[0];
+-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"],
++      assert.deepEqual(actionInputNames(initialAsk), runner === "claude"
++        ? ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "pipelineActorLabel"]
++        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"],
+         `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
+       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
+         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
+@@ -983,12 +990,14 @@ test("a failed separate signature-anchor action preserves the completed initial
+     assert.equal(first.outcome, "pending-asks");
+     assert.equal(first.pendingAsks.length, 1);
+     const initialAction = first.pendingAsks[0];
++    // G15 / D210 (restates the first-round inputs): Claude's merged round also carries the intake profile.
+     assert.deepEqual(initialAction.inputs.map((input) => input.name), [
+       "gitAuthorName",
+       "gitAuthorEmail",
+       "humanApprovalMode",
+       "advisorExportConsent",
+       "language",
++      "profile",
+       "pipelineActorLabel",
+     ]);
+     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
+@@ -1047,7 +1056,8 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer
+       runner: "codex",
+       env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+     });
+-    assert.equal(seeded.outcome, "collect-input");
++    // G15 / D210 (restates: Codex's first stop was a separate consent collect-input): it is now the one merged pending ask.
++    assert.equal(seeded.outcome, "pending-asks");
+     let setupCalls = 0;
+     const runSetup = (_executable, argv) => {
+       setupCalls += 1;
+@@ -1336,7 +1346,8 @@ function checkRollbackCell(selectedCell) {
+     const destination = join(home, `authority-${failure.name}`);
+     try {
+       const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+-      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "collect-input");
++      // G15 / D210 (restates: Codex's first stop was a separate consent collect-input): now the one merged pending ask.
++      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+       const policyPath = join(root, "project", "critical-human-proof.json");
+       const policyPreimage = readFileSync(policyPath, "utf8");
+       const pointerPath = join(root, ".git", "agent-pipeline", "po-key-directory.json");
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index ec5543c41..10913131f 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -376,6 +376,21 @@ function advanceTypedOnboardingInput(path, result) {
+   ]);
+   for (let attempt = 0; attempt < 3; attempt += 1) {
+     const action = current.json?.nextAction;
++    // G15 / D210 (restates the former separate consent collect-input): the intake consent values now
++    // travel in the merged first-round pending ask. This legacy fixture helper answers only that ask's
++    // preceding intake-consent-apply command (the initial-answers command stays unexecuted, as before),
++    // so the typed-input fixtures keep reaching the next non-input step.
++    const mergedAsk = action?.pendingAsks?.find((ask) => ask?.precedingApplyAction !== undefined);
++    if (action?.kind !== "collect-input" && mergedAsk !== undefined) {
++      mkdirSync(join(path, "scratch"), { recursive: true });
++      writeFileSync(join(path, "scratch", "onboarding-intake.txt"),
++        "Build a small local project from this original fixture request.\nKeep the result self-contained and locally verifiable.\n");
++      const mergedArgv = mergedAsk.precedingApplyAction.argv.map((value) => answers.get(value) ?? value);
++      const mergedApplied = run(onboarding, mergedArgv.slice(1), path);
++      assert.equal(mergedApplied.status, 0, mergedApplied.stdout);
++      current = run(onboarding, ["inspect", "--root", path, "--runner", "codex"], path);
++      continue;
++    }
+     if (action?.kind !== "collect-input") return current;
+     const names = action.inputs?.map((input) => input.name) ?? (action.input ? [action.input.name] : []);
+     assert.ok(names.length > 0 && names.every((name) => allowed.has(name)), `unhandled published input names: ${names.join(",")}`);
+@@ -1005,56 +1020,84 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         assert.equal(held.value.values.profile, "feature");
+         return held;
+       };
+-      const assertConsentInputs = (action) => {
++      // G15 / D210 (restates the former separate intake-consent assertions): the intake consent
++      // values travel in the merged first round. Its precedingApplyAction is the unchanged
++      // intake-consent-apply command (consent granted, material text only off Claude), run first.
++      const assertMergedFirstRound = (action) => {
+         const held = readOnboardingIntakeCheckpoint({ rootDir: path });
+         assert.equal(held.status === "absent" || held.value.consent === null, true,
+-          `${runner}: this returned action requests consent before capturing material`);
++          `${runner}: the merged first round requests consent before capturing material`);
+         assert.equal(held.status === "absent" || held.value.materialInput.length === 0, true);
+-        const argv = action.applyAction.argv;
++        assert.deepEqual(action.applyOrder, ["precedingApplyAction", "applyAction"]);
++        const argv = action.precedingApplyAction.argv;
+         assert.equal(argv[1], "intake-consent-apply");
+         assert.equal(argv.includes("--granted"), true);
+         assert.equal(argv.includes("--text-file"), runner !== "claude");
+         assert.equal(argv.includes("--text-turn-ref"), false);
+-        assert.deepEqual(action.inputs.map((input) => input.name), runner === "claude"
+-          ? ["language", "profile"]
+-          : ["language", "profile", "projectDescription"]);
++        assert.equal(argv.includes("--git-author-name"), false, `${runner}: consent does not ask the Git author again`);
++        assert.equal(argv.includes("<PO_INTAKE_LANGUAGE>"), false, `${runner}: one language answer fills both commands`);
++        assert.equal(argv.includes("<de|en>"), true);
++        assert.equal(runner === "claude", action.precedingExistingFileApplyAction === undefined);
++        const names = action.inputs.map((input) => input.name);
++        assert.equal(names.filter((name) => name === "language").length, 1, `${runner}: language is asked once`);
++        assert.equal(names.includes("profile"), true);
++        assert.equal(names.includes("projectDescription"), runner !== "claude");
+       };
+ 
+-      let first = freshDriver(path, runner, env, privateKey);
+-      let intakeHoldsAuthor = false;
+-      if (runner === "codex" && first.outcome === "collect-input") {
+-        assert.deepEqual(first.collectInput.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "language", "profile", "projectDescription"]);
+-        assert.equal(first.collectInput.applyAction.argv.includes("scratch/onboarding-intake.txt"), true);
+-        mkdirSync(join(path, "scratch"), { recursive: true });
+-        writeFileSync(originalFile, originalBytes);
+-        const firstIntake = invokeAction(first.collectInput.applyAction, new Map([
+-          ["<PO_INTAKE_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
+-          ["<PO_INTAKE_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
+-          ["<PO_INTAKE_LANGUAGE>", "en"],
+-          ["<PO_INTAKE_PROFILE>", "feature"],
+-        ]), path, env);
+-        assert.equal(firstIntake.json.status, "applied", JSON.stringify(firstIntake.json));
+-        assertCapturedOriginal();
+-        intakeHoldsAuthor = true;
+-        first = freshDriver(path, runner, env, privateKey);
+-      }
++      // G15 / D210 ANCHOR: count the collect-input actions that need a human answer before the
++      // first design draft. D210 enumerates the counted turns: the merged first round (initial
++      // answers plus intake consent), the material turn (Claude only, its opaque reference arrives
++      // with the PO's next turn) and the one bundled design-question round. The trust-anchor key
++      // ceremony (trustAnchorSetupMode ...) is a conditional follow-up of the "signature" answer and
++      // is not an enumerated D210 turn: it is recorded separately and bounded to one.
++      const poTurns = [];
++      const keyCeremonies = [];
++      const poTurn = (action, where) => {
++        const names = (action?.inputs ?? (action?.input ? [action.input] : [])).map((input) => input.name);
++        assert.ok(names.length > 0, `${runner}: ${where} presents no input to the PO`);
++        (names.some((name) => name.startsWith("trustAnchor")) ? keyCeremonies : poTurns).push({ where, names });
++      };
++      const first = freshDriver(path, runner, env, privateKey);
++      // G15 / D210 (restates the former Codex-first consent collect-input and the separate Claude and
++      // Antigravity consent turns): every runner's first PO turn is ONE pending ask carrying the initial
++      // answers, the intake consent values and, off Claude, the first project description. The Git author
++      // is asked here on every runner; consent runs first without it and the initial answers take it.
+       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
+       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
+       const initialAsk = first.pendingAsks[0];
+       assert.equal(initialAsk.applyAction?.kind, "command");
+-      // D98 / QG-04 (ALF-K2-GITAUTHOR): once the intake record holds the Git author (the Codex path just applied the
+-      // intake with it), the initial round no longer asks it again; the receipt takes it from the record (asserted
+-      // below). Negative control: where no intake record holds an author, the author is still asked, as before.
+-      const authorAsked = intakeHoldsAuthor ? [] : ["gitAuthorName", "gitAuthorEmail"];
+-      assert.deepEqual(initialAsk.inputs.map((input) => input.name), runner === "codex"
+-        ? [...authorAsked, "humanApprovalMode", "advisorExportConsent"]
+-        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++      poTurn(initialAsk, "first-round");
++      assertMergedFirstRound(initialAsk);
++      assert.deepEqual(initialAsk.inputs.map((input) => input.name), runner === "claude"
++        ? ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "pipelineActorLabel"]
++        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
++      if (runner !== "claude") {
++        assert.equal(initialAsk.precedingApplyAction.argv.includes("scratch/onboarding-intake.txt"), true);
++        mkdirSync(join(path, "scratch"), { recursive: true });
++        writeFileSync(originalFile, originalBytes);
++      }
++      const consented = invokeAction(initialAsk.precedingApplyAction, new Map([
++        ["<de|en>", "en"],
++        ["<PO_INTAKE_PROFILE>", "feature"],
++      ]), path, env);
++      assert.equal(consented.json.status, "applied", JSON.stringify(consented.json));
++      if (runner === "claude") {
++        const consent = readOnboardingIntakeCheckpoint({ rootDir: path });
++        assert.equal(consent.status, "present");
++        assert.equal(consent.value.consent?.granted, true);
++        assert.equal(consent.value.transactionState, "collecting");
++        assert.deepEqual(consent.value.materialInput, [],
++          "claude: a consent-only action must not satisfy description readiness");
++      } else {
++        assertCapturedOriginal();
++      }
+       const initial = invokeAction(initialAsk.applyAction, new Map([
+         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
+         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
+         ["<signature|chat>", "signature"],
+         ["<approved|declined>", "declined"],
+         ["<de|en>", "en"],
++        ["<PO_PIPELINE_ACTOR>", "none"],
+       ]), path, env);
+       assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
+       assert.equal(initial.json.initialAnswers?.trustAnchor, "not-requested");
+@@ -1084,6 +1127,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       const anchorAsk = initial.json.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
+         ?? freshDriver(path, runner, env, privateKey).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+       assert.ok(anchorAsk, `${runner}: signature re-entry reaches the separate trust-anchor action`);
++      poTurn(anchorAsk, "key-ceremony");
+       assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false);
+       const anchored = invokeAction(anchorAsk.applyAction, new Map([
+         ["<existing|new>", "existing"],
+@@ -1117,39 +1161,22 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         // author values, so after anchoring the driver may expose the real
+         // remaining intake request directly rather than wrapping it as a
+         // second author-related pending-asks envelope.
++        // G15 / D210: the consent was answered in the merged first round, so the only intake request
++        // left after anchoring is Claude's separate material turn; Antigravity goes straight to the
++        // one bundled design-question round.
+         assert.equal(anchored.json.outcome, "collect-input", `${runner}: ${JSON.stringify(anchored.json)}`);
+-        assertConsentInputs(anchored.json.collectInput);
++        assert.equal(anchored.json.collectInput.input?.name, runner === "claude" ? "textTurnRef" : "answersJson",
++          `${runner}: ${JSON.stringify(anchored.json.collectInput)}`);
+       }
+ 
+       let intake = freshDriver(path, runner, env, privateKey);
+       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
+-      if (runner === "codex" && intake.collectInput.input?.name === "answersJson") {
+-        // Codex's portable-seed route reaches the explicit intake-consent
+-        // action before initial-answer collection; the description was
+-        // already supplied through that returned action above.
+-        assertCapturedOriginal();
+-      } else {
+-        assertConsentInputs(intake.collectInput);
+-        assert.equal(intake.collectInput.applyAction.argv.includes("--git-author-name"), false);
+-        if (runner !== "claude") {
+-          mkdirSync(join(path, "scratch"), { recursive: true });
+-          writeFileSync(originalFile, originalBytes);
+-        }
+-        const consented = invokeAction(intake.collectInput.applyAction, new Map([
+-          ["<PO_INTAKE_LANGUAGE>", "en"],
+-          ["<PO_INTAKE_PROFILE>", "feature"],
+-        ]), path, env);
+-        assert.equal(consented.json.status, "applied", JSON.stringify(consented.json));
++      {
+         if (runner === "claude") {
+-          const consent = readOnboardingIntakeCheckpoint({ rootDir: path });
+-          assert.equal(consent.status, "present");
+-          assert.equal(consent.value.consent?.granted, true);
+-          assert.equal(consent.value.transactionState, "collecting");
+-          assert.deepEqual(consent.value.materialInput, [],
+-            "claude: a consent-only action must not satisfy description readiness");
+-          const captureAsk = freshDriver(path, runner, env, privateKey);
++          const captureAsk = intake;
+           assert.equal(captureAsk.outcome, "collect-input", JSON.stringify(captureAsk));
+           assert.equal(captureAsk.collectInput.input.name, "textTurnRef");
++          poTurn(captureAsk.collectInput, "material-turn");
+           assert.equal(captureAsk.collectInput.applyAction.argv.includes("--text-turn-ref"), true);
+           // This fixture has no trusted native event reference. Supply the
+           // still-required explicit description once through the returned
+@@ -1196,6 +1223,13 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       intake = freshDriver(path, runner, env, privateKey);
+       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
+       assert.equal(intake.collectInput.input.name, "answersJson");
++      poTurn(intake.collectInput, "design-questions");
++      // G15 / D210 anchor: Codex and Antigravity take at most 2 PO turns before the first design
++      // draft (merged first round, design questions), Claude at most 3 (merged first round,
++      // material turn, design questions). The key ceremony is bounded separately (one, only for "signature").
++      assert.ok(poTurns.length <= (runner === "claude" ? 3 : 2),
++        `${runner}: ${poTurns.length} PO turns before the first design draft ${JSON.stringify(poTurns)}`);
++      assert.ok(keyCeremonies.length <= 1, `${runner}: the key ceremony is asked at most once`);
+       const answers = JSON.stringify([
+         { question: "Primary goal?", answer: "A keyboard-playable local game." },
+         { question: "Verification?", answer: "Run the repository verify script." },
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 976577e1e..720f64d0c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -49,7 +49,7 @@ shape is `MUTATING_ONBOARDING_ARGV_SHAPES` in
+ 
+ | `v4Inspection` status | checkpoint `transactionState` | command |
+ | --- | --- | --- |
+-| `intake-required` | absent, or consent not recorded | `intake-consent-apply --root <root> [--git-author-name <name>] [--git-author-email <email>] [--language <de\|en>] [--profile <epic\|feature\|mini>] --granted --activate` (fields already known may be omitted; filled on a later call) |
++| `intake-required` | absent, or consent not recorded | `intake-consent-apply --root <root> [--git-author-name <name>] [--git-author-email <email>] [--language <de\|en>] [--profile <epic\|feature\|mini>] --granted --activate` (fields already known may be omitted; filled on a later call; on a fresh project this command is the `precedingApplyAction` of the merged first-round ask, see below) |
+ | `intake-required` | `collecting` | `intake-capture-apply --root <root> --text <verbatim PO message> \| --text-file <repo-relative path> --activate` — once per PO message, repeated until the PO signals they are done describing the project |
+ | `intake-design-questions-required` | `design-questions-pending` | `intake-design-questions-apply --root <root> --answers-json <JSON array of {question, answer}> \| --answers-file <repo-relative path> [--answers-file-sha256 <sha256>] --activate` — exactly ONE bundled round; a second round with different answers is refused |
+ | `intake-design-questions-required` | `ready-to-generate` | `intake-generate-plan --root <root>`, then digest-bound `intake-generate-apply --root <root> --plan-sha256 <sha256> --activate` |
+@@ -75,6 +75,24 @@ before any artifact is written — operator-facing language and PO profile —
+ plus the repository's git author identity, gathered together rather than as
+ a separate blocking question later.
+ 
++**PO turns before the first design draft (G15, PO decision D210).** The first
++round is ONE PO turn on every runner. While the intake consent is still
++unrecorded, the initial-answers ask (git author, human-approval mode, Advisor
++export consent, language) also carries the consent values — the PO profile
++and, on Codex and Antigravity, the first project description — so the PO
++answers once. That ask names two existing, unchanged commands in order:
++`precedingApplyAction` (`intake-consent-apply`, run FIRST) and then
++`applyAction` (the `onboarding-init.mjs` initial-answers command); the one
++`de|en` answer fills the language placeholder of both, and consent is applied
++only on the PO's explicit consent. Claude keeps material capture separate (its
++opaque native turn reference arrives with the PO's next turn), so Claude takes
++at most 3 PO turns before the first design draft (merged first round,
++material turn, design questions) and Codex and Antigravity at most 2 (merged
++first round, design questions). The `signature` trust-anchor key ceremony is a
++conditional follow-up of the human-approval answer, not one of these turns.
++If the consent command is skipped or fails, the ordinary `intake-required`
++consent action is published again; nothing already answered is asked twice.
++
+ ## What `intake-generate-apply` writes, and where
+ 
+ `intake-generate-apply` deterministically derives and writes three files
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index f1cde944f..61fad5be8 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -85,6 +85,9 @@ in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
+ 
+ A language already recorded at the onboarding consent step is not asked again
+ here: do not re-ask it, reuse the recorded value for the `po-language` binding.
++The first onboarding round collects that language together with the initial
++answers and the intake consent values in ONE PO turn (G15, D210); see "PO turns
++before the first design draft" in `intake-generate-design.md`.
+ 
+ For a hosted (non-Pipeline) project, the document language defaults to that
+ recorded consent language and is not a separate default question. It is asked
