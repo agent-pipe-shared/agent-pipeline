@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
-  chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
+  chmodSync, closeSync, copyFileSync, cpSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir, devNull } from "node:os";
@@ -14,6 +14,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {observeOnboardingEnrollmentHistory,KickoffError} from "./onboarding-continuity.mjs";
 import { SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
+import { createProjectUninstallController } from "./project-uninstall.mjs";
+import { fixture as projectUninstallFixture } from "./project-uninstall.fixture.mjs";
 import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
 import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
@@ -164,7 +166,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 // direct parent retains custody of all case completions.
 const SHARD_COUNT = 6;
 const CHUNK_COUNT = 2;
-const EXPECTED_CASE_COUNT = 228;
+const EXPECTED_CASE_COUNT = 240;
 const CASES_PER_CHILD = EXPECTED_CASE_COUNT / (SHARD_COUNT * CHUNK_COUNT);
 // Bound each independent chunk without truncating slower Git fixtures. Sized from a measured
 // native-Windows run of all 216 cases with no deadline (2026-10-05, working tree and HEAD): the
@@ -303,7 +305,7 @@ export function validateShardReceipt(value, index, selectedChunk, expectedCases)
   assert.equal(value.shard, index);
   assert.equal(value.chunk, selectedChunk);
   assert.equal(value.declaredCount, EXPECTED_CASE_COUNT);
-  assert.equal(expectedCases.length, CASES_PER_CHILD, "each child must own exactly 18 callbacks");
+  assert.equal(expectedCases.length, CASES_PER_CHILD, "each child must own exactly 20 callbacks");
   assert.deepEqual(value.assignedIndices, expectedCases.map((entry) => entry.index));
   assert.ok(Array.isArray(value.results));
   assert.equal(value.results.length, expectedCases.length, "every assigned callback must finish");
@@ -10741,11 +10743,219 @@ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
   }},
 ];
 for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)if(entry.standalone!==true)test(entry.name,entry.run);
+
+// Reinstall after project-uninstall (W7-REINSTALL-AFTER-UNINSTALL; backlog item
+// 2026-10-30-no-route-back-to-install-after-project-uninstall, decision D206).
+// Twelve callbacks so the closed partition (SHARD_COUNT x CHUNK_COUNT = 12) keeps
+// an integer CASES_PER_CHILD: 228 + 12 = 240 = 12 x 20.
+const RIU_OWNED_PATHS = [".claude/pipeline.json", ".claude/pipeline.yaml", "project/pipeline.json", "project/pipeline.yaml"];
+const RIU_STATE = { schema: "pipeline.state.v0", activeFeature: { id: "riu-fixture", planPath: "specs/riu-fixture/prd.md", phase: "design" }, planApproved: false, closedFeatures: [{ id: "closed-before-uninstall" }] };
+const riuOnboardedRoot = ({ withState = false } = {}) => {
+  const path = root();
+  const portable = planProjectOnboardingV3({ rootDir: path, runner: "claude" });
+  assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true }).status, "applied");
+  const base = spawnSync("git", ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-m", "test: fixture base", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
+  assert.equal(base.status, 0, base.stderr);
+  const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, runner: "claude", operation: "runtime" });
+  const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+  assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, runner: "claude", operation: "runtime", planSha256: digest, activate: true }).status, "intake-required");
+  let stateBytes = null;
+  if (withState) { stateBytes = `${JSON.stringify(RIU_STATE)}\n`; writeFileSync(join(path, "project/pipeline-state.json"), stateBytes); }
+  return { path, stateBytes };
+};
+// The consumer sequence: onboard, project-uninstall plan, project-uninstall apply.
+const riuUninstalledRoot = (options) => {
+  const onboarded = riuOnboardedRoot(options);
+  const before = Object.fromEntries(RIU_OWNED_PATHS.map((relative) => [relative, readFileSync(join(onboarded.path, relative), "utf8")]));
+  const controller = createProjectUninstallController({ hostStateRoot: join(onboarded.path, "unused-host") });
+  const uninstallPlan = controller.plan({ rootDir: onboarded.path });
+  assert.deepEqual(uninstallPlan.conflicts, []);
+  const uninstalled = controller.apply(uninstallPlan, { activate: true, planSha256: uninstallPlan.planSha256 });
+  assert.equal(uninstalled.status, "uninstalled");
+  return { ...onboarded, before, uninstallPlan, journalPath: uninstalled.journalPath };
+};
+const riuInspect = (path, runner = "claude") => inspectProjectOnboardingV3Core({ rootDir: path, runner, intent: "bootstrap" });
+const riuRead = (path, relative) => readFileSync(join(path, relative), "utf8");
+const riuInvalidateManifests = (path) => {
+  for (const relative of [".claude/pipeline.yaml", "project/pipeline.yaml"]) {
+    const text = riuRead(path, relative);
+    assert.ok(text.includes("    mode: blocking"));
+    writeFileSync(join(path, relative), text.replace("    mode: blocking", "    mode: not-a-mode"));
+  }
+  const loaded = loadManifest(path);
+  assert.equal(loaded.status, "invalid");
+  assert.notEqual(loaded.repair?.available, true);
+};
+// Follow the controlling actions the way an operator does: run each non-mutating one, take the action it names next.
+const riuFollow = (path, first) => {
+  const verbs = [first.argv[1]]; let action = first;
+  for (let step = 0; step < 6 && action.mutation !== true; step += 1) {
+    const verb = action.argv[1];
+    const out = verb === "plan-reinstall" ? planProjectOnboardingReinstall({ rootDir: path })
+      : verb === "plan-manifest-repair" ? planProjectOnboardingManifestRepairV4({ rootDir: path, runner: "claude" })
+        : verb === "plan-source-recovery" ? planProjectOnboardingSourceRecoveryV4({ rootDir: path, runner: "claude" })
+          : verb === "inspect" ? riuInspect(path) : null;
+    assert.ok(out !== null, `unexpected controlling verb ${verb}`);
+    const next = out.nextAction ?? out.applyAction ?? null;
+    if (next === null) return { verbs, terminal: out, action: null };
+    verbs.push(next.argv[1]); action = next;
+  }
+  return { verbs, terminal: null, action };
+};
+const REINSTALL_AFTER_UNINSTALL_CASES = [
+  { name: "RIU-01 anchor: after project-uninstall inspect names the reinstall route and its apply regenerates exactly the pre-uninstall projections", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const inspected = riuInspect(f.path);
+      assert.equal(inspected.status, "partial"); assert.equal(inspected.diagnostics[0].code, "manifest_invalid");
+      assert.equal(inspected.nextAction.argv[1], "plan-reinstall"); assert.equal(inspected.nextAction.mutation, false);
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      assert.equal(plan.status, "ready", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall"); assert.equal(plan.mutation, false);
+      assert.equal(plan.uninstall.planSha256, f.uninstallPlan.planSha256);
+      assert.deepEqual(plan.targets.map((target) => target.path).sort(), RIU_OWNED_PATHS);
+      for (const key of ["--root", "--plan-sha256", "--activate"]) assert.ok(plan.applyAction.argv.includes(key));
+      assert.equal(plan.applyAction.argv[1], "apply-reinstall"); assert.equal(plan.applyAction.argv.includes("--runner"), false); assert.equal(plan.applyAction.mutation, true);
+      assert.equal(riuRead(f.path, ".claude/pipeline.yaml").includes("modelRouting"), false, "the plan must not write");
+      const applied = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" });
+      assert.equal(applied.status, "applied", JSON.stringify(applied));
+      assert.deepEqual([...applied.changes].sort(), RIU_OWNED_PATHS);
+      for (const relative of RIU_OWNED_PATHS) assert.equal(riuRead(f.path, relative), f.before[relative], relative);
+      assert.equal(loadManifest(f.path).status, "ok");
+      const after = riuInspect(f.path);
+      assert.equal(after.diagnostics.some((entry) => entry.code === "manifest_invalid"), false, JSON.stringify(after));
+      assert.notEqual(after.nextAction?.argv?.[1], "plan-reinstall"); assert.notEqual(after.nextAction?.argv?.[1], "plan-manifest-repair");
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-02 the retained state with closedFeatures is restored by the reinstall and its private copy is kept", run: () => {
+    const f = riuUninstalledRoot({ withState: true }); try {
+      assert.equal(existsSync(join(f.path, "project/pipeline-state.json")), false);
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      assert.equal(plan.status, "ready", JSON.stringify(plan));
+      assert.deepEqual(plan.retainedState.map((entry) => [entry.path, entry.disposition]), [["project/pipeline-state.json", "restore"]]);
+      const applied = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" });
+      assert.equal(applied.status, "applied", JSON.stringify(applied));
+      assert.deepEqual(applied.restoredState.map((entry) => entry.path), ["project/pipeline-state.json"]);
+      assert.equal(riuRead(f.path, "project/pipeline-state.json"), f.stateBytes);
+      assert.deepEqual(JSON.parse(riuRead(f.path, "project/pipeline-state.json")).closedFeatures, RIU_STATE.closedFeatures);
+      assert.ok(readdirSync(join(dirname(f.journalPath), "retained")).some((name) => name.startsWith("metadata-")), "the private retained copy stays");
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-03 a file the user edited after the uninstall is a typed conflict and is never overwritten", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const edited = `${riuRead(f.path, "project/pipeline.yaml")}# user edit after uninstall\n`;
+      writeFileSync(join(f.path, "project/pipeline.yaml"), edited);
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      assert.equal(plan.status, "conflict", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall");
+      assert.deepEqual(plan.conflicts.map((entry) => [entry.path, entry.code]), [["project/pipeline.yaml", "reinstall_postimage_edited"]]);
+      assert.equal(plan.applyAction ?? null, null);
+      assert.equal(plan.diagnostics[0].code, "reinstall_postimage_edited");
+      assert.equal(riuRead(f.path, "project/pipeline.yaml"), edited);
+      const refused = applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: "0".repeat(64), activate: true, runner: "claude" });
+      assert.equal(refused.status, "invalid-plan");
+      assert.equal(riuRead(f.path, "project/pipeline.yaml"), edited); assert.equal(riuRead(f.path, ".claude/pipeline.yaml").includes("modelRouting"), false);
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-04 an uninstall journal that belongs to another root is ignored", run: () => {
+    const other = riuUninstalledRoot(); const own = riuOnboardedRoot(); try {
+      cpSync(join(other.path, ".git/pipeline-uninstall"), join(own.path, ".git/pipeline-uninstall"), { recursive: true });
+      riuInvalidateManifests(own.path);
+      const inspected = riuInspect(own.path);
+      assert.equal(inspected.nextAction.argv[1], "plan-manifest-repair");
+      const plan = planProjectOnboardingReinstall({ rootDir: own.path });
+      assert.notEqual(plan.case, "after-uninstall"); assert.equal(plan.uninstall, undefined);
+    } finally { dispose(other.path); dispose(own.path); }
+  } },
+  { name: "RIU-05 a merely invalid manifest without a journal keeps the owner-repair route and its refusal names the command", run: () => {
+    const f = riuOnboardedRoot(); try {
+      riuInvalidateManifests(f.path);
+      assert.equal(riuInspect(f.path).nextAction.argv[1], "plan-manifest-repair");
+      const repair = planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" });
+      assert.equal(repair.status, "unrepairable"); assertDiagnostic(repair, "canonical_manifest_requires_owner_repair");
+      assert.match(repair.diagnostics[0].guidance, /project-onboarding-v3\.mjs/u); assert.match(repair.diagnostics[0].guidance, /plan-manifest-repair/u);
+      assert.equal(riuFollow(f.path, riuInspect(f.path).nextAction).terminal?.status, "unrepairable");
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-06 plan-manifest-repair in the uninstalled state names the reinstall route instead of an owner-repair dead end", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const repair = planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" });
+      assert.equal(repair.status, "unrepairable"); assert.equal(repair.diagnostics[0].code, "canonical_manifest_stripped_by_uninstall");
+      assert.equal(repair.nextAction.argv[1], "plan-reinstall"); assert.equal(repair.nextAction.mutation, false);
+      assert.match(repair.diagnostics[0].guidance, /plan-reinstall/u);
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-07 plan-source-recovery in the uninstalled state names the reinstall route instead of sending back to inspect", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const recovery = planProjectOnboardingSourceRecoveryV4({ rootDir: f.path, runner: "claude" });
+      assert.equal(recovery.status, "unrepairable"); assert.equal(recovery.diagnostics[0].code, "source_is_current");
+      assert.equal(recovery.nextAction.argv[1], "plan-reinstall");
+      assert.doesNotMatch(recovery.diagnostics[0].guidance, /rerun the V4 lifecycle inspection/u);
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-08 no controlling action returned by inspect, manifest repair, reinstall or source recovery leads back to inspect without a mutation", run: () => {
+    const f = riuUninstalledRoot(); try {
+      for (const first of [riuInspect(f.path).nextAction, planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" }).nextAction, planProjectOnboardingSourceRecoveryV4({ rootDir: f.path, runner: "claude" }).nextAction]) {
+        const walked = riuFollow(f.path, first);
+        assert.equal(new Set(walked.verbs).size, walked.verbs.length, `circle: ${walked.verbs.join(" > ")}`);
+        assert.equal(walked.verbs.slice(1).includes("inspect"), false, walked.verbs.join(" > "));
+        assert.equal(walked.action?.argv?.[1], "apply-reinstall", walked.verbs.join(" > "));
+      }
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-09 the lifecycle guard admits the reinstall plan action from inspect and the apply action from the plan", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const route = riuInspect(f.path).nextAction;
+      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction(route), f.path, { runner: "claude" }), true);
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction(plan.applyAction), f.path, { runner: "claude" }), true);
+      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction({ ...plan.applyAction, argv: plan.applyAction.argv.filter((token) => token !== "--activate") }), f.path, { runner: "claude" }), false);
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-10 the apply refuses without activation, on a stale digest and after the planned files drifted, and writes nothing", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      const stripped = Object.fromEntries(RIU_OWNED_PATHS.map((relative) => [relative, riuRead(f.path, relative)]));
+      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: false }).status, "activation-required");
+      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: "f".repeat(64), activate: true }).status, "invalid-plan");
+      writeFileSync(join(f.path, ".claude/pipeline.json"), `${stripped[".claude/pipeline.json"]}\n`);
+      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true }).status, "invalid-plan");
+      for (const relative of RIU_OWNED_PATHS) if (relative !== ".claude/pipeline.json") assert.equal(riuRead(f.path, relative), stripped[relative], relative);
+    } finally { dispose(f.path); }
+  } },
+  { name: "RIU-11 the same builder serves a Codex-enabled source: foreign bytes survive and the regenerated projections are a fixpoint of the source", run: () => {
+    const cleanups = []; const f = projectUninstallFixture({ after: (run) => cleanups.push(run) }, { hooks: false });
+    try {
+      const owned = [".claude/pipeline.json", ".claude/pipeline.yaml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml"];
+      const uninstallPlan = f.controller.plan({ rootDir: f.root }); assert.deepEqual(uninstallPlan.conflicts, []);
+      assert.equal(f.controller.apply(uninstallPlan, { activate: true, planSha256: uninstallPlan.planSha256 }).status, "uninstalled");
+      const stripped = Object.fromEntries(owned.map((relative) => [relative, riuRead(f.root, relative)]));
+      const plan = planProjectOnboardingReinstall({ rootDir: f.root });
+      assert.equal(plan.status, "ready", JSON.stringify(plan)); assert.equal(plan.case, "after-uninstall");
+      for (const relative of owned) assert.ok(plan.targets.some((target) => target.path === relative), relative);
+      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.root, planSha256: plan.planSha256, activate: true, runner: "codex" }).status, "applied");
+      assert.match(riuRead(f.root, ".claude/pipeline.yaml"), /unowned_language_sentinel: exact/u); assert.match(riuRead(f.root, ".claude/pipeline.yaml"), /foreign: keep-exact/u);
+      assert.match(riuRead(f.root, ".codex/agents/implementor.toml"), /# foreign comment/u);
+      assert.notEqual(riuRead(f.root, ".claude/pipeline.yaml"), stripped[".claude/pipeline.yaml"]);
+      const again = planProjectOnboardingReinstall({ rootDir: f.root });
+      assert.notEqual(again.case, "after-uninstall", "an applied reinstall leaves nothing for the same journal to regenerate");
+    } finally { for (const run of cleanups) run(); }
+  } },
+  { name: "RIU-12 after the reinstall the old journal no longer controls: a later invalid manifest falls back to the owner-repair route", run: () => {
+    const f = riuUninstalledRoot(); try {
+      const plan = planProjectOnboardingReinstall({ rootDir: f.path });
+      assert.equal(applyProjectOnboardingReinstall({ rootDir: f.path, planSha256: plan.planSha256, activate: true, runner: "claude" }).status, "applied");
+      riuInvalidateManifests(f.path);
+      const inspected = riuInspect(f.path);
+      assert.equal(inspected.nextAction.argv[1], "plan-manifest-repair");
+      assert.notEqual(planProjectOnboardingReinstall({ rootDir: f.path }).case, "after-uninstall");
+      assert.equal(planProjectOnboardingManifestRepairV4({ rootDir: f.path, runner: "claude" }).diagnostics[0].code, "canonical_manifest_requires_owner_repair");
+    } finally { dispose(f.path); }
+  } },
+];
+for (const entry of REINSTALL_AFTER_UNINSTALL_CASES) test(entry.name, entry.run);
 Object.freeze(ONBOARDING_TEST_CASES);
 export const ONBOARDING_CASE_IDS = Object.freeze(ONBOARDING_TEST_CASES.map((entry) => entry.id).sort());
 if (DIRECT_INVOCATION) {
-  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 228 stable callbacks");
-  if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 18 callbacks");
+  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 240 stable callbacks");
+  if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 20 callbacks");
 }
 
 if (ORCHESTRATING_SHARDS) {
@@ -10763,7 +10973,7 @@ if (ORCHESTRATING_SHARDS) {
   if (failed.length === 0) {
     assert.equal(results.length, SHARD_COUNT * CHUNK_COUNT, "all 12 child receipts are required");
     const completion = recorder.snapshot();
-    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 228 callbacks must be reported");
+    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 240 callbacks must be reported");
     assert.equal(completion.terminal, true, "the parent must emit the terminal completion record");
     const classes = new Set(results.flatMap((result) => result.coverage));
     assert.ok(classes.size > 0, "B8 corpus must reach at least one real session command");

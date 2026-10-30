@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 // Source target: plugins/pipeline-core/lib/project-uninstall.mjs
-import {closeSync,constants,fstatSync,fsyncSync,mkdirSync,openSync,readSync,readdirSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
+import {closeSync,constants,fstatSync,fsyncSync,mkdirSync,openSync,readSync,readdirSync,realpathSync,renameSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,join,relative,resolve,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomBytes} from 'node:crypto';
@@ -26,6 +26,27 @@ function validJournal(journal,{root,controls,planSha256}){
  if(!Array.isArray(journal.completed)||canonical(journal.completed)!==canonical(PROJECT_UNINSTALL_FAULT_STAGES.slice(1,1+journal.completed.length))||!Array.isArray(journal.actions)||!Array.isArray(journal.plan.footprint?.actions))return false;
  const publicActions=journal.actions.map(({afterBytes,...entry})=>entry);if(canonical(publicActions)!==canonical(journal.plan.footprint.actions))return false;
  return journal.actions.every(entry=>typeof entry.path==='string'&&!entry.path.startsWith('/')&&!entry.path.includes('\\')&&!entry.path.split('/').some(p=>!p||p==='.'||p==='..')&&['owned-keys','retained-metadata'].includes(entry.kind)&&(entry.kind==='retained-metadata'?entry.afterBytes===null:typeof entry.afterBytes==='string'&&footprintSha256(entry.afterBytes)===entry.afterSha256));
+}
+// Read-only observation of the completed uninstall journals that belong to one root (the route back to an install, W7-REINSTALL).
+// The journal is the only record of what the uninstall stripped and retained; this reader adds no mutation and never widens what
+// the uninstall removes. A journal counts only when it validates exactly as resume() validates it, its owner root is this root,
+// and every stage through 'complete' finished. Newest first, so a later uninstall outranks an earlier one.
+export function observeCompletedUninstallJournals({rootDir,commonDir}){
+ const base=join(commonDir,'pipeline-uninstall'),found=[];let scopes;
+ try{scopes=readdirSync(base).sort();}catch{return found;}
+ for(const scopeKey of scopes){let plans;try{plans=readdirSync(join(base,scopeKey)).sort();}catch{continue;}
+  for(const planSha256 of plans){if(!/^[a-f0-9]{64}$/.test(planSha256))continue;
+   const controls=join(base,scopeKey,planSha256),path=join(controls,'journal.json');
+   try{const raw=readPhysicalFootprint(path,{max:4194304});if(!raw||(process.platform!=='win32'&&raw.mode!==0o600))continue;
+    const journal=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw.bytes));
+    if(typeof journal?.controls!=='string'||realpathSync(journal.controls)!==realpathSync(controls)||!validJournal(journal,{root:rootDir,controls:journal.controls,planSha256}))continue;
+    if(journal.completed.length!==PROJECT_UNINSTALL_FAULT_STAGES.length-1)continue;
+    found.push({planSha256,scopeKey,controls:journal.controls,journalSha256:raw.sha256,journal,modifiedMs:statSync(path).mtimeMs});}catch{continue;}}}
+ return found.sort((a,b)=>b.modifiedMs-a.modifiedMs||(a.planSha256<b.planSha256?-1:1));
+}
+// The private retained copy of a state file the uninstall moved aside (retained-metadata action number `index` of the journal).
+export function readUninstallRetainedMetadata({controls,index}){
+ try{const row=readPhysicalFootprint(join(controls,'retained','metadata-'+index),{max:4194304});return row?{bytes:row.bytes,sha256:row.sha256,mode:row.mode}:null;}catch{return null;}
 }
 function ensurePrivate(path){const existing=physicalFootprintPath(path,{missing:true});if(!existing){physicalFootprintPath(dirname(path),{missing:true,directory:true});mkdirSync(path,{recursive:true,mode:0o700});if(process.platform==='win32'&&hardenWindowsPrivateDirectory(path).status!=='secure')footprintFail('PU-PRIVATE-MODE');}const st=physicalFootprintPath(path,{directory:true});if(process.platform==='win32'?assessWindowsPrivatePath(path).status!=='secure':(st.mode&0o777)!==0o700)footprintFail('PU-PRIVATE-MODE');}
 function sync(path){let fd;try{fd=openSync(path,'r');fsyncSync(fd);}catch(e){if(process.platform!=='win32'||!['EACCES','EPERM','EINVAL','EISDIR','ENOTSUP'].includes(e.code))throw e;}finally{if(fd!==undefined)closeSync(fd);}}

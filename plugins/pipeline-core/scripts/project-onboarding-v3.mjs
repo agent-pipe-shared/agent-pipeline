@@ -897,7 +897,7 @@ export function main(args = process.argv.slice(2), {
     }
     else if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
-    else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
+    else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, runner: options.runner, deps });
     else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, deps });
     else if (options.command === "apply-partial-authority") output = applyProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "adopt-remote-plan") output = planProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, deps });
@@ -1132,6 +1132,9 @@ export function main(args = process.argv.slice(2), {
   if (output.schema === "pipeline.onboarding-intake-spec-marker-plan.v1") return ["repair-required", "already-current"].includes(output.status) ? 0 : 1;
   if (output.schema === "pipeline.onboarding-intake-spec-marker-apply.v1") return ["applied", "already-current"].includes(output.status) ? 0 : 1;
   if (output.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) return 0;
+  // apply-reinstall: "applied" is the success outcome of both the quarantine reinstall and the after-uninstall regeneration;
+  // it is not an inspection resting status, so without this line a successful apply exited 1.
+  if (output.schema === "pipeline.project-onboarding-reinstall-plan.v1" && output.status === "applied") return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   // `runtime-attestation-required` is a legitimate resting point for an
   // inspect/plan command: it names what the caller still needs before it can

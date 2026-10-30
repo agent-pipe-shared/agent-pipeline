@@ -123,6 +123,8 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { observeCompletedUninstallJournals, readUninstallRetainedMetadata } from "./project-uninstall.mjs";
+import { uninstallWorkspacePath } from "./project-uninstall-workspace.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
@@ -539,9 +541,220 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Reinstall after `project-uninstall` (W7-REINSTALL-AFTER-UNINSTALL; backlog
+// 2026-10-30-no-route-back-to-install-after-project-uninstall, decision D206).
+//
+// The uninstall is content-preserving: it strips only the owned projection
+// keys from the generated manifests/calibration (and the .codex agent files)
+// and moves the plan-state file into its private retained store. Its journal
+// records each stripped file's postimage digest. A project whose files still
+// equal those postimages is "uninstalled": the route back is to re-insert the
+// owned keys from the CURRENT source through the existing runtime-projection
+// generator (the same one a fresh onboarding uses), bound to the journal digest
+// and the source digest. A file the user changed since is a typed conflict and
+// is never overwritten; the retained state file is restored, never dropped.
+// ---------------------------------------------------------------------------
+const REINSTALL_AFTER_UNINSTALL = "after-uninstall";
+const UNINSTALL_RESTORABLE_STATE = /(?:^|\/)pipeline-state\.json$/u;
+
+/** The completed uninstall journal of this root whose owned-key postimages still describe the files on disk, or null. */
+function observeUninstalledState(root, fs) {
+  let repository; let journals;
+  try {
+    repository = discoverRepository(root, { spawn: fs.spawnSync });
+    journals = observeCompletedUninstallJournals({ rootDir: root, commonDir: repository.commonDir });
+  } catch { return null; }
+  for (const entry of journals) {
+    const states = entry.journal.actions.filter((action) => action.kind === "owned-keys" && !uninstallWorkspacePath(action)).map((action) => {
+      let current = null;
+      try { const path = safePath(root, action.path, fs); if (fs.existsSync(path)) current = readBoundPhysicalFile(path, fs); } catch { current = null; }
+      const actualSha256 = current === null ? null : sha256(current);
+      return { action, path: action.path, current, expectedSha256: action.afterSha256, actualSha256, state: actualSha256 === null ? "missing" : actualSha256 === action.afterSha256 ? "match" : "edited" };
+    });
+    if (states.some((entryState) => entryState.state === "match")) return { repository, entry, states };
+  }
+  return null;
+}
+
+function reinstallProjectionBaselines(root, intent, fs) {
+  const baselines = currentRuntimeBaselines(root, intent, fs);
+  for (const mirror of loadRuntimeProjectionV3OwnedKeys().neutralAuthorityMirrors ?? []) {
+    const path = safePath(root, mirror.path, fs);
+    if (fs.existsSync(path)) baselines[mirror.path] = { status: "present", bytes: decodeUtf8Strict(readBoundPhysicalFile(path, fs), mirror.path) };
+  }
+  return baselines;
+}
+
+/**
+ * The generator replaces owned values in place; the uninstall removed them. Put the owned anchors back (never a value) so the
+ * existing generator can write the values from the source: the human_facing child under `language:`, a `modelRouting:` block
+ * before the key that follows it in a fresh manifest, and no emptied `session:` stub (the generator owns that whole block).
+ */
+function reseedStrippedYaml(stripped, fresh) {
+  const eol = stripped.includes("\r\n") ? "\r\n" : "\n";
+  const lines = stripped.split(/(?<=\n)/u);
+  const isTop = (line) => /^[A-Za-z_][\w-]*:/u.test(line);
+  const keyLine = (key) => lines.findIndex((line) => line.replace(/[\r\n]+$/u, "") === `${key}:`);
+  const blockEnd = (start) => { let end = start + 1; while (end < lines.length && !(lines[end].replace(/[\r\n]+$/u, "").length > 0 && !/^[ \t#]/u.test(lines[end]))) end += 1; return end; };
+  const session = keyLine("session");
+  if (session !== -1 && !lines.slice(session + 1, blockEnd(session)).some((line) => line.replace(/[\r\n]+$/u, "").length > 0 && !line.startsWith("#"))) lines.splice(session, 1);
+  const language = keyLine("language");
+  if (language !== -1 && !lines.slice(language + 1, blockEnd(language)).some((line) => /^ {2}human_facing:\s*(?:de|en)/u.test(line))) lines.splice(language + 1, 0, `  human_facing: en${eol}`);
+  if (keyLine("modelRouting") === -1) {
+    const order = fresh.split(/\r?\n/u).filter(isTop).map((line) => line.slice(0, line.indexOf(":")));
+    const following = order.slice(order.indexOf("modelRouting") + 1).filter((key) => !["criticExport", "runnerRoutes", "session"].includes(key));
+    let at = lines.length;
+    for (const key of following) { const found = lines.findIndex((line) => isTop(line) && line.startsWith(`${key}:`)); if (found !== -1) { at = found; break; } }
+    // An appended block follows the last content line directly: the generator's own trailing separator is what the uninstall cut.
+    if (at === lines.length) while (lines.length > 0 && lines.at(-1).trim() === "") lines.pop();
+    if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
+    lines.splice(at, 0, `modelRouting:${eol}`);
+  }
+  return lines.join("");
+}
+
+function reseedStrippedToml(stripped, keys) {
+  const eol = stripped.includes("\r\n") ? "\r\n" : "\n";
+  const lines = stripped.split(/(?<=\n)/u);
+  const section = lines.findIndex((line) => /^\s*\[/u.test(line));
+  const head = section === -1 ? lines : lines.slice(0, section);
+  const present = new Set(head.map((line) => line.match(/^\s*([A-Za-z_][\w-]*)\s*=/u)?.[1]).filter(Boolean));
+  const missing = keys.filter((key) => !present.has(key));
+  if (missing.length === 0) return stripped;
+  const at = section === -1 ? lines.length : section;
+  if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
+  lines.splice(at, 0, ...missing.map((key) => `${key} = ""${eol}`));
+  return lines.join("");
+}
+
+function replaceFileBytes(fs, path, bytes, mode) {
+  const temporary = `${path}.reinstall-${randomBytes(6).toString("hex")}`;
+  try {
+    fs.writeFileSync(temporary, bytes, { flag: "wx", mode });
+    fs.renameSync(temporary, path);
+  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+}
+
+/**
+ * Build the typed plan (and the byte-exact writes behind it) for a project the uninstall left behind. Returns null when
+ * this root has no recognisable uninstalled state, so every other reinstall disposition stays exactly as it was.
+ */
+function buildReinstallAfterUninstall(root, fs) {
+  let sourceBytes; let intent;
+  try {
+    sourceBytes = readBoundPhysicalFile(safePath(root, SOURCE, fs), fs);
+    intent = parseYaml(decodeUtf8Strict(sourceBytes, SOURCE));
+    if (!validatePipelineUserV3(intent).ok) return null;
+  } catch { return null; }
+  const observed = observeUninstalledState(root, fs);
+  if (observed === null) return null;
+  const { repository, entry, states } = observed;
+  const uninstall = { planSha256: entry.planSha256, journalSha256: entry.journalSha256 };
+  const refuse = (status, diagnostics, extra = {}) => ({ plan: { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, root, status, uninstall, diagnostics, ...extra }, writes: [], restores: [] });
+  const conflicts = states.filter((entryState) => entryState.state !== "match").map((entryState) => ({
+    path: entryState.path,
+    code: entryState.state === "edited" ? "reinstall_postimage_edited" : "reinstall_postimage_missing",
+    expectedSha256: entryState.expectedSha256,
+    actualSha256: entryState.actualSha256,
+  }));
+  if (conflicts.length > 0) {
+    return refuse("conflict", conflicts.map((conflict) => diagnostic(`$.targets.${conflict.path}`, conflict.code,
+      `${conflict.path} no longer equals the bytes the uninstall left, so the reinstall will not overwrite it`,
+      "restore the file to its post-uninstall bytes or move your change aside, then run plan-reinstall again")), { conflicts });
+  }
+  const retainedState = []; const restores = []; const notes = [];
+  for (const [index, action] of entry.journal.actions.entries()) {
+    if (action.kind !== "retained-metadata") continue;
+    const row = { path: action.path, retainedSha256: action.beforeSha256 };
+    if (!UNINSTALL_RESTORABLE_STATE.test(action.path)) {
+      retainedState.push({ ...row, disposition: "left-retained" });
+      notes.push(diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_marker_left", `${action.path} is a transient onboarding marker and stays in the private retained store`, "onboarding asks for it again when it is needed"));
+      continue;
+    }
+    const retained = readUninstallRetainedMetadata({ controls: entry.controls, index });
+    if (retained === null || retained.sha256 !== action.beforeSha256) {
+      return refuse("conflict", [diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_state_unavailable", `the retained copy of ${action.path} is missing or changed, so its closed features cannot be restored`, "restore the private retained copy named by the uninstall journal, then run plan-reinstall again")], { conflicts: [{ path: action.path, code: "reinstall_retained_state_unavailable", expectedSha256: action.beforeSha256, actualSha256: retained?.sha256 ?? null }] });
+    }
+    let current = null;
+    try { const path = safePath(root, action.path, fs); if (fs.existsSync(path)) current = readBoundPhysicalFile(path, fs); } catch { current = null; }
+    if (current === null) { retainedState.push({ ...row, disposition: "restore" }); restores.push({ path: action.path, bytes: retained.bytes, sha256: retained.sha256, mode: (retained.mode ?? 0o600) & 0o777 }); }
+    else if (sha256(current) === action.beforeSha256) retainedState.push({ ...row, disposition: "already-restored" });
+    else {
+      retainedState.push({ ...row, disposition: "kept-current" });
+      notes.push(diagnostic(`$.retainedState.${action.path}`, "reinstall_retained_state_superseded", `${action.path} exists again with different bytes, so the retained copy is not restored over it`, "the retained copy stays in the private store named by the uninstall journal"));
+    }
+  }
+  let projection; let writes;
+  try {
+    const owned = loadRuntimeProjectionV3OwnedKeys();
+    const formats = new Map([...owned.targets.map((target) => [target.path, target]), ...(owned.neutralAuthorityMirrors ?? []).map((mirror) => [mirror.path, { ...owned.targets.find((target) => target.path === mirror.mirrorOf), path: mirror.path, format: mirror.format }])]);
+    const fresh = freshBaselines(intent, { rootDir: root, fs })[".claude/pipeline.yaml"].bytes;
+    const baselines = reinstallProjectionBaselines(root, intent, fs);
+    for (const entryState of states) {
+      const target = formats.get(entryState.path);
+      const bytes = decodeUtf8Strict(entryState.current, entryState.path);
+      baselines[entryState.path] = { status: "present", bytes: target?.format === "yaml" ? reseedStrippedYaml(bytes, fresh) : target?.projection === "codex-custom-agent-v3" ? reseedStrippedToml(bytes, target.ownedKeys) : bytes };
+    }
+    projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines });
+    if (projection.status !== "ready") throw new Error(`projection ${projection.status}`);
+    writes = states.map((entryState) => {
+      const target = projection.targets.find((candidate) => candidate.path === entryState.path);
+      if (typeof target?.after?.bytes !== "string") throw new Error(`no regenerated bytes for ${entryState.path}`);
+      return { path: entryState.path, beforeSha256: entryState.actualSha256, beforeBytes: entryState.current, afterBytes: target.after.bytes, mode: fs.lstatSync(safePath(root, entryState.path, fs)).mode & 0o777 };
+    });
+  } catch (error) {
+    return refuse("unrepairable", [diagnostic("$.projection", "reinstall_projection_unavailable", `the current source cannot be regenerated over the stripped files: ${String(error.message).split("\n")[0]}`, "repair the source or the stripped file named above through its owning workflow")]);
+  }
+  const targets = writes.map((write) => ({ path: write.path, before: describe(write.beforeBytes), after: describe(write.afterBytes) }));
+  const binding = { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, root, commonDir: repository.commonDir, uninstall, source: { path: SOURCE, sha256: sha256(sourceBytes) }, targets, retainedState };
+  const planSha256 = sha256(JSON.stringify(stable(binding)));
+  return {
+    plan: { ...binding, status: "ready", planSha256, mutation: false, diagnostics: notes, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-reinstall", "--root", root, "--plan-sha256", planSha256, "--activate"], true, true, REINSTALL_PLAN_SCHEMA, ["applied"]) },
+    writes,
+    restores,
+    intent,
+  };
+}
+
+function applyReinstallAfterUninstall(built, fs, runner) {
+  const { plan, writes, restores } = built; const root = plan.root;
+  const written = []; const created = [];
+  try {
+    for (const write of writes) {
+      const path = safePath(root, write.path, fs);
+      if (sha256(readBoundPhysicalFile(path, fs)) !== write.beforeSha256) throw new Error(`preimage changed: ${write.path}`);
+      replaceFileBytes(fs, path, write.afterBytes, write.mode); written.push({ path, previous: write.beforeBytes, mode: write.mode });
+    }
+    for (const restore of restores) {
+      const path = safePath(root, restore.path, fs);
+      fs.mkdirSync(dirname(path), { recursive: true });
+      fs.writeFileSync(path, restore.bytes, { flag: "wx", mode: restore.mode }); created.push(path);
+    }
+    // Read back: the files on disk must now be a fixpoint of the source under the same generator.
+    const settled = planRuntimeProjectionV3(built.intent, { source: SOURCE, baselines: reinstallProjectionBaselines(root, built.intent, fs) });
+    if (settled.status !== "ready" || settled.targets.some((target) => target.changed && writes.some((write) => write.path === target.path))) throw new Error("the regenerated files are not a fixpoint of the source");
+  } catch (error) {
+    const failures = [];
+    for (const path of created.reverse()) try { fs.unlinkSync(path); } catch (rollbackError) { failures.push(rollbackError); }
+    for (const entryWritten of written.reverse()) try { replaceFileBytes(fs, entryWritten.path, entryWritten.previous, entryWritten.mode); } catch (rollbackError) { failures.push(rollbackError); }
+    return { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, status: failures.length ? "rollback-failed" : "rolled-back", root, diagnostics: [diagnostic("$.transaction", failures.length ? "reinstall_rollback_failed" : "reinstall_apply_failed", error.message, "inspect the project files named above before retrying")] };
+  }
+  const result = { schema: REINSTALL_PLAN_SCHEMA, case: REINSTALL_AFTER_UNINSTALL, status: "applied", root, uninstall: plan.uninstall, changes: writes.map((write) => write.path), restoredState: restores.map((restore) => ({ path: restore.path, sha256: restore.sha256 })), retainedState: plan.retainedState };
+  if (typeof runner === "string" && runner.length > 0) {
+    // The hooks, runner permissions and enrollment the uninstall also removed follow through the ordinary lifecycle:
+    // the observation below names the controlling action that comes next.
+    const postInspection = inspectProjectOnboardingV3({ rootDir: root, deps: fs, intent: "onboarding", runner });
+    return { ...result, postInspection, nextAction: postInspection.nextAction ?? null };
+  }
+  return result;
+}
+
 /**
  * Reinstall is deliberately an authority-only transaction.  It never treats
  * legacy calibration, skills, hooks, docs, or runner directories as owned.
+ * The one extension is the typed "after-uninstall" case above: a project that
+ * `project-uninstall` stripped is regenerated from its source, never quarantined.
  */
 export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
   const fs = deps(overrides); let root;
@@ -554,11 +767,11 @@ export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps: 
     intent = parseYaml(decodeUtf8Strict(source, SOURCE));
     if (!validatePipelineUserV3(intent).ok) throw new Error("invalid V3 source");
     projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines: currentRuntimeBaselines(root, intent, fs) });
-  } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unowned", "the V3 source cannot prove a current owned projection", "use the source-owning recovery route")] }; }
+  } catch { return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unowned","the V3 source cannot prove a current owned projection", "use the source-owning recovery route")] }; }
   const expected = projection.targets.find((target) => target.path === ".claude/pipeline.yaml")?.after?.bytes;
   let manifest;
-  try { manifest = readBoundPhysicalFile(manifestPath, fs); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unavailable", "the generated manifest is unavailable", "use the manifest repair route")] }; }
-  if (typeof expected !== "string" || Buffer.compare(manifest, Buffer.from(expected, "utf8")) !== 0) return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unowned", "the existing manifest is not the current generated V3 projection", "repair or preserve it through its owning workflow")] };
+  try { manifest = readBoundPhysicalFile(manifestPath, fs); } catch { return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unavailable", "the generated manifest is unavailable", "use the manifest repair route")] }; }
+  if (typeof expected !== "string" || Buffer.compare(manifest, Buffer.from(expected, "utf8")) !== 0) return buildReinstallAfterUninstall(root, fs)?.plan ?? { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unowned", "the existing manifest is not the current generated V3 projection", "repair or preserve it through its owning workflow")] };
   let repository;
   try { repository = discoverRepository(root, { spawn: fs.spawnSync }); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "private-store-unavailable", root, diagnostics: [diagnostic("$.repository", "reinstall_private_store_unavailable", "the physical Git common directory is unavailable", "restore local Git capability before retrying")] }; }
   const targets = [{ path: SOURCE, before: describe(source) }, { path: ".claude/pipeline.yaml", before: describe(manifest) }];
@@ -567,11 +780,16 @@ export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps: 
   return { ...binding, status: "ready", planSha256, mutation: false, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-reinstall", "--root", root, "--plan-sha256", planSha256, "--activate"], true, true, REINSTALL_PLAN_SCHEMA, ["applied"]) };
 }
 
-export function applyProjectOnboardingReinstall({ rootDir = process.cwd(), planSha256, activate = false, deps: overrides = {} } = {}) {
+export function applyProjectOnboardingReinstall({ rootDir = process.cwd(), planSha256, activate = false, runner = null, deps: overrides = {} } = {}) {
   const fs = deps(overrides);
   if (!activate || !SHA256_RE.test(planSha256 ?? "")) return { schema: REINSTALL_PLAN_SCHEMA, status: "activation-required" };
   const plan = planProjectOnboardingReinstall({ rootDir, deps: fs });
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: REINSTALL_PLAN_SCHEMA, status: "invalid-plan", root: plan.root };
+  if (plan.case === REINSTALL_AFTER_UNINSTALL) {
+    const built = buildReinstallAfterUninstall(plan.root, fs);
+    if (built === null || built.plan.status !== "ready" || built.plan.planSha256 !== planSha256) return { schema: REINSTALL_PLAN_SCHEMA, status: "invalid-plan", root: plan.root };
+    return applyReinstallAfterUninstall(built, fs, runner);
+  }
   const archive = join(plan.commonDir, "agent-pipeline", "reinstall-quarantine", planSha256);
   const moved = [];
   try {
@@ -4492,6 +4710,26 @@ export function planProjectOnboardingSourceRecoveryV4({
       }],
     });
   }
+  // The source is current, but a project that project-uninstall stripped is not: name the route back instead of sending the
+  // caller to the inspection that sent it here.
+  if (observeUninstalledState(root, fs) !== null) {
+    return sourceRecoveryResult({
+      status: "unrepairable",
+      root,
+      category: "current-authority",
+      sourceSha256: inspected.sourceSha256,
+      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", root], runner, intent ?? "onboarding"), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
+      diagnostics: [{
+        ...lifecycleDiagnostic(
+          "$.source",
+          "source_is_current",
+          "the V3 source is current; the project was stripped by project-uninstall",
+          "run plan-reinstall, which regenerates the stripped projections from this source",
+        ),
+        repairCommand: { available: true, reason: "project_uninstalled", guidance: "run the journal-bound reinstall plan (plan-reinstall) and apply it" },
+      }],
+    });
+  }
   return sourceRecoveryResult({
     status: "unrepairable",
     root,
@@ -4606,6 +4844,23 @@ export function planProjectOnboardingManifestRepairV4({
   // this writer must never treat that as permission to mask or replace a
   // malformed canonical project manifest.
   const canonicalManifest = loadManifest(root);
+  if (canonicalManifest.status !== "ok" && !canonicalManifest.repair?.available && observeUninstalledState(root, fs) !== null) {
+    // Not an owner-repair dead end: project-uninstall stripped the owned keys and its journal knows how to put them back.
+    return {
+      ...manifestRepairResult({
+        status: "unrepairable",
+        root,
+        source: { path: SOURCE, sha256: inspection.sourceSha256 },
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.manifest",
+          "canonical_manifest_stripped_by_uninstall",
+          "the canonical project manifest is invalid because project-uninstall stripped its owned keys",
+          "run plan-reinstall (node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-reinstall --root <project-dir>); it regenerates the manifest from the current source",
+        )],
+      }),
+      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", root], runner, sessionIntent ?? "onboarding"), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
+    };
+  }
   if (canonicalManifest.status !== "ok") {
     // A schema-less-but-otherwise-valid canonical manifest (backlog:
     // a-schema-less-project-pipeline-yaml-has-no-known-repair-path) is a normalizing repair,
@@ -4623,7 +4878,7 @@ export function planProjectOnboardingManifestRepairV4({
         "$.authority.manifest",
         "canonical_manifest_requires_owner_repair",
         "the canonical project manifest is absent or invalid",
-        "repair project/pipeline.yaml through its owning authority workflow before repairing a runtime projection",
+        "no command rewrites an existing invalid project/pipeline.yaml: edit it by hand, then re-check it with: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-manifest-repair --root <project-dir>; a manifest that project-uninstall stripped is regenerated by: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-reinstall --root <project-dir>",
       );
     return manifestRepairResult({
       status: "unrepairable",
@@ -5259,6 +5514,13 @@ function v4InspectionWithoutFirstIntakeBoundary(rootDir, fs, intent = "onboardin
         }
         const manifest = loadManifest(legacy.root);
         if (manifest.status !== "ok") {
+          // A project that project-uninstall stripped has a route back, bound to the uninstall journal: the manifest
+          // repair below is unrepairable for it by design (the manifest is not absent, it is stripped).
+          if (observeUninstalledState(legacy.root, fs) !== null) {
+            return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
+              nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-reinstall", "--root", legacy.root], runner, intent), false, false, REINSTALL_PLAN_SCHEMA, ["ready", "conflict", "unrepairable"]),
+              diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is invalid because project-uninstall stripped its owned keys", "review the journal-bound reinstall plan: plan-reinstall regenerates it from the current source")] });
+          }
           return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
             nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], runner, intent), false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
             diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "review the digest-bound manifest-only repair plan")] });
