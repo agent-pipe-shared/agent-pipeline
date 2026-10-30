@@ -118,7 +118,7 @@ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/publi
 const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
 const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
 const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
-const { inspectNativeGoldfishItemDelivery, observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
 const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
@@ -333,11 +333,32 @@ function defaultQueueRows(root) {
  * D196 (R1): slices of the governed item course that were started and have not finished. The queue stores no started state
  * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); a started slice is a native pending state without a terminal
  * record (phase "active"), which is also what a budget checkpoint leaves (the reservation stays live). A fault yields none (warn only).
+ * Read straight from the pending files: the full item delivery inspection verifies every historical member and took minutes on a
+ * repository with a long dispatch history, which hung every build. Only a slice the governed queue still holds as ready counts:
+ * an old dispatch whose pending state was never settled but whose slice was cancelled or never queued is no owner.
  */
-function defaultStartedOwners(root) {
+export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
   try {
-    const observed = inspectNativeGoldfishItemDelivery({ root });
-    return observed.status === "observed" ? observed.items.filter((entry) => entry.phase === "active").map((entry) => ({ dispatchId: entry.dispatchId, itemId: entry.itemId })) : [];
+    const live = new Set(queueRows.filter((entry) => entry?.state === "ready").map((entry) => entry.id));
+    if (live.size === 0) return [];
+    // A slice with a commit carrying its Dispatch trailer is delivered (one git call; the full integration read takes tens of seconds).
+    const trailers = execFileSync("git", ["-C", root, "log", "--format=%(trailers:key=Dispatch,valueonly,separator=%x0a)"], { encoding: "utf8", maxBuffer: 1 << 26 });
+    for (const line of trailers.split("\n")) { const id = /^(\S+) \(goldfish\)$/u.exec(line.trim())?.[1]; if (id) live.delete(id); }
+    if (live.size === 0) return [];
+    const commonDir = resolve(root, execFileSync("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim());
+    const dir = resolve(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+    if (!existsSync(dir)) return [];
+    const names = readdirSync(dir);
+    const started = [];
+    for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
+      try {
+        const bytes = readFileSync(resolve(dir, name));
+        if (names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) continue;
+        const value = JSON.parse(bytes.toString("utf8"));
+        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId });
+      } catch { /* an unreadable pending file names no owner */ }
+    }
+    return started;
   } catch { return []; }
 }
 

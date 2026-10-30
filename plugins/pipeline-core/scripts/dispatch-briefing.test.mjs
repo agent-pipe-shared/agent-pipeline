@@ -1713,3 +1713,34 @@ test("D196 R4: an estimate above twice the base cap plus one grant step warns DB
   assert.ok(warningCodes(farResult).includes("DBG-ESTIMATE-NEEDS-SPLIT"), JSON.stringify(farResult.warnings));
   assert.match(farResult.warnings.find((entry) => entry.code === "DBG-ESTIMATE-NEEDS-SPLIT").message, /independent criteria/u);
 });
+
+test("D196 R1 default reader: an unsettled pending state of a ready queue slice names its owner; settled, unreadable, delivery-less, cancelled, unqueued and committed (Dispatch trailer) ones do not", async () => {
+  const { defaultStartedOwners } = await lib();
+  const dir = mkdtempSync(join(tmpdir(), "dbg-started-owner-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", dir]).status, 0);
+    assert.deepEqual(defaultStartedOwners(dir), [], "no host directory: no owner");
+    const host = join(dir, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+    mkdirSync(host, { recursive: true });
+    const pending = (dispatchId, delivery = { itemId: "item.a" }) => {
+      const bytes = Buffer.from(JSON.stringify({ binding: { dispatchId }, ...(delivery ? { delivery } : {}) }));
+      const digest = createHash("sha256").update(bytes).digest("hex");
+      writeFileSync(join(host, `pending-claude-${createHash("sha256").update(dispatchId).digest("hex")}.json`), bytes);
+      return digest;
+    };
+    pending("ALF-OPEN");
+    writeFileSync(join(host, `authority-terminal-${pending("ALF-DONE")}.json`), "{}");
+    pending("ALF-NO-DELIVERY", null);
+    pending("ALF-CANCELLED");
+    pending("ALF-UNQUEUED");
+    pending("ALF-DELIVERED");
+    assert.equal(spawnSync("git", ["-C", dir, "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty",
+      "-m", "fixture delivery", "-m", "Dispatch: ALF-DELIVERED (goldfish)"]).status, 0);
+    writeFileSync(join(host, `pending-codex-${"0".repeat(64)}.json`), "not json");
+    writeFileSync(join(host, "pending-claude-short.json"), JSON.stringify({ binding: { dispatchId: "ALF-BADNAME" }, delivery: { itemId: "item.a" } }));
+    const rows = [{ id: "ALF-OPEN", state: "ready" }, { id: "ALF-DONE", state: "ready" }, { id: "ALF-NO-DELIVERY", state: "ready" },
+      { id: "ALF-CANCELLED", state: "cancelled" }, { id: "ALF-BADNAME", state: "ready" }, { id: "ALF-DELIVERED", state: "ready" }];
+    assert.deepEqual(defaultStartedOwners(dir, rows), [{ dispatchId: "ALF-OPEN", itemId: "item.a" }]);
+    assert.deepEqual(defaultStartedOwners(dir, []), [], "no live queue row: no owner, whatever the pending states say");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
