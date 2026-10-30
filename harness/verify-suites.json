@@ -3618,6 +3618,12 @@
       "nonOverlapNote": "Unique CLI suite for session-authority-repair.mjs (PF-55, D52)"
     },
     {
+      "name": "routine-repair-tests",
+      "file": "plugins/pipeline-core/lib/routine-repair.test.mjs",
+      "invariantPinned": "The routine-repair verb runs only the closed D194 list (heal, slice-cancel for budget or integrated-elsewhere, stop-failure-aside, move-aside for two named findings), records every run in the ledger, refuses everything else with RR-OUTSIDE-LIST and the original tool's command, and never deletes",
+      "nonOverlapNote": "Unique suite for lib/routine-repair.mjs and scripts/routine-repair.mjs (D194, D197); session-authority-repair-tests keeps the delegated heal and move-aside behaviour"
+    },
+    {
       "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
       "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",

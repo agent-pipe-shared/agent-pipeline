@@ -36,11 +36,12 @@
 //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
 //
 // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
 import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
@@ -103,39 +104,10 @@ function parse(argv) {
 
 // D181b: a finalizer stop-failure record written before the diagnostic moved out of the native Goldfish namespace sits in the old
 // directory and makes the native inventory refuse. Heal moves it aside (never deletes) unless its dispatch may still be in flight.
-const LEGACY_STOP_FAILURE_NAME = /^stop-failure-[a-f0-9]{32}\.json$/u;
+// The rule itself lives in lib/routine-repair.mjs (moveStopFailuresAside), shared with the routine-repair stop-failure-aside kind (D194).
 function retireLegacyStopFailures(repository, asideDir) {
   const directory = join(repository.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
-  const retired = [], kept = [];
-  if (!existsSync(directory)) return { retired, kept };
-  const names = readdirSync(directory);
-  const candidates = names.filter((name) => LEGACY_STOP_FAILURE_NAME.test(name));
-  if (!candidates.length) return { retired, kept };
-  // Unsettled pending state: a pending file naming the dispatch with no authority-terminal record for its digest.
-  const unsettled = new Set(); let pendingProblem = null;
-  for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
-    try {
-      const bytes = readFileSync(join(directory, name));
-      const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
-      if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
-      if (!names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
-    } catch (error) { pendingProblem = `pending state ${name} cannot be read (${short(error)}), so in-flight cannot be decided`; }
-  }
-  for (const name of candidates) {
-    const path = join(directory, name);
-    let record;
-    try {
-      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
-      record = JSON.parse(readFileSync(path, "utf8"));
-    } catch (error) { kept.push({ name, reason: `unreadable or malformed: ${short(error)}` }); continue; }
-    if (record === null || typeof record !== "object" || Array.isArray(record) || record.schema !== "pipeline.native-goldfish-host-stop-failure.v1" || typeof record.dispatchId !== "string") { kept.push({ name, reason: "not a native-goldfish-host-stop-failure.v1 record" }); continue; }
-    if (pendingProblem !== null) { kept.push({ name, reason: pendingProblem }); continue; }
-    if (unsettled.has(record.dispatchId)) { kept.push({ name, reason: `dispatch ${record.dispatchId} has an unsettled pending state` }); continue; }
-    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
-    renameSync(path, join(asideDir, name));
-    retired.push({ name, dispatchId: record.dispatchId, code: record.code ?? null, observedAt: record.observedAt ?? null });
-  }
-  return { retired, kept };
+  return moveStopFailuresAside({ sourceDir: directory, pendingDir: directory, asideDir });
 }
 
 function producerReport(repository) {
