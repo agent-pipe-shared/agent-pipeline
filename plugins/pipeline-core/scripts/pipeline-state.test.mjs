@@ -99,6 +99,15 @@ function capturedStderr(fn) {
   }
 }
 
+// D206 (restated cases, same intent): a signature approval no longer lives in the tracked state file but in the private
+// store under the git common directory, so the recorded approval is read through the one shared overlay every gate uses.
+// Falls back to the tracked state unchanged when the overlay does not exist, so the cases keep their meaning on any build.
+async function approvalReadThroughStore(root) {
+  const authorization = await import("../lib/critical-action-authorization.mjs");
+  const tracked = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  return typeof authorization.withPrivateCriticalApprovals === "function" ? authorization.withPrivateCriticalApprovals(tracked, root) : tracked;
+}
+
 function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destination: "refs/heads/main" }) {
   return capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
     "--proof-request", join(root, "missing-request.json"), "--proof-authority", join(root, "missing-authority.json"), "--proof", join(root, "missing-proof.json")], deps));
@@ -151,7 +160,7 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   const approved = run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
     "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps);
   assert.equal(approved, 0, "AC-1/AC-6: the materialized artifact is fully bindable end to end, no sprint directory involved");
-  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const state = await approvalReadThroughStore(root);
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
 }
 
@@ -384,7 +393,8 @@ for (const kind of ["closed", "discarded"]) {
   assert.equal(approved.result, 0, approved.lines.join(" "));
   assert.equal(terminalCalls, 0, "global chat must not create or confirm a terminal challenge");
   assert.equal(approved.lines.some((line) => line.includes("PO-CHALLENGE")), false);
-  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  // D206 (restated, same intent -- the explicit non-attested marker): read through the private approval store.
+  const state = await approvalReadThroughStore(root);
   const approval = state.pushApproval.lastApproved;
   assert.equal(approval.criticalProof, null, "global chat must not require or import a detached proof");
   assert.deepEqual(approval.humanApproval, {
@@ -584,7 +594,7 @@ for (const kind of ["closed", "discarded"]) {
   const approval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
     "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps));
   assert.equal(approval.result, 0, `GF-067: a fresh three-field (SETUP-1) authority file must be accepted, not rejected as an exact-shape mismatch: ${approval.lines.join(" ")}`);
-  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const state = await approvalReadThroughStore(root);
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
 }
 
@@ -616,7 +626,7 @@ for (const kind of ["closed", "discarded"]) {
   const approval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
     "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps));
   assert.equal(approval.result, 0, `a legacy two-field authority file must keep being accepted: ${approval.lines.join(" ")}`);
-  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const state = await approvalReadThroughStore(root);
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
 }
 
@@ -3482,3 +3492,200 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
 
 assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
 console.log("D190 residual acceptance C11-a..e complete.");
+
+// W7 N26 / D206: a signature approval must not dirty the tracked state file. approve-push and the
+// feature-package reconcile approval write the approval and the proof consumption to a private store
+// under the git common directory; every gate reads that store; a legacy tracked record is still honoured;
+// a proof consumed in either place is refused. These cases are written from the criterion (clean tree,
+// gates admit, replay refused, legacy honoured), not from the implementation.
+const n26Failures = [];
+const n26Test = (name, fn) => { try { fn(); } catch (error) { n26Failures.push(`${name}: ${error?.message ?? error}`); } };
+const n26Git = (root, ...args) => {
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+  return result.stdout;
+};
+const n26Authorization = await import("../lib/critical-action-authorization.mjs");
+const n26Checkpoint = await import("../lib/checkpoint-push-approval.mjs");
+const n26State = await import("./pipeline-state.mjs");
+
+// One signed fixture: a committed repository (clean tree), a v3 policy whose trust anchor is the test key, and
+// signed proof files for a push and for a reconcile over the same repository.
+function n26Fixture() {
+  const { root, deps } = freshFixture();
+  n26Git(root, "config", "user.email", "po@example.invalid");
+  n26Git(root, "config", "user.name", "PO");
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push", "feature-package-reconcile"], waivedKinds: [], trustAnchors: [authority],
+  }));
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  n26Git(root, "add", "-A");
+  n26Git(root, "commit", "-q", "-m", "fixture");
+  const external = mktempProjectDir();
+  const pushTarget = { remote: "origin", destination: "refs/heads/main" };
+  const threatBytes = readFileSync(join(root, "project", "push-threat-model.md"));
+  const threatModel = { path: "project/push-threat-model.md", sha256: createHash("sha256").update(threatBytes).digest("hex") };
+  const signedFiles = (kind, subject, name) => {
+    const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"),
+      action: { kind, subjectSha256: criticalActionSubjectSha256({ kind, candidate, subject }), expiresAt: "2026-08-08T18:50:00.000Z" } });
+    const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey,
+      signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
+    const files = { request: join(external, `${name}-request.json`), authority: join(external, `${name}-authority.json`), proof: join(external, `${name}-proof.json`) };
+    writeFileSync(files.request, JSON.stringify(request)); writeFileSync(files.authority, JSON.stringify(authority)); writeFileSync(files.proof, JSON.stringify(proof));
+    return ["--proof-request", files.request, "--proof-authority", files.authority, "--proof", files.proof];
+  };
+  const pushFlags = signedFiles("push", { sourceCommit: candidate.commit, ...pushTarget, threatModel }, "push");
+  const pushArgv = ["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, ...pushFlags];
+  const common = n26Git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").trim();
+  const stateFile = join(root, "project", "pipeline-state.json");
+  return { root, deps, pushTarget, pushArgv, signedFiles, common, stateFile, threatModel };
+}
+
+n26Test("N26-a signed approve-push leaves the tree clean and the tracked state file byte-identical", () => {
+  const fx = n26Fixture();
+  assert.equal(n26Git(fx.root, "status", "--porcelain"), "", "fixture must start clean");
+  const before = readFileSync(fx.stateFile);
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  assert.equal(n26Git(fx.root, "status", "--porcelain"), "", "approve-push must leave git status clean");
+  assert.ok(before.equals(readFileSync(fx.stateFile)), "the tracked state file must not be written by approve-push (no updatedAt bump either)");
+  assert.ok(!Object.hasOwn(JSON.parse(readFileSync(fx.stateFile, "utf8")), "pushApproval"), "no pushApproval in the tracked state");
+});
+
+n26Test("N26-b every gate reader admits the approved push from the private store", () => {
+  const fx = n26Fixture();
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  const tracked = JSON.parse(readFileSync(fx.stateFile, "utf8"));
+  const input = { projectDir: fx.root, state: tracked, candidate, remote: fx.pushTarget.remote, destination: fx.pushTarget.destination, now };
+  const verdict = n26Authorization.authorizeRecordedPush(input);
+  assert.equal(verdict.authorized, true, JSON.stringify(verdict));
+  assert.equal(verdict.code, "PUSH-PROOF-VERIFIED");
+  const checkpoint = n26Checkpoint.checkCheckpointPushApproval({ projectDir: fx.root, state: tracked, candidate, remote: fx.pushTarget.remote, destination: fx.pushTarget.destination, now });
+  assert.equal(checkpoint.ok, true, JSON.stringify(checkpoint));
+  const wrong = n26Authorization.authorizeRecordedPush({ ...input, destination: "refs/heads/other" });
+  assert.equal(wrong.authorized, false, "the destination binding still holds");
+  const otherCommit = n26Authorization.authorizeRecordedPush({ ...input, candidate: { commit: "c".repeat(40), tree: candidate.tree } });
+  assert.equal(otherCommit.authorized, false, "the commit binding still holds");
+});
+
+n26Test("N26-c the same proof replayed is refused, and the replay entry lives outside the tracked state", () => {
+  const fx = n26Fixture();
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  const second = capturedStderr(() => run(fx.pushArgv, fx.deps));
+  assert.equal(second.result, 2);
+  assert.ok(second.lines.some((line) => line.includes("CRITICAL-PROOF-REPLAY")), second.lines.join(" "));
+  // The PO's manual `git checkout -- <state file>` used to drop the replay entry with it; now it cannot.
+  n26Git(fx.root, "checkout", "--", "project/pipeline-state.json");
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 2, "a reset of the tracked file must not reopen the replay");
+  assert.equal(n26Git(fx.root, "status", "--porcelain"), "");
+});
+
+n26Test("N26-d the private store is bound to kind, commit, remote and destination, and is private and exclusive", () => {
+  const fx = n26Fixture();
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  const stored = n26Authorization.readLastPrivateApproval(fx.common, "push");
+  assert.equal(stored.kind, "push");
+  assert.equal(stored.forCommit, candidate.commit);
+  assert.equal(stored.remote, fx.pushTarget.remote);
+  assert.equal(stored.destination, fx.pushTarget.destination);
+  assert.deepEqual(stored.approval.threatModel, fx.threatModel);
+  assert.equal(stored.approval.pendingAuditWrite, undefined, "pendingAuditWrite has no meaning for a private record");
+  const root = n26Authorization.criticalApprovalStoreRoot(fx.common);
+  assert.ok(root.startsWith(fx.common), "the store lives under the git common directory");
+  const consumed = n26Authorization.readPrivateCriticalConsumption(fx.common);
+  assert.equal(consumed.length, 1);
+  assert.equal(consumed[0].kind, "push");
+  assert.equal(n26Authorization.isCriticalProofConsumedPrivately(fx.common, consumed[0].proofSha256), true);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(root).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(join(root, "consumed", `${consumed[0].proofSha256}.json`)).mode & 0o777, 0o600);
+  }
+  // Exclusive: the same proof offered to the store directly is refused as a replay.
+  const direct = n26Authorization.writeCriticalApproval({ gitCommonDir: fx.common, kind: "push", approval: { ...stored.approval, approvedAt: "2026-08-08T19:00:00.000Z" } });
+  assert.equal(direct.ok, false);
+  assert.equal(direct.code, "CRITICAL-PROOF-REPLAY");
+});
+
+n26Test("N26-e a legacy tracked record is still honoured (read, never written) and its consumption still refuses a replay", () => {
+  const fx = n26Fixture();
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  const stored = n26Authorization.readLastPrivateApproval(fx.common, "push");
+  const consumed = n26Authorization.readPrivateCriticalConsumption(fx.common);
+  // Move the record back into the tracked state, as a repository mid-flight carries it, and drop the private store.
+  const legacy = { ...JSON.parse(readFileSync(fx.stateFile, "utf8")), pushApproval: { lastApproved: { ...stored.approval, pendingAuditWrite: true } }, criticalProofConsumption: consumed };
+  writeFileSync(fx.stateFile, `${JSON.stringify(legacy, null, 2)}\n`);
+  rmSync(n26Authorization.criticalApprovalStoreRoot(fx.common), { recursive: true, force: true });
+  const verdict = n26Authorization.authorizeRecordedPush({ projectDir: fx.root, state: legacy, candidate, remote: fx.pushTarget.remote, destination: fx.pushTarget.destination, now });
+  assert.equal(verdict.authorized, true, JSON.stringify(verdict));
+  const before = readFileSync(fx.stateFile);
+  const replay = capturedStderr(() => run(fx.pushArgv, fx.deps));
+  assert.equal(replay.result, 2);
+  assert.ok(replay.lines.some((line) => line.includes("CRITICAL-PROOF-REPLAY")), replay.lines.join(" "));
+  assert.ok(before.equals(readFileSync(fx.stateFile)), "a refused replay writes nothing");
+  // The private record wins when both exist.
+  const privateWins = n26Authorization.withPrivateCriticalApprovals(legacy, fx.root);
+  assert.equal(privateWins, legacy, "with nothing private the same object is returned");
+});
+
+n26Test("N26-f the feature-package reconcile approval leaves the tree clean and is replay-protected privately", () => {
+  const fx = n26Fixture();
+  const subject = { manifest: { schema: "fixture.manifest.v1" }, planSha256: "d".repeat(64), candidate };
+  const flags = fx.signedFiles("feature-package-reconcile", subject, "reconcile");
+  const reconcileApproval = n26State.defaultFeaturePackageReconcileApproval;
+  const approve = () => reconcileApproval(["--by", "PO", ...flags], fx.deps)({
+    manifest: subject.manifest, planSha256: subject.planSha256, candidate });
+  const before = readFileSync(fx.stateFile);
+  const first = approve();
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(n26Git(fx.root, "status", "--porcelain"), "", "the reconcile approval must leave git status clean");
+  assert.ok(before.equals(readFileSync(fx.stateFile)), "the tracked state file is not written by the reconcile approval");
+  const stored = n26Authorization.readLastPrivateApproval(fx.common, "feature-package-reconcile");
+  assert.equal(stored.forCommit, candidate.commit);
+  assert.equal(n26Authorization.readPrivateCriticalConsumption(fx.common)[0].kind, "feature-package-reconcile");
+  const second = approve();
+  assert.equal(second.ok, false);
+  assert.equal(second.code, "CRITICAL-PROOF-REPLAY");
+});
+
+n26Test("N26-g the documented close step after a signed push is not a dead end: nothing is left to fold, so it exits 0", () => {
+  const fx = n26Fixture();
+  assert.equal(capturedStderr(() => run(fx.pushArgv, fx.deps)).result, 0);
+  const closed = spawnSync(process.execPath, [fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "--close"],
+    { cwd: fx.root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root } });
+  const report = JSON.parse(closed.stdout.trim().split("\n").at(-1));
+  assert.equal(report.folded, false);
+  assert.equal(report.reason, "clean");
+  assert.equal(closed.status, 0, "a clean tree after a private approval is a finished close, not a failure");
+  assert.equal(n26Git(fx.root, "status", "--porcelain"), "");
+});
+
+// N26-h pins the residual replay line in `runApproveResidualAcceptance`: the shared ledger a proof is checked against now
+// also lives in the private approval store (consumed by approve-push / the reconcile approval), so a proof consumed ONLY there
+// -- the residual store itself holds nothing -- is still refused as CRITICAL-PROOF-REPLAY with zero mutation.
+n26Test("N26-h a residual-acceptance proof consumed only in the private approval store is refused as a replay", () => {
+  const fx = c11Fixture({ chat: false, findings: c11Minor });
+  try {
+    const flags = c11SignatureFiles(fx, c11Minor);
+    const argv = ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags];
+    assert.equal(capturedStderr(() => run(argv, fx.deps)).result, 0, "premise: the signed acceptance is first admitted");
+    const proofSha256 = c11Private(fx).consumption.proofSha256;
+    // Forget the residual store's own record, then consume the same proof ONLY in the private approval store, through its owner.
+    rmSync(c11PrivatePath(fx), { force: true });
+    const seeded = n26Authorization.writeCriticalApproval({ gitCommonDir: fx.common, kind: "push", approval: {
+      approvedBy: "PO", approvedAt: "2026-08-08T19:00:00.000Z", forCommit: candidate.commit, remote: "origin", destination: "refs/heads/main",
+      criticalProof: { proofSha256 } } });
+    assert.equal(seeded.ok, true, JSON.stringify(seeded));
+    assert.equal(n26Authorization.isCriticalProofConsumedPrivately(fx.common, proofSha256), true);
+    const before = readFileSync(fx.statePathFile);
+    const replay = capturedStderr(() => run(argv, fx.deps));
+    assert.equal(replay.result, 2, replay.lines.join(" "));
+    assert.ok(replay.lines.some((line) => line.includes("approve-residual-acceptance refused (CRITICAL-PROOF-REPLAY)")), replay.lines.join(" "));
+    assert.ok(before.equals(readFileSync(fx.statePathFile)), "a refused replay writes nothing to the tracked state");
+    assert.equal(existsSync(c11PrivatePath(fx)), false, "a refused replay writes no residual record either");
+  } finally { fx.cleanup(); }
+});
+
+assert.deepEqual(n26Failures, [], "N26 private approval store cases failed: " + n26Failures.join(" | "));
+console.log("N26 private approval store cases a..h complete.");

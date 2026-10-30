@@ -9,6 +9,10 @@ import { tmpdir } from "node:os";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { run } from "./pipeline-state.mjs";
 
+// D206: the approval is read through the private-store owner. Dynamic import with an identity fallback, so that against a build
+// without the store the cases still LOAD and fail on their assertions (the byte-identity / consumption checks), not at link time.
+const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
+
 const root = mkdtempSync(join(tmpdir(), "critical-proof-gate-"));
 const external = mkdtempSync(join(tmpdir(), "critical-proof-external-"));
 // The fixture owns its repository, so it can never resolve an enclosing one.
@@ -48,14 +52,21 @@ writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify
 assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
 writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
 assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 0);
-const after = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+// D206 restatement. OLD intent: the approval and its single proof consumption were read from the TRACKED state file
+// (pushApproval.lastApproved, criticalProofConsumption length 1) and the file had to differ from `before`.
+// NEW intent (same: "the approval is recorded, bound to commit/remote/threat model, the proof is consumed once and a
+// replay is refused"): the approval and the consumption are read through the private-store owner
+// (withPrivateCriticalApprovals, never by opening store files), and the tracked file stays byte-identical to `before`.
+const trackedAfterBytes = readFileSync(join(root, "project", "pipeline-state.json"), "utf8");
+assert.equal(trackedAfterBytes, before, "D206: a signature approval must not write the tracked state file");
+const after = withPrivateCriticalApprovals(JSON.parse(trackedAfterBytes), root);
 assert.equal(after.pushApproval.lastApproved.forCommit, candidate.commit);
 assert.equal(typeof after.pushApproval.lastApproved.criticalProof?.proofSha256, "string");
 assert.equal(after.pushApproval.lastApproved.remote, pushTarget.remote);
 assert.deepEqual(after.pushApproval.lastApproved.threatModel, threatModel);
 assert.equal(after.criticalProofConsumption?.length, 1);
 assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
-assert.notEqual(before, JSON.stringify(after));
+assert.equal(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"), before, "a refused replay must leave the tracked file untouched too");
 
 const deploySubject = { artifact: "v0.5.1-rc.1", environment: "production" };
 const deployRequest = createCriticalActionApprovalRequest({

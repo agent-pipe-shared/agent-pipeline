@@ -39,6 +39,14 @@ import { derivePoGateRepositoryFingerprint } from "../../plugins/pipeline-core/l
 import { appendExternalPushLedgerConsumption } from "../../plugins/pipeline-core/lib/external-push-ledger.mjs";
 import { run } from "./pipeline-state.mjs";
 
+// D206: the approval and the proof consumption are read through the private-store owner (dynamic import + fallbacks: against a
+// build without the store the cases still load and fail on their assertions rather than at link time).
+const {
+  withPrivateCriticalApprovals = (state) => state,
+  resolveCriticalApprovalCommonDir = () => null,
+  isCriticalProofConsumedPrivately = () => false,
+} = await import("../../plugins/pipeline-core/lib/critical-action-authorization.mjs");
+
 let passed = 0;
 let failed = 0;
 const fixtureRoots = [];
@@ -236,9 +244,16 @@ check("PSXL03 approve-push refuses with ALREADY-CONSUMED when the external ledge
   assert.equal(result.code, 2);
   assert.ok(result.output.some((entry) => entry.stream === "error" && entry.text.includes("PUSH-EXTERNAL-LEDGER-ALREADY-CONSUMED")));
   assert.ok(!result.output.some((entry) => entry.text.startsWith('Push approved by "PO"')), "success line must be unreachable");
-  // The local write already happened (design §4: the two writes are not one transaction).
+  // D206 restatement. OLD intent: "the local write already happened (design §4: the two writes are not one transaction)" --
+  // the tracked state file held the approval although the external ledger refused afterwards. NEW intent (same: a replay seen
+  // only by the external ledger is refused and the success line stays unreachable): the external-ledger replay is now refused
+  // BEFORE anything is written, which is stricter -- no approval and no proof consumption exist anywhere (read through the
+  // private-store owner, never by opening store files), and the tracked state file is untouched.
   const finalState = JSON.parse(readFileSync(join(dir, "project", "pipeline-state.json"), "utf8"));
-  assert.equal(finalState.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
+  assert.equal(finalState.pushApproval, undefined, "D206: the tracked state file must not receive the approval");
+  const stored = withPrivateCriticalApprovals(finalState, dir);
+  assert.equal(stored.pushApproval?.lastApproved, undefined, "a replay refused by the external ledger must record no approval");
+  assert.equal(isCriticalProofConsumedPrivately(resolveCriticalApprovalCommonDir(dir), bundle.proofSha256), false, "a refused replay must not burn the private marker either");
 });
 
 // ---- gate required, ledger directory unwritable -> WRITE-FAILED, success unreachable ------
@@ -262,8 +277,18 @@ check("PSXL04 approve-push refuses with WRITE-FAILED on a genuine filesystem con
   assert.equal(result.code, 2);
   assert.ok(result.output.some((entry) => entry.stream === "error" && entry.text.includes("PUSH-EXTERNAL-LEDGER-WRITE-FAILED")));
   assert.ok(!result.output.some((entry) => entry.text.startsWith('Push approved by "PO"')), "success line must be unreachable");
+  // D206 restatement. OLD intent: the local (tracked) approval had already been written when the ledger append failed (the two
+  // writes are not one transaction). NEW intent (same): the approval is durably recorded -- now in the private store, read
+  // through its owner -- the tracked file is untouched, and because the proof is consumed privately a retry of the same proof is
+  // a replay and stays refused (fail closed; recovery is a fresh signing ceremony).
   const finalState = JSON.parse(readFileSync(join(dir, "project", "pipeline-state.json"), "utf8"));
-  assert.equal(finalState.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
+  assert.equal(finalState.pushApproval, undefined, "D206: the tracked state file must not receive the approval");
+  const stored = withPrivateCriticalApprovals(finalState, dir);
+  assert.equal(stored.pushApproval.lastApproved.forCommit, CANDIDATE.commit);
+  assert.equal(isCriticalProofConsumedPrivately(resolveCriticalApprovalCommonDir(dir), bundle.proofSha256), true);
+  const retry = callApprove(bundle.argv, deps(dir, home, CANDIDATE));
+  assert.equal(retry.code, 2);
+  assert.ok(retry.output.some((entry) => entry.stream === "error" && entry.text.includes("CRITICAL-PROOF-REPLAY")), JSON.stringify(retry.output));
 });
 
 // ---- gate required, dir is not a real git repository -> TOPOLOGY-UNRESOLVED ---------------

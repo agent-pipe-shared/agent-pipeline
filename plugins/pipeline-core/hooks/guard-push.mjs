@@ -136,7 +136,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
-import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { authorizeRecordedDeploy, authorizeRecordedPush, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
 import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -1024,6 +1024,9 @@ function attestedMainPublication(binding) {
   } catch {
     return { authorized: false, code: "PUSH-PROOF-STATE-UNREADABLE" };
   }
+  // D206: the approval and its consumption entry live in the private store under the git common
+  // directory (the tracked record is only the legacy fallback); every approval read goes through it.
+  state = withPrivateCriticalApprovals(state, binding.projectDir);
   // The anchor comes from the GOVERNED session, never from the repository the command
   // named. T6 Critic F1: `<root>/sub/project/critical-human-proof.json` is not a
   // gate-strength path, so reading the anchor from the push target let an agent mint
@@ -2576,6 +2579,8 @@ try {
           `Rewrite only via ${pipelineStateScriptRef()}; publication remains blocked.`,
         );
       }
+      // D206: read the approval through the private store (legacy tracked record as the fallback).
+      if (state !== undefined) state = withPrivateCriticalApprovals(state, projectDir);
       const approval = state?.pushApproval?.lastApproved;
       const forCommit = approval?.forCommit;
       if (!forCommit || forCommit !== sourceCommit) {

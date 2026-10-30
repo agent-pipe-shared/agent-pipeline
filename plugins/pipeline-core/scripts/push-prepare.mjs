@@ -11,9 +11,11 @@
  * correct `--subject-sha256`) plus the two agent-side commands that follow it.
  *
  * Never writes a file, never mutates pipeline state, never touches the
- * network -- with exactly ONE narrow exception (NVA-PUSHFOLD-1):
+ * network -- with exactly ONE narrow exception (NVA-PUSHFOLD-1), now LEGACY-ONLY (D206:
+ * `approve-push` writes its approval and proof consumption to the private store under the Git
+ * common directory, so a new record never dirties the tree and there is nothing to fold):
  * `foldPendingPushApprovalWrite()`, run at the very start of `pushPrepareReport()`,
- * commits a prior `approve-push` run's still-uncommitted trailing state-file write when (and
+ * commits a LEGACY, tracked `approve-push` record's still-uncommitted trailing state-file write when (and
  * only when) that file is the SOLE dirty path in the tree, that dirtiness is actually
  * `approve-push`'s own trailing write (`pendingAuditWrite === true`, NVA-CF-PUSHFOLD -- never
  * an operator's own unrelated direct edit to the same file), and the recorded approval is not
@@ -585,7 +587,15 @@ export function remoteCommit(dir, remote, destination, deps = {}) {
 }
 
 /**
- * NVA-PUSHFOLD-1: `approve-push` (`pipeline-state.mjs`) writes `pushApproval.lastApproved`
+ * D206 NOTE -- LEGACY ONLY. `approve-push` no longer writes `pushApproval.lastApproved` into the
+ * tracked state file: the approval and the proof consumption go to the private store under the Git
+ * common directory (`lib/critical-action-authorization.mjs`), every gate reads that store, and the
+ * tree stays clean. A new record therefore never reaches this fold and `pendingAuditWrite` is never
+ * set for it. The fold is kept, unchanged, for a LEGACY tracked record a repository mid-flight
+ * still carries (including the action-local `chat` ceremony, whose challenge step writes the tracked
+ * file); the rest of this comment describes that legacy shape.
+ *
+ * NVA-PUSHFOLD-1: `approve-push` (`pipeline-state.mjs`) used to write `pushApproval.lastApproved`
  * to the project's state file strictly AFTER the signed subject was computed, so that write
  * structurally can never be part of the commit it records
  * (backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md) --
@@ -926,7 +936,9 @@ export function pushCloseReport(deps = {}) {
 if (isDirectInvocation(import.meta.url) && process.argv.length === 3 && process.argv[2] === "--close") {
   const report = pushCloseReport();
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  process.exit(report.folded ? 0 : 1);
+  // D206: a clean tree after `approve-push` is the normal case now (the approval is private, nothing is
+  // left to fold), so "clean" is a finished close, not a failure; every other no-fold reason still exits 1.
+  process.exit(report.folded || report.reason === "clean" ? 0 : 1);
 } else if (isDirectInvocation(import.meta.url)) {
   const result = pushPrepareReport(process.argv.slice(2));
   if (!result.ok) {

@@ -45,7 +45,7 @@
  *    modification into what reads as a staged one (that is refused, which is safe but wrong).
  *  - The mode lookup (`criticalProofWaiverFor`) must use the same governed root.
  */
-import { authorizeRecordedPush } from "./critical-action-authorization.mjs";
+import { authorizeRecordedPush, withPrivateCriticalApprovals } from "./critical-action-authorization.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const VERIFIED = "PUSH-PROOF-VERIFIED";
@@ -134,8 +134,12 @@ export function checkpointApprovalMode(input) {
  */
 export function checkCheckpointPushApproval(input) {
   try {
-    const { projectDir, anchorDir, state, candidate, remote, destination, now, machinePlaneDeps } = input ?? {};
-    if (!isObject(state)) return refuse("CHECKPOINT-APPROVAL-STATE-MISSING");
+    const { projectDir, anchorDir, candidate, remote, destination, now, machinePlaneDeps } = input ?? {};
+    if (!isObject(input?.state)) return refuse("CHECKPOINT-APPROVAL-STATE-MISSING");
+    // D206: the approval and its consumption entry live in the private store (a legacy tracked record is
+    // the fallback). One overlay here serves the in-session guard and the pre-push hook alike, so they
+    // cannot read different records.
+    const state = withPrivateCriticalApprovals(input.state, projectDir);
 
     const commit = candidate?.commit;
     // The binding comparisons only mean something for usable operands; unusable ones fall

@@ -144,8 +144,11 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" --by <name> --remote ori
 It demands no Verify/security/Critic evidence and prints three steps: the PO's
 one `authorize-critical --kind push` command (attended terminal; OpenSSL must be
 on that terminal's PATH), the agent's `pipeline-state.mjs approve-push`, and the
-exact `git -C <root> push origin <ref>:<ref>`. `approve-push` rewrites the
-tracked state file; the checkpoint clean-tree check exempts exactly that path.
+exact `git -C <root> push origin <ref>:<ref>`. `approve-push` writes the
+approval and the proof consumption to a private store under the Git common
+directory and leaves the tree clean (D206); the checkpoint clean-tree check
+still exempts exactly the tracked state path, for a repository that carries an
+older tracked record.
 A missing key directory is repaired once with `po-human-approval.mjs
 set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
 signature).
@@ -575,7 +578,7 @@ too, and `guard-git.mjs` simply lets such a push through. What actually
 enforces the recorded push approval for an ordinary push is a separate hook,
 `guard-push.mjs`, which runs after `guard-git.mjs`: its approval check
 requires, under `gates.push.approval: "required"`, that
-`state.pushApproval.lastApproved.forCommit` equal the pushed source commit
+the recorded approval's `forCommit` (read through the private approval store; the legacy `state.pushApproval.lastApproved` is the fallback) equal the pushed source commit
 and that `authorizeRecordedPush` independently verify the recorded approval
 for this exact candidate, remote and destination ref; a failure there is
 reported under `gates.push.mode`. The entry deliberately covers `git push`
@@ -658,7 +661,7 @@ whatever ref
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
 | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
-| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds the push-approval record into one local commit once the remote is proven to hold the signed commit (D161) | Agent |
+| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
 | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
 | 7 | `gh release create` (tag + release) | Agent |
 
@@ -679,19 +682,34 @@ narrowing.
   happen, and the retry needs a fresh token. Do not assume a blocked command
   left the ledger untouched — read `agent-pipeline/guard-override.log.jsonl`
   under the repository's common Git directory (`git rev-parse --git-common-dir`).
-- `approve-push` writes into the tracked `project/pipeline-state.json`, so the
-  tree is dirty from that moment on. **Commit nothing between `approve-push` and
-  the push**: every commit moves `HEAD` past the `forCommit` the signature
-  names and voids the approval. Verify has to run *before* the approval, and the
-  state record's write is committed *after* the push -- not by this push
-  itself (which only ever pushes the already-signed `HEAD`, unchanged), but by
-  the close step, `push-prepare.mjs --close` (D161), run as the LAST step after
-  the signed push. It folds immediately, leaving the tree clean, but only after
-  a bounded read-only `git ls-remote` shows the remote holds `forCommit` at the
-  record's destination; otherwise it refuses and writes nothing. The fold
-  commit stays unpushed until the next signed push. If the close step is
-  skipped, the **next** `push-prepare.mjs` run still folds it, automatically
-  (the earlier behavior, unchanged). This is finding 7c of
+- **Where the approval lives (D206, supersedes D161).** `approve-push` (and the
+  feature-package reconcile approval) writes the approval record and the proof
+  consumption to a private store under the Git common directory,
+  `<git common dir>/agent-pipeline/critical-approvals/` (`approvals/<kind>/` and
+  `consumed/<proofSha256>.json`, mode 0700/0600, exclusive writes), **not** into
+  the tracked `project/pipeline-state.json`. The tree stays clean after the
+  approval, nothing has to be reset by hand, and a reset of the state file can no
+  longer drop the replay entry. Every gate -- `guard-push`, the generated pre-push
+  hook, `push-init`, `push-prepare`, the checkpoint check -- reads the approval
+  through that store (`withPrivateCriticalApprovals` in
+  `lib/critical-action-authorization.mjs`); a record still present in the tracked
+  state is only a legacy fallback and the private record wins when both exist. A
+  proof already consumed in the private store, in the legacy tracked list or in
+  the external push ledger is refused as a replay. **Still: commit nothing
+  between `approve-push` and the push** -- every commit moves `HEAD` past the
+  `forCommit` the signature names and voids the approval; Verify has to run
+  *before* the approval. The one exception is the action-local `gates.push_approval:
+  chat` ceremony (a `pendingPushChallenge` is in the tracked state): it still
+  writes the tracked record too, because the Source-owned state-push authority
+  observes exactly that write.
+- **The fold (NVA-PUSHFOLD-1 / NVA-CF-PUSHFOLD / D161) is legacy only.** A new
+  record is never in the working tree, so there is nothing to fold and no
+  `pendingAuditWrite` hint is set for it. `push-prepare.mjs` (and `--close`) keep
+  folding a LEGACY pending tracked record exactly as before: the state file is
+  the sole dirty path, `pendingAuditWrite` is `true`, `HEAD` has moved past
+  `forCommit` (or, at close, a bounded read-only `git ls-remote` shows the remote
+  holds `forCommit` at the record's destination); otherwise it refuses and writes
+  nothing. The rest of this item describes that legacy shape. This is finding 7c of
   `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
   as of NVA-PUSHFOLD-1
   (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,

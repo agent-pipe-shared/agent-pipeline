@@ -11,6 +11,10 @@ import { validateGovernanceActionEvent } from "../lib/governance-action-events.m
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { run, statePath } from "./pipeline-state.mjs";
 
+// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
+// store the cases still load and fail on their assertions rather than at link time).
+const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
+
 const cases = [];
 const injectedFailure = process.env.PIPELINE_GATE_ACTION_EVENT_TEST_INJECT_FAILURE ?? "";
 function check(name, execute) {
@@ -96,6 +100,8 @@ function actionFrom(root, rel) {
 }
 
 function state(root) { return JSON.parse(readFileSync(statePath(root), "utf8")); }
+// D206: the state every approval reader sees -- the tracked file with the private approval store overlaid (store owner, never file reads).
+function storedState(root) { return withPrivateCriticalApprovals(state(root), root); }
 
 check("push approval publishes one completed event bound to the exact candidate", () => {
   const f = fixture({ humanChat: true });
@@ -153,7 +159,12 @@ check("omitting action-event-out preserves the existing push and deploy call pat
     assert.equal(deployResult.status, 0, deployResult.err.join("\n"));
     assert.match(pushResult.out.join("\n"), /^Push approved by/u);
     assert.match(deployResult.out.join("\n"), /^Deploy approval granted by/u);
-    assert.ok(state(push.root).pushApproval?.lastApproved);
+    // D206 restatement. OLD intent: the push approval is in the TRACKED state file after the existing call path. NEW intent
+    // (same: the existing path still records the approval): it is read through the private-store owner, and the tracked file
+    // and the working tree stay untouched (global chat mode has no challenge, so it never takes the tracked write).
+    assert.ok(storedState(push.root).pushApproval?.lastApproved);
+    assert.equal(state(push.root).pushApproval, undefined, "D206: the tracked state file must not receive the push approval");
+    assert.equal(git(push.root, "status", "--porcelain"), "", "D206: the tree stays clean after a push approval");
     assert.equal(state(deploy.root).deployApprovals?.length, 1);
     assert.equal(existsSync(join(push.root, "evidence")), false);
     assert.equal(existsSync(join(deploy.root, "evidence")), false);
@@ -171,7 +182,10 @@ check("event-requested physical state readback failure publishes no event", () =
     assert.equal(result.status, 2);
     assert.match(result.err.join("\n"), /PS-STATE-POSTIMAGE-READBACK/u);
     assert.equal(existsSync(join(f.root, rel)), false);
-    assert.ok(state(f.root).pushApproval?.lastApproved, "the result must not falsely describe the durable source mutation as zero");
+    // D206 restatement: OLD intent read the durable approval from the tracked state file; NEW intent (same: the refusal must
+    // not falsely describe the durable source mutation as zero) reads it through the private-store owner.
+    assert.ok(storedState(f.root).pushApproval?.lastApproved, "the result must not falsely describe the durable source mutation as zero");
+    assert.match(result.err.join("\n"), /recorded privately/u, "the refusal text names where the approval durably is");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

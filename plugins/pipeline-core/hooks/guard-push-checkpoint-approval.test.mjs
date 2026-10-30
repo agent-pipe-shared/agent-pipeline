@@ -35,6 +35,9 @@ import { classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs
 import { createCriticalActionApprovalRequest, criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { run as runPipelineState } from "../scripts/pipeline-state.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
+// store C14 still loads and fails on its assertions rather than at link time).
+const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
@@ -614,6 +617,7 @@ function splitSourceRepo(prefix) {
 
     const before = gitAt(dir, "status", "--porcelain").stdout;
     if (before !== "") problems.push(`premise: the fixture was not clean before approve-push: ${JSON.stringify(before)}`);
+    const stateBytesBefore = readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8");
     console.error = (...parts) => { stderrSeen.push(parts.join(" ")); };
     let exitCode;
     try {
@@ -625,20 +629,30 @@ function splitSourceRepo(prefix) {
       console.error = realConsoleError;
     }
     if (exitCode !== 0) problems.push(`the real approve-push exited ${exitCode}: ${stderrSeen.join(" | ").slice(0, 300)}`);
+    // D206 restatement. OLD intent: the real writer leaves exactly ` M project/pipeline-state.json` (the tracked state
+    // record carrying pendingAuditWrite: true), and the checkpoint classifier reads that as the one tolerated entry.
+    // NEW intent (same: the real writer's footprint on the neutral path is what the checkpoint classifier expects):
+    // the signature approval is written to the private store, so the porcelain is EMPTY (clean) and the tracked file is
+    // byte-identical; the approval is read through the store owner (withPrivateCriticalApprovals), never by opening
+    // store files, and the classifier reads the real writer's porcelain as clean. The legacy ` M <state>` shape stays
+    // tolerated by the classifier (pinned by the other C cases that fabricate it).
     const porcelain = gitAt(dir, "status", "--porcelain").stdout;
-    if (porcelain.replace(/\r?\n$/u, "") !== ` M ${NEUTRAL_STATE_REL}`) problems.push(`porcelain after approve-push was ${JSON.stringify(porcelain)}`);
+    if (porcelain !== "") problems.push(`porcelain after approve-push was ${JSON.stringify(porcelain)}; the tree must stay clean`);
     if (gitAt(dir, "ls-files", "--error-unmatch", NEUTRAL_STATE_REL).status !== 0) problems.push("the neutral state record is not tracked");
     if (existsSync(join(dir, STATE_REL))) problems.push("the writer also created the legacy state path");
-    const written = JSON.parse(readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8"));
-    if (written.pushApproval?.lastApproved?.forCommit !== head) problems.push("the written state record does not name the approved commit");
-    if (written.pushApproval?.lastApproved?.pendingAuditWrite !== true) problems.push("the written state record does not carry pendingAuditWrite: true");
-    if (!classifyCheckpointPorcelain(porcelain, [NEUTRAL_STATE_REL]).approvalRecordOnly) problems.push("the checkpoint classifier does not read the real writer's porcelain as the one tolerated entry");
+    const trackedBytes = readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8");
+    if (trackedBytes !== stateBytesBefore) problems.push("the tracked state record changed; D206 forbids writing the approval there");
+    const written = withPrivateCriticalApprovals(JSON.parse(trackedBytes), dir);
+    if (written.pushApproval?.lastApproved?.forCommit !== head) problems.push("the approval read through the private store does not name the approved commit");
+    if (written.pushApproval?.lastApproved?.pendingAuditWrite === true) problems.push("the private approval carries pendingAuditWrite although nothing was written to the tree");
+    if (written.criticalProofConsumption?.length !== 1) problems.push("the proof consumption is not visible through the private store");
+    if (!classifyCheckpointPorcelain(porcelain, [NEUTRAL_STATE_REL]).clean) problems.push("the checkpoint classifier does not read the real writer's porcelain as clean");
   } catch (error) {
     problems.push(`fixture or writer threw: ${error?.message ?? error}`);
   } finally {
     console.error = realConsoleError;
   }
-  record("C14 the real approve-push writer leaves exactly ` M project/pipeline-state.json` on the neutral path (design 3.4 premise)", problems);
+  record("C14 the real approve-push writer leaves the tree clean and the approval in the private store on the neutral path (D206; was: exactly ` M project/pipeline-state.json`)", problems);
 }
 
 // ---- cleanup and summary ---------------------------------------------------------------------

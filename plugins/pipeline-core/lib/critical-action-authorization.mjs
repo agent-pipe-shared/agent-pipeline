@@ -53,10 +53,11 @@
  * attribution rather than a proof. Publication keeps its own external-verification route
  * through the fixed executor and is untouched here.
  */
+import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync,
-  readFileSync, renameSync, unlinkSync, writeSync,
+  readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -337,6 +338,195 @@ function validCandidate(candidate) {
 
 const validNow = (now) => typeof now === "string" && Number.isFinite(Date.parse(now));
 
+/*
+ * THE PRIVATE APPROVAL STORE (D206, backlog 2026-10-30-signature-approvals-dirty-the-tracked-state-file).
+ *
+ * `approve-push` and the feature-package reconcile approval used to write their approval record and the
+ * proof-consumption entry into the TRACKED state file. That left the working tree dirty after every
+ * signature, the next steps refuse a dirty checkout, and resetting the file dropped the replay entry:
+ * a clean tree and kept replay protection were impossible with that storage location.
+ *
+ * Both now write here instead: `<git common dir>/agent-pipeline/critical-approvals/`, created mode 0700,
+ * files 0600 and exclusive (`wx`), the same private-directory rules as the residual acceptance store and
+ * the external push ledger. Layout:
+ *   approvals/<kind>/<approvedAtMs>-<recordDigest16>.json   one immutable record per approval; the
+ *                                                          NEWEST valid record of a kind is that kind's
+ *                                                          `lastApproved` (the old tracked slot's meaning)
+ *   consumed/<proofSha256>.json                             the single-use marker; its mere existence
+ *                                                          is the replay refusal
+ * A record is bound to its kind, the approved commit and, for push, the remote and destination; a file
+ * whose envelope disagrees with the record inside it, or whose directory names another kind, is ignored.
+ *
+ * This module is the ONE owner of the record format and of every read and write of the store. Readers
+ * never open the files themselves: they call `withPrivateCriticalApprovals(state, projectDir)`, which
+ * returns a state-shaped object whose `pushApproval` / `featurePackageReconcileApproval` /
+ * `criticalProofConsumption` are overlaid from the store (the private record WINS when both exist; a
+ * legacy record still present in the tracked state is the fallback and is never written by anything now).
+ * With nothing private to overlay it returns the very same object it was given.
+ *
+ * Host note: the briefing asked for a new lib module; the write scope names no new path, so the owner
+ * lives in this file, which already is the single verifier of these records. Moving it out later is a
+ * pure relocation of this block.
+ */
+export const CRITICAL_APPROVAL_STORE_SCHEMA = "pipeline.critical-approval-record.v1";
+export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-consumption.v1";
+/** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
+const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval" });
+
+export function criticalApprovalStoreRoot(gitCommonDir) {
+  return join(resolve(gitCommonDir), "agent-pipeline", "critical-approvals");
+}
+
+/** The git common directory of `projectDir` (worktree-invariant), or null when it cannot be resolved. */
+export function resolveCriticalApprovalCommonDir(projectDir) {
+  try {
+    if (typeof projectDir !== "string" || projectDir === "") return null;
+    const result = spawnSync("git", ["-C", projectDir, "rev-parse", "--git-common-dir"], { encoding: "utf8", timeout: 5000 });
+    if (result.status !== 0 || typeof result.stdout !== "string" || result.stdout.trim() === "") return null;
+    return resolve(projectDir, result.stdout.trim());
+  } catch {
+    return null;
+  }
+}
+
+function approvalEnvelope(kind, approval) {
+  const envelope = { schema: CRITICAL_APPROVAL_STORE_SCHEMA, kind, forCommit: approval.forCommit, approvedAt: approval.approvedAt };
+  if (kind === "push") { envelope.remote = approval.remote; envelope.destination = approval.destination; }
+  envelope.approval = approval;
+  return envelope;
+}
+
+function approvalEnvelopeValid(kind, envelope) {
+  if (!object(envelope) || envelope.schema !== CRITICAL_APPROVAL_STORE_SCHEMA || envelope.kind !== kind) return false;
+  const approval = envelope.approval;
+  if (!object(approval) || typeof approval.forCommit !== "string" || approval.forCommit !== envelope.forCommit
+    || approval.approvedAt !== envelope.approvedAt) return false;
+  return kind !== "push" || (approval.remote === envelope.remote && approval.destination === envelope.destination);
+}
+
+/**
+ * Writes one approval and its proof consumption. The consumption marker is claimed FIRST with `wx`
+ * (the replay mechanism), then the approval lands via an exclusive temp file and a rename, so a reader
+ * never sees a half-written record. A proof burned by a failed second step stays burned (fail closed;
+ * a fresh signing ceremony is the recovery, as for the external ledger).
+ *
+ * @param {{gitCommonDir: string, kind: "push"|"feature-package-reconcile", approval: object, consumedAt?: string}} input
+ * @returns {{ok: true} | {ok: false, code: "CRITICAL-PROOF-REPLAY"|"CRITICAL-APPROVAL-STORE-INPUT-INVALID"|"CRITICAL-APPROVAL-STORE-WRITE-FAILED"}}
+ */
+export function writeCriticalApproval({ gitCommonDir, kind, approval, consumedAt } = {}) {
+  const invalid = { ok: false, code: "CRITICAL-APPROVAL-STORE-INPUT-INVALID" };
+  if (typeof gitCommonDir !== "string" || gitCommonDir === "" || !Object.hasOwn(CRITICAL_APPROVAL_SLOTS, kind)
+    || !object(approval) || typeof approval.forCommit !== "string" || approval.forCommit === ""
+    || typeof approval.approvedAt !== "string" || !Number.isFinite(Date.parse(approval.approvedAt))) return invalid;
+  if (kind === "push" && (typeof approval.remote !== "string" || typeof approval.destination !== "string")) return invalid;
+  const proofSha256 = object(approval.criticalProof) ? approval.criticalProof.proofSha256 : null;
+  if (approval.criticalProof !== null && approval.criticalProof !== undefined && !SHA256.test(proofSha256 ?? "")) return invalid;
+  const envelope = approvalEnvelope(kind, approval);
+  const root = criticalApprovalStoreRoot(gitCommonDir);
+  try {
+    mkdirSync(join(root, "consumed"), { recursive: true, mode: 0o700 });
+    mkdirSync(join(root, "approvals", kind), { recursive: true, mode: 0o700 });
+    if (proofSha256 !== null) {
+      const marker = { schema: CRITICAL_APPROVAL_CONSUMPTION_SCHEMA, proofSha256, kind, consumedAt: consumedAt ?? approval.approvedAt };
+      try {
+        writeFileSync(join(root, "consumed", `${proofSha256}.json`), `${JSON.stringify(marker, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      } catch (error) {
+        if (error?.code === "EEXIST") return { ok: false, code: "CRITICAL-PROOF-REPLAY" };
+        throw error;
+      }
+    }
+    const digest = createHash("sha256").update(canonical(envelope)).digest("hex").slice(0, 16);
+    const name = `${String(Date.parse(approval.approvedAt)).padStart(16, "0")}-${digest}.json`;
+    const dir = join(root, "approvals", kind);
+    const temp = join(dir, `.${randomBytes(6).toString("hex")}.tmp`);
+    writeFileSync(temp, `${JSON.stringify(envelope, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+    renameSync(temp, join(dir, name));
+  } catch {
+    return { ok: false, code: "CRITICAL-APPROVAL-STORE-WRITE-FAILED" };
+  }
+  return { ok: true };
+}
+
+/** Has this proof digest been consumed in the private store? An existing marker (even a damaged one) counts. */
+export function isCriticalProofConsumedPrivately(gitCommonDir, proofSha256) {
+  try {
+    if (typeof gitCommonDir !== "string" || !SHA256.test(proofSha256 ?? "")) return false;
+    lstatSync(join(criticalApprovalStoreRoot(gitCommonDir), "consumed", `${proofSha256}.json`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readJsonFile(path) {
+  try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; }
+}
+
+/** The newest valid private approval record of `kind` (its `.approval` is the old `lastApproved`), or null. */
+export function readLastPrivateApproval(gitCommonDir, kind) {
+  try {
+    if (typeof gitCommonDir !== "string" || !Object.hasOwn(CRITICAL_APPROVAL_SLOTS, kind)) return null;
+    const dir = join(criticalApprovalStoreRoot(gitCommonDir), "approvals", kind);
+    const names = readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().reverse();
+    for (const name of names) {
+      const envelope = readJsonFile(join(dir, name));
+      if (approvalEnvelopeValid(kind, envelope)) return envelope;
+    }
+  } catch {
+    // an absent or unreadable store is "nothing private"; the legacy fallback still applies
+  }
+  return null;
+}
+
+/** Every private consumption entry, in the legacy ledger's `{ proofSha256, kind, consumedAt }` shape. */
+export function readPrivateCriticalConsumption(gitCommonDir) {
+  const entries = [];
+  try {
+    const dir = join(criticalApprovalStoreRoot(gitCommonDir), "consumed");
+    for (const name of readdirSync(dir).sort()) {
+      const match = /^([a-f0-9]{64})\.json$/u.exec(name);
+      if (match === null) continue;
+      const marker = readJsonFile(join(dir, name));
+      if (object(marker) && marker.schema === CRITICAL_APPROVAL_CONSUMPTION_SCHEMA && marker.proofSha256 === match[1]
+        && typeof marker.kind === "string" && typeof marker.consumedAt === "string") {
+        entries.push({ proofSha256: marker.proofSha256, kind: marker.kind, consumedAt: marker.consumedAt });
+      }
+    }
+  } catch {
+    // none readable
+  }
+  return entries;
+}
+
+/**
+ * The state every approval reader should consult: `state` with the private store overlaid (see the block
+ * comment above). Idempotent; never throws; returns `state` itself when there is nothing private.
+ */
+export function withPrivateCriticalApprovals(state, projectDir) {
+  try {
+    if (!object(state)) return state;
+    const common = resolveCriticalApprovalCommonDir(projectDir);
+    if (common === null) return state;
+    let next = null;
+    for (const [kind, slot] of Object.entries(CRITICAL_APPROVAL_SLOTS)) {
+      const envelope = readLastPrivateApproval(common, kind);
+      if (envelope === null) continue;
+      next ??= { ...state };
+      next[slot] = { ...(object(state[slot]) ? state[slot] : {}), lastApproved: envelope.approval };
+    }
+    const consumed = readPrivateCriticalConsumption(common);
+    if (consumed.length > 0) {
+      next ??= { ...state };
+      const legacy = Array.isArray(state.criticalProofConsumption) ? state.criticalProofConsumption : [];
+      const known = new Set(legacy.filter(object).map((entry) => `${entry.kind}:${entry.proofSha256}`));
+      next.criticalProofConsumption = [...legacy, ...consumed.filter((entry) => !known.has(`${entry.kind}:${entry.proofSha256}`))];
+    }
+    return next ?? state;
+  } catch {
+    return state;
+  }
+}
+
 /**
  * @param {{projectDir: string, state: object, candidate: {commit: string, tree: string},
  *          remote: string, destination: string, now: string, machinePlaneDeps?: object}} input
@@ -350,6 +540,8 @@ export function authorizeRecordedPush({
   projectDir, anchorDir = projectDir, state, candidate, remote, destination, now, machinePlaneDeps = {},
 } = {}) {
   const prefix = "PUSH-PROOF";
+  // D206: the approval and its consumption entry live in the private store; the tracked record is only the legacy fallback.
+  state = withPrivateCriticalApprovals(state, projectDir);
   if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof remote !== "string" || remote === ""
     || typeof destination !== "string" || destination === "" || !validNow(now)) {
@@ -438,6 +630,7 @@ export function authorizeRecordedChatPush({
   projectDir, anchorDir = projectDir, state, candidate, remote, destination,
 } = {}) {
   const prefix = "PUSH-PROOF";
+  state = withPrivateCriticalApprovals(state, projectDir);
   if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof remote !== "string" || remote === ""
     || typeof destination !== "string" || destination === "") {

@@ -33,6 +33,10 @@ import { discoverRepository } from "../../plugins/pipeline-core/lib/worktree-lif
 import { derivePoGateRepositoryFingerprint } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import { run } from "./pipeline-state.mjs";
 
+// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
+// store the cases still load and fail on their assertions rather than at link time).
+const { withPrivateCriticalApprovals = (state) => state } = await import("../../plugins/pipeline-core/lib/critical-action-authorization.mjs");
+
 let passed = 0;
 let failed = 0;
 const fixtureRoots = [];
@@ -221,6 +225,13 @@ function stateOf(dir) {
   return JSON.parse(readFileSync(join(dir, STATE_REL), "utf8"));
 }
 
+// D206: a push approval lives in the private store, not in the tracked state file; every reader sees it through the one
+// store owner (withPrivateCriticalApprovals), never by opening store files. The "nothing was written" cases below (PSDR03-07)
+// read through the same owner, so they keep meaning "no approval exists anywhere", not merely "the tracked file is empty".
+function storedStateOf(dir) {
+  return withPrivateCriticalApprovals(stateOf(dir), dir);
+}
+
 const DISAGREEMENT = "DECISION-REFERENCE-DISAGREEMENT";
 
 // ---- PSDR01: approve-push WITHOUT --decision-reference -> prior behavior, byte-for-byte ------
@@ -231,10 +242,15 @@ check("PSDR01 approve-push without --decision-reference records exactly the pre-
   const { dir, argv } = pushFixture("push-absent");
   const { code, output } = call(dir, argv);
   assert.equal(code, 0, output);
-  const approval = stateOf(dir).pushApproval.lastApproved;
+  // D206 restatement. OLD intent: the pre-existing tracked record shape plus NVA-PUSHFOLD-1's `pendingAuditWrite` hint, read from
+  // the tracked state file. NEW intent (same: the record gains no key beyond the pre-existing shape, in particular no
+  // `decisionReference`): the record is read through the private-store owner; the tracked file is untouched, so there is
+  // nothing to fold and no `pendingAuditWrite` hint -- every other key is unchanged.
+  assert.equal(stateOf(dir).pushApproval, undefined, "D206: the tracked state file must not receive the approval");
+  const approval = storedStateOf(dir).pushApproval.lastApproved;
   assert.equal(Object.hasOwn(approval, "decisionReference"), false);
   assert.deepEqual(Object.keys(approval).sort(),
-    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "pendingAuditWrite", "remote", "threatModel"]);
+    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "remote", "threatModel"]);
 });
 
 // ---- PSDR02: present and agreeing -> the transition proceeds and the reference is recorded ----
@@ -244,7 +260,9 @@ check("PSDR02 approve-push with an agreeing --decision-reference proceeds and re
   writeReference(dir, value);
   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
   assert.equal(code, 0, output);
-  assert.deepEqual(stateOf(dir).pushApproval.lastApproved.decisionReference, value);
+  // D206 restatement: OLD intent read the recorded reference from the tracked state file; NEW intent (same: the agreeing
+  // reference is recorded with the approval) reads it through the private-store owner.
+  assert.deepEqual(storedStateOf(dir).pushApproval.lastApproved.decisionReference, value);
 });
 
 // ---- PSDR03: present and disagreeing (different candidate commit) -> refused, zero mutation ---
@@ -256,7 +274,7 @@ check("PSDR03 approve-push with a --decision-reference bound to another commit i
   assert.match(output, new RegExp(DISAGREEMENT));
   assert.match(output, /legacy=true, decision-reference=false/);
   assert.match(output, /compatibility owner "pipeline"/);
-  assert.equal(stateOf(dir).pushApproval, undefined); // nothing was written
+  assert.equal(storedStateOf(dir).pushApproval, undefined); // nothing was written
 });
 
 // ---- PSDR04: present and disagreeing (different tree -- invisible to every legacy check) ------
@@ -265,7 +283,7 @@ check("PSDR04 approve-push with a --decision-reference bound to another tree is 
   writeReference(dir, reference(dir, { tree: "e".repeat(40) }));
   const { code } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
   assert.equal(code, 2);
-  assert.equal(stateOf(dir).pushApproval, undefined);
+  assert.equal(storedStateOf(dir).pushApproval, undefined);
 });
 
 // ---- PSDR05: present but malformed -> fails closed, never a silent "no reference supplied" ----
@@ -275,7 +293,7 @@ check("PSDR05 approve-push with a malformed --decision-reference fails closed", 
   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
   assert.equal(code, 2);
   assert.match(output, new RegExp(DISAGREEMENT));
-  assert.equal(stateOf(dir).pushApproval, undefined);
+  assert.equal(storedStateOf(dir).pushApproval, undefined);
 });
 
 // ---- PSDR06: absent reference file -> refused with its own code, never a pass-through ---------
@@ -287,7 +305,7 @@ check("PSDR06 approve-push with a missing --decision-reference file is refused",
   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
   assert.equal(code, 2);
   assert.match(output, /DECISION-REFERENCE-FILE/);
-  assert.equal(stateOf(dir).pushApproval, undefined);
+  assert.equal(storedStateOf(dir).pushApproval, undefined);
 });
 
 // ---- PSDR06b: reference file exists but is not JSON -> DECISION-REFERENCE-UNREADABLE ----------
@@ -298,7 +316,7 @@ check("PSDR06b approve-push with a non-JSON --decision-reference file is refused
   const { code, output } = call(dir, [...argv, "--decision-reference", REFERENCE_REL]);
   assert.equal(code, 2);
   assert.match(output, /DECISION-REFERENCE-UNREADABLE/);
-  assert.equal(stateOf(dir).pushApproval, undefined);
+  assert.equal(storedStateOf(dir).pushApproval, undefined);
 });
 
 // ---- PSDR07: an unsafe reference path never leaves the repository -----------------------------
@@ -307,7 +325,7 @@ check("PSDR07 approve-push with an absolute --decision-reference path is refused
   const { code, output } = call(dir, [...argv, "--decision-reference", "/etc/passwd"]);
   assert.equal(code, 2);
   assert.match(output, /DECISION-REFERENCE-FILE/);
-  assert.equal(stateOf(dir).pushApproval, undefined);
+  assert.equal(storedStateOf(dir).pushApproval, undefined);
 });
 
 // ---- PSDR08: approve-deploy WITHOUT --decision-reference -> prior behavior, byte-for-byte -----

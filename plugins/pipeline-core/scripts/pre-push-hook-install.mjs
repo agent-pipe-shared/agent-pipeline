@@ -257,8 +257,11 @@ export function renderImpl(pluginLibDir) {
  *   - (b.2) the v2 policy-complete verdict, via the SAME exported
  *     \`checkSecurityCompleteness\` guard-push.mjs itself calls -- reused, not copied.
  *   - (c) push approval, GENERAL MODE ONLY: gates.push.approval === "standing-approved"
- *     auto-passes; otherwise state.pushApproval.lastApproved.forCommit/destination must
- *     match this exact push. This is "necessary but not sufficient" under guard-
+ *     auto-passes; otherwise the recorded approval's forCommit/destination must
+ *     match this exact push. The approval is read through the shared private store
+ *     (lib/critical-action-authorization.mjs, D206: <git-common-dir>/agent-pipeline/
+ *     critical-approvals/); a legacy record still present in the tracked state is the
+ *     fallback, and the private record wins when both exist. This is "necessary but not sufficient" under guard-
  *     push.mjs's own signature-mode contract -- NOT mirrored here: the Ed25519
  *     critical-proof chain, the refs/heads/main fixed-publication-executor boundary,
  *     the anonymous-public-push identity checks, the external push ledger, the H-AC-12
@@ -278,8 +281,9 @@ export function renderImpl(pluginLibDir) {
  *     Verify/security evidence is read for it. The trust anchor and the mode lookup are
  *     read from this repository's own root (a hook is per repository). "chat" and
  *     "standing-approved" keep admitting a clean exact checkpoint without an approval. In
- *     signature mode the one tolerated dirty entry is the tracked state record that
- *     approve-push rewrites after signing (" M <state path>", classified by the shared
+ *     signature mode the one tolerated dirty entry is the tracked state record (" M <state
+ *     path>"; since D206 approve-push no longer dirties it, so this only serves a legacy
+ *     tracked record still being carried), classified by the shared
  *     classifyCheckpointPorcelain on the RAW porcelain text); any other dirt blocks. The
  *     approval binds the remote NAME, so a push addressed by URL is never admitted here.
  *     A failure to load the shared module is a fault and blocks like every other fault.
@@ -452,6 +456,9 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   // blocked by main()'s fault boundary -- fail closed, like every import above.
   const { checkpointApprovalMode, checkCheckpointPushApproval, classifyCheckpointPorcelain } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-approval.mjs")).href);
   const { criticalProofWaiverFor } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-human-proof-policy.mjs")).href);
+  // D206: an approval (and its consumption entry) lives in the private store under the git common directory;
+  // the tracked state record is only the legacy fallback. Reused from the shared owner, never copied.
+  const { withPrivateCriticalApprovals } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
   // The repository-relative path of the pipeline state record: the one place a push approval is
   // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
   const stateRelPathFor = () => {
@@ -542,6 +549,7 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
       failures.push(\`push approval state \${stateRelPath} is missing or unreadable (\${error.code ?? "unparseable"}); cannot confirm approval.\`);
     }
     if (state) {
+      state = withPrivateCriticalApprovals(state, projectRoot);
       const approval = state?.pushApproval?.lastApproved;
       if (!approval || approval.forCommit !== commit) {
         failures.push(\`push approval missing or stale: expected state.pushApproval.lastApproved.forCommit=\${commit}, found \${JSON.stringify(approval?.forCommit ?? null)}.\`);

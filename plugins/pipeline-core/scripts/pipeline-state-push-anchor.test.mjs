@@ -38,6 +38,10 @@ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from
 import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
 import { run } from "./pipeline-state.mjs";
 import { readFileSync } from "node:fs";
+
+// D206: the approval is read through the private-store owner (dynamic import + identity fallback: against a build without the
+// store the cases still load and fail on their assertions rather than at link time).
+const { withPrivateCriticalApprovals = (state) => state } = await import("../lib/critical-action-authorization.mjs");
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
@@ -405,7 +409,12 @@ test("K52-1: with a catalogue present, signature-mode approve-push approves a co
   assert.ok(!result.stderr.includes("state-push-source-requester"), `the producer route must not be taken\n${describeResult(result)}`);
   assert.equal(result.code, 0, describeResult(result));
   assert.ok(result.stdout.includes(SUCCESS_LINE), describeResult(result));
-  const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
+  // D206 restatement. OLD intent: read pushApproval.lastApproved from the TRACKED state file. NEW intent (same: the approval
+  // is recorded and bound to the exact candidate commit): read it through the private-store owner, never the store files,
+  // and the tracked file carries no approval at all.
+  const tracked = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
+  assert.equal(tracked.pushApproval?.lastApproved, undefined, "D206: the tracked state file must not receive the approval");
+  const state = withPrivateCriticalApprovals(tracked, fixture.dir);
   assert.equal(state.pushApproval?.lastApproved?.forCommit, git(fixture.dir, ["rev-parse", "HEAD"]), "the approval is bound to the exact candidate commit");
 });
 
@@ -416,7 +425,8 @@ for (const [tamper, label] of [["commit", "a proof signed for another commit"], 
     const result = callApprove(fixture);
     assert.notEqual(result.code, 0, describeResult(result));
     assert.ok(!result.stdout.includes(SUCCESS_LINE), describeResult(result));
-    const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
+    // D206: "no approval recorded" is now read through the private-store owner as well (the tracked file never held one).
+    const state = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8")), fixture.dir);
     assert.equal(state.pushApproval?.lastApproved, undefined, "no approval may be recorded");
   });
 }
