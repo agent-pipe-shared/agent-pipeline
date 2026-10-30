@@ -13,10 +13,9 @@ import { execFileSync } from "node:child_process";
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
-import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness, readSettledItemSliceIds } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness, readSettledItemSliceIds, itemReservationCollision } from "./native-goldfish-host-state.mjs";
 import { bindAgyItemDeliveryChecks, inspectAgyItemMainIntegration, inspectAgyItemMainIntegrationValue } from "./agy-item-delivery.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
-import { scopesOverlap } from "./slice-queue.mjs";
 import { invokeAgy } from "./antigravity-execution-host.mjs";
 import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn, validateAgyFamilyReturnBinding } from "./agy-final-return.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
@@ -103,13 +102,10 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
         if(item.dependsOn.length){const readiness=observeGovernedItemIntegrationReadiness({root});if(readiness.status!=='observed'||item.dependsOn.some(id=>!readiness.integrated.includes(id)))authorityFailure('AGY-ITEM-INTEGRATION-DEPENDENCY-HELD');}
         if(item.delivery.baseCommit!==repository.candidate.commit)authorityFailure('AGY-ITEM-BASE-MISMATCH');
         itemDelivery={itemId:item.delivery.itemId,sliceId:item.id,queuePath:governed.path,queueSha256:governed.sha256,writeScope:[...item.writeScope]};
-        const criterionSha256=familyDigest(itemBriefing.criterionLocator);
+        // D205 (PO, 2026-10-30): the one predicate of both routes; the same item or criterion alone no longer refuses, only the same slice or an overlapping write scope.
+        const collide=(held)=>{const collision=itemReservationCollision({sliceId:held.sliceId,writeScope:held.writeScope},{sliceId:itemDelivery.sliceId,writeScope:itemDelivery.writeScope});if(collision)authorityFailure(collision==='same-slice'?'AGY-ITEM-OWNER-COLLISION':'AGY-ITEM-SCOPE-COLLISION');};
         const {reservations}=readNativeReservedItemScopes({repository,boundary});
-        for(const row of reservations) {
-          if(row.criterionSha256===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
-          if(row.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
-          if(scopesOverlap(row.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
-        }
+        for(const row of reservations)collide(row);
         const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
         const latest=new Map();for(const row of agy.entries.filter(entry=>entry.value?.basis?.itemDelivery)){const prior=latest.get(row.value.operationId);if(!prior||(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);}
         const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
@@ -117,10 +113,7 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
         // D51 (2): the same settled definition as the native route; an integrated or cancelled slice no longer collides.
         const settled=readSettledItemSliceIds({repository,boundary,governed});
         for(const row of [...latest.values()].filter(entry=>!released.has(entry.value.bindingSha256)&&!settled.has(entry.value.basis.itemDelivery.sliceId))) {
-          const previous=row.value.basis.itemDelivery;
-          if(row.value.basis.itemBriefing?.criterionLocator&&familyDigest(row.value.basis.itemBriefing.criterionLocator)===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
-          if(previous.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
-          if(scopesOverlap(previous.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
+          collide(row.value.basis.itemDelivery);
         }
       }
     }

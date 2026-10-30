@@ -791,11 +791,11 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
       // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
       checkpoint('collision-check');
       const settled=readSettledItemSliceIds({repository,boundary,governed});
+      // D205: the same item or criterion alone no longer refuses; only the same slice or an overlapping write scope does.
       for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
         const pending=entry.value.basis.itemDelivery;
-        if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
-        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.sliceId);
-        if(scopesOverlap(pending.writeScope,state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.sliceId);
+        const collision=itemReservationCollision({sliceId:pending.sliceId,writeScope:pending.writeScope},{sliceId:state.delivery.sliceId,writeScope:state.delivery.writeScope});
+        if(collision)throw reservationFault(itemReservationCollisionReason(collision),pending.sliceId);
       }
       const inventory=nativeAuthorityScan(owner);
       for(const entry of inventory.entries.filter(row=>row.relativePath.startsWith('pending-'))){
@@ -804,9 +804,8 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
         // A terminal report alone frees no item reservation; a native release, the slice's
         // integration by commit evidence, or its cancellation does (D51 (2)).
         if(settled.has(pending.delivery?.sliceId))continue;
-        if(pending.delivery?.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.delivery?.sliceId);
-        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.delivery?.sliceId);
-        if(scopesOverlap(pending.delivery?.writeScope??pending.binding?.allowedPaths??[],state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.delivery?.sliceId);
+        const collision=itemReservationCollision({sliceId:pending.delivery?.sliceId,writeScope:pending.delivery?.writeScope??pending.binding?.allowedPaths??[]},{sliceId:state.delivery.sliceId,writeScope:state.delivery.writeScope});
+        if(collision)throw reservationFault(itemReservationCollisionReason(collision),pending.delivery?.sliceId);
       }
     }
     // PF-55: every check that can still refuse runs before the registry member is reserved, so a
@@ -1706,9 +1705,19 @@ export function itemReservationRepair(sliceId) {
     :'a reservation that names no slice holds this item; report it to the PO with the refusal';
 }
 function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}
-/** PF-66: one criterion has one owner at a time, also for slices whose write scopes are disjoint; the repair says so and names the way out. */
-export const CRITERION_OWNER_COLLISION_TEACHING='Two slices that bind the same item criterion cannot run at the same time, even with disjoint write scopes: the criterion has one owner. Serialise them (add a dependency so the second starts after the first is integrated), or bind each slice to its own criterion in its package.';
-function criterionOwnerCollisionFault(sliceId){const fault=reservationFault('item-delivery-criterion-owner-collision',sliceId);fault.repair=`${CRITERION_OWNER_COLLISION_TEACHING} ${fault.repair}`;return fault;}
+/** D205 (PO, 2026-10-30): the one reservation predicate of the native and the Antigravity route. A held reservation blocks a new slice only
+ * when it is the same slice (a slice is never admitted twice) or its write scope overlaps the new slice's scope. Binding the same item or the
+ * same criterion no longer refuses by itself: every maintenance package binds one placeholder item and criterion, so that rule (PF-66)
+ * serialised every dispatch. An unjudgeable scope overlaps (scopesOverlap answers true), the safe direction.
+ * Both arguments are `{sliceId, writeScope}`; the answer is `'same-slice'`, `'scope'` or `null`. */
+export function itemReservationCollision(pending,next) {
+  if(typeof pending?.sliceId==='string'&&pending.sliceId===next?.sliceId)return 'same-slice';
+  return scopesOverlap(pending?.writeScope,next?.writeScope)?'scope':null;
+}
+/** The native refusal reason for an itemReservationCollision answer. */
+export function itemReservationCollisionReason(collision) {
+  return collision==='same-slice'?'item-delivery-owner-collision':'item-delivery-scope-collision';
+}
 /** D52 (2): a dirty host baseline names its paths and the repair, not only its code. */
 function baselineFault(captured) {
   const fault=nativeManagedFault(captured.code);

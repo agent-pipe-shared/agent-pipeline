@@ -108,7 +108,16 @@ const cases=[
     const alias={...itemDelivery,itemId:'AC-1-ALIAS',sliceId:'ITEM-ALIAS',checks:[{id:'alias',path:'unit.test.cjs',dependencies:['dependency.txt']}]};
     const aliasPacket={...packet,dispatchId:'ITEM-ALIAS',requiredPaths:['dependency.txt'],prompt:packet.prompt.replaceAll('ITEM-A','ITEM-ALIAS').replace('src/change.mjs','dependency.txt')};
     const collided=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet:aliasPacket,itemDelivery:alias,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/alias.json'}));
-    assert.equal(collided.code,'AGY-ITEM-CRITERION-OWNER-COLLISION','a caller alias of the same approved criterion cannot acquire another owner');
+    // D205: disjoint scopes admitted, PO 2026-10-30. The alias binds the same approved criterion under another item label with a disjoint write scope,
+    // so no owner or scope collision refuses it (PF-66 once did); it reaches the same later stage as the first slice (unavailable native model).
+    assert.ok(!/COLLISION/u.test(String(collided.code)),`a disjoint-scope alias is admitted past the reservation check: ${JSON.stringify(collided.code)}`);
+    // The same slice dispatched twice stays refused, and an overlapping write scope on the same criterion stays refused: the queue ordering holds it behind
+    // the first slice (the shared reservation predicate's scope answer is pinned in native-goldfish-host-state.test.mjs NGHS58, NGHS07 and NGHS45).
+    const again=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet,itemDelivery,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/again.json'}));
+    assert.equal(again.code,'AGY-ITEM-OWNER-COLLISION','the same slice is never admitted twice');
+    const overlap={...itemDelivery,itemId:'AC-1-OVERLAP',sliceId:'ITEM-OVERLAP'},overlapPacket={...packet,dispatchId:'ITEM-OVERLAP',prompt:packet.prompt.replaceAll('ITEM-A','ITEM-OVERLAP')};
+    const overlapped=await runtime.run(()=>prepareAgyFamilyNativeDispatch({root,packet:overlapPacket,itemDelivery:overlap,sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,resultPath:'results/overlap.json'}));
+    assert.equal(overlapped.ok,false);assert.equal(overlapped.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD','an overlapping write scope on the same criterion is refused behind the first slice');
 
   })},
   {id:'AGYID06',name:'consent journal physical identity survives actual HEAD advance and candidate-bound v1 stays closed',run:()=>fixture(({root,git})=>{
