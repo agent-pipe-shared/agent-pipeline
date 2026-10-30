@@ -20,7 +20,7 @@ export const ROUTINE_REPAIRS = Object.freeze([
   Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
-  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused is healed first, and moved aside only when it is still reconcile-refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
+  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
   Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate" }),
 ]);
 const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
@@ -218,12 +218,22 @@ export function classifyInspectFindings(inspect) {
   if (inspect?.lock?.status === "held") add("lock", text("registry-lock-held", inspect.lock.owner));
   for (const row of inspect?.reservations ?? []) if (row?.sliceId && row.settled === null) add("reservation", `open-item-reservation:${row.sliceId}`);
   if (inspect?.registry?.status === "unreadable") add("registry", text("registry-unreadable", inspect.registry.reason));
+  // D203 (live 2026-10-30): a producer that heal leaves `drifted` (namespace drift) is the same case as one left
+  // reconcile-refused, and the registry read refusal it causes names that producer; both go heal first, then move aside.
+  const healFirstProducers = new Set();
   for (const row of inspect?.registry?.producers ?? []) {
     if (row?.status === "ok") continue;
     add(`producer:${row?.producerId}`, text(row?.status, row?.code, row?.reason, ...(row?.drifted ?? [])));
-    if (row?.status === "reconcile-refused") rows.at(-1).reconcileRefused = true;
+    if (row?.status === "reconcile-refused" || row?.status === "drifted") {
+      rows.at(-1).reconcileRefused = true;
+      healFirstProducers.add(row.producerId);
+    }
   }
-  if (inspect?.registry?.read?.status === "refused") add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
+  if (inspect?.registry?.read?.status === "refused") {
+    add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
+    const named = /^([a-z0-9-]+):/u.exec(String(inspect.registry.read.reason ?? ""))?.[1];
+    if (named !== undefined && healFirstProducers.has(named)) rows.at(-1).reconcileRefused = true;
+  }
   return rows;
 }
 

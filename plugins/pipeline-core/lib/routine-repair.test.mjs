@@ -59,6 +59,8 @@ function stub(inspectResult) {
 }
 const emptyInspect = { lock: { status: "absent" }, reservations: [], registry: { status: "present", producers: [], read: { status: "ok" } } };
 const inspectWith = (producer) => ({ ...emptyInspect, registry: { status: "present", producers: [producer], read: { status: "ok" } } });
+// The exact inspect of 2026-10-30 after a returned Goldfish and a heal (SAR-HEAL-INCOMPLETE): one drifted producer and the read refusal.
+const driftedLive = { ...emptyInspect, registry: { status: "present", producers: [{ producerId: "onboarding-continuity", status: "ok", drifted: [], inFlight: 0 }, { producerId: "native-goldfish", status: "drifted", drifted: ["native-goldfish-host-commit"], inFlight: 1 }], read: { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "native-goldfish:namespace-drift" } } };
 
 // The ONE shared table. `expect.calls` is the delegated tool + first argv word list; `stopFailures` marks the real repair.
 const TABLE = [
@@ -76,7 +78,11 @@ const TABLE = [
   { id: "refuse: wrong cancel class", request: { kind: "slice-cancel", sliceId: "S-3", cancelClass: "wrong-premise", reason: "r" }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [], nextHas: "slice-queue.mjs cancel" } },
   { id: "refuse: missing reason", request: { kind: "heal" }, expect: { exit: 2, code: "RR-REASON-REQUIRED", calls: [] } },
   { id: "refuse: blank reason", request: { kind: "stop-failure-aside", reason: "   " }, expect: { exit: 2, code: "RR-REASON-REQUIRED", calls: [] } },
-  { id: "refuse: move-aside with another finding", request: { kind: "move-aside", reason: "r" }, inspect: inspectWith({ producerId: "p", status: "drifted", drifted: ["ns"], inFlight: 1 }), expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]], reasonHas: "producer:p" } },
+  // QG-04 restatement (D203, live 2026-10-30): this row used a `drifted` producer as "another finding"; heal leaves exactly that state
+  // after a returned Goldfish, so it now goes heal first (rows below). Intent unchanged with a finding that is outside the list.
+  { id: "refuse: move-aside with another finding", request: { kind: "move-aside", reason: "r" }, inspect: inspectWith({ producerId: "p", status: "unreadable", code: "foreign-format", inFlight: 1 }), expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]], reasonHas: "producer:p" } },
+  { id: "D203 move-aside of a producer still drifted after heal, with the registry read refusal it causes (live shape)", request: { kind: "move-aside", reason: "namespace drift after a returned goldfish" }, inspect: driftedLive, expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"], ["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]], argvHas: ["--no-goldfish-running"] } },
+  { id: "refuse: a registry read refusal naming a producer that is not drifted stays outside the list", request: { kind: "move-aside", reason: "r" }, inspect: { ...driftedLive, registry: { ...driftedLive.registry, read: { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "other-producer:namespace-drift" } } }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]] } },
   { id: "refuse: move-aside with one allowed and one other finding", request: { kind: "move-aside", reason: "r" }, inspect: { ...emptyInspect, lock: { status: "held", owner: "live" }, registry: { status: "present", producers: [{ producerId: "p", status: "reconcile-refused", reason: "unknown-registry-entry" }], read: { status: "ok" } } }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]] } },
   { id: "refuse: move-aside with no finding", request: { kind: "move-aside", reason: "r" }, inspect: emptyInspect, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [["session-authority-repair.mjs", "inspect"]] } },
 ];
@@ -119,6 +125,16 @@ test("D203: heal names the move-aside routine as the next step when a producer i
   assert.match(result.next, /only when no Goldfish runs/u);
   const clean = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: stub(emptyInspect).spawn });
   assert.equal(clean.result.next, undefined);
+}));
+
+test("D203 (live 2026-10-30): a heal that ends SAR-HEAL-INCOMPLETE with a drifted producer still names the move-aside routine", () => withRepo((root) => {
+  const { spawn: base } = stub(driftedLive);
+  const spawn = (script, args) => (args[0] === "heal"
+    ? { status: 2, stdout: `${JSON.stringify({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: "the registry still does not read after heal: native-goldfish:namespace-drift" })}\n`, stderr: "" }
+    : base(script, args));
+  const { result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn });
+  assert.deepEqual(result.stillReconcileRefused, ["producer:native-goldfish", "registry-read"]);
+  assert.match(result.next, /routine-repair\.mjs run move-aside --no-goldfish-running/u);
 }));
 
 test("stop-failure-aside moves the record aside under session-authority-abandoned and removes it from the diagnostics directory", () => withRepo((root, ap) => {
