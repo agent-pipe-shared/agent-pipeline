@@ -1,0 +1,648 @@
+diff --git a/plugins/pipeline-core/lib/critic-disposition-addendum.mjs b/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
+index e6cb7a32f..05c0c6b7d 100644
+--- a/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
++++ b/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
+@@ -46,6 +46,12 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
+   const authored = record?.outcomeClassification?.kind === "authored-commit"
+     && Array.isArray(record.commits) && record.commits.length === 1
+     && record.commits[0] === addendum.candidateCommit;
++  // D212 (N33 A): an orchestrator-attested v4 record is an authored delivery with a weaker assurance (review admission already
++  // reads it that way); it is admitted on the same conditions as authored-commit: exactly one commit, equal to the candidate.
++  const attested = record?.schema === DISPATCH_RECORD_SCHEMA
++    && record?.outcomeClassification?.kind === "orchestrator-attested"
++    && Array.isArray(record.commits) && record.commits.length === 1
++    && record.commits[0] === addendum.candidateCommit;
+   const authoredV3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+     && isTerminalOutcome(record.outcome) && !isNoDeliveryOutcome(record.outcome)
+     && Array.isArray(record.commits) && record.commits.length > 0
+@@ -58,6 +64,6 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
+     || record.taskId !== addendum.taskId
+     || record.candidateCommit !== addendum.candidateCommit
+     || !Object.hasOwn(record, "criticRequired")
+-    || (!undelivered && !interrupted && !authored && !authoredV3)) throw new TypeError("critic addendum does not bind an immutable Critic-required authored v3/v4 record");
++    || (!undelivered && !interrupted && !authored && !attested && !authoredV3)) throw new TypeError("critic addendum does not bind an immutable Critic-required authored v3/v4 record");
+   return addendum;
+ }
+diff --git a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+index ac300c886..5472135c2 100644
+--- a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+@@ -8,13 +8,19 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
++import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+ 
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
++import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../critic-disposition-addendum.mjs";
++import { readBoundConsumedCriticReceipt } from "../critic-verify-lifecycle.mjs";
++import { registerGenericCriticBatch } from "../critic-generic-batch.mjs";
++import { reportSha256 } from "../dispatch-record.mjs";
++import { planVerifySelection } from "../verify-selection.mjs";
++import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../scripts/session-critic-finalizer.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
+ import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
+ 
+@@ -182,6 +188,103 @@ test("(a) only the uncovered course slice is named", () => {
+   assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-OPEN"], notNamed: ["TASK-DONE"] });
+ });
+ 
++// N33 (D212): the refusal stated a round cap (D190/D199 removed it) and named no command to write the addendum, so an operator holding a
++// passed Critic course receipt had no route from the refusal to a satisfied gate.
++test("(h) the refusal states the current rule and names the addendum command, with no stale round-cap wording (D212)", () => {
++  const repo = checkpointed("h", {
++    ...courseFile(FEATURE, ["TASK-IN-COURSE"]),
++    ...recordFile("TASK-IN-COURSE", { criticRequired: required() }),
++  });
++  const refused = repo.planPrepared();
++  assertRefusedForMissingCritic(refused, { named: ["TASK-IN-COURSE"] });
++  const message = refused.body.message;
++  assert.match(message, /node <plugin-root>\/scripts\/dispatch-record-write\.mjs --repo-root <repo-root> --critic-addendum <request\.json>/u);
++  assert.match(message, /no round cap/u);
++  assert.match(message, /a further correction-diff Critic round is always allowed/u);
++  assert.match(message, /reviewed range contains the record's commit/u);
++  assert.doesNotMatch(message, /at most three|never another Critic|once spent|Elephant self-verification/u);
++});
++
++// N33 A+B (D212): two orchestrator-attested records, one commit each, covered by ONE consumed, passed Critic course receipt whose
++// task id is the FIRST delivery's (TASK-ONE), so it covers TASK-TWO only by range. The receipt is a REAL consumed packet (generic batch -> admit -> finalize) under the fixture's
++// .git/agent-pipeline/critic-packets, the same machinery the audit-lifecycle test uses; the coordinator reads it with no injection.
++const sha = (value) => createHash("sha256").update(value).digest("hex");
++const attestedV4 = (taskId, commit) => {
++  const text = "Orchestrator-committed hand-back.";
++  return { schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
++    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: commit, resultSha256: reportSha256(text), outcome: "completed-orchestrator-attested",
++    commits: [commit], log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }],
++    report: { text, changedFiles: [`src/${taskId}.mjs`] }, criticRequired: required(),
++    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" },
++    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "1".repeat(64), handbackSha256: "2".repeat(64) } };
++};
++/** afterFixture hook: history P0 <- base <- R1 <- R2 <- candidate; a passed course Critic over (base, candidate]; both records; both addenda. */
++const attestedWithCourseReceipt = ({ secondInsideRange }) => (root) => {
++  const put = (path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
++  const commit = (message, paths) => { git(root, ["add", "--", ...paths]); git(root, ["commit", "-m", message]); return git(root, ["rev-parse", "HEAD"]); };
++  put("src/before.mjs", "export const before = 1;\n");
++  const beforeBase = commit("before the reviewed range", ["src/before.mjs"]);
++  put("specs/critic/spec.md", "# Spec\nAC-1 AC-2\n");
++  put(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
++  put("specs/review-unit.json", JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Close the feature as one delivery",
++    specPath: "specs/critic/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"], deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null }));
++  const baseCommit = commit("reviewed range base", ["specs/critic/spec.md", ".claude/pipeline.yaml", "specs/review-unit.json"]);
++  put("src/TASK-ONE.mjs", "export const one = 1;\n");
++  const first = commit("feat(x): one", ["src/TASK-ONE.mjs"]);
++  put("src/TASK-TWO.mjs", "export const two = 2;\n");
++  const second = commit("feat(x): two", ["src/TASK-TWO.mjs"]);
++  const secondCommit = secondInsideRange ? second : beforeBase;
++  const records = { "TASK-ONE": attestedV4("TASK-ONE", first), "TASK-TWO": attestedV4("TASK-TWO", secondCommit) };
++  for (const [taskId, value] of Object.entries(records)) put(`evidence/dispatch-record-${taskId}.json`, json(value));
++  const candidate = (() => { commit("persist the attested dispatch records", Object.keys(records).map((taskId) => `evidence/dispatch-record-${taskId}.json`));
++    return { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) }; })();
++  const common = git(root, ["rev-parse", "--git-common-dir"]);
++  const controlRoot = join(root, common, "agent-pipeline", "critic-packets");
++  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
++  chmodSync(join(root, common, "agent-pipeline"), 0o700);
++  chmodSync(controlRoot, 0o700);
++  const changedPaths = git(root, ["diff", "--name-only", baseCommit, candidate.commit]).split("\n").filter(Boolean).sort();
++  put("evidence/critic-diagnostic.json", JSON.stringify({ schema: "pipeline.verify-evidence.v0", commit: candidate.commit, tree: candidate.tree, candidate, exitCode: 0,
++    selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit, changedPaths, registeredSuiteIds: ["test"],
++      policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
++    steps: [{ name: "test", exitCode: 0 }] }));
++  const packetId = "1".repeat(32);
++  const review = { preflightInput: { root, base: baseCommit, candidate: candidate.commit, specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
++      evidencePaths: ["evidence/critic-diagnostic.json"], priorCriticEvidencePath: null },
++    taskId: "TASK-ONE", projectId: "fixture", sessionId: "close-review-1", packetId,
++    route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
++    verdict: { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true } };
++  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId: "TASK-ONE", baseCommit, candidateCommit: candidate.commit,
++    logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
++  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
++  admitSessionCriticReview(review);
++  finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
++  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: join(root, common), criticPacketId: packetId, candidate });
++  for (const [taskId, value] of Object.entries(records)) {
++    const bytes = Buffer.from(json(value));
++    const criticBytes = `Independent Critic course review covering ${taskId}.\n`;
++    put(`evidence/critic-${taskId}.md`, criticBytes);
++    put(criticDispositionAddendumPath(taskId), json({ schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha(bytes),
++      taskId, candidateCommit: value.candidateCommit, reviewCandidateCommit: candidate.commit, criticPacketId: packetId, criticReceiptSha256: bound.criticReceiptSha256,
++      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: value.candidateCommit, path: `evidence/critic-${taskId}.md`, sha256: sha(criticBytes) } }));
++  }
++};
++
++test("(i) two orchestrator-attested records covered by one consumed course receipt whose reviewed range contains both commits plan (D212 A+B)", () => {
++  const repo = checkpointed("i", courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), attestedWithCourseReceipt({ secondInsideRange: true }));
++  const planned = repo.planPrepared();
++  assert.equal(planned.status, 0, JSON.stringify(planned.body));
++  assert.equal(planned.body.phase, "feature-close-prepared");
++  assert.equal(invokeAction(planned.body.nextAction).body.status, "applied");
++});
++
++test("(i) the same course receipt does not cover a record whose commit lies before the reviewed range: the close names only that record", () => {
++  const repo = checkpointed("i-out", courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), attestedWithCourseReceipt({ secondInsideRange: false }));
++  const before = repo.snapshot();
++  assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-TWO"], notNamed: ["TASK-ONE"] });
++  assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
++});
++
+ test("(b) the same record with matching Critic evidence plans", () => {
+   const repo = checkpointed("b", {
+     ...courseFile(FEATURE, ["TASK-IN-COURSE"]),
+diff --git a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+index 6424cae04..e0ff02cbe 100644
+--- a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
+@@ -116,12 +116,19 @@ test("AC1 typed budget refusal names Elephant self-verification or an explicit P
+   assert.doesNotMatch(src, /at most one (?:re-review|follow-up)/iu);
+ });
+ 
+-test("AC3 coordinator next-action text offers the Critic dispatch only with the delta-only batch rule", () => {
++// Restated for D212 (N33, 2026-10-30): intent unchanged -- the close refusal offers the Critic dispatch only with the delta-only
++// follow-up rule. The round-cap wording ("one full review plus at most three correction-diff reviews", "Elephant self-verification
++// or an explicit PO decision") is dropped because D190/D199 removed the cap; a stale cap in the refusal sent an operator holding a
++// passed course receipt to a dead end. The cap-free rule and the addendum route replace it (pinned behaviourally by the close
++// coordinator pin, case (h)).
++test("AC3 coordinator next-action text offers the Critic dispatch only with the delta-only follow-up rule (restated D212)", () => {
+   const src = read("scripts/close-coordinator.mjs");
+   assert.match(src, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
+   assert.match(src, /follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate/u);
+-  assert.match(src, /one full review plus at most three correction-diff reviews per declared batch/u);
+-  assert.match(src, /Elephant self-verification or an explicit PO decision/u);
++  assert.match(src, /no round cap since D190\/D199; a further correction-diff Critic round is always allowed/u);
++  assert.match(src, /--critic-addendum <request\.json>/u);
++  assert.doesNotMatch(src, /one full review plus at most three correction-diff reviews per declared batch/u);
++  assert.doesNotMatch(src, /never another Critic/u);
+ });
+ 
+ // AC-142 chain: the refusal and the sanctioned route are tested apart elsewhere; this drives one valid pre-rule feature through both.
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 6cd6c2e4c..312ce47e5 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -516,6 +516,47 @@ function readCriticDispositionAddenda(root) {
+   return { entriesByPath, findings };
+ }
+ 
++const COMMIT_OID = /^[a-f0-9]{40}$/u;
++/** True when `ancestor` is an ancestor of, or equal to, `descendant`; false only on git's "not an ancestor" exit (1). Anything else throws. */
++function gitIsAncestor(gitRead, ancestor, descendant) {
++  try { gitRead(["merge-base", "--is-ancestor", ancestor, descendant]); return true; }
++  catch (error) { if (error?.status === 1) return false; throw error; }
++}
++
++/**
++ * D212 (N33 B): a consumed, passed Critic receipt whose packet carries ANOTHER task id (a feature-wide Critic course) satisfies a
++ * required record when the record's commit lies inside the receipt's reviewed range.
++ *
++ * The reviewed range is read from the validated receipt, `bound.critic.reviewRange = { base, commit, diffSha256 }`.
++ * `readBoundConsumedCriticReceipt` has already proved that it equals the consumed packet's `diff` and that its `commit` is the
++ * review candidate; a receipt always names a `base` (the receipt validator requires one). The range is the half-open set
++ * (base, commit]: the record's commit must be an ancestor of, or equal to, the review candidate and must NOT be an ancestor of, or
++ * equal to, the base. A course packet never lists the record as reviewed evidence, so the record-binding checks of the task-bound
++ * route do not apply; the private snapshot, when present, keeps its exact key shape and its assurance (null or orchestrator-attested).
++ */
++function courseReceiptFinding(addendum, bound, gitRead) {
++  const prefix = "Critic addendum does not match a passed, consumed Critic receipt of this task or a course receipt whose reviewed range contains the record's commit";
++  const range = bound.critic.reviewRange;
++  if (range === null || typeof range !== "object" || !COMMIT_OID.test(range.base ?? "") || range.commit !== addendum.reviewCandidateCommit) {
++    return `${prefix} (the receipt names no reviewed range ending at the review candidate)`;
++  }
++  const local = bound.packet?.coordinatorOnly?.localDispatchEvidence;
++  if (local !== undefined) {
++    const legacyForm = !Object.hasOwn(local ?? {}, "assurance");
++    try {
++      exactObject(local, legacyForm
++        ? ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"]
++        : ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
++    } catch { return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record"; }
++    if (!legacyForm && local.assurance !== null && local.assurance !== "orchestrator-attested") {
++      return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
++    }
++  }
++  if (!gitIsAncestor(gitRead, addendum.candidateCommit, range.commit)) return `${prefix} (the commit is not an ancestor of the reviewed candidate)`;
++  if (gitIsAncestor(gitRead, addendum.candidateCommit, range.base)) return `${prefix} (the commit is not after the reviewed range base)`;
++  return null;
++}
++
+ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+   try {
+     const readBound = options.readBoundCriticReceipt ?? ((input) => readBoundConsumedCriticReceipt(input));
+@@ -532,12 +573,16 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+     const tree = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}^{tree}`]);
+     const bound = readBound({ gitCommonDir, criticPacketId: addendum.criticPacketId,
+       candidate: { commit: addendum.reviewCandidateCommit, tree } });
+-    if (bound?.packet?.request?.taskId !== addendum.taskId
+-      || bound?.critic?.reviewPass !== true
++    if (bound?.critic?.reviewPass !== true
+       || bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
+       || bound.criticReceiptSha256 !== addendum.criticReceiptSha256) {
+       return "Critic addendum does not match a passed, consumed, task-bound Critic receipt";
+     }
++    if (bound?.packet?.request?.taskId !== addendum.taskId) {
++      // D212 (N33 B): task-id equality stays sufficient (below); a receipt of another task id is a course receipt and satisfies the
++      // record only when the record's commit lies inside the receipt's reviewed range.
++      return courseReceiptFinding(addendum, bound, gitRead);
++    }
+     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
+     if (localDispatchEvidence !== undefined) {
+       // A packet claimed before the assurance field carries the exact old key set and the old digest; it reads as assurance null.
+@@ -603,6 +648,17 @@ function resolvedCriticAddendumFinding(root, entry, addendumEntry, options) {
+   return reviewFinding ? `${addendumEntry.path}: ${reviewFinding}` : null;
+ }
+ 
++/**
++ * Finding (string) or null for an addendum that is NOT yet on disk: the same evidence and receipt checks the coverage evaluation
++ * applies to a published addendum, so the sanctioned writer can refuse an unbound addendum before its exclusive, irreplaceable
++ * publication (D212 C). Additive export; shares resolvedCriticAddendumFinding with every other consumer.
++ */
++export function criticAddendumBindingFinding({ root, addendum, record, recordBytes, options = {} } = {}) {
++  return resolvedCriticAddendumFinding(root,
++    { path: addendum.recordPath, bytes: recordBytes, record },
++    { path: criticDispositionAddendumPath(addendum.taskId), addendum }, options);
++}
++
+ /** Single-record readback for authorship consumers; does not waive corpus coverage. */
+ export function verifyCriticDispositionAddendumForRecord({ root, taskId, record, recordBytes, options = {} } = {}) {
+   if (typeof root !== "string" || !Buffer.isBuffer(recordBytes)) {
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 23897e921..61efb9d2d 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -3,7 +3,7 @@
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+@@ -12,7 +12,7 @@ import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDE
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+-import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE } from "../lib/dispatch-record.mjs";
++import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE, reportSha256 } from "../lib/dispatch-record.mjs";
+ 
+ const SHA = "a".repeat(40);
+ const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
+@@ -1126,3 +1126,139 @@ test("CSC-A8 the zero-target refusal names the attested-request CLI and no longe
+   assert.doesNotMatch(text, /PO decision/u);
+   assert.doesNotMatch(text, /writeOrchestratorAttestedDispatchRecord/u);
+ });
++
++// ---------------------------------------------------------------------------------------------------------------
++// N33 A+B (D212, backlog 2026-10-30-close-gate-rejects-critic-evidence-for-attested-records). Criterion: a Critic-
++// required, orchestrator-attested record is satisfiable by an addendum (A), and a consumed, passed Critic course
++// receipt whose reviewed range contains the record's commit satisfies it without task-id equality (B).
++// ---------------------------------------------------------------------------------------------------------------
++const N33_CRITIC_BYTES = "Independent Critic review (course receipt) for an attested delivery.\n";
++function attestedDelivery(taskId, commit) {
++  const text = "Orchestrator-committed hand-back.";
++  return deliveredV4(taskId, "orchestrator-attested", { candidateCommit: commit, commits: [commit], resultSha256: reportSha256(text), report: { text, changedFiles: ["src/change.txt"] },
++    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], outcome: "completed-orchestrator-attested" });
++}
++function n33Addendum(taskId, recordBytes, commit, reviewCommit) {
++  return { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha256(recordBytes),
++    taskId, candidateCommit: commit, reviewCandidateCommit: reviewCommit, criticPacketId, criticReceiptSha256,
++    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: commit, path: `evidence/critic-${taskId}.md`, sha256: sha256(N33_CRITIC_BYTES) } };
++}
++/** A real repository: base <- first <- second <- head on main, and a side commit on a branch off base. */
++function courseRepository() {
++  const root = fixture({ "evidence/.keep": "" });
++  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
++  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
++  const commit = (name) => {
++    writeFileSync(join(root, name), `${name}\n`);
++    git("add", name);
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", name);
++    return git("rev-parse", "HEAD");
++  };
++  git("init", "-q", "-b", "main");
++  const base = commit("base.txt"); const first = commit("first.txt"); const second = commit("second.txt"); const head = commit("head.txt");
++  git("checkout", "-q", "-b", "side", base);
++  const side = commit("side.txt");
++  git("checkout", "-q", "main");
++  return { root, base, first, second, head, side };
++}
++/** Writes one attested record plus its addendum; the reviewed Critic packet belongs to another task id (a feature-wide course). */
++function writeAttested(root, taskId, commit, reviewCommit, { record = attestedDelivery(taskId, commit) } = {}) {
++  const recordBytes = json(record);
++  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
++  writeFileSync(join(root, `evidence/critic-${taskId}.md`), N33_CRITIC_BYTES);
++  writeFileSync(join(root, criticDispositionAddendumPath(taskId)), json(n33Addendum(taskId, recordBytes, commit, reviewCommit)));
++  return recordBytes;
++}
++const courseReceiptReader = ({ base, head, taskId = "FEATURE-COURSE", reviewPass = true, receiptSha = criticReceiptSha256, range = { base, commit: head, diffSha256: "9".repeat(64) }, throwing = false }) => ({
++  readBoundCriticReceipt: () => {
++    if (throwing) throw Object.assign(new Error("no consumed receipt"), { code: "CVL-CRITIC-UNAVAILABLE" });
++    return { packet: { request: { taskId }, candidate: { base, commit: head }, references: [] },
++      critic: { reviewPass, candidate: { base, commit: head }, ...(range === null ? {} : { reviewRange: range }) }, criticReceiptSha256: receiptSha };
++  },
++});
++
++test("N33A the addendum validator admits a v4 orchestrator-attested record with exactly one commit equal to the candidate (D212 A)", () => {
++  const taskId = "ATT-VALID";
++  const record = attestedDelivery(taskId, SHA);
++  const recordBytes = Buffer.from(json(record));
++  const entry = n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit);
++  const context = { recordPath: `evidence/dispatch-record-${taskId}.json`, recordBytes, record };
++  assert.equal(validateCriticDispositionAddendum(entry, context), entry);
++  for (const refused of [
++    { ...record, commits: [SHA, "b".repeat(40)] },
++    { ...record, commits: ["b".repeat(40)] },
++    { ...record, commits: [] },
++  ]) assert.throws(() => validateCriticDispositionAddendum(entry, { ...context, record: refused }), /authored v3\/v4/u);
++});
++
++test("N33A an authored-commit record with two commits still refuses an addendum", () => {
++  const taskId = "AUT-TWO";
++  const record = deliveredV4(taskId, "authored-commit", { commits: [SHA, "b".repeat(40)], candidateCommit: SHA });
++  const recordBytes = Buffer.from(json(record));
++  assert.throws(() => validateCriticDispositionAddendum(n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit),
++    { recordPath: `evidence/dispatch-record-${taskId}.json`, recordBytes, record }), /authored v3\/v4/u);
++});
++
++test("N33A an attested record is covered by an addendum with a task-id-matching receipt (equality stays sufficient)", () => {
++  const taskId = "ATT-EQUAL";
++  const record = attestedDelivery(taskId, SHA);
++  const recordBytes = json(record);
++  const root = fixture({ [`evidence/dispatch-record-${taskId}.json`]: recordBytes, [`evidence/critic-${taskId}.md`]: N33_CRITIC_BYTES,
++    [criticDispositionAddendumPath(taskId)]: json(n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit)) });
++  const result = evaluate(root, ["src/change.txt"], boundReview(recordBytes, taskId));
++  assert.equal(result.ok, true, result.readFindings.join("\n"));
++  assert.equal(result.criticEvidenceRecordCount, 1);
++  assert.equal(result.requiredRecordCount, 0);
++});
++
++test("N33B two attested records are covered by one course receipt whose reviewed range contains both commits (D212 B)", () => {
++  const repo = courseRepository();
++  writeAttested(repo.root, "ATT-ONE", repo.first, repo.head);
++  writeAttested(repo.root, "ATT-TWO", repo.second, repo.head);
++  const options = courseReceiptReader({ base: repo.base, head: repo.head });
++  const scoped = evaluate(repo.root, ["src/change.txt"], { ...options, taskIds: ["ATT-ONE", "ATT-TWO"] });
++  assert.equal(scoped.ok, true, scoped.readFindings.join("\n"));
++  assert.equal(scoped.criticEvidenceRecordCount, 2);
++  assert.equal(scoped.requiredRecordCount, 0);
++  assert.deepEqual(scoped.requiredTaskIds, []);
++  // The push gate reads the same evidence through the single-record readback.
++  for (const taskId of ["ATT-ONE", "ATT-TWO"]) {
++    const bytes = Buffer.from(readFileSync(join(repo.root, `evidence/dispatch-record-${taskId}.json`)));
++    assert.equal(verifyCriticDispositionAddendumForRecord({ root: repo.root, taskId, record: JSON.parse(bytes), recordBytes: bytes, options }).code, "critic-addendum-bound");
++  }
++});
++
++test("N33B a course receipt that does not contain the record's commit still refuses", () => {
++  const cases = [
++    ["the commit is the range base (outside the half-open range)", (repo) => repo.base, (repo) => ({ base: repo.base, head: repo.head }), /not after the reviewed range base/u],
++    ["the commit is older than the range base", (repo) => repo.first, (repo) => ({ base: repo.second, head: repo.head }), /not after the reviewed range base/u],
++    ["the commit is not an ancestor of the reviewed candidate", (repo) => repo.side, (repo) => ({ base: repo.base, head: repo.head }), /unavailable or invalid/u],
++  ];
++  for (const [label, commitOf, receiptOf, reason] of cases) {
++    const repo = courseRepository();
++    writeAttested(repo.root, "ATT-OUT", commitOf(repo), repo.head);
++    const result = evaluate(repo.root, ["src/change.txt"], { ...courseReceiptReader(receiptOf(repo)), taskIds: ["ATT-OUT"] });
++    assert.equal(result.ok, false, label);
++    assert.match(result.readFindings.join("\n"), reason, label);
++    assert.deepEqual(result.requiredTaskIds, ["ATT-OUT"], label);
++    assert.equal(result.criticEvidenceRecordCount, 0, label);
++  }
++});
++
++test("N33B a failed, unconsumed, mis-digested or range-less course receipt still refuses", () => {
++  const repo = courseRepository();
++  writeAttested(repo.root, "ATT-RCPT", repo.first, repo.head);
++  const base = { base: repo.base, head: repo.head };
++  for (const [label, receipt, reason] of [
++    ["failed", { ...base, reviewPass: false }, /does not match a passed, consumed, task-bound/u],
++    ["unconsumed", { ...base, throwing: true }, /unavailable or invalid/u],
++    ["wrong receipt digest", { ...base, receiptSha: "f".repeat(64) }, /does not match a passed, consumed, task-bound/u],
++    ["no reviewed range", { ...base, range: null }, /names no reviewed range/u],
++    ["range names another review commit", { ...base, range: { base: repo.base, commit: repo.second, diffSha256: "9".repeat(64) } }, /names no reviewed range/u],
++  ]) {
++    const result = evaluate(repo.root, ["src/change.txt"], { ...courseReceiptReader(receipt), taskIds: ["ATT-RCPT"] });
++    assert.equal(result.ok, false, label);
++    assert.match(result.readFindings.join("\n"), reason, label);
++    assert.deepEqual(result.requiredTaskIds, ["ATT-RCPT"], label);
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index e33e3ad94..c69a0ac00 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -439,7 +439,12 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
+   try { coverage = evaluateRepositoryCriticSkipCoverage({ root, taskIds: ids }); }
+   catch { fail("CLOSE-CRITIC-EVIDENCE-UNAVAILABLE", "Critic evidence coverage for the feature's delivery course could not be evaluated"); }
+   if (coverage.requiredTaskIds.length > 0) {
+-    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; one full review plus at most three correction-diff reviews per declared batch; once spent, Elephant self-verification or an explicit PO decision, never another Critic`);
++    // D212 (N33): name WHY an addendum that exists does not bind (only findings about the uncovered ids), the route that writes the
++    // addendum, and the current rule. The round cap this text used to state was removed by D190/D199.
++    const reasons = coverage.readFindings.filter((finding) => coverage.requiredTaskIds.some((id) => finding.includes(id))).slice(0, 3)
++      .map((finding) => (finding.length > 300 ? `${finding.slice(0, 300)}...` : finding));
++    const why = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
++    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed`);
+   }
+   // D52: a Critic slice of THIS course that is still scheduled (ready, no terminal dispatch record) means the
+   // independent review has not happened; the close must not reach feature-close-prepared past it. Legacy v1
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index 303578233..84da368ad 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -10,6 +10,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
++import { criticAddendumBindingFinding } from "./check-critic-skip-coverage.mjs";
+ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+ import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+ import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
+@@ -522,6 +523,12 @@ export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dep
+   validateCriticDispositionAddendum(addendum, { recordPath: addendum.recordPath, recordBytes, record });
+   const evidenceBytes = readPhysicalRequest(root, addendum.criticEvidence.path, dependencies);
+   if (createHash("sha256").update(evidenceBytes).digest("hex") !== addendum.criticEvidence.sha256) fail("critic-evidence", "critic evidence digest mismatch");
++  if (typeof dependencies.verifyBinding === "function") {
++    // The publication below is exclusive: a wrongly bound addendum could never be replaced, so the sanctioned CLI route proves the
++    // consumed receipt BEFORE it writes (the object route keeps its documented behaviour: coverage verifies afterwards).
++    const finding = dependencies.verifyBinding({ root, addendum, record, recordBytes });
++    if (finding) fail("addendum-unbound", `the addendum is not bound by a consumed, passed Critic receipt, so it was not written: ${finding}`);
++  }
+   const bytes = Buffer.from(`${JSON.stringify(addendum, null, 2)}\n`, "utf8");
+   const digest = publishExclusiveBytes(root, target, addendum.taskId, bytes, dependencies, "critic-addendum");
+   return { schema: "pipeline.critic-disposition-addendum-write-receipt.v1", target, sha256: digest,
+@@ -600,23 +607,41 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
+   return writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
+ }
+ 
+-const USAGE = "usage: dispatch-record-write.mjs --repo-root <path> (--request <repo-relative-json> | --attested-request <repo-relative-json>)";
++/**
++ * D212 (N33 C) Elephant-side CLI mode: publish the byte-bound Critic addendum for a Critic-required record. The request file IS the
++ * `pipeline.critic-disposition-addendum.v1` object (recordPath, recordSha256, taskId, candidateCommit, reviewCandidateCommit,
++ * criticPacketId, criticReceiptSha256, criticEvidence). It is written only when the consumed Critic receipt binds it, either by the
++ * record's own task id or as a course receipt whose reviewed range contains the record's commit (check-critic-skip-coverage.mjs).
++ */
++export function runCriticAddendumRequest({ repoRoot, criticAddendumPath }, dependencies = {}) {
++  const root = physicalRoot(repoRoot);
++  const path = attestedInputPath(criticAddendumPath, "criticAddendumPath");
++  const bytes = readPhysicalRequest(root, path, dependencies);
++  let addendum;
++  try { addendum = parseStrictJson(bytes); } catch (error) { fail("addendum-shape", `critic addendum request is not strict JSON: ${error.message}`); }
++  const verifyBinding = dependencies.verifyBinding
++    ?? ((input) => criticAddendumBindingFinding({ ...input, options: dependencies.coverageOptions ?? {} }));
++  return writeCriticDispositionAddendumObject({ repoRoot: root, addendum }, { ...dependencies, verifyBinding });
++}
++
++const USAGE = "usage: dispatch-record-write.mjs --repo-root <path> (--request <repo-relative-json> | --attested-request <repo-relative-json> | --critic-addendum <repo-relative-json>)";
+ export function parseArgs(argv) {
+   const values = {};
+   for (let index = 0; index < argv.length; index += 2) {
+     const key = argv[index]; const value = argv[index + 1];
+-    if (!["--repo-root", "--request", "--attested-request"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", USAGE);
++    if (!["--repo-root", "--request", "--attested-request", "--critic-addendum"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", USAGE);
+     values[key] = value;
+   }
+-  if (!values["--repo-root"] || (values["--request"] === undefined) === (values["--attested-request"] === undefined)) fail("usage", USAGE);
+-  return values["--request"] !== undefined
+-    ? { repoRoot: values["--repo-root"], requestPath: values["--request"] }
+-    : { repoRoot: values["--repo-root"], attestedRequestPath: values["--attested-request"] };
++  const modes = ["--request", "--attested-request", "--critic-addendum"].filter((key) => values[key] !== undefined);
++  if (!values["--repo-root"] || modes.length !== 1) fail("usage", USAGE);
++  if (modes[0] === "--request") return { repoRoot: values["--repo-root"], requestPath: values["--request"] };
++  if (modes[0] === "--critic-addendum") return { repoRoot: values["--repo-root"], criticAddendumPath: values["--critic-addendum"] };
++  return { repoRoot: values["--repo-root"], attestedRequestPath: values["--attested-request"] };
+ }
+ if (isDirectInvocation(import.meta.url)) {
+   try {
+     const args = parseArgs(process.argv.slice(2));
+-    process.stdout.write(`${JSON.stringify(args.attestedRequestPath !== undefined ? runAttestedRequest(args) : writeDispatchRecord(args))}\n`);
++    process.stdout.write(`${JSON.stringify(args.criticAddendumPath !== undefined ? runCriticAddendumRequest(args) : args.attestedRequestPath !== undefined ? runAttestedRequest(args) : writeDispatchRecord(args))}\n`);
+   }
+   catch (error) { process.stderr.write(`DISPATCH-RECORD-WRITE-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
+ }
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index a30a63da7..0c4dd46be 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -621,7 +621,89 @@ check("attested CLI: a second call for the same task is refused and the first re
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 31, "the complete dispatch-record writer corpus must be registered before execution begins");
++// N33 A+B+C (D212): the sanctioned addendum route. `--critic-addendum <request>` is the command the close gate's refusal names;
++// the request file IS the addendum object. The route refuses an addendum that no consumed, passed Critic receipt binds BEFORE it
++// publishes, because the publication is exclusive and a wrongly written addendum could never be replaced.
++const N33_BASE = "1".repeat(40);
++const N33_HEAD = "2".repeat(40);
++function n33Fixture({ commits = [ATT_COMMIT] } = {}) {
++  const root = attestedRoot();
++  const value = attestedRecord({ commits, candidateCommit: commits.at(-1) });
++  const parents = Object.fromEntries(commits.map((commit, index) => [commit, [index === 0 ? ATT_BASE : commits[index - 1]]]));
++  const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: value }, gitReaders({ parents }));
++  const criticBytes = Buffer.from("Independent Critic review of the feature course.\n");
++  writeFileSync(join(root, "evidence/critic-NVA-ATT-1.md"), criticBytes);
++  const addendum = { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: "evidence/dispatch-record-NVA-ATT-1.json", recordSha256: receipt.sha256,
++    taskId: "NVA-ATT-1", candidateCommit: value.candidateCommit, reviewCandidateCommit: N33_HEAD, criticPacketId: "d".repeat(32), criticReceiptSha256: "c".repeat(64),
++    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-ATT-1", candidateCommit: value.candidateCommit, path: "evidence/critic-NVA-ATT-1.md",
++      sha256: createHash("sha256").update(criticBytes).digest("hex") } };
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  writeFileSync(join(root, "scratch/addendum-request.json"), `${JSON.stringify(addendum)}\n`);
++  return { root, value, addendum };
++}
++/** A course receipt of ANOTHER task whose reviewed range is (N33_BASE, N33_HEAD]; ATT_COMMIT lies inside it unless `outside` names it the base. */
++function n33CoverageOptions({ outside = false } = {}) {
++  return { coverageOptions: {
++    gitRead: (args) => {
++      if (args[1] === "--git-common-dir") return ".git";
++      if (args[0] === "rev-parse") return N33_HEAD;
++      if (args[0] === "merge-base" && outside && args[2] === ATT_COMMIT && args[3] === N33_BASE) return "";
++      if (args[0] === "merge-base" && args[3] === N33_BASE) { throw Object.assign(new Error("not an ancestor"), { status: 1 }); }
++      return "";
++    },
++    readBoundCriticReceipt: () => ({ packet: { request: { taskId: "FEATURE-COURSE" }, candidate: { base: N33_BASE, commit: N33_HEAD }, references: [] },
++      critic: { reviewPass: true, candidate: { base: N33_BASE, commit: N33_HEAD }, reviewRange: { base: N33_BASE, commit: N33_HEAD, diffSha256: "9".repeat(64) } }, criticReceiptSha256: "c".repeat(64) }),
++  } };
++}
++
++check("N33 addendum writer admits an orchestrator-attested one-commit record and refuses a two-commit one (D212 A)", () => {
++  const { root, addendum } = n33Fixture();
++  try {
++    const receipt = writeCriticDispositionAddendumObject({ repoRoot: root, addendum });
++    assert.equal(receipt.target, "evidence/dispatch-critic-addendum-NVA-ATT-1.json");
++    assert.deepEqual(JSON.parse(readFileSync(join(root, receipt.target), "utf8")), addendum);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++  const two = n33Fixture({ commits: ["8".repeat(40), ATT_COMMIT] });
++  try {
++    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: two.root, addendum: two.addendum }), /authored v3\/v4/u);
++    assert.equal(existsSync(join(two.root, criticDispositionAddendumPath("NVA-ATT-1"))), false);
++  } finally { rmSync(two.root, { recursive: true, force: true }); }
++});
++
++check("N33 --critic-addendum is the third mutually exclusive mode and keeps the usage refusals", () => {
++  assert.deepEqual(writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "scratch/a.json"]), { repoRoot: "r", criticAddendumPath: "scratch/a.json" });
++  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--request", "b.json"]));
++  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--attested-request", "b.json"]));
++  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--critic-addendum", "b.json"]));
++});
++
++check("N33 --critic-addendum publishes an addendum a course receipt binds, and refuses one it does not bind without writing", () => {
++  const bound = n33Fixture();
++  try {
++    const receipt = writerModule.runCriticAddendumRequest({ repoRoot: bound.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions());
++    assert.equal(receipt.schema, "pipeline.critic-disposition-addendum-write-receipt.v1");
++    assert.equal(existsSync(join(bound.root, receipt.target)), true);
++    refusedWith("target-exists", () => writerModule.runCriticAddendumRequest({ repoRoot: bound.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions()));
++  } finally { rmSync(bound.root, { recursive: true, force: true }); }
++  const outside = n33Fixture();
++  try {
++    refusedWith("addendum-unbound", () => writerModule.runCriticAddendumRequest({ repoRoot: outside.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions({ outside: true })));
++    assert.equal(existsSync(join(outside.root, criticDispositionAddendumPath("NVA-ATT-1"))), false, "an unbound addendum must never be published");
++  } finally { rmSync(outside.root, { recursive: true, force: true }); }
++});
++
++check("N33 --critic-addendum refuses an absolute, out-of-tree or non-JSON request path", () => {
++  const { root } = n33Fixture();
++  try {
++    for (const path of ["/etc/passwd", "src/addendum.json", "scratch/../src/a.json"]) {
++      refusedWith("attested-request-path", () => writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: path }, n33CoverageOptions()));
++    }
++    writeFileSync(join(root, "scratch/not-json.json"), "{ nope");
++    refusedWith("addendum-shape", () => writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: "scratch/not-json.json" }, n33CoverageOptions()));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 35, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 7144fb37a..48738e053 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -52,6 +52,24 @@ candidate. The plan's `courseAuthorship` names each slice's record:
+ `dispatchRecord`, `orchestratorCommit`, or `unrecorded`. An `unrecorded` slice
+ has no record of either kind. Report it to the PO before applying.
+ 
++The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
++dispatch record that requires a Critic and carries no bound evidence (an
++orchestrator-attested record included). A record is immutable, so the evidence
++is a separate addendum. Write one request file under `scratch/`, `evidence/` or
++`specs/` holding the `pipeline.critic-disposition-addendum.v1` object
++(`recordPath`, `recordSha256`, `taskId`, `candidateCommit`,
++`reviewCandidateCommit`, `criticPacketId`, `criticReceiptSha256`, and a
++`criticEvidence` reference to a file under `evidence/` whose bytes you digest),
++then run `node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root
++<repo-root> --critic-addendum <request.json>` and plan the transition again.
++The command refuses, and writes nothing, unless a consumed, passed Critic
++receipt binds the addendum: either the receipt of the record's own task id, or a
++feature-wide Critic course (one task id, any number of rounds) whose reviewed
++range, the commits after the receipt's base up to its reviewed candidate,
++contains the record's commit. The addendum is exclusive and cannot be
++replaced. Rounds are not capped (D190/D199): a further correction-diff Critic
++round is always allowed.
++
+ The returned action has this shape (the Continuity flag is mandatory whenever
+ it is present in the returned argv):
+ 
