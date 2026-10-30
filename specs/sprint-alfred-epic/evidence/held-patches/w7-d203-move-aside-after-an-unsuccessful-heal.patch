@@ -1,0 +1,124 @@
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index 025846773..cc098d0f1 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -20,7 +20,7 @@ export const ROUTINE_REPAIRS = Object.freeze([
+   Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
+   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
+   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
+-  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
++  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused is healed first, and moved aside only when it is still reconcile-refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
+   Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate" }),
+ ]);
+ const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
+@@ -193,11 +193,16 @@ export function classifyInspectFindings(inspect) {
+   for (const row of inspect?.registry?.producers ?? []) {
+     if (row?.status === "ok") continue;
+     add(`producer:${row?.producerId}`, text(row?.status, row?.code, row?.reason, ...(row?.drifted ?? [])));
++    if (row?.status === "reconcile-refused") rows.at(-1).reconcileRefused = true;
+   }
+   if (inspect?.registry?.read?.status === "refused") add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
+   return rows;
+ }
+ 
++// D203: the only findings move-aside admits after an unsuccessful heal are reconcile-refused producers.
++const onlyReconcileRefused = (rows) => rows.length > 0 && rows.every((row) => row.allowed || row.reconcileRefused === true);
++const moveAsideNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run move-aside --no-goldfish-running --root <root> --reason "<why>" (D203: only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
++
+ const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
+ 
+ function defaultSpawn(script, args, cwd) {
+@@ -295,7 +300,11 @@ function execute(plan, ctx) {
+       const inspect = run.status === 0 ? parseJson(run.stdout) : null;
+       settledPending = inspect === null ? { skipped: "session-authority-repair inspect did not report, so no pending state was classified" } : retireSettledPending(ctx, inspect);
+     } catch (error) { settledPending = { skipped: short(error) }; }
+-    return { ...delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx), settledPending };
++    const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
++    // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
++    const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
++    const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
++    return { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+   }
+   if (plan.kind === "settled-pending-aside") {
+     const run = spawn(SAR, ["inspect", "--root", root], root);
+@@ -321,8 +330,18 @@ function execute(plan, ctx) {
+   const inspectRun = spawn(SAR, ["inspect", "--root", root], root);
+   const inspect = parseJson(inspectRun.stdout);
+   if (inspectRun.status !== 0 || inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no finding can be classified", `node ${SAR} inspect --root <root>`);
+-  const findings = classifyInspectFindings(inspect);
++  let findings = classifyInspectFindings(inspect);
+   if (!findings.length) return refuse("RR-OUTSIDE-LIST", "inspect reports no blocking finding, so there is nothing for move-aside to repair", humanStep("move-aside"));
++  if (findings.some((row) => !row.allowed) && onlyReconcileRefused(findings)) {
++    // D203: heal first; only a producer that heal did not resolve is moved aside.
++    const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
++    if (!healed.ok) return { ...healed, healedFirst: true };
++    const again = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
++    if (again === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report after heal, so no finding can be classified", `node ${SAR} inspect --root <root>`);
++    findings = classifyInspectFindings(again);
++    if (!findings.length) return { ...healed, healedFirst: true };
++    if (onlyReconcileRefused(findings)) return { ...delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx), healedFirst: true };
++  }
+   const other = findings.find((row) => !row.allowed);
+   if (other) return refuse("RR-OUTSIDE-LIST", `finding ${other.finding} (${other.source}) is not on the closed list for move-aside (${ROUTINE_REPAIRS.find((row) => row.kind === "move-aside").findings.join(", ")})`, `this repair is decided by the human; the original tool's own command: ${humanStep("inspect")}`);
+   return delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx);
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 02869307f..b1b98ef9a 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -45,11 +45,13 @@ function files(dir) {
+ const ledger = (ap) => (existsSync(join(ap, "routine-repair-ledger.jsonl")) ? readFileSync(join(ap, "routine-repair-ledger.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line)) : []);
+ 
+ // A recording stand-in for the delegated tools.
++// An array of inspect results is answered in order (the last one repeats).
+ function stub(inspectResult) {
+   const calls = [];
++  const answers = Array.isArray(inspectResult) ? [...inspectResult] : [inspectResult];
+   const spawn = (script, args) => {
+     calls.push({ tool: script.split(/[\\/]/u).pop(), args });
+-    if (args[0] === "inspect") return { status: 0, stdout: `${JSON.stringify(inspectResult)}\n`, stderr: "" };
++    if (args[0] === "inspect") return { status: 0, stdout: `${JSON.stringify(answers.length > 1 ? answers.shift() : answers[0])}\n`, stderr: "" };
+     if (args[0] === "cancel") return { status: 0, stdout: `${JSON.stringify({ status: "ok", state: "cancelled" })}\n`, stderr: "" };
+     return { status: 0, stdout: `${JSON.stringify({ status: args[0] === "heal" ? "healed" : "moved-aside", retained: ["20261030-aaaa-delegated"] })}\n`, stderr: "" };
+   };
+@@ -60,11 +62,13 @@ const inspectWith = (producer) => ({ ...emptyInspect, registry: { status: "prese
+ 
+ // The ONE shared table. `expect.calls` is the delegated tool + first argv word list; `stopFailures` marks the real repair.
+ const TABLE = [
+-  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
++  { id: "heal", request: { kind: "heal", reason: "stale lock after a stopped dispatch" }, expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"], ["session-authority-repair.mjs", "inspect"]], retained: ["agent-pipeline/session-authority-abandoned/20261030-aaaa-delegated"] } },
+   { id: "slice-cancel budget", request: { kind: "slice-cancel", sliceId: "S-1", cancelClass: "budget", started: true, reason: "budget exhausted" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["S-1", "--class", "budget", "--started"] } },
+   { id: "slice-cancel integrated-elsewhere", request: { kind: "slice-cancel", sliceId: "S-2", cancelClass: "integrated-elsewhere", reason: "landed in another commit" }, expect: { exit: 0, code: "ok", calls: [["slice-queue.mjs", "cancel"]], argvHas: ["integrated-elsewhere"] } },
+   { id: "stop-failure-aside", request: { kind: "stop-failure-aside", reason: "diagnostic of a settled dispatch" }, setup: (ap) => { writeStopFailure(ap, "1", "D-1"); }, expect: { exit: 0, code: "moved-aside", calls: [], moved: 1 } },
+   { id: "move-aside unknown-registry-entry", request: { kind: "move-aside", reason: "unindexed registry entry" }, inspect: inspectWith({ producerId: "p", status: "reconcile-refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "unknown-registry-entry" }), expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]], argvHas: ["--no-goldfish-running"] } },
++  { id: "D203 move-aside of a producer still reconcile-refused after heal", request: { kind: "move-aside", reason: "member drift heal did not resolve" }, inspect: inspectWith({ producerId: "native", status: "reconcile-refused", code: "native-authority-member-drift", reason: "x" }), expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"], ["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]], argvHas: ["--no-goldfish-running"] } },
++  { id: "D203 move-aside stops after heal when heal resolved the reconcile-refused producer", request: { kind: "move-aside", reason: "member drift" }, inspect: [inspectWith({ producerId: "native", status: "reconcile-refused", code: "native-authority-member-drift", reason: "x" }), emptyInspect], expect: { exit: 0, code: "healed", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "heal"], ["session-authority-repair.mjs", "inspect"]] } },
+   { id: "move-aside native-managed-unknown-native-entry", request: { kind: "move-aside", reason: "unknown native entry" }, inspect: inspectWith({ producerId: "p", status: "reconcile-refused", code: "native-managed-unknown-native-entry", reason: "x" }), expect: { exit: 0, code: "moved-aside", calls: [["session-authority-repair.mjs", "inspect"], ["session-authority-repair.mjs", "move-aside"]] } },
+   // Refusals.
+   { id: "refuse: kind outside the list", request: { kind: "release-lock", reason: "r" }, expect: { exit: 2, code: "RR-OUTSIDE-LIST", calls: [], nextHas: "release-lock" } },
+@@ -106,6 +110,17 @@ for (const row of TABLE) {
+   }));
+ }
+ 
++test("D203: heal names the move-aside routine as the next step when a producer is still reconcile-refused after its delegate", () => withRepo((root) => {
++  const refused = inspectWith({ producerId: "native", status: "reconcile-refused", code: "native-authority-member-drift", reason: "x" });
++  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: stub(refused).spawn });
++  assert.equal(exit, 0);
++  assert.deepEqual(result.stillReconcileRefused, ["producer:native"]);
++  assert.match(result.next, /routine-repair\.mjs run move-aside --no-goldfish-running/u);
++  assert.match(result.next, /only when no Goldfish runs/u);
++  const clean = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: stub(emptyInspect).spawn });
++  assert.equal(clean.result.next, undefined);
++}));
++
+ test("stop-failure-aside moves the record aside under session-authority-abandoned and removes it from the diagnostics directory", () => withRepo((root, ap) => {
+   const name = writeStopFailure(ap, "2", "D-2");
+   const { exit, result } = runRoutineRepair({ kind: "stop-failure-aside", root, reason: "r" });
+@@ -243,7 +258,7 @@ test("heal retires settled pending states before its delegate runs, and reports
+   const { calls, spawn } = stub(inspectRows(rowOf(settled, "integrated-by-commit"), rowOf(ready, null)));
+   const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn, ...SETTLED_DEPS });
+   assert.equal(exit, 0, JSON.stringify(result));
+-  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "heal"]);
++  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "heal", "inspect"], "inspect, heal, then the D203 check");
+   assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+   assert.deepEqual(result.settledPending.keptPending.map((row) => row.name), [ready.name]);
+   assert.ok(!existsSync(join(commitDir(ap), settled.name)) && existsSync(join(commitDir(ap), ready.name)));
