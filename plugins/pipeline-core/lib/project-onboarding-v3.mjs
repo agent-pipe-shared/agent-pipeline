@@ -3363,7 +3363,14 @@ function designToImplementationHandoverAction(root, fs) {
         "pipeline.project-onboarding.v4", ["ready"]),
     };
   };
-  if (authority.status === "drifted" && authority.nextAction === "reopen-design") return reopenDesignAction();
+  if (authority.status === "drifted" && authority.nextAction === "reopen-design") {
+    // A stale approval offers the approval-keeping repair as a structured alternative next to reopen-design;
+    // the invalid-architecture-evidence case below never gets it.
+    const action = reopenDesignAction();
+    action.alternativeAction = commandAction([PO_AUTHORITY_REBIND_WRITER, "rebind-approval"], true, false,
+      "pipeline.rebind-approval.v1", ["verified"]);
+    return action;
+  }
   if (authority.status !== "observed" || !["approved", "implementing"].includes(authority.lifecycleStatus)) return null;
   // The approved PRD is the sole human decision. Its closed greenfield design
   // package may now be rendered deterministically before implementation; the

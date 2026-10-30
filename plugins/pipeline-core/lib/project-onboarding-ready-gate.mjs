@@ -262,8 +262,28 @@ function validReopenDesignActorInput(value) {
     && value.rejectNul === true;
 }
 
+// The stale-approval form also carries `alternativeAction`: the approval-keeping `rebind-approval`
+// command, pinned as exactly as reopen-design itself (one argv shape, one schema, one status).
+function validRebindApprovalCommand(value) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && Array.isArray(value.argv)
+    && value.argv.length === 2
+    && validPipelineStateScript(value.argv[0])
+    && value.argv[1] === "rebind-approval"
+    && value.mutation === true
+    && value.requiresConfirmation === false
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === "pipeline.rebind-approval.v1"
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["verified"]);
+}
+
 function validReopenDesignCollectAction(value) {
-  return exactKeys(value, ["kind", "inputs", "mutation", "requiresConfirmation", "guidance", "applyAction"])
+  const keys = ["kind", "inputs", "mutation", "requiresConfirmation", "guidance", "applyAction"];
+  const withAlternative = value !== null && typeof value === "object" && Object.hasOwn(value, "alternativeAction");
+  return exactKeys(value, withAlternative ? [...keys, "alternativeAction"] : keys)
+    && (!withAlternative || validRebindApprovalCommand(value.alternativeAction))
     && value.kind === "collect-input"
     && Array.isArray(value.inputs)
     && value.inputs.length === 1

@@ -517,12 +517,28 @@ function reopenDesignAction(guidance = REOPEN_STALE_GUIDANCE) {
   };
 }
 
+function rebindApprovalAction() {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [PIPELINE_STATE_SCRIPT, "rebind-approval"],
+    mutation: true,
+    requiresConfirmation: false,
+    expected: { schema: "pipeline.rebind-approval.v1", statuses: ["verified"] },
+  };
+}
+
+// A stale approval carries the approval-keeping rebind-approval as a structured alternative.
+function staleApprovalAction() {
+  return { ...reopenDesignAction(), alternativeAction: rebindApprovalAction() };
+}
+
 // What the producer publishes per lifecycle status (v3 :3041 stale approval, :3048 materialization required,
 // :3055-3060 invalid architecture evidence; the last two only in `approved` / `implementing`).
 const NEW_SHAPE_PRODUCER_CASES = [
   { lifecycleStatus: "approved", name: "materialization required", build: materializeArchitectureAction },
   { lifecycleStatus: "approved", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
-  { lifecycleStatus: "approved", name: "stale approval", build: () => reopenDesignAction() },
+  { lifecycleStatus: "approved", name: "stale approval", build: staleApprovalAction },
   { lifecycleStatus: "implementing", name: "materialization required", build: materializeArchitectureAction },
   { lifecycleStatus: "implementing", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
 ];
@@ -577,6 +593,8 @@ test("the new-shape fixtures mirror the literals the producer publishes (drift o
     `[PO_AUTHORITY_REBIND_WRITER, "materialize-architecture"],`,
     `"pipeline.architecture-design-materialization.v1",`,
     `["materialized"],`,
+    `action.alternativeAction = commandAction([PO_AUTHORITY_REBIND_WRITER, "rebind-approval"], true, false,`,
+    `"pipeline.rebind-approval.v1", ["verified"]);`,
     REOPEN_STALE_GUIDANCE,
     REOPEN_INVALID_EVIDENCE_GUIDANCE.replace(" (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED)", " (${architecture.code ?? \"ARCHITECTURE-DESIGN-INVALID\"})"),
   ]) {
@@ -667,6 +685,34 @@ test("the new shapes are bound to the plugin's own resolved pipeline-state.mjs, 
     const reopen = reopenDesignAction();
     reopen.applyAction.argv[0] = script;
     assertInvalidObservation(reopen, `reopen-design via ${script}`);
+    const stale = staleApprovalAction();
+    stale.alternativeAction.argv[0] = script;
+    assertInvalidObservation(stale, `rebind-approval alternative via ${script}`);
+  }
+});
+
+test("the rebind-approval alternative is exact about its argv, flags and expected result", () => {
+  const mutations = [
+    ["other subcommand", (a) => { a.alternativeAction.argv[1] = "reopen-design"; }],
+    ["extra argv", (a) => { a.alternativeAction.argv.push("--force"); }],
+    ["missing subcommand", (a) => { a.alternativeAction.argv = [a.alternativeAction.argv[0]]; }],
+    ["foreign script", (a) => { a.alternativeAction.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "pipeline-state.mjs"); }],
+    ["non-node executable", (a) => { a.alternativeAction.executable = "bash"; }],
+    ["not mutating", (a) => { a.alternativeAction.mutation = false; }],
+    ["confirmation required", (a) => { a.alternativeAction.requiresConfirmation = true; }],
+    ["other schema", (a) => { a.alternativeAction.expected.schema = "pipeline.other.v1"; }],
+    ["other status", (a) => { a.alternativeAction.expected.statuses = ["refused"]; }],
+    ["extra status", (a) => { a.alternativeAction.expected.statuses = ["verified", "refused"]; }],
+    ["extra key", (a) => { a.alternativeAction.unexpected = true; }],
+    ["collect-input kind", (a) => { a.alternativeAction.kind = "collect-input"; }],
+    ["null alternative", (a) => { a.alternativeAction = null; }],
+    ["alternative is the reopen-design apply action", (a) => { a.alternativeAction = a.applyAction; }],
+    ["second extra key next to the alternative", (a) => { a.unexpected = true; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const action = staleApprovalAction();
+    mutate(action);
+    assertInvalidObservation(action, `rebind-approval alternative: ${label}`);
   }
 });
 
