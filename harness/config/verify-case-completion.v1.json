@@ -862,6 +862,12 @@
       "disposition": "required"
     },
     {
+      "name": "guard-grep-max-count-read-tests",
+      "path": "plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
       "name": "guard-handover-size-tests",
       "path": "plugins/pipeline-core/hooks/guard-handover-size.test.mjs",
       "disposition": "legacy-process-only",
@@ -1854,6 +1860,12 @@
       "name": "security-remote-identity-tests",
       "path": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
       "disposition": "required"
+    },
+    {
+      "name": "security-scan-large-inventory-tests",
+      "path": "plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
       "name": "security-scanner-diagnostics-tests",

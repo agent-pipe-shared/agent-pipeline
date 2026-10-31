@@ -207,6 +207,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",154],
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
+    ["guard-grep-max-count-read-tests","plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs","node-test-single",9],
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
     ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",58], // W7-R7 (QG-04): 57->58, the restated HGOD005/HGOD011 (c206f3370) assert the denial-drift code; classifier unchanged
     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],
@@ -239,6 +240,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["runtime-handover-writer-tests","plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs","top-level-assertions",14],
     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+    ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
     ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",288],
     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
@@ -271,7 +273,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 386);
+  assert.equal(result.registryCount, 388);
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -352,6 +354,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "g23-read-help-tests",
     "g29-public-handover-admission-tests",
     "g6-aggregate-native-boundaries-tests",
+    "guard-grep-max-count-read-tests",
+    "security-scan-large-inventory-tests",
     "mid-session-hook-refresh-tests",
     "pipeline-state-calibration-recovery-tests",
     "po-human-approval-signing-handoff-tests",
