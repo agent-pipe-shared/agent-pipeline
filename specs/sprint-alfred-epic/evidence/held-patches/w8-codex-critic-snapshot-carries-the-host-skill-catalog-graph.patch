@@ -1,0 +1,33 @@
+diff --git a/plugins/pipeline-core/scripts/codex-critic-app-server.mjs b/plugins/pipeline-core/scripts/codex-critic-app-server.mjs
+index 39e649668..429cad2a2 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-app-server.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-app-server.mjs
+@@ -123,6 +123,12 @@ function snapshotRuleset(candidateRoot) {
+     [null, "lib/passive-read-policy.mjs"],
+     [null, "lib/machine-plane.mjs"],
+     [null, "lib/po-key-directory.mjs"],
++    // passive-read-policy.mjs imports the declared host skill catalog (AC-209), which reaches the private-boundary chain.
++    [null, "lib/host-skill-catalog.mjs"],
++    [null, "lib/private-boundary.mjs"],
++    [null, "lib/hardened-private-directory.mjs"],
++    [null, "lib/windows-private-state.mjs"],
++    [null, "lib/successful-spawn.mjs"],
+   ];
+   const files = definitions.map(([binding, relativePath]) => {
+     const path = physicalRulesetFile(relativePath);
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index e3b2dbea7..d7a08eaad 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -2267,6 +2267,11 @@ await checkAsync("codex-critic-app-server consumer accepts a complete, valid chi
+     "lib/passive-read-policy.mjs",
+     "lib/machine-plane.mjs",
+     "lib/po-key-directory.mjs",
++    "lib/host-skill-catalog.mjs",
++    "lib/private-boundary.mjs",
++    "lib/hardened-private-directory.mjs",
++    "lib/windows-private-state.mjs",
++    "lib/successful-spawn.mjs",
+   ].map((path) => ({ path, sha256: createHash("sha256").update(readFileSync(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core", path))).digest("hex") }));
+   expectedBindings.childModuleGraphSha256 = createHash("sha256").update(`${JSON.stringify(graph)}\n`).digest("hex");
+   assert.deepEqual(result.rulesetBindings, expectedBindings);
