@@ -10,6 +10,8 @@ import { sha256Canonical } from "./review-economy.mjs";
 export const CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA = "pipeline.critic-correction-input-bindings.v1";
 export const ROLE_RETAINED_PRIOR_RESULT = "retained prior result";
 export const ROLE_PROJECT_STATE_RECORD = "project-state record";
+export const ROLE_FINDING_DISPOSITION_RECORD = "finding-disposition record";
+export const FINDING_RECORDS_FIELD = "criticFindingRecordPaths";
 const ABSENT = "absent";
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const ZERO_ID = /^0+$/u;
@@ -40,12 +42,14 @@ function gitOrRange(repoRoot, args, what) {
   return result.stdout;
 }
 
-function readHandover(repoRoot, head) {
+function readCalibration(repoRoot, head) {
   const shown = git(repoRoot, ["show", `${head}:project/pipeline.json`]);
   if (!shown.ok) fail("CCI-CALIBRATION", "project/pipeline.json is not readable at the head commit");
-  let parsed;
-  try { parsed = JSON.parse(shown.stdout); } catch { fail("CCI-CALIBRATION", "project/pipeline.json is not valid JSON"); }
-  const handover = parsed?.handover;
+  try { return JSON.parse(shown.stdout); } catch { fail("CCI-CALIBRATION", "project/pipeline.json is not valid JSON"); }
+}
+
+function handoverOf(calibration) {
+  const handover = calibration?.handover;
   if (typeof handover !== "string" || handover === "" || handover.startsWith("/") || handover.includes("\\")
     || handover.split("/").some((part) => part === "" || part === "." || part === "..")) {
     fail("CCI-CALIBRATION", "the calibration handover field is missing or not a repository-relative path");
@@ -53,10 +57,26 @@ function readHandover(repoRoot, head) {
   return handover;
 }
 
-function classify(path, handover) {
+// D213: the calibration names, positively, the files that quote earlier Critic findings and carry no source or operative
+// contract. An entry is one exact repository-relative file path, or a directory prefix ending in "/"; no globs. A file never
+// declares itself: only this committed list does. An absent field means none; a malformed one is refused, never ignored.
+const FINDING_RECORD_LIMIT = 64;
+function findingRecordsOf(calibration) {
+  const listed = calibration?.[FINDING_RECORDS_FIELD];
+  if (listed === undefined) return [];
+  const invalid = (entry) => typeof entry !== "string" || entry === "" || entry.startsWith("/") || entry.includes("\\") || entry.includes("*")
+    || entry.replace(/\/$/u, "").split("/").some((part) => part === "" || part === "." || part === "..");
+  if (!Array.isArray(listed) || listed.length > FINDING_RECORD_LIMIT || listed.some(invalid)) {
+    fail("CCI-FINDING-RECORDS", `the calibration field ${FINDING_RECORDS_FIELD} must be an array of at most ${FINDING_RECORD_LIMIT} repository-relative file paths or directory prefixes ending in "/" (no globs)`);
+  }
+  return [...new Set(listed)].sort();
+}
+
+function classify(path, handover, findingRecords = []) {
   if (handover !== null && path === handover) return ROLE_PROJECT_STATE_RECORD;
   if (handover !== null && posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
   if (RETAINED_PATTERN.test(path)) return ROLE_RETAINED_PRIOR_RESULT;
+  if (findingRecords.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry))) return ROLE_FINDING_DISPOSITION_RECORD;
   return "source";
 }
 
@@ -92,11 +112,22 @@ export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, proj
     if (!git(repoRoot, ["merge-base", "--is-ancestor", baseCommit, headCommit]).ok) fail("CCI-RANGE", "base is not an ancestor of head");
     const treeOf = (commit) => gitOrRange(repoRoot, ["rev-parse", `${commit}^{tree}`], "resolve tree").trim();
     let handover;
+    let findingRecords = [];
     if (projectStateOptional === true) {
-      try { handover = readHandover(repoRoot, headCommit); } catch (error) {
+      // An unreadable calibration then means "no project-state paths and no finding records"; a malformed finding-record list is still refused.
+      let calibration = null;
+      try { calibration = readCalibration(repoRoot, headCommit); } catch (error) {
+        if (!(error instanceof CriticCorrectionInputBindingsError && error.code === "CCI-CALIBRATION")) throw error;
+      }
+      try { handover = calibration === null ? null : handoverOf(calibration); } catch (error) {
         if (error instanceof CriticCorrectionInputBindingsError && error.code === "CCI-CALIBRATION") handover = null; else throw error;
       }
-    } else handover = readHandover(repoRoot, headCommit);
+      findingRecords = calibration === null ? [] : findingRecordsOf(calibration);
+    } else {
+      const calibration = readCalibration(repoRoot, headCommit);
+      handover = handoverOf(calibration);
+      findingRecords = findingRecordsOf(calibration);
+    }
     const listed = gitOrRange(repoRoot, ["rev-list", "--reverse", "--parents", `${baseCommit}..${headCommit}`], "list range").split("\n").filter(Boolean);
     const commits = listed.map((line) => { const [commit, ...parents] = line.split(" "); return { commit, parents, tree: treeOf(commit) }; });
     const excluded = new Map();
@@ -105,7 +136,7 @@ export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, proj
       const from = parents[0] ?? EMPTY_TREE;
       const raw = gitOrRange(repoRoot, ["diff-tree", "-r", "-z", "-M", "--raw", "--no-textconv", "--no-ext-diff", from, commit], "diff-tree");
       for (const entry of parseRaw(raw)) {
-        const roles = entry.paths.map((p) => classify(p, handover));
+        const roles = entry.paths.map((p) => classify(p, handover, findingRecords));
         if (new Set(roles).size > 1) fail("CCI-MIXED", `a ${CHANGE_NAMES[entry.status] ?? "change"} crosses classes (${roles.join(" / ")})`);
         entry.paths.forEach((path, index) => {
           if (roles[index] === "source") { sources.add(path); return; }
@@ -142,7 +173,7 @@ export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, proj
 }
 
 export function bindingsRoleCounts(document) {
-  const counts = { [ROLE_RETAINED_PRIOR_RESULT]: 0, [ROLE_PROJECT_STATE_RECORD]: 0, source: document.sourcePaths.length };
+  const counts = { [ROLE_RETAINED_PRIOR_RESULT]: 0, [ROLE_PROJECT_STATE_RECORD]: 0, [ROLE_FINDING_DISPOSITION_RECORD]: 0, source: document.sourcePaths.length };
   for (const entry of document.exclusions) counts[entry.role] += 1;
   return counts;
 }

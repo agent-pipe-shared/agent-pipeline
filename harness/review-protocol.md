@@ -105,6 +105,16 @@ Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-corr
 them; the command refuses a mixed path (CCI-MIXED), and an unknown role, a
 refused path or missing bindings for such paths still stops the review.
 
+The role finding-disposition record is admissible only for the files the project
+calibration names, positively and in the committed list `criticFindingRecordPaths`
+(`project/pipeline.json`): each entry is one exact repository-relative file path or
+a directory prefix ending in `/`, no globs, at most 64 entries. The project lists
+only files that quote or dispose earlier Critic findings and carry no source and no
+operative contract; a file never declares itself (no marker in the file counts), and
+a malformed list is refused (CCI-FINDING-RECORDS), never ignored. The role is an
+exclusion binding only, exactly like the project-state record: the Critic verifies
+the blob SHA-256 and mode without emitting bytes and never reads the file.
+
 The Critic verifies the commit enumeration and complete path partition using
 metadata-only Git observations before requesting any patch body. Include
 per-commit changes as well as the endpoint comparison so an intermediate edit

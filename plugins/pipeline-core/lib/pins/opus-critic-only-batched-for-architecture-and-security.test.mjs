@@ -221,6 +221,16 @@ test("CCI canon names the project-state record role and the derive command in bo
   assert.equal(read(tpl), read(tplCopy), "the two template copies are byte-identical");
 });
 
+test("CCI canon (D213) names the finding-disposition record role as calibration-listed only (criticFindingRecordPaths) in the template copies, the protocol, the role and the skill", () => {
+  const tpl = "templates/prompts/critic-review.md";
+  const tplCopy = "plugins/pipeline-core/templates/prompts/critic-review.md";
+  for (const p of [tpl, tplCopy, "harness/review-protocol.md", "plugins/pipeline-core/skills/critic-review/SKILL.md"]) {
+    assert.ok(read(p).includes("criticFindingRecordPaths"), `${p} names the calibration field that lists finding-disposition records`);
+  }
+  for (const p of ["roles/critic.md", "plugins/pipeline-core/roles/critic.md"]) assert.ok(read(p).includes("finding-disposition record"), `${p} names the role as a binding, not readable material`);
+  assert.equal(read("roles/critic.md"), read("plugins/pipeline-core/roles/critic.md"), "the two role copies are byte-identical");
+});
+
 test("work item 3: an Opus choice on the Requested route line also fires without rationale", () => {
   const prompt = "Ruleset SHA: abc123def456\n- Requested route: claude-opus-5 at max\nDispatch metadata: tool budget 30";
   const r = dispatchFindings({ subagentType: "pipeline-core:critic", prompt });

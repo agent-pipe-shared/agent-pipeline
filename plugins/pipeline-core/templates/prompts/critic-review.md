@@ -259,8 +259,12 @@ environment dump or a credential read; it reads such strings as text only.
   handover/state file and a `pipeline-handover*.md` file in the same directory;
   it is an exclusion binding only: verify its blob SHA-256 and mode without
   emitting bytes and never read it. The forbidden-material rule for handover,
-  state and history is NOT relaxed. An unknown role, a path the command refused
-  (CCI-MIXED) or missing bindings for such paths still stops the review.
+  state and history is NOT relaxed. A finding-disposition record is admissible
+  only for the files the project calibration lists in `criticFindingRecordPaths`
+  (exact file paths or directory prefixes ending in `/`, no globs); a file never
+  declares itself, and the same exclusion-binding-only rule applies. An unknown
+  role, a path the command refused (CCI-MIXED) or missing bindings for such
+  paths still stops the review.
   First use metadata-only Git observations to reconcile every enumerated
   commit's changes and the endpoint comparison with the source/report partition;
   verify excluded blob digests without emitting their bytes. Then reconstruct

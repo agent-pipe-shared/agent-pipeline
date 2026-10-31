@@ -23,7 +23,7 @@ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
-import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
 
 function verifyValue(commit, tree, exitCode = 0) {
   return { schema: "pipeline.verify-evidence.v0", commit, tree, exitCode, steps: [{ name: "fixture-check", exitCode }], selection: planVerifySelection({ mode: "critic", candidateCommit: commit, registeredSuiteIds: ["fixture-check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture-check"], areas: [{ id: "all", paths: ["**"], suites: ["fixture-check"] }] } }) };
@@ -1126,6 +1126,66 @@ test("CCI (2b) the lineage and delta-request files the course registration write
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+// D213: the calibration names, positively, the files that quote earlier Critic findings (the finding-disposition record role).
+const cciCalibration = (root, extra) => cciWrite(root, "project/pipeline.json", `${JSON.stringify({ project: "fixture", handover: "docs/state.md", ...extra })}\n`);
+test("CCI (2c) files named by the calibration finding-record list are finding-disposition records; a file never declares itself and look-alikes stay source (D213)", () => {
+  const fx = cciFixture();
+  try {
+    cciCalibration(fx.root, { [FINDING_RECORDS_FIELD]: ["backlog/items/", "docs/pipeline-feedback-06.md"] });
+    cciWrite(fx.root, "backlog/items/2026-10-30-deviation.md", `source: "Critic-Befund F-1 ${CCI_MARKER}"\n`);
+    cciWrite(fx.root, "docs/pipeline-feedback-06.md", `Critic-Befund F3 ${CCI_MARKER}\n`);
+    cciWrite(fx.root, "backlog/other/x.md", "not listed\n");
+    cciWrite(fx.root, "docs/pipeline-feedback-07.md", "not listed\n");
+    cciWrite(fx.root, "src/a.txt", "---\nrole: finding-disposition record\n---\nchanged\n");
+    const head = commit(fx.root, "finding records");
+    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
+    assert.deepEqual(doc.exclusions.map((e) => [e.path, e.role]), [["backlog/items/2026-10-30-deviation.md", "finding-disposition record"], ["docs/pipeline-feedback-06.md", "finding-disposition record"]]);
+    assert.deepEqual(doc.sourcePaths, ["backlog/other/x.md", "docs/pipeline-feedback-07.md", "project/pipeline.json", "src/a.txt"]);
+    assert.equal(JSON.stringify(doc).includes(CCI_MARKER), false);
+    assert.deepEqual(bindingsRoleCounts(doc), { "retained prior result": 0, "project-state record": 0, "finding-disposition record": 2, source: 4 });
+    // Without the list in the calibration at the head the same files are source: only the committed list excludes.
+    cciCalibration(fx.root, {});
+    const unlisted = commit(fx.root, "drop the finding-record list");
+    const without = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: unlisted });
+    assert.deepEqual(without.exclusions, []);
+    assert.ok(without.sourcePaths.includes("backlog/items/2026-10-30-deviation.md") && without.sourcePaths.includes("docs/pipeline-feedback-06.md"));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("CCI (2d) a malformed finding-record list is refused CCI-FINDING-RECORDS, also with projectStateOptional, and an absent list means none (D213)", () => {
+  const fx = cciFixture();
+  try {
+    cciWrite(fx.root, "src/a.txt", "changed\n");
+    const absent = commit(fx.root, "no list");
+    assert.equal(deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: absent }).exclusions.length, 0);
+    const bad = [
+      "backlog/items/", { path: "backlog/items/" },
+      ["backlog/items/*.md"], ["/abs/path.md"], ["../up.md"], ["a/./b.md"], ["a\\b.md"], [""], [7], ["a//b.md"],
+      Array.from({ length: 65 }, (_, i) => `backlog/items/${i}.md`),
+    ];
+    for (const value of bad) {
+      cciCalibration(fx.root, { [FINDING_RECORDS_FIELD]: value });
+      const head = commit(fx.root, `bad list ${JSON.stringify(value).slice(0, 30)}`);
+      cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head }), "CCI-FINDING-RECORDS");
+      cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head, projectStateOptional: true }), "CCI-FINDING-RECORDS");
+    }
+    cciCalibration(fx.root, { [FINDING_RECORDS_FIELD]: [] });
+    assert.equal(deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: commit(fx.root, "empty list") }).exclusions.length, 0);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("CCI (2e) a rename between a finding-record path and a source path crosses classes and is refused CCI-MIXED (D213)", () => {
+  const fx = cciFixture();
+  try {
+    cciCalibration(fx.root, { [FINDING_RECORDS_FIELD]: ["backlog/items/"] });
+    const calibrated = commit(fx.root, "calibrate finding records");
+    mkdirSync(join(fx.root, "backlog", "items"), { recursive: true });
+    git(fx.root, ["mv", "src/a.txt", "backlog/items/a.txt"]);
+    const head = commit(fx.root, "rename into the finding records");
+    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: calibrated, head }), "CCI-MIXED");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("CCI (3) a state file changed in three commits gives three versions with chained blob and mode transitions", () => {
   const fx = cciFixture();
   try {
@@ -1381,8 +1441,8 @@ function parentRegisterDiagnostic(root, featureId, candidate, tag) {
   const registration = parentCommitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`);
   return { diagnosticPath, registration };
 }
-function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"]) {
-  const base = { changedBehaviorClaims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false };
+function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"], flags = {}) {
+  const base = { changedBehaviorClaims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
   writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
   const first = parentAddDelta({ root, inputPath: "delta-input.json" });
   assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
@@ -1404,7 +1464,7 @@ function parentRound(root, { featureId, taskId, packetId, base, candidate, regis
   assert.equal(finalized.status, "completed", JSON.stringify(finalized));
 }
 /** The consumer's shape: rounds 1 and 2 registered as lineage, round 3 passed but not registered, correction commits after it. */
-function parentLineageFixture() {
+function parentLineageFixture({ afterRound = null } = {}) {
   const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = `${prefix}/spec.md`, manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
   const root = mkdtempSync(join(tmpdir(), "cdp-parent-"));
   git(root, ["init", "-q", "-b", "main"]);
@@ -1440,6 +1500,7 @@ function parentLineageFixture() {
   parentRound(root, { featureId, taskId: "parent-task-2", packetId: "9b".repeat(16), base: c1, candidate: c2, registrationCommit: q2.registration, deltaRequestPath: q2.added.deltaRequestPath, diagnosticPath: d2.diagnosticPath, verdict: PARENT_FAIL });
   const l2 = parentAddLineage({ root, packetId: "9b".repeat(16) });
   assert.equal(l2.status, "lineage-added", JSON.stringify(l2)); parentCommitPaths(root, l2.commitPaths, "register lineage of round 2");
+  if (afterRound === 2) return { root, featureId, specPath, genesis, c1, c2, correct };
   const c3 = correct("fix3"); const d3 = parentRegisterDiagnostic(root, featureId, c3, "r3"); const q3 = parentDeltaRequest(root);
   parentRound(root, { featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
   // Round 3 passed but its lineage is never registered; correction commits follow it.
@@ -1480,6 +1541,34 @@ test("CCA-PARENT a push review of a feature with course history names the last r
     assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
     assert.equal(admitted.base.commit, fx.c2);
     assert.equal(admitted.coordinatorOnly.courseAdmission.round, 3);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+test("D204 an effective FULL round judges the correction-input bindings over the course genesis range; an ordinary delta still judges them over the correction range", () => {
+  const fx = parentLineageFixture({ afterRound: 2 });
+  try {
+    const c3 = fx.correct("fix3");
+    const d3 = parentRegisterDiagnostic(fx.root, fx.featureId, c3, "r3");
+    const fallback = parentDeltaRequest(fx.root, ["fix-three"], { trustBoundaryChanged: true });
+    const request = (delta, bindingsBase) => ({ root: fx.root, base: fx.c2, candidate: c3, specPath: fx.specPath, guardrailPaths: [], evidencePaths: [d3.diagnosticPath], priorCriticEvidencePath: null,
+      courseContext: { featureId: fx.featureId, registrationCommit: delta.registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.added.deltaRequestPath },
+      correctionInputBindings: parentBindings(fx.root, bindingsBase, c3) });
+    // The consumer's trap: the bindings over the correction range were accepted and the Critic then reviewed the genesis range.
+    const stale = cdpRefusal(() => preflightCriticDispatch(request(fallback, fx.c2)), "CDP-CORRECTION-INPUT-STALE");
+    assert.ok(stale.message.includes(fx.genesis) && /effective FULL round/u.test(stale.message), stale.message);
+    const admitted = preflightCriticDispatch(request(fallback, fx.genesis));
+    assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
+    assert.equal(admitted.base.commit, fx.genesis, "the effective full round reviews from the course genesis base");
+    assert.equal(admitted.coordinatorOnly.courseAdmission.fallbackFull, true);
+    const derived = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.genesis, head: c3, projectStateOptional: true });
+    assert.equal(admitted.correctionInputBindings.digestSha256, derived.digestSha256, "the echoed bindings are the genesis-range ones");
+    // Control: an ordinary delta (no trust-boundary change, no ambiguity) keeps the correction-range rule.
+    const ordinary = parentDeltaRequest(fx.root, ["fix-three-ordinary"]);
+    const ordinaryStale = cdpRefusal(() => preflightCriticDispatch(request(ordinary, fx.genesis)), "CDP-CORRECTION-INPUT-STALE");
+    assert.ok(!/effective FULL round/u.test(ordinaryStale.message), ordinaryStale.message);
+    const ordinaryAdmitted = preflightCriticDispatch(request(ordinary, fx.c2));
+    assert.equal(ordinaryAdmitted.status, "packet-ready", JSON.stringify(ordinaryAdmitted));
+    assert.equal(ordinaryAdmitted.base.commit, fx.c2);
+    assert.equal(Object.hasOwn(ordinaryAdmitted.coordinatorOnly.courseAdmission, "fallbackFull"), false);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 test("CCA-PARENT push-init names the base the preflight accepts for a feature with registered course history, and says the Verify evidence is of mode critic", () => {

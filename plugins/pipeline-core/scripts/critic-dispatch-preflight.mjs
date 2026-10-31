@@ -195,7 +195,7 @@ function candidateBytes(root, candidate, path) {
 }
 
 const CCI_COMMAND_HINT = "Run critic-correction-input-bindings.mjs derive --base <base> --head <candidate> and pass its file as correctionInputBindings";
-function checkCorrectionInputBindings(root, baseCommit, candidateCommit, reference) {
+function checkCorrectionInputBindings(root, baseCommit, candidateCommit, reference, hint = CCI_COMMAND_HINT) {
   let derived;
   try {
     try { derived = deriveCriticCorrectionInputBindings({ repoRoot: root, base: baseCommit, head: candidateCommit }); }
@@ -211,14 +211,14 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
   }
   if (reference === null || reference === undefined) {
     if (derived.exclusions.length === 0) return null;
-    fail("CDP-CORRECTION-INPUT-REQUIRED", `${CCI_COMMAND_HINT}; the range contains project-state or retained-result paths.`);
+    fail("CDP-CORRECTION-INPUT-REQUIRED", `${hint}; the range contains project-state or retained-result paths.`);
   }
   const path = normalizePath(reference, "correction input bindings path");
   if (!path.startsWith("scratch/")) fail("CDP-PATH", "correction input bindings path must be under scratch/.");
   let given;
   try { given = JSON.parse(localEvidence(root, path)); } catch { given = null; }
   if (!isObject(given) || given.digestSha256 !== derived.digestSha256 || sha256Canonical(given) !== sha256Canonical(derived)) {
-    fail("CDP-CORRECTION-INPUT-STALE", `${CCI_COMMAND_HINT}; the given bindings file is unreadable or does not match this range.`);
+    fail("CDP-CORRECTION-INPUT-STALE", `${hint}; the given bindings file is unreadable or does not match this range.`);
   }
   return { path, digestSha256: derived.digestSha256 };
 }
@@ -321,7 +321,18 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
   sourceCandidate = { commit: candidateCommit, tree: candidateTree };
   if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
-  const correctionInputEcho = scope === null && baseCommit !== null ? checkCorrectionInputBindings(realRoot, baseCommit, candidateCommit, correctionInputBindings) : null;
+  let correctionInputEcho = null;
+  let deferredBindingsRefusal = null;
+  if (scope === null && baseCommit !== null) {
+    try { correctionInputEcho = checkCorrectionInputBindings(realRoot, baseCommit, candidateCommit, correctionInputBindings); }
+    catch (error) {
+      // D204: a delta request may be admitted as an effective FULL round, which reviews the course genesis base .. candidate; its
+      // bindings must cover that range, so a stale or missing file over the correction range is judged after the admission.
+      const deferrable = courseContext?.deltaRequestPath != null && ["CDP-CORRECTION-INPUT-STALE", "CDP-CORRECTION-INPUT-REQUIRED"].includes(error?.code);
+      if (!deferrable) throw error;
+      deferredBindingsRefusal = error;
+    }
+  }
 
   stage = "paths";
   const spec = normalizePath(specPath, "spec path");
@@ -468,6 +479,16 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   }
 
   if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
+
+  if (courseAdmission?.fallbackFull === true && scope === null && baseCommit !== null) {
+    stage = "candidate";
+    const genesis = reviewBase.commit;
+    correctionInputEcho = checkCorrectionInputBindings(realRoot, genesis, candidateCommit, correctionInputBindings,
+      `${CCI_COMMAND_HINT.replace("<base>", genesis)} (this round is an effective FULL round: its bindings cover the course genesis base ${genesis} to the candidate, not the correction range)`);
+  } else if (deferredBindingsRefusal !== null) {
+    stage = "candidate";
+    throw deferredBindingsRefusal;
+  }
 
   // N13: the dispatch record admission `session-critic-finalizer admit` applies later, asked now, so this tool no longer
   // says packet-ready for a task id that admit will refuse. Optional: without --task-id nothing changes.

@@ -1111,11 +1111,14 @@ const d204Delta = (fx, flag) => {
   assert.equal(delta.status, "delta-request-added", JSON.stringify(delta));
   return { delta, registration: pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request") };
 };
-const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration }) => {
+// bindingsBase: the base of the correction-input bindings. It is the round's own base for an ordinary diff round, and the course
+// genesis base for an effective full round (D204 + D218: that round reviews genesis base .. candidate, so its bindings must
+// cover that range; the older case derived them over the correction range, which the Critic then rejected as covering 20 of 248 commits).
+const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration, bindingsBase = base }) => {
   const specPath = `specs/${fx.featureId}/spec.md`, taskId = `feature-held-task-d204-${n}`, packetId = (0xd0 + n).toString(16).repeat(16);
   const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
   writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
-  const preflightInput = { root: fx.root, base, candidate, specPath, guardrailPaths: [], evidencePaths: [diagnostic], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, base, candidate) };
+  const preflightInput = { root: fx.root, base, candidate, specPath, guardrailPaths: [], evidencePaths: [diagnostic], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, bindingsBase, candidate) };
   const preflight = preflightCriticDispatch(preflightInput);
   assert.equal(preflight.status, "packet-ready", `round ${n} preflight: ${JSON.stringify(preflight)}`);
   assert.equal(preflight.coordinatorOnly.courseAdmission.round, n);
@@ -1148,7 +1151,7 @@ for (const [flag, reason] of [["trustBoundaryChanged", "trust-boundary-change"],
     assert.equal(d3.delta.nextRoundReason, reason, "stage 3: ...and why");
     const admission3 = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: c1, candidateCommit: c2, registrationCommit: d3.registration, requestedMode: "delta", deltaRequestPath: d3.delta.deltaRequestPath });
     assert.deepEqual([admission3.decision.status, admission3.decision.mode, admission3.decision.code, admission3.decision.reason], ["admitted", "full", "RE-DELTA-FALLBACK-FULL", reason]);
-    const r3 = d204Round(fx, { n: 3, base: c1, candidate: c2, diagnostic: diag2, delta: d3.delta, registration: d3.registration });
+    const r3 = d204Round(fx, { n: 3, base: c1, candidate: c2, diagnostic: diag2, delta: d3.delta, registration: d3.registration, bindingsBase: genesisBase });
     assert.equal(r3.preflight.base.commit, genesisBase, "stage b: the packet reviews the whole feature range from the course genesis base");
     assert.equal(r3.preflight.dispatch.reviewerInput.baseCommit, genesisBase);
     assert.equal(r3.lineage.course.reviewRound, 3);
