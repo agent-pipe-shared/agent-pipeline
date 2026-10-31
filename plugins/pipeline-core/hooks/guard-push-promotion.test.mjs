@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { commitApprovedMiniFixtureState } from "../lib/verify-selection-fixture.mjs";
 import { createReleasePromotionEnvelope, SECURITY_EVIDENCE_DEFAULT_PATH } from "../lib/release-promotion-envelope.mjs";
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -74,6 +75,9 @@ function runGuard(cmd, repoDir) {
 nodeTest("valid promotion envelope allows record-only commit", () => {
       const dir = freshRepo("allow");
       try {
+        // The source commit carries an approved low-rigor state, which waives the publication review (272d0f668), so
+        // the case reaches the promotion envelope it tests (the same fixture fix as the other guard-push allow cases).
+        commitApprovedMiniFixtureState(dir);
         const commitSResult = gitAt(dir, "rev-parse", "HEAD");
         assert.equal(commitSResult.status, 0, "fixture source commit lookup failed");
         const commitS = commitSResult.stdout.trim();
