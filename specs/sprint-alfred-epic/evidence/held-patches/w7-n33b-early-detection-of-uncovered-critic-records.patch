@@ -1,0 +1,466 @@
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 6e6c4768d..47859e45d 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -23,6 +23,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
++import { criticCoverageAdvisory, listUncoveredCriticRecords } from "./dispatch-record-write.mjs";
+ import {
+   CriticGuardrailDerivationError,
+   deriveRequiredCriticGuardrails,
+@@ -520,6 +521,21 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   }
+ }
+ 
++/**
++ * D212 (N33 D) early detection for the ready result that is PRINTED to a person or script: the Critic-required dispatch records whose
++ * commit lies in the reviewed range (base, candidate] and that no Critic evidence covers yet, so the Critic dispatch can include them
++ * and the addendum command is known before the feature close. Additive and advisory: the status stays packet-ready, nothing new
++ * refuses, and `preflightCriticDispatch` itself is untouched. That separation is deliberate: the session finalizer binds the library
++ * result by digest at admit and again at finalize, so a field that changes while a review runs (a record or an addendum written in
++ * between) would turn this notice into a refusal there. The coverage rule is the shared evaluation; this only supplies the range.
++ */
++export function preflightCriticDispatchWithCoverage(input, observer = null) {
++  const result = preflightCriticDispatch(input, observer);
++  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return result;
++  const advisory = criticCoverageAdvisory(listUncoveredCriticRecords({ root: input.root, range: { base: result.base?.commit ?? null, head: result.candidate.commit } }));
++  return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
++}
++
+ /**
+  * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
+  * task id, across every location ADR-0063 names as an evidence home. This is
+@@ -625,7 +641,7 @@ if (isDirectInvocation(import.meta.url)) {
+       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
+       process.stdout.write(`${JSON.stringify(result)}\n`);
+     } else {
+-      const result = preflightCriticDispatch(args);
++      const result = preflightCriticDispatchWithCoverage(args);
+       process.stdout.write(`${JSON.stringify(result)}\n`);
+       if (result.status !== "packet-ready") process.exitCode = 1;
+     }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 6fc165928..0b9cacb11 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -11,6 +11,7 @@ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CDPF" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ 
+ import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
++import * as preflightModule from "./critic-dispatch-preflight.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import childProcess from "node:child_process";
+ import fs from "node:fs";
+@@ -1546,4 +1547,60 @@ test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// N33 D (D212): early detection. The ready result a person or script reads lists the Critic-required records of the reviewed range that no
++// Critic evidence covers yet, so the Critic dispatch can include them. Additive and advisory: no refusal, and the library result the
++// session finalizer binds by digest is left byte-identical.
++const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
++function n33bRequiredRecord(root, taskId, commitSha) {
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [commitSha], candidateCommit: commitSha, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["specs/spec.md"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), `${JSON.stringify(record)}\n`);
++}
++test("N33B the ready result lists the Critic-required records of the reviewed range without covering evidence, with the next command; a record outside the range is not listed; the library result is unchanged", () => {
++  const fx = fixture();
++  try {
++    n33bRequiredRecord(fx.root, "N33B-INSIDE", fx.candidate);
++    n33bRequiredRecord(fx.root, "N33B-AT-BASE", fx.base);
++    const library = preflightCriticDispatch(input(fx));
++    assert.equal(library.status, "packet-ready");
++    assert.equal(Object.hasOwn(library, "criticCoverageAdvisory"), false, "the library result is digest-bound by the session finalizer and must not vary with evidence written during a review");
++    const ready = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
++    assert.equal(ready.status, "packet-ready", "early detection must never refuse");
++    const advisory = ready.criticCoverageAdvisory;
++    assert.equal(advisory.schema, "pipeline.critic-coverage-advisory.v1");
++    assert.equal(advisory.code, "CRITIC-COVERAGE-PENDING");
++    assert.deepEqual(advisory.records.map((entry) => entry.taskId), ["N33B-INSIDE"]);
++    assert.equal(advisory.records[0].recordPath, "evidence/dispatch-record-N33B-INSIDE.json");
++    assert.equal(advisory.records[0].candidateCommit, fx.candidate);
++    assert.equal(advisory.command, N33B_COMMAND);
++    assert.ok(advisory.line.includes("N33B-INSIDE") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("N33B-AT-BASE"), advisory.line);
++    const { criticCoverageAdvisory: _advisory, ...rest } = ready;
++    assert.deepEqual(rest, library, "the advisory is the only difference from the library result");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("N33B with no uncovered Critic-required record in the range the ready result is silent and identical to the library result", () => {
++  const fx = fixture();
++  try {
++    const none = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
++    assert.equal(Object.hasOwn(none, "criticCoverageAdvisory"), false);
++    assert.deepEqual(none, preflightCriticDispatch(input(fx)));
++    n33bRequiredRecord(fx.root, "N33B-AT-BASE", fx.base);
++    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithCoverage(input(fx)), "criticCoverageAdvisory"), false, "a record at the review base lies outside (base, candidate]");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("N33B the command line prints the advisory in the ready result and still exits 0", () => {
++  const fx = fixture();
++  try {
++    n33bRequiredRecord(fx.root, "N33B-INSIDE", fx.candidate);
++    const run = spawnSync(process.execPath, [fileURLToPath(new URL("./critic-dispatch-preflight.mjs", import.meta.url)), "--root", fx.root, "--base", fx.base, "--candidate", fx.candidate,
++      "--spec", "specs/spec.md", "--evidence", "evidence/verify.json", "--prior-critic", "evidence/prior-critic.json"], { encoding: "utf8" });
++    assert.equal(run.status, 0, run.stderr);
++    const printed = JSON.parse(run.stdout);
++    assert.equal(printed.status, "packet-ready");
++    assert.deepEqual(printed.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-INSIDE"]);
++    assert.equal(printed.criticCoverageAdvisory.command, N33B_COMMAND);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index 84da368ad..ba2574a30 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -10,7 +10,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+-import { criticAddendumBindingFinding } from "./check-critic-skip-coverage.mjs";
++import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+ import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+ import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
+@@ -19,7 +19,7 @@ import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation, readNa
+ 
+ import { readNativeCodexPending, readNativeGoldfishPending } from "../lib/native-goldfish-host-state.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+-import { CRITIC_REQUIRED_SCHEMA } from "../lib/critic-skip-decision.mjs";
++import { CRITIC_REQUIRED_SCHEMA, criticDisposition } from "../lib/critic-skip-decision.mjs";
+ 
+ const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+ const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
+@@ -604,7 +604,71 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
+     attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested",
+       briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex") },
+   };
+-  return writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
++  const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
++  // D212 (N33 D) early detection, AFTER the write and never instead of it: every attested record is Critic-required, so name the
++  // missing coverage and the next command now rather than first at the feature close. Advisory only; it cannot refuse or throw.
++  const advisory = criticCoverageAdvisory(listUncoveredCriticRecords({ root, taskIds: [record.taskId], coverageOptions: dependencies.coverageOptions ?? {} }));
++  return advisory === null ? receipt : { ...receipt, criticCoverageAdvisory: advisory };
++}
++
++export const CRITIC_COVERAGE_ADVISORY_SCHEMA = "pipeline.critic-coverage-advisory.v1";
++/** The one spelling of the command that publishes the addendum; the feature close (close-coordinator.mjs) and the close-feature skill name the same command. */
++export const CRITIC_ADDENDUM_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
++const COVERAGE_LISTING_CAP = 25;
++
++function reachableCommits(root, range) {
++  if (range === null) return null;
++  const base = range.base ?? null;
++  for (const ref of [base, range.head]) {
++    if (ref !== null && (typeof ref !== "string" || ref === "" || ref.startsWith("-") || /[\s\0]/u.test(ref))) throw new Error("the review range must name plain git refs");
++  }
++  const output = execFileSync("git", ["-C", root, "rev-list", base === null ? range.head : `${base}..${range.head}`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
++  return new Set(output.split("\n").filter(Boolean));
++}
++
++/**
++ * D212 (N33 D): the Critic-required v3/v4 dispatch records that the shared coverage evaluation (check-critic-skip-coverage.mjs
++ * `evaluateRepositoryCriticSkipCoverage`, scoped by task id exactly as the feature close scopes it) reports without covering Critic
++ * evidence. This function only chooses WHICH records to ask about (optionally those whose candidate commit lies in `range`, the git
++ * half-open set (base, head], or the whole history up to head when base is null); the coverage rule itself is not reimplemented.
++ * Never throws: a failure is returned as `unavailable`. `coverageOptions` is the injection seam the coverage evaluation already has.
++ */
++export function listUncoveredCriticRecords({ root, range = null, taskIds, coverageOptions = {} } = {}) {
++  try {
++    const physical = physicalRoot(root);
++    const members = reachableCommits(physical, range);
++    const candidates = walkDispatchRecords(physical).records.filter(({ record }) => (record?.schema === DISPATCH_RECORD_SCHEMA || record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA)
++      && criticDisposition(record) === "required"
++      && (taskIds === undefined || taskIds.includes(record.taskId))
++      && (members === null || (typeof record.candidateCommit === "string" && members.has(record.candidateCommit))));
++    if (candidates.length === 0) return { records: [], totalCount: 0, unavailable: null };
++    const owners = [...new Set(candidates.map(({ record }) => (typeof record.sliceId === "string" ? record.sliceId : record.taskId)))];
++    const open = new Set(evaluateRepositoryCriticSkipCoverage({ ...coverageOptions, root: physical, taskIds: owners }).requiredTaskIds);
++    const uncovered = candidates.filter(({ record }) => open.has(record.taskId))
++      .map(({ path, sha256, record }) => ({ taskId: record.taskId, recordPath: path, recordSha256: sha256, candidateCommit: record.candidateCommit, appliedRow: record.criticRequired?.appliedRow ?? null }))
++      .sort((left, right) => (left.recordPath < right.recordPath ? -1 : left.recordPath > right.recordPath ? 1 : 0));
++    return { records: uncovered.slice(0, COVERAGE_LISTING_CAP), totalCount: uncovered.length, unavailable: null };
++  } catch (error) {
++    return { records: [], totalCount: 0, unavailable: `the Critic coverage evaluation could not run (${String(error?.message ?? error).split("\n")[0].slice(0, 200)})` };
++  }
++}
++
++/**
++ * The typed, plain-JSON advisory every runner reads the same way (writer result, Critic preflight output, push-init result), or null
++ * when there is nothing to say. Advisory by construction: it carries no refusal, and the feature close
++ * (CLOSE-CRITIC-EVIDENCE-MISSING) stays the one refusing gate.
++ */
++export function criticCoverageAdvisory({ records = [], totalCount = records.length, unavailable = null } = {}) {
++  if (typeof unavailable === "string") {
++    return { schema: CRITIC_COVERAGE_ADVISORY_SCHEMA, code: "CRITIC-COVERAGE-UNAVAILABLE", severity: "advisory", message: unavailable,
++      line: `Critic coverage could not be checked early: ${unavailable}; the feature close still refuses a Critic-required record without covering evidence (CLOSE-CRITIC-EVIDENCE-MISSING).` };
++  }
++  if (!Array.isArray(records) || records.length === 0) return null;
++  const nextStep = `a passed, consumed Critic receipt must cover each record (the receipt of its own task id, or a Critic course whose reviewed range contains its commit; run the Critic dispatch when none does), then write the byte-bound addendum with ${CRITIC_ADDENDUM_COMMAND} (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill); the feature close refuses with CLOSE-CRITIC-EVIDENCE-MISSING until then, and this notice itself refuses nothing`;
++  const named = records.map((entry) => `${entry.recordPath} (${entry.appliedRow ?? "Critic required"}, commit ${String(entry.candidateCommit).slice(0, 12)})`).join(", ");
++  const omitted = totalCount > records.length ? ` and ${totalCount - records.length} more` : "";
++  return { schema: CRITIC_COVERAGE_ADVISORY_SCHEMA, code: "CRITIC-COVERAGE-PENDING", severity: "advisory", totalCount, records, command: CRITIC_ADDENDUM_COMMAND, nextStep,
++    line: `Critic evidence is still missing for ${totalCount} Critic-required dispatch record(s): ${named}${omitted}. Next: ${nextStep}.` };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index 0c4dd46be..dc6a039bb 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -703,7 +703,79 @@ check("N33 --critic-addendum refuses an absolute, out-of-tree or non-JSON reques
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 35, "the complete dispatch-record writer corpus must be registered before execution begins");
++// N33 D (D212): early detection. A Critic-required record without covering Critic evidence is named when it is written, with the next
++// command, instead of first at the feature close. Advisory only: the record is always written and the close gate stays the one refusing gate.
++const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
++
++check("N33B an attested request writes the record and its result carries a typed, non-refusing advisory naming the record and the next command", () => {
++  const root = cliFixture();
++  try {
++    const receipt = runCli(root);
++    assert.equal(existsSync(join(root, receipt.target)), true, "the advisory must never replace the write");
++    const advisory = receipt.criticCoverageAdvisory;
++    assert.ok(advisory, "an attested Critic-required record without covering evidence must be named when it is written");
++    assert.equal(advisory.schema, "pipeline.critic-coverage-advisory.v1");
++    assert.equal(advisory.code, "CRITIC-COVERAGE-PENDING");
++    assert.equal(advisory.severity, "advisory");
++    assert.deepEqual(advisory.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
++    assert.equal(advisory.records[0].recordPath, receipt.target);
++    assert.equal(advisory.records[0].recordSha256, receipt.sha256);
++    assert.equal(advisory.records[0].candidateCommit, ATT_COMMIT);
++    assert.equal(advisory.records[0].appliedRow, "T3");
++    assert.equal(advisory.command, N33B_COMMAND);
++    assert.equal(writerModule.CRITIC_ADDENDUM_COMMAND, N33B_COMMAND);
++    assert.ok(advisory.line.includes("NVA-ATT-1") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("\n"), advisory.line);
++    assert.match(advisory.nextStep, /passed, consumed Critic receipt/u);
++    assert.match(advisory.nextStep, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
++    // The feature close names the same command: one spelling, no second version that could drift.
++    assert.ok(readFileSync(join(import.meta.dirname, "close-coordinator.mjs"), "utf8").includes(N33B_COMMAND), "close-coordinator.mjs must spell the same command");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("N33B the named command accepts what the advisory names, and a record is silent only once a bound addendum covers it", () => {
++  const { root, addendum } = n33Fixture();
++  try {
++    const before = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions() });
++    assert.deepEqual(before.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
++    assert.equal(before.unavailable, null);
++    assert.equal(writerModule.criticCoverageAdvisory(before).records[0].recordSha256, addendum.recordSha256);
++    // The command the advisory names, run exactly as named, publishes the addendum ...
++    const written = writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions());
++    assert.equal(existsSync(join(root, written.target)), true);
++    // ... and the record is covered: no listing, no advisory.
++    const after = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions() });
++    assert.deepEqual(after.records, []);
++    assert.equal(writerModule.criticCoverageAdvisory(after), null);
++    // A published addendum whose receipt does not hold the commit is still uncovered.
++    const stillUnbound = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions({ outside: true }) });
++    assert.deepEqual(stillUnbound.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("N33B a repository with no dispatch records, or only skipped ones, has nothing to name and an advisory builder that says nothing", () => {
++  const root = attestedRoot();
++  try {
++    const none = writerModule.listUncoveredCriticRecords({ root });
++    assert.deepEqual(none.records, []);
++    assert.equal(writerModule.criticCoverageAdvisory(none), null);
++    writeFileSync(join(root, "evidence/dispatch-record-NVA-SKIP-1.json"), `${JSON.stringify(record({ taskId: "NVA-SKIP-1" }))}\n`);
++    const skipped = writerModule.listUncoveredCriticRecords({ root });
++    assert.deepEqual(skipped.records, []);
++    assert.equal(writerModule.criticCoverageAdvisory(skipped), null);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("N33B an evaluation that cannot run is named as unavailable, never thrown, and never refuses", () => {
++  const advisory = writerModule.criticCoverageAdvisory({ records: [], totalCount: 0, unavailable: "the repository root is unreadable" });
++  assert.equal(advisory.code, "CRITIC-COVERAGE-UNAVAILABLE");
++  assert.equal(advisory.severity, "advisory");
++  assert.match(advisory.line, /unreadable/u);
++  const listing = writerModule.listUncoveredCriticRecords({ root: join(tmpdir(), "n33b-no-such-root-ever") });
++  assert.equal(typeof listing.unavailable, "string");
++  assert.deepEqual(listing.records, []);
++});
++
++assert.equal(cases.length, 39, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 276f16c72..18beb9ba4 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -125,6 +125,7 @@ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from
+ import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
+ import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
+ import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
++import { criticCoverageAdvisory, listUncoveredCriticRecords } from "./dispatch-record-write.mjs";
+ 
+ export const SCHEMA = "pipeline.push-init.v1";
+ export const RECOVERY_SCHEMA = "pipeline.push-init-recovery.v1";
+@@ -376,6 +377,41 @@ export function assessVerifiedCandidateDelivery({ root, remote, destination, rea
+   } catch { return no("assessment-unavailable"); }
+ }
+ 
++/**
++ * D212 (N33 D): which Critic-required dispatch records are still without covering Critic evidence, asked through the SAME shared
++ * evaluation the feature close uses (check-critic-skip-coverage.mjs, reached via dispatch-record-write.mjs), so a consumer learns it
++ * here and not first at the close. The records asked about are those this push would carry: `--base`..HEAD when a base was given,
++ * else the local commits not yet on the destination branch's remote-tracking ref, else (no tracking ref, no HEAD) every record.
++ * It deliberately does not go through the injected `run`, which stands in for the reconciliation subprocess only.
++ */
++function inspectPushCriticCoverage({ root, base, remote, destination }) {
++  const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawnSync);
++  if (head === null || !OID_TEXT.test(head)) return listUncoveredCriticRecords({ root });
++  let from = base;
++  if (from === null && typeof destination === "string" && destination.startsWith("refs/heads/")) {
++    const tracked = gitText(root, ["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${destination.slice("refs/heads/".length)}^{commit}`], spawnSync);
++    from = tracked !== null && OID_TEXT.test(tracked) ? tracked : null;
++  }
++  return listUncoveredCriticRecords({ root, range: { base: from, head } });
++}
++
++/**
++ * The driver. The sequence itself is `drivePushInitCore`; this wrapper adds the early Critic-coverage notice to its result as one
++ * additive, advisory field (`criticCoverageAdvisory`, absent when nothing is uncovered). It is not a step, not a check and not a
++ * blocker: the outcome, the exit status and the recovery block are those of the core, and the close gate stays the only refusing gate.
++ * `inspectCriticCoverage` is the injection seam (default: the real inspection above).
++ */
++export function drivePushInit(options = {}) {
++  const { inspectCriticCoverage = inspectPushCriticCoverage, ...rest } = options;
++  const result = drivePushInitCore(rest);
++  if (rest.checkpoint === true || typeof result?.root !== "string" || result.outcome === "usage-error") return result;
++  let listing;
++  try { listing = inspectCriticCoverage({ root: result.root, base: rest.base ?? null, remote: rest.remote, destination: rest.destination }); }
++  catch (error) { listing = { records: [], totalCount: 0, unavailable: `the Critic coverage evaluation could not run (${String(error?.message ?? error).split("\n")[0].slice(0, 200)})` }; }
++  const advisory = criticCoverageAdvisory(listing);
++  return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
++}
++
+ /**
+  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
+  * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
+@@ -386,7 +422,7 @@ export function assessVerifiedCandidateDelivery({ root, remote, destination, rea
+  * push-prepare.test.mjs's own `readyDeps()` idiom. `exists` is injectable for the same
+  * reason `deps.exists` is threaded through push-prepare.mjs itself.
+  */
+-export function drivePushInit({
++function drivePushInitCore({
+   rootDir, by, remote, destination, base = null, candidate = null, recordRef = null, checkpoint = false,
+   run = spawnSync,
+   exists = existsSync,
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 0a2bad4a2..64e7c276b 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -990,6 +990,102 @@ test("drivePushInit (N25): only the stale verdict is an early check -- a structu
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// ---------------------------------------------------------------------------
++// N33 D (D212): early detection. push-init names every Critic-required dispatch record that has no covering Critic evidence, with the
++// next command, before the push gates (and the feature close) do. Advisory only: the outcome, the exit status and every check are unchanged.
++// ---------------------------------------------------------------------------
++
++const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
++function n33bRequiredRecord(root, taskId, commitSha) {
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [commitSha], candidateCommit: commitSha, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["a.txt"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  mkdirSync(join(root, "evidence"), { recursive: true });
++  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), `${JSON.stringify(record)}\n`);
++}
++/** A real, remote-less repository with two commits, so the default coverage inspection derives its range from git. */
++function n33bPushRepo() {
++  const root = freshFixtureRoot();
++  const git = (...args) => { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
++  git("init", "-q");
++  const commit = (name) => { writeFileSync(join(root, "a.txt"), `${name}\n`); git("add", "a.txt"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", name); return git("rev-parse", "HEAD"); };
++  const first = commit("first");
++  const second = commit("second");
++  return { root, first, second };
++}
++const n33bDrive = (root, extra = {}) => drivePushInit({
++  rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++  satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
++  inspectArchitectureCurrency: () => ({ ok: true, applicable: false }), assessPushHookBackstop: () => ({ blocking: false }), ...extra,
++});
++
++test("drivePushInit (N33 D): an injected inspection result is carried as one advisory line on the ready outcome and on the refused one, and changes neither", () => {
++  const root = freshFixtureRoot();
++  try {
++    const listing = { records: [{ taskId: "N33B-ONE", recordPath: "evidence/dispatch-record-N33B-ONE.json", recordSha256: "d".repeat(64), candidateCommit: "e".repeat(40), appliedRow: "T1" }], totalCount: 1, unavailable: null };
++    const plain = n33bDrive(root);
++    assert.equal(plain.outcome, "chat-ready", JSON.stringify(plain));
++    assert.equal(Object.hasOwn(plain, "criticCoverageAdvisory"), false, "a repository with nothing uncovered is silent");
++    const ready = n33bDrive(root, { inspectCriticCoverage: () => listing });
++    assert.equal(ready.outcome, "chat-ready");
++    assert.deepEqual(ready.steps, plain.steps, "advisory, not a step");
++    assert.equal(ready.criticCoverageAdvisory.code, "CRITIC-COVERAGE-PENDING");
++    assert.deepEqual(ready.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-ONE"]);
++    assert.equal(ready.criticCoverageAdvisory.command, N33B_COMMAND);
++    assert.ok(ready.criticCoverageAdvisory.line.includes("N33B-ONE") && ready.criticCoverageAdvisory.line.includes(N33B_COMMAND) && !ready.criticCoverageAdvisory.line.includes("\n"));
++    const { criticCoverageAdvisory: _advisory, ...rest } = ready;
++    assert.deepEqual(rest, plain);
++    const refused = n33bDrive(root, { inspectCriticCoverage: () => listing, pushPrepareReport: () => ({ ok: true, report: { ready: false, checks: [{ id: "working-tree-clean", ok: false, message: "dirty" }] }, lines: {} }) });
++    assert.equal(refused.outcome, "precondition-unmet");
++    assert.deepEqual(refused.checks.map((check) => check.id), ["working-tree-clean"], "the advisory is never a check and never a blocker");
++    assert.ok(refused.criticCoverageAdvisory, "the refused outcome carries it too");
++    assert.equal(refused.recovery.blockers.some((blocker) => /critic-coverage/iu.test(blocker.id)), false);
++    const unavailable = n33bDrive(root, { inspectCriticCoverage: () => { throw new Error("evaluation exploded"); } });
++    assert.equal(unavailable.outcome, "chat-ready", "an evaluation that cannot run never flips the outcome");
++    assert.equal(unavailable.criticCoverageAdvisory.code, "CRITIC-COVERAGE-UNAVAILABLE");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("drivePushInit (N33 D): the default inspection runs the shared coverage evaluation, names the uncovered record with the next command, and is re-entrant", () => {
++  const repo = n33bPushRepo();
++  try {
++    n33bRequiredRecord(repo.root, "N33B-PUSH-1", repo.second);
++    const first = n33bDrive(repo.root);
++    assert.equal(first.outcome, "chat-ready", JSON.stringify(first));
++    assert.deepEqual(first.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-PUSH-1"]);
++    assert.equal(first.criticCoverageAdvisory.records[0].recordPath, "evidence/dispatch-record-N33B-PUSH-1.json");
++    assert.equal(first.criticCoverageAdvisory.command, N33B_COMMAND);
++    assert.deepEqual(n33bDrive(repo.root), first, "two calls from unchanged state are byte-identical");
++  } finally { rmSync(repo.root, { recursive: true, force: true }); }
++});
++
++test("drivePushInit (N33 D): with --base only the records of base..HEAD are named", () => {
++  const repo = n33bPushRepo();
++  try {
++    n33bRequiredRecord(repo.root, "N33B-BEFORE-BASE", repo.first);
++    n33bRequiredRecord(repo.root, "N33B-IN-RANGE", repo.second);
++    const ranged = n33bDrive(repo.root, { base: repo.first, candidate: repo.second });
++    assert.deepEqual(ranged.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-IN-RANGE"]);
++    const unbounded = n33bDrive(repo.root);
++    assert.deepEqual(unbounded.criticCoverageAdvisory.records.map((entry) => entry.taskId).sort(), ["N33B-BEFORE-BASE", "N33B-IN-RANGE"]);
++  } finally { rmSync(repo.root, { recursive: true, force: true }); }
++});
++
++test("drivePushInit (N33 D): a usage error carries no advisory, and the printed ready result carries it and keeps exit status 0", () => {
++  const repo = n33bPushRepo();
++  try {
++    n33bRequiredRecord(repo.root, "N33B-PUSH-1", repo.second);
++    const usage = drivePushInit({ rootDir: repo.root, by: "", remote: "origin", destination: "refs/heads/main" });
++    assert.equal(usage.outcome, "usage-error");
++    assert.equal(Object.hasOwn(usage, "criticCoverageAdvisory"), false);
++    let printed = "";
++    const code = main(["--root", repo.root, "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], {
++      write: (text) => { printed += text; }, writeError: () => {},
++      drive: (options) => n33bDrive(options.rootDir),
++    });
++    assert.equal(code, 0);
++    assert.equal(JSON.parse(printed).criticCoverageAdvisory.records[0].taskId, "N33B-PUSH-1");
++  } finally { rmSync(repo.root, { recursive: true, force: true }); }
++});
++
+ // ---------------------------------------------------------------------------
+ // N27b / D206: delivery of the verified candidate when HEAD is ahead only by handover or Critic-export commits.
+ // ---------------------------------------------------------------------------
