@@ -62,13 +62,24 @@ is a separate addendum. Write one request file under `scratch/`, `evidence/` or
 `criticEvidence` reference to a file under `evidence/` whose bytes you digest),
 then run `node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root
 <repo-root> --critic-addendum <request.json>` and plan the transition again.
-The command refuses, and writes nothing, unless a consumed, passed Critic
-receipt binds the addendum: either the receipt of the record's own task id, or a
+The command refuses, and writes nothing, unless a consumed Critic receipt binds
+the addendum: either the receipt of the record's own task id, or a
 feature-wide Critic course (one task id, any number of rounds) whose reviewed
 range, the commits after the receipt's base up to its reviewed candidate,
-contains the record's commit. The addendum is exclusive and cannot be
-replaced. Rounds are not capped (D190/D199): a further correction-diff Critic
-round is always allowed.
+contains the record's commit. A failed receipt (`reviewPass` false) never binds
+without a PO residual acceptance of its minor findings
+(`node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance
+--by <name> --critic-packet <packet-id>`, the PO's own attended step; the
+acceptance must be bound to that receipt's digest, candidate and exact all-minor
+finding set). A course closed by a residual acceptance covers the records of
+all its registered rounds (D217): name the course's LAST round in the addendum
+(`criticPacketId` and `reviewCandidateCommit` of that round); the record's
+commit may then lie anywhere in the union of the reviewed ranges of the
+registered rounds, after the course's genesis base up to the last candidate,
+provided the rounds form one connected chain (each delta round starts at the
+previous round's candidate). Earlier rounds may carry findings. The addendum is
+exclusive and cannot be replaced. Rounds are not capped (D190/D199): a further
+correction-diff Critic round is always allowed.
 
 The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):

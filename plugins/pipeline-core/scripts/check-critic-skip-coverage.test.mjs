@@ -12,6 +12,7 @@ import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDE
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
+import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE, reportSha256 } from "../lib/dispatch-record.mjs";
 
 const SHA = "a".repeat(40);
@@ -1260,5 +1261,136 @@ test("N33B a failed, unconsumed, mis-digested or range-less course receipt still
     assert.equal(result.ok, false, label);
     assert.match(result.readFindings.join("\n"), reason, label);
     assert.deepEqual(result.requiredTaskIds, ["ATT-RCPT"], label);
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// N35 (D217 A+B, backlog 2026-10-31-close-addendum-ignores-residual-acceptance-and-course-chain). The consumer's Critic course
+// ended through a PO residual acceptance of minor findings (every consumed receipt carries reviewPass false), and the two
+// attested records lie only in the range of course round 1 while the later rounds are deltas that start at round 1's
+// candidate. Criterion: (A) a failed receipt binds an addendum only through a valid PO residual acceptance; (B) a record is
+// covered by the union of the reviewed ranges of the registered rounds of ONE course when the addendum names its LAST round.
+// ---------------------------------------------------------------------------------------------------------------
+const N35_RESIDUAL = Object.freeze({ basis: "po-acceptance-of-residual-minor-findings", mode: "chat", acceptanceSha256: "7".repeat(64), findings: [] });
+const N35_PACKET_IDS = ["1".repeat(32), "2".repeat(32), "3".repeat(32)];
+const n35H = (c) => c.repeat(64);
+/** A real repository: pre <- genesis <- a <- b <- c1 <- c2 <- c3 <- registered (HEAD, the commit that registers the lineage). */
+function n35Repository() {
+  const root = fixture({ "evidence/.keep": "" });
+  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
+  const commit = (name, files = [name]) => {
+    for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); if (file === name) writeFileSync(join(root, file), `${name}\n`); }
+    git("add", ...files);
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", name);
+    return git("rev-parse", "HEAD");
+  };
+  git("init", "-q", "-b", "main");
+  const pre = commit("pre.txt"); const genesis = commit("genesis.txt"); const a = commit("a.txt"); const b = commit("b.txt");
+  const c1 = commit("c1.txt"); const c2 = commit("c2.txt"); const c3 = commit("c3.txt");
+  const rounds = [{ base: genesis, head: c1, mode: "full" }, { base: c1, head: c2, mode: "delta" }, { base: c2, head: c3, mode: "delta" }];
+  const path = "src/example.mjs";
+  const delta = { changedPaths: [path], changedBehaviorClaims: ["behavior-one"], priorReceipt: { id: "receipt-1", sha256: n35H("4") },
+    pathInvariantMap: { [path]: ["INV-1"] }, pathInvariantMapSha256: sha256Canonical({ [path]: ["INV-1"] }), coordinatorImpactConfirmed: true,
+    trustBoundaryChanged: false, impactAmbiguous: false };
+  const history = [];
+  rounds.forEach((round, index) => {
+    const packet = { packetId: N35_PACKET_IDS[index], request: { projectId: "fixture", taskId: "FEATURE-COURSE", trigger: "T1" },
+      candidate: { base: round.base, commit: round.head, tree: git("rev-parse", `${round.head}^{tree}`) },
+      diff: { base: round.base, commit: round.head, path: ".git/review.diff", bytes: 1, sha256: n35H("5") },
+      diffPaths: [path], bindings: { requestSha256: n35H("a"), diffPathsSha256: n35H("b"), governanceSha256: n35H("c") } };
+    history.push(compileCriticReviewLineage({ packet, reviewId: `review-${index + 1}`, parent: history.at(-1) ?? null,
+      packages: [{ id: "package", subjectSha256: n35H("d"), changedPaths: [path], integrationEdges: ["edge"] }],
+      coverage: { changedPaths: [path], acceptanceIds: ["AC-1"], integrationEdges: ["edge"], complete: true, receiptSha256: n35H("e") },
+      lane: { laneId: `lane-${index + 1}`, contextSha256: n35H((index + 3).toString(16)), evidenceSha256: n35H((index + 6).toString(16)) },
+      verdict: { status: "findings", schemaValid: true, resultSha256: n35H("2"), failure: null },
+      findings: [{ id: "finding-1", priorFindingId: index === 0 ? null : "finding-1", severity: "low", status: "open", evidenceSha256: n35H("3") }],
+      correction: index === 0 ? null : { commit: round.head, deltaSha256: n35H("5"), impactSha256: sha256Canonical(["edge"]) },
+      invalidation: { kind: "none", reason: null, evidenceSha256: null },
+      reviewAttempt: index === 0 ? { round: 1, correctionCommits: 0, requestedMode: "full" }
+        : { round: index + 1, correctionCommits: index, requestedMode: "delta", base: round.base, head: round.head, tree: packet.candidate.tree, ...delta } }));
+  });
+  const feature = "n35-feature";
+  const artifacts = history.map((record, index) => {
+    const text = `${JSON.stringify(record)}\n`;
+    const evidencePath = `specs/${feature}/evidence/critic-review-${index + 1}.json`;
+    mkdirSync(dirname(join(root, evidencePath)), { recursive: true });
+    writeFileSync(join(root, evidencePath), text);
+    return { class: "candidate-evidence", path: evidencePath, sha256: sha256(text), authority: false, mutability: "immutable", retention: "retain" };
+  });
+  writeFileSync(join(root, `specs/${feature}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: feature, rigor: 1 }, state: "approved", artifacts })}\n`);
+  const registered = commit("registered", [`specs/${feature}`, "registered"]);
+  return { root, pre, genesis, a, b, c1, c2, c3, registered, rounds, history };
+}
+/** Receipt reader that, like readBoundConsumedCriticReceipt, refuses a failed receipt unless the residual deps reached it. */
+function n35Reader(repo, { round = 3, reviewPass = false, residualDeps = true, throwsFailed = true } = {}) {
+  const { base, head } = repo.rounds[round - 1];
+  const seen = [];
+  return { seen, options: {
+    loadResidualDeps: ({ criticPacketId }) => { seen.push(criticPacketId); return residualDeps ? { residualAcceptance: { junk: true }, verifyResidualAcceptanceFn: () => ({ authorized: true, mode: "chat" }) } : null; },
+    readBoundCriticReceipt: (_input, deps) => {
+      if (!reviewPass && deps?.residualAcceptance === undefined && throwsFailed) throw Object.assign(new Error("Critic findings remain unresolved"), { code: "CVL-CRITIC-FAILED" });
+      return { packet: { request: { taskId: "FEATURE-COURSE" }, candidate: { base, commit: head }, references: [] },
+        critic: { reviewPass, candidate: { base, commit: head }, reviewRange: { base, commit: head, diffSha256: "9".repeat(64) } },
+        criticReceiptSha256, residual: reviewPass ? null : (deps?.residualAcceptance === undefined ? null : N35_RESIDUAL) };
+    } } };
+}
+function n35Write(repo, taskId, commit, { packetId = N35_PACKET_IDS[2], reviewCommit = repo.c3 } = {}) {
+  const record = attestedDelivery(taskId, commit);
+  const recordBytes = json(record);
+  writeFileSync(join(repo.root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
+  writeFileSync(join(repo.root, `evidence/critic-${taskId}.md`), N33_CRITIC_BYTES);
+  writeFileSync(join(repo.root, criticDispositionAddendumPath(taskId)), json({ ...n33Addendum(taskId, recordBytes, commit, reviewCommit), criticPacketId: packetId }));
+}
+
+test("N35 two attested records in round 1 are covered by a course closed through a residual acceptance of its last round (D217 A+B)", () => {
+  const repo = n35Repository();
+  n35Write(repo, "ATT-ONE", repo.a); n35Write(repo, "ATT-TWO", repo.b);
+  const { options, seen } = n35Reader(repo);
+  const result = evaluate(repo.root, ["src/change.txt"], { ...options, taskIds: ["ATT-ONE", "ATT-TWO"] });
+  assert.equal(result.ok, true, result.readFindings.join("\n"));
+  assert.equal(result.criticEvidenceRecordCount, 2);
+  assert.deepEqual(result.requiredTaskIds, []);
+  assert.ok(seen.includes(N35_PACKET_IDS[2]), "the residual acceptance is loaded for the addendum's own Critic packet");
+  for (const taskId of ["ATT-ONE", "ATT-TWO"]) { // the push gate reads the same evidence through the single-record readback
+    const bytes = Buffer.from(readFileSync(join(repo.root, `evidence/dispatch-record-${taskId}.json`)));
+    assert.equal(verifyCriticDispositionAddendumForRecord({ root: repo.root, taskId, record: JSON.parse(bytes), recordBytes: bytes, options }).code, "critic-addendum-bound");
+  }
+});
+
+test("N35 a failed receipt never binds without a PO residual acceptance, and the refusal names the accept route (D217 A, C)", () => {
+  const repo = n35Repository();
+  n35Write(repo, "ATT-NOACC", repo.a);
+  for (const [label, overrides] of [["no private acceptance record (the receipt reader refuses the failed receipt)", { residualDeps: false }],
+    ["a failed receipt returned with no verified residual", { residualDeps: false, throwsFailed: false }]]) {
+    const { options } = n35Reader(repo, overrides);
+    const result = evaluate(repo.root, ["src/change.txt"], { ...options, taskIds: ["ATT-NOACC"] });
+    assert.equal(result.ok, false, label);
+    const text = result.readFindings.join("\n");
+    assert.match(text, /a failed receipt never binds without a PO residual acceptance/u, label);
+    assert.match(text, /approve-residual-acceptance/u, label);
+    assert.deepEqual(result.requiredTaskIds, ["ATT-NOACC"], label);
+  }
+});
+
+test("N35 a record outside the union of the registered rounds, a broken chain, a middle round or no course still refuses (D217 B)", () => {
+  const cases = [
+    ["a record commit before the genesis base", (repo) => repo.pre, {}, {}, /not after the (?:reviewed range|course genesis) base/u],
+    ["a record commit after the last candidate", (repo) => repo.registered, {}, {}, /unavailable or invalid/u],
+    ["a record commit equal to the genesis base", (repo) => repo.genesis, {}, {}, /not after the (?:reviewed range|course genesis) base/u],
+    ["a broken chain (a gap between two rounds)", (repo) => repo.a, { history: (repo) => repo.history.map((row, i) => (i === 1 ? { ...row, diff: { ...row.diff, base: repo.b } } : row)) }, {}, /chain/u],
+    ["an addendum naming a middle round instead of the last", (repo) => repo.a, { round: 2 }, { packetId: N35_PACKET_IDS[1], reviewCommit: "c2" }, /last round/u],
+    ["a single failed receipt without a course", (repo) => repo.a, { history: () => null }, {}, /no round of a registered Critic course/u],
+  ];
+  for (const [label, commitOf, reader, write, reason] of cases) {
+    const repo = n35Repository();
+    const { options } = n35Reader(repo, reader.round === undefined ? {} : { round: reader.round });
+    n35Write(repo, "ATT-OUT", commitOf(repo), { ...write, reviewCommit: write.reviewCommit === "c2" ? repo.c2 : repo.c3 });
+    const readCourseHistory = reader.history === undefined ? {} : { readCourseHistory: () => reader.history(repo) };
+    const result = evaluate(repo.root, ["src/change.txt"], { ...options, ...readCourseHistory, taskIds: ["ATT-OUT"] });
+    assert.equal(result.ok, false, label);
+    assert.match(result.readFindings.join("\n"), reason, label);
+    assert.deepEqual(result.requiredTaskIds, ["ATT-OUT"], label);
+    assert.equal(result.criticEvidenceRecordCount, 0, label);
   }
 });

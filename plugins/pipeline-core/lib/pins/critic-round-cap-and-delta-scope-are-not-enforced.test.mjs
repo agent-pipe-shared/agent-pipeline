@@ -166,6 +166,20 @@ test("AC3 coordinator next-action text offers the Critic dispatch only with the 
   assert.doesNotMatch(src, /never another Critic/u);
 });
 
+// D217 (N35): added to the AC3 text pin above, which stays as it is. A failed receipt never binds without a PO residual acceptance, and a
+// course closed through one covers the records of all its registered rounds; the close refusal, the early-detection advisory and the
+// close-feature skill state the same rule and name the accept route.
+test("AC3b the close refusal, the advisory and the close-feature skill state the residual-acceptance and course-chain rule (D217)", () => {
+  const src = read("scripts/close-coordinator.mjs");
+  assert.match(src, /a failed receipt never binds without a PO residual acceptance of its minor findings/u);
+  assert.match(src, /pipeline-state\.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>/u);
+  assert.match(src, /a course closed by a residual acceptance covers the records of all its registered rounds/u);
+  assert.match(read("scripts/dispatch-record-write.mjs"), /a failed receipt never binds without a PO residual acceptance/u);
+  const skill = read("skills/close-feature/SKILL.md");
+  assert.match(skill, /A failed receipt \(`reviewPass` false\) never binds\s+without a PO residual acceptance/u);
+  assert.match(skill, /A course closed by a residual acceptance covers the records of\s+all its registered rounds/u);
+});
+
 // AC-142 chain: the refusal and the sanctioned route are tested apart elsewhere; this drives one valid pre-rule feature through both.
 test("AC4 a valid pre-rule feature goes from CCA-REVIEW-UNIT-REQUIRED through --add-review-unit to an admitted Critic dispatch", () => {
   const root = mkdtempSync(join(tmpdir(), "critic-route-chain-"));

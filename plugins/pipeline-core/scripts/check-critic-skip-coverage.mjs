@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
+import { loadResidualAcceptanceDepsForPacket } from "../lib/critic-verify-readiness.mjs";
+import { resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
@@ -534,7 +536,81 @@ function gitIsAncestor(gitRead, ancestor, descendant) {
  * equal to, the base. A course packet never lists the record as reviewed evidence, so the record-binding checks of the task-bound
  * route do not apply; the private snapshot, when present, keeps its exact key shape and its assurance (null or orchestrator-attested).
  */
-function courseReceiptFinding(addendum, bound, gitRead) {
+/** D217 (N35 A, C): shared text of a failed receipt that no valid PO residual acceptance binds; names the accept route. */
+const FAILED_RECEIPT_FINDING = "Critic addendum does not match a passed, consumed, task-bound Critic receipt: a failed receipt never binds without a PO residual acceptance of its minor findings (the PO's own attended step: node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>)";
+const COURSE_LINEAGE_FEATURE_LIMIT = 256;
+const courseHistoryCache = new Map();
+/**
+ * D217 (N35 B): the registered Critic course the addendum's packet belongs to, or null. The course is derived from the packet id
+ * alone (no field is added to the addendum): every registered lineage record carries `request.packetId`, and the records of one
+ * course live in one feature package's `specs/<featureId>/lifecycle.json`. The feature id therefore falls out of the path that holds
+ * the record, whichever feature the close is for. The manifest is read at the repository HEAD, not at the review candidate: the
+ * lineage record of the LAST round is registered in a commit after that round's candidate.
+ */
+function defaultReadCourseHistory({ root, gitRead, criticPacketId }) {
+  const head = gitRead(["rev-parse", "HEAD"]);
+  const repoRoot = resolve(root);
+  const key = `${repoRoot}\0${head}\0${criticPacketId}`;
+  if (courseHistoryCache.has(key)) return courseHistoryCache.get(key);
+  let found = null;
+  const listing = gitRead(["ls-tree", "--name-only", "-d", head, "specs/"]);
+  for (const entry of listing.split("\n").filter(Boolean).slice(0, COURSE_LINEAGE_FEATURE_LIMIT)) {
+    const featureId = entry.replace(/^specs\//u, "");
+    let resolved;
+    try { resolved = resolveRegisteredCriticCourseHistory({ repoRoot, featureId, candidateCommit: head }); } catch { continue; }
+    if (Array.isArray(resolved?.history) && resolved.history.some((row) => row?.request?.packetId === criticPacketId)) { found = resolved.history; break; }
+  }
+  if (courseHistoryCache.size > 64) courseHistoryCache.clear();
+  courseHistoryCache.set(key, found);
+  return found;
+}
+
+/**
+ * D217 (N35 B): a record is covered by the UNION of the reviewed ranges of the registered rounds of one course when (1) the addendum
+ * names the LAST round of that course (its packet and its review candidate), (2) that round passed or is residual-accepted (checked by
+ * the caller through the bound receipt), (3) the rounds form one connected chain (a delta round starts at the previous round's
+ * candidate; a full round starts at the course genesis base) and (4) the record's commit is an ancestor of, or equal to, the last
+ * candidate and not an ancestor of, or equal to, the genesis base. Earlier rounds may carry findings: the later rounds reviewed the
+ * corrections. Returns null when covered, else the reason.
+ */
+function courseChainFinding(addendum, bound, history, gitRead) {
+  const notRound = "the Critic packet is no round of a registered Critic course";
+  if (!Array.isArray(history) || history.length === 0) return notRound;
+  const index = history.findIndex((row) => row?.request?.packetId === addendum.criticPacketId);
+  if (index < 0) return notRound;
+  const last = history.at(-1);
+  if (index !== history.length - 1 || last?.candidate?.commit !== addendum.reviewCandidateCommit) {
+    return "the addendum must name the last round of the registered Critic course (an earlier round does not cover the records of the later rounds)";
+  }
+  if (bound.critic?.reviewRange?.base !== last?.diff?.base) return "the registered last round and the consumed receipt name different reviewed ranges";
+  const genesisBase = history[0]?.diff?.base;
+  if (!COMMIT_OID.test(genesisBase ?? "")) return "the registered rounds do not form one connected chain (the course genesis base is not a commit)";
+  for (let round = 0; round < history.length; round += 1) {
+    const base = history[round]?.diff?.base;
+    const head = history[round]?.candidate?.commit;
+    const mode = history[round]?.request?.mode;
+    const connected = COMMIT_OID.test(base ?? "") && COMMIT_OID.test(head ?? "")
+      && (round === 0 || (mode === "delta" && base === history[round - 1].candidate.commit) || (mode === "full" && base === genesisBase));
+    if (!connected || !gitIsAncestor(gitRead, base, head)) return `the registered rounds do not form one connected chain (round ${round + 1} breaks it)`;
+  }
+  if (!gitIsAncestor(gitRead, addendum.candidateCommit, last.candidate.commit)) return "the commit is not an ancestor of the last candidate of the registered course";
+  if (gitIsAncestor(gitRead, addendum.candidateCommit, genesisBase)) return "the commit is not after the course genesis base";
+  return null;
+}
+
+function courseReceiptFinding(addendum, bound, gitRead, { root, readCourseHistory } = {}) {
+  const single = singleReceiptFinding(addendum, bound, gitRead);
+  if (single === null) return null;
+  // Not inside this one receipt's range: the registered course, when there is one, may still cover the record (D217 B).
+  let chain;
+  try {
+    const history = (readCourseHistory ?? defaultReadCourseHistory)({ root, gitRead, criticPacketId: addendum.criticPacketId });
+    chain = courseChainFinding(addendum, bound, history, gitRead);
+  } catch { return single; }
+  return chain === null ? null : `${single}; nor does the registered Critic course cover it (${chain})`;
+}
+
+function singleReceiptFinding(addendum, bound, gitRead) {
   const prefix = "Critic addendum does not match a passed, consumed Critic receipt of this task or a course receipt whose reviewed range contains the record's commit";
   const range = bound.critic.reviewRange;
   if (range === null || typeof range !== "object" || !COMMIT_OID.test(range.base ?? "") || range.commit !== addendum.reviewCandidateCommit) {
@@ -559,7 +635,8 @@ function courseReceiptFinding(addendum, bound, gitRead) {
 
 function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
   try {
-    const readBound = options.readBoundCriticReceipt ?? ((input) => readBoundConsumedCriticReceipt(input));
+    const readBound = options.readBoundCriticReceipt ?? ((input, deps) => readBoundConsumedCriticReceipt(input, deps));
+    const loadResidualDeps = options.loadResidualDeps ?? ((input) => loadResidualAcceptanceDepsForPacket(input));
     const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
     const gitRead = options.gitRead ?? ((args) => execFileSync("git", args, {
       cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024,
@@ -571,17 +648,28 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
     const gitCommonDir = resolve(root, gitRead(["rev-parse", "--git-common-dir"]));
     gitRead(["merge-base", "--is-ancestor", addendum.candidateCommit, addendum.reviewCandidateCommit]);
     const tree = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}^{tree}`]);
-    const bound = readBound({ gitCommonDir, criticPacketId: addendum.criticPacketId,
-      candidate: { commit: addendum.reviewCandidateCommit, tree } });
-    if (bound?.critic?.reviewPass !== true
-      || bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
+    // D217 (N35 A): the PO residual acceptance of this packet's receipt (the same loader Verify and the push gate use) reaches the
+    // receipt reader, which admits a failed receipt only through a candidate-, digest- and finding-set-bound, all-minor acceptance.
+    const residualDeps = loadResidualDeps({ gitCommonDir, projectDir: root, criticPacketId: addendum.criticPacketId }) ?? undefined;
+    let bound;
+    try {
+      bound = readBound({ gitCommonDir, criticPacketId: addendum.criticPacketId,
+        candidate: { commit: addendum.reviewCandidateCommit, tree } }, residualDeps);
+    } catch (error) {
+      if (error?.code === "CVL-CRITIC-FAILED") return FAILED_RECEIPT_FINDING;
+      throw error;
+    }
+    if (bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
       || bound.criticReceiptSha256 !== addendum.criticReceiptSha256) {
       return "Critic addendum does not match a passed, consumed, task-bound Critic receipt";
     }
+    // A failed receipt never binds without a valid PO residual acceptance (`residual` is non-null only then).
+    if (bound.critic.reviewPass !== true && (bound.residual === null || bound.residual === undefined)) return FAILED_RECEIPT_FINDING;
     if (bound?.packet?.request?.taskId !== addendum.taskId) {
       // D212 (N33 B): task-id equality stays sufficient (below); a receipt of another task id is a course receipt and satisfies the
-      // record only when the record's commit lies inside the receipt's reviewed range.
-      return courseReceiptFinding(addendum, bound, gitRead);
+      // record when the record's commit lies inside the receipt's reviewed range or, D217 (N35 B), inside the union of the
+      // reviewed ranges of the registered rounds of the same course (this receipt being its last round).
+      return courseReceiptFinding(addendum, bound, gitRead, { root, readCourseHistory: options.readCourseHistory });
     }
     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
     if (localDispatchEvidence !== undefined) {

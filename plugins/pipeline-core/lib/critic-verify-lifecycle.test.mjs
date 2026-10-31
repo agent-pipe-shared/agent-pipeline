@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { inspectConsumedCriticEvidenceCarryForward, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualFindingId } from "./critic-verify-lifecycle.mjs";
+import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualFindingId } from "./critic-verify-lifecycle.mjs";
 import { inspectCriticBoundVerify } from "./critic-verify-readiness.mjs";
 import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "../scripts/check-critic-bound-verify.mjs";
@@ -127,6 +127,25 @@ test("a missing or unverified acceptance leaves the failed receipt refused", t =
     const ok = record(fixture(t), failed,{ ...deps, verifyResidualAcceptanceFn: () => ({ authorized: true, mode }) });
     assert.equal(ok.receipt.residualAcceptance.mode, mode);
   }
+});
+// D217 (N35 A): the close addendum reads the receipt through this very reader. `residual` is non-null exactly when a failed receipt is
+// admitted through a valid acceptance, and a failed receipt without one never comes back as a bound receipt.
+test("N35 the bound reader returns a non-null residual only for a failed receipt with a valid, exactly bound acceptance (D217 A)", t => {
+  const common = fixture(t);
+  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "minor")]);
+  const read = (extra) => readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: failed.packetId, candidate }, { ...deps, ...extra });
+  const bound = read({});
+  assert.equal(bound.critic.reviewPass, false);
+  assert.equal(bound.residual.basis, "po-acceptance-of-residual-minor-findings");
+  assert.equal(bound.residual.findings.length, 2);
+  for (const refused of [{ residualAcceptance: undefined }, { verifyResidualAcceptanceFn: () => ({ authorized: false }) },
+    { residualAcceptance: { ...deps.residualAcceptance, criticReceiptSha256: sha("9") } },
+    { readOpenFindingsFn: () => [finding("a", "minor"), finding("b", "major")] }]) {
+    assert.throws(() => read(refused), error => error.code === "CVL-CRITIC-FAILED");
+  }
+  const passing = critic();
+  assert.equal(readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: passing.packetId, candidate },
+    { readConsumedCandidateReceiptFn: () => consumed(passing) }).residual, null);
 });
 test("a passing receipt is unchanged by the acceptance machinery", t => {
   const common = fixture(t);

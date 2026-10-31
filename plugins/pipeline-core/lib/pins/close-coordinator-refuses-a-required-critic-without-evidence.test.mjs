@@ -16,7 +16,11 @@ import test from "node:test";
 
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../critic-disposition-addendum.mjs";
-import { readBoundConsumedCriticReceipt } from "../critic-verify-lifecycle.mjs";
+import { readBoundConsumedCriticReceipt, residualFindingId } from "../critic-verify-lifecycle.mjs";
+import { writeResidualAcceptanceRecord } from "../critic-verify-readiness.mjs";
+import { compileCriticReviewLineage } from "../critic-review-lineage.mjs";
+import { sha256Canonical as courseSha256Canonical } from "../review-economy.mjs";
+import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../../scripts/critic-packet-preflight.mjs";
 import { registerGenericCriticBatch } from "../critic-generic-batch.mjs";
 import { reportSha256 } from "../dispatch-record.mjs";
 import { planVerifySelection } from "../verify-selection.mjs";
@@ -283,6 +287,144 @@ test("(i) the same course receipt does not cover a record whose commit lies befo
   const before = repo.snapshot();
   assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-TWO"], notNamed: ["TASK-ONE"] });
   assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
+});
+
+// N35 (D217 A+B): the consumer's exact acceptance path. A three-round Critic course: round 1 full over (G, C1], rounds 2 and 3 deltas over
+// (C1, C2] and (C2, C3]. Both attested records have one commit each, inside (G, C1]. The LAST round is a REAL consumed receipt with reviewPass
+// false (two minor findings); the course ended through a PO residual acceptance recorded in the private store, in the repository's committed
+// chat approval mode. The three lineage records are registered in specs/critic-course/lifecycle.json at HEAD. The coordinator reads all of
+// it with no injection. The receipt's task id is TASK-ONE (the batch needs a task with a dispatch record), so TASK-ONE binds by task-id
+// equality and TASK-TWO only through the course chain.
+const N35_HASH = (c) => c.repeat(64);
+const N35_FINDINGS = [
+  { gap: "first missing edge", risk: "failure one", severity: "minor", evidence: "src/fix3.mjs:1", spec_ref: "AC-1" },
+  { gap: "second missing edge", risk: "failure two", severity: "minor", evidence: "src/fix3.mjs:2", spec_ref: "AC-2" },
+];
+const failedCourseWithResidual = ({ residual = "valid", severity = "minor" } = {}) => (root) => {
+  const put = (path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
+  const commit = (message, paths) => { git(root, ["add", "--", ...paths]); git(root, ["commit", "-m", message]); return git(root, ["rev-parse", "HEAD"]); };
+  put("src/before.mjs", "export const before = 1;\n");
+  commit("before the reviewed range", ["src/before.mjs"]);
+  put("specs/critic/spec.md", "# Spec\nAC-1 AC-2\n");
+  put(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
+  put("specs/review-unit.json", JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Close the feature as one delivery",
+    specPath: "specs/critic/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"], deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null }));
+  const genesis = commit("course genesis base", ["specs/critic/spec.md", ".claude/pipeline.yaml", "specs/review-unit.json"]);
+  put("src/TASK-ONE.mjs", "export const one = 1;\n");
+  const first = commit("feat(x): one", ["src/TASK-ONE.mjs"]);
+  put("src/TASK-TWO.mjs", "export const two = 2;\n");
+  const second = commit("feat(x): two", ["src/TASK-TWO.mjs"]);
+  const records = { "TASK-ONE": attestedV4("TASK-ONE", first), "TASK-TWO": attestedV4("TASK-TWO", second) };
+  for (const [taskId, value] of Object.entries(records)) put(`evidence/dispatch-record-${taskId}.json`, json(value));
+  const c1 = commit("persist the attested dispatch records", Object.keys(records).map((taskId) => `evidence/dispatch-record-${taskId}.json`));
+  put("src/fix2.mjs", "export const fix2 = 2;\n");
+  const c2 = commit("fix: round two correction", ["src/fix2.mjs"]);
+  put("src/fix3.mjs", "export const fix3 = 3;\n");
+  const c3 = commit("fix: round three correction", ["src/fix3.mjs"]);
+  const candidate = { commit: c3, tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
+  const common = git(root, ["rev-parse", "--git-common-dir"]);
+  const controlRoot = join(root, common, "agent-pipeline", "critic-packets");
+  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+  chmodSync(join(root, common, "agent-pipeline"), 0o700);
+  chmodSync(controlRoot, 0o700);
+  const changedPaths = git(root, ["diff", "--name-only", c2, c3]).split("\n").filter(Boolean).sort();
+  put("evidence/critic-diagnostic.json", JSON.stringify({ schema: "pipeline.verify-evidence.v0", commit: c3, tree: candidate.tree, candidate, exitCode: 0,
+    selection: planVerifySelection({ mode: "critic", baseCommit: c2, candidateCommit: c3, changedPaths, registeredSuiteIds: ["test"],
+      policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
+    steps: [{ name: "test", exitCode: 0 }] }));
+  const packetId = "3".repeat(32);
+  const findings = N35_FINDINGS.map((finding) => ({ ...finding, severity }));
+  const review = { preflightInput: { root, base: c2, candidate: c3, specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      evidencePaths: ["evidence/critic-diagnostic.json"], priorCriticEvidencePath: null },
+    taskId: "TASK-ONE", projectId: "fixture", sessionId: "close-review-3", packetId,
+    route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
+    verdict: { findings, deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: false } };
+  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId: "TASK-ONE", baseCommit: c2, candidateCommit: c3,
+    logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
+  admitSessionCriticReview(review);
+  finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+  const consumed = readConsumedCandidateReceipt({ controlRoot, packetId });
+  assert.equal(consumed.receipt.reviewPass, false, "the fixture receipt is a failed receipt");
+  const receiptSha = sha256(packetCanonicalJson(consumed.receipt));
+  const open = readConsumedCandidateResult({ controlRoot, packetId }).result.verdict.findings;
+  const idsOf = (list) => list.map((finding) => ({ id: residualFindingId(finding), severity: finding.severity })).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (residual !== "none") {
+    const accepted = residual === "other-findings" ? idsOf(open.slice(0, 1)) : idsOf(open);
+    const stored = writeResidualAcceptanceRecord({ gitCommonDir: join(root, common), criticReceiptSha256: receiptSha, consumption: null,
+      record: { schema: "pipeline.critic-residual-acceptance.v1", mode: "chat", forCommit: c3, forTree: candidate.tree, candidate, criticReceiptSha256: receiptSha,
+        findings: accepted, approvedBy: "PO", approvedAt: "2026-10-31T10:00:00.000Z", criticalProof: null,
+        criticalProofWaiver: { kind: "accept-residual-critic-findings", mode: "chat-attributed-unattested", source: "pipeline.user.yaml" },
+        humanApproval: { kind: "accept-residual-critic-findings", mode: "chat-attributed-unattested" } } });
+    assert.equal(stored.ok, true, JSON.stringify(stored));
+  }
+  for (const [taskId, value] of Object.entries(records)) {
+    const bytes = Buffer.from(json(value));
+    const criticBytes = `Independent Critic course review covering ${taskId}.\n`;
+    put(`evidence/critic-${taskId}.md`, criticBytes);
+    put(criticDispositionAddendumPath(taskId), json({ schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha(bytes),
+      taskId, candidateCommit: value.candidateCommit, reviewCandidateCommit: c3, criticPacketId: packetId, criticReceiptSha256: receiptSha,
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: value.candidateCommit, path: `evidence/critic-${taskId}.md`, sha256: sha(criticBytes) } }));
+  }
+  // The four registered lineage records of the course (rounds 1-3 and the registration itself at HEAD).
+  const path = "src/example.mjs";
+  const rounds = [{ base: genesis, head: c1, id: "1".repeat(32) }, { base: c1, head: c2, id: "2".repeat(32) }, { base: c2, head: c3, id: packetId }];
+  const delta = { changedPaths: [path], changedBehaviorClaims: ["behavior-one"], priorReceipt: { id: "receipt-1", sha256: N35_HASH("4") },
+    pathInvariantMap: { [path]: ["INV-1"] }, pathInvariantMapSha256: courseSha256Canonical({ [path]: ["INV-1"] }), coordinatorImpactConfirmed: true,
+    trustBoundaryChanged: false, impactAmbiguous: false };
+  const history = [];
+  rounds.forEach((round, index) => {
+    const packet = { packetId: round.id, request: { projectId: "fixture", taskId: "TASK-ONE", trigger: "T1" },
+      candidate: { base: round.base, commit: round.head, tree: git(root, ["rev-parse", `${round.head}^{tree}`]) },
+      diff: { base: round.base, commit: round.head, path: ".git/review.diff", bytes: 1, sha256: N35_HASH("5") },
+      diffPaths: [path], bindings: { requestSha256: N35_HASH("a"), diffPathsSha256: N35_HASH("b"), governanceSha256: N35_HASH("c") } };
+    history.push(compileCriticReviewLineage({ packet, reviewId: `review-${index + 1}`, parent: history.at(-1) ?? null,
+      packages: [{ id: "package", subjectSha256: N35_HASH("d"), changedPaths: [path], integrationEdges: ["edge"] }],
+      coverage: { changedPaths: [path], acceptanceIds: ["AC-1"], integrationEdges: ["edge"], complete: true, receiptSha256: N35_HASH("e") },
+      lane: { laneId: `lane-${index + 1}`, contextSha256: N35_HASH((index + 3).toString(16)), evidenceSha256: N35_HASH((index + 6).toString(16)) },
+      verdict: { status: "findings", schemaValid: true, resultSha256: N35_HASH("2"), failure: null },
+      findings: [{ id: "finding-1", priorFindingId: index === 0 ? null : "finding-1", severity: "low", status: "open", evidenceSha256: N35_HASH("3") }],
+      correction: index === 0 ? null : { commit: round.head, deltaSha256: N35_HASH("5"), impactSha256: courseSha256Canonical(["edge"]) },
+      invalidation: { kind: "none", reason: null, evidenceSha256: null },
+      reviewAttempt: index === 0 ? { round: 1, correctionCommits: 0, requestedMode: "full" }
+        : { round: index + 1, correctionCommits: index, requestedMode: "delta", base: round.base, head: round.head, tree: packet.candidate.tree, ...delta } }));
+  });
+  const artifacts = history.map((record, index) => {
+    const text = `${JSON.stringify(record)}\n`;
+    put(`specs/critic-course/evidence/critic-review-${index + 1}.json`, text);
+    return { class: "candidate-evidence", path: `specs/critic-course/evidence/critic-review-${index + 1}.json`, sha256: sha(text), authority: false, mutability: "immutable", retention: "retain" };
+  });
+  // The course lives in its own registered package (the closing feature's package is validated separately by the coordinator); the
+  // addendum check derives the course from the packet id, so the feature id need not equal the closing feature.
+  put("specs/critic-course/lifecycle.json", `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "critic-course", rigor: 1 }, state: "approved", artifacts })}\n`);
+  commit("register the Critic course lineage", ["specs/critic-course"]);
+};
+const N35_USER_CONFIG = { "pipeline.user.yaml": "gates:\n  human_approval: chat\n" };
+
+test("(j) two attested records of round 1 are covered by a course closed through a PO residual acceptance of its last round: the close plans (D217 A+B)", () => {
+  const repo = checkpointed("j", { ...courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), ...N35_USER_CONFIG }, failedCourseWithResidual());
+  const planned = repo.planPrepared();
+  assert.equal(planned.status, 0, JSON.stringify(planned.body));
+  assert.equal(planned.body.phase, "feature-close-prepared");
+  assert.equal(invokeAction(planned.body.nextAction).body.status, "applied");
+});
+
+test("(j) a failed last round without a PO residual acceptance never covers the records: the refusal says so and names the accept route (D217 A, C)", () => {
+  const repo = checkpointed("j-none", { ...courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), ...N35_USER_CONFIG }, failedCourseWithResidual({ residual: "none" }));
+  const before = repo.snapshot();
+  const refused = repo.planPrepared();
+  assertRefusedForMissingCritic(refused, { named: ["TASK-ONE", "TASK-TWO"] });
+  assert.match(refused.body.message, /a failed receipt never binds without a PO residual acceptance/u);
+  assert.match(refused.body.message, /approve-residual-acceptance/u);
+  assert.match(refused.body.message, /course closed by a residual acceptance covers the records of all its registered rounds/u);
+  assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
+});
+
+test("(j) a residual acceptance bound to another finding set, or a receipt with a non-minor finding, never covers the records (D217 A)", () => {
+  for (const options of [{ residual: "other-findings" }, { severity: "major" }]) {
+    const repo = checkpointed(`j-${options.residual ?? "major"}`, { ...courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), ...N35_USER_CONFIG }, failedCourseWithResidual(options));
+    assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-ONE", "TASK-TWO"] });
+  }
 });
 
 test("(b) the same record with matching Critic evidence plans", () => {

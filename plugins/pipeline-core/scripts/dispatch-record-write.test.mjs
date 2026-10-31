@@ -692,6 +692,32 @@ check("N33 --critic-addendum publishes an addendum a course receipt binds, and r
   } finally { rmSync(outside.root, { recursive: true, force: true }); }
 });
 
+// N35 (D217): the same sanctioned route accepts an addendum naming the LAST round of a registered course that was closed through a
+// PO residual acceptance, and publishes nothing when no valid residual acceptance binds the failed last receipt.
+const N35_GENESIS = "3".repeat(40);
+const N35_ROUND_ONE = "4".repeat(40);
+function n35CoverageOptions({ residual }) {
+  const history = [
+    { request: { packetId: "b".repeat(32), mode: "full" }, candidate: { commit: N35_ROUND_ONE }, diff: { base: N35_GENESIS } },
+    { request: { packetId: "d".repeat(32), mode: "delta" }, candidate: { commit: N33_HEAD }, diff: { base: N35_ROUND_ONE } },
+  ];
+  return { coverageOptions: {
+    gitRead: (args) => {
+      if (args[1] === "--git-common-dir") return ".git";
+      if (args[0] === "rev-parse") return N33_HEAD;
+      if (args[0] === "merge-base" && args[2] === ATT_COMMIT && args[3] === N35_GENESIS) throw Object.assign(new Error("not an ancestor"), { status: 1 });
+      return "";
+    },
+    loadResidualDeps: () => (residual ? { residualAcceptance: { junk: true }, verifyResidualAcceptanceFn: () => ({ authorized: true, mode: "chat" }) } : null),
+    readCourseHistory: () => history,
+    readBoundCriticReceipt: (_input, deps) => {
+      if (deps?.residualAcceptance === undefined) throw Object.assign(new Error("Critic findings remain unresolved"), { code: "CVL-CRITIC-FAILED" });
+      return { packet: { request: { taskId: "FEATURE-COURSE" }, candidate: { base: N35_ROUND_ONE, commit: N33_HEAD }, references: [] },
+        critic: { reviewPass: false, candidate: { base: N35_ROUND_ONE, commit: N33_HEAD }, reviewRange: { base: N35_ROUND_ONE, commit: N33_HEAD, diffSha256: "9".repeat(64) } },
+        criticReceiptSha256: "c".repeat(64), residual: { basis: "po-acceptance-of-residual-minor-findings", mode: "chat", acceptanceSha256: "7".repeat(64), findings: [] } };
+    },
+  } };
+}
 check("N33 --critic-addendum refuses an absolute, out-of-tree or non-JSON request path", () => {
   const { root } = n33Fixture();
   try {
@@ -775,7 +801,21 @@ check("N33B an evaluation that cannot run is named as unavailable, never thrown,
   assert.deepEqual(listing.records, []);
 });
 
-assert.equal(cases.length, 39, "the complete dispatch-record writer corpus must be registered before execution begins");
+// Appended last so that no existing case id is renumbered (the corpus count above moves from 39 to 40 for this one case).
+check("N35 --critic-addendum publishes an addendum for the last round of a residual-accepted course whose union holds the record, and refuses it without the acceptance (D217)", () => {
+  const accepted = n33Fixture();
+  try {
+    const receipt = writerModule.runCriticAddendumRequest({ repoRoot: accepted.root, criticAddendumPath: "scratch/addendum-request.json" }, n35CoverageOptions({ residual: true }));
+    assert.equal(existsSync(join(accepted.root, receipt.target)), true);
+  } finally { rmSync(accepted.root, { recursive: true, force: true }); }
+  const refused = n33Fixture();
+  try {
+    refusedWith("addendum-unbound", () => writerModule.runCriticAddendumRequest({ repoRoot: refused.root, criticAddendumPath: "scratch/addendum-request.json" }, n35CoverageOptions({ residual: false })));
+    assert.equal(existsSync(join(refused.root, criticDispositionAddendumPath("NVA-ATT-1"))), false, "an unbound addendum must never be published");
+  } finally { rmSync(refused.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 40, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
