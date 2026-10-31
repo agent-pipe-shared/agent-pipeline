@@ -308,7 +308,11 @@ for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", pat
     try {
       signAndArm(root, { toolName, toolInput: build("exp.md") });
       const otherDenial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DIFFERENT-REASON" }];
-      assert.equal(consume(root, toolName, build("exp.md"), { denials: otherDenial }).status, "absent");
+      // c206f3370 (AC-160 r2): a capability bound to this exact tool input whose denial digests drifted is no longer skipped
+      // silently ("absent"); it is refused and audited as HGO-DRIFT, and still never consumed.
+      const denialDrift = consume(root, toolName, build("exp.md"), { denials: otherDenial });
+      assert.equal(denialDrift.status, "replan");
+      assert.equal(denialDrift.code, "HGO-DRIFT");
       assert.notEqual(consume(root, toolName, build("other-input.md")).status, "consumed");
       const expired = consume(root, toolName, build("exp.md"), { nowMs: 100_000_000_000_000 });
       assert.equal(expired.status, "replan");

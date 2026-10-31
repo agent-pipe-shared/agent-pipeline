@@ -73,23 +73,39 @@ register("K152B refuse an Antigravity entry without an explicit native Model", (
   const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
   const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: subagents } });
   assert.equal(code, BLOCK);
-  assert.ok(stderr.includes("Subagents[].Model"));
+  assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), stderr);
+  // dc8204a28 bound the native Model to the carrier's configured duty tier: an ungoverned type
+  // (customer-researcher) is no longer judged on its Model and is refused as a write carrier instead,
+  // so the explicit-Model message is asserted on a governed read-only carrier (consult-advisor).
+  const governed = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
+  assert.equal(governed.code, BLOCK);
+  assert.ok(governed.stderr.includes("DISPATCH-MODEL-MISSING"), governed.stderr);
+  assert.ok(governed.stderr.includes("Subagents[].Model"), governed.stderr);
 });
 
 register("K152B check every native Model and preserve explicit model admission", () => {
-  const entry = (Model) => ({ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model });
+  // dc8204a28: each governed carrier admits exactly its configured duty tier (advisory = pro,
+  // readiness = flash); "flash_lite" is a valid enum value that no duty selects, so it is refused as a mismatch.
+  const entry = (Model, TypeName = "consult-advisor") => ({ TypeName, Role: "Advisor", Prompt: "inspect input.txt", Model });
   for (const Model of ["inherit", "unknown"]) {
-    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash"), entry(Model)] } });
+    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("pro"), entry(Model)] } });
     assert.equal(code, BLOCK);
     assert.ok(stderr.includes("DISPATCH-MODEL"));
   }
-  for (const Model of ["flash_lite", "flash", "pro"]) {
-    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model)] } });
-    assert.equal(code, ALLOW, `${Model}: ${stderr}`);
+  const advisory = run({ tool_name: "Task", tool_input: { Subagents: [entry("pro", "consult-advisor")] } });
+  assert.equal(advisory.code, ALLOW, `pro: ${advisory.stderr}`);
+  // A readiness-reviewer is a Critic-family carrier, so a bare prompt is refused later by the role-template check;
+  // the explicit-Model admission is what this case pins, so the configured "flash" tier must raise no model finding.
+  const readiness = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash", "readiness-reviewer")] } });
+  assert.ok(!readiness.stderr.includes("DISPATCH-MODEL"), `flash: ${readiness.stderr}`);
+  for (const [Model, TypeName] of [["flash_lite", "consult-advisor"], ["flash_lite", "readiness-reviewer"], ["flash", "consult-advisor"], ["pro", "readiness-reviewer"]]) {
+    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model, TypeName)] } });
+    assert.equal(code, BLOCK, `${TypeName}/${Model}`);
+    assert.ok(stderr.includes("DISPATCH-MODEL-DUTY-MISMATCH"), stderr);
   }
 });
 
-assert.equal(cases.length, 5, "the dispatch-model hook corpus must register five cases");
+assert.equal(cases.length, 5,"the dispatch-model hook corpus must register five cases");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
