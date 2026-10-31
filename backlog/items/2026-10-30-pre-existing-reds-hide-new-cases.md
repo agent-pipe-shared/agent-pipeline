@@ -56,7 +56,13 @@ Red on the plain candidate (identical in every baseline clone this session):
    `hooks/guard-dispatch-native-worker.test.mjs` GDW01/04 (hand-built briefings, now refused with
    DBG-GENERATED-BRIEFING-REQUIRED), `lib/human-guard-override-disjoint.test.mjs` HGOD005/011 (expect `absent`,
    get `replan`). The same sweep found two more fixture reds, fixed in candidate-13 patches: the guard-push promotion
-   allow case (publication review) and guard-dispatch-budget (mkdtemp under a missing scratch/).
+   allow case (publication review) and guard-dispatch-budget (mkdtemp under a missing scratch/). R7 restates all six
+   cases to the decided contracts (test-only, held with candidate 13).
+8. Sweep part 2 (52 more suites, 49 green; red identically on HEAD, the security pin also in the main checkout):
+   `lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types` A1-A3 (Plan and general-purpose now refused with
+   DISPATCH-WRITE-CARRIER-REQUIRED), `lib/pins/onboarding-test-runner-reports-async-pass-before-settlement` (pins 216
+   declared onboarding cases, the suite now declares 240), `lib/pins/security-scanner-failure-provenance` P1-P3 (the
+   fixture projects have no remote, so the scan stops at remote-missing). Slice R8.
 
 ### Status after the candidate-13 held patches (2026-10-31, not yet applied)
 
