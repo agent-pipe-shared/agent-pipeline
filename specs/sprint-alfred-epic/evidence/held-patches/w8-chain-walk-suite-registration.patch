@@ -1,0 +1,17 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 68d6adfbe..385944bbc 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3569,6 +3569,12 @@
+       "invariantPinned": "The close coordinator cannot reach feature-close-prepared while a delivery-course dispatch record of the same feature requires a Critic and carries no matching Critic evidence; records of other features never block",
+       "nonOverlapNote": "Unique regression pin (ALF-W3B-CRITIC-CLOSE-GATE) driving the real coordinator process in its own fixture repository"
+     },
++    {
++      "name": "pin-critic-course-consumer-chain-walk-tests",
++      "file": "plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs",
++      "invariantPinned": "A consumer-shaped multi-round, multi-slice Critic course with residual acceptances walks every step with the real entry points (correction-input bindings, dispatch preflight, admission, finalizer, lineage registration, dispatch-record addendum per record, close coordinator up to feature-close-prepared) and the negative variants stay refused with their typed codes",
++      "nonOverlapNote": "Whole-chain walk (W8, 2026-10-31); the single-step suites (preflight, finalizer, course admission, close coordinator, addendum writer) pin their own step and none of them drives the chain end to end"
++    },
+     {
+       "name": "pin-close-feature-names-reconcile-order-and-close-evidence-tests",
+       "file": "plugins/pipeline-core/lib/pins/close-feature-names-reconcile-order-and-close-evidence.test.mjs",
