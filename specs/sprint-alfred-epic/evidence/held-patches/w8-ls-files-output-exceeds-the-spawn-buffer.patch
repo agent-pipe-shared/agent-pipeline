@@ -1,0 +1,52 @@
+diff --git a/harness/scripts/check-consumer-safe-paths.mjs b/harness/scripts/check-consumer-safe-paths.mjs
+index 9512a5504..2db2c7e2f 100644
+--- a/harness/scripts/check-consumer-safe-paths.mjs
++++ b/harness/scripts/check-consumer-safe-paths.mjs
+@@ -754,7 +754,7 @@ function posixPath(value) {
+ }
+ 
+ function gitListPlugin(root) {
+-  const result = spawnSync("git", ["ls-files", "-z", "--", SCAN_PREFIX], { cwd: root, encoding: "buffer" });
++  const result = spawnSync("git", ["ls-files", "-z", "--", SCAN_PREFIX], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
+   if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
+   return decoder
+     .decode(result.stdout)
+diff --git a/harness/scripts/check-directory-contract.mjs b/harness/scripts/check-directory-contract.mjs
+index eda664f69..cbdc11551 100644
+--- a/harness/scripts/check-directory-contract.mjs
++++ b/harness/scripts/check-directory-contract.mjs
+@@ -107,7 +107,7 @@ function posixPath(value) {
+ }
+ 
+ function gitListFiles(root) {
+-  const result = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "buffer" });
++  const result = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
+   if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
+   return decoder
+     .decode(result.stdout)
+diff --git a/harness/scripts/check-reference-paths.mjs b/harness/scripts/check-reference-paths.mjs
+index ed5582c47..49da302f8 100644
+--- a/harness/scripts/check-reference-paths.mjs
++++ b/harness/scripts/check-reference-paths.mjs
+@@ -188,7 +188,7 @@ function posixPath(value) {
+ }
+ 
+ function gitListTracked(root) {
+-  const result = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "buffer" });
++  const result = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
+   if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
+   return decoder.decode(result.stdout).split("\0").filter(Boolean).map(posixPath).sort();
+ }
+diff --git a/plugins/pipeline-core/scripts/check-backlog-state.mjs b/plugins/pipeline-core/scripts/check-backlog-state.mjs
+index b38d1d61f..e2b3f5a58 100644
+--- a/plugins/pipeline-core/scripts/check-backlog-state.mjs
++++ b/plugins/pipeline-core/scripts/check-backlog-state.mjs
+@@ -150,7 +150,7 @@ function normalizeRepoPath(root, repoPath) {
+ function trackedPaths(root, repoPaths) {
+   const paths = [...new Set(repoPaths.filter((value) => typeof value === "string" && value.trim() !== ""))];
+   if (paths.length === 0) return { state: "known", tracked: new Set() };
+-  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8" });
++  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+   if (!isSuccessfulSpawn(probe)) return { state: "indeterminate", tracked: new Set() };
+   return { state: "known", tracked: new Set(probe.stdout.split("\0").filter((entry) => entry !== "")) };
+ }

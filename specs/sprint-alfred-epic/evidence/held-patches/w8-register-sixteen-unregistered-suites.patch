@@ -1,0 +1,254 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index e3dbdbac7..107d23e89 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -239,6 +239,7 @@
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:architecture-close-disposition-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-public-greenfield-route-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+@@ -251,6 +252,7 @@
+         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
+         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
+         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
++        "verify-phase:harness/scripts/verify.mjs:authority-trace-preload-tests",
+         "verify-phase:harness/scripts/verify.mjs:backlog-dispatch-reference-tests",
+         "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-check",
+         "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-tests",
+@@ -278,6 +280,7 @@
+         "verify-phase:harness/scripts/verify.mjs:check-commit-type-range",
+         "verify-phase:harness/scripts/verify.mjs:check-commit-type-range-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-completeness-vocabulary-doclint-tests",
++        "verify-phase:harness/scripts/verify.mjs:check-critic-bound-verify-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-critic-skip-coverage-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
+@@ -292,6 +295,7 @@
+         "verify-phase:harness/scripts/verify.mjs:check-state-phase-consistency-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-suite-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:check-vendored-template-sync-tests",
++        "verify-phase:harness/scripts/verify.mjs:checkpoint-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:checkpoint-push-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:checkpoint-push-audit-tests",
+         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+@@ -472,6 +476,8 @@
+         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
+         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-value-binding-tests",
++        "verify-phase:harness/scripts/verify.mjs:gitleaks-reproduction-gate-cli-tests",
++        "verify-phase:harness/scripts/verify.mjs:gitleaks-reproduction-gate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-scratch-clones-exclusion-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-windows-suppression-tests",
+@@ -501,6 +507,7 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-native-worker-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-find-or-operator-read-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-ledger-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
+@@ -509,9 +516,11 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-grep-max-count-read-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-no-route-denials-seed-no-override-request-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-architecture-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-attestation-diagnostics-tests",
+@@ -609,6 +618,7 @@
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-fanout-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
++        "verify-phase:harness/scripts/verify.mjs:native-managed-inventory-reuse-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
+         "verify-phase:harness/scripts/verify.mjs:network-lockdown-tests",
+@@ -697,6 +707,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-greenfield-lifecycle-not-walkable-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-claude-windows-guard-refuses-every-in-repo-read-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-close-coordinator-refuses-a-scheduled-critic-slice-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-close-feature-names-reconcile-order-and-close-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-evidence-fails-after-host-update-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-codex-advisor-shared-namespace-rejects-fresh-repository-identity-tests",
+@@ -844,6 +855,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-signing-prompt-prints-the-whole-review-package-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-signing-toolchain-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-source-agent-definition-change-locks-that-agent-until-install-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-stale-approval-repair-names-rebind-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-three-runner-happy-path-with-two-po-approvals-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-transfer-redaction-alters-digest-bound-files-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-unasked-advisor-export-consent-in-fresh-seed-tests",
+@@ -854,6 +866,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-windows-portable-seed-rolls-back-with-hidden-worktree-error-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-windows-pre-push-installer-fsync-and-relative-action-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-windows-private-dacl-detail-codes-and-root-only-rule-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-windows-requester-ancestors-above-repository-are-human-controlled-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-worktree-process-start-parser-misreads-spaced-comm-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-worktrees-share-onboarding-private-state-with-root-bound-intake-tests",
+@@ -962,6 +975,8 @@
+         "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
++        "verify-phase:harness/scripts/verify.mjs:publish-evidence-run-tests",
++        "verify-phase:harness/scripts/verify.mjs:published-tag-push-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
+@@ -1038,6 +1053,7 @@
+         "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-remote-identity-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan",
++        "verify-phase:harness/scripts/verify.mjs:security-scan-large-inventory-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-snapshot-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-v2-integration-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 68d6adfbe..d6609f1e5 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4296,6 +4296,102 @@
+       "file": "scripts/check-greenfield-comparison-citations.test.mjs",
+       "invariantPinned": "Every runner comparison claim a release or retro marks must cite a published comparison file by repo-relative path and matching sha256; unknown, private, missing, mismatching, unscreened or non-comparison citations are refused with a typed GFC code.",
+       "nonOverlapNote": "Unique suite for scripts/check-greenfield-comparison-citations.mjs; the cited files themselves are validated by greenfield-public-comparison-tests."
++    },
++    {
++      "name": "architecture-public-greenfield-route-tests",
++      "file": "plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs",
++      "invariantPinned": "The public consumer greenfield route reaches architecture entry readiness through the Source aggregate approval and the State writer",
++      "nonOverlapNote": "Unique public-consumer qualification of the architecture entry route; the adoption mechanics keep their own suite architecture-adoption-tests"
++    },
++    {
++      "name": "guard-find-or-operator-read-tests",
++      "file": "plugins/pipeline-core/lib/guard/find-or-operator-read.test.mjs",
++      "invariantPinned": "A bounded find read may combine its closed predicates with -o/-a, and a quoted path with parentheses (framework route groups) is a plain passive read (PF-60)",
++      "nonOverlapNote": "Unique grammar pin for the bounded find read in the lifecycle guard"
++    },
++    {
++      "name": "guard-grep-max-count-read-tests",
++      "file": "plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs",
++      "invariantPinned": "A bounded grep read does not spend a guard refusal and a second dispatch turn",
++      "nonOverlapNote": "Unique grammar pin for the bounded grep max-count read in the lifecycle guard"
++    },
++    {
++      "name": "guard-no-route-denials-seed-no-override-request-tests",
++      "file": "plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs",
++      "invariantPinned": "A guard refusal for which no human override route exists seeds no override request, including a target outside the project root; a refusal that offers one seeds exactly one (AC-160)",
++      "nonOverlapNote": "Unique count-based pin of the override request namespace through the real lifecycle guard"
++    },
++    {
++      "name": "native-managed-inventory-reuse-tests",
++      "file": "plugins/pipeline-core/lib/native-managed-inventory-reuse.test.mjs",
++      "invariantPinned": "The native-goldfish namespace read is reused only while every file is provably unchanged, outside the racy window and younger than the maximum age; a rewrite, a fresh write or an elapsed age reads the files again (NMIR)",
++      "nonOverlapNote": "Unique contract suite for the inventory reuse of the native managed namespace"
++    },
++    {
++      "name": "pin-close-coordinator-refuses-a-scheduled-critic-slice-tests",
++      "file": "plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-scheduled-critic-slice.test.mjs",
++      "invariantPinned": "The close coordinator cannot reach feature-close-prepared while a slice of this feature's delivery course with tier critic is still scheduled; a done or cancelled Critic slice and another feature's course never block (D52 clause B)",
++      "nonOverlapNote": "Unique regression pin driving the real coordinator process; the required-Critic evidence gate keeps its own pin"
++    },
++    {
++      "name": "pin-stale-approval-repair-names-rebind-approval-tests",
++      "file": "plugins/pipeline-core/lib/pins/stale-approval-repair-names-rebind-approval.test.mjs",
++      "invariantPinned": "After a clone or transfer the stale-approval repair text names rebind-approval, the route that re-checks every bound digest, instead of only asking to approve the plan again",
++      "nonOverlapNote": "Unique repair-text pin for backlog 2026-10-26-transfer-invalidates-plan-approval"
++    },
++    {
++      "name": "pin-windows-private-dacl-detail-codes-and-root-only-rule-tests",
++      "file": "plugins/pipeline-core/lib/pins/windows-private-dacl-detail-codes-and-root-only-rule.test.mjs",
++      "invariantPinned": "The native private-authority check reports distinct DACL detail codes and applies a root-only rule below a proven-hardened agent-pipeline root (Toolbox D50 / AC-127)",
++      "nonOverlapNote": "Unique regression pin for the Windows private DACL detail codes; the readiness suite keeps its own contract"
++    },
++    {
++      "name": "published-tag-push-tests",
++      "file": "plugins/pipeline-core/lib/published-tag-push.test.mjs",
++      "invariantPinned": "The single predicate shared by guard-push and the generated pre-push hook decides whether a push publishes a tag (N27a / D206)",
++      "nonOverlapNote": "Unique contract suite for lib/published-tag-push.mjs"
++    },
++    {
++      "name": "authority-trace-preload-tests",
++      "file": "plugins/pipeline-core/scripts/authority-trace-preload.test.mjs",
++      "invariantPinned": "The opt-in hook trace preload writes nothing without PIPELINE_AUTHORITY_TRACE=1 and, with it, exactly one v1 line per process naming the hook, the exit code and the counters; an unwritable trace file never changes the exit code",
++      "nonOverlapNote": "Unique child-process suite for authority-trace-preload.mjs"
++    },
++    {
++      "name": "check-critic-bound-verify-tests",
++      "file": "plugins/pipeline-core/scripts/check-critic-bound-verify.test.mjs",
++      "invariantPinned": "The Critic-bound Verify gate compares the checkout root as a physical path, not as text, so a Windows spelling of the same root is the same root (N11)",
++      "nonOverlapNote": "Unique pin for the checkout-root comparison of check-critic-bound-verify.mjs"
++    },
++    {
++      "name": "checkpoint-commit-tests",
++      "file": "plugins/pipeline-core/scripts/checkpoint-commit.test.mjs",
++      "invariantPinned": "The sanctioned checkpoint-commit route commits only allowlisted paths with both provenance trailers and the hooks on, and refuses a disallowed or staged-outside path, an empty change and a message file outside scratch/ or already carrying trailers (D52)",
++      "nonOverlapNote": "Unique regression suite for checkpoint-commit.mjs"
++    },
++    {
++      "name": "gitleaks-reproduction-gate-cli-tests",
++      "file": "plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs",
++      "invariantPinned": "The public gitleaks repair command requires a current exact-value reproduction before it mutates a stale ignore, admits an explicit new suppression only for the reproduced domain, and refuses hardlinked or linked destinations and stale facts, rechecking physical facts after its own scanner returns",
++      "nonOverlapNote": "Unique CLI suite; the adapter keeps its own suite gitleaks-reproduction-gate-tests"
++    },
++    {
++      "name": "publish-evidence-run-tests",
++      "file": "plugins/pipeline-core/scripts/publish-evidence-run.test.mjs",
++      "invariantPinned": "The public evidence-run producer retains distinct immutable functional and visual records with source hash and viewport; an existing run id is immutable, and foreign, malformed, symlinked or racing inputs and outputs refuse without altering previous bytes",
++      "nonOverlapNote": "Unique suite for publish-evidence-run.mjs"
++    },
++    {
++      "name": "gitleaks-reproduction-gate-tests",
++      "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs",
++      "invariantPinned": "The reproduction gate binds the exact local scanner report, binary, config and input without exposing the value, and a review must match one reproduced plain domain so a credential-shaped value cannot enter the gate",
++      "nonOverlapNote": "Unique adapter suite; the command line keeps its own suite gitleaks-reproduction-gate-cli-tests"
++    },
++    {
++      "name": "security-scan-large-inventory-tests",
++      "file": "plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs",
++      "invariantPinned": "observeCandidate reads a tracked-input inventory larger than the default process buffer without losing the candidate identity",
++      "nonOverlapNote": "Unique pin for the candidate-identity buffer defect of the security scan"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+index 78eb7d83e..3a5341f7a 100644
+--- a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
++++ b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+@@ -35,6 +35,9 @@ test("NRS01 refusals with no override route seed no request", () => {
+     ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
+     ["Bash", { command: "node -e \"process.exit(0)\"" }, "GUARD-LIFECYCLE-NOT-READY"],
++    // A target outside the physical project root is HGO-NONOVERRIDABLE-CROSS-BOUNDARY (constants.mjs, "Measured boundary"):
++    // the denial prints the typed no-route line and seeds nothing.
++    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
+   ]) {
+     const { result, seeded } = seededRequests(toolName, toolInput);
+     assert.equal(result.exitCode, 2, `${toolInput.command}`);
+@@ -48,7 +51,6 @@ test("NRS02 refusals that offer a human override seed exactly one request", () =
+     ["Bash", { command: "echo a; echo b" }, "GUARD-PARSE-UNSUPPORTED"],
+     ["Bash", { command: "cat a.txt > b.txt" }, "GUARD-REDIRECT-UNAPPROVED"],
+     ["Bash", { command: "cat a.txt | tee b.txt" }, "GUARD-OPERATOR-UNAPPROVED"],
+-    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
+   ]) {
+     const { result, seeded } = seededRequests(toolName, toolInput);
+     assert.equal(result.exitCode, 2, JSON.stringify(toolInput));
+diff --git a/plugins/pipeline-core/lib/published-tag-push.test.mjs b/plugins/pipeline-core/lib/published-tag-push.test.mjs
+index cde3b6dae..c47bf2d7b 100644
+--- a/plugins/pipeline-core/lib/published-tag-push.test.mjs
++++ b/plugins/pipeline-core/lib/published-tag-push.test.mjs
+@@ -1,6 +1,5 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Pins lib/published-tag-push.mjs (N27a / D206): the one predicate guard-push and the generated pre-push hook share.
+-// NOTE: this file needs registration in the project's Verify suite list (harness/scripts/verify.mjs) -- it is not run by Verify before that.
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
