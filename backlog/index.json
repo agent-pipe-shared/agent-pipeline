@@ -3,16 +3,26 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7edbdad82389d5132cf519fd76e65d1456aee53cc2a210ead63a672320cb855d"
+    "transitionHead": "ea1870bd329893a39344cb2a87647ee2de95e6e0344b0e29d3326fd35aa05f62"
   },
   "counts": {
-    "open": 338,
+    "open": 368,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
     "deferred": 11
   },
   "items": [
+    {
+      "id": "pipeline.a-briefing-package-cannot-carry-an-effort-escalation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Elephant observation 2026-10-30 while packaging candidate 8 slices",
+      "deferred": false,
+      "sprint": "alfred"
+    },
     {
       "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
       "status": "closed",
@@ -26,6 +36,16 @@
       "closureRepository": "self",
       "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
       "closureEvidence": "backlog/evidence/2026-09-18-advisor-prohibition-closure.md"
+    },
+    {
+      "id": "pipeline.a-budget-checkpoint-is-resumed-with-a-grant-not-redispatched",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "PO direction 2026-10-29 (chat): Goldfish keep failing at the budget limit, splitting into small successor dispatches costs more than it saves, and 'everyone will do it wrong' unless the standard procedure is enforced; Elephant analysis the same day",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
@@ -190,6 +210,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.a-dispatched-agent-cannot-delete-its-own-scratch-files",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Toolbox consumer finding N15 (PO relay, 2026-10-29, from the consumer's handover list of 2026-10-27); not yet reproduced here",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted",
       "status": "open",
       "type": "defect",
@@ -287,6 +317,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.a-new-item-course-is-refused-with-cac-registration-invalid-and-no-reason",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Toolbox consumer finding N14 (PO relay, 2026-10-29, from the consumer's handover list of 2026-10-27); not yet reproduced here",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
       "status": "closed",
       "type": "defect",
@@ -374,6 +414,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.a-recurring-housekeeping-job-collects-growing-runtime-state",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "PO direction 2026-10-29 (chat): after moving about 2.3 GB of unused git-hook runtime snapshots aside by hand, the PO wants a regular housekeeping job for this and for comparable growing state, not only for the snapshots",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
       "status": "closed",
       "type": "defect",
@@ -386,6 +436,16 @@
       "closureRepository": "self",
       "closureCommit": "eca3e170e0cf19660c1e0455c8daf656cb638863",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
+    },
+    {
+      "id": "pipeline.a-residual-acceptance-never-reaches-critic-bound-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer report N22 relayed by the PO 2026-10-30 (installed candidate 0.7.0+claude.20261030091213.ca4e1c4)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-restore-of-a-protected-file-to-its-committed-bytes-is-refused",
@@ -1379,6 +1439,16 @@
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
+      "id": "pipeline.architecture-map-currency-is-checked-only-at-git-push",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N25); PO 2026-10-30: major, into candidate 11; the block itself is right, its timing is the defect",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.architecture-materialization-requires-premature-code",
       "status": "closed",
       "type": "defect",
@@ -2007,6 +2077,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md"
     },
     {
+      "id": "pipeline.candidate11-follow-ups",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Open items named in the candidate 11 held-patch notes (N25, N26, N29, reinstall) and a consumer report",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.canonical-verify-evidence-path",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2338,6 +2418,36 @@
       "closureRepository": "self",
       "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
       "closureEvidence": "backlog/items/2026-08-18-cli-docs-generated-from-parser.md"
+    },
+    {
+      "id": "pipeline.close-addendum-ignores-residual-acceptance-and-course-chain",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Consumer hand-over N35 of 2026-10-31, retested on the installed stamp a2099ff5f (0.7.0+claude.20261031060558.62b553e) with a read-only probe; both causes checked by the Elephant against the tree.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.close-feature-unreachable-without-result-authority",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N29, build 0.7.0+claude.20261030131902.8fc9c8b); PO direction 2026-10-30: major, into the next candidate, because work cannot be closed today",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.close-gate-rejects-critic-evidence-for-attested-records",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer report N33 on 0.7.0+claude.20261030222500.21a5a8a (feature close of a live feature)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.close-spec-retention-and-consent",
@@ -3091,6 +3201,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.course-takeover-and-lineage-registration-point-at-each-other",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer report relayed by the PO 2026-10-30 (installed 0.7.0 candidate, after the hook refresh)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
       "status": "closed",
       "type": "defect",
@@ -3225,6 +3345,26 @@
       "owner": "pipeline",
       "created": "2026-10-27",
       "source": "Consumer finding relayed 2026-10-27 (Glossover, PF-80): the admit step printed only SCF-INTERNAL; the real cause was found only by calling the same function directly",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.critic-follow-up-round-that-moves-a-trust-boundary-has-no-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer finding 2026-10-30 (Elephant session on 0.7.0+claude.20261030114801.c23df26); PO direction 2026-10-30: when a diff round is no longer admissible because too much changed, a new full run must be admissible, end to end, with no chain of follow-up errors",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.critic-full-fallback-round-bindings-and-finding-disposition-role",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Consumer hand-over of 2026-10-31, retested on the installed stamp a2099ff5f (0.7.0+claude.20261031060558.62b553e); both causes checked by the Elephant against the tree.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -3540,6 +3680,16 @@
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
+      "id": "pipeline.delivery-after-the-verified-candidate-has-no-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (findings N27 and N23); PO 2026-10-30: major, into candidate 11",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.delivery-is-not-always-a-git-push",
       "status": "open",
       "type": "workflow-improvement",
@@ -3805,6 +3955,16 @@
       "owner": "pipeline",
       "created": "2026-10-26",
       "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, finding D25, build 0.7.0+claude.20261026152532.b8a2ec6): the first Goldfish dispatch fails before start with SDC-AUTHORITY-UNAVAILABLE / item-delivery-registry-initialization-failed (AGY-AUTHORITY-PRIVATE-PATH)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.dispatch-briefing-build-cannot-read-a-spec-addendum-as-a-criterion",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Toolbox consumer finding N16 (PO relay, 2026-10-29, from the consumer's handover list of 2026-10-27); not yet reproduced here",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -4403,6 +4563,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.expired-critic-packet-holds-the-round-slot",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N21, not retested on c23df26); PO 2026-10-30: minor, filed after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise",
       "status": "closed",
       "type": "defect",
@@ -4495,6 +4665,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.feature-close-reconcile-route-is-undocumented",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer report N30-N32 after the N29 retest on 0.7.0+claude.20261030170444.85c269e",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
       "status": "closed",
       "type": "defect",
@@ -4562,6 +4742,16 @@
       "source": "real greenfield project report 2026-10-18 (unnumbered finding from the same run)",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.follow-up-round-lineage-fails-in-session-mode",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N20, not retested on c23df26); PO 2026-10-30: major, into candidate 11",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
@@ -4970,6 +5160,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.git-hook-runtime-snapshots-are-never-collected",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "PO observation 2026-10-29 (chat): a background dispatch spent 13 minutes in 'running PreToolUse hooks 3/4'; PO suspected an oversized state file and asked for a cleanup job",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
       "status": "open",
       "type": "defect",
@@ -5281,6 +5481,16 @@
       "source": "PO decision #27, 2026-10-16: an emitter/consumer for the Goldfish briefing 'quick' field is a backlog item after 0.7.0; the template field is the 0.7.0 delivery.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.goldfish-stop-leaves-registry-drift-and-blocks-parallel-dispatch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Elephant observation 2026-10-30, candidate 11 build (nine Goldfish dispatches)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
@@ -6199,6 +6409,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md"
+    },
+    {
+      "id": "pipeline.handover-size-guard-omits-the-extraction-acknowledgment",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N28); PO 2026-10-30: minor, filed after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof",
@@ -7668,6 +7888,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
+      "id": "pipeline.no-route-back-to-install-after-project-uninstall",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (third consumer, build 0.7.0+claude.20261030131902.8fc9c8b, all observations read-only); PO direction 2026-10-30: major, into candidate 11; after an uninstall no new version can be installed",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
       "status": "closed",
       "type": "defect",
@@ -8948,6 +9178,16 @@
       "closureEvidence": "docs/state.md"
     },
     {
+      "id": "pipeline.pre-existing-reds-hide-new-cases",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Elephant observation 2026-10-30, baseline comparisons of the candidate 11 held patches",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.pre-push-hook-is-offered-not-installed",
       "status": "closed",
       "type": "defect",
@@ -9563,6 +9803,16 @@
       "closureEvidence": "backlog/items/2026-08-31-push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy.md"
     },
     {
+      "id": "pipeline.push-init-names-the-wrong-verify-producer-mode",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N24, not retested on c23df26); PO 2026-10-30: minor, filed after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.push-path-has-no-driver",
       "status": "closed",
       "type": "workflow-improvement",
@@ -9590,6 +9840,26 @@
       "closureRepository": "self",
       "closureCommit": "e2fcf75cde2e698f0fcd1565718d3fc6b5369c45",
       "closureEvidence": "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
+    },
+    {
+      "id": "pipeline.push-review-of-a-feature-with-course-history-ends-in-cca-parent",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer report PF-102 follow-up relayed by the PO 2026-10-30 (installed candidate 0.7.0+claude.20261030091213.ca4e1c4)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.push-review-waiver-has-no-committed-approval-evidence",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "D214 slice of candidate 14 (2026-10-31): the build stopped at its own stop condition; evidence survey in specs/sprint-alfred-epic/evidence/held-patches/w8-d214-committed-rigor-source-for-the-push-review-waiver.notes.md.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.quote-style-fragility-in-shell-command-admission",
@@ -10118,6 +10388,16 @@
       "sprint": "nightwing"
     },
     {
+      "id": "pipeline.residual-acceptance-route-is-not-named-at-the-push-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (gate hints and command builder); PO 2026-10-30: minor, filed after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
       "status": "closed",
       "type": "defect",
@@ -10454,7 +10734,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-10-29",
-      "source": "Consumer handover (PF-99 part d), 2026-10-29; Elephant triage 2026-10-29",
+      "source": "Consumer handover (PF-99 part d), 2026-10-29; Elephant triage 2026-10-29; raised to P1/0.7.0 the same evening: the Toolbox consumer feature is blocked at its push gate by exactly this budget (N10, see Update)",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -11021,6 +11301,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.signature-approvals-dirty-the-tracked-state-file",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-30",
+      "source": "Consumer handover 2026-10-30 (finding N26); PO direction 2026-10-30: major, a signature must not leave the working tree dirty, block the next steps and force a manual reset",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
       "status": "open",
       "type": "defect",
@@ -11557,6 +11847,16 @@
       "closureRepository": "self",
       "closureCommit": "63c1a8ab06f2169ad490b3a1c3d5b178707f1d4c",
       "closureEvidence": "templates/prompts/goldfish-task.md"
+    },
+    {
+      "id": "pipeline.the-elephant-can-attest-its-own-document-work-for-critic-admission",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Toolbox consumer finding N13 (2026-10-29), first read as 'the Elephant cannot attest its own work', corrected the same day from the source of check-critic-skip-coverage.mjs: a descendant of a delivered record is already admitted; the tools do not say so",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.the-elephant-fast-path-excludes-the-small-test-first-fix",
