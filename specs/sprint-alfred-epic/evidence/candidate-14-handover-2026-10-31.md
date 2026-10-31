@@ -5,7 +5,7 @@ reported and the consumer then failed at the next step of the same chain (bindin
 push). This candidate adds a chain walk that drives the real entry points from the first Critic round to the push decision and treats the first
 red step as the work item.
 
-## What the stack contains (apply order, `scratch/po-apply-0.7-candidate14.sh`, rehearsed clean on HEAD)
+## What the stack contains (seven patches, apply order, `scratch/po-apply-0.7-candidate14.sh`, rehearsed clean on HEAD)
 
 | # | Held patch | Effect |
 |---|---|---|
@@ -15,6 +15,7 @@ red step as the work item.
 | 4 | `w8-chain-walk-critic-course-consumer-paths` | the whole-chain walk (3 consumer-shaped paths, 5 negatives); its first red step was the course reader: the chain reader knew only lineage v1 rows, the current registration writes v2 |
 | 5 | `w8-d214-committed-rigor-source-for-the-push-review-waiver` | NOT the waiver: the walk's push step gets the real consumer shape (no State at the pushed commit) and reaches the review decision |
 | 6 | `w8-chain-walk-suite-registration` | registers the walk in `harness/verify-suites.json` |
+| 7 | `w8-empty-tree-course-base-in-the-close-coverage` | a course whose round 1 is a root-candidate review (base: the empty tree, a greenfield consumer's normal start) is covered by the close; before, git refused the tree as a base and the close ended in `CLOSE-CRITIC-EVIDENCE-MISSING` |
 
 ## Evidence
 
@@ -23,8 +24,10 @@ red step as the work item.
 - Walked with real entry points: bindings derive, dispatch preflight, admission, finalizer, lineage registration, addendum per record,
   close coordinator up to `feature-close-prepared`, and the push decision.
 - Not driven, named: Full Verify, batch Critic, native Windows runs, the real consumer repositories, a real signature, a real model call,
-  `closed-local` (needs final Verify and cleanup), a course whose genesis base is the empty tree, the runtime of the retained-course read on a
-  repository with very many features.
+  `closed-local` (needs final Verify and cleanup).
+- Measured, not a gap: the retained-course search costs about 23 ms per feature (3 manifest commits) to about 100 ms (40 manifest commits),
+  at most 256 features, once per HEAD and packet, only after the single-receipt test failed (worst case roughly 25 s, typical consumers
+  milliseconds). The empty-tree course base was a real gap and is closed by patch 7 (the walk and the coverage suite stay green).
 
 ## Open, with the owner
 
