@@ -223,7 +223,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
     ["pipeline-state-calibration-recovery-tests","plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs","top-level-assertions",69],
     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
-    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",14],
+    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",17],
     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
     ["project-onboarding-temp-root-tests","plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs","top-level-assertions",20],

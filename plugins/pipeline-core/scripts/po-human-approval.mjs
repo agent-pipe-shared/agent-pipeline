@@ -511,6 +511,12 @@ export function formatHumanApprovalCliResult(result, { humanFacing = process.std
     const proofPath = result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"
       ? result.externalPaths?.proof ?? null
       : result.paths?.proof ?? null;
+    // N31r (D212): a non-push critical kind keeps its request and authority in the PO
+    // key directory, which an agent cannot list; the follow-on command needs all three.
+    if (result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY" && result.action?.kind !== undefined && result.action.kind !== "push") {
+      return JSON.stringify({ ok: true, code: result.code, proofPath,
+        requestPath: result.externalPaths?.request ?? null, authorityPath: result.externalPaths?.authority ?? null }) + "\n";
+    }
     return JSON.stringify({ ok: true, code: result.code, proofPath }) + "\n";
   }
   return JSON.stringify(result, null, 2) + "\n";

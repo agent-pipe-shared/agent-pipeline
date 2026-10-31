@@ -683,6 +683,44 @@ test("N30: without a readable candidate the completion says why it has no signin
   assert.match(completion.nextAction, /feature-package-reconcile/u);
 });
 
+// ---- N31 remainder (D212): the reconcile plan and its digest can be read again after the bootstrap apply ----
+// The close-feature skill says to take the signing command again from a fresh continuity-result-bootstrap-plan once a
+// commit moved the candidate; that read must answer with the pending reconcile instead of refusing.
+
+test("N31r: a read-only bootstrap plan after the apply prints the pending reconcile plan, its planSha256 and both commands, and writes nothing", () => {
+  const f = fixture("n31r-reread"); const { manifestPath } = registerPackageWithoutResultAuthority(f);
+  const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+  const p = plan(f);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
+  const completion = JSON.parse(applied.out).completion;
+  const before = readFileSync(f.statePath); const manifestBefore = readFileSync(join(f.root, manifestPath));
+  const reread = invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps);
+  assert.equal(reread.status, 0, reread.err);
+  assert.deepEqual(readFileSync(f.statePath), before, "the read writes no State");
+  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBefore, "the read writes no manifest");
+  const value = JSON.parse(reread.out);
+  assert.equal(value.schema, "pipeline.continuity-result-reconcile-pending.v1");
+  assert.equal(value.status, "reconcile-preview"); assert.equal(value.manifest, manifestPath);
+  assert.equal(value.planSha256, completion.planSha256, "the same plan digest the apply printed");
+  assert.equal(value.signatureCommand.subjectSha256, completion.signatureCommand.subjectSha256);
+  assert.deepEqual(value.reconcileCommand.argv, completion.reconcileCommand.argv);
+  assert.equal(value.mutated, false);
+});
+
+test("N31r: the reconcile command marks --by as the PO's own value and names where each proof path comes from", () => {
+  const f = fixture("n31r-by"); registerPackageWithoutResultAuthority(f);
+  const p = plan(f);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) });
+  assert.equal(applied.status, 0, applied.err);
+  const placeholders = JSON.parse(applied.out).completion.reconcileCommand.placeholders;
+  const by = placeholders.find((entry) => entry.flag === "--by");
+  assert.equal(by.token, "<po-name>");
+  assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
+  for (const [flag, field] of [["--proof-request", "requestPath"], ["--proof-authority", "authorityPath"], ["--proof", "proofPath"]]) {
+    assert.match(placeholders.find((entry) => entry.flag === flag).from, new RegExp(field, "u"), `${flag} names the ${field} the signing terminal prints`);
+  }
+});
+
 const argv0 = (argv) => argv[1];
 
 test("N29 negatives: two Result entries, a Result at another path and a PRD without authority stay refused with a typed detail", () => {

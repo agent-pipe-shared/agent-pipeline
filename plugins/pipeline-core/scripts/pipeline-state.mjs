@@ -6093,10 +6093,10 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
   const root = realpathSync(resolve(dir));
   const approvalKind = "feature-package-reconcile";
   const placeholders = [
-    { flag: "--by", token: "<by>", from: "the name of the person who ran the signing step" },
-    { flag: "--proof-request", token: "<proof-request>", from: "externalPaths.request in the signing step's output" },
-    { flag: "--proof-authority", token: "<proof-authority>", from: "externalPaths.authority in the signing step's output" },
-    { flag: "--proof", token: "<proof>", from: "externalPaths.proof in the signing step's output" },
+    { flag: "--by", token: "<po-name>", from: "the PO's own name, supplied by the PO who ran the signing step; never the agent (EL-36)" },
+    { flag: "--proof-request", token: "<proof-request>", from: "requestPath (externalPaths.request) in the signing step's output" },
+    { flag: "--proof-authority", token: "<proof-authority>", from: "authorityPath (externalPaths.authority) in the signing step's output" },
+    { flag: "--proof", token: "<proof>", from: "proofPath (externalPaths.proof) in the signing step's output" },
   ];
   const reconcileCommand = {
     executable: process.execPath,
@@ -6498,6 +6498,15 @@ function runResultBootstrapCommand(sub, rest, deps) {
           console.log(JSON.stringify({ schema: "pipeline.continuity-result-legacy-repair-plan.v1", status: "legacy-repair-preview",
             preview: completion.preview, planSha256: completion.planSha256, applyAction: completion.repairAction,
             nextAction: completion.nextAction }, null, 2));
+          return 0;
+        }
+        // N31r (D212): once the Result is bound, the read answers with the pending
+        // reconcile so its digest and commands can be taken again after a commit.
+        if (completion.state === "reconciliation-pending") {
+          console.log(JSON.stringify({ schema: "pipeline.continuity-result-reconcile-pending.v1", status: completion.preview.status,
+            manifest: completion.manifest, preview: completion.preview, planSha256: completion.planSha256,
+            signatureCommand: completion.signatureCommand ?? null, ...(completion.signatureUnavailable ? { signatureUnavailable: completion.signatureUnavailable } : {}),
+            reconcileCommand: completion.reconcileCommand ?? null, nextAction: completion.nextAction, mutated: false }, null, 2));
           return 0;
         }
       }

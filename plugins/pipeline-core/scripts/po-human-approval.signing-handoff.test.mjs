@@ -52,5 +52,18 @@ test("G31: human-facing critical authorization names the external proof", () => 
   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
 });
 
-if (cases.length !== 4) throw new Error("signing handoff case count drift");
+test("N31r: human-facing critical authorization of a non-push kind names the request, proof and authority paths the reconcile needs", () => {
+  const result = { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
+    action: { kind: "feature-package-reconcile" },
+    paths: { request: "/keys/request.json", proof: "/keys/proof.json", signer: "/keys/signer.json" },
+    externalPaths: { request: "/keys/request.json", proof: "/keys/proof.json", authority: "/keys/authority.json" } };
+  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: true })),
+    { ok: true, code: result.code, proofPath: "/keys/proof.json", requestPath: "/keys/request.json", authorityPath: "/keys/authority.json" });
+  const push = { ...result, action: { kind: "push" } };
+  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(push, { humanFacing: true })),
+    { ok: true, code: result.code, proofPath: "/keys/proof.json" }, "the push output stays as it was");
+  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
+});
+
+if (cases.length !== 5) throw new Error("signing handoff case count drift");
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
