@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.candidate11-follow-ups
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-10-30

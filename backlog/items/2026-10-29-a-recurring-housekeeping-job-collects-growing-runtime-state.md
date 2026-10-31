@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-10-29
 priority: P2
-release: 0.7.x
+release: 0.7.1
 sprint: none
 source: "PO direction 2026-10-29 (chat): after moving about 2.3 GB of unused git-hook runtime snapshots aside by hand, the PO wants a regular housekeeping job for this and for comparable growing state, not only for the snapshots"
 done_when: manual
