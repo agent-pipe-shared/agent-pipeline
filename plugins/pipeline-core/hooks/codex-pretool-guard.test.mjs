@@ -644,6 +644,7 @@ check("production adapter gives a slow push guard its dedicated share", () => {
   assert.equal(observeGovernanceScope({ rootDir: candidateRoot }).requiresEnforcement, true,
     JSON.stringify(observeGovernanceScope({ rootDir: candidateRoot })));
   const repoRoot = join(pluginRoot, "..", "..");
+  mkdirSync(join(repoRoot, "scratch"), { recursive: true }); // a fresh clone has no scratch/ yet
   const adapterFixture = mkdtempSync(join(repoRoot, "scratch", "codex-push-budget-adapter-"));
   const copiedPluginRoot = join(adapterFixture, "pipeline-core");
   cpSync(pluginRoot, copiedPluginRoot, { recursive: true, dereference: false });
@@ -657,7 +658,10 @@ check("production adapter gives a slow push guard its dedicated share", () => {
     'os.userInfo = () => ({ uid: 65000, gid: 65000, username: "pipeline-fixture", homedir: process.env.HOME, shell: "" });',
     "",
   ].join("\n"));
-  assert.match(process.env.HOME ?? "", /codex-push-test-home/u, "test runner must provide a synthetic HOME");
+  // The adapter children (and the userInfo preload) run with the fixture's own synthetic HOME, never the runner's.
+  for (const root of [baselineRoot, candidateRoot, hungRoot]) {
+    assert.match(readyLifecycleEnvByRoot.get(root)?.HOME ?? "", /codex-ready-hgo-home-/u, "the adapter children must get a synthetic HOME");
+  }
   try {
     const invocation = {
       tool_name: "Bash",
