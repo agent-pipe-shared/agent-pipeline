@@ -50,6 +50,14 @@ Red on the plain candidate (identical in every baseline clone this session):
    was caught only by comparing findings against the baseline. It was trimmed back to 1796 with no assertion lost.
    Needs a decision: split slices, or a re-baseline of the ratchet with reasons.
 
+7. Found 2026-10-31 in a fresh-clone sweep of every suite that makes temp dirs under scratch/ (44 suites, 41 green on
+   the candidate and identical on HEAD): `hooks/guard-dispatch-model.test.mjs` GDM04/05 (expect the
+   `Subagents[].Model` refusal, but the duty-selector check DISPATCH-MODEL-DUTY-MISMATCH now fires first),
+   `hooks/guard-dispatch-native-worker.test.mjs` GDW01/04 (hand-built briefings, now refused with
+   DBG-GENERATED-BRIEFING-REQUIRED), `lib/human-guard-override-disjoint.test.mjs` HGOD005/011 (expect `absent`,
+   get `replan`). The same sweep found two more fixture reds, fixed in candidate-13 patches: the guard-push promotion
+   allow case (publication review) and guard-dispatch-budget (mkdtemp under a missing scratch/).
+
 ### Status after the candidate-13 held patches (2026-10-31, not yet applied)
 
 - Item 1: R3 runs every chunk, and R3, G15c2 and R4 make onboarding-v3 green except the seeded push gate and SECGATE-1.
