@@ -1,0 +1,50 @@
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+index 17a95aab5..1371ac2d8 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+@@ -156,12 +156,12 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
+   Object.freeze({
+     id: "GS-10",
+     path: "project/pipeline.json",
+-    reason: "the project authority configuration declares verify and core settings and must not be edited directly.",
++    reason: "the project authority configuration declares verify and core settings and must not be edited directly. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
+   }),
+   Object.freeze({
+     id: "GS-11",
+     path: ".claude/pipeline.json",
+-    reason: "the legacy-tier project authority configuration declares verify and core settings.",
++    reason: "the legacy-tier project authority configuration declares verify and core settings. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
+   }),
+   Object.freeze({
+     id: "GS-12",
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+index 8e74c14aa..d80fc4fab 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+@@ -999,6 +999,26 @@ try {
+     }
+   });
+ 
++  check("GST39 the refusal of either calibration mirror names the other mirror and the Verify drift code (Toolbox N42)", () => {
++    // The two calibration files must stay byte-equal (PCI-CALIBRATION-DRIFT) and each override covers exactly one file. The first refusal used to say
++    // nothing about the mirror, so the second signature was discovered only when Verify went red. The warning belongs to the refusal itself, before any override.
++    const root = governed();
++    const mirrors = [["project/pipeline.json", ".claude/pipeline.json", "GS-10", "GS-11"], [".claude/pipeline.json", "project/pipeline.json", "GS-11", "GS-10"]];
++    for (const [path, other, id, otherId] of mirrors) {
++      const refused = ask(root, path);
++      assert.equal(refused.blocked, true, path);
++      assert.match(refused.stderr, new RegExp(`Rule ID: ${id}\\b`, "u"), path);
++      assert.ok(refused.stderr.includes(other), `the refusal of ${path} names the mirror ${other}: ${refused.stderr}`);
++      assert.match(refused.stderr, new RegExp(otherId, "u"), `the refusal of ${path} names the mirror's rule ${otherId}`);
++      assert.match(refused.stderr, /PCI-CALIBRATION-DRIFT/u, path);
++      assert.match(refused.stderr, /own (PO-approved )?override/u, path);
++    }
++    // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
++    const rootManifest = ask(root, "pipeline.json");
++    assert.equal(rootManifest.blocked, true);
++    assert.doesNotMatch(rootManifest.stderr, /PCI-CALIBRATION-DRIFT/u);
++  });
++
+   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
+ } finally {
+   for (const entry of roots) rmSync(entry, { recursive: true, force: true });
