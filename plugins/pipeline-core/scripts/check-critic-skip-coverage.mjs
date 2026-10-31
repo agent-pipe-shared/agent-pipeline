@@ -524,6 +524,15 @@ function gitIsAncestor(gitRead, ancestor, descendant) {
   try { gitRead(["merge-base", "--is-ancestor", ancestor, descendant]); return true; }
   catch (error) { if (error?.status === 1) return false; throw error; }
 }
+/**
+ * The base of a ROOT-candidate review (a greenfield consumer's round 1, the preflight's `base.commit` null) is the EMPTY TREE, not a
+ * commit: no commit lies at or before it, and `merge-base --is-ancestor` refuses a tree object. The whole-chain walk found the close
+ * ending in CLOSE-CRITIC-EVIDENCE-MISSING for such a course.
+ */
+const EMPTY_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+function gitIsAtOrBeforeBase(gitRead, commit, base) {
+  return base === EMPTY_TREE_OID ? false : gitIsAncestor(gitRead, commit, base);
+}
 
 /**
  * D212 (N33 B): a consumed, passed Critic receipt whose packet carries ANOTHER task id (a feature-wide Critic course) satisfies a
@@ -592,10 +601,10 @@ function courseChainFinding(addendum, bound, history, gitRead) {
     const mode = history[round]?.request?.mode;
     const connected = COMMIT_OID.test(base ?? "") && COMMIT_OID.test(head ?? "")
       && (round === 0 || (mode === "delta" && base === history[round - 1].candidate.commit) || (mode === "full" && base === genesisBase));
-    if (!connected || !gitIsAncestor(gitRead, base, head)) return `the registered rounds do not form one connected chain (round ${round + 1} breaks it)`;
+    if (!connected || !(base === EMPTY_TREE_OID || gitIsAncestor(gitRead, base, head))) return `the registered rounds do not form one connected chain (round ${round + 1} breaks it)`;
   }
   if (!gitIsAncestor(gitRead, addendum.candidateCommit, last.candidate.commit)) return "the commit is not an ancestor of the last candidate of the registered course";
-  if (gitIsAncestor(gitRead, addendum.candidateCommit, genesisBase)) return "the commit is not after the course genesis base";
+  if (gitIsAtOrBeforeBase(gitRead, addendum.candidateCommit, genesisBase)) return "the commit is not after the course genesis base";
   return null;
 }
 
@@ -630,7 +639,7 @@ function singleReceiptFinding(addendum, bound, gitRead) {
     }
   }
   if (!gitIsAncestor(gitRead, addendum.candidateCommit, range.commit)) return `${prefix} (the commit is not an ancestor of the reviewed candidate)`;
-  if (gitIsAncestor(gitRead, addendum.candidateCommit, range.base)) return `${prefix} (the commit is not after the reviewed range base)`;
+  if (gitIsAtOrBeforeBase(gitRead, addendum.candidateCommit, range.base)) return `${prefix} (the commit is not after the reviewed range base)`;
   return null;
 }
 

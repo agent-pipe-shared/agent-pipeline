@@ -1275,7 +1275,9 @@ const N35_RESIDUAL = Object.freeze({ basis: "po-acceptance-of-residual-minor-fin
 const N35_PACKET_IDS = ["1".repeat(32), "2".repeat(32), "3".repeat(32)];
 const n35H = (c) => c.repeat(64);
 /** A real repository: pre <- genesis <- a <- b <- c1 <- c2 <- c3 <- registered (HEAD, the commit that registers the lineage). */
-function n35Repository() {
+const N35_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+/** `emptyTreeGenesis`: the course starts with a ROOT-candidate review, whose base is the empty tree (a greenfield consumer's round 1). */
+function n35Repository({ emptyTreeGenesis = false } = {}) {
   const root = fixture({ "evidence/.keep": "" });
   const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
   const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
@@ -1288,7 +1290,7 @@ function n35Repository() {
   git("init", "-q", "-b", "main");
   const pre = commit("pre.txt"); const genesis = commit("genesis.txt"); const a = commit("a.txt"); const b = commit("b.txt");
   const c1 = commit("c1.txt"); const c2 = commit("c2.txt"); const c3 = commit("c3.txt");
-  const rounds = [{ base: genesis, head: c1, mode: "full" }, { base: c1, head: c2, mode: "delta" }, { base: c2, head: c3, mode: "delta" }];
+  const rounds = [{ base: emptyTreeGenesis ? N35_EMPTY_TREE : genesis, head: c1, mode: "full" }, { base: c1, head: c2, mode: "delta" }, { base: c2, head: c3, mode: "delta" }];
   const path = "src/example.mjs";
   const delta = { changedPaths: [path], changedBehaviorClaims: ["behavior-one"], priorReceipt: { id: "receipt-1", sha256: n35H("4") },
     pathInvariantMap: { [path]: ["INV-1"] }, pathInvariantMapSha256: sha256Canonical({ [path]: ["INV-1"] }), coordinatorImpactConfirmed: true,
@@ -1356,6 +1358,24 @@ test("N35 two attested records in round 1 are covered by a course closed through
     const bytes = Buffer.from(readFileSync(join(repo.root, `evidence/dispatch-record-${taskId}.json`)));
     assert.equal(verifyCriticDispositionAddendumForRecord({ root: repo.root, taskId, record: JSON.parse(bytes), recordBytes: bytes, options }).code, "critic-addendum-bound");
   }
+});
+
+test("N35 a course that starts with a root-candidate review (empty-tree base) covers the records of its whole history and still refuses one after the last candidate (D217 B, whole chain)", () => {
+  // A greenfield consumer's round 1 reviews the first commit onward against the EMPTY TREE (the preflight's base.commit is null). The
+  // chain reader used to read that genesis base as "not a commit"/"not connected" and the close ended in CLOSE-CRITIC-EVIDENCE-MISSING.
+  const repo = n35Repository({ emptyTreeGenesis: true });
+  assert.equal(repo.history[0].diff.base, N35_EMPTY_TREE);
+  n35Write(repo, "ATT-ROOT", repo.pre); n35Write(repo, "ATT-MID", repo.a);
+  const { options } = n35Reader(repo);
+  const result = evaluate(repo.root, ["src/change.txt"], { ...options, taskIds: ["ATT-ROOT", "ATT-MID"] });
+  assert.equal(result.ok, true, result.readFindings.join("\n"));
+  assert.equal(result.criticEvidenceRecordCount, 2);
+  assert.deepEqual(result.requiredTaskIds, []);
+  const after = n35Repository({ emptyTreeGenesis: true });
+  n35Write(after, "ATT-OUT", after.registered);
+  const outside = evaluate(after.root, ["src/change.txt"], { ...n35Reader(after).options, taskIds: ["ATT-OUT"] });
+  assert.equal(outside.ok, false, "a record after the last candidate stays refused");
+  assert.deepEqual(outside.requiredTaskIds, ["ATT-OUT"]);
 });
 
 test("N35 a failed receipt never binds without a PO residual acceptance, and the refusal names the accept route (D217 A, C)", () => {
