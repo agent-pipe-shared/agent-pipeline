@@ -1,0 +1,243 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 5e139cb34..8ba179549 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -206,9 +206,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
+     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
+     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",154],
+-    ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",19],
++    ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
+     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
+-    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",57],
++    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",58], // W7-R7 (QG-04): 57->58, the restated HGOD005/HGOD011 (c206f3370) assert the denial-drift code; classifier unchanged
+     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],
+     ["install-snapshot-progress-tests","plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs","top-level-assertions",17],
+     ["installed-bootstrap-import-closure-tests","plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+index 1bc0c0987..48449c5cd 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+@@ -73,23 +73,39 @@ register("K152B refuse an Antigravity entry without an explicit native Model", (
+   const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
+   const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: subagents } });
+   assert.equal(code, BLOCK);
+-  assert.ok(stderr.includes("Subagents[].Model"));
++  assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), stderr);
++  // dc8204a28 bound the native Model to the carrier's configured duty tier: an ungoverned type
++  // (customer-researcher) is no longer judged on its Model and is refused as a write carrier instead,
++  // so the explicit-Model message is asserted on a governed read-only carrier (consult-advisor).
++  const governed = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
++  assert.equal(governed.code, BLOCK);
++  assert.ok(governed.stderr.includes("DISPATCH-MODEL-MISSING"), governed.stderr);
++  assert.ok(governed.stderr.includes("Subagents[].Model"), governed.stderr);
+ });
+ 
+ register("K152B check every native Model and preserve explicit model admission", () => {
+-  const entry = (Model) => ({ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model });
++  // dc8204a28: each governed carrier admits exactly its configured duty tier (advisory = pro,
++  // readiness = flash); "flash_lite" is a valid enum value that no duty selects, so it is refused as a mismatch.
++  const entry = (Model, TypeName = "consult-advisor") => ({ TypeName, Role: "Advisor", Prompt: "inspect input.txt", Model });
+   for (const Model of ["inherit", "unknown"]) {
+-    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash"), entry(Model)] } });
++    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("pro"), entry(Model)] } });
+     assert.equal(code, BLOCK);
+     assert.ok(stderr.includes("DISPATCH-MODEL"));
+   }
+-  for (const Model of ["flash_lite", "flash", "pro"]) {
+-    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model)] } });
+-    assert.equal(code, ALLOW, `${Model}: ${stderr}`);
++  const advisory = run({ tool_name: "Task", tool_input: { Subagents: [entry("pro", "consult-advisor")] } });
++  assert.equal(advisory.code, ALLOW, `pro: ${advisory.stderr}`);
++  // A readiness-reviewer is a Critic-family carrier, so a bare prompt is refused later by the role-template check;
++  // the explicit-Model admission is what this case pins, so the configured "flash" tier must raise no model finding.
++  const readiness = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash", "readiness-reviewer")] } });
++  assert.ok(!readiness.stderr.includes("DISPATCH-MODEL"), `flash: ${readiness.stderr}`);
++  for (const [Model, TypeName] of [["flash_lite", "consult-advisor"], ["flash_lite", "readiness-reviewer"], ["flash", "consult-advisor"], ["pro", "readiness-reviewer"]]) {
++    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model, TypeName)] } });
++    assert.equal(code, BLOCK, `${TypeName}/${Model}`);
++    assert.ok(stderr.includes("DISPATCH-MODEL-DUTY-MISMATCH"), stderr);
+   }
+ });
+ 
+-assert.equal(cases.length, 5, "the dispatch-model hook corpus must register five cases");
++assert.equal(cases.length, 5,"the dispatch-model hook corpus must register five cases");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
+ registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index 968105458..a14021e12 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -14,7 +14,7 @@
+ import assert from "node:assert/strict";
+ import { execFileSync, spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir, devNull } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -33,6 +33,8 @@ import { evaluateAdvisorProhibitionGuard } from "./guard-advisor-prohibition.mjs
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
++import { nativeContractFixtureParent, nativeContractFixtureRepositoryRoot, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
+ 
+ // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
+ // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
+@@ -113,63 +115,70 @@ function nativeCodexWorkerPrompt(extra = {}) {
+   return `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(binding)}\n-->\nNATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.`;
+ }
+ 
++// D185 (90fa209cf, b206d17cb): a productive Goldfish dispatch is admitted only with a briefing from the generator, so this case
++// (D183 never weakened) builds its Codex worker briefing with the real generator, run in process with an injected ruleset
++// identity and Codex route, on a production approved-course fixture. The intent is unchanged: a complete dispatched Codex
++// briefing publishes one native pending binding; a candidate that no longer matches the fixture HEAD blocks launch with the
++// typed NGHS-CANDIDATE-MISMATCH and publishes nothing.
++const generatedRoots = [];
++process.once("exit", () => { for (const root of generatedRoots) rmSync(root, { recursive: true, force: true }); });
++function generatedCodexFixture(label) {
++  const root = realpathSync(mkdtempSync(join(nativeContractFixtureParent(), `guard-dispatch-native-${label}-`)));
++  generatedRoots.push(root);
++  const pipelineUserSource = readFileSync(join(nativeContractFixtureRepositoryRoot(), "pipeline.user.yaml"), "utf8").replace("gates:\n", "gates:\n  human_approval: chat\n");
++  prepareApprovedItemCourseFixture({ root, pipelineUserSource, calibrationExtra: { handover: "docs/state.md" } });
++  recordConsentGiven({ rootDir: root });
++  assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true,
++    "native fixture must be admitted through canonical governance enrollment");
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  writeFileSync(join(root, "scratch", "pkg.json"), JSON.stringify({
++    id: "GD15N-CODEX-WORKER", item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", runner: "codex", modelId: "gpt-6-luna", modelWhy: "role default",
++    check: "src/change.test.mjs", paths: ["src/change.mjs"], spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal: "Fixture goal text.",
++    context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
++  }));
++  const built = runDispatchBriefing(["build", "--root", root, "--package", "scratch/pkg.json"], {
++    observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),
++    resolveBaseline: () => ({ status: "ready", entries: [] }),
++    codexRoute: (taskRoute) => ({ taskRoute, runner: "codex", role: "worker", effort: "high", state: "default", selector: { kind: "model-id", value: "gpt-6-luna" } }),
++  });
++  assert.equal(built.ok, true, `the generator must build the fixture briefing -- ${JSON.stringify(built).slice(0, 300)}`);
++  return { root, text: built.text };
++}
++const pendingCodexFiles = (root) => {
++  const privateDir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
++  return existsSync(privateDir) ? readdirSync(privateDir).filter((name) => name.startsWith("pending-codex-") && name.endsWith(".json")).map((name) => join(privateDir, name)) : [];
++};
+ manualCheck("GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation", () => {
+-  const fixture = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-native-v2-"));
+   const sessionId = "gd15n-session";
+-  const toolUseId = "gd15n-positive";
+-  try {
+-    execFileSync("git", ["init", "-q"], { cwd: fixture });
+-    execFileSync("git", ["config", "user.name", "Pipeline Fixture"], { cwd: fixture });
+-    execFileSync("git", ["config", "user.email", "pipeline-fixture@example.invalid"], { cwd: fixture });
+-    mkdirSync(join(fixture, "src"), { recursive: true });
+-    writeFileSync(join(fixture, "src", "change.mjs"), "export const candidate = true;\n");
+-    recordConsentGiven({ rootDir: fixture });
+-    assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
+-      "native fixture must be admitted through canonical governance enrollment");
+-    mkdirSync(join(fixture, ".claude"), { recursive: true });
+-    writeFileSync(join(fixture, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+-    writeFileSync(join(fixture, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
+-    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs", ".claude/pipeline.yaml", ".claude/pipeline-state.json"], { cwd: fixture });
+-    execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
+-    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: fixture, encoding: "utf8" }).trim(), "",
+-      "native preparation fixture must begin from a clean committed tree");
+-    const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture, encoding: "utf8" }).trim();
+-    const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: fixture, encoding: "utf8" }).trim();
+-    const binding = { schema: "pipeline.native-goldfish-host-briefing.v2", dispatchId: "GD15N-CODEX-WORKER",
+-      candidateCommit, candidateTree, runner: "codex", role: "pipeline-core:goldfish-implementor",
+-      nativeAgentType: "worker", model: "gpt-6-luna", effort: "high", rulesetSha: "c".repeat(64),
+-      allowedPaths: ["src/change.mjs"],
+-      criticDecision: { schema: "pipeline.critic-required-decision.v1",
+-        trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
+-          diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" } };
+-    const fullBriefing = filledTemplateBody("plugins/pipeline-core/templates/prompts/goldfish-task.md");
+-    const message = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(binding)}\n-->\n${fullBriefing}`;
+-    assert.equal((message.match(new RegExp("<" + "!-- pipeline-native-goldfish-host-commit:v[12]", "gu")) ?? []).length, 1,
+-      "the dispatched message must contain only its selected binding");
+-    assert.equal((message.match(/NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record;/gu) ?? []).length, 1,
+-      "the dispatched message must contain exactly one host directive");
+-    const positive = run({ tool_name: "spawn_agent", tool_use_id: toolUseId, session_id: sessionId,
+-      tool_input: { agent_type: "worker", message } }, fixture);
+-    assert.equal(positive.code, ALLOW, `complete v2 briefing should prepare before launch: ${positive.stderr}`);
+-    const privateDir = join(fixture, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+-    const pendingFiles = readdirSync(privateDir).filter((name) => name.startsWith("pending-codex-") && name.endsWith(".json"));
+-    assert.equal(pendingFiles.length, 1, "successful preparation must publish one native pending state");
+-    const pending = JSON.parse(readFileSync(join(privateDir, pendingFiles[0]), "utf8"));
+-    assert.equal(pending.schema, "pipeline.native-goldfish-host-state.v1");
+-    assert.equal(pending.binding.dispatchId, binding.dispatchId);
+-    assert.equal(pending.binding.adapterVersion, 2);
+-    assert.equal(pending.binding.nativeAgentType, "worker");
+-    assert.equal(pending.binding.candidateCommit, candidateCommit);
++  const { root, text } = generatedCodexFixture("positive");
++  const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
++  assert.equal((text.match(new RegExp("<" + "!-- pipeline-native-goldfish-host-commit:v[123]", "gu")) ?? []).length, 1,
++    "the dispatched message must contain only its selected binding");
++  assert.equal((text.match(/NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record;/gu) ?? []).length, 1,
++    "the dispatched message must contain exactly one host directive");
++  const positive = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-positive", session_id: sessionId, cwd: root,
++    tool_input: { agent_type: "worker", message: text } }, root);
++  assert.equal(positive.code, ALLOW, `complete generated briefing should prepare before launch: ${positive.stderr}`);
++  const pendingFiles = pendingCodexFiles(root);
++  assert.equal(pendingFiles.length, 1, "successful preparation must publish one native pending state");
++  const pending = JSON.parse(readFileSync(pendingFiles[0], "utf8"));
++  // A generated, item-governed briefing publishes the configured-route state schema (the bare v1 schema was the hand-built shape).
++  assert.equal(pending.schema, "pipeline.native-goldfish-host-state.v3");
++  assert.equal(pending.binding.dispatchId, "GD15N-CODEX-WORKER");
++  assert.equal(pending.binding.adapterVersion, 2);
++  assert.equal(pending.binding.nativeAgentType, "worker");
++  assert.equal(pending.binding.candidateCommit, candidateCommit);
+ 
+-    const failedBinding = { ...binding, candidateTree: "d".repeat(40), dispatchId: "GD15N-CODEX-MISMATCH" };
+-    const failedMessage = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(failedBinding)}\n-->\n${fullBriefing}`;
+-    const failed = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-negative", session_id: sessionId,
+-      tool_input: { agent_type: "worker", message: failedMessage } }, fixture);
+-    assert.equal(failed.code, BLOCK, `failed v2 native preparation must block launch: ${failed.stderr}`);
+-    assert.ok(failed.stderr.includes("NGHS-CANDIDATE-MISMATCH"), `typed preparation failure missing: ${failed.stderr}`);
+-    assert.equal(readdirSync(privateDir).filter((name) => name.startsWith("pending-codex-") && name.endsWith(".json")).length, 1,
+-      "failed preparation must not publish a pending state");
+-  } finally { rmSync(fixture, { recursive: true, force: true }); }
++  // The candidate moves after the briefing is generated: the binding no longer matches the fixture HEAD.
++  const stale = generatedCodexFixture("negative");
++  writeFileSync(join(stale.root, "src", "moved.txt"), "head moved after the briefing was generated\n");
++  execFileSync("git", ["add", "--", "src/moved.txt"], { cwd: stale.root });
++  execFileSync("git", ["-c", "user.name=Pipeline Fixture", "-c", "user.email=pipeline-fixture@example.invalid", "commit", "-q", "-m", "move the candidate"], { cwd: stale.root });
++  const failed = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-negative", session_id: sessionId, cwd: stale.root,
++    tool_input: { agent_type: "worker", message: stale.text } }, stale.root);
++  assert.equal(failed.code, BLOCK, `failed native preparation must block launch: ${failed.stderr}`);
++  assert.ok(failed.stderr.includes("NGHS-CANDIDATE-MISMATCH"), `typed preparation failure missing: ${failed.stderr}`);
++  assert.equal(pendingCodexFiles(stale.root).length, 0, "failed preparation must not publish a pending state");
+ });
+ check("GD15k block a marked Codex worker when its native type differs from the binding", {
+   tool_name: "spawn_agent", tool_input: { agent_type: "goldfish-implementor", message: nativeCodexWorkerPrompt() },
+@@ -197,7 +206,10 @@ manualCheck("GD15m check a marked worker packet against the functional Goldfish
+     execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
+     const { code, stderr } = run({ tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() } }, fixture);
+     assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 200)}`);
+-    assert.ok(stderr.includes("DISPATCH-INCOMPLETE-BRIEFING"), `stderr missing "DISPATCH-INCOMPLETE-BRIEFING" -- ${stderr.trim().slice(0, 200)}`);
++    // D185 (90fa209cf): the generated-briefing check runs before the completeness check, so a marked worker packet that is not
++    // the generator's output is refused DBG-GENERATED-BRIEFING-REQUIRED; DISPATCH-INCOMPLETE-BRIEFING stays pinned in
++    // lib/dispatch-policy.test.mjs. The packet is still never admitted as a functional Goldfish briefing.
++    assert.ok(stderr.includes("BLOCKED (guard-dispatch): DBG-GENERATED-BRIEFING-REQUIRED"), `stderr missing "DBG-GENERATED-BRIEFING-REQUIRED" -- ${stderr.trim().slice(0, 200)}`);
+   } finally { rmSync(fixture, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs b/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
+index 95892ceb6..9979c41da 100644
+--- a/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
+@@ -308,7 +308,11 @@ for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", pat
+     try {
+       signAndArm(root, { toolName, toolInput: build("exp.md") });
+       const otherDenial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DIFFERENT-REASON" }];
+-      assert.equal(consume(root, toolName, build("exp.md"), { denials: otherDenial }).status, "absent");
++      // c206f3370 (AC-160 r2): a capability bound to this exact tool input whose denial digests drifted is no longer skipped
++      // silently ("absent"); it is refused and audited as HGO-DRIFT, and still never consumed.
++      const denialDrift = consume(root, toolName, build("exp.md"), { denials: otherDenial });
++      assert.equal(denialDrift.status, "replan");
++      assert.equal(denialDrift.code, "HGO-DRIFT");
+       assert.notEqual(consume(root, toolName, build("other-input.md")).status, "consumed");
+       const expired = consume(root, toolName, build("exp.md"), { nowMs: 100_000_000_000_000 });
+       assert.equal(expired.status, "replan");
