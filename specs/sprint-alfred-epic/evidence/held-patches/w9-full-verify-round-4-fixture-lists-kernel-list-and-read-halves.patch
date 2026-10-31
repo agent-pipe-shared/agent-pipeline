@@ -1,0 +1,209 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 7ce45919b..0d6087aad 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -585,6 +585,15 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs`,
+ `plugins/pipeline-core/lib/doc-reader-plan-scope.mjs`,
+ `plugins/pipeline-core/lib/historical-fresh-review-admission.mjs`,
++`plugins/pipeline-core/lib/critic-packet-preflight-read.mjs`,
++`plugins/pipeline-core/lib/critic-verify-readiness-read.mjs`,
++`plugins/pipeline-core/lib/critical-action-authorization-read.mjs`,
++`plugins/pipeline-core/lib/critical-human-proof-policy-read.mjs`,
++`plugins/pipeline-core/lib/po-gate-authority-read.mjs`,
++`plugins/pipeline-core/lib/po-human-approval-read.mjs`,
++`plugins/pipeline-core/lib/project-authority-read.mjs`,
++`plugins/pipeline-core/lib/review-admission-read.mjs`,
++`plugins/pipeline-core/lib/session-critic-finalizer-read.mjs`,
+ `plugins/pipeline-core/lib/interruption-promotion.mjs`,
+ `plugins/pipeline-core/lib/interruption-receipt-store.mjs`,
+ `plugins/pipeline-core/lib/interruption-receipts.mjs`,
+diff --git a/harness/scripts/check-consumer-safe-paths.mjs b/harness/scripts/check-consumer-safe-paths.mjs
+index 2db2c7e2f..308a02781 100644
+--- a/harness/scripts/check-consumer-safe-paths.mjs
++++ b/harness/scripts/check-consumer-safe-paths.mjs
+@@ -376,12 +376,12 @@ export const ALLOWLIST = Object.freeze([
+     reason: "Class B (coordinator-confirmed): names the checker (harness/scripts/check-observation-governance.mjs) that by design only exists in a source checkout; the bootstrap skill's own Observation-governance step already explains this to the agent.",
+   },
+   {
+-    file: "plugins/pipeline-core/lib/po-gate-authority.mjs",
++    file: "plugins/pipeline-core/lib/po-gate-authority-read.mjs",
+     match: "project has the plugin but no setup.mjs",
+     reason: "Class B: source comment, not an operator-facing message.",
+   },
+   {
+-    file: "plugins/pipeline-core/lib/po-gate-authority.mjs",
++    file: "plugins/pipeline-core/lib/po-gate-authority-read.mjs",
+     match: "Run node setup.mjs --publish-po-profile",
+     reason: "Class unclear: a constructed repair message that names \"the canonical primary checkout\" rather than the current repo, which may or may not make it consumer-reachable in practice. Not confidently classified within this dispatch's budget -- left for the follow-up dispatch's judgment rather than guessed.",
+   },
+diff --git a/harness/scripts/check-reference-paths.mjs b/harness/scripts/check-reference-paths.mjs
+index 49da302f8..c920749c0 100644
+--- a/harness/scripts/check-reference-paths.mjs
++++ b/harness/scripts/check-reference-paths.mjs
+@@ -170,6 +170,33 @@ export const ALLOWLIST = Object.freeze([
+       "explain a directory-depth arithmetic correction caused by the " +
+       "Nova/Phoenix merge relocating it one directory deeper.",
+   },
++  // C14-GITLEAKS-FP (2026-10-31): each content-v1 fingerprint in .gitleaksignore names the TRACKED evidence copy
++  // "<script>.mjs.txt"; the detection rule reads the "<script>.mjs" prefix of that file name as a script reference.
++  // The tracked file is the .txt copy, so the fingerprint is right as written and cannot name anything else.
++  {
++    file: ".gitleaksignore",
++    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/scripts/po-human-approval" +
++      ".mjs",
++    reason:
++      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy po-human-approval.mjs.txt (a .txt file); " +
++      "the detector reads its .mjs prefix as a script path.",
++  },
++  {
++    file: ".gitleaksignore",
++    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/dependencies/frozen-g8-postimages/plugins/pipeline-core/lib/model-family-host-store.test" +
++      ".mjs",
++    reason:
++      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy model-family-host-store.test.mjs.txt (a .txt file); " +
++      "the detector reads its .mjs prefix as a script path.",
++  },
++  {
++    file: ".gitleaksignore",
++    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/lib/model-family-host-store.test" +
++      ".mjs",
++    reason:
++      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy model-family-host-store.test.mjs.txt (a .txt file); " +
++      "the detector reads its .mjs prefix as a script path.",
++  },
+ ]);
+ 
+ /** What this check cannot see. Printed with every result, not just here. */
+diff --git a/harness/scripts/check-verify-suite-registration.test.mjs b/harness/scripts/check-verify-suite-registration.test.mjs
+index 484371c05..fd2ed6dd7 100644
+--- a/harness/scripts/check-verify-suite-registration.test.mjs
++++ b/harness/scripts/check-verify-suite-registration.test.mjs
+@@ -598,6 +598,7 @@ const FIXTURE_MODULES = Object.freeze([
+   "plugins/pipeline-core/lib/governance-event.mjs",
+   "plugins/pipeline-core/lib/governance-verification-action.mjs",
+   "plugins/pipeline-core/lib/project-authority.mjs",
++  "plugins/pipeline-core/lib/project-authority-read.mjs", // via project-authority.mjs (D216-A read half; node: imports only)
+   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
+   "plugins/pipeline-core/lib/verify-resume.mjs",
+   "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index e3529d388..f7e6002ed 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -600,7 +600,8 @@ function decideGreenfieldPendingFitness(input) {
+  * after `const scope = ...` is validated. The existing allowance is conditioned on `adoption.disposition ===
+  * "deferred"`; this one must sit OUTSIDE that condition because a design-package tree is `approved-scoped`:
+  *
+- *   // import { greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
++ *   // import { greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from this module (one directory up from guard/);
++ *   // the module specifier is not spelled out here: a copy-graph walker that reads import text would take it for a real import.
+  *   const pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
+  *     rootDir: root,
+  *     taskScope: scope,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index bd04fa98d..ab3ff069a 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -797,6 +797,17 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+   "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+   "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
++  // D216 option A (D219): the read halves the dispatch preflight imports. Each is first-party code reached from an
++  // already-kernel module, so the closure rule requires it here; they carry no write API (GST33 pins that).
++  "plugins/pipeline-core/lib/critic-packet-preflight-read.mjs",
++  "plugins/pipeline-core/lib/critic-verify-readiness-read.mjs",
++  "plugins/pipeline-core/lib/critical-action-authorization-read.mjs",
++  "plugins/pipeline-core/lib/critical-human-proof-policy-read.mjs",
++  "plugins/pipeline-core/lib/po-gate-authority-read.mjs",
++  "plugins/pipeline-core/lib/po-human-approval-read.mjs",
++  "plugins/pipeline-core/lib/project-authority-read.mjs",
++  "plugins/pipeline-core/lib/review-admission-read.mjs",
++  "plugins/pipeline-core/lib/session-critic-finalizer-read.mjs",
+   "plugins/pipeline-core/lib/interruption-promotion.mjs",
+   "plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+   "plugins/pipeline-core/lib/interruption-receipts.mjs",
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 715cdd79c..e6c0268a0 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -6159,6 +6159,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["../scripts/pipeline-manifest.schema.json", ["plugins", "pipeline-core", "scripts", "pipeline-manifest.schema.json"]],
+       ["./manifest.mjs", ["plugins", "pipeline-core", "lib", "manifest.mjs"]],
+       ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],
++      ["./project-authority-read.mjs", ["plugins", "pipeline-core", "lib", "project-authority-read.mjs"]],
+       ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
+       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
+       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
+diff --git a/plugins/pipeline-core/lib/scoped-verify-registration.test.mjs b/plugins/pipeline-core/lib/scoped-verify-registration.test.mjs
+index a06e39803..4fff07389 100644
+--- a/plugins/pipeline-core/lib/scoped-verify-registration.test.mjs
++++ b/plugins/pipeline-core/lib/scoped-verify-registration.test.mjs
+@@ -249,6 +249,8 @@ function scopedRegistrationFailureFixture() {
+     // verify.mjs resolves the manifest tier through the authority resolver (ADR-0054);
+     // the fixture root must carry it and its one local dependency.
+     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"));
++    // D216-A: project-authority.mjs re-exports its read half (node: imports only).
++    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority-read.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority-read.mjs"));
+     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"));
+     mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
+     writeFileSync(
+diff --git a/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs b/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs
+index 25cccccac..6de1bbd38 100644
+--- a/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs
++++ b/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs
+@@ -34,11 +34,41 @@ function copyPluginGraph(version) {
+     fs.mkdirSync(dirname(target), { recursive: true });
+     fs.copyFileSync(source, target);
+     assert.deepEqual(fs.readFileSync(target), fs.readFileSync(source), 'immutable source copy');
+-    for (const match of fs.readFileSync(source, 'utf8').matchAll(/(?:from\s+|import\s*)["'](\.[^"']+)["']/g)) {
++    const text = fs.readFileSync(source, 'utf8');
++    for (const match of text.matchAll(/(?:from\s+|import\s*)["'](\.[^"']+)["']/g)) {
+       copyModule(resolve(dirname(source), match[1]), resolve(dirname(target), match[1]));
+     }
++    // Files a module resolves at load time with new URL('<relative>', import.meta.url) (a launcher, a worker, a schema)
++    // are part of the graph too. Since D216-A the package validation lives in review-admission-read.mjs, which reaches
++    // the host-process supervisor and the design-readiness schemas through critic-course-admission.mjs.
++    for (const match of text.matchAll(/new URL\(\s*["'](\.[^"']+)["']\s*,\s*import\.meta\.url\s*\)/g)) {
++      const asset = resolve(dirname(source), match[1]);
++      const assetInside = relative(pluginRoot, asset);
++      if (assetInside && assetInside !== '..' && !assetInside.startsWith('..' + sep) && fs.existsSync(asset) && fs.statSync(asset).isFile()) copyModule(asset, resolve(dirname(target), match[1]));
++    }
+   }
+   copyModule(join(sourceLib, 'signed-quality-package.mjs'), join(version, 'lib/signed-quality-package.mjs'));
++  // Static data the graph loads at module load through join(pluginRoot, 'config/...') or 'schemas/...' (runner profiles,
++  // design-readiness and other receipt schemas). Both directories are small, closed and data-only; copy them whole, byte checked.
++  function copyDataTree(rel) {
++    for (const entry of fs.readdirSync(join(pluginRoot, rel), { withFileTypes: true })) {
++      const entryRel = join(rel, entry.name);
++      if (entry.isDirectory()) { copyDataTree(entryRel); continue; }
++      const target = join(version, entryRel);
++      fs.mkdirSync(dirname(target), { recursive: true });
++      fs.copyFileSync(join(pluginRoot, entryRel), target);
++      assert.deepEqual(fs.readFileSync(target), fs.readFileSync(join(pluginRoot, entryRel)), 'immutable data tree copy');
++    }
++  }
++  for (const rel of ['config', 'schemas']) copyDataTree(rel);
++  // The user and manifest schemas beside the scripts (scripts/*.json) are data too.
++  for (const entry of fs.readdirSync(join(pluginRoot, 'scripts'), { withFileTypes: true })) {
++    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
++    const target = join(version, 'scripts', entry.name);
++    fs.mkdirSync(dirname(target), { recursive: true });
++    fs.copyFileSync(join(pluginRoot, 'scripts', entry.name), target);
++    assert.deepEqual(fs.readFileSync(target), fs.readFileSync(join(pluginRoot, 'scripts', entry.name)), 'immutable data file copy');
++  }
+   for (const path of ['config/runner-profiles-v3.json', 'scripts/pipeline-user-v3.schema.json']) {
+     const target = join(version, path);
+     fs.mkdirSync(dirname(target), { recursive: true });
+diff --git a/plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs b/plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs
+index de8792b80..11761c79b 100644
+--- a/plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs
++++ b/plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs
+@@ -160,6 +160,7 @@ const FIXTURE_MODULES = Object.freeze([
+   "plugins/pipeline-core/lib/governance-event.mjs",
+   "plugins/pipeline-core/lib/governance-verification-action.mjs",
+   "plugins/pipeline-core/lib/project-authority.mjs", // resolveAuthorityArtifactPath (ADR-0054)
++  "plugins/pipeline-core/lib/project-authority-read.mjs", // via project-authority.mjs (D216-A read half; node: imports only)
+   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
+   "plugins/pipeline-core/lib/verify-resume.mjs",
+   "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",
