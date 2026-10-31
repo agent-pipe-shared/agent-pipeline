@@ -1,0 +1,171 @@
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index b7d5ee192..6d5cf3e97 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -75,9 +75,16 @@ const INVENTORY = Object.freeze([
+  * Approval-bearing verbs deliberately NOT on the happy path. They are recovery,
+  * re-enrollment mechanics (no extra prompt, PO decision 2026-10-04 #7), deploy or
+  * release-publication acts. A happy-path scenario may never contain them.
++ *
++ * `approve-residual-acceptance` (c3898ac93, 2026-10-29) is the PO's acceptance of the MINOR residue of a FAILED Critic
++ * round (the inventory id `accept-residual-critic-findings`, docs/human-authorization-inventory.md): it exists only after a
++ * Critic round has failed, so it is a recovery act off the happy path, not a third per-feature decision. The happy path
++ * (Critic passes) still needs exactly the plan approval and the push approval; the third-class and extra-ceremony mirrors
++ * below stay red-checked.
+  */
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
++  "approve-residual-acceptance",
+   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
+   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
+   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",
+diff --git a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+index 00edc6be8..220c3bb83 100644
+--- a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
++++ b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+@@ -285,6 +285,30 @@ function authorArchitectureDesign(dir, prdRelPath) {
+   writeFileSync(prdFile, base + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
+ }
+ 
++/**
++ * The `design-authoring-required` stop (5e939278b, `stagingDesignNeedsAuthoring`): the generated staging PRD and Spec must be
++ * authored before bootstrap binding. This stand-in PO replaces the Spec's skeleton criterion and traceability row with a real
++ * criterion, binds the PRD's Spec digest to those bytes, and then authors the architecture block exactly as the later
++ * `architecture-design-required` stop does (the reserved draft template, banner included, is replaced, not duplicated).
++ */
++function authorStagingDesign(dir, prdRelPath, specRelPath) {
++  const specFile = join(dir, specRelPath);
++  const prdFile = join(dir, prdRelPath);
++  const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
++  const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
++  const spec = readFileSync(specFile, "utf8");
++  if (!spec.includes(skeletonCriterion) || !spec.includes(skeletonTraceability)) return { ok: false, reason: "the generated Spec no longer carries the skeleton criterion and traceability rows" };
++  const authoredSpec = spec
++    .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
++    .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
++  writeFileSync(specFile, authoredSpec);
++  authorArchitectureDesign(dir, prdRelPath);
++  const specHash = createHash("sha256").update(authoredSpec).digest("hex");
++  const prd = readFileSync(prdFile, "utf8");
++  writeFileSync(prdFile, prd.replace(/(technical-spec-sha256\s*:\s*)[a-f0-9]{64}/iu, `$1${specHash}`));
++  return { ok: true };
++}
++
+ function acknowledgePrd(dir, guidance) {
+   const match = /staging PRD at (\S+\.md)/u.exec(String(guidance));
+   if (match === null) return { ok: false, reason: "the guidance did not name a staging PRD path" };
+@@ -486,6 +510,19 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
+       return { schema: SCHEMA, root: dir, runner, outcome: "unanswerable-collect-input", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
+     }
+ 
++    // Contract change 5e939278b: the generated PRD and Spec are authored BEFORE bootstrap binding, so the walk now stops at
++    // `design-authoring-required` ahead of the `architecture-design-required` stop the same helper already follows.
++    if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "design-authoring-required") {
++      const na = result.final.nextAction;
++      const authored = authorStagingDesign(dir, na.prdPath, na.specPath);
++      turns += 1;
++      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-staging-design", code: na.code ?? null, ok: authored.ok });
++      if (!authored.ok) {
++        return { schema: SCHEMA, root: dir, runner, outcome: "design-authoring-failed", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final, error: authored.reason };
++      }
++      continue;
++    }
++
+     if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "architecture-design-required") {
+       const na = result.final.nextAction;
+       authorArchitectureDesign(dir, na.prdPath);
+diff --git a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+index bd1fba5ff..df9106b96 100644
+--- a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+@@ -126,8 +126,9 @@ test("fakeSetupSpawn: every other openssl invocation falls through to a real spa
+ // recorded signed push without the design course itself (author the staging PRD/Spec, submit-plan, review receipt, present-plan --review-receipt, signed
+ // approval), which a disposable in-process measurement cannot supply. The assertions of the old claim (outcome "signed-push-recorded", a successful
+ // approve-push step, trustAnchorPinned false, the critical-human-proof-policy schema) are therefore not carried over; the signed push is measured by the
+-// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends at the Driver's own refusal to
+-// acknowledge a generated placeholder PRD/Spec, within the measured six turns, and no later ceremony step ran.
++// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends typed at the PO signature request of
++// the plan acknowledgement (the signing step refuses the disposable unencrypted key; restated W7-R6 after 5e939278b moved the earlier stop, see below),
++// within the measured six turns, and no later ceremony step ran.
+ test("TOFU measurement stops typed at the ADR-0085 single-review design-course boundary; the Greenfield test measures the signed push", { timeout: 120_000 }, () => {
+   let stdout = "";
+   const status = main([], { write: (chunk) => { stdout += chunk; } });
+@@ -138,16 +139,26 @@ test("TOFU measurement stops typed at the ADR-0085 single-review design-course b
+   assert.equal(result.steps[0]?.step, "setup", stdout);
+   assert.equal(result.steps[0]?.ok, true, stdout);
+   assert.equal(result.steps[1]?.step, "onboarding", stdout);
+-  assert.equal(result.steps[1]?.outcome, "error", stdout);
++  assert.equal(result.steps[1]?.outcome, "external-operator-failed", stdout);
+   // Turn count bound as the existing case measured it (six turns up to the boundary).
+   assert.ok(result.steps[1]?.turns <= 6, stdout);
+   assert.equal(result.onboarding?.turns, result.steps[1]?.turns, stdout);
+-  // The walk reached the design course: the architecture design was authored, then the Driver's last step was the plan acknowledgement, which refuses the
+-  // generated placeholder PRD/Spec (the ADR-0085 course replaces that acknowledgement with the single review).
+-  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design" && round.code === "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE"), stdout);
+-  assert.equal(result.onboarding?.lastStep?.subcommand, "bootstrap-acknowledge-plan", stdout);
+-  assert.equal(result.onboarding?.lastStep?.exitCode, 2, stdout);
+-  assert.match(result.onboarding?.stopStderr ?? "", /BOOTSTRAP-ACK-PLACEHOLDER-CONTENT/, stdout);
++  // Restated for the contract change 5e939278b (stagingDesignNeedsAuthoring; sibling restatement W7-R5, project-onboarding-e2e.test.mjs): the Driver now
++  // stops at `design-authoring-required` BEFORE the bind, and the helper (measure-fresh-repo-onboarding-turns.mjs) authors the staging PRD, Spec and
++  // architecture block there as the stand-in PO (round `authored-staging-design`), so the old stop (the plan acknowledgement refusing the generated
++  // placeholder content, via an `authored-architecture-design` round with ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE) is no longer reached. The walk
++  // gets one step further and stops typed at the PO's signature request for the plan acknowledgement (`signature-required`, a returned `sign-intent`
++  // external action): the disposable fixture key is unencrypted, so the real signing step refuses it (PO-KEY-UNENCRYPTED, passphrase-protected keys
++  // only). The intent is unchanged: setup ok, onboarding ends typed before the signed push, within the six turns, and no later ceremony step ran.
++  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-staging-design" && round.ok === true), stdout);
++  assert.equal(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design"), false, stdout);
++  assert.equal(result.onboarding?.rounds.at(-1)?.resolved, "executed-driver-provided-external-action", stdout);
++  assert.equal(result.onboarding?.rounds.at(-1)?.appliedExitCode, 2, stdout);
++  assert.equal(result.onboarding?.outcome, "external-operator-failed", stdout);
++  assert.equal(result.onboarding?.final?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1", stdout);
++  assert.equal(result.onboarding?.final?.status, "signature-required", stdout);
++  assert.equal(result.onboarding?.final?.nextAction?.argv?.[1], "sign-intent", stdout);
++  assert.match(result.onboarding?.error?.stderr ?? "", /PO-KEY-UNENCRYPTED/, stdout);
+   // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
+   assert.equal(result.steps.length, 2, stdout);
+   assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+index abf35efa6..6dae64e74 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+@@ -589,6 +589,40 @@ test("project-onboarding-v3 CLI: mini retains early acknowledgement while featur
+ 
+     result = invoke(["intake-generate-apply", "--root", dir, "--plan-sha256", generatePlan.planSha256, "--activate"]);
+     assert.equal(result.status, 0, result.output);
++    const generated = JSON.parse(result.output);
++
++    // Contract change (5e939278b, stagingDesignNeedsAuthoring; sibling restatement of the same drift: project-onboarding-e2e.test.mjs
++    // in W7-R5): the bind planner refuses the untouched generated PRD and Spec before binding their bytes. Mini keeps its early
++    // acknowledgement, so mini's refusal is still the missing acknowledgement marker; feature and epic wait for the final package, so
++    // theirs is the new design-authoring refusal (before 5e939278b they bound the unauthored bytes, exit 0). The intent of the case
++    // (mini keeps the early acknowledgement, feature and epic wait for the final package) is asserted on the authored package below, unchanged.
++    result = invoke(["bootstrap-bind-plan", "--root", dir]);
++    assert.equal(result.status, 2, result.output);
++    assert.match(result.output, profile === "mini" ? /KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING/u : /BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED/u, `${profile}: ${result.output}`);
++
++    // First authoring pass (the same minimal edit the e2e restatement makes): a real criterion row and traceability row in the Spec,
++    // the PRD's Spec digest moved to those bytes, the draft banner gone and the architecture prose fields written.
++    const prdFile = join(dir, generated.targets.prd.path);
++    const specFile = join(dir, generated.targets.spec.path);
++    const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
++    const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
++    const generatedSpec = readFileSync(specFile, "utf8");
++    assert.ok(generatedSpec.includes(skeletonCriterion) && generatedSpec.includes(skeletonTraceability), `${profile}: the generated Spec carries the skeleton rows`);
++    const authoredSpec = generatedSpec
++      .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
++      .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
++    const generatedPrd = readFileSync(prdFile, "utf8");
++    const generatedSpecDigest = generatedPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
++    assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u, `${profile}: the generated PRD carries its Spec binding`);
++    const authoredPrd = generatedPrd
++      .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
++      .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Local keyboard game."')
++      .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the whole local game."')
++      .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "local-game"')
++      .replace(generatedSpecDigest, createHash("sha256").update(Buffer.from(authoredSpec)).digest("hex"));
++    assert.notEqual(authoredPrd, generatedPrd, `${profile}: the authoring pass changed the PRD`);
++    writeFileSync(specFile, authoredSpec);
++    writeFileSync(prdFile, authoredPrd);
+ 
+     result = invoke(["bootstrap-bind-plan", "--root", dir]);
+     if (profile === "mini") {
