@@ -306,9 +306,11 @@ function checkConvergenceCell(selectedCell) {
         const first = driveOnboardingInit({ rootDir: root, runner, env });
 
         assert.equal(first.schema, SCHEMA, label);
-        assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
+        // G15 / D210 (restates: Codex stopped on a separate consent collect-input): every runner's first stop
+        // is the ONE merged pending ask; on Codex the primary step is the read-only inspect, not a consent action.
+        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
         assert.equal(first.final?.status, runner === "codex" ? "intake-required" : "runtime-initialization-required", `${label}: runner-specific intake boundary must be explicit`);
-        assert.equal(first.final?.nextAction?.kind, runner === "codex" ? "collect-input" : "command", `${label}: the primary action remains visible alongside pending asks`);
+        assert.equal(first.final?.nextAction?.kind, "command", `${label}: the primary action remains visible alongside pending asks`);
         assert.ok(first.pendingAsks.length > 0, `${label}: the boundary must carry real asks`);
         assertPinnedRunner(first, runner, label);
         firstShapes.push({ schema: first.schema, outcome: first.outcome, status: first.final.status, nextActionKind: first.final.nextAction.kind });
@@ -449,8 +451,9 @@ test("host-managed initial answers publish privately and never write reserved Gi
     const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
     assert.equal(first.outcome, "pending-asks");
+    // G15 / D210 (restates the first-round inputs): the intake consent values ride in the same first round.
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
     const sourcePath = join(root, "pipeline.user.yaml");
     const sourceBefore = readFileSync(sourcePath);
     const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
@@ -489,8 +492,9 @@ test("host-managed first stop asks identity, approval and language before intake
     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
     assert.equal(first.outcome, "pending-asks");
     assert.equal(first.pendingAsks.length, 1);
+    // G15 / D210 (restates the first-round inputs): consent values are collected in this same first round.
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
   } finally {
     dispose(root);
@@ -798,10 +802,13 @@ function checkApprovalCell(selectedCell) {
       }, runner);
 
       const first = driveOnboardingInit({ rootDir: root, runner, env });
-      assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
+      // G15 / D210 (restates: Codex stopped on collect-input and the first round omitted consent values).
+      assert.equal(first.outcome, "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"],
+      assert.deepEqual(actionInputNames(initialAsk), runner === "claude"
+        ? ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "pipelineActorLabel"]
+        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"],
         `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
@@ -983,12 +990,14 @@ test("a failed separate signature-anchor action preserves the completed initial 
     assert.equal(first.outcome, "pending-asks");
     assert.equal(first.pendingAsks.length, 1);
     const initialAction = first.pendingAsks[0];
+    // G15 / D210 (restates the first-round inputs): Claude's merged round also carries the intake profile.
     assert.deepEqual(initialAction.inputs.map((input) => input.name), [
       "gitAuthorName",
       "gitAuthorEmail",
       "humanApprovalMode",
       "advisorExportConsent",
       "language",
+      "profile",
       "pipelineActorLabel",
     ]);
     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
@@ -1047,7 +1056,8 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
       runner: "codex",
       env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
     });
-    assert.equal(seeded.outcome, "collect-input");
+    // G15 / D210 (restates: Codex's first stop was a separate consent collect-input): it is now the one merged pending ask.
+    assert.equal(seeded.outcome, "pending-asks");
     let setupCalls = 0;
     const runSetup = (_executable, argv) => {
       setupCalls += 1;
@@ -1336,7 +1346,8 @@ function checkRollbackCell(selectedCell) {
     const destination = join(home, `authority-${failure.name}`);
     try {
       const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
-      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "collect-input");
+      // G15 / D210 (restates: Codex's first stop was a separate consent collect-input): now the one merged pending ask.
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
       const policyPath = join(root, "project", "critical-human-proof.json");
       const policyPreimage = readFileSync(policyPath, "utf8");
       const pointerPath = join(root, ".git", "agent-pipeline", "po-key-directory.json");

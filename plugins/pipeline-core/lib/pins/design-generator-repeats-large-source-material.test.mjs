@@ -260,12 +260,29 @@ test("[pendingAsks compaction] routine inspect repeats no request text and is si
 const ONBOARDING_INIT_CLI = fileURLToPath(new URL("../../scripts/onboarding-init.mjs", import.meta.url));
 const COLLECT_INPUT_OUTPUT_BOUND = 19_000;
 
-function driverOutput(runner) {
+// G15 / D210 (restates the fixture state, not the compaction intent): the Codex fresh first stop is now the ONE merged
+// pending ask (outcome "pending-asks"), no longer a collect-input outcome with sibling asks. `consentFirst` reaches a
+// state that still has a primary collect-input action plus sibling asks: only the merged ask's preceding
+// intake-consent-apply command (without the first project description) has run, so the driver publishes the
+// intake-capture collect-input beside the still-pending initial-answers ask.
+function driverOutput(runner, { consentFirst = false } = {}) {
   const root = mkdtempTestScratch("alf-k15-root-");
   const home = mkdtempTestScratch("alf-k15-home-");
+  const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+  if (consentFirst) {
+    const first = spawnSync(process.execPath, [ONBOARDING_INIT_CLI, "--root", root, "--runner", runner], {
+      encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, env,
+    });
+    assert.equal(first.status, 0, first.stderr);
+    const consentArgv = JSON.parse(first.stdout).pendingAsks[0].precedingApplyAction.argv
+      .filter((value, index, all) => value !== "--text-file" && all[index - 1] !== "--text-file")
+      .map((value) => value === "<de|en>" ? "en" : value === "<PO_INTAKE_PROFILE>" ? "feature" : value);
+    const consent = spawnSync(process.execPath, consentArgv, { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, env });
+    assert.equal(consent.status, 0, consent.stderr);
+  }
   const run = spawnSync(process.execPath, [ONBOARDING_INIT_CLI, "--root", root, "--runner", runner], {
     encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024,
-    env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+    env,
   });
   rmSync(root, { recursive: true, force: true });
   rmSync(home, { recursive: true, force: true });
@@ -283,8 +300,8 @@ function assertAsksPrintedOnce({ stdout, parsed }, label) {
 }
 
 test("[pendingAsks compaction] the driver prints each published ask once for the collect-input outcome and stays within its size bound", () => {
-  const codex = driverOutput("codex");
-  assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex first stop is a collect-input outcome with sibling asks");
+  const codex = driverOutput("codex", { consentFirst: true });
+  assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex stop after consent is a collect-input outcome with sibling asks");
   assertAsksPrintedOnce(codex, "codex/collect-input");
   // The primary question stays reachable: in full in collectInput, by kind in final.nextAction.
   assert.equal(codex.parsed.collectInput.kind, "collect-input");
@@ -302,7 +319,7 @@ test("[pendingAsks compaction] the driver prints each published ask once for the
 const COLLECT_INPUT_REFERENCE_BOUND = 15_000;
 
 test("[pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference", async () => {
-  const codex = driverOutput("codex");
+  const codex = driverOutput("codex", { consentFirst: true }); // G15 / D210: see driverOutput()
   const { parsed, stdout } = codex;
   assert.equal(parsed.outcome, "collect-input");
   assert.equal(countOf(stdout, JSON.stringify(parsed.collectInput)), 1, "the full primary action is printed more than once");

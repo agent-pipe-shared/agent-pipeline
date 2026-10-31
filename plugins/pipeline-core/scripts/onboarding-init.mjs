@@ -126,6 +126,9 @@ import {
 } from "../lib/critical-human-proof-policy.mjs";
 import {
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+  INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE,
+  INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE,
+  INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE,
   shellWord, intakeGitAuthor,
 } from "../lib/project-onboarding-v3.mjs";
 import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
@@ -1350,7 +1353,7 @@ function initialAnswersActionWithoutTrustAnchor(action) {
   return {
     ...action,
     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
-    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
     applyAction: { ...action.applyAction, argv },
   };
 }

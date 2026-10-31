@@ -122,7 +122,10 @@ const MATRIX = [["claude", "signature"], ["claude", "chat"], ["codex", "signatur
       // P2: the first round carries the approval question and its published action is admitted when answered.
       const ask = firstAction(first);
       assert.ok(ask, `first round published an action: ${first.outcome}`);
-      assert.deepEqual(inputNames(ask), FIRST_ROUND);
+      // G15 / D210 (restates: the first round was exactly FIRST_ROUND): it keeps these inputs in order and now
+      // also carries the intake consent values (profile; off Claude the first project description).
+      assert.deepEqual(inputNames(ask).slice(0, FIRST_ROUND.length), FIRST_ROUND);
+      assert.equal(inputNames(ask).includes("profile"), true, "the intake consent values ride in the same first round");
       assert.ok(ask.applyAction.argv.includes("--human-approval"));
       const argv = fillFirst(ask, mode);
       assert.equal(isSanctionedLifecycleCommand(quote([ask.applyAction.executable, ...argv]), root), true);

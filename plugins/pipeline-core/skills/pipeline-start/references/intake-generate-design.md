@@ -49,7 +49,7 @@ shape is `MUTATING_ONBOARDING_ARGV_SHAPES` in
 
 | `v4Inspection` status | checkpoint `transactionState` | command |
 | --- | --- | --- |
-| `intake-required` | absent, or consent not recorded | `intake-consent-apply --root <root> [--git-author-name <name>] [--git-author-email <email>] [--language <de\|en>] [--profile <epic\|feature\|mini>] --granted --activate` (fields already known may be omitted; filled on a later call) |
+| `intake-required` | absent, or consent not recorded | `intake-consent-apply --root <root> [--git-author-name <name>] [--git-author-email <email>] [--language <de\|en>] [--profile <epic\|feature\|mini>] --granted --activate` (fields already known may be omitted; filled on a later call; on a fresh project this command is the `precedingApplyAction` of the merged first-round ask, see below) |
 | `intake-required` | `collecting` | `intake-capture-apply --root <root> --text <verbatim PO message> \| --text-file <repo-relative path> --activate` — once per PO message, repeated until the PO signals they are done describing the project |
 | `intake-design-questions-required` | `design-questions-pending` | `intake-design-questions-apply --root <root> --answers-json <JSON array of {question, answer}> \| --answers-file <repo-relative path> [--answers-file-sha256 <sha256>] --activate` — exactly ONE bundled round; a second round with different answers is refused |
 | `intake-design-questions-required` | `ready-to-generate` | `intake-generate-plan --root <root>`, then digest-bound `intake-generate-apply --root <root> --plan-sha256 <sha256> --activate` |
@@ -74,6 +74,24 @@ The consent step asks for the same PO inputs `kickoff-design.md` requires
 before any artifact is written — operator-facing language and PO profile —
 plus the repository's git author identity, gathered together rather than as
 a separate blocking question later.
+
+**PO turns before the first design draft (G15, PO decision D210).** The first
+round is ONE PO turn on every runner. While the intake consent is still
+unrecorded, the initial-answers ask (git author, human-approval mode, Advisor
+export consent, language) also carries the consent values — the PO profile
+and, on Codex and Antigravity, the first project description — so the PO
+answers once. That ask names two existing, unchanged commands in order:
+`precedingApplyAction` (`intake-consent-apply`, run FIRST) and then
+`applyAction` (the `onboarding-init.mjs` initial-answers command); the one
+`de|en` answer fills the language placeholder of both, and consent is applied
+only on the PO's explicit consent. Claude keeps material capture separate (its
+opaque native turn reference arrives with the PO's next turn), so Claude takes
+at most 3 PO turns before the first design draft (merged first round,
+material turn, design questions) and Codex and Antigravity at most 2 (merged
+first round, design questions). The `signature` trust-anchor key ceremony is a
+conditional follow-up of the human-approval answer, not one of these turns.
+If the consent command is skipped or fails, the ordinary `intake-required`
+consent action is published again; nothing already answered is asked twice.
 
 ## What `intake-generate-apply` writes, and where
 

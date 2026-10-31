@@ -63,7 +63,10 @@ for (const runner of RUNNERS) {
 
     // 2. The bundled ask carries the approved|declined question; the generated command requires it.
     const ask = first.pendingAsks[0];
-    assert.deepEqual(inputNames(ask), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+    // G15 / D210 (restates: the bundled ask ended at language): the first-answer round keeps its five inputs in
+    // order and now also carries the intake consent values (profile; off Claude the first project description).
+    assert.deepEqual(inputNames(ask).slice(0, 5), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+    assert.equal(inputNames(ask).includes("profile"), true, "the intake consent values ride in the same first round");
     assert.ok(ask.applyAction.argv.includes("--advisor-export-consent"));
     assert.ok(ask.applyAction.argv.includes("<approved|declined>"));
     assert.equal(ask.applyAction.argv.some((value) => String(value).startsWith("--trust-anchor-")), false);

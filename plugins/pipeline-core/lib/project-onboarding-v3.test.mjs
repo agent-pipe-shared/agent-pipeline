@@ -3023,8 +3023,17 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
     assert.equal(applied.result.status, "intake-required",
       "uncaptured original input precedes the first Codex restart");
-    assert.equal(applied.result.nextAction.kind, "collect-input",
-      "the primary action captures original input before runtime initialization");
+    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
+    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
+    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
+    // first project description) as precedingApplyAction, so the original input is still captured
+    // before the first restart and no separate consent collect-input sits beside it.
+    assert.equal(applied.result.nextAction.kind, "command");
+    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
+      "the merged first round is the one question");
+    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
+      .precedingApplyAction.argv.includes("--text-file"), true,
+    "the merged round captures original input before runtime initialization");
     assert.equal(applied.result.authorIdentityAction.kind, "collect-input");
     assert.equal(applied.result.authorIdentityAction.mutation, false);
     const fieldNames = applied.result.authorIdentityAction.inputs.map((input) => input.name).sort();
@@ -3146,8 +3155,17 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
     assert.equal(applied.result.status, "intake-required",
       "uncaptured original input precedes the first Codex restart");
-    assert.equal(applied.result.nextAction.kind, "collect-input",
-      "the primary action captures original input before runtime initialization");
+    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
+    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
+    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
+    // first project description) as precedingApplyAction, so the original input is still captured
+    // before the first restart and no separate consent collect-input sits beside it.
+    assert.equal(applied.result.nextAction.kind, "command");
+    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
+      "the merged first round is the one question");
+    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
+      .precedingApplyAction.argv.includes("--text-file"), true,
+    "the merged round captures original input before runtime initialization");
     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
     assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
     assert.equal(applied.result.pushApprovalSetupAction.input.name, "humanApprovalMode");
@@ -3225,8 +3243,17 @@ test("apply-portable-seed records baseline-only verification without a PO questi
     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
     assert.equal(applied.result.status, "intake-required",
       "uncaptured original input precedes the first Codex restart");
-    assert.equal(applied.result.nextAction.kind, "collect-input",
-      "the primary action captures original input before runtime initialization");
+    // G15 / D210 (restates: the primary action is the consent collect-input that captures original input
+    // before runtime initialization): the first Codex round is ONE merged ask. The primary step is the
+    // read-only inspect, and the single pending ask carries the unchanged consent command (with the
+    // first project description) as precedingApplyAction, so the original input is still captured
+    // before the first restart and no separate consent collect-input sits beside it.
+    assert.equal(applied.result.nextAction.kind, "command");
+    assert.equal(applied.result.nextAction.pendingAsks.filter((ask) => ask.precedingApplyAction !== undefined).length, 1,
+      "the merged first round is the one question");
+    assert.equal(applied.result.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined)
+      .precedingApplyAction.argv.includes("--text-file"), true,
+    "the merged round captures original input before runtime initialization");
     assert.equal(Object.hasOwn(applied.result, "verifyContractAction"), false);
     assert.equal(Object.hasOwn(applied.result, "verifyContractStatus"), false);
     assert.equal(Object.hasOwn(applied.result, "pushGateSatisfiable"), false);
@@ -7752,8 +7779,10 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(postSeed.status, "intake-required");
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "command");
+    // G15 / D210 (restates the five first-round inputs): the unresolved intake consent values (profile and,
+    // on Codex, the first project description) are collected in the same first round.
     assert.deepEqual(postSeed.nextAction.pendingAsks[0].inputs.map((input) => input.name),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription"]);
     const kickoff = completeKickoff(
       path,
       "Build one small HTML game from the supplied design",
@@ -9303,24 +9332,25 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     const fresh = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(fresh.status, "intake-required");
     assert.equal(fresh.continuity.status, "absent-pristine");
-    assert.equal(fresh.nextAction.kind, "collect-input");
+    // G15 / D210 (restates: the first Codex step is a separate consent collect-input carrying the author inputs):
+    // consent travels in the merged first-round ask and the primary step is the read-only inspect. The consent
+    // command is that ask's precedingApplyAction: the Git author is collected by the same ask (its own initial
+    // command applies it), the language shares the one <de|en> placeholder, and the argv shape is otherwise unchanged.
+    assert.equal(fresh.nextAction.kind, "command");
     assert.deepEqual(fresh.nextAction.expected, { schema: "pipeline.project-onboarding.v4", statuses: ["intake-required"] });
-    assert.ok(fresh.nextAction.inputs.some((input) => input.name === "gitAuthorName"));
-    assert.deepEqual(fresh.nextAction.applyAction.argv, [
+    const mergedFresh = fresh.nextAction.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined);
+    assert.ok(mergedFresh.inputs.some((input) => input.name === "gitAuthorName"));
+    assert.deepEqual(mergedFresh.precedingApplyAction.argv, [
       ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
-      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
-      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
-      "--language", "<PO_INTAKE_LANGUAGE>",
+      "--language", "<de|en>",
       "--profile", "<PO_INTAKE_PROFILE>",
       "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex",
     ]);
-    assert.equal(fresh.nextAction.applyAction.argv.includes("--text"), false,
+    assert.equal(mergedFresh.precedingApplyAction.argv.includes("--text"), false,
       "the multiline-safe returned action uses exactly one of --text/--text-file");
-    assert.deepEqual(fresh.nextAction.existingFileApplyAction.argv, [
+    assert.deepEqual(mergedFresh.precedingExistingFileApplyAction.argv, [
       ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
-      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
-      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
-      "--language", "<PO_INTAKE_LANGUAGE>", "--profile", "<PO_INTAKE_PROFILE>",
+      "--language", "<de|en>", "--profile", "<PO_INTAKE_PROFILE>",
       "--text-file", "<existing-repository-file>", "--text-file-sha256", "<sha256-of-existing-file>",
       "--activate", "--runner", "codex",
     ]);
@@ -9523,7 +9553,18 @@ for (const runner of ["claude", "codex", "antigravity"]) {
         return JSON.parse(output);
       };
 
-      const consent = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
+      const publishedFirst = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
+      // G15 / D210 (restates: the Codex first-restart boundary publishes a separate consent collect-input):
+      // on Codex the consent values travel in the merged first-round ask, whose precedingApplyAction is the
+      // unchanged consent command (sharing the one <de|en> language placeholder). Claude and Antigravity still
+      // publish the consent action here once the initial answers are in. The assertions below run unchanged.
+      const mergedFirst = publishedFirst.kind === "collect-input" ? null
+        : publishedFirst.pendingAsks.find((ask) => ask.precedingApplyAction !== undefined);
+      const consent = mergedFirst === null ? publishedFirst : {
+        inputs: mergedFirst.inputs.filter((input) => ["language", "profile", "projectDescription"].includes(input.name)),
+        applyAction: { ...mergedFirst.precedingApplyAction,
+          argv: mergedFirst.precedingApplyAction.argv.map((value) => value === "<de|en>" ? "<PO_INTAKE_LANGUAGE>" : value) },
+      };
       const consentNames = consent.inputs.map((input) => input.name);
       assert.equal(consentNames.includes("gitAuthorName"), false, `${runner}: local Git already resolved the name`);
       assert.equal(consentNames.includes("gitAuthorEmail"), false, `${runner}: local Git already resolved the email`);

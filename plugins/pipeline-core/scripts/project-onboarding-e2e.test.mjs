@@ -376,6 +376,21 @@ function advanceTypedOnboardingInput(path, result) {
   ]);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const action = current.json?.nextAction;
+    // G15 / D210 (restates the former separate consent collect-input): the intake consent values now
+    // travel in the merged first-round pending ask. This legacy fixture helper answers only that ask's
+    // preceding intake-consent-apply command (the initial-answers command stays unexecuted, as before),
+    // so the typed-input fixtures keep reaching the next non-input step.
+    const mergedAsk = action?.pendingAsks?.find((ask) => ask?.precedingApplyAction !== undefined);
+    if (action?.kind !== "collect-input" && mergedAsk !== undefined) {
+      mkdirSync(join(path, "scratch"), { recursive: true });
+      writeFileSync(join(path, "scratch", "onboarding-intake.txt"),
+        "Build a small local project from this original fixture request.\nKeep the result self-contained and locally verifiable.\n");
+      const mergedArgv = mergedAsk.precedingApplyAction.argv.map((value) => answers.get(value) ?? value);
+      const mergedApplied = run(onboarding, mergedArgv.slice(1), path);
+      assert.equal(mergedApplied.status, 0, mergedApplied.stdout);
+      current = run(onboarding, ["inspect", "--root", path, "--runner", "codex"], path);
+      continue;
+    }
     if (action?.kind !== "collect-input") return current;
     const names = action.inputs?.map((input) => input.name) ?? (action.input ? [action.input.name] : []);
     assert.ok(names.length > 0 && names.every((name) => allowed.has(name)), `unhandled published input names: ${names.join(",")}`);
@@ -1005,56 +1020,84 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         assert.equal(held.value.values.profile, "feature");
         return held;
       };
-      const assertConsentInputs = (action) => {
+      // G15 / D210 (restates the former separate intake-consent assertions): the intake consent
+      // values travel in the merged first round. Its precedingApplyAction is the unchanged
+      // intake-consent-apply command (consent granted, material text only off Claude), run first.
+      const assertMergedFirstRound = (action) => {
         const held = readOnboardingIntakeCheckpoint({ rootDir: path });
         assert.equal(held.status === "absent" || held.value.consent === null, true,
-          `${runner}: this returned action requests consent before capturing material`);
+          `${runner}: the merged first round requests consent before capturing material`);
         assert.equal(held.status === "absent" || held.value.materialInput.length === 0, true);
-        const argv = action.applyAction.argv;
+        assert.deepEqual(action.applyOrder, ["precedingApplyAction", "applyAction"]);
+        const argv = action.precedingApplyAction.argv;
         assert.equal(argv[1], "intake-consent-apply");
         assert.equal(argv.includes("--granted"), true);
         assert.equal(argv.includes("--text-file"), runner !== "claude");
         assert.equal(argv.includes("--text-turn-ref"), false);
-        assert.deepEqual(action.inputs.map((input) => input.name), runner === "claude"
-          ? ["language", "profile"]
-          : ["language", "profile", "projectDescription"]);
+        assert.equal(argv.includes("--git-author-name"), false, `${runner}: consent does not ask the Git author again`);
+        assert.equal(argv.includes("<PO_INTAKE_LANGUAGE>"), false, `${runner}: one language answer fills both commands`);
+        assert.equal(argv.includes("<de|en>"), true);
+        assert.equal(runner === "claude", action.precedingExistingFileApplyAction === undefined);
+        const names = action.inputs.map((input) => input.name);
+        assert.equal(names.filter((name) => name === "language").length, 1, `${runner}: language is asked once`);
+        assert.equal(names.includes("profile"), true);
+        assert.equal(names.includes("projectDescription"), runner !== "claude");
       };
 
-      let first = freshDriver(path, runner, env, privateKey);
-      let intakeHoldsAuthor = false;
-      if (runner === "codex" && first.outcome === "collect-input") {
-        assert.deepEqual(first.collectInput.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "language", "profile", "projectDescription"]);
-        assert.equal(first.collectInput.applyAction.argv.includes("scratch/onboarding-intake.txt"), true);
-        mkdirSync(join(path, "scratch"), { recursive: true });
-        writeFileSync(originalFile, originalBytes);
-        const firstIntake = invokeAction(first.collectInput.applyAction, new Map([
-          ["<PO_INTAKE_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
-          ["<PO_INTAKE_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
-          ["<PO_INTAKE_LANGUAGE>", "en"],
-          ["<PO_INTAKE_PROFILE>", "feature"],
-        ]), path, env);
-        assert.equal(firstIntake.json.status, "applied", JSON.stringify(firstIntake.json));
-        assertCapturedOriginal();
-        intakeHoldsAuthor = true;
-        first = freshDriver(path, runner, env, privateKey);
-      }
+      // G15 / D210 ANCHOR: count the collect-input actions that need a human answer before the
+      // first design draft. D210 enumerates the counted turns: the merged first round (initial
+      // answers plus intake consent), the material turn (Claude only, its opaque reference arrives
+      // with the PO's next turn) and the one bundled design-question round. The trust-anchor key
+      // ceremony (trustAnchorSetupMode ...) is a conditional follow-up of the "signature" answer and
+      // is not an enumerated D210 turn: it is recorded separately and bounded to one.
+      const poTurns = [];
+      const keyCeremonies = [];
+      const poTurn = (action, where) => {
+        const names = (action?.inputs ?? (action?.input ? [action.input] : [])).map((input) => input.name);
+        assert.ok(names.length > 0, `${runner}: ${where} presents no input to the PO`);
+        (names.some((name) => name.startsWith("trustAnchor")) ? keyCeremonies : poTurns).push({ where, names });
+      };
+      const first = freshDriver(path, runner, env, privateKey);
+      // G15 / D210 (restates the former Codex-first consent collect-input and the separate Claude and
+      // Antigravity consent turns): every runner's first PO turn is ONE pending ask carrying the initial
+      // answers, the intake consent values and, off Claude, the first project description. The Git author
+      // is asked here on every runner; consent runs first without it and the initial answers take it.
       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
       assert.equal(initialAsk.applyAction?.kind, "command");
-      // D98 / QG-04 (ALF-K2-GITAUTHOR): once the intake record holds the Git author (the Codex path just applied the
-      // intake with it), the initial round no longer asks it again; the receipt takes it from the record (asserted
-      // below). Negative control: where no intake record holds an author, the author is still asked, as before.
-      const authorAsked = intakeHoldsAuthor ? [] : ["gitAuthorName", "gitAuthorEmail"];
-      assert.deepEqual(initialAsk.inputs.map((input) => input.name), runner === "codex"
-        ? [...authorAsked, "humanApprovalMode", "advisorExportConsent"]
-        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+      poTurn(initialAsk, "first-round");
+      assertMergedFirstRound(initialAsk);
+      assert.deepEqual(initialAsk.inputs.map((input) => input.name), runner === "claude"
+        ? ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "pipelineActorLabel"]
+        : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "profile", "projectDescription", "pipelineActorLabel"]);
+      if (runner !== "claude") {
+        assert.equal(initialAsk.precedingApplyAction.argv.includes("scratch/onboarding-intake.txt"), true);
+        mkdirSync(join(path, "scratch"), { recursive: true });
+        writeFileSync(originalFile, originalBytes);
+      }
+      const consented = invokeAction(initialAsk.precedingApplyAction, new Map([
+        ["<de|en>", "en"],
+        ["<PO_INTAKE_PROFILE>", "feature"],
+      ]), path, env);
+      assert.equal(consented.json.status, "applied", JSON.stringify(consented.json));
+      if (runner === "claude") {
+        const consent = readOnboardingIntakeCheckpoint({ rootDir: path });
+        assert.equal(consent.status, "present");
+        assert.equal(consent.value.consent?.granted, true);
+        assert.equal(consent.value.transactionState, "collecting");
+        assert.deepEqual(consent.value.materialInput, [],
+          "claude: a consent-only action must not satisfy description readiness");
+      } else {
+        assertCapturedOriginal();
+      }
       const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
         ["<signature|chat>", "signature"],
         ["<approved|declined>", "declined"],
         ["<de|en>", "en"],
+        ["<PO_PIPELINE_ACTOR>", "none"],
       ]), path, env);
       assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
       assert.equal(initial.json.initialAnswers?.trustAnchor, "not-requested");
@@ -1084,6 +1127,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const anchorAsk = initial.json.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
         ?? freshDriver(path, runner, env, privateKey).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
       assert.ok(anchorAsk, `${runner}: signature re-entry reaches the separate trust-anchor action`);
+      poTurn(anchorAsk, "key-ceremony");
       assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false);
       const anchored = invokeAction(anchorAsk.applyAction, new Map([
         ["<existing|new>", "existing"],
@@ -1117,39 +1161,22 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         // author values, so after anchoring the driver may expose the real
         // remaining intake request directly rather than wrapping it as a
         // second author-related pending-asks envelope.
+        // G15 / D210: the consent was answered in the merged first round, so the only intake request
+        // left after anchoring is Claude's separate material turn; Antigravity goes straight to the
+        // one bundled design-question round.
         assert.equal(anchored.json.outcome, "collect-input", `${runner}: ${JSON.stringify(anchored.json)}`);
-        assertConsentInputs(anchored.json.collectInput);
+        assert.equal(anchored.json.collectInput.input?.name, runner === "claude" ? "textTurnRef" : "answersJson",
+          `${runner}: ${JSON.stringify(anchored.json.collectInput)}`);
       }
 
       let intake = freshDriver(path, runner, env, privateKey);
       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
-      if (runner === "codex" && intake.collectInput.input?.name === "answersJson") {
-        // Codex's portable-seed route reaches the explicit intake-consent
-        // action before initial-answer collection; the description was
-        // already supplied through that returned action above.
-        assertCapturedOriginal();
-      } else {
-        assertConsentInputs(intake.collectInput);
-        assert.equal(intake.collectInput.applyAction.argv.includes("--git-author-name"), false);
-        if (runner !== "claude") {
-          mkdirSync(join(path, "scratch"), { recursive: true });
-          writeFileSync(originalFile, originalBytes);
-        }
-        const consented = invokeAction(intake.collectInput.applyAction, new Map([
-          ["<PO_INTAKE_LANGUAGE>", "en"],
-          ["<PO_INTAKE_PROFILE>", "feature"],
-        ]), path, env);
-        assert.equal(consented.json.status, "applied", JSON.stringify(consented.json));
+      {
         if (runner === "claude") {
-          const consent = readOnboardingIntakeCheckpoint({ rootDir: path });
-          assert.equal(consent.status, "present");
-          assert.equal(consent.value.consent?.granted, true);
-          assert.equal(consent.value.transactionState, "collecting");
-          assert.deepEqual(consent.value.materialInput, [],
-            "claude: a consent-only action must not satisfy description readiness");
-          const captureAsk = freshDriver(path, runner, env, privateKey);
+          const captureAsk = intake;
           assert.equal(captureAsk.outcome, "collect-input", JSON.stringify(captureAsk));
           assert.equal(captureAsk.collectInput.input.name, "textTurnRef");
+          poTurn(captureAsk.collectInput, "material-turn");
           assert.equal(captureAsk.collectInput.applyAction.argv.includes("--text-turn-ref"), true);
           // This fixture has no trusted native event reference. Supply the
           // still-required explicit description once through the returned
@@ -1196,6 +1223,13 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       intake = freshDriver(path, runner, env, privateKey);
       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
       assert.equal(intake.collectInput.input.name, "answersJson");
+      poTurn(intake.collectInput, "design-questions");
+      // G15 / D210 anchor: Codex and Antigravity take at most 2 PO turns before the first design
+      // draft (merged first round, design questions), Claude at most 3 (merged first round,
+      // material turn, design questions). The key ceremony is bounded separately (one, only for "signature").
+      assert.ok(poTurns.length <= (runner === "claude" ? 3 : 2),
+        `${runner}: ${poTurns.length} PO turns before the first design draft ${JSON.stringify(poTurns)}`);
+      assert.ok(keyCeremonies.length <= 1, `${runner}: the key ceremony is asked at most once`);
       const answers = JSON.stringify([
         { question: "Primary goal?", answer: "A keyboard-playable local game." },
         { question: "Verification?", answer: "Run the repository verify script." },

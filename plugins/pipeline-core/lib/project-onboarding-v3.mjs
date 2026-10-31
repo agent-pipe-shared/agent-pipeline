@@ -3146,6 +3146,29 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, in
   };
 }
 
+// G15 / D210: the first onboarding round is ONE PO turn on every runner. While intake consent is
+// unrecorded, collectInitialAnswersAction() also collects the still-unresolved intake values and
+// carries the existing intake-consent-apply command beside its own onboarding-init command; the two
+// sanctioned commands are chained by order (no new mutation verb): consent first, so the intake
+// record exists before the initial answers re-enter the driver, then the initial answers. Each
+// stays the command it is today (idempotent, fills only unresolved fields) and refuses on drift
+// by its own rules; a skipped or failed first command leaves the ordinary consent action published.
+export const INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE = "This same round also collects the intake consent, so the PO answers once before any project material: ask for explicit intake consent and the PO profile (epic|feature|mini) together with the answers above; the one de|en language answer fills the language placeholder of both commands, and the Git author is not asked again for consent. Execute the returned precedingApplyAction FIRST (it records consent and the typed intake values), then applyAction, each exactly once, and never without the PO's explicit consent; do not reconstruct either command. ";
+export const INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE = "Keep material capture separate: after consent is durably applied, the following intake-capture action takes the opaque native reference of the PO's next turn. ";
+export const INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE = `Also ask for the first project description in this same round: if it already exists in a regular file inside this repository use precedingExistingFileApplyAction with that file's repository-relative path and SHA-256; otherwise write the bytes once to ${INTAKE_TEXT_FILE} before precedingApplyAction. If the original project request was already supplied in this session, reuse its exact bytes (multiline, trailing whitespace) instead of asking again. `;
+
+function mergedIntakeConsentFields(consent, runner) {
+  const sharedLanguage = (action) => ({
+    ...action,
+    argv: action.argv.map((part) => part === INTAKE_LANGUAGE_PLACEHOLDER ? INITIAL_LANGUAGE_PLACEHOLDER : part),
+  });
+  return {
+    precedingApplyAction: sharedLanguage(consent.applyAction),
+    ...(runner === "claude" ? {} : { precedingExistingFileApplyAction: sharedLanguage(consent.existingFileApplyAction) }),
+    applyOrder: ["precedingApplyAction", "applyAction"],
+  };
+}
+
 // Mirrors the private INTAKE_MAX_MATERIAL_BYTES bound enforced by
 // applyOnboardingIntakeCapture() in onboarding-continuity.mjs (not exported
 // there, so restated here rather than imported).
@@ -5324,6 +5347,8 @@ function firstRestartIntakeBoundary(observed, fs) {
     const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)(options);
     let action = null;
     if (checkpoint.status === "absent" || checkpoint.value?.consent === null) {
+      // G15 / D210: this consent action is replaced by the merged first-round ask when the pending
+      // initial answers are attached afterwards (withPendingAsksSurfacedOnNextAction()).
       const firstAnswers = initialAnswersReceipt(observed.root, fs, observed.repository.mode);
       action = observed.repository.mode === "host-managed" && firstAnswers === null
         ? hostManagedFirstAnswersAction(observed.root, observed.runner, observed.repository, fs)
@@ -7189,6 +7214,10 @@ function withPendingVerifyContractAsk(observed) {
 function collectInitialAnswersAction(observed, fs) {
   if (!observed.pushApprovalSetupAction) return null;
   let answeredLanguage = null;
+  // G15 / D210: while intake consent is still unrecorded, the same round also collects the
+  // still-unresolved intake values (profile; off Claude the first project description). An
+  // unreadable checkpoint never merges: consent stays its own explicit action.
+  let openConsentCheckpoint = null;
   try {
     const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({
       rootDir: observed.root,
@@ -7198,9 +7227,14 @@ function collectInitialAnswersAction(observed, fs) {
     if (checkpoint.status === "present" && ["de", "en"].includes(checkpoint.value.values.language)) {
       answeredLanguage = checkpoint.value.values.language;
     }
+    if (checkpoint.status === "absent" || (checkpoint.status === "present" && checkpoint.value.consent === null)) {
+      openConsentCheckpoint = checkpoint;
+    }
   } catch {
     // An unavailable private checkpoint never authorizes a guessed answer.
   }
+  const mergedConsent = openConsentCheckpoint === null ? null
+    : intakeConsentAction(observed.root, observed.runner, openConsentCheckpoint, [], answeredLanguage);
   const authorInputs = observed.authorIdentityAction?.inputs ?? [];
   const trustSetupArgv = observed.trustAnchorGuidanceAction?.applyAction?.argv;
   const trustSetup = trustSetupArgv?.[0] === ONBOARDING_INIT_DRIVER
@@ -7213,6 +7247,8 @@ function collectInitialAnswersAction(observed, fs) {
     { name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true },
     ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
     ...(trustSetup?.inputs ?? []),
+    // The language is asked once above and fills both commands; consent's other inputs follow.
+    ...(mergedConsent?.inputs ?? []).filter((input) => input.name !== "language"),
   ];
   const identityProvenance = gitIdentityProvenance(observed.root, fs);
   const argv = [ONBOARDING_INIT_DRIVER, "--root", observed.root, "--runner", observed.runner];
@@ -7250,7 +7286,7 @@ function collectInitialAnswersAction(observed, fs) {
       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
       advisorExportConsent: { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
     },
-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
       true,
@@ -7258,6 +7294,7 @@ function collectInitialAnswersAction(observed, fs) {
       "pipeline.onboarding-init.v1",
       ["ready", "collect-input", "pending-asks", "unsupported-next-action"],
     ),
+    ...(mergedConsent === null ? {} : mergedIntakeConsentFields(mergedConsent, observed.runner)),
     expected: { schema: "pipeline.onboarding-init.v1", outcomes: ["ready", "collect-input", "pending-asks", "unsupported-next-action"] },
   };
 }
@@ -7277,11 +7314,20 @@ function withPendingAsksSurfacedOnNextAction(observed, fs) {
     observed.projectAttributesGapAction,
   ].filter(Boolean);
   if (observed.nextAction == null) return observed;
+  // G15 / D210: a separate intake-consent question must never sit beside the merged first-round
+  // ask (Codex publishes it before its first restart): the merged ask already carries the same
+  // values, so the primary step becomes the read-only inspect and the driver stops on the one ask.
+  const consentSupersededByMergedRound = initialAnswersAction?.precedingApplyAction !== undefined
+    && observed.runtime?.firstRestartIntake?.status === "capture-required"
+    && observed.nextAction.kind === "collect-input"
+    && observed.nextAction.applyAction?.argv?.[1] === "intake-consent-apply";
   // Keep the current genuine primary question. Once answered, the ordinary
   // inspector exposes this read-only plan ahead of the next command. Other
   // unresolved questions still stop the generic driver before any mutation.
-  const nextAction = initialAnswersAction === null && publicAnchorPlan !== null
-    && observed.nextAction.kind === "command" ? publicAnchorPlan : observed.nextAction;
+  const nextAction = consentSupersededByMergedRound
+    ? commandAction([ONBOARDING_SCRIPT, "inspect", "--root", observed.root, "--runner", observed.runner], false, false, SCHEMA, ["intake-required"])
+    : initialAnswersAction === null && publicAnchorPlan !== null
+      && observed.nextAction.kind === "command" ? publicAnchorPlan : observed.nextAction;
   if (pendingAsks.length === 0 && nextAction === observed.nextAction) return observed;
   return { ...observed, nextAction: { ...nextAction, ...(pendingAsks.length ? { pendingAsks } : {}) } };
 }

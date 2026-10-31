@@ -85,6 +85,9 @@ in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
 
 A language already recorded at the onboarding consent step is not asked again
 here: do not re-ask it, reuse the recorded value for the `po-language` binding.
+The first onboarding round collects that language together with the initial
+answers and the intake consent values in ONE PO turn (G15, D210); see "PO turns
+before the first design draft" in `intake-generate-design.md`.
 
 For a hosted (non-Pipeline) project, the document language defaults to that
 recorded consent language and is not a separate default question. It is asked
