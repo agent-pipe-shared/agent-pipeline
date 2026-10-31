@@ -1,0 +1,136 @@
+diff --git a/.gitleaksignore b/.gitleaksignore
+index 8de8dc16f..b52b9abd9 100644
+--- a/.gitleaksignore
++++ b/.gitleaksignore
+@@ -222,3 +222,131 @@ content-v1:6cfbf95413d12d03d9840a46a4cb96ca8363ad1655003f54a277c7b3ec8b2b53:gove
+ content-v1:e54ba2dd01807e12464178a678547ec0decd0c0e9671e1d57fcb8eeaac35480f:governance/events/human/34-evt-gmw-revoke-70ec32844333bd613eaaad1208cd41e1-0.json:generic-api-key:1:1071
+ content-v1:c91d79d2d3ef6db00cf593ce278dd5fa139bb90857d3ee4a79666715e4b430a0:governance/events/human/25-evt-gmw-revoke-a4ab91786ab3fd289eaa6aca5c4c0c80-0.json:generic-api-key:1:1024
+ content-v1:f840c4991e62e19fcd599381605f275b7266199ff6ece6c9611b3e175ffadbe6:governance/events/human/28-evt-gmw-revoke-3e56dd12d9ce87a4d3e56dbb473c7265-0.json:generic-api-key:1:1047
++# C14-GITLEAKS-FP (2026-10-31, PO decision "individual fingerprints"): the 117 findings of the tracked-tree scan that no entry covered yet.
++# Each was classified by shape and location, and the code lines were inspected directly (not by rule alone):
++#  - frozen evidence and implementation records under specs/: bare SHA-256 or SHA-1 digests (hash chains, inventory rows, commit ids) and
++#    archived checkpoint copies of source files whose string constants name a PEM header literal; no credential of any kind;
++#  - test and fixture lines: deterministic synthetic identifiers and deliberately fake tokens (the literals self-describe as fake);
++#  - plugins/pipeline-core/scripts/po-human-approval.mjs: a string constant that detects an unencrypted key file, not a key;
++#  - project/pipeline-state.json: state digests.
++# Every entry binds exact path, rule, line, column and the SHA-256 of the matched value (content-v1); nothing is widened to a path or a rule.
++# Generated with the adapter's own exported gitleaksContentAuthorityLine() from the normalized real findings, not hand-computed.
++# Cost, recorded honestly: line-bound, so an edit above one of these lines makes its entry stale (the near-miss diagnostic and
++# gitleaks-repair-ignore.mjs exist for that case).
++content-v1:039edfd56df3f2b3b1b75c7be7d7e0267fce58231497ef416b5afaba1c09c16d:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/postimages/plugins/pipeline-core/scripts/po-human-approval.test.mjs:private-key:122:24
++content-v1:0413d1c05f4d209eb6b5b41e3f33fe2f5da898202d8ec9acc20d9cae10085daa:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:40291
++content-v1:045d7eac612b41f1b3633ace492545d9bc775e306637c0a8616890dfc2e221e3:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:31185
++content-v1:076b931f371448dddfbce29fb0802377a99062b8fe94f9a423a214c5af11eab8:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/E2E-ONB-B3-20261009/walk-vars.json:generic-api-key:6:5
++content-v1:0818eb8f11f94348f98dc0828dd744fb93bd62c2f34c8b9709ab9eef3eb46ef5:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:14043
++content-v1:0b6d9ece0eb67bab6fe1ea6d917cc5b17a827ade81dcd92890d3cdf752522f51:specs/sprint-alfred-epic/evidence/handover-2026-10-09/scratch/dispatch-wip/GREP-PUSH-F/guard-git.body.mjs:generic-api-key:1305:6
++content-v1:0d343699471b9de3d1c22400cbc79691004aa78595292f95aa1ad875b1ecb81d:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:43:507
++content-v1:0ef1044d073f80baac93be742e962c88fc5e2de9285f41a743c1657cb6bbd4b5:plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs:github-pat:182:19
++content-v1:1180543fb4abe084aec424afb30ee5eb1d348ecf799bd3048a03e9aea1ec676a:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29401:636
++content-v1:165bddd164881925b3d99f74862d2b2612eb4d64603c480f0aad1ed214a77141:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4c3139e5d042cde078d532e7420a4eefe4bce1104627e9e39cd6138488788b01.mode-0644.json:sourcegraph-access-token:1:84
++content-v1:16714b2fcea4ade84d1304954f39bc556b52f6db451a28a216bbe0ba63c752a3:plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs:generic-api-key:333:10
++content-v1:1c8d41f5ea909bd270040b3d5ddaa138b28740d026ba27154702497636fc05ff:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:10:494
++content-v1:1eedcf3d435b09dc8ab3621102e7ff83d7868a59b90583535b4d24ce01eafab3:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:894
++content-v1:21f3f278e1befd19d50de16f98876c1183c84bb53225b42ef4034ddbb5669f12:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request-disclosure.json:generic-api-key:23:22
++content-v1:2400d2cf16b36773675be9efbc9da6e1dfe5eeda7018364c4e0bdfe0a9e0681a:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:24550
++content-v1:252ce7b81c4635785f2e327c356f631cd2c39220625de1333a9d23259b530fa9:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:11593
++content-v1:269ddd10c83ae251120dca4a8e072dd6294b76fad0083a776fe1da33d7238369:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-registration-postimages-r3.txt:generic-api-key:89:35
++content-v1:2bc6b4bf316967c5b3c42b0c530536ac1c485abb7c7afb0566a93e5d5a21f0ea:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:71137:110
++content-v1:2c1273734b3774651b634e76eb39b0d9a37550c8ada1bcf9194d5a7819126e6c:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:89205:110
++content-v1:2c91695828fa295a78bf9bcb5bd88f01531859d16fb9cc83ddf0848898bac960:specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/focused-proofs.json:sourcegraph-access-token:17:23
++content-v1:2c9e90c13a91fe9e9aaf8dbe22dcd33819ae9e412c3ec133338393220f5f97c0:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request-disclosure.json:generic-api-key:24:22
++content-v1:2cc1bdf33a226c594333a3f951e2d989fb3a3290fcc376f2081b4c5d73d74dbb:plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs:generic-api-key:50:8
++content-v1:2d3a6fa453cd79c8e28ab985da04c7759714f40861d65b7ceab445d82b5aa9c5:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:28922
++content-v1:2d53c3df1ddb5090c0e5d3ede9f2b432ff3b5334349881275545e62b1ca8f693:specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.test.mjs:generic-api-key:1305:6
++content-v1:3183524163ce28075b83b8772115333b2205d6b1c2561af59df9373ba8ae3ace:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb.json:generic-api-key:1:124
++content-v1:32e19c068c82e5f7646222a460f761d5a0df798549c6833ba7e105812893cdb4:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/ADR0085-T0c-b-20261009/enroll-diagnostic.txt:generic-api-key:22:678
++content-v1:34c10b3d0d480c23d78fa195df6fa839aa0c1e85547d411dfb7adea4b999b354:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:github-pat:531:75
++content-v1:35613e452a08aa9bb7df5f5acccbdee8a3ba91cad410028c62a4832e36f4510a:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/b3e12add2e700896cdd38741e3c4b191eb7d6bd19c0330720144f3a0d21f09f8.txt:private-key:1693:22
++content-v1:367a9bc6ded893f6fdd25a903f5194807857a24f470dbccf147b2eba0ec2305a:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:11:367
++content-v1:376b7ce94fc78864755587e15b04d28d8fa76562ac698f3a1d1fec94842bc77b:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:747
++content-v1:397e94b45aebc44cf11d3ee98303a6a6e1606fe8cb97cd16126f8b2901f4864c:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29439:1000
++content-v1:39abe45a6fd29dd0cd4c9c63950e1e476854c2a7322afb17e4d254dc3c84db0b:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:60336
++content-v1:3c9201dd8efe3e61381a79280de42ba5d0b7b2948c4db1287e95b6be84df9f79:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:26:472
++content-v1:3e5df2c354bedaac92eae3619b5d50d225567e7960649756f7e5cd560cb5dbc5:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2bb50e5e993674da5f04536785a2147aee7e389067e02156034c1d78ee5a2c17.mode-0644.json:sourcegraph-access-token:1:84
++content-v1:3ed3f435fa87a772f82d03a923415046f06826e638bc0fce0f72c4223b8ff534:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request.json:generic-api-key:12:20
++content-v1:3ff2c5691fe7c85f4a4d4a9cad3af44e9844664d502b593b798f84a5bfef2d59:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:17:645
++content-v1:40fb057e7bb51e09dd33b8ce7f156b0b350dcee56682dfcfecc9129fce90174d:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29404:471
++content-v1:41f58bc0a3ea78b5b3e759ecc3de88beb353fcf52a994cf5cfe5e047417e6ba4:plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs:generic-api-key:122:108
++content-v1:4b6095195d2dd0faab0cd4bd1bbe4206de0bf3dd450138ee8d8287fcf305a8df:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:31662
++content-v1:4b80fcd368a1240d974d52248b5d3a2b47b8f2de1f04f7fd4795c1a1b0dc161b:specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/focused-proofs.json:sourcegraph-access-token:18:21
++content-v1:4e6d18fe7d7b570989c1f5a604774493dc282c1033727dbb68580b7fe4c3dad8:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.txt:generic-api-key:12951:23
++content-v1:50fb370292078575e19f6b11408556522c1e595622a5fc7ca38d0afe54e51853:project/pipeline-state.json:sentry-access-token:1014:9
++content-v1:528b54c275f398a2ab37992b1910be2c14ed982ba10188d3da15b551fbffaed4:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:7211
++content-v1:52cd2f48b71be8268b177098f1d85b2330a4a9d4327023f7761b16f3541cb1ae:plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:generic-api-key:140:16
++content-v1:57cb71cbbdd5dab44c32ac5fdd15093ab76c562161e43db9f13f3c8b2105afb6:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:4156
++content-v1:586126b69e79a6052b9d36c41276b2910c605911bad0cbe508dc9d1db05eba55:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/postimages/plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs:generic-api-key:115:108
++content-v1:5b0330ed03a2f69f6ef3b59cc97089aeeee190a43562dec6e77180311d129951:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:20:635
++content-v1:5ce2c3bcf7d1927118300bb3d0d5ff3e2f845baeaa2f37a3d54d415bd307e243:specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/scripts/po-human-approval.mjs.txt:private-key:1717:22
++content-v1:602117d63941591972e5a1079d03125532836c444efd2041bd9e3445d82be4b6:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.json:generic-api-key:13156:33
++content-v1:631ca1551ac5b6b03700438971173a0d48cb25e4279ee58afbb8cab98e45390a:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:34278
++content-v1:6320da69c64e44097a83a2f168c7c6fe99f3040fa839c3827fe76bfbc97b4f49:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:23:470
++content-v1:652cf3b15b0f47398b1a4084055f84c85a78e52bd6abe63bcd3254163400e1cc:specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/dependencies/frozen-g8-postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt:generic-api-key:49:26
++content-v1:6560a503602a37c2392a676bad8a698c288a46a6e765256ee8eb852ff305e0d6:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29398:646
++content-v1:66073bf6920fdd0ad5699c8d87b354b7300a5e758b7e249ef099a6aab44b27b2:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/db7dc13cb7dd4f75c0e8ca02f2c3f30c0a7033f81ea455108d8c4316f15ad3a5.mode-0600.json:sourcegraph-access-token:1:8884
++content-v1:6b0c0a4420d487f98e24af53526124a9b0a7c6ba55bde8f1fb173613a41bda32:plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs:github-pat:268:20
++content-v1:6d07f036091bfdd85928d47421b62da962dbd5f31af64a699a066910723e4ac8:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:20631
++content-v1:6d883193581b2c2b2a22cb4886bac629236ee3c168c14a5f62924007cfb4cc52:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:9827
++content-v1:6f3a01a9e4c9f4e70e9ae7e19a3edd180c90f75fa93c330fc9f46716913e138e:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:26797
++content-v1:76700cc62c8c33f7f92aed2c3e94df07a2f3f2b397162659712e15c60d539113:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.json:generic-api-key:12944:23
++content-v1:79be8c07f1ec7697177d6031b37a054ccc53eb6c02a85c3b7821753460e7c795:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:16993
++content-v1:7ca5c6a4ca89aa50885b941b63dd989e45c2e53731ab938bb639ffb6b9a237b9:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.txt:generic-api-key:13107:33
++content-v1:7d95f96d0a923cf0c5d9ff4ef6c599eeb74b37e833d03c4ee708dc830296344d:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:19482
++content-v1:81c93d9871f3cf57b6a6b3ec51fb2979e923b9936ec4ac35ddbdfb494ee1ddca:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/E2E-ONB-B3-20261009/step-01-preflight.txt:generic-api-key:5:229
++content-v1:84dbdc8ca15f79368a54d8b4247d1b9b9dc34a8e01eb11a88a9c710d1e7bcff6:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:21534
++content-v1:875f6c7090ccbac70b93c5281e123f32d3ee3f9f178ebed4250109cf6ffdbd09:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:4633
++content-v1:8872c0083dffd15ddc1c47ac9439ea1af3979ad2155b23a8d6b49b02d3b3151a:plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1728:22
++content-v1:893f43743acb7a1be3ecc14c572ffe8a3dffb3deb8273056c66ae72f78e50dd5:plugins/pipeline-core/lib/model-family-host-store.test.mjs:generic-api-key:46:26
++content-v1:8b76a898ce9cb9c08a0661f42a000f22c650d9a0185b0685c204400009141567:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/base-source/plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1424:22
++content-v1:8bbf5abe3b848e6a3f5237fe9327eb17f48fb1470cecf3def9fcbb5b40e0a3a4:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/db7dc13cb7dd4f75c0e8ca02f2c3f30c0a7033f81ea455108d8c4316f15ad3a5.mode-0600.json:sourcegraph-access-token:1:8834
++content-v1:906e08dd01f52714a667c02f5560b93ed172483bfdf188ace4d8251e32b859b1:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:16516
++content-v1:934e856030f57d652d102997c7e44ddd6a1d620081616050be1e63f1284e7e3f:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/TR-S1-F2-20261009/po-human-approval.patch:private-key:20:26
++content-v1:95d064b4b0e905ab5437205a902afd552e0dd95ed1672e7946ae7a7b07a4fb21:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/signing-review-material.json:generic-api-key:1:40439
++content-v1:97670b0167b97fdadbdd0b12981925321c6bdfbd50a636e1bdd97f08fccf51ed:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:29399
++content-v1:9b08d1f82d45f9404203bc8aa4c8b1a096b3f39584a42495820a30ceab111c56:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/6b45860f3a6fe522116a618f3b7d06bfb2d97d702ff31d48f22fa455787aa5f4.patch.txt:generic-api-key:100:11
++content-v1:9cf59f8ff19eff95701faeb774c574dad182ada22df48c71bede873c9d50c4c5:plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs:generic-api-key:115:108
++content-v1:9d96603640347d4560de729fee7b7b450c87200afcb499b54aa955ffbd5921b6:specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3f2c43abab12a40e044b5b8a615c7365ecf5d55ad3d1cc9531e77c182ebe1185.mode-0644.json:sourcegraph-access-token:1:84
++content-v1:9f64ae45db839dab9e2531698d8e07b0fd5a720be240570434ebd9980710f8fd:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:12072
++content-v1:9f767fdd683f7299d7d460f7f8fab9a2800adafaf1c1777dda6ff43a58695497:project/pipeline-state.json:sentry-access-token:1346:9
++content-v1:a19202ee73161d04b88be5228b4b7e7a8fb174b71430e86216de0dff3986037e:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:14520
++content-v1:a284c59a4f773e7612bcbff1ffe040f674cd7f85fd570a543b6b1dfa248ae8a9:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request-disclosure.json:generic-api-key:184:35
++content-v1:a60862c3bb5a6bc4ccd49b81730e5cddc0f7fb0dcd6ffe288e855d237be8bba6:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:generic-api-key:529:12
++content-v1:a897f4dde804fc364d6478362437d040de167ba4d8a32f0bf43869aa60e225a8:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/cc3e42efe94b0f44e62447c43a88b85ddac5ba3f4d4bf9d975bbcbf5c4aa3e13.txt:generic-api-key:141:16
++content-v1:a924b7e21bd92b513322b53d3c37eadbdfaf7c4a1ac59dd7a9b2c4e29b89619b:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:19005
++content-v1:aab222ac2127c1b4cdce7606967de361adaf4e5a94bb0df086b15735666ca171:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:33801
++content-v1:b0e9a12ddd88b022cf05979c5e2dc2808426042d3fcf26f2ccfacf177069d09f:specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt:generic-api-key:49:26
++content-v1:b153d8ac8e9ec06e88df2550f3bb127145c2bb8154c22d90a98eb8f11ce9f012:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:58:999
++content-v1:b33a5a81c581b1ed43030e59b9c240bd52f3620b35510440660e48591dd42c7e:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.txt:generic-api-key:13163:33
++content-v1:b58bf428a7f8d533deee3c22631b37a316b70dc57deb5fb52d09c88fd73a87f3:plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs:generic-api-key:174:10
++content-v1:b8bdccdd238de23b3a1dba43a3f5e875213de9d16eb3ae173d25d561146c8dfc:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/E2E-ONB-B2-20261009/step-01-preflight.txt:generic-api-key:5:229
++content-v1:ba19079f8d0acd120cc5f0f7b46819c2e9b3e80080f66460bbe4c86521ac5c76:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/cumulative.patch:generic-api-key:50282:109
++content-v1:bc1fae73724647292c5f31afdc4d000a2d7e06d07cf22257d2574abec347947e:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/ADR0085-T0c-b-20261009/enroll-diagnostic.txt:generic-api-key:22:158
++content-v1:be1812923a57e949471132a17734612c9b4de92f7d975821d0fc9a6db3dedb89:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/base-source/plugins/pipeline-core/scripts/po-human-approval.test.mjs:private-key:122:24
++content-v1:c08945b237d6b5037f8d6c4d0e2ef9638fd4916fa642dfe171cb1861555011d7:specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/dispatch-record-TR-S1-F-20261009.json:private-key:43:134
++content-v1:c310798cabc1a328a17b896350063be6aa535c8f267ea61bb1f1c25c9ee3e6f9:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/e2d5e98563ef34cafc152596b73d03a02766de35a4884d9d42eb74cf0a3560a1.txt:generic-api-key:79:10
++content-v1:c329b2bf5ec2b9be8192cb0471420821e7d0c1f90a01c3d05f6f1d9a9b4902fb:plugins/pipeline-core/lib/legacy-owner-custody.test.mjs:generic-api-key:424:16
++content-v1:cba4e53a46b4221303a6eb9f21a3c723846a865006cbfe527b3b8290d4b568d9:plugins/pipeline-core/hooks/guard-git.test.mjs:generic-api-key:1314:6
++content-v1:cebfda0d97869387a1c047fbd6a49ee83e1f08460133b0dbfd48efcde8fcd821:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.json:generic-api-key:13100:33
++content-v1:d00a9b973e02278aa99caae2865e6f8de67d2ef093357e094edc008b7416e38a:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:488:10
++content-v1:d3450b6057f06a1a8a1df73569351d8e726724b273d5d4104dc5aa1499645e9b:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29391:495
++content-v1:e14693005b17295ab6a20969325d7a52937203245d1b7e9687102994c60ca7d2:plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs:generic-api-key:272:8
++content-v1:e35e64540a20aeaaca15ac5ab5199fdaa0c4e5517294bc0b2e0da0ad18c78e41:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/postimages/plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1624:22
++content-v1:e3cce7a3502aec2211130251ee4a29c823820475b21170bd5723ad6159a072f8:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/postimages/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs:generic-api-key:118:108
++content-v1:e572e50edf8ebd6d7d89fd5ba734fd4bdafcd1e37d83fa9d2fd4c996c09e66b1:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request.json:generic-api-key:173:33
++content-v1:e71f804f982879b222e1ec14fc0e9949f7f7fe8f3b044d958169cb009f786d87:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29407:473
++content-v1:ed13bf0536d1d7d4149e9016a9ccd4aa84471db4231df5d54481f296ff7d839f:plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs:generic-api-key:485:8
++content-v1:f0253f7933a011cd00779e685c88fbc0898083d683b75c86e5cedc906d19a6b0:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:26320
++content-v1:f07b8f2fb44034e0216e78d99b37cc50d1c2816925e8344a808d1f04a7b0e45c:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/33e2599d6f9a33aa1726f7b5409b50f2a1040200d52157d4c9ff2897afeb4374.txt:private-key:1713:22
++content-v1:f2ce402ad1903344ca63ce09dca27298e3cb7d6fd86cb1e401b44fff9bf000c5:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:private-key:17926:27
++content-v1:f6ada1b041a71bde1926738fa326d15f5993a811f2224473d16ac08ebcbd8363:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:22011
++content-v1:f6e80157f43b6da94d056e607a15877755ea206d34d7abc373d1ed96dcc76999:plugins/pipeline-core/scripts/po-human-approval.test.mjs:private-key:160:24
++content-v1:f81753caa0776e70905bab52cd6f855c868d0258a59018b411e14c9c5ee241bd:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request.json:generic-api-key:13:20
++content-v1:fba2baa1906599dd17af71cbc58036fa717d666c3df9de3f196427c8e3e3ae26:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:24073
++content-v1:fd68173d99204df491c1d75aa610a1f08eea5f2fbed64d7df37b4a0a1fb8b4cb:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29424:508
++content-v1:fd7fadb7d60662ebf84a2e74b877dcf9a88801066fbde0bcb902132256f370f7:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/cumulative.patch:generic-api-key:32214:109
++content-v1:fd988155580aa115ad83d09d51276030cc669dfb62d2bfd26c030be2230de9e9:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:6734
++content-v1:fdd5b163386c8ae7638c21a90b9e2c040aaa1c5763eb4845d139bd934ed5b76b:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:9350
++content-v1:ff6ba7bee4b2361645149717cfe254aa4e5128f857f4fcf1c224619b91b50f2e:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29392:368
