@@ -76,6 +76,10 @@ Red on the plain candidate (identical in every baseline clone this session):
   - Run standalone for codex and antigravity, the measurement helper stops at INTAKE-CAPTURE-TEXT-FILE-UNREADABLE
     before authoring, with and without R6 (a separate helper drift).
 - VCR01: six outgrown sites counts are restated in the candidate-13 VCR01 patch.
+- Found in the R6 sweep and fixed in two more candidate-13 patches: `measure-tofu-push-e2e.mjs` failed with ENOENT in
+  a fresh clone (no scratch/ yet, the same class as the codex guard case), and `dispatch-budget-calibration.test.mjs`
+  had been red on HEAD since 88afb9b94 raised the deep and implementor `maxTurns` to 400 while its rule helper still
+  said 76/80.
 
 ## Wanted
 
