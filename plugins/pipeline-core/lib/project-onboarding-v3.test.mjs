@@ -16,7 +16,7 @@ import { SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
 import { createProjectUninstallController } from "./project-uninstall.mjs";
 import { fixture as projectUninstallFixture } from "./project-uninstall.fixture.mjs";
-import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
+import {derivePlanLifecycle,CURRENT_APPROVAL_SCHEMA,PLAN_SUBMISSION_SCHEMA,sha256CanonicalJson} from "./plan-spec-state-v2.mjs";
 import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
@@ -5791,6 +5791,32 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
 // The two halves are both the contract. Refusing forever is the deadlock; passing
 // with nothing done is the defect the PO found -- a push that succeeded in a
 // project whose own calibration said `push: blocking`.
+// D214-C: the push review is strict (no independent review, no admission) unless the pushed commit carries an approved plan of
+// profile mini, for which the review duty falls away by design (REVIEW-LOW-RIGOR). A consumer doing mini work has exactly this: the
+// feature's plan and spec in the pushed tree and a State that records the submission and its approval. The seeded gate chapters used
+// to rely on a review waiver that a feature-less State no longer gets. The caller commits the files this writes.
+function seedApprovedMiniFeature(path) {
+  const planPath = "specs/seeded-feature/prd.md";
+  const specPath = "specs/seeded-feature/spec.md";
+  mkdirSync(join(path, "specs", "seeded-feature"), { recursive: true });
+  writeFileSync(join(path, planPath), "# PRD\n\nSeeded mini feature.\n");
+  writeFileSync(join(path, specPath), "# Spec\n\nSeeded mini feature.\n");
+  const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const profileSha256 = "a".repeat(64);
+  const submission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: "seeded-feature", planPath,
+    planSha256: sha(readFileSync(join(path, planPath))), specPath, specSha256: sha(readFileSync(join(path, specPath))),
+    profile: "mini", profileSha256, submittedBy: "po", submittedAt: "2026-10-24T00:00:00.000Z" };
+  const poGateAuthority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "b".repeat(64),
+    runtimeSha256: "c".repeat(64), receiptSha256: "d".repeat(64), repositoryFingerprint: "e".repeat(64),
+    planPath, planSha256: submission.planSha256, specPath, specSha256: submission.specSha256 };
+  writeFileSync(join(path, "project", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0",
+    activeFeature: { id: "seeded-feature", planPath, phase: "implementation" }, planApproved: true, planSubmission: submission,
+    planApproval: { schema: CURRENT_APPROVAL_SCHEMA, approvedBy: "po", approvedAt: "2026-10-24T00:01:00.000Z",
+      submissionSha256: sha256CanonicalJson(submission), profileSha256, poGateAuthority, priorInvalidationSha256: null,
+      designApprovalBinding: null, designApproval: null } })}\n`);
+  hostGit(path, ["add", "-f", "project/pipeline-state.json"]); // the State is gitignored in a consumer; the waiver reads it from the pushed tree
+}
+
 test("the seeded push gate refuses an unapproved push and admits it after the shipped commands", () => {
   const path = root();
   try {
@@ -5899,6 +5925,8 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     // (4) The artifact the approval binds, from the plugin's shipped template.
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
+    seedApprovedMiniFeature(path);
+    commit("approved mini feature");
     assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
     const securityEvidence = produceSecurityEvidence();
     assert.equal(securityEvidence.status, 0, `a fresh consumer with no catalog must yield a clean, non-blocking security scan: ${securityEvidence.stderr}${securityEvidence.stdout}`);
@@ -6024,6 +6052,8 @@ test("the seeded security gate refuses a push with missing security evidence and
     commit("configure verify and global human approval", { noVerify: true });
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
+    seedApprovedMiniFeature(path);
+    commit("approved mini feature");
     assert.equal(produceVerifyEvidence().status, 0, "a configured, passing verify command must yield evidence");
     const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"], {
       isattyFn: () => { throw new Error("global chat must not inspect a terminal"); },
