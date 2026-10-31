@@ -67,11 +67,13 @@ the addendum: either the receipt of the record's own task id, or a
 feature-wide Critic course (one task id, any number of rounds) whose reviewed
 range, the commits after the receipt's base up to its reviewed candidate,
 contains the record's commit. A failed receipt (`reviewPass` false) never binds
-without a PO residual acceptance of its minor findings
+without a PO residual acceptance of its open findings
 (`node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance
 --by <name> --critic-packet <packet-id>`, the PO's own attended step; the
-acceptance must be bound to that receipt's digest, candidate and exact all-minor
-finding set). A course closed by a residual acceptance covers the records of
+acceptance must be bound to that receipt's digest, candidate and exact
+finding set; a major finding of past authorship that no commit can correct is
+accepted only with `--reason-class uncorrectable-past-authorship`, which is part
+of the signed subject, and a blocker never is). A course closed by a residual acceptance covers the records of
 all its registered rounds (D217): name the course's LAST round in the addendum
 (`criticPacketId` and `reviewCandidateCommit` of that round); the record's
 commit may then lie anywhere in the union of the reviewed ranges of the
