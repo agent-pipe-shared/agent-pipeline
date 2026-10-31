@@ -35,7 +35,8 @@ export const REVIEW_LIMITS = Object.freeze({
   environmentReroutes: 1,
 });
 // Historical lineage/projection records keep REVIEW_LIMITS unchanged. New
-// dispatch admission follows the PO's one-full plus at most three correction-DIFF cap.
+// dispatch admission follows D190: one full review, then correction-DIFF reviews until PASS or a PO decision. These limits gate only a
+// FULL request after round 1; no round or correction-commit count refuses a diff round (see admitReviewAttempt).
 export const CRITIC_DISPATCH_LIMITS = Object.freeze({
   criticRounds: 4,
   correctionCommits: REVIEW_LIMITS.correctionCommits,

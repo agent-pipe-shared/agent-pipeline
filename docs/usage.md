@@ -138,8 +138,9 @@ may still be pending and must be disclosed honestly.
 
 If findings need correction, give one fresh Correction Goldfish the entire
 batch. That same owner keeps context through every finding, fix and delta
-review. The batch budget is one full Critic plus at most three delta Critics;
-stop immediately on PASS and never restart the budget under a new batch ID.
+review. The batch course is one full Critic, then delta Critics until PASS or an
+explicit PO decision (no round count); stop immediately on PASS and never
+restart the course under a new batch ID.
 
 Run Full Verify once on the integrated, reviewed candidate with its consumed
 Critic evidence. A failed check needs repair and the applicable affected

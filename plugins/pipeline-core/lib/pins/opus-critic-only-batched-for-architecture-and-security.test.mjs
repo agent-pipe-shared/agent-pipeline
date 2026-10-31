@@ -191,7 +191,10 @@ test("MP-07 German reference half states one full review plus at most three delt
   assert.ok(start >= 0);
   assert.match(sec, /höchstens drei Delta-Reviews/);
   assert.doesNotMatch(sec, /höchstens ein Delta-Review/);
-  assert.match(mp07(), /at most three correction-diff re-critics/);
+  // Restated N33c (D190): the English MP-07 no longer states a count; the German reference half above is a separate reader aid
+  // that still carries the earlier cap and is pinned unchanged until its own translation pass.
+  assert.match(mp07(), /correction-diff re-critics until genuine PASS or an explicit PO decision/);
+  assert.doesNotMatch(mp07(), /at most three correction-diff re-critics/);
 });
 
 test("item (e): the Mechanic tier is installed as Haiku at effort medium in agent, authority and runner mapping", () => {

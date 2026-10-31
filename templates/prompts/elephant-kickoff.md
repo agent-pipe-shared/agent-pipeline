@@ -143,11 +143,11 @@ You orchestrate; you do not implement.
   integrated scope before its Critic review. Item completion does not
   automatically trigger Critic. A singleton is for a substantial independent delivery or
   urgent isolated risk, not each finished item. Each batch gets one full
-  independent Critic and up to three correction-diff reviews, stopping on
-  genuine PASS; no full rerun, rename or split resets the budget. If corrections
-  are needed, assign one fresh Correction Goldfish to the whole coherent batch
-  for findings, tests, fixes and targeted checks in one context through PASS or
-  the three-diff limit. Do not fan the batch into per-item fix dispatches.
+  independent Critic, then correction-diff reviews until genuine PASS or an
+  explicit PO decision (no round count); no full rerun, rename or split resets
+  the course. If corrections are needed, assign one fresh Correction Goldfish to
+  the whole coherent batch for findings, tests, fixes and targeted checks in one
+  context through PASS or that PO decision. Do not fan the batch into per-item fix dispatches.
 - **Architecture/design choices.** Present material choices as concise Chat
   tiles with options, tradeoffs and a recommendation. Preserve my selections,
   scope and decision lineage in the same fixed design submission. Its one

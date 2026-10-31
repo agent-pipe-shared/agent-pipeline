@@ -144,11 +144,11 @@ ok("RE22 ambiguous impact is admitted as an effective full round, never as a del
 ok("RE22b fallback still demands valid structural bindings and names the failing one", (() => { const r = admitReviewAttempt({ ...delta, trustBoundaryChanged: true, priorReceipt: null }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
 ok("RE22c fallback needs the coordinator impact confirmation", (() => { const r = admitReviewAttempt({ ...delta, impactAmbiguous: true, coordinatorImpactConfirmed: false }); return r.ok === false && r.binding === "coordinatorImpactConfirmed"; })());
 ok("RE22d a delta with an invalid prior receipt stays refused and names it", (() => { const r = admitReviewAttempt({ ...delta, priorReceipt: { id: "x", sha256: "nope" } }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
-ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
+ok("RE23 D190 no round count (here the fourth) creates a course gate for a diff round",admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
 // D190: the old cap now gates only a FULL request; a diff round past it is admitted.
 ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);
 ok("RE24d D190 a diff round past the old round cap is admitted", admitReviewAttempt({ ...delta, round: 5 }).mode === "delta" && admitReviewAttempt({ ...delta, round: 9 }).ok === true);
-ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
+ok("RE25 D190 no correction-commit count (here the third) creates a course gate for a diff round", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
 ok("RE26 fourth correction commit creates course gate for a full request", admitReviewAttempt({ ...delta, correctionCommits: 4, requestedMode: "full" }).courseGateRequired === true);
 ok("RE26d2 D190 a diff round past the old correction-commit cap is admitted", admitReviewAttempt({ ...delta, correctionCommits: 4 }).mode === "delta");
 

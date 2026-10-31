@@ -431,8 +431,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
     }
     // Defense at the actual packet preflight: history may remain readable in
-    // the historical four-round format, and the current one-full plus three-DIFF
-    // policy can produce a packet-ready result for this registered batch.
+    // the historical four-round format, and the current policy (D190: one full review, then correction-DIFF reviews until PASS or a
+    // PO decision, no round count) can produce a packet-ready result for this registered batch.
     const round = admission.budgets?.reviewRound;
     // D204: a round > 1 is requested as a delta; the admission may turn it into an effective FULL round (RE-DELTA-FALLBACK-FULL) when the
     // registered delta request moves a trust boundary or is impact-ambiguous. That is the only full round accepted after round 1.
@@ -444,9 +444,10 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
       || (admission.decision.mode !== expectedMode && !fallbackFull)
       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
-      const BUDGET_NEXT_STEP = "Critic budget spent (one full review plus at most three correction-diff reviews per declared batch): do not dispatch another Critic; the next step is Elephant self-verification, which cannot become PASS, or an explicit PO decision.";
-      fail("CDP-COURSE-BUDGET", `Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch. ${BUDGET_NEXT_STEP}`,
-        { nextStep: BUDGET_NEXT_STEP });
+      // The code string stays CDP-COURSE-BUDGET (it is the typed key consumers match); it no longer means a spent budget (D190).
+      const MODE_MISMATCH_NEXT_STEP = "No review count refuses a correction-DIFF round, and no Critic round is spent. Ask for the mode the round needs: round 1 is a full review (no delta request); every later round is a correction-DIFF review requested with a delta request over the range from the immediately previous reviewed candidate to the new candidate (a delta that moves a trust boundary or is impact-ambiguous is admitted as an effective full round). If the request already matches, the admission limits differ from the dispatch limits: report that defect instead of retrying.";
+      fail("CDP-COURSE-BUDGET", `The requested review mode does not match the round of this registered batch: round 1 is a full review, every later round is a correction-DIFF review from the immediately previous reviewed candidate, and the admission limits must equal the dispatch limits. ${MODE_MISMATCH_NEXT_STEP}`,
+        { nextStep: MODE_MISMATCH_NEXT_STEP });
     }
     if (admission.source?.reviewUnit?.specPath !== spec) {
       fail("CDP-COURSE-CONTEXT", "The registered review unit must bind the requested feature Spec.");

@@ -3,7 +3,7 @@
 // Exercises the real review-economy / critic-course-admission functions; no mocks.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -91,29 +91,64 @@ test("AC2 follow-up wider than the delta is refused (unmapped path, boundary cha
   assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true, priorReceipt: { id: "x", sha256: "bad" } })).code, "RE-DELTA-BINDINGS-INVALID");
 });
 
-test("AC2 dispatch preflight carries the typed course-budget refusal", () => {
+// Restated for N33c (D190, 2026-10-31): intent unchanged -- the dispatch preflight keeps its typed CDP-COURSE-BUDGET refusal and the
+// canon keeps the delta-only, correction-only follow-up rule. What is dropped is the claim that a COUNT limits the diff rounds (one
+// full review plus at most three correction-diff reviews, "four calls total", "Critic budget spent"): D190 decided one full review,
+// then correction-diff reviews until genuine PASS or an explicit PO decision, and the code (review-economy.mjs, critic-course-admission.mjs)
+// no longer refuses a diff round by count. The refusal fires only on a requested-mode/round mismatch, and says so.
+test("AC2 dispatch preflight carries the typed course-mode refusal and states its real cause (restated N33c/D190)", () => {
   const src = read("scripts/critic-dispatch-preflight.mjs");
   assert.match(src, /CDP-COURSE-BUDGET/u);
-  assert.match(src, /one full review and at most three correction-DIFF reviews/u);
+  assert.match(src, /requested review mode does not match the round/u);
+  assert.match(src, /every later round is a correction-DIFF review/u);
+  assert.doesNotMatch(src, /at most three correction-DIFF reviews/u);
+  assert.doesNotMatch(src, /Critic budget spent/u);
 });
 
-test("AC3 guardrail and Elephant role contract state the delta-only, bounded follow-up rule", () => {
+test("AC3 guardrail and Elephant role contract state the delta-only follow-up rule with no round count (restated N33c/D190)", () => {
   const qg = read("guardrails/quality-gates.md");
-  assert.match(qg, /Four Critic calls total is the maximum/u);
+  assert.match(qg, /correction-diff reviews until genuine PASS or an explicit PO decision/u);
+  assert.doesNotMatch(qg, /Four Critic calls total is the maximum/u);
+  assert.doesNotMatch(qg, /after the third correction-diff review/u);
   assert.match(qg, /Correction-only scope/u);
   assert.match(qg, /examines only that immediate correction diff/u);
   assert.match(qg, /Self-verification[^.]*cannot become PASS/u);
   const el = read("roles/elephant.md");
-  assert.match(el, /maximum of three correction-diff reviews/u);
+  assert.match(el, /correction-diff[^.]*until genuine PASS or an explicit PO decision/u);
+  assert.doesNotMatch(el, /maximum of three correction-diff reviews/u);
 });
 
-test("AC1 typed budget refusal names Elephant self-verification or an explicit PO decision as the next step (E3: one number, four calls)", () => {
+test("AC1 typed mode-mismatch refusal names the real cause and the real next step, never a spent budget (restated N33c/D190; was: E3 one number, four calls)", () => {
   const src = read("scripts/critic-dispatch-preflight.mjs");
   assert.match(src, /CDP-COURSE-BUDGET/u);
-  assert.match(src, /nextStep: BUDGET_NEXT_STEP/u);
-  assert.match(src, /do not dispatch another Critic/u);
-  assert.match(src, /Elephant self-verification, which cannot become PASS, or an explicit PO decision/u);
+  assert.match(src, /nextStep: MODE_MISMATCH_NEXT_STEP/u);
+  assert.match(src, /round 1 is a full review/u);
+  assert.match(src, /immediately previous reviewed candidate/u);
+  assert.match(src, /no review count refuses a correction-DIFF round/iu);
+  assert.doesNotMatch(src, /do not dispatch another Critic/u);
+  assert.doesNotMatch(src, /Elephant self-verification, which cannot become PASS, or an explicit PO decision/u);
   assert.doesNotMatch(src, /at most one (?:re-review|follow-up)/iu);
+});
+
+// New (N33c): the sweep the briefing names as its acceptance -- no current canon text states the retired count.
+test("AC3 N33c sweep: no current canon, prompt or agent text states a count that limits the correction-diff rounds", () => {
+  const stale = /three correction-diff|three fresh correction|three correction rounds|Four Critic calls total|Four calls total|four reviews total|No fifth review|no fifth-round exception|three-diff limit|full-plus-three-diff|third correction-diff|at most three correction-DIFF|plus at most three correction/iu;
+  const files = [
+    "roles/elephant.md", "roles/critic.md", "templates/prompts/critic-review.md", "templates/prompts/goldfish-task.md",
+    "templates/prompts/elephant-kickoff.md", "guardrails/quality-gates.md", "docs/operating-model.md",
+    "agents/critic.md", "skills/critic-review/SKILL.md", "skills/pipeline-start/references/workflow-dispatch.md",
+    "scripts/critic-dispatch-preflight.mjs", "lib/review-economy.mjs",
+  ];
+  // Repo-root-only sources (not vendored into the installed plugin) are checked when the source checkout is present.
+  const rootOnly = ["policies/model-policy.md", "harness/checklists/critic-review.md"]
+    .filter((rel) => existsSync(join(pluginRoot, "..", "..", rel))).map((rel) => `../../${rel}`);
+  const english = (text) => text.split("<!-- DE-REFERENCE-BELOW")[0]; // the German reference half is a separate reader aid
+  for (const rel of [...files, ...rootOnly]) assert.doesNotMatch(english(read(rel)), stale, rel);
+  // The Reader keeps its own two-plus-one budget; the sweep must not touch it.
+  assert.match(read("skills/reader-review/SKILL.md"), /three correction batches/u);
+  // Behavioural twin of the wording: a diff round past every old count is admitted, only a FULL request past the cap is refused.
+  assert.equal(admitReviewAttempt(delta({ round: 9, correctionCommits: 8 })).ok, true);
+  assert.equal(admitReviewAttempt(delta({ round: 9, correctionCommits: 8, requestedMode: "full" })).code, "RE-CRITIC-ROUND-LIMIT");
 });
 
 // Restated for D212 (N33, 2026-10-30): intent unchanged -- the close refusal offers the Critic dispatch only with the delta-only

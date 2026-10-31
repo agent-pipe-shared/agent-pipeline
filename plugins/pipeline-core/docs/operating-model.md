@@ -362,9 +362,8 @@ normative shape is:
    dispatching (e.g. "this sweep's N items"), so a regression cannot ride
    along unreviewed indefinitely. This does not change a single package's
    correction-review rule: each finished work batch permits one full
-   independent Critic review and up to three correction-diff reviews, stopping
-   earlier on genuine PASS. Four Critic calls total is the maximum; there is no
-   full-review rerun. Preserve original coverage and continuous exact-candidate
+   independent Critic review and correction-diff reviews until genuine PASS or
+   an explicit PO decision (D190: no round count). There is no full-review rerun. Preserve original coverage and continuous exact-candidate
    lineage; each correction review starts at the immediately preceding
    reviewed candidate and covers only its correction diff and direct
    regressions. Renaming or splitting the same batch does not reset its budget.
@@ -460,10 +459,9 @@ first hunts for defects, then reports only findings it can support. “No
 findings” is valid. The Elephant decides whether each finding is fixed,
 accepted with a reason, or escalated; it must not silently discard one.
 
-The selected PO direction prospectively limits each meaningful work batch to
-one full independent Critic review and up to three correction-diff reviews,
-stopping earlier on genuine PASS. Four Critic calls total is the maximum; no
-full-review rerun is permitted. Renaming or splitting the same batch does not
+The selected PO direction prospectively gives each meaningful work batch
+one full independent Critic review and correction-diff reviews until genuine PASS or an explicit PO decision (D190: no round count); no full-review rerun is
+permitted. Renaming or splitting the same batch does not
 reset its history. Each correction review starts at the immediately previous
 reviewed candidate and examines only its fixes and direct regressions. The
 coordinator retains genuine source coverage and continuous receipt/finding-

@@ -53,10 +53,10 @@ source/runtime combination still requires qualification before enforcement is
 claimed. When corrections are
 needed, one fresh Correction Goldfish owns the coherent batch's findings,
 test cases, fixes, targeted checks and subsequent correction-diff findings in
-the same context through PASS or the three-diff limit. Do not create one
-correction worker per item. Keep one full Critic plus at most three
-correction-diff reviews bound to that original batch; renaming or splitting
-does not reset the budget. A singleton batch requires a substantial independent
+the same context through PASS or an explicit PO decision. Do not create one
+correction worker per item. Keep one full Critic, then correction-diff reviews
+without a round count, bound to that original batch; renaming or splitting
+does not reset the course. A singleton batch requires a substantial independent
 delivery or urgent isolated risk.
 
 ## `isolation: "worktree"` self-heal (mandatory in every such briefing)
