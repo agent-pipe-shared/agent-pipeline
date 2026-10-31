@@ -1,0 +1,181 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index f5dfcba8e..d624f8534 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -150,6 +150,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // unchanged classifier: agy-item-delivery 33->36, critic-course-admission 259->329, critic-dispatch-preflight 246->314 (N33b adds 18),
+   // critic-generic-batch 79->115, guard-dispatch-budget-checkpoint 143->154, slice-queue-cli 125->132. Only these six numbers change;
+   // names, paths, classifications, the identity digest and the counts stay as pinned, and no assertion is weakened.
++  // Restated 2026-10-31 (candidate 15, own hunk): two sites counts moved with the D223 slices and the Toolbox fixes, measured on the stacked candidate with
++  // the unchanged classifier: critic-course-admission 329->334, critic-dispatch-preflight 352->382 (the
++  // stack was already at 373 before slice 3, which adds 5, and the N43 follow-up text assertions add 4). Only these two numbers change.
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
+@@ -171,8 +174,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",329],
+-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",352],
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",334],
++    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",382],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",115],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index e62f9b2fa..f970c1fb1 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -39,7 +39,7 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
+   "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+   "  3. Commit the artifact, its log and the manifest the registration names in ONE evidence-only commit (the only form the admission accepts).",
+   "  4. Rerun critic-dispatch-preflight.mjs with --registration-commit <that commit>.",
+-  "  5. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
++  "  5. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
+   "",
+ ].join("\n");
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index f1dd03628..7427da217 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -287,7 +287,7 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path,
+       // route is the producer's own derivation (`--base`), never a typed `--guardrail`. The exact base is the one this preflight derived the list over.
+       const reason = diagnosticBase === null
+         ? `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}); this review has no commit base to derive them over, so re-produce the diagnostic with one --guardrail per listed path that is not a protected calibration path`
+-        : `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}). Re-produce the diagnostic so the producer derives the required guardrails itself: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log <evidence log> --out <evidence file> --candidate ${candidateCommit} --base ${diagnosticBase} -- <command>; with --base it adds every required guardrail on its own, so never pass a protected calibration path by --guardrail (the shell guard refuses that command)`;
++        : `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}). Re-produce the diagnostic so the producer derives the required guardrails itself: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log <evidence log> --out <evidence file> --candidate ${candidateCommit} --base ${diagnosticBase} -- <command>; with --base it adds every required guardrail on its own, so never pass a protected calibration path by --guardrail (the shell guard refuses that command). Keep --base exactly as printed (this preflight's base; a base equal to the candidate derives an empty set). Produce it while HEAD is still the candidate and the tree is clean (CDI-DIRTY-CANDIDATE after any follow-up commit); a second diagnostic for the same candidate gives CCA-DELTA-BINDING until the delta request is registered again`;
+       fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths, diagnosticBase, reason });
+     }
+     const reason = value?.schema === "pipeline.verify-evidence.v0"
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 6abd89f57..12af549f1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1060,6 +1060,11 @@ test("N43 (a) the missing-guardrails refusal for a changed calibration names the
+       assert.ok(reason.includes(`--base ${fx.candidate}`), reason);
+       assert.match(reason, /derives the required guardrails itself/u);
+       assert.match(reason, /never pass a protected calibration path by --guardrail/u);
++      // Toolbox follow-up: the base stays the preflight base, the diagnostic is made while HEAD is the candidate, a second one binds to the delta request.
++      assert.match(reason, /Keep --base exactly as printed/u);
++      assert.match(reason, /a base equal to the candidate derives an empty set/u);
++      assert.match(reason, /still the candidate and the tree is clean \(CDI-DIRTY-CANDIDATE/u);
++      assert.match(reason, /CCA-DELTA-BINDING/u);
+       assert.equal(error.details.diagnosticBase, fx.candidate);
+       return true;
+     });
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 167622603..af7bf63f6 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -714,7 +714,7 @@ export function criticBoundVerifyRemedy(dir, headCommit) {
+   const publicationBase = "<merge base of HEAD with the publication target>";
+   const first = bases.length > 0 ? bases[0].lastRegisteredCandidate : publicationBase;
+   const registered = bases.map((row) => ` Feature ${row.featureId} has a registered Critic course through round ${row.lastRegisteredRound}: its preflight base is ${row.lastRegisteredCandidate} (the last registered round's candidate), not the merge base (CCA-PARENT); add --spec specs/${row.featureId}/spec.md and the course selectors of the CCA-PARENT repair.`).join("");
+-  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).`;
++  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.`;
+ }
+ 
+ export function pushPrepareReport(argv, deps = {}, options = {}) {
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 16edc5419..783c2c8ee 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -59,7 +59,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  3. Commit the artifact, its log and the manifest the registration names in ONE evidence-only commit (the only form the admission accepts).",
+   "  4. Rerun critic-dispatch-preflight.mjs with --registration-commit <that commit>.",
+   "  5. A delta request that moves a trust boundary or is impact-ambiguous is admitted as an effective FULL round of the same course (RE-DELTA-FALLBACK-FULL); the verb says so.",
+-  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
++  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
+   "",
+   "Critic course lineage route (PF-94; register round N BEFORE the next correction commit):",
+   "  1. Finalize the course round (session-critic-finalizer) so the packet is consumed.",
+@@ -81,7 +81,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
+   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
+-  "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
++  "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
+   "",
+   "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
+   "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 050b6f64f..dfa0e3229 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2122,13 +2122,22 @@ function d1Admit(fx, request, name = "d1-request.json") {
+   return runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, name, request)]);
+ }
+ 
+-test("D1 walk (1) admit without the bindings field is refused and the detail names the derive command", () => {
++// W9 slice 3 restatement: the preflight derives the bindings in memory when the request carries none, so admit without the field is admitted and the
++// packet binds the derived echo ({ path: null, derived: true, ... }) instead of the old refusal CDP-CORRECTION-INPUT-REQUIRED.
++test("D1 walk (1) admit without the bindings field is admitted with the derived bindings and the packet binds the derived echo", () => {
+   const fx = fixture({ handover: true });
+   try {
+-    const result = d1Admit(fx, d1Request(fx));
+-    assert.equal(result.exitCode, 2);
+-    assert.match(result.output.detail, /CDP-CORRECTION-INPUT-REQUIRED/u);
+-    assert.match(result.output.detail, /critic-correction-input-bindings\.mjs derive/u);
++    const request = d1Request(fx);
++    const result = d1Admit(fx, request);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
++    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
++    const expected = preflightCriticDispatch({ root: fx.root, base: fx.base, candidate: fx.candidate, specPath: "specs/spec.md",
++      guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null });
++    assert.equal(expected.correctionInputBindings.derived, true);
++    assert.equal(expected.correctionInputBindings.path, null);
++    assert.match(expected.correctionInputBindings.digestSha256, /^[0-9a-f]{64}$/u);
++    assert.equal(readback.packet.request.sessionBinding.preflightSha256, createHash("sha256").update(canonicalJson(expected)).digest("hex"));
+   } finally { cleanup(fx); }
+ });
+ 
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 2dd56447d..fe6fb8935 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -332,7 +332,7 @@ tool or mutating command, do not delegate, and report the exposure as a
+ residual host limitation. No staleness check (the dispatch fixed the SHA); no
+ handover, no history — ever.
+ 
+-**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record, finding-disposition record or retained prior result exclusion, never readable; a finding-disposition record is only a file the project calibration lists in `criticFindingRecordPaths`, so a project whose backlog or feedback files quote earlier Critic findings lists them there and commits the calibration before the range is derived) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic). For an effective FULL round (a delta request that moves a trust boundary or is impact-ambiguous, RE-DELTA-FALLBACK-FULL) the range is the course genesis base to the candidate, not the correction range: derive with `--base <genesis base>`; the preflight refusal names that base.
++**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record, finding-disposition record or retained prior result exclusion, never readable; a finding-disposition record is only a file the project calibration lists in `criticFindingRecordPaths`, so a project whose backlog or feedback files quote earlier Critic findings lists them there and commits the calibration before the range is derived) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic). For an effective FULL round (a delta request that moves a trust boundary or is impact-ambiguous, RE-DELTA-FALLBACK-FULL) the range is the course genesis base to the candidate, not the correction range: derive with `--base <genesis base>`; the preflight refusal names that base. Passing the file is optional: when the flag is omitted the preflight derives the same bindings in memory and echoes them as `derived: true` (admit and finalize then bind that echo), and `--registration-commit` may be omitted too when exactly one commit after the candidate qualifies (several refuse, never the latest). The built-in project-state convention covers `docs/HISTORY.md` and everything under `docs/state-archive/`; any other history-named markdown or text file in the range is refused before a packet is reserved with `CDP-HISTORY-IN-RANGE` (list it in `criticFindingRecordPaths` in BOTH calibration mirrors, or leave it out of the range). A missing delta input file is written as a path skeleton by `--add-delta-request` (the four judgment fields stay for the Coordinator).
+ 
+ **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
+ lane runs under a Lifecycle Guard, perform each repository inspection as one
+diff --git a/plugins/pipeline-core/templates/prompts/critic-review.md b/plugins/pipeline-core/templates/prompts/critic-review.md
+index a12b4fd9f..674d24ed9 100644
+--- a/plugins/pipeline-core/templates/prompts/critic-review.md
++++ b/plugins/pipeline-core/templates/prompts/critic-review.md
+@@ -256,7 +256,11 @@ environment dump or a credential read; it reads such strings as text only.
+   The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+   (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
+   record is admissible only for the file the project calibration names as its
+-  handover/state file and a `pipeline-handover*.md` file in the same directory;
++  handover/state file, a `pipeline-handover*.md` file in the same directory,
++  and the built-in convention set `docs/HISTORY.md` and everything under
++  `docs/state-archive/` (no calibration entry); the dispatch preflight refuses
++  any other history-named markdown or text file in the range before a packet is
++  reserved (CDP-HISTORY-IN-RANGE);
+   it is an exclusion binding only: verify its blob SHA-256 and mode without
+   emitting bytes and never read it. The forbidden-material rule for handover,
+   state and history is NOT relaxed. A finding-disposition record is admissible
+diff --git a/templates/prompts/critic-review.md b/templates/prompts/critic-review.md
+index a12b4fd9f..674d24ed9 100644
+--- a/templates/prompts/critic-review.md
++++ b/templates/prompts/critic-review.md
+@@ -256,7 +256,11 @@ environment dump or a credential read; it reads such strings as text only.
+   The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+   (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
+   record is admissible only for the file the project calibration names as its
+-  handover/state file and a `pipeline-handover*.md` file in the same directory;
++  handover/state file, a `pipeline-handover*.md` file in the same directory,
++  and the built-in convention set `docs/HISTORY.md` and everything under
++  `docs/state-archive/` (no calibration entry); the dispatch preflight refuses
++  any other history-named markdown or text file in the range before a packet is
++  reserved (CDP-HISTORY-IN-RANGE);
+   it is an exclusion binding only: verify its blob SHA-256 and mode without
+   emitting bytes and never read it. The forbidden-material rule for handover,
+   state and history is NOT relaxed. A finding-disposition record is admissible
