@@ -1,12 +1,11 @@
 diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
-index 2de346c94..d67173d91 100644
 --- a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
 +++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
-@@ -45,6 +45,7 @@ import { fileURLToPath } from "node:url";
+@@ -45,6 +45,6 @@ import { fileURLToPath } from "node:url";
  const GUARD = fileURLToPath(new URL("./guard-dispatch-budget.mjs", import.meta.url));
  const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
- const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
-+mkdirSync(SCRATCH_ROOT, { recursive: true }); // a fresh clone has no scratch/ yet
+-const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
++const SCRATCH_ROOT = join(REPO_ROOT, "scratch"); mkdirSync(SCRATCH_ROOT, { recursive: true }); // a fresh clone has no scratch/ yet
  function activeGovernanceRoot(prefix) {
    const root = mkdtempSync(join(SCRATCH_ROOT, `guard-budget-active-${prefix}-`));
    execFileSync("git", ["init", "--quiet"], { cwd: root });
