@@ -1,0 +1,55 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index dece7bdcb..7ce45919b 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -159,7 +159,14 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/security-completeness-gate.mjs`,
+   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
+   `lib/checkpoint-push-audit.mjs`, and
+-  `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
++  `scripts/pre-push-hook-install.mjs`. A later refresh of the same table
++  (2026-10-31: the install hook's declared dynamic-import edges had drifted from
++  eight to ten sites, and `push-init.mjs` and `critic-dispatch-preflight.mjs`
++  had gained a static import) added `lib/published-tag-push.mjs`, which decides
++  whether a push targets a published tag, and `lib/architecture-push-currency.mjs`,
++  which holds the architecture-currency check both entry scripts consult before
++  a push or a Critic dispatch, so a window covering either would let one edit
++  change what the push or dispatch gate admits. A fourth closure gap (NVA-KERNELDOC-1,
+   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
+   `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
+   the shared predicate that decides when the GS-15 refusal stands down for the
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index 830cd937d..5f531ba07 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -224,7 +224,7 @@ const DYNAMIC_IMPORT_EDGES = {
+   "plugins/pipeline-core/lib/consumer-verify.mjs": [
+     "../scripts/consumer-verify-check.mjs",
+   ],
+-  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these eight via
++  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these ten via
+   // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
+   // install-time-bound absolute path, not a literal specifier the static scanner can read.
+   // CLOSURE-REPAIR (Ruling 86a): the declaration had drifted from the source (six declared, eight
+@@ -238,6 +238,8 @@ const DYNAMIC_IMPORT_EDGES = {
+     "../lib/project-authority.mjs",
+     "../lib/checkpoint-push-approval.mjs",
+     "../lib/critical-human-proof-policy.mjs",
++    "../lib/critical-action-authorization.mjs",
++    "../lib/published-tag-push.mjs",
+   ],
+   // CLOSURE-REPAIR (Ruling 86a): the start preflight loads the toolchain/readiness coordinator and
+   // the model-role bootstrap lazily, so both are edges of the kernel closure.
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 41d0503e9..bd04fa98d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -310,6 +310,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
+   "plugins/pipeline-core/lib/verify-evidence-path.mjs",
+   "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
++  "plugins/pipeline-core/lib/published-tag-push.mjs",
++  "plugins/pipeline-core/lib/architecture-push-currency.mjs",
+   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+   // NVA-GS15-1: onboarding-staging-authoring.mjs is imported by both
+   // guard-gate-strength.mjs and guard-lifecycle-ready.mjs (already kernel above), so it

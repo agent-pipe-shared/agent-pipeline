@@ -1,0 +1,52 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index 10ebf9ca9..a7b4bb223 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -242,7 +242,7 @@ import {
+ import { createGovernanceScopeController, observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+-if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 770a40516..c9821623d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -98,7 +98,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+-if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ 
+ // W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
+ const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+index 90160546d..ccd96050b 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+@@ -27,7 +27,7 @@ export { isAgentPoPublicCommand, isForbiddenCrossRepositoryMutation, isHostOnlyC
+ export { evaluateLifecycleReadyGuard } from "../lib/guard/evaluate.mjs";
+ 
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+-if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ 
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !process.argv.slice(2).includes("--consume-owned-verification-guard")
+diff --git a/plugins/pipeline-core/hooks/guard-worktree-isolation.mjs b/plugins/pipeline-core/hooks/guard-worktree-isolation.mjs
+index 02fbad5ad..e8471620a 100644
+--- a/plugins/pipeline-core/hooks/guard-worktree-isolation.mjs
++++ b/plugins/pipeline-core/hooks/guard-worktree-isolation.mjs
+@@ -17,7 +17,7 @@ import {
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+-if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ 
