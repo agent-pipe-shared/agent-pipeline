@@ -1624,6 +1624,32 @@ check("Antigravity pretool guard writes no handoff for another conversation, ano
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// AC-175D: a conversation that names another conversation's id in the export would be served that conversation's
+// unconsumed handoff by the CLI, so the hook refuses such an export before it runs.
+check("Antigravity pretool guard refuses an Antigravity export naming another conversation and leaves that conversation's handoff untouched (AC-175D)", () => {
+  const f = agyHandoffFixture();
+  try {
+    mkdirSync(f.directory(), { recursive: true, mode: 0o700 });
+    const foreignHandoff = join(f.directory(), `${AGY_HANDOFF_OTHER}.json`);
+    writeFileSync(foreignHandoff, "{}", { mode: 0o600 });
+    const foreign = {
+      "a foreign session id": f.exportArgs({ session: AGY_HANDOFF_OTHER, exclude: AGY_HANDOFF_OTHER }),
+      "a foreign claimed session": f.exportArgs({ exclude: AGY_HANDOFF_OTHER }),
+      "a foreign requested session": f.exportArgs({ session: AGY_HANDOFF_OTHER }),
+    };
+    for (const [name, args] of Object.entries(foreign)) {
+      const res = decision(run(f.hostEnvelope(f.commandFor(args)), f.root));
+      assert.equal(res.decision, "deny", name);
+      assert.match(res.reason, /AGY-EXPORT-FOREIGN-CONVERSATION/u, name);
+      assert.match(res.reason, new RegExp(AGY_HANDOFF_CONVERSATION, "u"), `${name}: the refusal names the own conversation id to use`);
+    }
+    assert.equal(existsSync(foreignHandoff), true, "the other conversation's handoff is not touched");
+    // Other runners and the own conversation are not affected.
+    assert.equal(decision(run(f.hostEnvelope(f.commandFor(f.exportArgs({ runner: "codex", session: AGY_HANDOFF_OTHER, exclude: AGY_HANDOFF_OTHER }))), f.root)).decision, "allow");
+    assert.equal(decision(run(f.hostEnvelope(f.commandFor(f.exportArgs())), f.root)).decision, "allow");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 check("Antigravity pretool guard clears stale handoffs on every shell call it admits (AC-175C)", () => {
   const f = agyHandoffFixture();
   try {

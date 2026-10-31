@@ -375,6 +375,26 @@ function handOffAntigravityHostContext({ input, command, projectRoot, toolName }
   }
 }
 
+/**
+ * AC-175D. The CLI consumes the handoff named by the export's `--session-id`, so an Antigravity export that names
+ * another conversation could be served that conversation's unconsumed handoff. This refuses it while the envelope still
+ * says which conversation is asking. Other runners and the own conversation are untouched; without a host context
+ * there is nothing to compare, and the CLI answers `antigravity-host-context-unavailable` as before.
+ */
+export function foreignAntigravityExportReason({ input, command, projectRoot, toolName }) {
+  if (toolName !== "Bash") return null;
+  const host = antigravityArtifactHostContext(input);
+  if (host === undefined) return null;
+  const invocation = resolveSanctionedScriptInvocation(command, projectRoot);
+  if (invocation === null || invocation.script !== TRANSCRIPT_RECOVERY_SCRIPT) return null;
+  const { args } = invocation;
+  if (args[0] !== "export") return null;
+  const value = (flag) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
+  if (value("--runner") !== "antigravity") return null;
+  if (value("--session-id") === host.conversationId && value("--exclude-session") === host.conversationId) return null;
+  return `AGY-EXPORT-FOREIGN-CONVERSATION: an Antigravity transcript export may name only this conversation; pass --session-id ${host.conversationId} and --exclude-session ${host.conversationId}.`;
+}
+
 function isNativeImplementationSubagent(entry) {
   const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
     ? entry.TypeName.slice("pipeline-core:".length)
@@ -1133,6 +1153,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
   }
 
   if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
+  const foreignExport = foreignAntigravityExportReason({ input, command, projectRoot, toolName });
+  if (foreignExport !== null) deny(foreignExport);
   handOffAntigravityHostContext({ input, command, projectRoot, toolName });
   allow();
 }
