@@ -129,7 +129,8 @@ const { observeCurrentPlanApprovalForCalibration } = cliHelp ? {} : await import
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
 const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
 const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
-const { observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
+const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
+const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
 const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
 const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
 const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
@@ -739,6 +740,20 @@ export function generateDispatchBinding(options, deps = {}) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
       soft("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${commandId !== null || checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} (or --check command:<registered id> for a repository without a unit-test runner) and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
     }
+  }
+
+  // AC-175 part A (D209/D210): the bootstrap already observes continuity-source drift; a dispatch built on moved authority bytes
+  // is an open recovery, not a silent pass. The same projection (observeContinuityAuthorityDrift), the same recovery, no new verb.
+  // A project without a State or continuity, a malformed record, a failing observer and a current record all yield null here, so
+  // none of them changes any output byte. A source that cannot be compared at all is a warning (bootstrap's fail-open reading).
+  const continuityDrift = (() => {
+    try { return (deps.observeContinuityDrift ?? ((rootDir) => observeContinuityAuthorityDrift({ rootDir })))(root) ?? null; } catch { return null; }
+  })();
+  const driftSources = continuityAuthorityDriftSources(continuityDrift);
+  if (driftSources.changed.length > 0) {
+    soft("DBG-CONTINUITY-AUTHORITY-DRIFT", continuityAuthorityDriftRefusalText(driftSources.changed, driftSources.unobservable));
+  } else if (driftSources.unobservable.length > 0) {
+    warnings.push({ code: "DBG-CONTINUITY-AUTHORITY-UNOBSERVABLE", message: `the continuity record binds digests for ${driftSources.unobservable.map((entry) => `${entry.role} ${entry.path}`).join(", ")}, which could not be compared with the checkout (missing, unsafe or not a single regular file); the dispatch was not checked against them. See the bootstrap advisory continuityAuthorityDrift` });
   }
 
   // D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise repeats that stop

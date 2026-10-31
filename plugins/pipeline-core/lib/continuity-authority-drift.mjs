@@ -13,6 +13,36 @@ export const CONTINUITY_AUTHORITY_DRIFT_ROUTE = "continuity-authority-revision-p
 const HEX64 = /^[0-9a-f]{64}$/u;
 const ROLES = ["prd", "spec"];
 
+/**
+ * The sanctioned recovery both the bootstrap advisory and the dispatch refusal name (same code, same route; no new
+ * verb). `-plan` is read-only and takes exactly `--proposal-file <repo-relative-json>`; the human revision approval is
+ * consumed by `-apply`, not here.
+ */
+export const CONTINUITY_AUTHORITY_DRIFT_RECOVERY_COMMAND =
+  "node <plugin-root>/scripts/pipeline-state.mjs continuity-authority-revision-plan --proposal-file <repo-relative proposal json>";
+
+/**
+ * Dispatch-time reading of a drift projection (pure): the sources whose bytes no longer match the recorded digest
+ * ("changed") and the ones that could not be compared ("unobservable"), each as `{ role, path }`. Anything that is not a
+ * well-formed projection yields no sources, so a malformed value can never turn into a refusal.
+ */
+export function continuityAuthorityDriftSources(projection) {
+  const artifacts = Array.isArray(projection?.artifacts) ? projection.artifacts : [];
+  const pick = (state) => artifacts
+    .filter((entry) => entry && entry.state === state && typeof entry.path === "string" && typeof entry.role === "string")
+    .map((entry) => ({ role: entry.role, path: entry.path }));
+  return { changed: pick("changed"), unobservable: pick("unobservable") };
+}
+
+/** The refusal text naming each drifted source and the sanctioned recovery; paths are the repo-relative ones State records. */
+export function continuityAuthorityDriftRefusalText(changed, unobservable = []) {
+  const list = changed.map((entry) => `${entry.role} ${entry.path}`).join(", ");
+  const unseen = unobservable.length === 0 ? "" : ` (${unobservable.map((entry) => `${entry.role} ${entry.path}`).join(", ")} could not be compared at all)`;
+  return `the continuity record binds source digests that no longer match the checkout: ${list} changed since they were recorded${unseen}; a dispatch built now would work from authority bytes the approved plan never saw. `
+    + `repair: record the new authority through the recovery the bootstrap names (${CONTINUITY_AUTHORITY_DRIFT_CODE}, route ${CONTINUITY_AUTHORITY_DRIFT_ROUTE}): run ${CONTINUITY_AUTHORITY_DRIFT_RECOVERY_COMMAND} in the project root (read-only plan; its apply step takes the human revision approval), `
+    + "or restore the recorded bytes of the changed file(s); then build this briefing again";
+}
+
 function observeSafely(observeSha256, path) {
   try {
     const value = observeSha256(path);

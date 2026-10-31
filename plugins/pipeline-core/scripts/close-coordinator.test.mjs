@@ -395,6 +395,7 @@ function processFixture(name, options = {}) {
     ["--continuity-close-request", paths.closeRequest],
   );
   assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms"));
+  if (options.afterPrepared) options.afterPrepared({ prepared, invokeAction, root });
 
   const coordinatorSha256 = prepared.applied.stateSha256;
   const closedState = {
@@ -450,12 +451,56 @@ function processFixture(name, options = {}) {
     root,
     lifecycle,
     transition,
+    prepared,
     candidateOid,
     candidateTree,
     evidenceDirectory: started.evidenceDirectory,
     trackedPath: join(root, paths.tracked),
   };
 }
+
+// AC-175 part A (D209/D210): the close course writes the generated audit index next to the close evidence on the
+// feature-close-prepared transition, names it in the close result, and lists a missing source instead of refusing.
+test("process: feature-close-prepared writes the audit index next to the close evidence and names it in the result", () => {
+  const f = processFixture("audit-index");
+  const named = f.prepared.applied.auditIndex;
+  assert.ok(named, "the close result names the audit index");
+  assert.equal(named.status, "written");
+  assert.equal(named.file, "audit-index.json");
+  const bytes = readFileSync(join(f.evidenceDirectory, "audit-index.json"));
+  assert.equal(named.sha256, digest(bytes));
+  const index = JSON.parse(bytes);
+  assert.equal(index.schema, "pipeline.audit-index.v1");
+  assert.deepEqual(index.sources.map((s) => s.path), ["specs/feature/prd.md", "specs/feature/result.md", "specs/feature/spec.md"]);
+  assert.ok(index.sources.every((s) => s.status === "present" && /^[0-9a-f]{64}$/u.test(s.sha256)));
+  assert.equal(index.commit.status, "present");
+  assert.equal(index.complete, false, "the fixture has no Verify receipt or delivery course");
+  assert.ok(index.missingSteps.some((m) => m.step === "gate:verify"), JSON.stringify(index.missingSteps));
+  assert.equal(named.complete, false);
+  assert.equal(named.missingSteps, index.missingSteps.length);
+  const text = bytes.toString("utf8");
+  assert.ok(!text.includes(f.root), "no absolute path in the index");
+  assert.equal(index.manifest.schema, "pipeline.audit-index-manifest.v1");
+});
+
+test("process: a replayed feature-close-prepared apply still names the audit index and the close is never refused for a missing source", () => {
+  let again;
+  let first;
+  processFixture("audit-index-replay", {
+    afterPrepared({ prepared, invokeAction: replay, root }) {
+      first = prepared.applied.auditIndex;
+      // A source moves after the close was prepared: a re-collection would now record a different index under another digest.
+      const prd = join(root, "specs/feature/prd.md");
+      const original = readFileSync(prd);
+      appendFileSync(prd, "edited after the close was prepared\n");
+      try { again = replay(prepared.planned.nextAction); } finally { writeFileSync(prd, original); }
+    },
+  });
+  assert.equal(again.status, "replayed");
+  assert.deepEqual(again.auditIndex, first, "a replay reports the index the first apply wrote, with the same digest");
+  assert.equal(again.auditIndex.status, "written");
+  assert.equal(again.auditIndex.file, "audit-index.json");
+});
 
 test("process: registered package digest drift blocks close preparation before any transition", () => {
   const f = processFixture("package-drift", {

@@ -19,6 +19,7 @@ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
+import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
 import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
@@ -843,6 +844,28 @@ function preparedAuditReadback(root, common, coordinator, continuityRequest) {
   }
 }
 
+/**
+ * AC-175 part A (D209/D210): the generated audit index is written next to the close evidence on the feature-close-prepared
+ * transition and named in the close result. It is evidence only: a missing source is a missing step INSIDE the index, and any
+ * fault here becomes `{ status: "unavailable" }` in the result. It can never refuse, delay or change the close.
+ */
+function closeAuditIndex(root, common, coordinator, { replay = false } = {}) {
+  try {
+    const directory = join(publicationClosePaths(common, coordinator.lifecycleId).directory, "evidence");
+    // A replay reports the index the first apply wrote; it never overwrites earlier evidence from a later State.
+    if (replay) {
+      const existing = readAuditIndexEvidence({ directory });
+      if (existing !== null) return existing;
+    }
+    let commit;
+    try { commit = git(root, ["rev-parse", "HEAD"]); } catch { commit = undefined; }
+    const index = collectAuditIndex({ rootDir: root, featureId: coordinator.featureId, state: stateSnapshot(root).state, commit });
+    return writeAuditIndexEvidence({ directory, index });
+  } catch {
+    return { status: "unavailable", code: "CLOSE-AUDIT-INDEX-UNAVAILABLE" };
+  }
+}
+
 async function applyTransition(values, suppliedDigest) {
   const root = physicalRoot(values.root);
   const common = gitCommonDir(root);
@@ -865,6 +888,7 @@ async function applyTransition(values, suppliedDigest) {
         const request = continuityCloseRequest(root, stateSnapshot(root), values.continuityCloseRequest);
         preparedAuditReadback(root, common, prior.coordinator, request);
         result.nextAction = featureCloseAction(values, prior.coordinator);
+        result.auditIndex = closeAuditIndex(root, common, prior.coordinator, { replay: true });
       }
       return result;
     }
@@ -911,6 +935,7 @@ async function applyTransition(values, suppliedDigest) {
   };
   if (next.phase === "feature-close-prepared") {
     result.nextAction = featureCloseAction(values, next);
+    result.auditIndex = closeAuditIndex(root, common, next);
   }
   return result;
 }
