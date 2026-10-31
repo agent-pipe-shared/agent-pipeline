@@ -1,0 +1,42 @@
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+index 1371ac2d8..5fe70d13f 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+@@ -156,12 +156,12 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
+   Object.freeze({
+     id: "GS-10",
+     path: "project/pipeline.json",
+-    reason: "the project authority configuration declares verify and core settings and must not be edited directly. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
++    reason: "the project authority configuration declares verify and core settings and must not be edited directly. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+   }),
+   Object.freeze({
+     id: "GS-11",
+     path: ".claude/pipeline.json",
+-    reason: "the legacy-tier project authority configuration declares verify and core settings. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
++    reason: "the legacy-tier project authority configuration declares verify and core settings. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+   }),
+   Object.freeze({
+     id: "GS-12",
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+index d80fc4fab..92e4fb32e 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+@@ -999,7 +999,7 @@ try {
+     }
+   });
+ 
+-  check("GST39 the refusal of either calibration mirror names the other mirror and the Verify drift code (Toolbox N42)", () => {
++  check("GST41 the refusal of either calibration mirror names the other mirror, the Verify drift code and the commit order (Toolbox N42)", () => {
+     // The two calibration files must stay byte-equal (PCI-CALIBRATION-DRIFT) and each override covers exactly one file. The first refusal used to say
+     // nothing about the mirror, so the second signature was discovered only when Verify went red. The warning belongs to the refusal itself, before any override.
+     const root = governed();
+@@ -1012,6 +1012,9 @@ try {
+       assert.match(refused.stderr, new RegExp(otherId, "u"), `the refusal of ${path} names the mirror's rule ${otherId}`);
+       assert.match(refused.stderr, /PCI-CALIBRATION-DRIFT/u, path);
+       assert.match(refused.stderr, /own (PO-approved )?override/u, path);
++      // Toolbox follow-up: every signature binds to the exact HEAD, so the second ceremony can only run after the first commit.
++      assert.match(refused.stderr, /binds to the exact HEAD/u, path);
++      assert.match(refused.stderr, /commit this file first/u, path);
+     }
+     // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
+     const rootManifest = ask(root, "pipeline.json");
