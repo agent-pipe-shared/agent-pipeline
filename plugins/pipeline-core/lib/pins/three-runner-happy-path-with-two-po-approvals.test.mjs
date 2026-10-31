@@ -75,9 +75,16 @@ const INVENTORY = Object.freeze([
  * Approval-bearing verbs deliberately NOT on the happy path. They are recovery,
  * re-enrollment mechanics (no extra prompt, PO decision 2026-10-04 #7), deploy or
  * release-publication acts. A happy-path scenario may never contain them.
+ *
+ * `approve-residual-acceptance` (c3898ac93, 2026-10-29) is the PO's acceptance of the MINOR residue of a FAILED Critic
+ * round (the inventory id `accept-residual-critic-findings`, docs/human-authorization-inventory.md): it exists only after a
+ * Critic round has failed, so it is a recovery act off the happy path, not a third per-feature decision. The happy path
+ * (Critic passes) still needs exactly the plan approval and the push approval; the third-class and extra-ceremony mirrors
+ * below stay red-checked.
  */
 const OFF_HAPPY_PATH_VERBS = Object.freeze([
   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+  "approve-residual-acceptance",
   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",

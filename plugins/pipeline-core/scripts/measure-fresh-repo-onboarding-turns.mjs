@@ -285,6 +285,30 @@ function authorArchitectureDesign(dir, prdRelPath) {
   writeFileSync(prdFile, base + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
 }
 
+/**
+ * The `design-authoring-required` stop (5e939278b, `stagingDesignNeedsAuthoring`): the generated staging PRD and Spec must be
+ * authored before bootstrap binding. This stand-in PO replaces the Spec's skeleton criterion and traceability row with a real
+ * criterion, binds the PRD's Spec digest to those bytes, and then authors the architecture block exactly as the later
+ * `architecture-design-required` stop does (the reserved draft template, banner included, is replaced, not duplicated).
+ */
+function authorStagingDesign(dir, prdRelPath, specRelPath) {
+  const specFile = join(dir, specRelPath);
+  const prdFile = join(dir, prdRelPath);
+  const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
+  const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
+  const spec = readFileSync(specFile, "utf8");
+  if (!spec.includes(skeletonCriterion) || !spec.includes(skeletonTraceability)) return { ok: false, reason: "the generated Spec no longer carries the skeleton criterion and traceability rows" };
+  const authoredSpec = spec
+    .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
+    .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
+  writeFileSync(specFile, authoredSpec);
+  authorArchitectureDesign(dir, prdRelPath);
+  const specHash = createHash("sha256").update(authoredSpec).digest("hex");
+  const prd = readFileSync(prdFile, "utf8");
+  writeFileSync(prdFile, prd.replace(/(technical-spec-sha256\s*:\s*)[a-f0-9]{64}/iu, `$1${specHash}`));
+  return { ok: true };
+}
+
 function acknowledgePrd(dir, guidance) {
   const match = /staging PRD at (\S+\.md)/u.exec(String(guidance));
   if (match === null) return { ok: false, reason: "the guidance did not name a staging PRD path" };
@@ -484,6 +508,19 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
       }
       rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "unanswerable", names: answer.names });
       return { schema: SCHEMA, root: dir, runner, outcome: "unanswerable-collect-input", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
+    }
+
+    // Contract change 5e939278b: the generated PRD and Spec are authored BEFORE bootstrap binding, so the walk now stops at
+    // `design-authoring-required` ahead of the `architecture-design-required` stop the same helper already follows.
+    if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "design-authoring-required") {
+      const na = result.final.nextAction;
+      const authored = authorStagingDesign(dir, na.prdPath, na.specPath);
+      turns += 1;
+      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-staging-design", code: na.code ?? null, ok: authored.ok });
+      if (!authored.ok) {
+        return { schema: SCHEMA, root: dir, runner, outcome: "design-authoring-failed", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final, error: authored.reason };
+      }
+      continue;
     }
 
     if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "architecture-design-required") {

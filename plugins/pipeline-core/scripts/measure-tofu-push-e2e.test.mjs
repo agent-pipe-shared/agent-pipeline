@@ -126,8 +126,9 @@ test("fakeSetupSpawn: every other openssl invocation falls through to a real spa
 // recorded signed push without the design course itself (author the staging PRD/Spec, submit-plan, review receipt, present-plan --review-receipt, signed
 // approval), which a disposable in-process measurement cannot supply. The assertions of the old claim (outcome "signed-push-recorded", a successful
 // approve-push step, trustAnchorPinned false, the critical-human-proof-policy schema) are therefore not carried over; the signed push is measured by the
-// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends at the Driver's own refusal to
-// acknowledge a generated placeholder PRD/Spec, within the measured six turns, and no later ceremony step ran.
+// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends typed at the PO signature request of
+// the plan acknowledgement (the signing step refuses the disposable unencrypted key; restated W7-R6 after 5e939278b moved the earlier stop, see below),
+// within the measured six turns, and no later ceremony step ran.
 test("TOFU measurement stops typed at the ADR-0085 single-review design-course boundary; the Greenfield test measures the signed push", { timeout: 120_000 }, () => {
   let stdout = "";
   const status = main([], { write: (chunk) => { stdout += chunk; } });
@@ -138,16 +139,26 @@ test("TOFU measurement stops typed at the ADR-0085 single-review design-course b
   assert.equal(result.steps[0]?.step, "setup", stdout);
   assert.equal(result.steps[0]?.ok, true, stdout);
   assert.equal(result.steps[1]?.step, "onboarding", stdout);
-  assert.equal(result.steps[1]?.outcome, "error", stdout);
+  assert.equal(result.steps[1]?.outcome, "external-operator-failed", stdout);
   // Turn count bound as the existing case measured it (six turns up to the boundary).
   assert.ok(result.steps[1]?.turns <= 6, stdout);
   assert.equal(result.onboarding?.turns, result.steps[1]?.turns, stdout);
-  // The walk reached the design course: the architecture design was authored, then the Driver's last step was the plan acknowledgement, which refuses the
-  // generated placeholder PRD/Spec (the ADR-0085 course replaces that acknowledgement with the single review).
-  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design" && round.code === "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE"), stdout);
-  assert.equal(result.onboarding?.lastStep?.subcommand, "bootstrap-acknowledge-plan", stdout);
-  assert.equal(result.onboarding?.lastStep?.exitCode, 2, stdout);
-  assert.match(result.onboarding?.stopStderr ?? "", /BOOTSTRAP-ACK-PLACEHOLDER-CONTENT/, stdout);
+  // Restated for the contract change 5e939278b (stagingDesignNeedsAuthoring; sibling restatement W7-R5, project-onboarding-e2e.test.mjs): the Driver now
+  // stops at `design-authoring-required` BEFORE the bind, and the helper (measure-fresh-repo-onboarding-turns.mjs) authors the staging PRD, Spec and
+  // architecture block there as the stand-in PO (round `authored-staging-design`), so the old stop (the plan acknowledgement refusing the generated
+  // placeholder content, via an `authored-architecture-design` round with ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE) is no longer reached. The walk
+  // gets one step further and stops typed at the PO's signature request for the plan acknowledgement (`signature-required`, a returned `sign-intent`
+  // external action): the disposable fixture key is unencrypted, so the real signing step refuses it (PO-KEY-UNENCRYPTED, passphrase-protected keys
+  // only). The intent is unchanged: setup ok, onboarding ends typed before the signed push, within the six turns, and no later ceremony step ran.
+  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-staging-design" && round.ok === true), stdout);
+  assert.equal(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design"), false, stdout);
+  assert.equal(result.onboarding?.rounds.at(-1)?.resolved, "executed-driver-provided-external-action", stdout);
+  assert.equal(result.onboarding?.rounds.at(-1)?.appliedExitCode, 2, stdout);
+  assert.equal(result.onboarding?.outcome, "external-operator-failed", stdout);
+  assert.equal(result.onboarding?.final?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1", stdout);
+  assert.equal(result.onboarding?.final?.status, "signature-required", stdout);
+  assert.equal(result.onboarding?.final?.nextAction?.argv?.[1], "sign-intent", stdout);
+  assert.match(result.onboarding?.error?.stderr ?? "", /PO-KEY-UNENCRYPTED/, stdout);
   // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
   assert.equal(result.steps.length, 2, stdout);
   assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);

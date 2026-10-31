@@ -589,6 +589,40 @@ test("project-onboarding-v3 CLI: mini retains early acknowledgement while featur
 
     result = invoke(["intake-generate-apply", "--root", dir, "--plan-sha256", generatePlan.planSha256, "--activate"]);
     assert.equal(result.status, 0, result.output);
+    const generated = JSON.parse(result.output);
+
+    // Contract change (5e939278b, stagingDesignNeedsAuthoring; sibling restatement of the same drift: project-onboarding-e2e.test.mjs
+    // in W7-R5): the bind planner refuses the untouched generated PRD and Spec before binding their bytes. Mini keeps its early
+    // acknowledgement, so mini's refusal is still the missing acknowledgement marker; feature and epic wait for the final package, so
+    // theirs is the new design-authoring refusal (before 5e939278b they bound the unauthored bytes, exit 0). The intent of the case
+    // (mini keeps the early acknowledgement, feature and epic wait for the final package) is asserted on the authored package below, unchanged.
+    result = invoke(["bootstrap-bind-plan", "--root", dir]);
+    assert.equal(result.status, 2, result.output);
+    assert.match(result.output, profile === "mini" ? /KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING/u : /BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED/u, `${profile}: ${result.output}`);
+
+    // First authoring pass (the same minimal edit the e2e restatement makes): a real criterion row and traceability row in the Spec,
+    // the PRD's Spec digest moved to those bytes, the draft banner gone and the architecture prose fields written.
+    const prdFile = join(dir, generated.targets.prd.path);
+    const specFile = join(dir, generated.targets.spec.path);
+    const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
+    const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
+    const generatedSpec = readFileSync(specFile, "utf8");
+    assert.ok(generatedSpec.includes(skeletonCriterion) && generatedSpec.includes(skeletonTraceability), `${profile}: the generated Spec carries the skeleton rows`);
+    const authoredSpec = generatedSpec
+      .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
+      .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
+    const generatedPrd = readFileSync(prdFile, "utf8");
+    const generatedSpecDigest = generatedPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+    assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u, `${profile}: the generated PRD carries its Spec binding`);
+    const authoredPrd = generatedPrd
+      .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
+      .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Local keyboard game."')
+      .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the whole local game."')
+      .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "local-game"')
+      .replace(generatedSpecDigest, createHash("sha256").update(Buffer.from(authoredSpec)).digest("hex"));
+    assert.notEqual(authoredPrd, generatedPrd, `${profile}: the authoring pass changed the PRD`);
+    writeFileSync(specFile, authoredSpec);
+    writeFileSync(prdFile, authoredPrd);
 
     result = invoke(["bootstrap-bind-plan", "--root", dir]);
     if (profile === "mini") {
