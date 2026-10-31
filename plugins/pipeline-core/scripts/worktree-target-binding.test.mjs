@@ -19,7 +19,7 @@ function enrollFixtureGovernance(root) {
   const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
   if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
 }
-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 const GUARD = fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "btm-d1-linked-")), primary = join(root, "primary"), target = join(root, "target");
 const git = (cwd, ...args) => spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -39,7 +39,10 @@ const completionCases = [
   const targetActive = targetController.applyDecision(targetPlan, { activate: true, planSha256: targetPlan.planSha256 });
   assert.equal(targetActive.state, "active");
   assert.equal(targetActive.requiresEnforcement, true);
-  writeFileSync(join(target, "README.md"), "B\n"); git(target, "commit", "-qam", "B"); b = git(target, "rev-parse", "HEAD").stdout.trim(); a = git(primary, "rev-parse", "HEAD").stdout.trim();
+  writeFileSync(join(target, "README.md"), "B\n"); git(target, "commit", "-qam", "B");
+  // The pushed commit (target tip) carries an approved low-rigor plan state, so the publication-review duty is waived and
+  // WTB002/WTB003 reach the evidence binding they test; the primary tip stays bare (it is never the pushed source).
+  b = commitApprovedMiniFixtureState(target); a = git(primary, "rev-parse", "HEAD").stdout.trim();
   const listed = git(primary, "worktree", "list", "--porcelain").stdout; assert.ok(listed.includes(primary) && listed.includes(target));
   assert.equal(git(primary, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.trim(), git(target, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.trim());
   assert.notEqual(git(primary, "rev-parse", "--path-format=absolute", "--git-dir").stdout.trim(), git(target, "rev-parse", "--path-format=absolute", "--git-dir").stdout.trim());

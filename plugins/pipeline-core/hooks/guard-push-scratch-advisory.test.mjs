@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { bindScratchDescriptor } from "../lib/session-cleanup-recovery.mjs";
-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 function enrollFixtureGovernance(root) {
@@ -113,7 +113,10 @@ function signedPushRepo(prefix) {
   gitAt(dir, "commit", "-q", "-m", "threat model");
   const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
 
-  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  // The advisory under test is surfaced on the all-green path, which a push reaches only when the pushed
+  // commit's own state is an approved low-rigor plan (otherwise a candidate-bound independent review is
+  // required first). The working-tree state written below is the push-approval record and does not undo it.
+  const head = commitApprovedMiniFixtureState(dir);
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
