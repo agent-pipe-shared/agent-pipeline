@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "84ca0ec82332eda573654a7896c50764fa14edbc89a5d39723172c8cb86a5348"
+    "transitionHead": "76c723eb8fd148e54f8449fb17d5aeef82c3c01dc41dfeacd22be86325eb6164"
   },
   "counts": {
-    "open": 369,
+    "open": 373,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -3709,6 +3709,16 @@
       "deferred": false,
       "tracking": "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate",
       "sprint": "batman"
+    },
+    {
+      "id": "pipeline.delta-candidate-choice-and-transport-test-disagree-on-reconcile-commits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N38 (2026-10-31): register-feature-package --add-delta-request refused with FPR-DELTA-TRANSPORT after a PO-signed feature-package-reconcile commit, although the evidence and the delta input were correct.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.denial-names-a-diagnosis-it-refuses",
@@ -10212,6 +10222,16 @@
       "closureEvidence": "harness/scripts/check-product-capability-inventory.test.mjs"
     },
     {
+      "id": "pipeline.registrar-and-verify-read-crlf-checkout-bytes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N39 and its 2026-10-31 follow-up (Windows consumer, git core.autocrlf=true): verify-evidence-producer --commit fails with VEP-ADAPTER-CONFLICT, and a checkout of another commit and back makes the registrar report FTP-ARTIFACT-44/45/46.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.registry-source-migration-gaps-after-a-plugin-update",
       "status": "open",
       "type": "defect",
@@ -10396,6 +10416,16 @@
       "source": "Directly measured during the 2026-08-27 Nova-A candidate session: four deep-tier dispatches truncated at a maxTurns the repository had already raised",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.residual-acceptance-expires-after-the-signature-window",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N36 (2026-10-31): a PO residual acceptance given the day before was invalid at feature close and had to be signed again.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.residual-acceptance-route-is-not-named-at-the-push-gate",
@@ -12592,6 +12622,16 @@
       "closureRepository": "self",
       "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
       "closureEvidence": "backlog/items/2026-08-18-universal-human-command-renderer.md"
+    },
+    {
+      "id": "pipeline.unregistered-critic-rounds-have-no-repair-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N37 (2026-10-31): a multi-round Critic course whose rounds 2-4 were finalized before candidate 15's automatic lineage.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.unregistered-suite-is-red-and-invisible-to-verify",

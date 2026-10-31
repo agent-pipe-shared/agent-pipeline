@@ -302,6 +302,7 @@
 | pipeline.default-claude-readiness-route-rejects-registered-alias | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.delivery-after-the-verified-candidate-has-no-route | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
+| pipeline.delta-candidate-choice-and-transport-test-disagree-on-reconcile-commits | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.denial-names-a-diagnosis-it-refuses | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -821,6 +822,7 @@
 | pipeline.refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | none | 2026-08-27 | — | — |
+| pipeline.registrar-and-verify-read-crlf-checkout-bytes | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.registry-source-migration-gaps-after-a-plugin-update | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
@@ -836,6 +838,7 @@
 | pipeline.report-05-consumer-findings | open | defect | pipeline | alfred | 2026-10-26 | — | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
+| pipeline.residual-acceptance-expires-after-the-signature-window | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.residual-acceptance-route-is-not-named-at-the-push-gate | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | nova-b | 2026-08-27 | — | — |
 | pipeline.restart-barrier-can-precede-verbatim-intake-capture | closed | defect | pipeline | none | 2026-09-27 | — | — |
@@ -1010,6 +1013,7 @@
 | pipeline.unified-runner-launcher-for-empty-folders | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.universal-batch-scope-for-every-full-critic | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.unregistered-critic-rounds-have-no-repair-route | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.unverifiable-approval-should-degrade-to-advisory | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.v1-trust-anchor-makes-signature-push-functionless | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
@@ -1065,7 +1069,7 @@
 
 ## Counts
 
-- open: 369
+- open: 373
 - in_progress: 0
 - closed: 674
 - rejected: 3
