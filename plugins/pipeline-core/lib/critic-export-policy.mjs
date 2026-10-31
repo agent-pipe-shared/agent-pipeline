@@ -154,12 +154,18 @@ function validPacketBoundary(packet) {
     if (exactKeys(coordinator, ["localDispatchEvidence"])) {
       const evidence = coordinator.localDispatchEvidence;
       const safeTaskId = typeof evidence?.taskId === "string" && /^[A-Za-z0-9._-]+$/u.test(evidence.taskId);
+      // The binding carries an `assurance` field (null or "orchestrator-attested"); a packet claimed before that field existed
+      // keeps the older closed form, whose digest covers no assurance (same two forms critic-packet-preflight reads).
+      const baseKeys = ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit"];
+      const preAssurance = exactKeys(evidence, [...baseKeys, "snapshotId"]);
       const snapshot = evidence && {
         schema: evidence.schema, taskId: evidence.taskId, recordPath: evidence.recordPath,
         recordSha256: evidence.recordSha256, sourceCandidateCommit: evidence.sourceCandidateCommit,
         reviewCandidateCommit: evidence.reviewCandidateCommit,
+        ...(preAssurance ? {} : { assurance: evidence.assurance }),
       };
-      if (!exactKeys(evidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])
+      if (!(preAssurance || (exactKeys(evidence, [...baseKeys, "assurance", "snapshotId"])
+          && (evidence.assurance === null || evidence.assurance === "orchestrator-attested")))
         || evidence.schema !== "pipeline.local-dispatch-evidence.v1" || !safeTaskId || evidence.taskId !== packet.request.taskId
         || evidence.recordPath !== `evidence/dispatch-record-${evidence.taskId}.json`
         || !/^[a-f0-9]{64}$/u.test(evidence.recordSha256 ?? "")
