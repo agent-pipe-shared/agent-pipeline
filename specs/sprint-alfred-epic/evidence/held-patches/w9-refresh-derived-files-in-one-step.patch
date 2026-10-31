@@ -1,0 +1,273 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index e4610f50c..0d9ede625 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -19,6 +19,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
+ | The capability inventory gate went red after a suite, hook or skill was added | `scripts/rebaseline-inventory.mjs` | the `sourceBaseline` block of the inventory (protected file) |
+ | A Reader input (capability inventory, observation governance, reader protocol) changed and the plugin's hash-pinned mirrors must follow, or you want to know whether they already drifted | `scripts/sync-reader-inputs.mjs [<root>] [--check]` | the three mirrors, `reader-inputs/manifest.json` and the two pins in `lib/doc-reader-documentation-snapshot.mjs` (`--check` writes nothing) |
++| After a commit that changed sources, refresh every derived file in one step: the backlog ledger projections, the inventory `sourceBaseline` and the Reader inputs (D223 slice 4; use this instead of the two rows above and `reconcile-backlog-ledger.mjs --activate` one by one) | `scripts/refresh-derived-files.mjs [<root>] [--check]` (`node --test scripts/refresh-derived-files.test.mjs`) | the files of those three steps in the working tree only, never staged or committed; it names the changed paths and the commit instruction; `--check` writes nothing and exits 1 on drift |
+ | A release note or retro claims one runner's greenfield course is faster, cheaper or more reliable: check that every marked claim cites a published comparison under `evidence/greenfield-public/` by path and sha256 | `scripts/check-greenfield-comparison-citations.mjs <file.md>` (`node --test scripts/check-greenfield-comparison-citations.test.mjs`) | none |
+ | Re-measure the delivery matrix and run the gap rounds | `scripts/delivery-owners.mjs`, `scripts/delivery-agent-items.mjs`, `scripts/matrix-gaps.mjs`, `scripts/gap-inputs.mjs`, `scripts/gap-summary.mjs`, `scripts/gap-collect.mjs`, `scripts/gap-evidence.mjs`, `scripts/delivery-remeasure-inputs.mjs` | see below |
+ | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
+diff --git a/scripts/refresh-derived-files.mjs b/scripts/refresh-derived-files.mjs
+new file mode 100644
+index 000000000..eea030fd4
+--- /dev/null
++++ b/scripts/refresh-derived-files.mjs
+@@ -0,0 +1,109 @@
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: refresh every DERIVED file of a checkout in one step instead of three remembered commands: the backlog ledger projections
++//          (reconcile-backlog-ledger.mjs --activate), the capability-inventory sourceBaseline (rebaseline-inventory.mjs) and the Reader-input
++//          mirrors, manifest and pins (sync-reader-inputs.mjs). D223 slice 4: the step is written to the working tree and NEVER staged or
++//          committed; it names the files it changed and the commit instruction, the agent (or the PO) commits them.
++// Usage:   node scripts/refresh-derived-files.mjs [<root>] [--check]     (<root> defaults to "."; a clone path such as scratch/clones/<name> works too)
++//          Run it AFTER the commit that changed the sources, then commit the named files. --check writes nothing and exits 1 on drift.
++// Inputs:  <root>'s git HEAD, docs/product-capability-inventory.json, backlog/, the Reader-input sources.
++// Output:  one line per step (current | refreshed | DRIFT | FAILED), then the changed paths and the commit instruction; exit 0 when every
++//          derived file is current or was refreshed, 1 when --check found drift, 2 when a step failed.
++// Data:    default mode rewrites derived files in <root> (the three scripts above write nothing else). Never runs git add/commit/stash.
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { existsSync, readFileSync } from "node:fs";
++import { resolve } from "node:path";
++
++const args = process.argv.slice(2);
++if (args.includes("-h") || args.includes("--help")) {
++  console.log("usage: node scripts/refresh-derived-files.mjs [<root>] [--check]   (refreshes the backlog ledger projections, the inventory sourceBaseline and the Reader inputs; writes the working tree only, never stages or commits; --check writes nothing)");
++  process.exit(0);
++}
++const check = args.includes("--check");
++const positional = args.filter((a) => !a.startsWith("--"));
++const unknown = args.filter((a) => a.startsWith("--") && a !== "--check");
++if (unknown.length > 0 || positional.length > 1) {
++  console.error("usage: node scripts/refresh-derived-files.mjs [<root>] [--check]");
++  process.exit(2);
++}
++const root = resolve(positional[0] ?? ".");
++const scriptsDir = resolve(root, "scripts");
++const run = (file, fileArgs, cwd = root) => spawnSync(process.execPath, [file, ...fileArgs], { cwd, encoding: "utf8", maxBuffer: 1 << 26 });
++const git = (...a) => spawnSync("git", ["-C", root, ...a], { encoding: "utf8", maxBuffer: 1 << 26 });
++
++// Content fingerprint of every path git reports as modified or untracked, so a path that was already dirty before the step still counts as changed when its bytes move.
++function fingerprint() {
++  const status = git("status", "--porcelain=v1", "-z", "--untracked-files=all");
++  const map = new Map();
++  for (const entry of status.stdout.split("\0")) {
++    if (entry.length < 4) continue;
++    const path = entry.slice(3);
++    const abs = resolve(root, path);
++    map.set(path, existsSync(abs) ? createHash("sha256").update(readFileSync(abs)).digest("hex") : "absent");
++  }
++  return map;
++}
++
++const steps = [];
++const fail = (name, result) => {
++  steps.push({ name, state: "FAILED" });
++  console.error(`${name}: FAILED (exit ${result.status})`);
++  const text = `${result.stdout}${result.stderr}`.trim();
++  if (text) console.error(text.split("\n").slice(-12).join("\n"));
++};
++
++const before = fingerprint();
++
++// 1. Backlog ledger projections. Without --activate the script only plans: "nothing to reconcile" means current.
++{
++  const result = run(resolve(root, "plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs"), check ? [] : ["--activate"]);
++  if (result.status !== 0) fail("backlog-ledger", result);
++  else if (check) steps.push({ name: "backlog-ledger", state: /nothing to reconcile/u.test(result.stdout) ? "current" : "DRIFT" });
++  else steps.push({ name: "backlog-ledger", state: "refreshed" });
++}
++
++// 2. Capability inventory sourceBaseline: the baseline must name <root>'s HEAD. rebaseline exits 1 when it is already equal.
++{
++  const inventory = resolve(root, "docs/product-capability-inventory.json");
++  const head = git("rev-parse", "HEAD").stdout.trim();
++  const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
++  const text = existsSync(inventory) ? readFileSync(inventory, "utf8") : "";
++  const m = /"sourceBaseline": \{\s*"commit": "([0-9a-f]{40})",\s*"tree": "([0-9a-f]{40})"/u.exec(text);
++  if (!m) fail("inventory-baseline", { status: 1, stdout: "", stderr: "sourceBaseline block not found" });
++  else if (m[1] === head && m[2] === tree) steps.push({ name: "inventory-baseline", state: "current" });
++  else if (check) steps.push({ name: "inventory-baseline", state: "DRIFT" });
++  else {
++    const result = run(resolve(scriptsDir, "rebaseline-inventory.mjs"), [root]);
++    if (result.status !== 0) fail("inventory-baseline", result);
++    else steps.push({ name: "inventory-baseline", state: "refreshed" });
++  }
++}
++
++// 3. Reader inputs (mirrors, manifest, pins). --check is the script's own read-only mode.
++{
++  const result = run(resolve(scriptsDir, "sync-reader-inputs.mjs"), check ? [root, "--check"] : [root]);
++  if (check && result.status === 1) steps.push({ name: "reader-inputs", state: "DRIFT" });
++  else if (result.status !== 0) fail("reader-inputs", result);
++  else if (check) steps.push({ name: "reader-inputs", state: "current" });
++  else steps.push({ name: "reader-inputs", state: "refreshed" });
++}
++
++const after = fingerprint();
++const changed = [...after].filter(([path, hash]) => before.get(path) !== hash).map(([path]) => path).sort();
++for (const s of steps) console.log(`${s.name}: ${s.state}`);
++
++if (steps.some((s) => s.state === "FAILED")) process.exit(2);
++if (check) {
++  const drift = steps.filter((s) => s.state === "DRIFT").map((s) => s.name);
++  if (drift.length > 0) { console.log(`DRIFT in ${drift.join(", ")}: run without --check to refresh, then commit the named files.`); process.exit(1); }
++  console.log("all derived files are current");
++  process.exit(0);
++}
++if (changed.length === 0) {
++  console.log("no derived file changed; nothing to commit");
++} else {
++  console.log(`changed (${changed.length}), written to the working tree and not staged:`);
++  for (const p of changed) console.log(`  ${p}`);
++  console.log(`commit instruction: git add ${changed.join(" ")}  then commit them (one chore commit); this script never stages or commits.`);
++}
++process.exit(0);
+diff --git a/scripts/refresh-derived-files.test.mjs b/scripts/refresh-derived-files.test.mjs
+new file mode 100644
+index 000000000..cc8b6fea2
+--- /dev/null
++++ b/scripts/refresh-derived-files.test.mjs
+@@ -0,0 +1,140 @@
++// Purpose: pin scripts/refresh-derived-files.mjs (D223 slice 4): one step refreshes the derived files, names exactly the files it changed,
++// writes the working tree only (never stages, never commits), --check writes nothing, and a failing step is reported, not swallowed.
++// The fixture root holds the REAL rebaseline-inventory.mjs and two small stand-ins for the ledger and Reader-input scripts (those two
++// have their own suites); every case works in its own temp directory with a real `git init`.
++// Usage:   node --test scripts/refresh-derived-files.test.mjs
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync, execFileSync } from "node:child_process";
++import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync } from "node:fs";
++import { join, resolve } from "node:path";
++import { tmpdir } from "node:os";
++
++const SCRIPT = resolve(import.meta.dirname, "refresh-derived-files.mjs");
++const REBASELINE = resolve(import.meta.dirname, "rebaseline-inventory.mjs");
++const ZERO = "0".repeat(40);
++const inventoryText = (commit, tree) => `{\n  "sourceBaseline": {\n    "commit": "${commit}",\n    "tree": "${tree}"\n  }\n}\n`;
++
++const git = (root, ...a) => execFileSync("git", ["-C", root, ...a], { encoding: "utf8" }).trim();
++
++// Ledger stand-in: prints "nothing to reconcile" when backlog/STATUS.md is current, otherwise (with --activate) rewrites it.
++const LEDGER_STUB = `import { readFileSync, writeFileSync, existsSync } from "node:fs";
++const activate = process.argv.includes("--activate");
++const want = "projection v2\\n";
++const have = existsSync("backlog/STATUS.md") ? readFileSync("backlog/STATUS.md", "utf8") : "";
++if (process.env.FIXTURE_LEDGER_FAIL) { console.error("BLOCKED ledger fixture failure"); process.exit(2); }
++if (have === want) { console.log("Backlog ledger already records every item's asserted status; nothing to reconcile."); process.exit(0); }
++if (activate) writeFileSync("backlog/STATUS.md", want);
++console.log(activate ? "Recorded 1 transition(s) across 1 item(s)." : "Would record 1 transition(s) across 1 item(s).");
++`;
++// Reader-input stand-in: --check exits 1 on drift, default mode rewrites docs/reader-mirror.txt.
++const READER_STUB = `import { readFileSync, writeFileSync, existsSync } from "node:fs";
++const want = "mirror v2\\n";
++const have = existsSync("docs/reader-mirror.txt") ? readFileSync("docs/reader-mirror.txt", "utf8") : "";
++if (process.argv.includes("--check")) { if (have !== want) { console.error("DRIFT (1)"); process.exit(1); } process.exit(0); }
++writeFileSync("docs/reader-mirror.txt", want);
++`;
++
++function mkFixture() {
++  const root = mkdtempSync(join(tmpdir(), "rdf-root-"));
++  execFileSync("git", ["init", "-q", root]);
++  git(root, "config", "user.name", "fixture");
++  git(root, "config", "user.email", "fixture@example.invalid");
++  for (const d of ["scripts", "docs", "backlog", "plugins/pipeline-core/scripts"]) mkdirSync(join(root, d), { recursive: true });
++  copyFileSync(REBASELINE, join(root, "scripts", "rebaseline-inventory.mjs"));
++  writeFileSync(join(root, "scripts", "sync-reader-inputs.mjs"), READER_STUB);
++  writeFileSync(join(root, "plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs"), LEDGER_STUB);
++  writeFileSync(join(root, "docs/product-capability-inventory.json"), inventoryText(ZERO, ZERO));
++  writeFileSync(join(root, "docs/reader-mirror.txt"), "mirror v1\n");
++  writeFileSync(join(root, "backlog/STATUS.md"), "projection v1\n");
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "fixture");
++  return root;
++}
++const run = (root, ...extra) => spawnSync(process.execPath, [SCRIPT, root, ...extra], { encoding: "utf8" });
++const stagedAndCommits = (root) => ({ staged: git(root, "diff", "--cached", "--name-only"), head: git(root, "rev-parse", "HEAD"), stash: git(root, "stash", "list") });
++
++test("RDF01 the step refreshes all three derived files, names exactly those paths, and stages and commits nothing", () => {
++  const root = mkFixture();
++  const before = stagedAndCommits(root);
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^backlog-ledger: refreshed$/mu);
++  assert.match(r.stdout, /^inventory-baseline: refreshed$/mu);
++  assert.match(r.stdout, /^reader-inputs: refreshed$/mu);
++  assert.match(r.stdout, /changed \(3\)/u);
++  for (const p of ["backlog/STATUS.md", "docs/product-capability-inventory.json", "docs/reader-mirror.txt"]) assert.match(r.stdout, new RegExp(`^  ${p.replace(/[./]/g, "\\$&")}$`, "mu"));
++  assert.match(r.stdout, /commit instruction: git add backlog\/STATUS\.md docs\/product-capability-inventory\.json docs\/reader-mirror\.txt /u);
++  assert.equal(readFileSync(join(root, "backlog/STATUS.md"), "utf8"), "projection v2\n");
++  assert.equal(readFileSync(join(root, "docs/reader-mirror.txt"), "utf8"), "mirror v2\n");
++  assert.match(readFileSync(join(root, "docs/product-capability-inventory.json"), "utf8"), new RegExp(git(root, "rev-parse", "HEAD")));
++  assert.deepEqual(stagedAndCommits(root), before, "nothing staged, HEAD unchanged, no stash");
++});
++
++test("RDF02 a second run finds everything current and reports nothing to commit", () => {
++  const root = mkFixture();
++  assert.equal(run(root).status, 0);
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^backlog-ledger: refreshed$/mu, "the ledger step always runs with --activate; its own no-op writes nothing");
++  assert.match(r.stdout, /^inventory-baseline: current$/mu);
++  assert.match(r.stdout, /no derived file changed; nothing to commit/u);
++});
++
++test("RDF03 --check on drift writes nothing, names the drifting steps and exits 1", () => {
++  const root = mkFixture();
++  const snapshot = ["backlog/STATUS.md", "docs/product-capability-inventory.json", "docs/reader-mirror.txt"].map((p) => readFileSync(join(root, p), "utf8"));
++  const r = run(root, "--check");
++  assert.equal(r.status, 1, r.stdout + r.stderr);
++  assert.match(r.stdout, /^backlog-ledger: DRIFT$/mu);
++  assert.match(r.stdout, /^inventory-baseline: DRIFT$/mu);
++  assert.match(r.stdout, /^reader-inputs: DRIFT$/mu);
++  assert.match(r.stdout, /DRIFT in backlog-ledger, inventory-baseline, reader-inputs/u);
++  assert.deepEqual(["backlog/STATUS.md", "docs/product-capability-inventory.json", "docs/reader-mirror.txt"].map((p) => readFileSync(join(root, p), "utf8")), snapshot);
++  assert.equal(git(root, "status", "--porcelain"), "");
++});
++
++test("RDF04 --check after a refresh reports every derived file current and exits 0", () => {
++  const root = mkFixture();
++  assert.equal(run(root).status, 0);
++  const r = run(root, "--check");
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /all derived files are current/u);
++});
++
++test("RDF05 a failing step is reported FAILED with exit 2, the other steps still run, and nothing is staged", () => {
++  const root = mkFixture();
++  const before = stagedAndCommits(root);
++  const r = spawnSync(process.execPath, [SCRIPT, root], { encoding: "utf8", env: { ...process.env, FIXTURE_LEDGER_FAIL: "1" } });
++  assert.equal(r.status, 2, r.stdout + r.stderr);
++  assert.match(r.stdout, /^backlog-ledger: FAILED$/mu);
++  assert.match(r.stdout, /^reader-inputs: refreshed$/mu);
++  assert.match(r.stderr, /BLOCKED ledger fixture failure/u);
++  assert.deepEqual(stagedAndCommits(root), before);
++});
++
++test("RDF06 a path that was already dirty before the step counts as changed when its bytes move, and an untouched dirty path does not", () => {
++  const root = mkFixture();
++  writeFileSync(join(root, "docs/reader-mirror.txt"), "mirror v0 dirty\n");
++  writeFileSync(join(root, "docs/unrelated-note.txt"), "keep me\n");
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^  docs\/reader-mirror\.txt$/mu);
++  assert.doesNotMatch(r.stdout, /unrelated-note/u);
++});
++
++test("RDF07 an unknown flag or a second positional is refused with exit 2 and writes nothing", () => {
++  const root = mkFixture();
++  for (const bad of [["--activate"], [root]]) {
++    const r = spawnSync(process.execPath, [SCRIPT, root, ...bad], { encoding: "utf8" });
++    assert.equal(r.status, 2, bad.join(" "));
++    assert.match(r.stderr, /usage:/u);
++  }
++  assert.equal(git(root, "status", "--porcelain"), "");
++});
++
++test("RDF08 the script source never runs git add, commit or stash", () => {
++  const source = readFileSync(SCRIPT, "utf8");
++  assert.doesNotMatch(source, /git\(\s*["'](add|commit|stash|reset|checkout)["']/u);
++  assert.doesNotMatch(source, /["']git["']\s*,\s*\[\s*["'](add|commit|stash|reset|checkout)["']/u);
++});
