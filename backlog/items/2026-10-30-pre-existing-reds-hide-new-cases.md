@@ -24,7 +24,12 @@ Red on the plain candidate (identical in every baseline clone this session):
    reinstall cases RIU-07..12 are proven only in a fast loop.
 2. `hooks/guard-push.test.mjs`: 22 failing names (PG09, PG08b, PG10, PG12*, PG13, PG17*, PG26a, PG30, D4a-c), and
    `guard-push-external-ledger` PGXL01/02/04, `guard-push-decision-reference` GPDR01/02, all
-   `verify-evidence-not-exact-green`.
+   `verify-evidence-not-exact-green`. Held patch R1 (2026-10-31) makes the three named suites green: their allow
+   fixtures commit an approved low-rigor state, which waives the publication review as the current rule says. Still
+   red, identical to the baseline and of the same fixture class: `guard-push-v2` PGV2-01/06 and
+   `guard-push-scratch-advisory` PGSA01..04 (follow-up slice R1b); `worktree-target-binding` WTB002/003 (cause not
+   read yet). No hook-level case walks required review, exact-green Verify, a lifecycle-bound Critic and then ALLOW;
+   that path is covered only in `critic-verify-lifecycle.test.mjs`.
 3. `harness/scripts/pipeline-state.test.mjs` crashes with a TypeError at its line 1252.
 4. `project-onboarding-v3-argv-closure` ("mini retains early acknowledgement ..."), `project-onboarding-e2e`
    ("in-process driver ... Codex legacy-advisory approval boundary"), `measure-tofu-push-e2e` (1),
