@@ -694,7 +694,7 @@ test("PARWORK-M5a: the real producer CLI and the repair inspect run while anothe
 // ===================================================================================================================
 // The liveness READBACK (PO decision D110: PID plus process start identity, alive | gone | unjudgeable, read-only) is pinned in
 // lib/dispatch-record-liveness.test.mjs; here the REAL guard-dispatch hook process consults it before admitting a Goldfish dispatch.
-import { recordConsentGiven } from "../onboarding-consent-marker.mjs";
+import { buildGeneratedGoldfishBriefing, prepareGeneratedDispatchRoot } from "../test-generated-goldfish-briefing-fixture.mjs";
 import { LANDED_DISPATCH_RECORD_OWNER_SCHEMA, DISPATCH_RECORD_OWNER_SCHEMA } from "../guard/dispatch-record-lane.mjs";
 
 const DISPATCH_GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch.mjs", import.meta.url));
@@ -702,26 +702,12 @@ const SKIP6 = process.platform === "linux" ? false : "linux-only: the process st
 const sha6 = (text) => createHash("sha256").update(text).digest("hex");
 let seq6 = 0;
 
-function goldfishPrompt6(extra = "") {
-  const raw = readFileSync(join(REPO_ROOT, "templates", "prompts", "goldfish-task.md"), "utf8");
-  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
-  let body = raw.slice(raw.indexOf(marker) + marker.length);
-  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
-    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "<=24 tool uses")
-    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
-  return `${body}${extra}`;
-}
-
-/** An enrolled, not item-governed repository (the shape guard-dispatch.test.mjs uses) with an initial commit. */
+// D185: a productive Goldfish dispatch is admitted only with a briefing from the generator that resolves against an approved
+// course, so the admission input is built by the shared generated-briefing fixture instead of filling the template by hand.
+/** An enrolled, item-governed repository (an approved course, real commit, consent recorded) with an evidence directory. */
 function dispatchFixture6() {
-  const root = join(FIXTURE, `m6-repo-${seq6 += 1}`);
-  mkdirSync(join(root, ".claude"), { recursive: true });
-  execFileSync("git", ["init", "-q"], { cwd: root, env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } });
-  recordConsentGiven({ rootDir: root });
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
-  writeFileSync(join(root, "README.md"), "# Fixture\n");
-  commit4(root, ["README.md"], "initial");
+  seq6 += 1;
+  const root = prepareGeneratedDispatchRoot(`m6-repo-${seq6}-`);
   mkdirSync(join(root, "evidence"), { recursive: true });
   assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true, "fixture precondition: the repository is enrolled");
   return root;
@@ -747,11 +733,11 @@ function v1Record6(root, taskId) {
 }
 
 /** One REAL guard-dispatch hook process admitting (or refusing) a Goldfish dispatch in `root`. */
-function dispatchHook6(root, prompt = goldfishPrompt6(), toolInputExtra = {}) {
-  const payload = { tool_name: "Task", tool_use_id: `toolu_m6_${seq6}_${Date.now()}`, cwd: root,
-    tool_input: { subagent_type: GOLDFISH, model: "sonnet", prompt, ...toolInputExtra } };
+function dispatchHook6(root, prompt = buildGeneratedGoldfishBriefing(root, "PW-M6"), toolInputExtra = {}) {
+  const payload = { tool_name: "Agent", session_id: "m6-item-session", tool_use_id: `toolu_m6_${seq6}_${Date.now()}`, cwd: root,
+    tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt, ...toolInputExtra } };
   return spawnSync(process.execPath, [DISPATCH_GUARD], { input: JSON.stringify(payload), encoding: "utf8", cwd: root, timeout: 120000,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root, GIT_CEILING_DIRECTORIES: FIXTURE } });
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root, GIT_CEILING_DIRECTORIES: dirname(root) } });
 }
 
 const liveChild6 = () => spawn("sleep", ["600"], { stdio: "ignore" });
@@ -802,13 +788,17 @@ test("PARWORK-M6d unjudgeable: an open record with no judgeable owner process ad
 
 test("PARWORK-M6e same dispatch: the record of the dispatch being admitted (its own Slice) is never held against it, even with a live owner", { skip: SKIP6, timeout: 180000 }, () => {
   const root = dispatchFixture6();
+  // The generator refuses a briefing that overlaps a running dispatch's write scope (DBG-SCOPE-OVERLAP), so both briefings are built
+  // before the open record exists; this case pins what the dispatch guard itself does with them.
+  const ownBriefing = buildGeneratedGoldfishBriefing(root, "SAME-1");
+  const otherBriefing = buildGeneratedGoldfishBriefing(root, "OTHER-1");
   const owner = liveChild6();
   try {
     openRecord6(root, "SAME-1", owner.pid);
-    const own = dispatchHook6(root, goldfishPrompt6("\nSlice: SAME-1\n"));
+    const own = dispatchHook6(root, ownBriefing);
     assert.equal(own.status, 0, own.stderr);
     assert.doesNotMatch(own.stderr, /SECOND-WRITER/u);
-    const other = dispatchHook6(root, goldfishPrompt6("\nSlice: OTHER-1\n"));
+    const other = dispatchHook6(root, otherBriefing);
     assert.equal(other.status, 2, "a dispatch of a different slice is still refused by the same live record");
     assert.match(other.stderr, /GUARD-DISPATCH-SECOND-WRITER/u);
   } finally { owner.kill("SIGKILL"); }
@@ -819,7 +809,7 @@ test("PARWORK-M6f isolated: a dispatch isolated in its own worktree writes in an
   const owner = liveChild6();
   try {
     openRecord6(root, "OWNER-LIVE-2", owner.pid);
-    const result = dispatchHook6(root, goldfishPrompt6(), { isolation: "worktree" });
+    const result = dispatchHook6(root, buildGeneratedGoldfishBriefing(root, "PW-M6F"), { isolation: "worktree" });
     assert.equal(result.status, 0, result.stderr);
     assert.doesNotMatch(result.stderr, /SECOND-WRITER/u);
   } finally { owner.kill("SIGKILL"); }
