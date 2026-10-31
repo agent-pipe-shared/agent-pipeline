@@ -72,6 +72,12 @@
     "profileSource": {
       "type": "string"
     },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "documentation"
+      ]
+    },
     "provisional": {
       "type": "boolean"
     },
