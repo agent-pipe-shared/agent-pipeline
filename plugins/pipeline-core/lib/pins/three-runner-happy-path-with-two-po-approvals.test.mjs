@@ -64,6 +64,9 @@ const ALLOWED_CLASSES = Object.freeze([PER_FEATURE, ONE_TIME]);
  * `export`/`file` entries must resolve in the plugin.
  */
 const INVENTORY = Object.freeze([
+  // D215: for profile mini the bootstrap plan acknowledgement is asked early (before the bootstrap bind) but it is
+  // this one plan decision, not a third approval; a separate "bootstrap-plan-acknowledgement" entry stays refused
+  // (see the extra-entry case below), so the per-feature count of the happy path stays two.
   { id: "plan-approval", class: PER_FEATURE, anchor: { verb: "approve-plan" } },
   { id: "push-approval", class: PER_FEATURE, anchor: { verb: "approve-push" } },
   { id: "enrollment-consent", class: ONE_TIME,
