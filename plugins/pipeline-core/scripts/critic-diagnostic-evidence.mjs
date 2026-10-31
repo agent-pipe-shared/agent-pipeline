@@ -45,5 +45,5 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
 if (isDirectInvocation(import.meta.url)) {
   if (process.argv.length === 3 && process.argv[2] === "--help") { process.stdout.write(CRITIC_DIAGNOSTIC_EVIDENCE_HELP); process.exit(0); }
   try { console.log(JSON.stringify(runCriticDiagnosticCli(process.argv.slice(2)))); }
-  catch (error) { console.error(error.code ?? error.message); process.exitCode = 1; }
+  catch (error) { console.error(error.message || error.code); process.exitCode = 1; } // N40: a coded refusal prints "CODE: cause and repair" when it has one, the bare code otherwise
 }

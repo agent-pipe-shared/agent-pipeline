@@ -265,3 +265,79 @@ test("D2 text (4) the skill operator note names the flag, the request key, the s
   assert.match(note, /never null/u);
   assert.match(note, /derive again/u);
 });
+// N40 (Toolbox finding): CDI-FULL-VERIFY named no cause. Every raise site now says what was observed and how to repair it.
+function n40Impacted(f) {
+  const selection = planVerifySelection({ mode: "critic", baseCommit: "a".repeat(40), candidateCommit: f.candidate.commit, changedPaths: ["spec.md"], registeredSuiteIds: ["check", "other"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["check"], areas: [{ id: "all", paths: ["spec.md"], suites: ["check"] }, { id: "rest", paths: ["other/**"], suites: ["other"] }] } });
+  return { schema: "pipeline.verify-evidence.v0", ...f.candidate, exitCode: 0, steps: [{ name: "check", exitCode: 0 }], selection };
+}
+function n40Full(f) {
+  const selection = planVerifySelection({ mode: "critic", baseCommit: f.candidate.commit, candidateCommit: f.candidate.commit, changedPaths: [], registeredSuiteIds: ["check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["check"], areas: [{ id: "all", paths: ["**"], suites: ["check"] }] } });
+  return { schema: "pipeline.verify-evidence.v0", ...f.candidate, exitCode: 0, steps: [{ name: "check", exitCode: 0 }], selection };
+}
+const n40Write = (f, path, value) => { mkdirSync(join(f.root, "evidence"), { recursive: true }); writeFileSync(join(f.root, path), JSON.stringify(value)); };
+test("N40 (a) the producer refuses impacted --full-verify evidence and names the observed run, the cause and the repair", () => {
+  const f = fixture();
+  try {
+    assert.equal(n40Impacted(f).selection.execution, "impacted");
+    n40Write(f, "evidence/impacted.json", n40Impacted(f));
+    assert.throws(() => produceCriticDiagnostic({ ...options(f), fullVerifyPath: "evidence/impacted.json" }), (error) => {
+      assert.equal(error.code, "CDI-FULL-VERIFY");
+      assert.match(error.message, /^CDI-FULL-VERIFY: /u);
+      assert.match(error.message, /"impacted"/u);
+      assert.match(error.message, /not a full run/u);
+      assert.match(error.message, /verify-evidence-producer\.mjs/u);
+      assert.match(error.message, /--base/u);
+      return true;
+    });
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("N40 (b) full evidence is still accepted by the producer", () => {
+  const f = fixture();
+  try {
+    assert.equal(n40Full(f).selection.execution, "full");
+    n40Write(f, "evidence/full.json", n40Full(f));
+    assert.equal(produceCriticDiagnostic({ ...options(f), fullVerifyPath: "evidence/full.json" }).fullVerify.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("N40 (c) the validator names the cause for an execution mismatch, a status mismatch, a bad shape and a not-run record that carries evidence", () => {
+  const f = fixture();
+  try {
+    n40Write(f, "evidence/full.json", n40Full(f));
+    const good = produceCriticDiagnostic({ ...options(f), fullVerifyPath: "evidence/full.json" });
+    const context = { root: f.root, candidate: f.candidate };
+    const refuse = (mutate, patterns) => {
+      const changed = structuredClone(good); mutate(changed);
+      assert.throws(() => validateCriticDiagnostic(changed, context), (error) => {
+        assert.equal(error.code, "CDI-FULL-VERIFY");
+        for (const pattern of patterns) assert.match(error.message, pattern);
+        return true;
+      });
+    };
+    // Execution mismatch: the recorded evidence file is replaced by an impacted run with a matching digest.
+    const impacted = JSON.stringify(n40Impacted(f));
+    writeFileSync(join(f.root, "evidence/full.json"), impacted);
+    refuse((v) => { v.fullVerify.evidence.sha256 = diagnosticDigestOf(impacted); }, [/"impacted"/u, /not a full run/u, /verify-evidence-producer\.mjs/u]);
+    writeFileSync(join(f.root, "evidence/full.json"), JSON.stringify(n40Full(f)));
+    refuse((v) => { v.fullVerify.status = "failed"; }, [/records "failed"/u, /evidence file says "passed"/u]);
+    refuse((v) => { v.fullVerify.status = "bogus"; }, [/status/u, /not-run, passed or failed/u]);
+    refuse((v) => { v.fullVerify = { status: "not-run", evidence: v.fullVerify.evidence }; }, [/not-run/u, /evidence null/u]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("N40 (d) the CLI prints the cause and the repair on stderr, not only the code, and keeps the bare code for a refusal without text", () => {
+  const f = fixture();
+  try {
+    n40Write(f, "evidence/impacted.json", n40Impacted(f));
+    const script = resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs");
+    const run = (extra) => spawnSync(process.execPath, [script, "--root", f.root, "--spec", "spec.md", "--guardrail", "guard.md", "--log", "evidence/n40.log", "--out", "evidence/n40.json", ...extra, "--", process.execPath, "-e", "process.exit(0)"], { encoding: "utf8" });
+    const refused = run(["--full-verify", "evidence/impacted.json"]);
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /^CDI-FULL-VERIFY: /u);
+    assert.match(refused.stderr, /"impacted"/u);
+    assert.match(refused.stderr, /verify-evidence-producer\.mjs/u);
+    const bare = run(["--candidate", "no-such-ref"]);
+    assert.equal(bare.status, 1);
+    assert.doesNotMatch(bare.stderr, /: /u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+import { createHash as n40CreateHash } from "node:crypto";
+const diagnosticDigestOf = (text) => n40CreateHash("sha256").update(text).digest("hex");

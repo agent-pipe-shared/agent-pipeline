@@ -11,6 +11,10 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
 export const diagnosticDigest = bytes => createHash("sha256").update(bytes).digest("hex");
 function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
+/** N40: the one wording for a --full-verify evidence file whose selection did not run every suite. */
+export function fullVerifyExecutionRefusal(observed) {
+  return `the full-Verify evidence ran as "${observed.execution}" (mode ${observed.mode}), not a full run, so it cannot be recorded as fullVerify. Produce it again with verify-evidence-producer.mjs --mode critic --commit <candidate> --base <candidate> --out <evidence path> (a base equal to the candidate makes the selection fall back to a full run; with an ordinary base the selection stays "impacted"), and pass that evidence file as --full-verify`;
+}
 export function diagnosticPath(path) {
   if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
   return path;
@@ -92,14 +96,15 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   for (const row of [value.spec, ...value.guardrails]) if (source(root, candidate.commit, row.path).sha256 !== row.sha256) fail("CDI-SOURCE-DIGEST");
   if (spec && (spec.path !== value.spec.path || spec.sha256 !== value.spec.sha256)) fail("CDI-SPEC");
   if (guardrails && guardrails.some(row => !value.guardrails.some(saved => saved.path === row.path && saved.sha256 === row.sha256))) fail("CDI-GUARDRAILS");
-  if (!exact(value.fullVerify, ["status", "evidence"]) || !["not-run", "passed", "failed"].includes(value.fullVerify.status)) fail("CDI-FULL-VERIFY");
-  if (value.fullVerify.status === "not-run") { if (value.fullVerify.evidence !== null) fail("CDI-FULL-VERIFY"); }
+  if (!exact(value.fullVerify, ["status", "evidence"]) || !["not-run", "passed", "failed"].includes(value.fullVerify.status)) fail("CDI-FULL-VERIFY", "the fullVerify record must have exactly the keys status and evidence, and its status must be not-run, passed or failed");
+  if (value.fullVerify.status === "not-run") { if (value.fullVerify.evidence !== null) fail("CDI-FULL-VERIFY", "the fullVerify record says not-run but carries evidence; a not-run record must have evidence null (pass --full-verify to the producer to record a run instead)"); }
   else {
     validateReference(value.fullVerify.evidence);
     const bytes = readArtifact(value.fullVerify.evidence.path);
     if (diagnosticDigest(bytes) !== value.fullVerify.evidence.sha256) fail("CDI-DIGEST");
     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), candidate);
-    if (observed.execution !== "full" || observed.status !== value.fullVerify.status) fail("CDI-FULL-VERIFY");
+    if (observed.execution !== "full") fail("CDI-FULL-VERIFY", fullVerifyExecutionRefusal(observed));
+    if (observed.status !== value.fullVerify.status) fail("CDI-FULL-VERIFY", `the fullVerify record records "${value.fullVerify.status}" but the evidence file says "${observed.status}"; produce the diagnostic again from that evidence file instead of editing the record`);
   }
   const t = value.targeted;
   if (!exact(t, ["label", "status", "exitCode", "log"]) || typeof t.label !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(t.label) || !Number.isInteger(t.exitCode) || t.exitCode < 0 || t.status !== (t.exitCode === 0 ? "passed" : "failed")) fail("CDI-TARGETED");

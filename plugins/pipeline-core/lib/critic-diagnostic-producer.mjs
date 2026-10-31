@@ -6,6 +6,7 @@ import {
   diagnosticDigest,
   diagnosticEvidenceLocation,
   diagnosticPath,
+  fullVerifyExecutionRefusal,
   inspectCriticVerifyDiagnostic,
   newDiagnosticPath,
   readDiagnosticArtifact,
@@ -14,7 +15,7 @@ import {
 import { deriveRequiredCriticGuardrails } from "./critic-required-guardrails.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-function fail(code) { const error = new Error(code); error.code = code; throw error; }
+function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
 
 function git(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 10000 });
@@ -56,7 +57,7 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = un
     if (diagnosticEvidenceLocation(fullVerifyPath) === null) fail("CDI-PATH");
     const bytes = readDiagnosticArtifact(root, fullVerifyPath);
     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), bound);
-    if (observed.execution !== "full") fail("CDI-FULL-VERIFY");
+    if (observed.execution !== "full") fail("CDI-FULL-VERIFY", fullVerifyExecutionRefusal(observed));
     fullVerify.status = observed.status; fullVerify.evidence = { path: fullVerifyPath, sha256: diagnosticDigest(bytes) };
   }
   const value = { schema: CRITIC_DIAGNOSTIC_SCHEMA, producer: "critic-diagnostic-evidence", assurance: "captured-process-output-not-host-attested", candidate: bound, spec, guardrails, fullVerify, targeted: { label, status: captured.exitCode === 0 ? "passed" : "failed", exitCode: captured.exitCode, log: { path: logPath, sha256: diagnosticDigest(readDiagnosticArtifact(root, logPath)) } }, pending: [...new Set([...pending, ...(fullVerify.status === "not-run" ? ["full-verify"] : [])])].sort() };
