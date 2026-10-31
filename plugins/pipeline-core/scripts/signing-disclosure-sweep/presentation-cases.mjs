@@ -37,13 +37,13 @@ export async function presentationCases({sourceRoot}) {
     }},
     {id:'SDP004',scope:'pure-input-refusal',run(){
       assert.throws(()=>compactSigningDisclosure({intentSha256:'wrong',record:{resolved:true,lines:[]}}));
-      for(const artifact of [{path:'scratch/file\nINJECT',sha256:material},{path:'scratch/file',sha256:'wrong'},{path:'x'.repeat(1000),sha256:material}]) {
+      for(const artifact of [{path:'scratch/file\nINJECT',sha256:material},{path:'scratch/file',sha256:'wrong'},{path:'x'.repeat(40000),sha256:material}]) {
         assert.throws(()=>compactSigningDisclosure({intentSha256:intent,record:{resolved:true,lines:[]},materialArtifact:artifact}));
       }
     }},
     {id:'SDP005',scope:'pure-human-presentation',run(){
       for(const code of ['PO-HUMAN-SIGN-INTENT-READY','PO-HUMAN-PROOF-READY','PO-HUMAN-CRITICAL-AUTHORIZATION-READY']) {
-        const result={ok:true,code,intentSha256:intent,signer:{sentinel:'NOT-HUMAN-OUTPUT'},paths:{proof:'scratch/proof.json',signer:'scratch/signer.json'},scratchProofPath:'scratch/mirror.json'};
+        const result={ok:true,code,intentSha256:intent,signer:{sentinel:'NOT-HUMAN-OUTPUT'},paths:{proof:'scratch/proof.json',signer:'scratch/signer.json'},externalPaths:{proof:'scratch/proof.json'},scratchProofPath:'scratch/mirror.json'};
         const before=JSON.stringify(result), output=formatHumanApprovalCliResult(result,{humanFacing:true});
         assert.equal(output.trimEnd().split('\n').length,1);
         assert.deepEqual(JSON.parse(output),{ok:true,code,proofPath:'scratch/proof.json'});
