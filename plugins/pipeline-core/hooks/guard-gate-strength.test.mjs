@@ -999,6 +999,26 @@ try {
     }
   });
 
+  check("GST39 the refusal of either calibration mirror names the other mirror and the Verify drift code (Toolbox N42)", () => {
+    // The two calibration files must stay byte-equal (PCI-CALIBRATION-DRIFT) and each override covers exactly one file. The first refusal used to say
+    // nothing about the mirror, so the second signature was discovered only when Verify went red. The warning belongs to the refusal itself, before any override.
+    const root = governed();
+    const mirrors = [["project/pipeline.json", ".claude/pipeline.json", "GS-10", "GS-11"], [".claude/pipeline.json", "project/pipeline.json", "GS-11", "GS-10"]];
+    for (const [path, other, id, otherId] of mirrors) {
+      const refused = ask(root, path);
+      assert.equal(refused.blocked, true, path);
+      assert.match(refused.stderr, new RegExp(`Rule ID: ${id}\\b`, "u"), path);
+      assert.ok(refused.stderr.includes(other), `the refusal of ${path} names the mirror ${other}: ${refused.stderr}`);
+      assert.match(refused.stderr, new RegExp(otherId, "u"), `the refusal of ${path} names the mirror's rule ${otherId}`);
+      assert.match(refused.stderr, /PCI-CALIBRATION-DRIFT/u, path);
+      assert.match(refused.stderr, /own (PO-approved )?override/u, path);
+    }
+    // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
+    const rootManifest = ask(root, "pipeline.json");
+    assert.equal(rootManifest.blocked, true);
+    assert.doesNotMatch(rootManifest.stderr, /PCI-CALIBRATION-DRIFT/u);
+  });
+
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

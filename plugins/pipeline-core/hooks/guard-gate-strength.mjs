@@ -156,12 +156,12 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
     id: "GS-10",
     path: "project/pipeline.json",
-    reason: "the project authority configuration declares verify and core settings and must not be edited directly.",
+    reason: "the project authority configuration declares verify and core settings and must not be edited directly. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
   }),
   Object.freeze({
     id: "GS-11",
     path: ".claude/pipeline.json",
-    reason: "the legacy-tier project authority configuration declares verify and core settings.",
+    reason: "the legacy-tier project authority configuration declares verify and core settings. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red.",
   }),
   Object.freeze({
     id: "GS-12",
