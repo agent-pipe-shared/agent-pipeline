@@ -6159,6 +6159,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["../scripts/pipeline-manifest.schema.json", ["plugins", "pipeline-core", "scripts", "pipeline-manifest.schema.json"]],
       ["./manifest.mjs", ["plugins", "pipeline-core", "lib", "manifest.mjs"]],
       ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],
+      ["./project-authority-read.mjs", ["plugins", "pipeline-core", "lib", "project-authority-read.mjs"]],
       ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],

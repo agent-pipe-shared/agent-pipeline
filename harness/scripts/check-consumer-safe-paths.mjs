@@ -376,12 +376,12 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B (coordinator-confirmed): names the checker (harness/scripts/check-observation-governance.mjs) that by design only exists in a source checkout; the bootstrap skill's own Observation-governance step already explains this to the agent.",
   },
   {
-    file: "plugins/pipeline-core/lib/po-gate-authority.mjs",
+    file: "plugins/pipeline-core/lib/po-gate-authority-read.mjs",
     match: "project has the plugin but no setup.mjs",
     reason: "Class B: source comment, not an operator-facing message.",
   },
   {
-    file: "plugins/pipeline-core/lib/po-gate-authority.mjs",
+    file: "plugins/pipeline-core/lib/po-gate-authority-read.mjs",
     match: "Run node setup.mjs --publish-po-profile",
     reason: "Class unclear: a constructed repair message that names \"the canonical primary checkout\" rather than the current repo, which may or may not make it consumer-reachable in practice. Not confidently classified within this dispatch's budget -- left for the follow-up dispatch's judgment rather than guessed.",
   },

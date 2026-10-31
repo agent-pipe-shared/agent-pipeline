@@ -249,6 +249,8 @@ function scopedRegistrationFailureFixture() {
     // verify.mjs resolves the manifest tier through the authority resolver (ADR-0054);
     // the fixture root must carry it and its one local dependency.
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"));
+    // D216-A: project-authority.mjs re-exports its read half (node: imports only).
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority-read.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority-read.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"));
     mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
     writeFileSync(

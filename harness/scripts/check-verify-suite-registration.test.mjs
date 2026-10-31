@@ -598,6 +598,7 @@ const FIXTURE_MODULES = Object.freeze([
   "plugins/pipeline-core/lib/governance-event.mjs",
   "plugins/pipeline-core/lib/governance-verification-action.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs",
+  "plugins/pipeline-core/lib/project-authority-read.mjs", // via project-authority.mjs (D216-A read half; node: imports only)
   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
   "plugins/pipeline-core/lib/verify-resume.mjs",
   "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",

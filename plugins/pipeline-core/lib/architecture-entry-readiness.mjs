@@ -600,7 +600,8 @@ function decideGreenfieldPendingFitness(input) {
  * after `const scope = ...` is validated. The existing allowance is conditioned on `adoption.disposition ===
  * "deferred"`; this one must sit OUTSIDE that condition because a design-package tree is `approved-scoped`:
  *
- *   // import { greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+ *   // import { greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from this module (one directory up from guard/);
+ *   // the module specifier is not spelled out here: a copy-graph walker that reads import text would take it for a real import.
  *   const pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
  *     rootDir: root,
  *     taskScope: scope,

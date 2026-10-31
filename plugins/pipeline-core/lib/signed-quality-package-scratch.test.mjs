@@ -34,11 +34,41 @@ function copyPluginGraph(version) {
     fs.mkdirSync(dirname(target), { recursive: true });
     fs.copyFileSync(source, target);
     assert.deepEqual(fs.readFileSync(target), fs.readFileSync(source), 'immutable source copy');
-    for (const match of fs.readFileSync(source, 'utf8').matchAll(/(?:from\s+|import\s*)["'](\.[^"']+)["']/g)) {
+    const text = fs.readFileSync(source, 'utf8');
+    for (const match of text.matchAll(/(?:from\s+|import\s*)["'](\.[^"']+)["']/g)) {
       copyModule(resolve(dirname(source), match[1]), resolve(dirname(target), match[1]));
+    }
+    // Files a module resolves at load time with new URL('<relative>', import.meta.url) (a launcher, a worker, a schema)
+    // are part of the graph too. Since D216-A the package validation lives in review-admission-read.mjs, which reaches
+    // the host-process supervisor and the design-readiness schemas through critic-course-admission.mjs.
+    for (const match of text.matchAll(/new URL\(\s*["'](\.[^"']+)["']\s*,\s*import\.meta\.url\s*\)/g)) {
+      const asset = resolve(dirname(source), match[1]);
+      const assetInside = relative(pluginRoot, asset);
+      if (assetInside && assetInside !== '..' && !assetInside.startsWith('..' + sep) && fs.existsSync(asset) && fs.statSync(asset).isFile()) copyModule(asset, resolve(dirname(target), match[1]));
     }
   }
   copyModule(join(sourceLib, 'signed-quality-package.mjs'), join(version, 'lib/signed-quality-package.mjs'));
+  // Static data the graph loads at module load through join(pluginRoot, 'config/...') or 'schemas/...' (runner profiles,
+  // design-readiness and other receipt schemas). Both directories are small, closed and data-only; copy them whole, byte checked.
+  function copyDataTree(rel) {
+    for (const entry of fs.readdirSync(join(pluginRoot, rel), { withFileTypes: true })) {
+      const entryRel = join(rel, entry.name);
+      if (entry.isDirectory()) { copyDataTree(entryRel); continue; }
+      const target = join(version, entryRel);
+      fs.mkdirSync(dirname(target), { recursive: true });
+      fs.copyFileSync(join(pluginRoot, entryRel), target);
+      assert.deepEqual(fs.readFileSync(target), fs.readFileSync(join(pluginRoot, entryRel)), 'immutable data tree copy');
+    }
+  }
+  for (const rel of ['config', 'schemas']) copyDataTree(rel);
+  // The user and manifest schemas beside the scripts (scripts/*.json) are data too.
+  for (const entry of fs.readdirSync(join(pluginRoot, 'scripts'), { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const target = join(version, 'scripts', entry.name);
+    fs.mkdirSync(dirname(target), { recursive: true });
+    fs.copyFileSync(join(pluginRoot, 'scripts', entry.name), target);
+    assert.deepEqual(fs.readFileSync(target), fs.readFileSync(join(pluginRoot, 'scripts', entry.name)), 'immutable data file copy');
+  }
   for (const path of ['config/runner-profiles-v3.json', 'scripts/pipeline-user-v3.schema.json']) {
     const target = join(version, path);
     fs.mkdirSync(dirname(target), { recursive: true });

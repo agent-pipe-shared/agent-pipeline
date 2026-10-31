@@ -170,6 +170,33 @@ export const ALLOWLIST = Object.freeze([
       "explain a directory-depth arithmetic correction caused by the " +
       "Nova/Phoenix merge relocating it one directory deeper.",
   },
+  // C14-GITLEAKS-FP (2026-10-31): each content-v1 fingerprint in .gitleaksignore names the TRACKED evidence copy
+  // "<script>.mjs.txt"; the detection rule reads the "<script>.mjs" prefix of that file name as a script reference.
+  // The tracked file is the .txt copy, so the fingerprint is right as written and cannot name anything else.
+  {
+    file: ".gitleaksignore",
+    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/scripts/po-human-approval" +
+      ".mjs",
+    reason:
+      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy po-human-approval.mjs.txt (a .txt file); " +
+      "the detector reads its .mjs prefix as a script path.",
+  },
+  {
+    file: ".gitleaksignore",
+    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/dependencies/frozen-g8-postimages/plugins/pipeline-core/lib/model-family-host-store.test" +
+      ".mjs",
+    reason:
+      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy model-family-host-store.test.mjs.txt (a .txt file); " +
+      "the detector reads its .mjs prefix as a script path.",
+  },
+  {
+    file: ".gitleaksignore",
+    match: "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/lib/model-family-host-store.test" +
+      ".mjs",
+    reason:
+      "C14-GITLEAKS-FP: the fingerprint names the tracked evidence copy model-family-host-store.test.mjs.txt (a .txt file); " +
+      "the detector reads its .mjs prefix as a script path.",
+  },
 ]);
 
 /** What this check cannot see. Printed with every result, not just here. */
