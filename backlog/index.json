@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "76c723eb8fd148e54f8449fb17d5aeef82c3c01dc41dfeacd22be86325eb6164"
+    "transitionHead": "ceb2749c46138fffdd99b6e50af4b9d3b7d444c6af29e1c89df2a95527410177"
   },
   "counts": {
-    "open": 373,
+    "open": 375,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -513,6 +513,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-17-a-schema-less-project-pipeline-yaml-has-no-known-repair-path.md"
+    },
+    {
+      "id": "pipeline.a-second-diagnostic-for-one-candidate-makes-the-lineage-unregistrable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N44 (2026-10-31): after a second diagnostic for the same candidate, preflight, admit, finalize and export pass but the lineage cannot be registered (FPR-LINEAGE-COMPILE / CCA-DELTA-BINDING); confirmed on the consumer manifest.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote",
@@ -10416,6 +10426,16 @@
       "source": "Directly measured during the 2026-08-27 Nova-A candidate session: four deep-tier dispatches truncated at a maxTurns the repository had already raised",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.residual-acceptance-cannot-close-an-uncorrectable-major",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Toolbox finding N45 (2026-10-31) and PO decision D227: a live feature has a Critic major that concerns commit trailers of past commits and cannot be corrected by a commit.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.residual-acceptance-expires-after-the-signature-window",

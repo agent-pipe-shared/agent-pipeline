@@ -46,6 +46,7 @@
 | pipeline.a-running-batch-has-no-admissible-critic-route | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.a-same-candidate-critic-rerun-after-a-failed-review-can-no-longer-be-compiled | open | defect | pipeline | none | 2026-10-21 | — | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.a-second-diagnostic-for-one-candidate-makes-the-lineage-unregistrable | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
@@ -838,6 +839,7 @@
 | pipeline.report-05-consumer-findings | open | defect | pipeline | alfred | 2026-10-26 | — | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
+| pipeline.residual-acceptance-cannot-close-an-uncorrectable-major | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.residual-acceptance-expires-after-the-signature-window | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.residual-acceptance-route-is-not-named-at-the-push-gate | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | nova-b | 2026-08-27 | — | — |
@@ -1069,7 +1071,7 @@
 
 ## Counts
 
-- open: 373
+- open: 375
 - in_progress: 0
 - closed: 674
 - rejected: 3
