@@ -204,6 +204,24 @@ export function resolveRegisteredCriticCourseHistory({ repoRoot, featureId, cand
   return Object.freeze({ history: Object.freeze(history), historySha256: sha256Canonical(history), manifestPath, manifestSha256: current.sha256, candidateCommit });
 }
 
+/**
+ * The retained Critic course of a feature package as the CURRENT registration route writes it: lineage rows of schema v1 AND v2
+ * (`resolveRegisteredCriticCourseHistory` above keeps only v1 and stays the reader of the v1-only consumers). The close gate's
+ * course-chain cover (check-critic-skip-coverage.mjs, D217 B) reads the course through this function; with the v1-only reader a
+ * course registered by `register-feature-package.mjs --add-review-lineage` (v2 rows) read as "no course" and the close ended again in
+ * CLOSE-CRITIC-EVIDENCE-MISSING (W8 chain walk, 2026-10-31). Read-only; the rows are ordered by parentage and validated as a history.
+ */
+export function resolveRetainedCriticCourseRecords({ repoRoot, featureId, candidateCommit }) {
+  if (typeof repoRoot !== "string" || !isAbsolute(repoRoot)
+    || typeof featureId !== "string" || !FEATURE_ID.test(featureId)
+    || typeof candidateCommit !== "string" || !OID.test(candidateCommit)) fail("CCA-SOURCE-SHAPE");
+  let root;
+  try { root = realpathSync(repoRoot); } catch { fail("CCA-SOURCE-ROOT"); }
+  const retained = retainedV2(root, featureId, candidateCommit);
+  const history = retained.rows.map((row) => row.record);
+  return Object.freeze({ history: Object.freeze(history), historySha256: retained.historySha256, candidateCommit });
+}
+
 /** Bind the retained course to an actual Git range without trusting counters. */
 export function deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCommit, candidateCommit }) {
   if (typeof baseCommit !== "string" || !OID.test(baseCommit)) fail("CCA-RANGE-SHAPE");

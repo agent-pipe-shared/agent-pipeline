@@ -14,7 +14,7 @@ import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
 import { loadResidualAcceptanceDepsForPacket } from "../lib/critic-verify-readiness.mjs";
-import { resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
+import { resolveRetainedCriticCourseRecords } from "../lib/critic-course-admission.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
@@ -557,7 +557,8 @@ function defaultReadCourseHistory({ root, gitRead, criticPacketId }) {
   for (const entry of listing.split("\n").filter(Boolean).slice(0, COURSE_LINEAGE_FEATURE_LIMIT)) {
     const featureId = entry.replace(/^specs\//u, "");
     let resolved;
-    try { resolved = resolveRegisteredCriticCourseHistory({ repoRoot, featureId, candidateCommit: head }); } catch { continue; }
+    // The reader of the CURRENT registration route (lineage rows of schema v1 and v2), not the v1-only runtime reader.
+    try { resolved = resolveRetainedCriticCourseRecords({ repoRoot, featureId, candidateCommit: head }); } catch { continue; }
     if (Array.isArray(resolved?.history) && resolved.history.some((row) => row?.request?.packetId === criticPacketId)) { found = resolved.history; break; }
   }
   if (courseHistoryCache.size > 64) courseHistoryCache.clear();
