@@ -19,7 +19,9 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 import { auditCurrentRunnerSession } from "../lib/runner-own-session-audit.mjs";
-import { antigravityArtifactLayoutIsValid, artifactPathIsPhysical } from "../lib/current-session-artifact-export.mjs";
+import {
+  antigravityArtifactLayoutIsValid, artifactPathIsPhysical, consumeAntigravityHostHandoff, sweepAntigravityHostHandoffs,
+} from "../lib/current-session-artifact-export.mjs";
 import { isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
@@ -412,8 +414,11 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
 //                <...>/brain/<conversationId> and <artifactRoot>/.system_generated/logs/transcript.jsonl,
 //                resolved ONLY from the host context the Antigravity pretool hook supplies
 //                (`antigravityArtifactHost`, shaped by antigravityArtifactHostContext); no directory is listed or
-//                guessed, and no environment variable carries it, so the CLI (which cannot receive it) names that
-//                reason. The export is of the CURRENT conversation only. Child sessions are not recorded there.
+//                guessed. The CLI receives it from ONE place: the single-use, expiring handoff file the pretool hook
+//                writes (mode 0600, under the git common dir) for exactly this admitted argv of its own conversation
+//                (AC-175C, `main` -> exportFromCommandLine); no flag, path or environment variable carries it, and a
+//                missing or expired handoff is `antigravity-host-context-unavailable`, any other failure `-invalid`.
+//                The export is of the CURRENT conversation only. Child sessions are not recorded there.
 //
 // Turn model (emitted as `turns.model`): claude = one distinct assistant message.id (usage-ledger.mjs convention);
 // codex = one event_msg task_started record; antigravity = one turn.started record. A child's startTurnIndex is the
@@ -1051,13 +1056,33 @@ function parseArgs(argv) {
   };
 }
 
-export function main(argv = process.argv.slice(2)) {
+/**
+ * AC-175C: the CLI export for Antigravity. The host context comes from ONE place: the single-use handoff the pretool hook wrote
+ * for exactly this admitted argv of this conversation (lib/current-session-artifact-export.mjs). Claude and Codex never reach it.
+ * A missing or expired handoff leaves the context absent (`antigravity-host-context-unavailable`); a handoff that fails any
+ * binding is `antigravity-host-context-invalid`; the existing screens in exportRunnerTranscript then apply unchanged.
+ */
+function exportFromCommandLine(args, argv, seams) {
+  if (args.runner !== ANTIGRAVITY_RUNNER) return exportRunnerTranscript(args);
+  sweepAntigravityHostHandoffs({ root: args.rootDir });
+  const handed = consumeAntigravityHostHandoff({ root: args.rootDir, sessionId: args.sessionId, args: argv });
+  if (handed.status === "invalid") return unavailable(ANTIGRAVITY_RUNNER, "antigravity-host-context-invalid");
+  return exportRunnerTranscript({
+    ...args,
+    // The only seams: the two machine-plane lookups a test stubs. Nothing here can carry a host context.
+    ...(typeof seams.homedirFn === "function" ? { homedirFn: seams.homedirFn } : {}),
+    ...(isObject(seams.credentialScreen) ? { credentialScreen: seams.credentialScreen } : {}),
+    ...(handed.status === "consumed" ? { antigravityArtifactHost: handed.host } : {}),
+  });
+}
+
+export function main(argv = process.argv.slice(2), seams = {}) {
   const args = parseArgs(argv);
   const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
     if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
     if (args.operation === "list") return listRunnerTranscripts(args);
     if (args.operation === "read") return readRunnerTranscript(args);
-    if (args.operation === "export") return exportRunnerTranscript(args);
+    if (args.operation === "export") return exportFromCommandLine(args, argv, seams);
     return recoverRunnerTranscript(args);
   })();
   if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);

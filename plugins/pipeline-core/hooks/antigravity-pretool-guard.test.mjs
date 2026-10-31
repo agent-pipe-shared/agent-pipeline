@@ -9,9 +9,11 @@ import {
   mkdtempSync,
   mkdirSync,
   openSync,
+  readdirSync,
   realpathSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,6 +24,8 @@ import { createHash } from "node:crypto";
 
 import { inspectScratchShellScript, normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+// AC-175C: reached through a namespace so only the handoff cases fail on code without the helpers.
+import * as exportLib from "../lib/current-session-artifact-export.mjs";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
@@ -1542,6 +1546,97 @@ check("Antigravity pretool guard allows running a node script file, not inline c
 
   assert.equal(res.decision, "allow");
   rmSync(root, { recursive: true, force: true });
+});
+
+// AC-175C: the CLI transcript export cannot receive the host context on its argv, so the hook hands the context of THIS
+// conversation to the one admitted export command, through a private single-use file under the git common dir.
+const AGY_HANDOFF_CONVERSATION = "11111111-2222-4333-8444-555555555555";
+const AGY_HANDOFF_OTHER = "11111111-2222-4333-8444-666666666666";
+const recoveryScript = join(pluginRoot, "scripts", "runner-transcript-recovery.mjs");
+
+function agyHandoffFixture() {
+  const root = realpathSync(fixture());
+  execFileSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  const artifacts = join(root, "agy-home", "brain", AGY_HANDOFF_CONVERSATION);
+  mkdirSync(join(artifacts, ".system_generated", "logs"), { recursive: true });
+  const transcriptPath = join(artifacts, ".system_generated", "logs", "transcript.jsonl");
+  writeFileSync(transcriptPath, "{}\n");
+  const exportArgs = (overrides = {}) => {
+    const { id = AGY_HANDOFF_CONVERSATION, exclude = id, session = id, runner = "antigravity", operation = "export" } = overrides;
+    return [operation, "--root", root, "--runner", runner, "--exclude-session", exclude, "--session-id", session];
+  };
+  const commandFor = (args) => `node ${JSON.stringify(recoveryScript)} ${args.map((arg) => JSON.stringify(arg)).join(" ")}`;
+  const hostEnvelope = (command) => ({
+    conversationId: AGY_HANDOFF_CONVERSATION, artifactDirectoryPath: artifacts, transcriptPath,
+    toolCall: { name: "run_command", args: { CommandLine: command, Cwd: root } },
+  });
+  const host = { conversationId: AGY_HANDOFF_CONVERSATION, artifactDirectoryPath: artifacts, transcriptPath, workspacePaths: [root] };
+  const directory = () => exportLib.antigravityHostHandoffDirectory(root);
+  const files = () => (existsSync(directory()) ? readdirSync(directory()) : []);
+  return { root, exportArgs, commandFor, hostEnvelope, host, directory, files };
+}
+
+check("Antigravity pretool guard hands the host context of its own conversation to the admitted CLI export (AC-175C)", () => {
+  const f = agyHandoffFixture();
+  try {
+    const args = f.exportArgs();
+    const res = decision(run(f.hostEnvelope(f.commandFor(args)), f.root));
+    assert.equal(res.decision, "allow");
+    assert.deepEqual(f.files(), [`${AGY_HANDOFF_CONVERSATION}.json`]);
+    const file = join(f.directory(), `${AGY_HANDOFF_CONVERSATION}.json`);
+    assert.equal(lstatSync(file).mode & 0o777, 0o600);
+    const consumed = exportLib.consumeAntigravityHostHandoff({ root: f.root, sessionId: AGY_HANDOFF_CONVERSATION, args });
+    assert.equal(consumed.status, "consumed");
+    assert.deepEqual(consumed.host, f.host);
+    assert.deepEqual(f.files(), []);
+    // The same command with any other argv is not served by the handoff the hook wrote for this one.
+    run(f.hostEnvelope(f.commandFor(args)), f.root);
+    assert.equal(exportLib.consumeAntigravityHostHandoff({ root: f.root, sessionId: AGY_HANDOFF_CONVERSATION, args: f.exportArgs({ exclude: AGY_HANDOFF_OTHER }) }).status, "invalid");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard writes no handoff for another conversation, another runner, another form or a denied call (AC-175C)", () => {
+  const f = agyHandoffFixture();
+  try {
+    const cases = {
+      "a foreign session id": f.exportArgs({ session: AGY_HANDOFF_OTHER, exclude: AGY_HANDOFF_OTHER }),
+      "a foreign claimed session": f.exportArgs({ exclude: AGY_HANDOFF_OTHER }),
+      "the codex runner": f.exportArgs({ runner: "codex" }),
+      "the claude runner": f.exportArgs({ runner: "claude" }),
+      "the list operation": f.exportArgs({ operation: "list" }).slice(0, 6),
+      "an unadmitted extra flag": [...f.exportArgs(), "--host-context", "x"],
+    };
+    for (const [name, args] of Object.entries(cases)) {
+      run(f.hostEnvelope(f.commandFor(args)), f.root);
+      assert.deepEqual(f.files(), [], name);
+    }
+    // No hook-supplied conversation (the canonical envelope carries no host fields): nothing to hand over.
+    const canonical = decision(run({ tool_name: "Bash", tool_input: { command: f.commandFor(f.exportArgs()) } }, f.root));
+    assert.equal(canonical.decision, "allow");
+    assert.deepEqual(f.files(), []);
+    // A call the guard denies hands over nothing, even when it names the admitted export.
+    const marker = join(f.root, ".git", "agent-pipeline", "run", `session-${AGY_HANDOFF_CONVERSATION}`, "requires-bootstrap.pending");
+    mkdirSync(join(marker, ".."), { recursive: true });
+    writeFileSync(marker, "pending\n");
+    const denied = decision(run(f.hostEnvelope(f.commandFor(f.exportArgs())), f.root));
+    assert.equal(denied.decision, "deny");
+    assert.deepEqual(f.files(), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard clears stale handoffs on every shell call it admits (AC-175C)", () => {
+  const f = agyHandoffFixture();
+  try {
+    mkdirSync(f.directory(), { recursive: true, mode: 0o700 });
+    const stale = join(f.directory(), `${AGY_HANDOFF_OTHER}.json`);
+    const live = join(f.directory(), `${AGY_HANDOFF_CONVERSATION}.json`);
+    for (const path of [stale, live]) writeFileSync(path, "{}", { mode: 0o600 });
+    const old = new Date(Date.now() - 10 * 60_000);
+    utimesSync(stale, old, old);
+    // An unrelated read-only call that the governed, not-yet-ready lane admits.
+    const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: "git rev-parse HEAD", Cwd: f.root } } }, f.root));
+    assert.equal(res.decision, "allow", res.reason);
+    assert.deepEqual(f.files(), [`${AGY_HANDOFF_CONVERSATION}.json`]);  } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
 check("Antigravity start hint never creates .git before Git initialization", () => {

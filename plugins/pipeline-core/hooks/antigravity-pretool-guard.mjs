@@ -43,7 +43,12 @@ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispa
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
-import { antigravityArtifactHostContext, crossRepositoryDenialReason } from "../lib/current-session-artifact-export.mjs";
+import {
+  antigravityArtifactHostContext, antigravityArtifactLayoutIsValid, crossRepositoryDenialReason,
+  sweepAntigravityHostHandoffs, writeAntigravityHostHandoff,
+} from "../lib/current-session-artifact-export.mjs";
+import { TRANSCRIPT_RECOVERY_SCRIPT } from "../lib/guard/constants.mjs";
+import { resolveSanctionedScriptInvocation, sanctionedTranscriptRecoveryArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 
@@ -339,6 +344,35 @@ export function antigravityGuardPayload(input, normalized, projectRoot) {
     tool_use_id: input?.tool_use_id ?? input?.toolUseId,
     antigravity_artifact_host: antigravityArtifactHostContext(input),
   };
+}
+
+/**
+ * AC-175C. Runs only for a shell call this hook is about to ADMIT. (1) Clears handoffs older than their lifetime, so no
+ * handoff outlives its use: this hook sees every admitted shell call, which makes it the mandatory path for the routine.
+ * (2) For the one command that needs it -- the sanctioned `runner-transcript-recovery.mjs export` of runner antigravity, whose
+ * `--session-id` and `--exclude-session` both name the conversation THIS envelope belongs to -- writes the host context this
+ * envelope carries into a single-use handoff bound to that conversation, project root and exact argv. Every other command,
+ * runner, conversation or form writes nothing. A failure to write is a diagnostic, never a denial: the CLI then answers
+ * `antigravity-host-context-unavailable`, exactly as before this handoff existed.
+ */
+function handOffAntigravityHostContext({ input, command, projectRoot, toolName }) {
+  if (toolName !== "Bash") return;
+  try {
+    sweepAntigravityHostHandoffs({ root: projectRoot });
+    const host = antigravityArtifactHostContext(input);
+    if (host === undefined) return;
+    const invocation = resolveSanctionedScriptInvocation(command, projectRoot);
+    if (invocation === null || invocation.script !== TRANSCRIPT_RECOVERY_SCRIPT) return;
+    const { args } = invocation;
+    if (args[0] !== "export" || !sanctionedTranscriptRecoveryArgs(args, projectRoot)) return;
+    const value = (flag) => args[args.indexOf(flag) + 1];
+    if (value("--runner") !== "antigravity" || value("--session-id") !== host.conversationId
+      || value("--exclude-session") !== host.conversationId || !antigravityArtifactLayoutIsValid(host, projectRoot)) return;
+    const written = writeAntigravityHostHandoff({ root: projectRoot, host, args });
+    if (written.status !== "written") diagnostic("antigravity-host-handoff-not-written", { reason: written.reason });
+  } catch (error) {
+    diagnostic("antigravity-host-handoff-failed", { name: error?.name, code: error?.code });
+  }
 }
 
 function isNativeImplementationSubagent(entry) {
@@ -1099,6 +1133,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   }
 
   if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
+  handOffAntigravityHostContext({ input, command, projectRoot, toolName });
   allow();
 }
 
