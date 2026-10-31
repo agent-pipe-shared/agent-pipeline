@@ -150,7 +150,7 @@ function normalizeRepoPath(root, repoPath) {
 function trackedPaths(root, repoPaths) {
   const paths = [...new Set(repoPaths.filter((value) => typeof value === "string" && value.trim() !== ""))];
   if (paths.length === 0) return { state: "known", tracked: new Set() };
-  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8" });
+  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
   if (!isSuccessfulSpawn(probe)) return { state: "indeterminate", tracked: new Set() };
   return { state: "known", tracked: new Set(probe.stdout.split("\0").filter((entry) => entry !== "")) };
 }

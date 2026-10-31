@@ -754,7 +754,7 @@ function posixPath(value) {
 }
 
 function gitListPlugin(root) {
-  const result = spawnSync("git", ["ls-files", "-z", "--", SCAN_PREFIX], { cwd: root, encoding: "buffer" });
+  const result = spawnSync("git", ["ls-files", "-z", "--", SCAN_PREFIX], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
   return decoder
     .decode(result.stdout)
