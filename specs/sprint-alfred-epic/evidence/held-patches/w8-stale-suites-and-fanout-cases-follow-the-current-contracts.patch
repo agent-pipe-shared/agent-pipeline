@@ -1,0 +1,1129 @@
+diff --git a/backlog/items/2026-10-28-critic-range-with-state-or-handover-files-has-no-admissible-briefing.md b/backlog/items/2026-10-28-critic-range-with-state-or-handover-files-has-no-admissible-briefing.md
+index 33fe7ea21..8933ea3ed 100644
+--- a/backlog/items/2026-10-28-critic-range-with-state-or-handover-files-has-no-admissible-briefing.md
++++ b/backlog/items/2026-10-28-critic-range-with-state-or-handover-files-has-no-admissible-briefing.md
+@@ -4,6 +4,7 @@ id: pipeline.critic-range-with-state-or-handover-files-has-no-admissible-briefin
+ type: defect
+ owner: pipeline
+ status: open
++done_when: manual
+ created: 2026-10-28
+ sprint: alfred
+ source: "Hit live, 2026-10-28, by a consumer repository: a feature-course Critic stopped with a briefing violation before reading anything; checked afterwards against templates/prompts/critic-review.md, harness/review-protocol.md section 2.2 and roles/critic.md."
+diff --git a/backlog/items/2026-10-31-close-addendum-ignores-residual-acceptance-and-course-chain.md b/backlog/items/2026-10-31-close-addendum-ignores-residual-acceptance-and-course-chain.md
+index 3af59d40e..d5c02347b 100644
+--- a/backlog/items/2026-10-31-close-addendum-ignores-residual-acceptance-and-course-chain.md
++++ b/backlog/items/2026-10-31-close-addendum-ignores-residual-acceptance-and-course-chain.md
+@@ -4,6 +4,7 @@ id: pipeline.close-addendum-ignores-residual-acceptance-and-course-chain
+ type: defect
+ owner: pipeline
+ status: open
++done_when: manual
+ release: 0.7.0
+ created: 2026-10-31
+ sprint: alfred
+diff --git a/backlog/items/2026-10-31-critic-full-fallback-round-bindings-and-finding-disposition-role.md b/backlog/items/2026-10-31-critic-full-fallback-round-bindings-and-finding-disposition-role.md
+index 8ac6d57ee..214003286 100644
+--- a/backlog/items/2026-10-31-critic-full-fallback-round-bindings-and-finding-disposition-role.md
++++ b/backlog/items/2026-10-31-critic-full-fallback-round-bindings-and-finding-disposition-role.md
+@@ -4,6 +4,7 @@ id: pipeline.critic-full-fallback-round-bindings-and-finding-disposition-role
+ type: defect
+ owner: pipeline
+ status: open
++done_when: manual
+ release: 0.7.0
+ created: 2026-10-31
+ sprint: alfred
+diff --git a/backlog/items/2026-10-31-push-review-waiver-has-no-committed-approval-evidence.md b/backlog/items/2026-10-31-push-review-waiver-has-no-committed-approval-evidence.md
+index d1a62c15f..d86be7e5d 100644
+--- a/backlog/items/2026-10-31-push-review-waiver-has-no-committed-approval-evidence.md
++++ b/backlog/items/2026-10-31-push-review-waiver-has-no-committed-approval-evidence.md
+@@ -4,6 +4,7 @@ id: pipeline.push-review-waiver-has-no-committed-approval-evidence
+ type: defect
+ owner: pipeline
+ status: open
++done_when: manual
+ release: 0.7.0
+ created: 2026-10-31
+ sprint: alfred
+diff --git a/docs/state.md b/docs/state.md
+index 91a58e2ef..920568dcb 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -383,3 +383,13 @@ Feature remains active in implementation. Push preparation follows after all
+ handover writes are committed; no new candidate-bound signature is claimed
+ here. Read actual local/remote Git OIDs on the next machine rather than
+ inferring a completed transfer from this plan.
++
++Retained Sentinel Epic authority (`governance/spec-retention.json`, archive
++`docs/spec-archive/2026-07-20-sentinel-recovery/`):
++[PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md),
++[Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md),
++[acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md),
++[reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md),
++[recovery](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md),
++[platform support](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md),
++[Windows blockers](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index e5273e69f..da1b99b7d 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -122,7 +122,27 @@
+           "TCP030",
+           "TCP031",
+           "TCP032",
+-          "TCP033"
++          "TCP033",
++          "TCP034",
++          "TCP035",
++          "TCP036",
++          "TCP037",
++          "TCP038",
++          "TCP039",
++          "TCP040",
++          "TCP041",
++          "TCP042",
++          "TCP043",
++          "TCP044",
++          "TCP045",
++          "TCP046",
++          "TCP047",
++          "TCP048",
++          "TCP049",
++          "TCP050",
++          "TCP051",
++          "TCP052",
++          "TCP053"
+         ],
+         "maxBytes": 65536
+       }
+@@ -214,9 +234,13 @@
+           "DABX005",
+           "DABX006",
+           "DABX007",
+-          "DABX008"
++          "DABX008",
++          "DABX009",
++          "DABX010",
++          "DABX011",
++          "DABX012"
+         ],
+-        "maxBytes": 16384
++        "maxBytes": 65536
+       }
+     },
+     {
+@@ -277,6 +301,11 @@
+       "caseCompletion": {
+         "schema": "pipeline.verify-case-completion-policy.v1",
+         "caseIds": [
++          "D177-a-memo-per-admission",
++          "D177-b-member-records-once-per-admission",
++          "D177-c-batch-member-records-equal-single",
++          "D177-differential-settled",
++          "D177-slow-phase-releases-lock",
+           "NGHS01",
+           "NGHS02",
+           "NGHS03",
+@@ -295,7 +324,47 @@
+           "NGHS16",
+           "NGHS17",
+           "NGHS18",
+-          "NGHS19"
++          "NGHS19",
++          "NGHS20",
++          "NGHS21",
++          "NGHS22",
++          "NGHS23",
++          "NGHS24",
++          "NGHS25",
++          "NGHS26",
++          "NGHS27",
++          "NGHS28",
++          "NGHS29",
++          "NGHS30",
++          "NGHS31",
++          "NGHS32",
++          "NGHS33",
++          "NGHS34",
++          "NGHS35",
++          "NGHS36",
++          "NGHS37",
++          "NGHS38",
++          "NGHS39",
++          "NGHS40",
++          "NGHS41",
++          "NGHS42",
++          "NGHS43",
++          "NGHS44",
++          "NGHS45",
++          "NGHS46",
++          "NGHS47",
++          "NGHS48",
++          "NGHS49",
++          "NGHS50",
++          "NGHS51",
++          "NGHS52",
++          "NGHS53",
++          "NGHS54",
++          "NGHS55",
++          "NGHS56",
++          "NGHS57",
++          "NGHS58",
++          "NGHS59"
+         ],
+         "maxBytes": 65536
+       }
+@@ -499,9 +568,36 @@
+         "schema": "pipeline.verify-case-completion-policy.v1",
+         "caseIds": [
+           "NGHF01",
++          "NGHF01-DEEP",
++          "NGHF01-P3",
+           "NGHF02",
+           "NGHF03",
+-          "NGHF04"
++          "NGHF04",
++          "NGHF05",
++          "NGHF06",
++          "NGHF07",
++          "NGHF08",
++          "NGHF09",
++          "NGHF10",
++          "NGHF11",
++          "NGHF12",
++          "NGHF13",
++          "NGHF14",
++          "NGHF15",
++          "NGHF16",
++          "NGHF17",
++          "NGHF18",
++          "NGHF18b",
++          "NGHF18c",
++          "NGHF19",
++          "NGHF20",
++          "NGHF21",
++          "NGHF22",
++          "NGHF23",
++          "NGHF24",
++          "NGHF25",
++          "NGHF26",
++          "NGHF27"
+         ],
+         "maxBytes": 65536
+       }
+@@ -606,6 +702,31 @@
+           "CGB009",
+           "CGB010",
+           "CGB011",
++          "CGB012",
++          "CGB013",
++          "CGB014",
++          "CGB015",
++          "CGB016",
++          "CGB017",
++          "CGB018",
++          "CGB019",
++          "CGB020",
++          "CGB021",
++          "CGB022",
++          "CGB023",
++          "CGB024",
++          "CGB025",
++          "CGB026",
++          "CGB027",
++          "CGB028",
++          "CGB029",
++          "CGB030",
++          "CGB031",
++          "CGB032",
++          "CGB033",
++          "CGB034",
++          "CGB035",
++          "CGB036",
+           "CGB037",
+           "CGB038"
+         ],
+@@ -698,7 +819,23 @@
+           "DLR033",
+           "DLR034",
+           "DLR035",
+-          "DLR036"
++          "DLR036",
++          "DLR037",
++          "DLR038",
++          "DLR039",
++          "DLR040",
++          "DLR041",
++          "DLR042",
++          "DLR043",
++          "DLR044",
++          "DLR045",
++          "DLR046",
++          "DLR047",
++          "DLR048",
++          "DLR049",
++          "DLR050",
++          "DLR051",
++          "DLR052"
+         ],
+         "maxBytes": 65536
+       }
+@@ -907,7 +1044,8 @@
+           "PCF033",
+           "PCF034",
+           "PCF035",
+-          "PCF036"
++          "PCF036",
++          "PCF037"
+         ],
+         "maxBytes": 65536
+       }
+@@ -918,7 +1056,9 @@
+       "caseCompletion": {
+         "schema": "pipeline.verify-case-completion-policy.v1",
+         "caseIds": [
+-          "PHARI001"
++          "PHARI001",
++          "PHARI002",
++          "PHARI003"
+         ],
+         "maxBytes": 65536
+       }
+@@ -1061,7 +1201,9 @@
+         "caseIds": [
+           "GDM01",
+           "GDM02",
+-          "GDM03"
++          "GDM03",
++          "GDM04",
++          "GDM05"
+         ],
+         "maxBytes": 65536
+       }
+@@ -1111,7 +1253,18 @@
+           "DMP003",
+           "DMP004",
+           "DMP005",
+-          "DMP006"
++          "DMP006",
++          "DMP007",
++          "DMP008",
++          "DMP009",
++          "DMP010",
++          "DMP011",
++          "DMP012",
++          "DMP013",
++          "DMP014",
++          "DMP015",
++          "DMP016",
++          "DMP017"
+         ],
+         "maxBytes": 65536
+       }
+@@ -1131,7 +1284,37 @@
+           "SAR07",
+           "SAR08",
+           "SAR09",
+-          "SAR10"
++          "SAR10",
++          "SAR11",
++          "SAR12",
++          "SAR13",
++          "SAR14",
++          "SAR15",
++          "SAR16",
++          "SAR17",
++          "SAR18",
++          "SAR19",
++          "SAR20",
++          "SAR21",
++          "SAS01",
++          "SAS02",
++          "SAS03",
++          "SAS04",
++          "SAS05",
++          "SAS06",
++          "SAS07",
++          "SAS08",
++          "SAS09",
++          "SAS10",
++          "SAS11",
++          "SAS12",
++          "SAS13",
++          "SAS14",
++          "SAS15",
++          "SAS16",
++          "SAS17",
++          "SAS18",
++          "SAS19"
+         ],
+         "maxBytes": 65536
+       }
+@@ -1149,7 +1332,8 @@
+           "GND005",
+           "GND006",
+           "GND007",
+-          "GND008"
++          "GND008",
++          "GND009"
+         ],
+         "maxBytes": 65536
+       }
+@@ -1569,7 +1753,23 @@
+           "OBC305",
+           "OBC306",
+           "OBC307",
+-          "OBC308"
++          "OBC308",
++          "OBC309",
++          "OBC310",
++          "OBC311",
++          "OBC312",
++          "OBC313",
++          "OBC314",
++          "OBC315",
++          "OBC316",
++          "OBC317",
++          "OBC318",
++          "OBC319",
++          "OBC320",
++          "OBC321",
++          "OBC322",
++          "OBC323",
++          "OBC324"
+         ],
+         "maxBytes": 65536
+       }
+@@ -2267,6 +2467,292 @@
+         "maxBytes": 65536
+       },
+       "previousPolicySha256": "7d8f44eb0fd795b4c1191c50bd3077593412291de402fdab28f3d9b544e73bfa"
++    },
++    {
++      "name": "native-goldfish-host-return-tests",
++      "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "NGHR01",
++          "NGHR02",
++          "NGHR03",
++          "NGHR04",
++          "NGHR05",
++          "NGHR06",
++          "NGHR07",
++          "NGHR08",
++          "NGHR09"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "0c71ffc24e73864142d2e1e498f88ece2cc02372ada9e358184c237b4211f5c1"
++    },
++    {
++      "name": "native-goldfish-host-commit-execution-tests",
++      "file": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "NGHC01",
++          "NGHC02",
++          "NGHC03",
++          "NGHC04",
++          "NGHC05",
++          "NGHC06",
++          "NGHC07"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "e1cacc0b56a2f35c6bde434ba7cd4ccac2d58e034576b5a3273951234abafb88"
++    },
++    {
++      "name": "security-scanner-diagnostics-tests",
++      "file": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G13D001",
++          "G13D002",
++          "G13D003",
++          "G13D004",
++          "G13D005",
++          "G13D006",
++          "G13D007",
++          "G13D008",
++          "G13D009",
++          "G13D010",
++          "G13D011",
++          "G13D012",
++          "G13D013",
++          "G13D014",
++          "G13D015",
++          "G13D016",
++          "G13D017",
++          "G13D018",
++          "G13D019",
++          "G13D020",
++          "G13D021",
++          "G13D022",
++          "G13D023",
++          "G13D024",
++          "G13D025",
++          "G13D026",
++          "G13D027",
++          "G13D028",
++          "G13D029",
++          "G13D030",
++          "G13D031",
++          "G13D032"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "917569eda892d43004893a058773e5d2f8d681bc0957e1c88db7da19c2d6a45b"
++    },
++    {
++      "name": "audit-pack-tests",
++      "file": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "AUDPK001",
++          "AUDPK002",
++          "AUDPK003",
++          "AUDPK004",
++          "AUDPK005"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "6783f021b91181551f53f3a61693cefa7409224fd02b9119bfd3a7ef031bcb83"
++    },
++    {
++      "name": "guard-dispatch-budget-checkpoint-tests",
++      "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "GDBC01",
++          "GDBC02",
++          "GDBC03",
++          "GDBC04",
++          "GDBC05",
++          "GDBC06",
++          "GDBC07",
++          "GDBC08",
++          "GDBC09",
++          "GDBC10",
++          "GDBC11",
++          "GDBC12",
++          "GDBC13",
++          "GDBC14",
++          "GDBC15",
++          "GDBC16",
++          "GDBC17"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "f0fec1c695d45695bf7c42b25743dd7f91c87a6994db5dad489dba485a4d4361"
++    },
++    {
++      "name": "windows-authority-readiness-tests",
++      "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "WAR001",
++          "WAR002",
++          "WAR003",
++          "WAR004",
++          "WAR005",
++          "WAR006",
++          "WAR007",
++          "WAR008",
++          "WAR009",
++          "WAR010",
++          "WAR011",
++          "WAR012",
++          "WAR013",
++          "WAR014",
++          "WAR015",
++          "WAR016",
++          "WAR017",
++          "WAR018"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "134079dd4f20353556fbb5f0fb1021f5cd1bf81e4e4a6c5d5bb015216b9f8527"
++    },
++    {
++      "name": "po-human-approval-signing-handoff-tests",
++      "file": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHS001",
++          "PHS002",
++          "PHS003",
++          "PHS004",
++          "PHS005"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "3296d11fc9b8299491720967123600f0bcc73e4a9270307b09a81b85737c9e08"
++    },
++    {
++      "name": "current-session-artifact-export-tests",
++      "file": "plugins/pipeline-core/lib/current-session-artifact-export.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G13A001",
++          "G13A002",
++          "G13A003",
++          "G13A004",
++          "G13A005",
++          "G13A006",
++          "G13A007"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "72d461d271d62e0d1896c4cde4c4996584f3e30eff34d5e3f498134d89ed17db"
++    },
++    {
++      "name": "public-handover-duty-tests",
++      "file": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHD001",
++          "PHD002",
++          "PHD003",
++          "PHD004",
++          "PHD005",
++          "PHD006",
++          "PHD007",
++          "PHD008",
++          "PHD009",
++          "PHD010",
++          "PHD011"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "07950603a5b00c3fd299ab9b54742a41fd66dd97dfbf740bed2f2f82140424b5"
++    },
++    {
++      "name": "model-family-host-store-tests",
++      "file": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "MFHS001",
++          "MFHS002",
++          "MFHS003",
++          "MFHS004",
++          "MFHS005",
++          "MFHS006",
++          "MFHS007",
++          "MFHS008",
++          "MFHS009",
++          "MFHS010",
++          "MFHS011",
++          "MFHS012",
++          "MFHS013",
++          "MFHS014",
++          "MFHS015",
++          "MFHS016",
++          "MFHS017",
++          "MFHS018",
++          "MFHS019",
++          "MFHS020",
++          "MFHS021",
++          "MFHS022",
++          "MFHS023",
++          "MFHS024",
++          "MFHS025",
++          "MFHS026",
++          "MFHS027",
++          "MFHS028",
++          "MFHS029",
++          "MFHS030",
++          "MFHS031",
++          "MFHS032",
++          "MFHS033"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "8bb81e781d515407c22b048ce90f10301a3c25cfe4938be570bbb769def1cea1"
++    },
++    {
++      "name": "codex-advisor-execution-tests",
++      "file": "plugins/pipeline-core/lib/codex-advisor-execution.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "RC06C001",
++          "RC06C002",
++          "RC06C003",
++          "RC06C004",
++          "RC06C005",
++          "RC06C006",
++          "RC06C007",
++          "RC06C008"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "2e43543da0924c3c52d8086e6d1a12700143e9eebdd7aabf4401031610d0e2b9"
++    },
++    {
++      "name": "design-workflow-package-v2-tests",
++      "file": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "RC12C001",
++          "RC12C002"
++        ],
++        "maxBytes": 65536
++      },
++      "previousPolicySha256": "2d3dcca820d8757f48b8cb01e5bbbb2d7e868d50c2e519580a1b62cf186dd745"
+     }
+   ]
+ }
+diff --git a/harness/scripts/wire-dispatch-budget-hook.mjs b/harness/scripts/wire-dispatch-budget-hook.mjs
+index 216872e3d..4919ba041 100644
+--- a/harness/scripts/wire-dispatch-budget-hook.mjs
++++ b/harness/scripts/wire-dispatch-budget-hook.mjs
+@@ -248,7 +248,7 @@ function binaryContainsAny(path, needles) {
+ 
+ const HOOKS_ANCHOR = [
+   '            "command": "node \\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\\"",\n',
+-  '            "timeout": 120\n',
++  '            "timeout": 330\n',
+   "          }\n",
+   "        ]\n",
+   "      },\n",
+diff --git a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+index 5155a0c7e..704290427 100644
+--- a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+@@ -248,10 +248,15 @@ function freshGeneratedConsumerFixture() {
+     const originalMaterial = "Document the original fixture material only.\n";
+     // The public route captures original material before its first restart;
+     // follow the producer's returned action rather than assuming runtime first.
+-    const consented = applyCollectedOnboardingAction(root, portable, {
++    // G15 / D210: the first round is one merged ask; the intake consent step travels as its `precedingApplyAction`
++    // (it also captures the original material), the typed initial-answers command stays unexecuted as before.
++    const mergedAsk = portable.nextAction?.pendingAsks?.find((candidate) => candidate?.precedingApplyAction !== undefined);
++    const consentStep = mergedAsk === undefined ? portable : { nextAction: { kind: "collect-input", applyAction: mergedAsk.precedingApplyAction } };
++    const consented = applyCollectedOnboardingAction(root, consentStep, {
+       "<PO_INTAKE_GIT_AUTHOR_NAME>": "Greenfield Fixture",
+       "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "greenfield@example.invalid",
+       "<PO_INTAKE_LANGUAGE>": "en",
++      "<de|en>": "en",
+       "<PO_INTAKE_PROFILE>": "feature",
+     }, originalMaterial);
+     const runtimePlan = runOnboarding(root, ["plan-runtime", "--root", root, "--runner", "codex"]);
+@@ -499,8 +504,24 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
+     const prdPath = join(created.root, prd);
+     const specPath = join(created.root, spec);
+     const scratchPath = join(created.root, "scratch", "nested", "greenfield-boundary.md");
+-    const prdBytes = `${readFileSync(prdPath, "utf8")}\nReviewed fixture wording.\n`;
+-    const specBytes = `${readFileSync(specPath, "utf8")}\nReviewed fixture specification.\n`;
++    // Since 5e939278b the generated staging PRD and Spec must be authored (draft framing and REPLACE markers removed) before
++    // bootstrap binding is offered, so the persisted bytes are the minimal authored package the way project-onboarding-e2e.test.mjs writes it.
++    const draftPrd = readFileSync(prdPath, "utf8");
++    const draftSpec = readFileSync(specPath, "utf8");
++    const draftSpecDigest = draftPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
++    assert.match(draftSpecDigest ?? "", /^[a-f0-9]{64}$/u);
++    const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
++    const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
++    assert.ok(draftSpec.includes(skeletonCriterion) && draftSpec.includes(skeletonTraceability));
++    const specBytes = draftSpec
++      .replace(skeletonCriterion, "| AC-1 | WHEN a guard fixture is requested, the system SHALL admit generated staging authoring. | tests/guard.test.mjs |")
++      .replace(skeletonTraceability, "| design-input.md | Generated staging authoring is admitted. | AC-1 | tests/guard.test.mjs |");
++    const prdBytes = draftPrd
++      .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
++      .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Guard fixture."')
++      .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the fixture."')
++      .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "guard-fixture"')
++      .replace(draftSpecDigest, sha256(specBytes));
+     const scratchBytes = "bounded scratch evidence\n";
+     writeFileSync(prdPath, prdBytes, "utf8");
+     writeFileSync(specPath, specBytes, "utf8");
+@@ -509,17 +530,7 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
+     assert.equal(readFileSync(prdPath, "utf8"), prdBytes);
+     assert.equal(readFileSync(specPath, "utf8"), specBytes);
+     assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
+-    const markerPending = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
+-    assert.equal(markerPending.status, "bootstrap-binding-required", JSON.stringify(markerPending));
+-    assert.equal(markerPending.nextAction?.kind, "command", JSON.stringify(markerPending));
+-    assert.equal(markerPending.nextAction.argv[1], "intake-spec-marker-apply", JSON.stringify(markerPending));
+-    assert.equal(markerPending.nextAction.requiresConfirmation, false);
+-    const markerDigestIndex = markerPending.nextAction.argv.indexOf("--plan-sha256");
+-    assert.notEqual(markerDigestIndex, -1);
+-    assert.match(markerPending.nextAction.argv[markerDigestIndex + 1], /^[a-f0-9]{64}$/u);
+-    const markerRepaired = followOnboardingAction(created.root, markerPending, "intake-spec-marker-apply");
+-    assert.equal(markerRepaired.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+-    assert.equal(markerRepaired.status, "applied", JSON.stringify(markerRepaired));
++    // The authored package carries its Spec digest, so no marker repair step is offered between authoring and binding.
+     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
+     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
+     // This fixture uses the "feature" intake profile. Since 1bd1d7bf6 a feature/epic
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
+index 1390dfd95..aefaffbeb 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
+@@ -37,6 +37,7 @@ import { appendEvent, fanoutStatePath, readEvents } from "../lib/fanout-ledger.m
+ import { HANDBACK_OUTCOMES, loadSliceQueue } from "../lib/slice-queue.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
++import { buildGeneratedGoldfishBriefing, prepareGeneratedDispatchRoot } from "../lib/test-generated-goldfish-briefing-fixture.mjs";
+ 
+ const gd = await import("./guard-dispatch.mjs");
+ const dp = await import("../lib/dispatch-policy.mjs");
+@@ -489,18 +490,29 @@ function requireEnrollment() {
+   assert.equal(observeGovernanceScope({ rootDir: hookRepo }).requiresEnforcement, true, "the fixture repository must be governance-enrolled");
+ }
+ 
+-function runHook(c, prompt, config) {
+-  writeFileSync(join(hookRepo, "slice-queue.json"), `${JSON.stringify(QUEUE, null, 2)}\n`);
+-  const payload = { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt } };
+-  const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo, PIPELINE_FANOUT_CONFIG: JSON.stringify({ queuePath: "slice-queue.json", commonDir: c.commonDir, ...config }) };
+-  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
++// D185 (2026-10-29): a write-capable dispatch needs a Goldfish carrier and a briefing from the generator, which resolves against an approved
++// course, so each hook-level case runs in its own approved-course repository (an admitted dispatch reserves its slice and write scope) with
++// a generated briefing. The queue below declares B1 with its check file, because the briefing's write scope is its paths plus the check.
++const HOOK_QUEUE = queueOf([slice("A1", ["src/a/"]), slice("B1", ["src/a/x.mjs", "src/a/x.test.mjs"], ["A1"]), slice("C1", ["src/c/"])]);
++function hookBriefing(repo, sliceId, paths) {
++  const check = `${paths[0].replace(/\.mjs$/u, "")}.test.mjs`;
++  return buildGeneratedGoldfishBriefing(repo, sliceId, { paths, check, newFiles: [...paths, check] });
++}
++function hookPayload(repo, prompt) {
++  return { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: repo, tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt } };
++}
++function runHook(c, repo, prompt, config) {
++  writeFileSync(join(repo, "slice-queue.json"), `${JSON.stringify(HOOK_QUEUE, null, 2)}\n`);
++  const env = { ...process.env, CLAUDE_PROJECT_DIR: repo, PIPELINE_FANOUT_CONFIG: JSON.stringify({ queuePath: "slice-queue.json", commonDir: c.commonDir, ...config }) };
++  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(hookPayload(repo, prompt)), env, encoding: "utf8", cwd: repo });
+ }
+ 
+ test("hook: shadow + overlap exits 0 and appends the launch", { skip: enrollmentSkip ?? false }, () => {
+   requireEnrollment();
+-  const c = makeCase("hook-shadow");
++  const c = makeCase("hook-shadow", HOOK_QUEUE);
+   makeLive(c, "A1");
+-  const result = runHook(c, overlapB1, {});
++  const repo = courseRepo("hook-shadow");
++  const result = runHook(c, repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]), {});
+   assert.equal(result.status, 0, result.stderr);
+   assert.doesNotMatch(result.stderr, /BLOCKED/u);
+   assert.ok(ledger(c).some((e) => e.type === "launch" && e.sliceId === "B1"));
+@@ -509,9 +521,10 @@ test("hook: shadow + overlap exits 0 and appends the launch", { skip: enrollment
+ 
+ test("hook: enforce + overlap exits 2 naming FANOUT-SCOPE-OVERLAP and appends no launch", { skip: enrollmentSkip ?? false }, () => {
+   requireEnrollment();
+-  const c = makeCase("hook-enforce");
++  const c = makeCase("hook-enforce", HOOK_QUEUE);
+   makeLive(c, "A1");
+-  const result = runHook(c, declaredB1, { mode: "enforce" });
++  const repo = courseRepo("hook-enforce");
++  const result = runHook(c, repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]), { mode: "enforce" });
+   assert.equal(result.status, 2, result.stderr);
+   assert.match(result.stderr, /FANOUT-SCOPE-OVERLAP/u);
+   assert.equal(ledger(c).filter((e) => e.type === "launch" && e.sliceId === "B1").length, 0);
+@@ -519,9 +532,10 @@ test("hook: enforce + overlap exits 2 naming FANOUT-SCOPE-OVERLAP and appends no
+ 
+ test("hook: enforce + the same slice already live exits 2 naming FANOUT-SLICE-NOT-READY", { skip: enrollmentSkip ?? false }, () => {
+   requireEnrollment();
+-  const c = makeCase("hook-not-ready");
++  const c = makeCase("hook-not-ready", HOOK_QUEUE);
+   makeLive(c, "A1");
+-  const result = runHook(c, `Implement it.\nSlice: A1\n${MODEL}Write scope: src/a/\n`, { mode: "enforce" });
++  const repo = courseRepo("hook-not-ready");
++  const result = runHook(c, repo, hookBriefing(repo, "A1", ["src/a/y.mjs"]), { mode: "enforce" });
+   assert.equal(result.status, 2, result.stderr);
+   assert.match(result.stderr, /FANOUT-SLICE-NOT-READY/u);
+   assert.equal(ledger(c).filter((e) => e.type === "launch" && e.sliceId === "A1").length, 1, "only the fixture's own launch exists");
+@@ -530,10 +544,11 @@ test("hook: enforce + the same slice already live exits 2 naming FANOUT-SLICE-NO
+ test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentSkip ?? false }, () => {
+   requireEnrollment();
+   const c = makeCase("hook-noconfig");
+-  const payload = { tool_name: "Agent", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: overlapB1 } };
+-  const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo };
++  const repo = courseRepo("hook-noconfig");
++  const payload = hookPayload(repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]));
++  const env = { ...process.env, CLAUDE_PROJECT_DIR: repo };
+   delete env.PIPELINE_FANOUT_CONFIG;
+-  const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
++  const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: repo });
+   assert.equal(result.status, 0, result.stderr);
+   assert.equal(existsSync(ledgerPath(c)), false);
+ });
+@@ -543,25 +558,31 @@ test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentS
+ // judged by the declared write scopes alone: no PIPELINE_FANOUT_CONFIG, no queue. The default is enforce; the explicit
+ // switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. Each case uses its own enrolled repository, because an open
+ // dispatch record of one case must not be seen by another.
+-const goldfishTemplate = () => {
+-  const raw = readFileSync(fileURLToPath(new URL("../../../templates/prompts/goldfish-task.md", import.meta.url)), "utf8");
+-  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
+-  return raw.slice(raw.indexOf(marker) + marker.length)
+-    .replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
+-    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses")
+-    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
+-};
+-const scoped = (id, scope) => `${goldfishTemplate()}\n${id === null ? "" : `Slice: ${id}\n`}${scope === null ? "" : `Write scope: ${scope}\n`}`;
++// D185 (2026-10-29): every productive Goldfish dispatch is admitted only with a briefing from the generator, which resolves against an
++// approved course. A batch (several dispatches in one call, the Antigravity and Workflow shape) has no item reservation adapter, so an
++// item-governed repository refuses it as a class (SQ-NATIVE-ITEM-ADMISSION-REQUIRED); the K93 cases therefore dispatch into an enrolled
++// repository that is NOT item governed (the shape guard-dispatch.test.mjs uses for its other batch cases), with briefings that the real
++// generator rendered in one approved-course repository. The briefing's write scope is the package paths plus its check file, so the
++// check is named per slice (inside no overlapping scope) and, like a scope the dispatch creates, listed as a new file.
++const scopeRepos = [];
++process.once("exit", () => { for (const repo of scopeRepos) rmSync(repo, { recursive: true, force: true }); });
++function courseRepo(name) {
++  const repo = prepareGeneratedDispatchRoot(`fanout-${name}-`);
++  scopeRepos.push(repo);
++  return repo;
++}
+ function scopeRepo(name) {
+   const repo = join(root, name);
+   mkdirSync(join(repo, ".claude"), { recursive: true });
+   execFileSync("git", ["init", "-q"], { cwd: repo });
+   recordConsentGiven({ rootDir: repo });
+-  // Enrolled but NOT item governed (the shape guard-dispatch.test.mjs uses for its productive Goldfish cases).
++  // Enrolled but NOT item governed.
+   writeFileSync(join(repo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+   writeFileSync(join(repo, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+   return repo;
+ }
++let generatorRoot = null;
++const scoped = (id, paths) => buildGeneratedGoldfishBriefing(generatorRoot ??= courseRepo("generator"), id, { paths, check: `k93/${id}.test.mjs`, newFiles: [...paths, `k93/${id}.test.mjs`] });
+ function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
+   const Subagents = prompts.map((Prompt) => ({ TypeName: "pipeline-core:goldfish-implementor", Prompt }));
+   const payload = { tool_name: "invoke_subagent", tool_use_id: "toolu_k93", session_id: SESSION, cwd: repo, tool_input: { Subagents, ...toolInput } };
+@@ -573,7 +594,7 @@ function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
+ 
+ test("K93 hook: two dispatches of one call with overlapping write scopes are refused by default, without a queue, naming both, the paths and the repair", { skip: enrollmentSkip ?? false }, () => {
+   const repo = scopeRepo("k93-enforce");
+-  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs, src/shared/b.mjs, src/own/x.mjs"), scoped("K93-BETA", "src/shared/")]);
++  const result = runBatch(repo, [scoped("K93-ALPHA", ["src/shared/a.mjs", "src/shared/b.mjs", "src/own/x.mjs"]), scoped("K93-BETA", ["src/shared"])]);
+   assert.equal(result.status, 2, result.stderr);
+   for (const needle of ["GUARD-DISPATCH-SCOPE-OVERLAP", "K93-ALPHA", "K93-BETA", "src/shared/a.mjs", "src/shared/b.mjs", "isolation: \"worktree\"", "PIPELINE_FANOUT_SCOPE_MODE=shadow"]) {
+     assert.ok(result.stderr.includes(needle), `stderr must name ${needle}: ${result.stderr.slice(0, 900)}`);
+@@ -586,7 +607,7 @@ test("K93 hook: two dispatches of one call with overlapping write scopes are ref
+ test("K93 hook: more than five overlapping paths name the first five and then a count", { skip: enrollmentSkip ?? false }, () => {
+   const repo = scopeRepo("k93-many");
+   const files = Array.from({ length: 8 }, (_, i) => `src/m/f${i}.mjs`);
+-  const result = runBatch(repo, [scoped("K93-M1", files.join(", ")), scoped("K93-M2", "src/m/")]);
++  const result = runBatch(repo, [scoped("K93-M1", files), scoped("K93-M2", ["src/m"])]);
+   assert.equal(result.status, 2, result.stderr);
+   assert.ok(result.stderr.includes("src/m/f4.mjs") && !result.stderr.includes("src/m/f5.mjs"), result.stderr.slice(0, 900));
+   assert.match(result.stderr, /and 3 more/u);
+@@ -594,30 +615,30 @@ test("K93 hook: more than five overlapping paths name the first five and then a
+ 
+ test("K93 hook: the explicit shadow switch admits the same overlap with a warning that names the paths", { skip: enrollmentSkip ?? false }, () => {
+   const repo = scopeRepo("k93-shadow");
+-  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs"), scoped("K93-BETA", "src/shared/")], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
++  const result = runBatch(repo, [scoped("K93-ALPHA", ["src/shared/a.mjs"]), scoped("K93-BETA", ["src/shared"])], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
+   assert.equal(result.status, 0, result.stderr);
+   assert.match(result.stderr, /WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
+   assert.ok(result.stderr.includes("src/shared/a.mjs"));
+ });
+ 
+ test("K93 hook: disjoint write scopes, and an isolated call, are admitted without a scope finding", { skip: enrollmentSkip ?? false }, () => {
+-  const disjoint = runBatch(scopeRepo("k93-disjoint"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", "src/b/")]);
++  const disjointRepo = scopeRepo("k93-disjoint");
++  const disjoint = runBatch(disjointRepo, [scoped("K93-ALPHA", ["src/a"]), scoped("K93-BETA", ["src/b"])]);
+   assert.equal(disjoint.status, 0, disjoint.stderr);
+   assert.doesNotMatch(disjoint.stderr, /GUARD-DISPATCH-SCOPE/u);
+-  const isolated = runBatch(scopeRepo("k93-isolated"), [scoped("K93-ALPHA", "src/s/"), scoped("K93-BETA", "src/s/")], { toolInput: { isolation: "worktree" } });
++  const isolatedRepo = scopeRepo("k93-isolated");
++  const isolated = runBatch(isolatedRepo, [scoped("K93-ALPHA", ["src/s"]), scoped("K93-BETA", ["src/s"])], { toolInput: { isolation: "worktree" } });
+   assert.equal(isolated.status, 0, isolated.stderr);
+   assert.doesNotMatch(isolated.stderr, /GUARD-DISPATCH-SCOPE/u);
+ });
+ 
+-test("K93 hook: a scope that cannot be read warns only, in a batch and against an open record", { skip: enrollmentSkip ?? false }, () => {
+-  const batch = runBatch(scopeRepo("k93-unknown-batch"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", null)]);
+-  assert.equal(batch.status, 0, batch.stderr);
+-  assert.match(batch.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
+-  assert.ok(batch.stderr.includes("K93-BETA"));
++// D185: a generated briefing always carries a write scope, so the "briefing without a scope" half of this case (a batch member the
++// guard cannot read) has no admitted shape any more; the open dispatch record without a scope still does.
++test("K93 hook: an open dispatch record whose scope cannot be read warns only", { skip: enrollmentSkip ?? false }, () => {
+   const repo = scopeRepo("k93-unknown-record");
+   mkdirSync(join(repo, "evidence"), { recursive: true });
+   writeFileSync(join(repo, "evidence", "dispatch-record-K93-OPEN.json"), JSON.stringify({ taskId: "K93-OPEN", outcome: "in-progress" }));
+-  const record = runBatch(repo, [scoped("K93-ALPHA", "src/a/")]);
++  const record = runBatch(repo, [scoped("K93-ALPHA", ["src/a"]), scoped("K93-BETA", ["src/b"])]); // two members: a single dispatch would be bound to the generator repository HEAD
+   assert.equal(record.status, 0, record.stderr);
+   assert.match(record.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
+   assert.ok(record.stderr.includes("K93-OPEN"));
+diff --git a/plugins/pipeline-core/hooks/guard-testpath-override.test.mjs b/plugins/pipeline-core/hooks/guard-testpath-override.test.mjs
+index 5b154cda2..e05252586 100644
+--- a/plugins/pipeline-core/hooks/guard-testpath-override.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-testpath-override.test.mjs
+@@ -388,7 +388,8 @@ try {
+     assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "signature mode must offer the signed route");
+     assert.match(stderr, /authorize-by-signature\b/u);
+     assert.doesNotMatch(stderr, /--activate\b/u, "signature mode must not offer the in-session activate step");
+-    assert.match(stderr, /outside\s+this session/u);
++    // The signing itself happens outside the session: the person receives exactly one sign-intent command after the agent's prepare step.
++    assert.match(stderr, /prepare-for-signature \(it needs no external key[^)]*\); the person then receives exactly one sign-intent command/u);
+   });
+ 
+   check("OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route", () => {
+diff --git a/plugins/pipeline-core/lib/briefing-file-reference.mjs b/plugins/pipeline-core/lib/briefing-file-reference.mjs
+index 6212cd728..4a5a82515 100644
+--- a/plugins/pipeline-core/lib/briefing-file-reference.mjs
++++ b/plugins/pipeline-core/lib/briefing-file-reference.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // D183: a Claude Agent dispatch prompt may carry the generator marker line and ONE pointer line
+ //   pipeline-briefing-file: <repository-relative path> sha256=<digest>
+ // instead of the full generated briefing. This pure module parses the pointer and loads the verified file text;
+diff --git a/plugins/pipeline-core/lib/dispatch-readiness.mjs b/plugins/pipeline-core/lib/dispatch-readiness.mjs
+index 514041c12..04287907e 100644
+--- a/plugins/pipeline-core/lib/dispatch-readiness.mjs
++++ b/plugins/pipeline-core/lib/dispatch-readiness.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Aggregate dispatch readiness (G18 Slice A). Pure: every probe is an injected observer.
+ // A probe is { area, observe() } where observe() returns { ok: true } or { code, nextAction }.
+ // All failing probes are listed in input order; a probe never aborts the assessment.
+diff --git a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+index 3a5341f7a..c4485df48 100644
+--- a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
++++ b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+@@ -35,9 +35,6 @@ test("NRS01 refusals with no override route seed no request", () => {
+     ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
+     ["Bash", { command: "node -e \"process.exit(0)\"" }, "GUARD-LIFECYCLE-NOT-READY"],
+-    // A target outside the physical project root is HGO-NONOVERRIDABLE-CROSS-BOUNDARY (constants.mjs, "Measured boundary"):
+-    // the denial prints the typed no-route line and seeds nothing.
+-    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
+   ]) {
+     const { result, seeded } = seededRequests(toolName, toolInput);
+     assert.equal(result.exitCode, 2, `${toolInput.command}`);
+@@ -51,6 +48,9 @@ test("NRS02 refusals that offer a human override seed exactly one request", () =
+     ["Bash", { command: "echo a; echo b" }, "GUARD-PARSE-UNSUPPORTED"],
+     ["Bash", { command: "cat a.txt > b.txt" }, "GUARD-REDIRECT-UNAPPROVED"],
+     ["Bash", { command: "cat a.txt | tee b.txt" }, "GUARD-OPERATOR-UNAPPROVED"],
++    // A target outside the project root offers an override when the fixture's temporary parent is no other repository
++    // (os.tmpdir(), as under Verify). Only a parent inside another repository is HGO-NONOVERRIDABLE-CROSS-BOUNDARY.
++    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
+   ]) {
+     const { result, seeded } = seededRequests(toolName, toolInput);
+     assert.equal(result.exitCode, 2, JSON.stringify(toolInput));
+diff --git a/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs b/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
+index d1ac5a78d..87eaa6b7a 100644
+--- a/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
++++ b/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
+@@ -151,7 +151,8 @@ test("P5: the real CLI prints scanner lines in the formatter shape and the verdi
+   assert.ok(res.status === 0 || res.status === 1 || res.status === 2, `cli exit ${res.status}: ${res.stderr}`);
+   const out = res.stdout;
+   assert.match(out, /^semgrep: \S+ \[[^\]]+\] \(\d+ findings\)/m);
+-  assert.match(out, /^Verdict: (CLEAN|WARNING|BLOCKING) /m);
++  // PATH is emptied above, so the scanner is not found: the verdict is INCOMPLETE (or PARTIAL where a scanner still ran), never a clean pass.
++  assert.match(out, /^Verdict: (CLEAN|WARNING|BLOCKING|INCOMPLETE|PARTIAL) /m);
+ });
+ 
+ test("cleanup fixtures (best effort: scratch/ is gitignored; host may refuse deleting read-only git objects)", () => {
+diff --git a/plugins/pipeline-core/lib/test-generated-goldfish-briefing-fixture.mjs b/plugins/pipeline-core/lib/test-generated-goldfish-briefing-fixture.mjs
+index 0ffe8bb4e..ff83bf170 100644
+--- a/plugins/pipeline-core/lib/test-generated-goldfish-briefing-fixture.mjs
++++ b/plugins/pipeline-core/lib/test-generated-goldfish-briefing-fixture.mjs
+@@ -21,13 +21,15 @@ export function prepareGeneratedDispatchRoot(prefix = "generated-dispatch-") {
+ /**
+  * Build one generated Goldfish briefing for `sliceId` in `root`. `goal` varies the bytes of the briefing without changing its slice
+  * (an amended re-dispatch); the generator runs in process with an injected ruleset identity and route (no real plugin registry).
++ * `check` is the binding check file and, with `paths`, the briefing's write scope: two slices with disjoint scopes need disjoint checks.
++ * A path the package names must exist unless it is listed in `newFiles` (a scope the dispatch is to create).
+  */
+-export function buildGeneratedGoldfishBriefing(root, sliceId, { goal = "Fixture goal text.", paths = ["src/change.mjs"] } = {}) {
++export function buildGeneratedGoldfishBriefing(root, sliceId, { goal = "Fixture goal text.", paths = ["src/change.mjs"], check = "src/change.test.mjs", newFiles } = {}) {
+   const packagePath = `scratch/pkg-${sliceId}.json`;
+   writeFileSync(join(root, packagePath), JSON.stringify({
+     id: sliceId, item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", modelId: "claude-sonnet-5-5", modelWhy: "role default",
+-    check: "src/change.test.mjs", paths, spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal,
+-    context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
++    check, paths, ...(newFiles === undefined ? {} : { newFiles }), spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal,
++    context: ["`src/change.mjs` -- the module."], targeted: [`\`node --test ${check}\` (green)`], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+   }));
+   const built = runDispatchBriefing(["build", "--root", root, "--package", packagePath], {
+     observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),
+diff --git a/plugins/pipeline-core/scripts/check-backlog-state.test.mjs b/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
+index d614921b4..08d7646dc 100644
+--- a/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
++++ b/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
+@@ -425,7 +425,13 @@ try {
+       acceptedLostReconciliationBatch.map((entry) => entry.finding),
+       // The rebased ledger has been reconciled; a historical exception is not
+       // itself evidence that the current checkout still has unreachable OIDs.
+-      [],
++      // D222 (2026-10-31): the PO accepted the two events whose evidence commit
++      // never reached this checkout (2356, 2358) as lost reconciliation, so
++      // exactly those two stay reported as accepted drift.
++      [
++        "ledger event 2356: evidence.commit is not a reachable local Git commit",
++        "ledger event 2358: evidence.commit is not a reachable local Git commit",
++      ],
+     );
+     assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
+   });
+diff --git a/plugins/pipeline-core/scripts/publish-evidence-run.test.mjs b/plugins/pipeline-core/scripts/publish-evidence-run.test.mjs
+index 6e67b04bc..ac1d89fdf 100644
+--- a/plugins/pipeline-core/scripts/publish-evidence-run.test.mjs
++++ b/plugins/pipeline-core/scripts/publish-evidence-run.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import { spawnSync } from 'node:child_process';
+ import { createHash } from 'node:crypto';
+diff --git a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+index 3a195017d..9f636d6bd 100644
+--- a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
++++ b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+diff --git a/setup.test.mjs b/setup.test.mjs
+index 168c14bbb..59ed1f244 100644
+--- a/setup.test.mjs
++++ b/setup.test.mjs
+@@ -725,9 +725,13 @@ for (const [name, source] of [
+     p.worktypes.mini.design_phase.effort === "high" && p.worktypes.mini.execution_phase.effort === "high",
+   );
+   ok("applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness, models UNCHANGED)", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
++  // D184 moved the direct Deep default to high; the legacy migration preset keeps its historical xhigh, so parity is asserted with that one delta named.
++  const defaults = buildDefaultAnswers();
+   ok(
+-    "applyAboPreset max: matches buildDefaultAnswers() worktypes + models",
+-    JSON.stringify(p.worktypes) === JSON.stringify(buildDefaultAnswers().worktypes) && JSON.stringify(p.models) === JSON.stringify(buildDefaultAnswers().models),
++    "applyAboPreset max: matches buildDefaultAnswers() worktypes + models, except the Deep effort D184 lowered on the direct default (legacy preset xhigh, default high)",
++    defaults.models.deep.effort === "high" &&
++      JSON.stringify(p.worktypes) === JSON.stringify(defaults.worktypes) &&
++      JSON.stringify({ ...p.models, deep: { ...p.models.deep, effort: "high" } }) === JSON.stringify(defaults.models),
+   );
+ }
+ {
+@@ -855,7 +859,8 @@ for (const [name, source] of [
+   ok(
+     "resolveRoutingAnswers: fresh install (defaults as previous) + empty answers == applyAboPreset('max') (no-op vs. old behaviour)",
+     JSON.stringify(resolved.worktypes) === JSON.stringify(applyAboPreset("max").worktypes) &&
+-      JSON.stringify(resolved.models) === JSON.stringify(applyAboPreset("max").models),
++      JSON.stringify({ ...resolved.models, deep: { ...resolved.models.deep, effort: "xhigh" } }) === JSON.stringify(applyAboPreset("max").models) &&
++      resolved.models.deep.effort === "high",
+   );
+ }
+ 
+@@ -1199,7 +1204,7 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
+   );
+   ok(
+     "renderPipelineYaml: goldfish_deep mirrors direct deep duty (MP-27 3-tier completeness)",
+-    /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: xhigh/.test(yaml),
++    /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: high/.test(yaml),
+     yaml,
+   );
+   ok(
