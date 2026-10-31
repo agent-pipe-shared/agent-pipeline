@@ -3530,6 +3530,35 @@ test("the five-wrapper pending-asks composition is expressed exactly once in the
     "the five-wrapper ask chain must be composed through one named helper, never hand-copied a second time");
 });
 
+// D210 / G15 (merged first onboarding round), restated contract for the Codex first-restart
+// boundary: while the project material is still to be captured, the primary action is the
+// read-only `inspect` step (never a mutation, never a separate consent question), and the ONE
+// question the PO is asked rides along as the merged initial-answers ask in nextAction.pendingAsks:
+// a collect-input that carries the unchanged `intake-consent-apply` command as its
+// precedingApplyAction. Used by the first-restart-ordering assertions of two cases below, whose
+// intent (a fresh repository must still be taken through intake before anything else, and the
+// progress action must stay exact and copy-safe) is unchanged -- only the old two-round shape
+// (a standalone consent collect-input as the primary action) was replaced by the merged round.
+function assertMergedFirstRoundOnCodexBoundary(result, label) {
+  const primary = result.nextAction;
+  assert.equal(primary.kind, "command",
+    `${label}: the primary action is the read-only step that leads to the merged first-round ask`);
+  assert.equal(primary.argv[1], "inspect", `${label}: the read-only step is the lifecycle inspect`);
+  assert.equal(primary.mutation, false, `${label}: the primary step mutates nothing`);
+  assert.notEqual(primary.requiresConfirmation, true, `${label}: the primary step needs no confirmation`);
+  assert.notEqual(primary.applyAction?.argv?.[1], "intake-consent-apply",
+    `${label}: no separate intake-consent question sits beside the merged ask`);
+  const asks = primary.pendingAsks ?? [];
+  const merged = asks.filter((ask) => ask.kind === "collect-input" && ask.precedingApplyAction?.argv?.[1] === "intake-consent-apply");
+  assert.equal(merged.length, 1, `${label}: exactly one merged first-round ask carries the consent command`);
+  const names = (merged[0].inputs ?? []).map((entry) => entry.name);
+  assert.ok(names.includes("profile") && names.includes("projectDescription"),
+    `${label}: the merged ask also collects the consent inputs (profile, projectDescription) -- the PO is still asked`);
+  assert.equal(asks.filter((ask) => ask.applyAction?.argv?.[1] === "intake-consent-apply").length, 0,
+    `${label}: the consent command is carried only as the merged ask's precedingApplyAction`);
+  return merged[0];
+}
+
 // Regression for backlog 2026-08-18-po-key-trust-anchor-onboarding.md and
 // 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md. A machine
 // that already held a signing key used to leave every fresh project on it
@@ -3576,7 +3605,9 @@ test("apply-portable-seed --activate seeds the machine's trust anchor into a fre
     assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
     assert.equal(applied.result.status, "intake-required",
       "a public trust anchor does not substitute for captured project material");
-    assert.equal(applied.result.nextAction.kind, "collect-input",
+    // D210/G15: first-restart intake ordering is preserved in the merged-round shape (read-only
+    // inspect as the primary step, the one merged ask in pendingAsks), not as a separate consent question.
+    assertMergedFirstRoundOnCodexBoundary(applied.result,
       "the returned primary action preserves first-restart intake ordering");
     const policyBytes = readFileSync(join(seeded, "project", "critical-human-proof.json"), "utf8");
     const policy = JSON.parse(policyBytes);
@@ -4175,8 +4206,12 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     }).status, "applied");
     const captureRequired = inspectProjectOnboardingV3({runner: "codex", rootDir: runtime, deps: fakeDeps});
     assert.equal(captureRequired.status, "intake-required");
-    assert.equal(captureRequired.nextAction.kind, "collect-input");
+    // D210/G15: the first-restart progress step is the read-only inspect with the one merged ask
+    // beside it (the old shape was a standalone consent collect-input); the diagnostic stays bound.
+    assertMergedFirstRoundOnCodexBoundary(captureRequired, "matrix capture-required progress action");
     assert.ok(captureRequired.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(renderProjectOnboardingAction(captureRequired.nextAction).includes("\n"), false,
+      "the merged-round progress action stays copy-safe on one line");
     captureFirstRestartFixtureInput(runtime, fakeDeps);
     const missing = inspectProjectOnboardingV3({ runner: "codex", rootDir: runtime, deps: fakeDeps });
     assert.equal(missing.status, "runtime-initialization-required");
