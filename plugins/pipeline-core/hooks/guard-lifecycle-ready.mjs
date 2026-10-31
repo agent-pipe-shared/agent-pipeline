@@ -27,7 +27,7 @@ export { isAgentPoPublicCommand, isForbiddenCrossRepositoryMutation, isHostOnlyC
 export { evaluateLifecycleReadyGuard } from "../lib/guard/evaluate.mjs";
 
 // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
-if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
 
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !process.argv.slice(2).includes("--consume-owned-verification-guard")
