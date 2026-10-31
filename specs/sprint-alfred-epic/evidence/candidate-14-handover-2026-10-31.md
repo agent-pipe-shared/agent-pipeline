@@ -21,6 +21,13 @@ red step as the work item.
 
 - Walk 8/8 and 17 further focused suites green on the full stack (committed HEAD of the rehearsal clone), plus 20 canon and script suites
   from the wider sweep; baseline comparison per slice in the slice notes.
+- **Full Verify of the stack in a clone** (`scripts/full-verify.mjs`, candidate mode, no reuse, private HOME; stack of seven patches plus the
+  rebaseline) against the same run on the unpatched HEAD: 1128 steps / 89 red against 1127 steps / 89 red, and the two sets of red step
+  names are identical (the one extra step is the chain walk, green). The first stack run found three red steps the baseline does not have: two
+  were real (the walk's registration lacked the product capability inventory entry, fixed in the registration patch, both steps green with
+  17 and 30 cases) and one was an existing flake (`pin-hgo-stale-capability-shadows-current-authorization`, AC2: the same commit was red on
+  one parallel worker and green on the other; it was green in the second run). The 89 shared reds include the Critic protected-preimage
+  step, GST33 and the onboarding-v3 push gate cases named below. This is a pre-stamp clone run, not the formal Verify of the installed candidate.
 - Walked with real entry points: bindings derive, dispatch preflight, admission, finalizer, lineage registration, addendum per record,
   close coordinator up to `feature-close-prepared`, and the push decision.
 - Not driven, named: Full Verify, batch Critic, native Windows runs, the real consumer repositories, a real signature, a real model call,
