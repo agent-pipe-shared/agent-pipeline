@@ -55,7 +55,11 @@ Red on the plain candidate (identical in every baseline clone this session):
 - Item 1: R3 runs every chunk, and R3, G15c2 and R4 make onboarding-v3 green except the seeded push gate and SECGATE-1.
   These two stay red as a product question: every consumer push needs a publication review, because onboarding
   gitignores `project/pipeline-state.json`.
-- Item 2: R1 as above; R1b is open.
+- Item 2: R1 as above; R1b makes guard-push-v2 (9/9), guard-push-scratch-advisory (4/4) and
+  worktree-target-binding (5/5) green with the same helper. PGV2-01 also needed its security evidence bound to the
+  push destination. The hook-level walk to ALLOW is still open.
+- codex-pretool-guard case 7 (slow push guard share, 7502188da) was red under every runner: a missing scratch/ and a
+  runner HOME nobody sets. It is fixed in the candidate-13 CPG patch.
 - Item 3: R2 fixes the harness pipeline-state crash and makes RGr deterministic.
 - Item 4: R5 restates the e2e in-process driver case to the design-authoring stop that 5e939278b introduced. Still
   open, with the same cause: `measure-tofu-push-e2e.test.mjs:147` (expects the old order) and
