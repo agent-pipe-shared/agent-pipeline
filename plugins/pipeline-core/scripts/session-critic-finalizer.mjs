@@ -1,33 +1,29 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
-/** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
-
 import { randomBytes } from "node:crypto";
 import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
+import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
 import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
-import {
-  GOVERNANCE_REVIEW_SOURCE_SCHEMA,
-  buildGovernanceReviewAction,
-  buildGovernanceReviewRetry,
-  preflightGovernanceReviewActionOutput,
-  writeGovernanceReviewAction,
-} from "../lib/governance-review-action.mjs";
+import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
-import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore,
-  inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
 import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
+import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
+import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
+export { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, SessionCriticFinalizerError, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
+/** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
+
+
 
 export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
 export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
@@ -71,28 +67,9 @@ function takeoverTarget(root, featureId, supersede = false) {
   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
     courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };
 }
-import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
-import {
-  registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
-  SESSION_PACKET_BINDING_SCHEMA,
-  canonicalJson,
-  claimCandidatePacket,
-  cleanupCandidatePacket,
-  consumeCandidatePacket,
-  inspectClaimedSessionAdmission,
-  inspectClaimedCandidatePacket,
-  inspectCandidatePacket,
-  packetDigestMatches,
-  prepareCandidatePacket,
-  publishClaimedSessionAdmission,
-  readConsumedCandidateReceipt,
-  recordCandidateResult,
-  sha256,
-} from "./critic-packet-preflight.mjs";
 
 export const SESSION_CRITIC_RESULT_SCHEMA = "pipeline.session-critic-result.v1";
 export const SESSION_CRITIC_ADMISSION_RESULT_SCHEMA = "pipeline.session-critic-prelaunch-admission.v1";
-export const SESSION_CRITIC_RECEIPT_SCHEMA = "pipeline.session-critic-receipt.v1";
 export const SESSION_CRITIC_FINALIZE_RESULT_SCHEMA = "pipeline.session-critic-finalization.v1";
 export const SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA = "pipeline.session-critic-finalization-request.v1";
 export const SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA = "pipeline.session-critic-finalization-request.v2";
@@ -106,7 +83,6 @@ export const SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA = "pipeline.session-cr
 export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
 export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
 export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
-export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json> [--allow-caller-authored-fallback]",
@@ -124,26 +100,11 @@ const CLI_HELP = [
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERDICT_SCHEMA = JSON.parse(readFileSync(join(HERE, "critic-verdict.schema.json"), "utf8"));
-const PACKET_ID = /^[a-f0-9]{32}$/u;
-const SHA256 = /^[a-f0-9]{64}$/u;
-const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/u;
 const RESULT_KEYS = Object.freeze(["schema", "packetId", "packetDigest", "session", "candidate", "reviewRange", "rulesetSha", "assurance", "verdict"]);
-const RECEIPT_KEYS = Object.freeze(["schema", "packetId", "packetDigest", "session", "candidate", "reviewRange", "rulesetSha", "assurance", "verdictSha256", "findingCount", "reviewPass"]);
 const ROUTE_KEYS = Object.freeze(["routeId", "runner", "adapter", "provider", "modelTier", "effortTier"]);
 const REQUEST_KEYS = Object.freeze(["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route", "review", "verdictPath", "event"]);
 const REVIEW_KEYS = Object.freeze(["base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath"]);
 const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
-
-export class SessionCriticFinalizerError extends Error {
-  constructor(code, message = "Session Critic finalization is invalid.") {
-    super(message);
-    this.name = "SessionCriticFinalizerError";
-    this.code = code;
-  }
-}
-
-function fail(code, message) { throw new SessionCriticFinalizerError(code, message); }
 
 // Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
 // No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
@@ -168,10 +129,6 @@ function originGate(query, options, deps) {
     || !Number.isSafeInteger(record.issuedAtMs) || !Number.isSafeInteger(record.expiresAtMs)
     || record.issuedAtMs > now || now >= record.expiresAtMs) fail("SCF-ORIGINAL-SOURCE-BINDING");
   return Object.freeze({ independence: "source-issued-origin", origin: "source", nativeAttestation: false });
-}
-function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function exact(value, keys) {
-  return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 function gitText(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5_000 });
@@ -588,24 +545,6 @@ export function validateSessionCriticResult(result, packet) {
 /** Pure receipt projection only; durable consumed readback remains required. */
 export function sessionCriticReceiptForResult(result) {
   return receiptFor(result);
-}
-
-export function validateSessionCriticReceipt(receipt) {
-  if (!exact(receipt, RECEIPT_KEYS) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
-    || !PACKET_ID.test(receipt.packetId) || !SHA256.test(receipt.packetDigest)
-    || !exact(receipt.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
-    || !SAFE_ID.test(receipt.session.id) || receipt.session.freshContext !== true
-    || receipt.session.historyInherited !== false || receipt.session.mayDelegate !== false
-    || !OID.test(receipt.rulesetSha)
-    || receipt.assurance !== SESSION_CRITIC_ASSURANCE || !SHA256.test(receipt.verdictSha256)
-    || !Number.isSafeInteger(receipt.findingCount) || receipt.findingCount < 0
-    || typeof receipt.reviewPass !== "boolean"
-    || !exact(receipt.candidate, ["base", "commit", "tree"])
-    || !exact(receipt.reviewRange, ["base", "commit", "diffSha256"])
-    || receipt.candidate.base !== receipt.reviewRange.base || receipt.candidate.commit !== receipt.reviewRange.commit
-    || !OID.test(receipt.candidate.base) || !OID.test(receipt.candidate.commit) || !OID.test(receipt.candidate.tree)
-    || !SHA256.test(receipt.reviewRange.diffSha256)) fail("SCF-RECEIPT");
-  return receipt;
 }
 
 /** Complete one fresh session against its *pre-existing* prelaunch admission. */

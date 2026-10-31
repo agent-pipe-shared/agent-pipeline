@@ -8,35 +8,26 @@
  * feature close can consequently demand this record and cannot be fooled by a
  * caller-supplied `{ status: "passed" }` object.
  */
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { realpathSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { canonicalJson as canonicalCourseJson, sha256Canonical } from "./review-economy.mjs";
 import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { sessionLaneMatches } from "./critic-review-lineage-core.mjs";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-
-import { canonicalJson, sha256, packetDigestMatches } from "../scripts/critic-packet-preflight.mjs";
-import { readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
+import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
+export { RESIDUAL_ACCEPTANCE_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
+
 
 export const CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v1";
 export const CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v2";
 export const CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v3";
-export const RESIDUAL_ACCEPTANCE_BASIS = "po-acceptance-of-residual-minor-findings";
-const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const SHA = /^[a-f0-9]{64}$/u;
-const PACKET = /^[a-f0-9]{32}$/u;
 const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
-
-function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
-function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key)); }
-function candidate(value) { return exact(value, ["commit", "tree"]) && OID.test(value.commit ?? "") && OID.test(value.tree ?? ""); }
-function bytesSha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
 export function criticVerifyLifecycleId({ candidate: sourceCandidate, criticPacketId, verifyEvidenceSha256 }) {
   if (!candidate(sourceCandidate) || !PACKET.test(criticPacketId ?? "") || !SHA.test(verifyEvidenceSha256 ?? "")) fail("CVL-IDENTITY", "Lifecycle identity is invalid.");
@@ -48,11 +39,6 @@ function recordPath(privateRoot, id) {
   return join(privateRoot, "critic-verify-lifecycle", `${id}.json`);
 }
 
-/** Derived id of one open Critic finding (verdict findings carry no id of their own). */
-export function residualFindingId(finding) {
-  return sha256(canonicalJson(finding));
-}
-
 /** The subject a PO residual acceptance is bound to; one definition for the signature route and the chat route. */
 export function residualAcceptanceSubject({ receipt, findings }) {
   return { criticReceiptSha256: sha256(canonicalJson(receipt)),
@@ -60,107 +46,7 @@ export function residualAcceptanceSubject({ receipt, findings }) {
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
 }
 
-// A failed receipt qualifies only through a PO acceptance bound to the exact open findings, all minor.
-// Returns the record fragment, or null (the caller keeps CVL-CRITIC-FAILED) on any shortfall.
-function residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps) {
-  const acceptance = deps.residualAcceptance;
-  if (acceptance === undefined || acceptance === null || typeof deps.verifyResidualAcceptanceFn !== "function") return null;
-  try {
-    const readOpen = deps.readOpenFindingsFn ?? (({ controlRoot, packetId }) => readConsumedCandidateResult({ controlRoot, packetId }).result.verdict.findings);
-    const open = readOpen({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId });
-    if (!Array.isArray(open) || open.length === 0 || open.length !== critic.findingCount
-      || !open.every(finding => finding !== null && typeof finding === "object" && finding.severity === "minor")) return null;
-    const expected = open.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    if (acceptance.candidate?.commit !== critic.candidate.commit || acceptance.candidate?.tree !== critic.candidate.tree
-      || acceptance.criticReceiptSha256 !== criticReceiptSha256
-      || canonicalJson(acceptance.findings) !== canonicalJson(expected)) return null;
-    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected });
-    if (verdict?.authorized !== true || typeof verdict.mode !== "string" || verdict.mode.length === 0) return null;
-    return Object.freeze({ basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode,
-      acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
-  } catch { return null; }
-}
-
-/**
- * Read a consumed Critic receipt from its private packet and prove that the
- * receipt is the receipt for that packet's exact candidate and diff.  A
- * syntactically valid receipt on its own is deliberately insufficient: the
- * packet journal is the authority that makes it a completed, fresh review.
- */
-export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate }, deps = {}) {
-  if (typeof gitCommonDir !== "string" || gitCommonDir.length === 0 || !PACKET.test(criticPacketId ?? "") || !candidate(sourceCandidate)) {
-    fail("CVL-INPUT", "Critic/Verify lifecycle input is invalid.");
-  }
-  const common = resolve(gitCommonDir);
-  const readReceipt = deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt;
-  let consumed;
-  try { consumed = readReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId }); }
-  catch (error) { fail("CVL-CRITIC-UNAVAILABLE", `No consumed private Critic receipt is available for this packet (${error?.code ?? "unavailable"}).`); }
-  const critic = consumed?.receipt;
-  const packet = consumed?.packet;
-  try { validateSessionCriticReceipt(critic); }
-  catch { fail("CVL-CRITIC-INVALID", "Private Critic receipt is malformed."); }
-  if (!packet || packet.packetId !== criticPacketId || critic.packetId !== criticPacketId
-    || !packetDigestMatches(packet, critic.packetDigest)
-    || packet.candidate?.base !== critic.candidate.base || packet.candidate?.commit !== critic.candidate.commit
-    || packet.candidate?.tree !== critic.candidate.tree || packet.diff?.base !== critic.reviewRange.base
-    || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {
-    fail("CVL-CRITIC-PACKET-MISMATCH", "Private Critic receipt is not bound to its consumed packet.");
-  }
-  const failedReceipt = critic.reviewPass !== true;
-  if (failedReceipt && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
-    fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
-  }
-  if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
-    || critic.reviewRange.commit !== sourceCandidate.commit) fail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
-  const criticReceiptSha256 = bytesSha256(canonicalJson(critic));
-  let residual = null;
-  if (failedReceipt) {
-    residual = residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps);
-    if (residual === null) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
-  }
-  const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
-  return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute, residual });
-}
-
-const CRITIC_HOST_OBSERVATION_SCHEMA = "pipeline.critic-host-observation.v1";
-const ROUTE_RUNNERS = new Set(["claude", "codex", "antigravity"]);
-// Typed `unavailable` verdicts shared by every reader. The reason codes mirror the role-route
-// preflight vocabulary (R4-1); they are restated here because this reader is a separate seam.
-const ROUTE_NO_OBSERVATION = Object.freeze({ state: "unavailable", reasonCode: "RRP-NO-HOST-OBSERVATION", evidence: "" });
 const ROUTE_NOT_REGISTERED = Object.freeze({ state: "unavailable", reasonCode: "RRP-ROLE-NOT-REGISTERED", evidence: "" });
-
-/**
- * Route verdict for the Critic behind a bound receipt (R4-2 / R4-12). REPORT-ONLY
- * per PO decision BD: with no host observation (no `deps.readCriticHostObservationFn`,
- * or one returning null) the verdict is a typed `unavailable` and nothing is refused,
- * so today's close outcome is unchanged. Only an observation that is SUPPLIED and
- * fails to prove a native, hook-recorded, per-call read-only Critic bound to this
- * exact packet and receipt is refused: forged or incomplete evidence never counts as
- * native. A `fallback-self-dispatch` observation is refused as fallback evidence.
- * The verdict is returned alongside the receipt and is never folded into the
- * private receipt bytes.
- */
-function criticRouteVerdict({ gitCommonDir, criticPacketId, critic, criticReceiptSha256 }, deps) {
-  const readObservation = deps.readCriticHostObservationFn;
-  if (readObservation === undefined || readObservation === null) return ROUTE_NO_OBSERVATION;
-  let observed;
-  try { observed = readObservation({ gitCommonDir, criticPacketId }); }
-  catch { fail("CVL-ROUTE-UNAVAILABLE", "The supplied Critic host observation reader failed."); }
-  if (observed === undefined || observed === null) return ROUTE_NO_OBSERVATION;
-  if (typeof observed !== "object" || Array.isArray(observed)) fail("CVL-ROUTE-UNAVAILABLE", "The supplied Critic host observation is malformed.");
-  if (observed.kind === "fallback-self-dispatch") fail("CVL-FALLBACK-EVIDENCE", "A fallback self-dispatch result is not Critic gate evidence.");
-  const { start, readOnly, terminal } = observed;
-  const native = observed.schema === CRITIC_HOST_OBSERVATION_SCHEMA && observed.kind === "native"
-    && ROUTE_RUNNERS.has(observed.runner) && observed.packetId === criticPacketId
-    && start?.hookRecorded === true && typeof start.subagentId === "string" && start.subagentId.length > 0
-    && readOnly?.perCallEnforced === true && Array.isArray(readOnly.writeToolCalls) && readOnly.writeToolCalls.length === 0
-    && terminal?.hookRecorded === true && terminal.packetDigest === critic.packetDigest
-    && terminal.receiptSha256 === criticReceiptSha256;
-  if (!native) fail("CVL-ROUTE-UNAVAILABLE", "The supplied host observation does not prove a native Critic for this packet and receipt.");
-  return Object.freeze({ state: "native", reasonCode: "RRP-NATIVE-OBSERVED", evidence: sha256(canonicalJson(observed)) });
-}
 
 /**
  * Read-only eligibility proof for a reviewed commit followed solely by

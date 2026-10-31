@@ -22,8 +22,8 @@ import { spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
-import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
-import { criticCoverageAdvisory, listUncoveredCriticRecords } from "./dispatch-record-write.mjs";
+import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
+import { criticCoverageAdvisory, listUncoveredCriticRecords } from "../lib/review-admission-read.mjs";
 import {
   CriticGuardrailDerivationError,
   deriveRequiredCriticGuardrails,

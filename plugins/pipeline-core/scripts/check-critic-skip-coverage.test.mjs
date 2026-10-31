@@ -1414,3 +1414,17 @@ test("N35 a record outside the union of the registered rounds, a broken chain, a
     assert.equal(result.criticEvidenceRecordCount, 0, label);
   }
 });
+
+test("D216A the coverage script re-exports every symbol it moved to lib/review-admission-read.mjs under the same name and identity", async () => {
+  const script = await import("./check-critic-skip-coverage.mjs");
+  const read = await import("../lib/review-admission-read.mjs");
+  for (const name of ["DEFAULT_ROOT", "LEGACY_RECONCILE_SCHEMA", "DEFAULT_LEGACY_RECONCILE_INDEX_PATH", "ABANDONED_V3_RECOVERY_INDEX_SCHEMA", "DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH",
+    "readAbandonedV3RecoveryIndex", "readLegacyDispatchReconcileIndex", "criticAddendumBindingFinding", "verifyCriticDispositionAddendumForRecord", "readCommitChangedPaths",
+    "walkDispatchRecords", "evaluateRepositoryCriticSkipCoverage", "evaluateReviewAdmission"]) {
+    assert.equal(typeof script[name] === "undefined", false, `${name} is still exported by the script`);
+    assert.strictEqual(script[name], read[name], `${name}: the script re-exports the read module's binding`);
+  }
+  for (const name of ["createLocalDispatchEvidenceBinding", "evaluateSignedQualityImportReviewAdmission", "observeHistoricalFreshReviewTargetAuthority"]) {
+    assert.equal(typeof script[name], "function", `${name} stays in the write-capable script`);
+  }
+});

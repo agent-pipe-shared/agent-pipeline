@@ -26,7 +26,6 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isatty as nodeIsatty } from "node:tty";
-
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-gate-ceremony.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
@@ -45,19 +44,19 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
-import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir, resolveRepoScopedDirectory } from "../lib/po-key-directory.mjs";
+import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
-import {
-  DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA,
-  validateDesignWorkflowPackageApprovalRequest,
-} from "../lib/design-workflow-approval.mjs";
+import { DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA, validateDesignWorkflowPackageApprovalRequest } from "../lib/design-workflow-approval.mjs";
 import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
 import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
 import { resolveTrustedSystemExecutable, trustedToolRepairHint } from "../lib/trusted-tool-resolution.mjs";
+import { PO_APPROVAL_DIRECTORY_ENV, own, text, resolvePoKeyDirectory } from "../lib/po-human-approval-read.mjs";
+export { resolvePoKeyDirectory } from "../lib/po-human-approval-read.mjs";
+
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -70,12 +69,6 @@ const PORTABLE_CRITIC_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-critic-e
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | set-po-key-directory --directory <absolute-dir> [--replace <current-value>] | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
-// This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
-// PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
-// PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
-// follows that convention rather than inventing a new one, and is read ONLY as a
-// fallback when no explicit --directory is supplied on the command line.
-const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
 
 function canonicalJson(value) {
@@ -734,7 +727,6 @@ function runSetPoKeyDirectory(argv, dependencies) {
 // those unrelated, pre-existing checks; this keeps the value fully readable by this
 // file's own code (args.directorySource) without joining the object's public shape.
 function setDirectorySource(values, source) { Object.defineProperty(values, "directorySource", { value: source, enumerable: false, configurable: true }); }
-const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 /**
  * `trustPolicy`/`authority` specifically may also carry `humanName` — the
  * SETUP-1 human-readable label some operators' external `trust-policy.json`
@@ -745,8 +737,6 @@ const own = (value, keys) => value !== null && typeof value === "object" && !Arr
  */
 const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
 const SHA = /^[a-f0-9]{64}$/u;
-const text = (value) => typeof value === "string" && value.trim() !== "";
-
 // NVA-WINPATH-1 (backlog/items/2026-08-17-po-human-approval-outside-check-uses-a-posix-only-
 // separator-on-windows.md): mirrors guard-human-override.mjs's own externalJson() fix for the
 // exact same defect class. node:path's default (host-platform) export makes relative() return
@@ -1035,46 +1025,6 @@ const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
 const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
-
-/**
- * R7-6-F3 (PO decision AC): the ONE key-directory resolver for every entry point (this module's
- * parseHumanArgs, toolchain-preflight.mjs, push-prepare.mjs). Tiers, in this exact order:
- *   1. `explicit`            -> source "flag"           (the --directory argument)
- *   2. PIPELINE_PO_APPROVAL_DIRECTORY -> source "environment" (per-terminal choice of a non-default key)
- *   3. machine-wide poKeyDirectory    -> source "machine-plane" (one default per OS user)
- *   4. legacy per-repository value    -> source "repo-scope", `legacy: true` (read-only)
- *   5. nothing               -> status "unset" (callers report SIGN-KEY-DIRECTORY-UNSET)
- * The result names the resolving tier. A store that is CONSULTED and invalid (the machine plane in
- * tier 3, the legacy store in tier 4) is `status: "invalid"`, never "unset" and never a fall-through
- * to a lower tier; but a higher tier that resolves is not blocked by an invalid lower store, because
- * the lower stores are not consulted at all once a higher tier has resolved. Resolving a directory
- * grants no trust: the committed anchor set decides whether the key found there may sign.
- */
-export function resolvePoKeyDirectory({ explicit, repoRoot, dependencies = {} } = {}) {
-  if (text(explicit)) return { status: "resolved", directory: explicit, source: "flag", legacy: false };
-  const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
-  if (text(fromEnv)) return { status: "resolved", directory: fromEnv, source: "environment", legacy: false };
-  const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
-  if (plane.status === "invalid") {
-    return { status: "invalid", store: "machine-plane", code: plane.code, error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
-  }
-  if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
-    return { status: "resolved", directory: plane.plane.poKeyDirectory, source: "machine-plane", legacy: false };
-  }
-  // The legacy tier needs a git-common-dir computed from repoRoot; the authoritative repoRoot
-  // validation stays with the caller -- this check only SKIPS the tier when repoRoot is not yet a
-  // usable absolute path.
-  const repoScope = (text(repoRoot) && isAbsolute(repoRoot))
-    ? resolveRepoScopedDirectory(repoRoot, dependencies)
-    : { status: "absent", directory: null };
-  if (repoScope.status === "invalid") {
-    return { status: "invalid", store: "repo-scope", code: repoScope.code, error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
-  }
-  if (repoScope.status === "valid" && text(repoScope.directory)) {
-    return { status: "resolved", directory: repoScope.directory, source: "repo-scope", legacy: true };
-  }
-  return { status: "unset", directory: null, source: null, legacy: false };
-}
 
 export function parseHumanArgs(argv, dependencies = {}) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();

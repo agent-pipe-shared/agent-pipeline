@@ -1692,4 +1692,153 @@ test("N33B the command line prints the advisory in the ready result and still ex
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+// D216 option A / D219: the read-only preflight reaches the review admission through the write-free read module only, so the
+// gate-strength lane's "provably read-only" claim (GST33) stays true without a third accepted exception.
+test("D216A the preflight imports the review admission from the read-only module, never from check-critic-skip-coverage, and its plugin-local import closure names no write API", () => {
+  const scriptSource = readFileSync(fileURLToPath(new URL("./critic-dispatch-preflight.mjs", import.meta.url)), "utf8");
+  const importLine = /^import\s*\{[^}]*\bevaluateReviewAdmission\b[^}]*\}\s*from\s*"([^"]+)";/mu.exec(scriptSource);
+  assert.ok(importLine, "the preflight must import evaluateReviewAdmission by name");
+  assert.equal(importLine[1], "../lib/review-admission-read.mjs");
+  assert.doesNotMatch(scriptSource, /check-critic-skip-coverage/u, "the preflight must not import the write-capable coverage script");
+  const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const writeApis = ["writeFileSync", "appendFileSync", "mkdirSync", "rmSync", "renameSync", "unlinkSync", "openSync", "createWriteStream",
+    "cpSync", "copyFileSync", "symlinkSync", "truncateSync", "chmodSync", "utimesSync"];
+  const acceptedExceptions = new Set(["lib/critic-course-admission.mjs", "lib/dispatch-budget-launch-observation.mjs"]);
+  const seen = new Set();
+  const violators = [];
+  const walk = (absolute) => {
+    if (seen.has(absolute)) return;
+    seen.add(absolute);
+    const source = readFileSync(absolute, "utf8");
+    const named = writeApis.filter((api) => new RegExp(`\\b${api}\\b`, "u").test(source));
+    if (named.length > 0) violators.push(`${path.relative(pluginRoot, absolute)} [${named.join(",")}]`);
+    const code = source.split("\n").filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
+    for (const re of [/\bfrom\s+["'](\.\.?\/[^"']+)["']/gu, /\bimport\(\s*["'](\.\.?\/[^"']+)["']\s*\)/gu]) {
+      for (const match of code.matchAll(re)) {
+        const next = path.resolve(path.dirname(absolute), match[1]);
+        const rel = path.relative(pluginRoot, next).replaceAll("\\", "/");
+        if (rel === "" || rel.startsWith("..") || acceptedExceptions.has(rel)) continue;
+        walk(next);
+      }
+    }
+  };
+  walk(fileURLToPath(new URL("./critic-dispatch-preflight.mjs", import.meta.url)));
+  assert.deepEqual(violators, [], `the preflight closure reaches write-capable modules: ${violators.slice(0, 5).join("; ")}`);
+});
+
+// D216A drift pins: the read halves carry read-only COPIES of code from modules outside the slice's write scope. Each case compares the
+// source of the copy with the source of the original (comments and blank lines ignored, documented renames undone) and the behavior of
+// both on one fixed input, so a later edit of the original fails here until the copy follows (or becomes an import).
+const d216aPluginDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const d216aStripped = (text) => text.replace(/\/\*[\s\S]*?\*\//gu, "").split("\n").filter((line) => line.trim() !== "" && !/^\s*\/\//u.test(line)).join("\n");
+function d216aBlock(file, name) {
+  const lines = readFileSync(path.join(d216aPluginDir, file), "utf8").split("\n");
+  const declaration = /^(?:export\s+)?(?:async\s+)?(?:function\*?\s+|const\s+|let\s+|class\s+)(\w+)/u;
+  const start = lines.findIndex((line) => declaration.exec(line)?.[1] === name);
+  assert.ok(start >= 0, `${file}: ${name} not found`);
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) if (declaration.test(lines[index]) || /^(?:export\s*\{|import\s)/u.test(lines[index])) { end = index; break; }
+  return d216aStripped(lines.slice(start, end).join("\n")).replace(/^export\s+/u, "").trimEnd();
+}
+function d216aCompare(copyFile, originalFile, names, renames = []) {
+  for (const [copyName, originalName] of names) {
+    let copy = d216aBlock(copyFile, copyName);
+    for (const [from, to] of renames) copy = copy.split(from).join(to);
+    assert.equal(copy, d216aBlock(originalFile, originalName), `${copyFile} ${copyName} drifted from ${originalFile} ${originalName}`);
+  }
+}
+const d216aOutcome = (run) => { try { return { value: run() }; } catch (error) { return { threw: true, code: error?.code ?? null, name: error?.name ?? null }; } };
+
+test("D216A drift pin: the machine-plane readers copied into po-human-approval-read equal lib/machine-plane.mjs, in source and on one input", async () => {
+  d216aCompare("lib/po-human-approval-read.mjs", "lib/machine-plane.mjs", ["MACHINE_PLANE_SCHEMA", "MACHINE_PLANE_KEYS", "PUSH_APPROVAL_DEFAULTS", "machinePlaneFilePath", "object", "keySetIssue",
+    "validPoKeyDirectory", "validPushApprovalDefault", "validLanguage", "nullOrPlainObject", "validUpdatedAt", "validateMachinePlane", "readMachinePlane", "resolveLocalOperatorKeyAnchor"].map((name) => [name, name]));
+  const copy = await import("../lib/po-human-approval-read.mjs");
+  const original = await import("../lib/machine-plane.mjs");
+  const dependencies = { homedirFn: () => path.join(tmpdir(), "no-such-home-d216a") };
+  assert.deepEqual(d216aOutcome(() => copy.readMachinePlane(dependencies)), d216aOutcome(() => original.readMachinePlane(dependencies)));
+});
+
+test("D216A drift pin: validateDiagnosticBundleShape copied into critic-packet-preflight-read equals lib/critic-diagnostic-packet.mjs", async () => {
+  d216aCompare("lib/critic-packet-preflight-read.mjs", "lib/critic-diagnostic-packet.mjs", [["diagnosticExact", "exact"], ["DIAGNOSTIC_PREFIX", "PREFIX"], ["validateDiagnosticBundleShape", "validateDiagnosticBundleShape"]],
+    [["diagnosticExact", "exact"], ["DIAGNOSTIC_PREFIX", "PREFIX"]]);
+  const copy = await import("../lib/critic-packet-preflight-read.mjs");
+  const original = await import("../lib/critic-diagnostic-packet.mjs");
+  assert.deepEqual(d216aOutcome(() => copy.validateDiagnosticBundleShape({})), d216aOutcome(() => original.validateDiagnosticBundleShape({})));
+});
+
+test("D216A drift pin: the coverage advisory readers copied into review-admission-read equal scripts/dispatch-record-write.mjs", async () => {
+  d216aCompare("lib/review-admission-read.mjs", "scripts/dispatch-record-write.mjs", ["CRITIC_COVERAGE_ADVISORY_SCHEMA", "CRITIC_ADDENDUM_COMMAND", "COVERAGE_LISTING_CAP", "reachableCommits",
+    "listUncoveredCriticRecords", "criticCoverageAdvisory", "physicalRoot"].map((name) => [name, name]), [["advisoryFail", "fail"]]);
+  const copy = await import("../lib/review-admission-read.mjs");
+  const original = await import("./dispatch-record-write.mjs");
+  const records = [{ recordPath: "evidence/dispatch-record-X.json", appliedRow: "T1", candidateCommit: "a".repeat(40) }];
+  for (const input of [{ unavailable: "gone" }, { records, totalCount: 3 }, {}]) assert.deepEqual(copy.criticCoverageAdvisory(input), original.criticCoverageAdvisory(input));
+});
+
+test("D216A drift pin: agyHostGitEnvironment copied into review-admission-read equals lib/agy-host-commit-admission.mjs", async () => {
+  d216aCompare("lib/review-admission-read.mjs", "lib/agy-host-commit-admission.mjs", [["agyHostGitEnvironment", "agyHostGitEnvironment"]]);
+  const copy = await import("../lib/review-admission-read.mjs");
+  const original = await import("../lib/agy-host-commit-admission.mjs");
+  assert.deepEqual(d216aOutcome(() => copy.agyHostGitEnvironment()), d216aOutcome(() => original.agyHostGitEnvironment()));
+});
+
+test("D216A drift pin: the device-rebind, private-boundary and canonical-JSON readers copied into po-gate-authority-read equal their originals", async () => {
+  d216aCompare("lib/po-gate-authority-read.mjs", "lib/plan-approval-device-rebind.mjs", ["PLAN_APPROVAL_DEVICE_REBIND_SCHEMA", "DEVICE_LOCAL_AUTHORITY_FIELDS", "RECEIPT_DIRECTORY",
+    "isObject", "sameKeys", "deviceValues", "validDeviceValues", "differsOnlyInDeviceFields", "withOriginDeviceValues", "planApprovalDeviceRebindPath", "readPlanApprovalDeviceRebind"].map((name) => [name, name]),
+    [["DEVICE_REBIND_SHA256", "SHA256"], ["DEVICE_REBIND_RECEIPT_KEYS", "RECEIPT_KEYS"]]);
+  d216aCompare("lib/po-gate-authority-read.mjs", "lib/plan-approval-device-rebind.mjs", [["DEVICE_REBIND_SHA256", "SHA256"], ["DEVICE_REBIND_RECEIPT_KEYS", "RECEIPT_KEYS"]],
+    [["DEVICE_REBIND_SHA256", "SHA256"], ["DEVICE_REBIND_RECEIPT_KEYS", "RECEIPT_KEYS"]]);
+  d216aCompare("lib/po-gate-authority-read.mjs", "lib/private-boundary.mjs", [["PrivateBoundaryError", "PrivateBoundaryError"], ["pbFail", "fail"], ["assertPrivateRegularFile", "assertPrivateRegularFile"],
+    ["readPrivateFile", "readPrivateFile"], ["readPrivateJson", "readPrivateJson"]], [["pbFail", "fail"]]);
+  d216aCompare("lib/po-gate-authority-read.mjs", "lib/plan-spec-state-v2.mjs", [["planSpecIsPlainObject", "isPlainObject"], ["canonicalJson", "canonicalJson"], ["sha256CanonicalJson", "sha256CanonicalJson"]],
+    [["planSpecIsPlainObject", "isPlainObject"]]);
+  const copy = await import("../lib/po-gate-authority-read.mjs");
+  const rebind = await import("../lib/plan-approval-device-rebind.mjs");
+  const boundary = await import("../lib/private-boundary.mjs");
+  const spec = await import("../lib/plan-spec-state-v2.mjs");
+  const input = { gitCommonDir: path.join(tmpdir(), "no-such-common-dir-d216a"), planApproval: {}, current: {} };
+  assert.equal(copy.readPlanApprovalDeviceRebind(input), rebind.readPlanApprovalDeviceRebind(input));
+  assert.equal(copy.sha256CanonicalJson({ b: 1, a: [2, "x"] }), spec.sha256CanonicalJson({ b: 1, a: [2, "x"] }));
+  const missing = path.join(tmpdir(), "no-such-private-file-d216a.json");
+  assert.deepEqual(d216aOutcome(() => copy.readPrivateJson(missing)), d216aOutcome(() => boundary.readPrivateJson(missing)));
+});
+
+test("D216A the read half of the residual acceptance carries no pin; the write-capable module still pins on first use through its own wrapper", async () => {
+  const readSource = readFileSync(path.join(d216aPluginDir, "lib/critical-action-authorization-read.mjs"), "utf8");
+  const oldSource = readFileSync(path.join(d216aPluginDir, "lib/critical-action-authorization.mjs"), "utf8");
+  assert.doesNotMatch(readSource, /pinTrustAnchorOnFirstUse/u);
+  assert.match(readSource, /if \(typeof pinTrustAnchor === "function"\) pinTrustAnchor\(/u);
+  assert.equal((oldSource.match(/pinTrustAnchor: pinTrustAnchorOnFirstUse/gu) ?? []).length, 2, "both entry points of the write-capable module pass its pin");
+  const oldModule = await import("../lib/critical-action-authorization.mjs");
+  const readModule = await import("../lib/critical-action-authorization-read.mjs");
+  for (const name of ["authorizeRecordedResidualAcceptance", "authorizeRecordedResidualAcceptanceByMode"]) {
+    assert.notEqual(oldModule[name], readModule[name], `${name}: the old module wraps the read half`);
+    assert.deepEqual(oldModule[name]({}), readModule[name]({}), `${name}: same verdict on invalid input`);
+  }
+});
+
+test("D216A the hardened read of po-gate-authority-read refuses a file that changes during the read and a symlink", async () => {
+  const { readPhysicalFile } = await import("../lib/po-gate-authority-read.mjs");
+  const root = fs.realpathSync(mkdtempSync(join(tmpdir(), "d216a-swap-")));
+  const target = join(root, "a.txt");
+  const realRead = fs.readFileSync;
+  try {
+    writeFileSync(target, "first-bytes");
+    assert.equal(readPhysicalFile(root, "a.txt").toString("utf8"), "first-bytes");
+    fs.symlinkSync(target, join(root, "b.txt"));
+    assert.throws(() => readPhysicalFile(root, "b.txt"), /symlink is not allowed/u);
+    fs.readFileSync = function swapped(file, ...rest) {
+      const bytes = realRead.call(this, file, ...rest);
+      if (file === target) writeFileSync(target, "second-and-longer-bytes");
+      return bytes;
+    };
+    syncBuiltinESMExports();
+    assert.throws(() => readPhysicalFile(root, "a.txt"), /file identity changed during read/u);
+  } finally {
+    fs.readFileSync = realRead;
+    syncBuiltinESMExports();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

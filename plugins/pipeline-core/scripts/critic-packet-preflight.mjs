@@ -1,6 +1,23 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
+import { randomBytes } from "node:crypto";
+import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, linkSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { loadManifest } from "../lib/manifest.mjs";
+import { revalidateHistoricalFreshReviewPacketBinding } from "../lib/historical-fresh-review-admission.mjs";
+import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
+import { CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA, deriveCriticPacketGovernance, validateCriticPacketGovernance } from "../lib/critic-packet-governance.mjs";
+import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
+import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle } from "../lib/critic-diagnostic-packet.mjs";
+import { PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
+export { PACKET_SCHEMA, STATE_SCHEMA, RECORD_SCHEMA, SESSION_PACKET_BINDING_SCHEMA, SESSION_ADMISSION_SCHEMA, CriticPacketError, canonicalJson, sha256, normalizedPacketView, packetDigestMatches, readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission } from "../lib/critic-packet-preflight-read.mjs";
 
 /**
  * Candidate-bound Critic packet lifecycle.
@@ -10,49 +27,8 @@ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-laun
  * lifecycle records.  Provider adapters may only claim/record/consume a packet;
  * they do not get to reinterpret its Git or governance bindings.
  */
-import { createHash, randomBytes } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  lstatSync,
-  linkSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { spawnSync } from "node:child_process";
 
-import { loadManifest } from "../lib/manifest.mjs";
-import { revalidateHistoricalFreshReviewPacketBinding } from "../lib/historical-fresh-review-admission.mjs";
-import { isSafeTaskId } from "../lib/dispatch-record.mjs";
-import { sha256Canonical } from "../lib/review-economy.mjs";
-import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
-import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
-import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
-import {
-  CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
-  deriveCriticPacketGovernance,
-  validateCriticPacketGovernance,
-} from "../lib/critic-packet-governance.mjs";
-import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
-import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
-import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle, validateDiagnosticBundleShape } from "../lib/critic-diagnostic-packet.mjs";
 
-export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
-export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
-export const RECORD_SCHEMA = "pipeline.critic-candidate-record.v1";
-export const SESSION_PACKET_BINDING_SCHEMA = "pipeline.session-critic-packet-binding.v1";
-export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
 export const PACKET_TTL_SECONDS = 900;
 export const SESSION_REVIEW_TTL_SECONDS = 24 * 60 * 60;
 export const PACKET_DIFF_PATH = ".git/agent-pipeline-review.diff";
@@ -61,31 +37,9 @@ export const PACKET_FILES = Object.freeze([
   "session-admission.json", "result.json", "receipt.json", "cleanup.json",
 ]);
 
-const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
-const PACKET_ID = /^[a-f0-9]{32}$/;
-const SHA256 = /^[a-f0-9]{64}$/;
-const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REFERENCE_KINDS = new Set(["spec", "calibration", "guardrail", "evidence"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
-const SESSION_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
-const SIGNED_IMPORT_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
-
-export class CriticPacketError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.name = "CriticPacketError";
-    this.code = code;
-  }
-}
-
-function fail(code, message) { throw new CriticPacketError(code, message); }
-function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function exactKeys(value, keys) {
-  return isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-}
 function textCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
-export function canonicalJson(value) { return `${JSON.stringify(value, null, 2)}\n`; }
-export function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function nowIso(now) {
   const date = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(date.getTime())) fail("CPP-TIME", "Invalid packet clock value.");
@@ -132,29 +86,6 @@ function assertOid(value, objectFormat, label) {
   const length = objectFormat === "sha1" ? 40 : objectFormat === "sha256" ? 64 : 0;
   if (!OID.test(value) || value.length !== length) fail("CPP-REF", `${label} does not match ${objectFormat}.`);
   return value;
-}
-function inside(root, child) {
-  const rel = relative(root, child);
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
-}
-function assertRealPrivateDir(path, label) {
-  const lexical = lstatSync(path);
-  if (lexical.isSymbolicLink() || !lexical.isDirectory()) fail("CPP-CONTROL", `${label} must be a real directory.`);
-  if (process.platform !== "win32" && (lexical.mode & 0o077) !== 0) fail("CPP-CONTROL", `${label} must deny group and other access.`);
-  const physical = realpathSync(path);
-  if (process.platform === "win32" && assessWindowsPrivatePath(physical).status !== "secure") fail("CPP-CONTROL", `${label} Windows assurance is unavailable or insecure.`);
-  return physical;
-}
-function assertNoSymlinkPath(path, root, label) {
-  const realRoot = realpathSync(root);
-  const absolute = resolve(path);
-  if (!inside(realRoot, absolute)) fail("CPP-CONTROL", `${label} escapes the control root.`);
-  let cursor = realRoot;
-  for (const part of relative(realRoot, absolute).split(sep)) {
-    cursor = join(cursor, part);
-    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) fail("CPP-CONTROL", `${label} crosses a symlink.`);
-  }
-  return absolute;
 }
 function unsupportedDirectoryDurability(error) {
   return process.platform === "win32"
@@ -210,15 +141,6 @@ function replaceState(path, value) {
   if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") fail("CPP-RECORD", "Packet state Windows assurance is unavailable or insecure.");
   fsyncDir(dirname(path));
 }
-function readJson(path, code = "CPP-RECORD") {
-  const info = lstatSync(path);
-  if (info.isSymbolicLink() || !info.isFile() || info.size > 1024 * 1024 || (process.platform !== "win32" && (info.mode & 0o077) !== 0)) {
-    fail(code, `${path} is not a private bounded regular file.`);
-  }
-  if (process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure")) fail(code, `${path} Windows assurance is unavailable or insecure.`);
-  try { return JSON.parse(readFileSync(path, "utf8")); } catch { fail(code, `${path} is not valid JSON.`); }
-}
-
 function normalizeRoute(route) {
   const keys = ["routeId", "runner", "adapter", "provider", "modelTier", "effortTier", "assurance", "projectionDigest"];
   if (!exactKeys(route, keys) || !keys.slice(0, -1).every((key) => typeof route[key] === "string" && route[key].length > 0)
@@ -226,28 +148,6 @@ function normalizeRoute(route) {
     fail("CPP-ROUTE", "The packet route is not closed or valid.");
   }
   return Object.fromEntries(keys.map((key) => [key, route[key]]));
-}
-function normalizeSessionBinding(value, route) {
-  const keys = ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"];
-  const hasModelRole = isObject(value) && Object.hasOwn(value, "modelRole");
-  if (!exactKeys(value, hasModelRole ? [...keys, "modelRole"] : keys) || value.schema !== SESSION_PACKET_BINDING_SCHEMA
-    || typeof value.sessionId !== "string" || !SAFE_ID.test(value.sessionId)
-    || typeof value.preflightSha256 !== "string" || !SHA256.test(value.preflightSha256)
-    || value.assurance !== SESSION_ASSURANCE || value.freshContext !== true
-    || value.historyInherited !== false || value.mayDelegate !== false) fail("CPP-SESSION-BINDING", "Session Critic binding is invalid.");
-  if (hasModelRole) {
-    const role = value.modelRole;
-    if (!exactKeys(role, ["schema", "runner", "taskRoute", "modelId", "effort", "readbackSha256", "receiptSha256"])
-      || role.schema !== "pipeline.session-critic-model-role.v1"
-      || !["codex", "claude"].includes(role.runner)
-      || !["duty.critic_normal", "duty.critic_high_risk"].includes(role.taskRoute)
-      || typeof role.modelId !== "string" || role.modelId.length === 0 || role.modelId.length > 128
-      || role.modelId.trim() !== role.modelId || typeof role.effort !== "string" || role.effort.length === 0
-      || !SHA256.test(role.readbackSha256) || !SHA256.test(role.receiptSha256)
-      || (route !== undefined && (role.runner !== route.runner || role.modelId !== route.modelTier
-        || role.effort !== route.effortTier))) fail("CPP-SESSION-BINDING", "Session Critic model-role binding is invalid.");
-  }
-  return Object.freeze(Object.fromEntries((hasModelRole ? [...keys, "modelRole"] : keys).map((key) => [key, value[key]])));
 }
 function normalizeReferences(references, candidateByPath) {
   if (!Array.isArray(references)) fail("CPP-REFERENCE", "references must be an array.");
@@ -312,99 +212,6 @@ function observeCheckout(checkout, candidateOid, candidateTree, creatorNonce) {
     creatorNonce,
   };
 }
-function bindingsFor(packet) {
-  return {
-    requestSha256: sha256(canonicalJson(packet.request)),
-    diffPathsSha256: sha256(canonicalJson(packet.diffPaths)),
-    governanceSha256: sha256(canonicalJson(packet.governance)),
-    ...(packet.diagnostics === undefined ? {} : { diagnosticsSha256: sha256(canonicalJson(packet.diagnostics)) }),
-    ...(packet.coordinatorOnly === undefined ? {} : { coordinatorOnlySha256: sha256(canonicalJson(packet.coordinatorOnly)) }),
-  };
-}
-function recordBody(packet, revision, priorStateDigest, phase, body, timestamp) {
-  return { schema: STATE_SCHEMA, packetId: packet.packetId, packetDigest: sha256(canonicalJson(packet)), revision, priorStateDigest, timestamp, phase, body };
-}
-function validatePacketShape(packet, shapeOptions = {}) {
-  if (!isObject(packet) || packet.schema !== PACKET_SCHEMA || !PACKET_ID.test(packet.packetId)
-    || !SHA256.test(packet.bindings?.requestSha256) || !SHA256.test(packet.bindings?.diffPathsSha256)
-    || !SHA256.test(packet.bindings?.governanceSha256)) fail("CPP-DIGEST", "Packet shape is invalid.");
-  const expected = bindingsFor(packet);
-  if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
-  if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding, packet.route);
-  if (packet.coordinatorOnly !== undefined) {
-    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, shapeOptions);
-    const taskId = coordinator.localDispatchEvidence?.taskId ?? coordinator.signedQualityImportAnchor?.taskId;
-    if (taskId !== packet.request?.taskId) fail("CPP-COORDINATOR-BINDING", "Coordinator-only binding does not name the packet task.");
-  }
-  if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
-}
-
-function normalizeCoordinatorOnly(value, candidate, { allowLegacyPreAssurance = false } = {}) {
-  if (isObject(value) && Object.hasOwn(value,"historicalFreshReview")) {
-    const {historicalFreshReview,...ordinary}=value;
-    const normalized=normalizeCoordinatorOnly(ordinary,candidate,{allowLegacyPreAssurance});
-    if(historicalFreshReview?.target?.baseCommit!==candidate.base
-      || historicalFreshReview?.target?.candidateCommit!==candidate.commit
-      || !revalidateHistoricalFreshReviewPacketBinding(historicalFreshReview)) fail("CPP-HISTORICAL-ADMISSION","Historical fresh-review binding is unavailable or drifted.");
-    return Object.freeze({...normalized,historicalFreshReview:Object.freeze({...historicalFreshReview})});
-  }
-  if (exactKeys(value, ["signedQualityImportAnchor"])) {
-    const anchor = value.signedQualityImportAnchor;
-    if (!exactKeys(anchor, ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"])
-      || anchor.schema !== SIGNED_IMPORT_ANCHOR_SCHEMA
-      || !SHA256.test(anchor.intentSha256 ?? "")
-      || !OID.test(anchor.integrationCommit ?? "") || anchor.integrationCommit.length !== candidate.commit.length
-      || !OID.test(anchor.baseCommit ?? "") || anchor.baseCommit.length !== candidate.commit.length
-      || anchor.candidateCommit !== candidate.commit || anchor.baseCommit !== candidate.base
-      || !isSafeTaskId(anchor.taskId) || anchor.taskId !== `signed-import-${anchor.intentSha256}`) {
-      fail("CPP-COORDINATOR-BINDING", "Signed import anchor is not closed or does not bind this candidate range.");
-    }
-    return Object.freeze({ signedQualityImportAnchor: Object.freeze({ ...anchor }) });
-  }
-  // Only a packet ALREADY CLAIMED under the older version may be read in this form; a new claim or admission stays strict.
-  if (allowLegacyPreAssurance === true && exactKeys(value, ["localDispatchEvidence"])
-    && exactKeys(value.localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])) {
-    // Pre-assurance form (claimed before the binding carried an assurance field): closed, exact old digest, read as assurance null.
-    const legacy = value.localDispatchEvidence;
-    const { snapshotId: legacySnapshotId, ...legacyBody } = legacy;
-    if (legacy.schema !== "pipeline.local-dispatch-evidence.v1"
-      || !isSafeTaskId(legacy.taskId) || legacy.recordPath !== `evidence/dispatch-record-${legacy.taskId}.json`
-      || !SHA256.test(legacy.recordSha256 ?? "") || !OID.test(legacy.sourceCandidateCommit ?? "")
-      || legacy.sourceCandidateCommit.length !== candidate.commit.length || legacy.reviewCandidateCommit !== candidate.commit
-      || legacySnapshotId !== sha256Canonical(legacyBody)) {
-      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
-    }
-    const view = { ...legacyBody, assurance: null };
-    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...view, snapshotId: sha256Canonical(view) }) });
-  }
-  if (exactKeys(value, ["localDispatchEvidence"])) {
-    const binding = value.localDispatchEvidence;
-    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"])
-      || (binding.assurance !== null && binding.assurance !== "orchestrator-attested")
-      || binding.schema !== "pipeline.local-dispatch-evidence.v1"
-      || !isSafeTaskId(binding.taskId) || binding.recordPath !== `evidence/dispatch-record-${binding.taskId}.json`
-      || !SHA256.test(binding.recordSha256 ?? "") || !OID.test(binding.sourceCandidateCommit ?? "")
-      || binding.sourceCandidateCommit.length !== candidate.commit.length || binding.reviewCandidateCommit !== candidate.commit
-      || binding.snapshotId !== sha256Canonical({ schema: binding.schema, taskId: binding.taskId,
-        recordPath: binding.recordPath, recordSha256: binding.recordSha256,
-        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit,
-        assurance: binding.assurance })) {
-      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
-    }
-    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...binding }) });
-  }
-  fail("CPP-COORDINATOR-BINDING", "Coordinator-only packet binding is invalid.");
-}
-function packetContext(controlRoot, packetId, shapeOptions = {}) {
-  if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
-  const root = assertRealPrivateDir(resolve(controlRoot), "control root");
-  const packetDir = assertNoSymlinkPath(join(root, packetId), root, "packet directory");
-  if (!existsSync(packetDir)) fail("CPP-ABSENT", "Packet does not exist.");
-  const packet = readJson(join(packetDir, "packet.json"));
-  validatePacketShape(packet, shapeOptions);
-  if (packet.packetId !== packetId) fail("CPP-DIGEST", "Packet ID mismatch.");
-  return { root, packetDir, packet };
-}
 function assertLive(packet, now) {
   const time = new Date(now).getTime();
   if (!Number.isFinite(time) || time > new Date(packet.expiresAt).getTime()) fail("CPP-EXPIRED", "Packet expired.");
@@ -446,13 +253,6 @@ export function readCandidateExport({ controlRoot, packetId, assuranceClass, pol
     fail("CPP-EXPORT", "Persisted Critic export authorization is invalid or drifted.");
   }
   return { ok: true, code: "CPP-EXPORT-READ", packet, receipt };
-}
-function currentState(packetDir, packet) {
-  const state = readJson(join(packetDir, "state.json"));
-  if (state.schema !== STATE_SCHEMA || state.packetId !== packet.packetId || state.packetDigest !== sha256(canonicalJson(packet))) {
-    fail("CPP-STATE", "Packet state binding mismatch.");
-  }
-  return state;
 }
 function advanceState(packetDir, packet, expected, next, body, now) {
   const statePath = join(packetDir, "state.json");
@@ -714,23 +514,6 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
   return inspectClaimedSessionAdmission({ controlRoot, packetId }, { now });
 }
 
-/** The packet as a claimed-session reader sees it: a stored pre-assurance coordinator binding is shown in its normalized form. */
-export function normalizedPacketView(packet) {
-  return packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
-    ? packet
-    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
-}
-
-/**
- * True when `digest` is the digest of this exact packet: as it lies on disk (what the finalizer binds today) or as its normalized
- * view (what the build before bound for a pre-assurance packet). Any other digest, or a changed packet, is false.
- */
-export function packetDigestMatches(packet, digest) {
-  if (typeof digest !== "string") return false;
-  if (digest === sha256(canonicalJson(packet))) return true;
-  try { return digest === sha256(canonicalJson(normalizedPacketView(packet))); } catch { return false; }
-}
-
 /** Re-read the exact admission while the packet is still claimed. */
 export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
   const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now, allowLegacyPreAssurance: true });
@@ -792,61 +575,6 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
   return { ok: true, code: "CPP-CONSUMED", replay: false, packet, record };
 }
 
-function readConsumedCandidateSnapshot({ controlRoot, packetId }) {
-  // A packet claimed in the pre-assurance form is consumed by the finalizer through the explicit legacy read; read it back the same way.
-  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
-  const state = currentState(packetDir, packet);
-  if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
-  const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
-  // A physical receipt file is not authority on its own. The consume step
-  // copied its exact body and journal position into the durable state; a
-  // later edit of either side must not mint a different positive review.
-  if (receiptRecord?.schema !== RECORD_SCHEMA || receiptRecord.phase !== "consumed"
-    || receiptRecord.packetId !== packetId
-    || receiptRecord.packetDigest !== sha256(canonicalJson(packet))
-    || !Number.isSafeInteger(receiptRecord.revision) || receiptRecord.revision < 1
-    || canonicalJson(recordBody(packet, receiptRecord.revision,
-      receiptRecord.priorStateDigest, receiptRecord.phase,
-      receiptRecord.body, receiptRecord.timestamp)) !== canonicalJson(state)) {
-    fail("CPP-RECEIPT-DRIFT", "Consumed Critic receipt differs from its durable journal state.");
-  }
-  return { packetDir, packet, state, receiptRecord };
-}
-export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
-  const { packet, receiptRecord } = readConsumedCandidateSnapshot({ controlRoot, packetId });
-  const receipt = receiptRecord?.body ?? receiptRecord;
-  return Object.freeze({ packet, receipt });
-}
-
-/** Read the exact durable result preceding a consumed receipt; no verdict authority. */
-export function readConsumedCandidateResult({ controlRoot, packetId }) {
-  const initial = readConsumedCandidateSnapshot({ controlRoot, packetId });
-  const { packetDir, packet, state, receiptRecord } = initial;
-  const resultRecord = readJson(join(packetDir, "result.json"), "CPP-RESULT");
-  if (!exactKeys(resultRecord, ["schema", "packetId", "packetDigest", "revision", "priorStateDigest", "timestamp", "phase", "body"])
-    || resultRecord.schema !== RECORD_SCHEMA || resultRecord.phase !== "result-recorded"
-    || resultRecord.packetId !== packet.packetId || resultRecord.packetDigest !== sha256(canonicalJson(packet))
-    || !Number.isSafeInteger(resultRecord.revision) || resultRecord.revision < 1
-    || resultRecord.revision !== receiptRecord.revision - 1 || !SHA256.test(resultRecord.priorStateDigest ?? "")
-    || typeof resultRecord.timestamp !== "string" || !Number.isFinite(Date.parse(resultRecord.timestamp))
-    || !isObject(resultRecord.body)) fail("CPP-RESULT-DRIFT", "Consumed Critic result record is invalid.");
-  const predecessor = recordBody(packet, resultRecord.revision, resultRecord.priorStateDigest,
-    resultRecord.phase, resultRecord.body, resultRecord.timestamp);
-  if (sha256(canonicalJson(predecessor)) !== receiptRecord.priorStateDigest) {
-    fail("CPP-RESULT-DRIFT", "Consumed Critic result differs from its journal predecessor.");
-  }
-  const current = readConsumedCandidateSnapshot({ controlRoot, packetId });
-  const resultReadback = readJson(join(packetDir, "result.json"), "CPP-RESULT");
-  if (canonicalJson(current.packet) !== canonicalJson(packet)
-    || canonicalJson(current.state) !== canonicalJson(state)
-    || canonicalJson(current.receiptRecord) !== canonicalJson(receiptRecord)
-    || canonicalJson(resultReadback) !== canonicalJson(resultRecord)) {
-    fail("CPP-RESULT-DRIFT", "Consumed Critic snapshot changed during readback.");
-  }
-  return Object.freeze({ packet, receipt: receiptRecord.body, result: resultRecord.body });
-}
-
-
 export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {
   // Cleanup acts on the packet the finalizer just consumed through the explicit legacy read, so it reads it the same way.
   const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
@@ -872,53 +600,6 @@ export function blockCandidatePacket({ controlRoot, packetId, code, detail = nul
 }
 
 export const __test = Object.freeze({ bindingsFor, observeCheckout, candidateInventory });
-
-/** Read the immutable prelaunch admission only after genuine journal consumption. */
-export function readConsumedSessionAdmission({ controlRoot, packetId }) {
-  const consumed = readConsumedCandidateResult({ controlRoot, packetId });
-  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
-  const admissionPath = join(packetDir, "session-admission.json");
-  if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
-    fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");
-  }
-  const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
-  if (!Object.hasOwn(admission ?? {}, "courseSourceSha256") || !Object.hasOwn(admission ?? {}, "courseDecisionSha256")) {
-    fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Historical admission has no course digest slots.");
-  }
-  const claim = readJson(join(packetDir, "claim.json"), "CPP-CLAIM-READ");
-  const resultRecord = readJson(join(packetDir, "result.json"), "CPP-RESULT");
-  const preparedState = recordBody(packet, 1, null, "prepared", { code: "CPP-PREPARED" }, packet.createdAt);
-  if (!exactKeys(claim, ["schema", "packetId", "packetDigest", "revision", "priorStateDigest", "timestamp", "phase", "body"])
-    || claim.schema !== RECORD_SCHEMA || claim.packetId !== packetId || claim.phase !== "claimed" || claim.revision !== 2
-    || claim.packetDigest !== sha256(canonicalJson(packet)) || claim.priorStateDigest !== sha256(canonicalJson(preparedState))
-    || typeof claim.timestamp !== "string" || !Number.isFinite(Date.parse(claim.timestamp))
-    || !(exactKeys(claim.body, ["adapter", "claimantNonce"]) || exactKeys(claim.body, ["adapter", "claimantNonce", "criticReviewLineageSha256"]))
-    || claim.body.adapter !== packet.route.adapter || !SHA256.test(claim.body.claimantNonce ?? "")
-    || (Object.hasOwn(claim.body, "criticReviewLineageSha256") && !SHA256.test(claim.body.criticReviewLineageSha256 ?? ""))
-    || resultRecord.revision !== 3
-    || resultRecord.priorStateDigest !== sha256(canonicalJson(recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, claim.timestamp)))
-    || canonicalJson(resultRecord.body) !== canonicalJson(consumed.result)) fail("CPP-CLAIM-READ", "Consumed journal claim binding differs.");
-  const binding = packet.request.sessionBinding;
-  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
-    || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
-    || admission.packetDigest !== sha256(canonicalJson(packet))
-    || admission.claimSha256 !== sha256(canonicalJson(claim))
-    || admission.sessionId !== binding.sessionId
-    || admission.preflightSha256 !== binding.preflightSha256
-    || admission.preflightSha256 !== packet.route.projectionDigest
-    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
-    || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
-    fail("CPP-SESSION-ADMISSION", "Consumed session admission is drifted.");
-  }
-  const readback = readConsumedCandidateResult({ controlRoot, packetId });
-  if (canonicalJson(readback) !== canonicalJson(consumed)
-    || canonicalJson(readJson(admissionPath, "CPP-SESSION-ADMISSION")) !== canonicalJson(admission)
-    || canonicalJson(readJson(join(packetDir, "claim.json"), "CPP-CLAIM-READ")) !== canonicalJson(claim)
-    || canonicalJson(readJson(join(packetDir, "result.json"), "CPP-RESULT")) !== canonicalJson(resultRecord)) {
-    fail("CPP-SESSION-ADMISSION", "Consumed admission changed during readback.");
-  }
-  return Object.freeze({ packet, receipt: consumed.receipt, result: consumed.result, admission });
-}
 
 /** Observe the real owner and canonical packet root before genuine claim. */
 export function claimCriticPacketWithLaunchContext(input, options) {
