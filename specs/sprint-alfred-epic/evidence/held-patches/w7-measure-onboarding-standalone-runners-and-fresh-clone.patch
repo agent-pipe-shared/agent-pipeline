@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+index 220c3bb83..2fa124715 100644
+--- a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
++++ b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+@@ -197,6 +197,17 @@ function answerArgvForCollectInput(dir, action) {
+     ]);
+     const argv = consentApply.argv.map((value) => replacements.get(value) ?? value);
+     const unresolved = argv.filter((value) => typeof value === "string" && /^<PO_[A-Z_]+>$/.test(value));
++    // The Codex and Antigravity consent step asks for `projectDescription` and names a scratch text file in its own
++    // action; the stand-in PO writes the description there once, as the `text` branch above does.
++    const textFileIndex = argv.indexOf("--text-file");
++    if (unresolved.length === 0 && names.includes("projectDescription") && textFileIndex >= 0) {
++      const textFile = argv[textFileIndex + 1];
++      if (typeof textFile !== "string" || !textFile.startsWith("scratch/") || textFile.includes("..")) {
++        return { kind: "unanswerable", names, guidance, reason: "intake-consent-apply omitted a bounded scratch text file" };
++      }
++      mkdirSync(join(dir, "scratch"), { recursive: true });
++      writeFileSync(join(dir, textFile), DEFAULT_ANSWERS.text);
++    }
+     if (unresolved.length === 0) {
+       return { kind: "command", executable: consentApply.executable, argv, publishedAction: true };
+     }
+@@ -548,6 +559,7 @@ export function main(args = process.argv.slice(2), {
+   write = process.stdout.write.bind(process.stdout),
+ } = {}) {
+   const scratchDir = join(REPO_ROOT, "scratch");
++  mkdirSync(scratchDir, { recursive: true }); // a fresh clone has no scratch/ yet
+   const fixtureHome = mkdtempSync(join(scratchDir, "measure-onboarding-home-"));
+   const dir = mkdtempSync(join(scratchDir, "measure-onboarding-fresh-"));
+   const env = { ...process.env, HOME: fixtureHome, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: fixtureHome };
