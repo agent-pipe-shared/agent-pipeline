@@ -350,3 +350,7 @@ content-v1:fd7fadb7d60662ebf84a2e74b877dcf9a88801066fbde0bcb902132256f370f7:spec
 content-v1:fd988155580aa115ad83d09d51276030cc669dfb62d2bfd26c030be2230de9e9:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:6734
 content-v1:fdd5b163386c8ae7638c21a90b9e2c040aaa1c5763eb4845d139bd934ed5b76b:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:9350
 content-v1:ff6ba7bee4b2361645149717cfe254aa4e5128f857f4fcf1c224619b91b50f2e:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29392:368
+# C14-GITLEAKS-FP-2 (2026-10-31): the D216-A split moved the string constant that detects an unencrypted key file in plugins/pipeline-core/scripts/po-human-approval.mjs
+# to a new line, so its line-bound entry above went stale. Same reviewed value (a PEM header literal in a detection constant, not a key), new line; generated with
+# gitleaksContentAuthorityLine() from the normalized finding of the applied tree. The stale entry stays as a harmless record.
+content-v1:2bb243f703e651052ed783debf08353b789416d602ecfe4a877a78b9cc58e26d:plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1678:22
