@@ -1,0 +1,165 @@
+diff --git a/plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs b/plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs
+index f2078e87b..425ff979c 100644
+--- a/plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs
++++ b/plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs
+@@ -5,7 +5,8 @@
+  * Acceptance points (backlog item, Acceptance):
+  *   A1 role normalisation accepts the runner's real agent-type spellings; a batch without the
+  *      prohibition line is `not-applicable` before any role parsing can reject it.
+- *   A2 Explore, Plan, general-purpose and pipeline-core:* types dispatch, alone and in parallel batches.
++ *   A2 Explore, Plan, general-purpose and pipeline-core:* types are recognised, alone and in parallel batches (at the hook
++ *      the write-carrier rule, D185, admits only direct Explore; Plan/general-purpose are refused by it, never by an APB- code).
+  *   A3 an invalid role produces its own code (APB-ROLE-UNPARSEABLE) naming the offending value.
+  * The real module and the real hook CLI are exercised; the RED cases run a scratch MIRROR of the
+  * production function carrying the original defect, never an edit of production.
+@@ -46,18 +47,36 @@ function guard(payload) {
+ const PROHIBITION = `- ${ADVISOR_PROHIBITION_LINE} (MP-26)`;
+ 
+ // ---- A1/A2: the real hook CLI, exact live tool_input shapes ----
+-for (const type of ["Explore", "Plan", "general-purpose"]) {
+-  test(`A1/A2 CLI: Agent ${type} without a prohibition line is admitted`, () => {
++// Restated to the decided write-carrier contract (2026-10-31 R8; PO decision D185 / commit 90fa209cf: "the guard order
++// stays and the tests follow"; rule introduced by a0feac3a4). The pin's intent is unchanged: a capitalised built-in agent
++// type is recognised by the role normalisation and never produces an APB-* (Advisor-binding) denial. What changed is the
++// admission outcome of the write-capable built-ins: `writeCapableCarrierAdmission` admits only the read-only direct `Explore`
++// carrier; `Plan` and `general-purpose` can write, so the hook refuses them with DISPATCH-WRITE-CARRIER-REQUIRED -- before
++// any role/prompt/Advisor check, which is why that refusal carries no APB- code. The carrier rule is not loosened here.
++const CARRIER_CODE = /DISPATCH-WRITE-CARRIER-REQUIRED/u;
++
++test("A1/A2 CLI: Agent Explore without a prohibition line is admitted", () => {
++  const { code, stderr } = guard({
++    tool_use_id: "pin-Explore", tool_name: "Agent",
++    tool_input: { subagent_type: "Explore", model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
++  });
++  assert.equal(code, 0, stderr.slice(0, 300));
++  assert.doesNotMatch(stderr, /APB-/u);
++});
++
++for (const type of ["Plan", "general-purpose"]) {
++  test(`A1/A2 CLI: Agent ${type} is recognised (no APB- denial) and refused only by the write-carrier rule`, () => {
+     const { code, stderr } = guard({
+       tool_use_id: `pin-${type}`, tool_name: "Agent",
+       tool_input: { subagent_type: type, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+     });
+-    assert.equal(code, 0, stderr.slice(0, 300));
++    assert.equal(code, 2, stderr.slice(0, 300));
++    assert.match(stderr, CARRIER_CODE);
+     assert.doesNotMatch(stderr, /APB-/u);
+   });
+ }
+ 
+-test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is admitted", () => {
++test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is recognised and refused only by the write-carrier rule", () => {
+   const { code, stderr } = guard({
+     tool_use_id: "pin-batch", tool_name: "Workflow",
+     tool_input: { script: `
+@@ -67,7 +86,8 @@ test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is
+       agent({ agentType: 'Explore', prompt: 'Read d and report.' })
+     ` },
+   });
+-  assert.equal(code, 0, stderr.slice(0, 300));
++  assert.equal(code, 2, stderr.slice(0, 300));
++  assert.match(stderr, CARRIER_CODE);
+   assert.doesNotMatch(stderr, /APB-/u);
+ });
+ 
+@@ -136,14 +156,17 @@ test("A3 module: an invalid role gets APB-ROLE-UNPARSEABLE naming the value", ()
+   assert.ok(long.message.length < 300);
+ });
+ 
+-test("A3 CLI: the hook blocks an unparseable role with APB-ROLE-UNPARSEABLE naming it", () => {
++// Restated to the decided guard order (D185 / 90fa209cf): the write-carrier check runs before the role, prompt and Advisor
++// checks, so an unparseable role is blocked at the hook by DISPATCH-WRITE-CARRIER-REQUIRED (exit 2, before any model call)
++// and never reaches the Advisor binding. The own code APB-ROLE-UNPARSEABLE and the value-naming message stay pinned at
++// module level by "A3 module" above (the code path the hook would take once a carrier is selected).
++test("A3 CLI: the hook blocks an unparseable role at the write-carrier check, never with the generic Advisor denial", () => {
+   const { code, stderr } = guard({
+     tool_use_id: "pin-bad", tool_name: "Agent",
+     tool_input: { subagent_type: "bad role", model: "sonnet", description: "r", prompt: `${PROHIBITION}\nRead and report.` },
+   });
+   assert.equal(code, 2, stderr.slice(0, 300));
+-  assert.match(stderr, /APB-ROLE-UNPARSEABLE/u);
+-  assert.match(stderr, /"bad role"/u);
++  assert.match(stderr, CARRIER_CODE);
+   assert.doesNotMatch(stderr, /APB-DISPATCH-INVALID/u);
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs b/plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs
+index bcb0881f7..dd5502078 100644
+--- a/plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs
++++ b/plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs
+@@ -9,8 +9,9 @@
+ //      current dependency closure (both scanner diagnostics modules copied)
+ //   A3 a child with no B8 coverage is valid; missing/invalid/duplicate reports fail;
+ //      an entirely unobserved corpus cannot pass
+-//   A4 (complete-suite consistency) the corpus declares 216 unique cases that the
+-//      12 children partition exactly; the full-suite run itself is NOT run here
++//   A4 (complete-suite consistency) the corpus declares its own EXPECTED_CASE_COUNT of unique cases (read from the
++//      suite source; 240 = 12 children x 20 at 2026-10-31, was 216 = 12 x 18) that the children partition exactly;
++//      the full-suite run itself is NOT run here
+ //
+ // Fixtures live under the repository's scratch/ (never the OS temp dir). No case here
+ // needs directory mode bits or directory symlinks, so none is skipped for the
+@@ -207,7 +208,17 @@ describe("A2: the original installed-plugin scanner fixture completes with the c
+ });
+ 
+ // ---- A3 -------------------------------------------------------------------
+-const SHARDS = 6, CHUNKS = 2, EXPECTED = 216;
++// The partition numbers are read from the suite's own declaration (SHARD_COUNT, CHUNK_COUNT, EXPECTED_CASE_COUNT), so adding
++// a closed-partition batch of cases (216 -> 240 = 6 x 2 x 20, the suite's own 228 + 12 note) does not re-red this pin. The
++// cross-check stays independent: A4 below still compares the declared constant to the corpus actually registered.
++function declaredSuiteConstant(name) {
++  const match = new RegExp(`^const ${name} = (\\d+);$`, "mu").exec(suiteSource);
++  assert.ok(match, `${name} must be declared as a numeric literal in the suite source`);
++  return Number(match[1]);
++}
++const SHARDS = declaredSuiteConstant("SHARD_COUNT");
++const CHUNKS = declaredSuiteConstant("CHUNK_COUNT");
++const EXPECTED = declaredSuiteConstant("EXPECTED_CASE_COUNT");
+ const assigned = (index, shard, chunk) => index % SHARDS === shard && Math.floor(index / SHARDS) % CHUNKS === chunk;
+ 
+ function expectedFor(shard, chunk) {
+@@ -254,7 +265,7 @@ describe("A3: per-child coverage reports", () => {
+       "wrong schema": { ...good, schema: "other" },
+       "extra key": { ...good, extra: 1 },
+       "wrong chunk": { ...good, chunk: 1 },
+-      "wrong declared count": { ...good, declaredCount: 215 },
++      "wrong declared count": { ...good, declaredCount: EXPECTED - 1 },
+       "missing result": { ...good, results: good.results.slice(1) },
+       "wrong id": { ...good, results: [{ ...good.results[0], id: "POV-x" }, ...good.results.slice(1)] },
+       "bad disposition": { ...good, results: [{ ...good.results[0], disposition: "skipped" }, ...good.results.slice(1)] },
+@@ -283,7 +294,7 @@ describe("A3: per-child coverage reports", () => {
+ 
+   it("an entirely unobserved corpus cannot pass: the parent requires nonempty coverage across successful children (structural pin)", () => {
+     // The aggregate decision is inline in the suite's direct-invocation parent block and is
+-    // not exported, so it is pinned structurally (full behavior needs the 216-case run).
++    // not exported, so it is pinned structurally (full behavior needs the full-corpus run).
+     assert.match(suiteSource,
+       /if \(failed\.length === 0\) \{[\s\S]*?const classes = new Set\(results\.flatMap\(\(result\) => result\.coverage\)\);\s*assert\.ok\(classes\.size > 0, "B8 corpus must reach at least one real session command"\);/u);
+     assert.match(suiteSource, /classes: \[\.\.\.b8ObservedCommandClasses\]\.sort\(\)/u, "children must report coverage once over IPC");
+@@ -295,8 +306,9 @@ describe("A3: per-child coverage reports", () => {
+ 
+ // ---- A4 -------------------------------------------------------------------
+ describe("A4: case-count consistency (complete suite run itself is out of this pin's scope)", () => {
+-  it("216 unique declared cases are partitioned exactly once by the 12 children, 18 each", () => {
++  it("the declared unique cases are partitioned exactly once by the children, an equal share each", () => {
+     const cases = suite.ONBOARDING_TEST_CASES;
++    assert.ok(Number.isInteger(EXPECTED / (SHARDS * CHUNKS)), "declared case count must divide evenly across the closed child partition");
+     assert.equal(cases.length, EXPECTED);
+     assert.equal(new Set(cases.map((c) => c.id)).size, EXPECTED);
+     assert.deepEqual(cases.map((c) => c.index), Array.from({ length: EXPECTED }, (_, i) => i));
+diff --git a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+index bef20b941..3550f7bd2 100644
+--- a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+@@ -225,6 +225,10 @@ function producerFixture(tag) {
+   writeFileSync(join(root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n");
+   const git = (args) => { const r = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false }); assert.equal(r.status, 0, r.stderr); };
+   git(["init", "-q"]); git(["config", "user.name", "SFP Pin Fixture"]); git(["config", "user.email", "sfp@example.invalid"]);
++  // Restated to the decided contract of 537d5c85d (G32-SECURITY-REMOTE): the candidate snapshot is bound to the effective push
++  // remote, so a project with no remote yields ERROR/candidate_snapshot (remote-missing) before any adapter runs. The fixture
++  // gives its project the remote the scan requires, the way the other security fixtures do (security-scan.test.mjs commitFixture).
++  git(["remote", "add", "origin", "https://example.invalid/pipeline/sfp-pin-fixture.git"]);
+   git(["add", "-A"]); git(["commit", "-qm", "fixture"]);
+   const binary = join(base, "synthetic-semgrep");
+   writeFileSync(binary, "synthetic selected child, never executed\n");
