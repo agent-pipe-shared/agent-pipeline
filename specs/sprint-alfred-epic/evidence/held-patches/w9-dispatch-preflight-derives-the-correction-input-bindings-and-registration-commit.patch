@@ -1,0 +1,547 @@
+diff --git a/harness/review-protocol.md b/harness/review-protocol.md
+index b6fb6595f..6904f3800 100644
+--- a/harness/review-protocol.md
++++ b/harness/review-protocol.md
+@@ -96,8 +96,19 @@ an unbound version, or an ambiguous role rejects the input preparation; neither
+ silently carve out source nor hand the mixed artifact to the fresh reviewer.
+ 
+ The role project-state record is admissible only for the file the project
+-calibration names as its handover/state file and a `pipeline-handover*.md` file
+-in the same directory. It is an exclusion binding only: the Critic verifies the
++calibration names as its handover/state file, a `pipeline-handover*.md` file
++in the same directory, and the built-in convention set `docs/HISTORY.md` and
++everything under `docs/state-archive/` (no calibration entry is needed or read
++for the convention set). Any other markdown or text file whose basename starts
++with `history` (case-insensitive) in the reviewed range, that is neither in this
++set nor listed in `criticFindingRecordPaths`, is refused by the dispatch
++preflight before any packet is reserved (CDP-HISTORY-IN-RANGE); its repair is to
++list the path in `criticFindingRecordPaths` of `project/pipeline.json` and its
++byte-equal mirror `.claude/pipeline.json`. When the caller passes no bindings
++file, the preflight derives the bindings itself (the same derivation as the
++derive command), judges them exactly as a given file, and reports them in its
++result; a given file is still compared with the derivation and refused
++(CDP-CORRECTION-INPUT-STALE) on mismatch. It is an exclusion binding only: the Critic verifies the
+ blob SHA-256 and mode without emitting bytes and never reads it, and the
+ forbidden-material rule for handover, state and history is not relaxed. The
+ Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+index b04b6ff43..36cfef60f 100644
+--- a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -72,9 +72,23 @@ function findingRecordsOf(calibration) {
+   return [...new Set(listed)].sort();
+ }
+ 
++// D223 slice 3 (Toolbox N41, PO decision 2026-10-31): the block-history file and the archived state files are a BUILT-IN convention of the
++// project-state record role, with no calibration entry: the role is an exclusion binding only (the Critic verifies blob digest and mode and
++// never reads the file), so the forbidden-material rule for history (CR-01a) keeps its meaning. The set is deliberately closed and exact.
++export const PROJECT_STATE_CONVENTION_FILES = Object.freeze(["docs/HISTORY.md"]);
++export const PROJECT_STATE_CONVENTION_DIRECTORIES = Object.freeze(["docs/state-archive/"]);
++// A markdown or text file whose basename starts with "history" is block-history-shaped. Narrow on purpose: a source file such as
++// lib/command-history.mjs never matches (it neither starts with the word nor has a markdown/text extension).
++const HISTORY_BASENAME = /^history[^/]*\.(?:md|markdown|txt)$/iu;
++/** The source paths of a derived bindings document that look like block history and are neither convention files nor calibrated (CDP-HISTORY-IN-RANGE). */
++export function historyPathsInBindings(document) {
++  return (document?.sourcePaths ?? []).filter((path) => HISTORY_BASENAME.test(posix.basename(path))).sort();
++}
++
+ function classify(path, handover, findingRecords = []) {
+   if (handover !== null && path === handover) return ROLE_PROJECT_STATE_RECORD;
+   if (handover !== null && posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
++  if (PROJECT_STATE_CONVENTION_FILES.includes(path) || PROJECT_STATE_CONVENTION_DIRECTORIES.some((directory) => path.startsWith(directory))) return ROLE_PROJECT_STATE_RECORD;
+   if (RETAINED_PATTERN.test(path)) return ROLE_RETAINED_PRIOR_RESULT;
+   if (findingRecords.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry))) return ROLE_FINDING_DISPOSITION_RECORD;
+   return "source";
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index a09f1d775..761bdbd6e 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -748,6 +748,24 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+ }
+ function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',affectedInvariantIds:[]}};}
+ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(input);return deriveCriticCourseAdmissionV2({source:{courseIdentity:c.resolved.courseIdentity,source:c.source},acceptedCriterion:c.criterion,consumedHistory:c.history,deltaRequest:c.delta,deterministicEvidence:c.evidence,budgets:c.budgets});}catch(error){return emptyProjection(input,error);}}
++// D223 slice 3: the registration commit of a round, derived (read-only) by the rule the admission itself applies. A candidate commit is
++// registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to
++// HEAD are the only possible registration commits; one qualifies when this module's own admission, asked with that commit as the
++// registration commit, ADMITS the request. Exactly one -> derived; none or more than one -> never guessed, never the latest.
++export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCommit,candidateCommit,deltaRequestPath=null,limit=32}){
++ const none={status:'none',commits:[]};
++ try{
++  if(!FEATURE_ID.test(featureId??'')||![baseCommit,candidateCommit].every(v=>OID.test(v??'')))return none;
++  const root=realpathSync(repoRoot),head=gitBytes(root,['rev-parse','HEAD'],'CCA-RANGE-READ').toString('utf8').trim();
++  const chain=range(root,candidateCommit,head);
++  if(chain.length===0||chain.length>limit)return none;
++  const admitted=[];
++  for(const registrationCommit of chain){
++   const admission=readCriticCourseAdmission({repoRoot:root,featureId,baseCommit,candidateCommit,registrationCommit,requestedMode:deltaRequestPath===null?'full':'delta',acceptedReference:null,criterionLocator:null,deltaRequestPath});
++   if(admission?.decision?.status==='admitted')admitted.push(registrationCommit);
++  }
++  return admitted.length===1?{status:'derived',commit:admitted[0],commits:admitted}:{status:admitted.length===0?'none':'ambiguous',commits:admitted};
++ }catch{return none;}}
+ function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
+ export function prepareRegisteredCriticDeltaRequest(input){try{
+  if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 425a6adc0..ba1c50521 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -681,6 +681,21 @@ export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {
+  */
+ const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
+ const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"trustBoundaryChanged":false,"impactAmbiguous":false}';
++// The four fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
++const DELTA_JUDGMENT_FIELDS = ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
++/** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": []}}) at the missing input path and refuses; wx: never overwrites. */
++function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
++  const names = gitOut(root, ["diff", "--name-only", "-z", baseCommit, candidate, "--"]);
++  if (names === null) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the changed paths of ${baseCommit}..${candidate} could not be read`, { inputPath });
++  const changedPaths = names.split("\0").filter(Boolean).sort();
++  const target = join(root, inputPath);
++  try {
++    mkdirSync(dirname(target), { recursive: true });
++    if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
++    writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
++  } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
++  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool - then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
++}
+ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
+   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
+   let root;
+@@ -690,17 +705,22 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+   const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds exactly these keys and nothing else: ${DELTA_INPUT_KEYS.join(", ")}; expected shape: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
+   // The input file: a repository-relative regular file, no link on the way (the same refusals as the diagnostic file).
+   const seen = repositoryRelative(inputPath) ? inspect(root, inputPath) : { kind: "invalid" };
+-  if (seen.kind !== "file") return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
+-  try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); }
+-  let input;
+-  try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
+-  if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
+-  const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
+-  if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
+-  const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
+-  if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
+-  if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
+-  for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
++  // D223 (slice 3): an input file that does not exist yet is not a dead end. The checks below that need no input run first (feature, lineage,
++  // correction commit); then a PATH SKELETON is written at the expected path and the verb refuses. An existing file is never touched.
++  const absent = seen.kind === "absent";
++  if (seen.kind !== "file" && !absent) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
++  if (!absent) { try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); } }
++  let input = null;
++  if (!absent) {
++    try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
++    if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
++    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
++    if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
++    const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
++    if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
++    if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
++    for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
++  }
+   // The single registered feature course.
+   let features = [];
+   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
+@@ -733,6 +753,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     candidate = oid; break;
+   }
+   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
++  if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate });
+   const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
+   const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, trustBoundaryChanged: input.trustBoundaryChanged, impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
+   if (!compiled.ok) {
+diff --git a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+index d6ed1d2a2..130be53ff 100644
+--- a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+@@ -14,7 +14,7 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -124,6 +124,52 @@ function registerDiagnostic(root, candidate, tag) {
+   return { diagnosticPath, registration: commitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`) };
+ }
+ 
++/** A further evidence-only registration commit (one more immutable candidate-evidence file in the manifest): the admission admits at it as well. */
++function registerExtraEvidence(root, tag) {
++  const manifestPath = `specs/${FEATURE}/lifecycle.json`, path = `specs/${FEATURE}/evidence/extra-${tag}.json`;
++  put(root, path, JSON.stringify({ note: `extra evidence ${tag}` }));
++  const manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
++  manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  return commitPaths(root, [manifestPath, path], `register extra evidence ${tag}`);
++}
++
++/** The entries under the repository's critic packet control root (a packet or reservation file would show up here). */
++function listControl(root) {
++  const dir = join(root, git(root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
++  return existsSync(dir) ? readdirSync(dir, { recursive: true }).map(String).sort() : [];
++}
++
++/**
++ * W9 slice 3 (D223): the delta request through the missing-input route. The input file does not exist: the verb writes a PATH SKELETON
++ * (the derived changed paths, an empty list per path, none of the four judgment fields) and refuses; the Coordinator fills the judgment
++ * and the invariant map; the verb then succeeds. Returns what each step observed.
++ */
++function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
++  const inputPath = `scratch/delta-skeleton-${Object.keys(observed.skeletons ?? {}).length + 1}.json`;
++  assert.equal(existsSync(join(root, inputPath)), false, "the input file does not exist before the verb runs");
++  const first = addCriticDeltaRequest({ root, inputPath });
++  assert.equal(first.status, "refused", JSON.stringify(first));
++  assert.equal(first.code, "FPR-DELTA-INPUT-PATH", JSON.stringify(first));
++  assert.ok(first.reason.includes(inputPath), "the refusal names the skeleton file");
++  for (const field of ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(first.reason.includes(field), `the refusal says ${field} stays a Coordinator judgment: ${first.reason}`);
++  const skeletonBytes = readFileSync(join(root, inputPath));
++  const skeleton = JSON.parse(skeletonBytes.toString("utf8"));
++  assert.deepEqual(Object.keys(skeleton), ["pathInvariantMap"], "the skeleton carries the path map only; no judgment field is filled, defaulted or inferred");
++  assert.ok(Object.keys(skeleton.pathInvariantMap).length > 0 && Object.values(skeleton.pathInvariantMap).every((list) => Array.isArray(list) && list.length === 0), "every changed path maps to an empty list");
++  // The skeleton never makes the verb succeed, and an existing file is never overwritten.
++  const again = addCriticDeltaRequest({ root, inputPath });
++  assert.equal(again.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(again));
++  assert.deepEqual(readFileSync(join(root, inputPath)), skeletonBytes, "the existing input file is not overwritten");
++  // The Coordinator's judgment: the four fields and the invariant lists.
++  put(root, inputPath, JSON.stringify({ changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags,
++    pathInvariantMap: Object.fromEntries(Object.keys(skeleton.pathInvariantMap).map((path) => [path, ["inv-one"]])) }));
++  const added = addCriticDeltaRequest({ root, inputPath });
++  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
++  (observed.skeletons ??= {})[inputPath] = Object.keys(skeleton.pathInvariantMap).sort();
++  return { added, registration: commitPaths(root, added.commitPaths, "register the delta request"), skeleton: inputPath };
++}
++
+ function deltaRequest(root, claims, flags) {
+   const base = { changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
+   put(root, "scratch/delta-input.json", JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
+@@ -167,7 +213,12 @@ function acceptResidual(root, packetId, { boundToPacket = packetId } = {}) {
+  * { kind: "full" | "delta" | "fallback", verdict, accept }; `slices` the task ids whose records are written through the attested route.
+  * Returns the repository and a log of what every step observed.
+  */
+-function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null }) {
++function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null,
++  derived = false, skeletonDelta = false, extraCorrectionFiles = null, listedExtra = null, duplicateDiagAtRound = null }) {
++  // W9 slice 3 options: `derived` passes NEITHER a bindings file NOR a registration commit (the preflight derives both);
++  // `skeletonDelta` creates the delta request through the missing-input skeleton route; `extraCorrectionFiles` = { round, files } adds
++  // files to that round's correction commit; `listedExtra` lists one more path in criticFindingRecordPaths of BOTH calibration mirrors
++  // (committed in the base commit); `duplicateDiagAtRound` registers a second diagnostic of that round's candidate.
+   const root = mkdtempSync(join(tmpdir(), `w8-walk-${label}-`));
+   const observed = { rounds: [], acceptances: [], bindings: [] };
+   git(root, ["init", "-q", "-b", "main"]);
+@@ -176,7 +227,8 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
+   put(root, "governance/policies/checklist.md", "- verify\n");
+   // The consumer's shape: the project State is not a tracked file, scratch and the captured diagnostic logs are not either.
+   put(root, ".gitignore", "/project/pipeline-state.json\n/.claude/pipeline-state.json\n/scratch/\n/evidence/*-targeted-*.log\n");
+-  put(root, "project/pipeline.json", json({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] }));
++  put(root, "project/pipeline.json", json({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md", ...(listedExtra === null ? [] : [listedExtra])] }));
++  if (listedExtra !== null) put(root, ".claude/pipeline.json", readFileSync(join(root, "project/pipeline.json"), "utf8"));
+   put(root, "docs/state.md", "state v1\n");
+   put(root, "docs/findings.md", "findings quoted here\n");
+   put(root, "pipeline.user.yaml", "gates:\n  human_approval: chat\n");
+@@ -237,7 +289,9 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
+       put(root, "docs/findings.md", `findings quoted here\n${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
+       put(root, "docs/state.md", `state v${n}\n`);
+       if (unlistedFindingFile) put(root, "docs/other-findings.md", `${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
+-      const correctionPaths = [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : [])];
++      const extraFiles = extraCorrectionFiles !== null && extraCorrectionFiles.round === n ? Object.entries(extraCorrectionFiles.files) : [];
++      for (const [path, text] of extraFiles) put(root, path, text);
++      const correctionPaths = [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : []), ...extraFiles.map(([path]) => path)];
+       if (guardCorrections) {
+         // W9: the correction commit passes the commit-path guard (the predicate the commit-msg hook runs) at the real staged index.
+         git(root, ["add", "-f", "--", ...correctionPaths]);
+@@ -252,8 +306,9 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
+     }
+     const diag = registerDiagnostic(root, candidate, tag);
+     registrationCommit = diag.registration;
++    if (duplicateDiagAtRound === n) registerExtraEvidence(root, tag); // a second evidence-only registration commit after the first one
+     if (n > 1) {
+-      delta = deltaRequest(root, [`fix-${n}`], round.kind === "fallback" ? { trustBoundaryChanged: true } : {});
++      delta = (skeletonDelta ? deltaRequestViaSkeleton : deltaRequest)(root, [`fix-${n}`], round.kind === "fallback" ? { trustBoundaryChanged: true } : {}, observed);
+       registrationCommit = delta.registration; deltaRequestPath = delta.added.deltaRequestPath;
+     }
+     const base = n === 1 ? genesis : previousCandidate;
+@@ -266,11 +321,17 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
+       assert.equal(derived.status, 0, `bindings ${tag}: ${derived.text}`);
+       step.bindings = { base: bindingsBase, digest: derived.body.digestSha256, counts: derived.body.counts };
+     }
+-    const argv = ["--root", root, "--base", base, "--candidate", candidate, "--spec", SPEC_PATH, "--evidence", diag.diagnosticPath, "--registration-commit", registrationCommit,
+-      ...(deltaRequestPath === null ? [] : ["--delta-request", deltaRequestPath]), ...(bindingsPath === null ? [] : ["--correction-input-bindings", bindingsPath])];
++    // W9 slice 3 (D223): in `derived` mode the caller passes NO registration commit and NO bindings file; the preflight derives both.
++    const argv = ["--root", root, "--base", base, "--candidate", candidate, "--spec", SPEC_PATH, "--evidence", diag.diagnosticPath, ...(derived ? [] : ["--registration-commit", registrationCommit]),
++      ...(deltaRequestPath === null ? [] : ["--delta-request", deltaRequestPath]), ...(bindingsPath === null || derived ? [] : ["--correction-input-bindings", bindingsPath])];
++    step.controlBefore = listControl(root);
++    step.expectedRegistration = registrationCommit;
+     const preflight = cli("critic-dispatch-preflight.mjs", argv);
+     step.preflight = preflight;
+     step.argv = argv;
++    step.bindingsPath = bindingsPath;
++    step.derivedEcho = preflight.body?.correctionInputBindings ?? null;
++    step.registrationEcho = preflight.body?.coordinatorOnly?.courseAdmission?.registrationCommit ?? null;
+     if (preflight.status !== 0 || preflight.body?.status !== "packet-ready") { observed.rounds.push(step); observed.refusedAt = { round: n, step: "preflight", body: preflight.body, text: preflight.text }; return { root, observed, genesis }; }
+     step.reviewBase = preflight.body.base.commit;
+     step.fallbackFull = preflight.body.coordinatorOnly.courseAdmission.fallbackFull === true;
+@@ -779,3 +840,124 @@ test("W9 NEGATIVE (4): a lineage write refusal leaves the round evidence exporte
+     assert.equal(finalizer.writeCriticRoundLineage({ root: fx.root, packetId }).status, "written");
+   } finally { cleanup(fx); }
+ });
++
++// ---------------------------------------------------------------------------------------------------------------------------------
++// Path W9 slice 3 (D223): the preflight derives the correction-input bindings and the registration commit; the delta request input is
++// prepared as a path skeleton; block history files are a built-in project-state exclusion with an early report (Toolbox N41).
++// Seams (named, as above): the Critic model call (fixed verdict), the PO residual acceptance (chat mode), the Critic's own dispatch
++// record, the guard adapter (the exported predicate the commit-msg hook calls). The delta verb is called as the exported function the
++// register-feature-package CLI calls (the CLI additionally needs the project authority State, which this fixture does not carry).
++// ---------------------------------------------------------------------------------------------------------------------------------
++const HISTORY_FILES = { "docs/HISTORY.md": "block history\n", "docs/state-archive/2026-10.md": "archived state\n", "lib/command-history.mjs": "export const history = 1;\n" };
++
++test("W9 SLICE 3 CHAIN: three rounds with NO bindings file and NO registration commit: skeleton delta input, derived values echoed, history files excluded, close plans", () => {
++  const fx = walkCourse({ label: "w9s3-chain", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: minors("r2"), accept: true }, { kind: "fallback", verdict: PASS }],
++    slices: ["TASK-ONE"], guardCorrections: true, derived: true, skeletonDelta: true, extraCorrectionFiles: { round: 3, files: HISTORY_FILES } });
++  try {
++    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
++    const [r1, r2, r3] = fx.observed.rounds;
++    for (const step of [r1, r2, r3]) {
++      assert.ok(!step.argv.includes("--registration-commit") && !step.argv.includes("--correction-input-bindings"), "the caller passes neither a registration commit nor a bindings file");
++      assert.match(step.registrationEcho, /^[a-f0-9]{40}$/u, "the registration commit the preflight derived is echoed");
++      assert.equal(step.registrationEcho, step.expectedRegistration, "the derived registration commit is the commit the registration verbs produced");
++    }
++    assert.equal(r1.derivedEcho, null, "round 1 has no project-state or retained-result path: no bindings");
++    for (const step of [r2, r3]) {
++      assert.equal(step.derivedEcho.path, null, "derived bindings have no file");
++      assert.equal(step.derivedEcho.digestSha256, step.bindings.digest, "the derived digest equals the digest the derive verb produces for the range");
++      assert.deepEqual(JSON.parse(readFileSync(join(fx.root, step.bindingsPath), "utf8")), step.derivedEcho.bindings, "the echoed document is what the derive verb writes");
++    }
++    assert.equal(r2.fallbackFull, false);
++    assert.equal(r3.fallbackFull, true, "round 3 is the effective FULL round over the whole feature range");
++    assert.equal(r3.bindings.base, fx.genesis);
++    // (5) the history files are project-state exclusions with no calibration entry; (7) lib/command-history.mjs is a source path.
++    const roles = Object.fromEntries(r3.derivedEcho.bindings.exclusions.map((entry) => [entry.path, entry.role]));
++    assert.equal(roles["docs/HISTORY.md"], "project-state record");
++    assert.equal(roles["docs/state-archive/2026-10.md"], "project-state record");
++    assert.ok(r3.derivedEcho.bindings.sourcePaths.includes("lib/command-history.mjs"), "a source file whose name merely contains history is never matched");
++    assert.deepEqual(JSON.parse(readFileSync(join(fx.root, "project/pipeline.json"), "utf8")).criticFindingRecordPaths, ["docs/findings.md"], "no calibration entry is involved");
++    // The skeleton route ran in rounds 2 and 3 (once each) and the changed paths came from the range.
++    assert.equal(Object.keys(fx.observed.skeletons).length, 2);
++    const addenda = writeAddenda(fx, ["TASK-ONE"]);
++    assert.equal(addenda["TASK-ONE"].status, 0, addenda["TASK-ONE"].text);
++    const closed = closeToPrepared(fx);
++    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
++    assert.equal(closed.apply().status, "applied");
++  } finally { cleanup(fx); }
++});
++
++test("W9 SLICE 3 NEGATIVE (1): a bindings file the caller passes is compared with the derivation and refused CDP-CORRECTION-INPUT-STALE on mismatch", () => {
++  const fx = walkCourse({ label: "w9s3-stale", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true });
++  try {
++    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
++    const round = fx.observed.rounds[1];
++    // Bindings for the course range (genesis..candidate) are not the bindings of this correction range.
++    const other = cli("critic-correction-input-bindings.mjs", ["derive", "--root", fx.root, "--base", fx.genesis, "--head", round.candidate, "--out", "scratch/bindings-other.json"]);
++    assert.equal(other.status, 0, other.text);
++    const refused = cli("critic-dispatch-preflight.mjs", [...round.argv, "--correction-input-bindings", "scratch/bindings-other.json"]);
++    assert.equal(refused.status, 1);
++    assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-STALE", refused.text);
++  } finally { cleanup(fx); }
++});
++
++test("W9 SLICE 3 NEGATIVE (2): a range the derivation refuses stays CDP-CORRECTION-INPUT-REFUSED (a rename across classes)", () => {
++  const fx = walkCourse({ label: "w9s3-refused", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
++  try {
++    const [round] = fx.observed.rounds;
++    git(fx.root, ["mv", "src/TASK-ONE.mjs", "docs/HISTORY.md"]);
++    const crossing = commitPaths(fx.root, ["src", "docs/HISTORY.md"], "move a source file onto the block history file");
++    const refused = cli("critic-dispatch-preflight.mjs", ["--root", fx.root, "--base", round.candidate, "--candidate", crossing, "--spec", SPEC_PATH, "--evidence", `specs/${FEATURE}/evidence/diagnostic-r1.json`]);
++    assert.equal(refused.status, 1);
++    assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-REFUSED", refused.text);
++  } finally { cleanup(fx); }
++});
++
++test("W9 SLICE 3 NEGATIVE (3): two commits qualify as registration commit: refused with the typed argument refusal, nothing guessed, nothing reserved", () => {
++  const fx = walkCourse({ label: "w9s3-ambiguous", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true, duplicateDiagAtRound: 1 });
++  try {
++    const refusal = fx.observed.refusedAt;
++    assert.equal(refusal?.round, 1, JSON.stringify(refusal));
++    assert.equal(refusal.body.code, "CDP-ARGUMENT", refusal.text);
++    assert.match(refusal.body.reason, /^An exact registration commit is required: 2 commits qualify/u, "the typed argument refusal of today, extended with the candidates");
++    assert.equal(refusal.body.registrationCommitDerivation.status, "ambiguous");
++    assert.equal(refusal.body.registrationCommitDerivation.commits.length, 2);
++    assert.deepEqual(listControl(fx.root), fx.observed.rounds[0].controlBefore, "no packet or reservation was created");
++    // The explicit input is still honoured: passing either one of the two commits is the caller's choice.
++    const explicit = cli("critic-dispatch-preflight.mjs", [...fx.observed.rounds[0].argv, "--registration-commit", refusal.body.registrationCommitDerivation.commits[0]]);
++    assert.equal(explicit.body?.status, "packet-ready", explicit.text);
++  } finally { cleanup(fx); }
++});
++
++test("W9 SLICE 3 NEGATIVE (4): an existing delta input of the wrong shape is refused FPR-DELTA-INPUT-SHAPE and never overwritten", () => {
++  const fx = walkCourse({ label: "w9s3-shape", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
++  try {
++    put(fx.root, "src/fix2.mjs", "export const fix2 = 2;\n");
++    const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
++    registerDiagnostic(fx.root, candidate, "r2");
++    const wrong = JSON.stringify({ pathInvariantMap: { "src/fix2.mjs": [] } });
++    put(fx.root, "scratch/delta-wrong.json", wrong);
++    const refused = addCriticDeltaRequest({ root: fx.root, inputPath: "scratch/delta-wrong.json" });
++    assert.equal(refused.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(refused));
++    assert.equal(readFileSync(join(fx.root, "scratch/delta-wrong.json"), "utf8"), wrong, "the file is not overwritten");
++  } finally { cleanup(fx); }
++});
++
++test("W9 SLICE 3 NEGATIVE (6): a history-named file in the range is refused CDP-HISTORY-IN-RANGE with the exact repair before anything is reserved; listing it in BOTH calibration mirrors admits it", () => {
++  const files = { "docs/history-notes.md": "notes about the history of the block\n" };
++  const fx = walkCourse({ label: "w9s3-history", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true, extraCorrectionFiles: { round: 2, files } });
++  try {
++    const refusal = fx.observed.refusedAt;
++    assert.equal(refusal?.round, 2, JSON.stringify(refusal));
++    assert.equal(refusal.body.code, "CDP-HISTORY-IN-RANGE", refusal.text);
++    assert.deepEqual(refusal.body.paths, ["docs/history-notes.md"]);
++    assert.ok(refusal.body.repair.includes("criticFindingRecordPaths") && refusal.body.repair.includes("project/pipeline.json") && refusal.body.repair.includes(".claude/pipeline.json") && refusal.body.repair.includes("docs/history-notes.md"), refusal.body.repair);
++    assert.deepEqual(listControl(fx.root), fx.observed.rounds.at(-1).controlBefore, "no packet or reservation file exists after the refusal");
++  } finally { cleanup(fx); }
++  const listed = walkCourse({ label: "w9s3-history-listed", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true,
++    extraCorrectionFiles: { round: 2, files }, listedExtra: "docs/history-notes.md" });
++  try {
++    assert.equal(listed.observed.refusedAt, undefined, JSON.stringify(listed.observed.refusedAt));
++    const role = listed.observed.rounds[1].derivedEcho.bindings.exclusions.find((entry) => entry.path === "docs/history-notes.md")?.role;
++    assert.equal(role, "finding-disposition record", "the calibrated file is an exclusion binding");
++  } finally { cleanup(listed); }
++});
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index f3deef8b1..f1dd03628 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
+ 
+-import { CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
++import { CriticCorrectionInputBindingsError, PROJECT_STATE_CONVENTION_DIRECTORIES, PROJECT_STATE_CONVENTION_FILES, deriveCriticCorrectionInputBindings, historyPathsInBindings } from "../lib/critic-correction-input-bindings.mjs";
+ 
+ /**
+  * Read-only admission for a path-only Critic dispatch.
+@@ -33,7 +33,7 @@ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+ } from "../lib/requirement-traceability.mjs";
+-import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
++import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+ 
+ export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
+@@ -209,9 +209,18 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
+     const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
+     fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
+   }
++  // N41: a block-history-shaped file in the range collides with the Critic's reference boundary (CR-01a); refuse here, before anything is reserved.
++  const historyPaths = historyPathsInBindings(derived);
++  if (historyPaths.length > 0) {
++    const reason = `The range changes block-history-shaped file(s) that are neither a built-in project-state record (${[...PROJECT_STATE_CONVENTION_FILES, ...PROJECT_STATE_CONVENTION_DIRECTORIES].join(", ")}) nor listed in criticFindingRecordPaths: ${historyPaths.join(", ")}. The Critic may not read history, so the review would stop after its packet was reserved.`;
++    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in project/pipeline.json AND to its byte-equal mirror .claude/pipeline.json (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
++    fail("CDP-HISTORY-IN-RANGE", reason, { reason, paths: historyPaths, repair });
++  }
+   if (reference === null || reference === undefined) {
++    // D223 (slice 3): no bindings file given, so the preflight uses its own in-memory derivation (the same function the derive verb calls)
++    // and reports it, so the Critic packet and the evidence carry it. A given file is still compared below and never silently replaced.
+     if (derived.exclusions.length === 0) return null;
+-    fail("CDP-CORRECTION-INPUT-REQUIRED", `${hint}; the range contains project-state or retained-result paths.`);
++    return { path: null, derived: true, digestSha256: derived.digestSha256, bindings: derived };
+   }
+   const path = normalizePath(reference, "correction input bindings path");
+   if (!path.startsWith("scratch/")) fail("CDP-PATH", "correction input bindings path must be under scratch/.");
+@@ -472,7 +481,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+       fail("CDP-COURSE-CONTEXT", "Course identity does not bind the requested feature Spec.");
+     }
+     const { decision, ...subject } = admission;
+-    courseAdmission = Object.freeze({ featureId: context.featureId,
++    courseAdmission = Object.freeze({ featureId: context.featureId, registrationCommit: context.registrationCommit,
+       sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
+       round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount,
+       ...(fallbackFull ? { fallbackFull: true, reason: admission.decision.reason ?? null, courseBase: baseCommit ?? baseTree } : {}) });
+@@ -639,6 +648,25 @@ export function parseCriticDispatchPreflightArgs(argv) {
+     else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
+     index += 1;
+   }
++  // D223 (slice 3): no --registration-commit given. The registration commit is the ONE commit after the candidate (an evidence-only chain, as
++  // the admission's own transport check requires) at which the existing course admission admits the request; derived here, at parse time, so
++  // every later step (admit, finalize, the reservation) sees the same explicit commit. None qualifying keeps today's behaviour; more than one
++  // is refused, nothing is guessed. A caller-given commit (or --accepted-contract, hashed at that commit) is never replaced.
++  if (selectors["--registration-commit"] === undefined && selectors["--accepted-contract"] === undefined && values.sweepEvidenceTaskId === null
++    && typeof values.root === "string" && typeof values.base === "string" && typeof values.candidate === "string") {
++    const featureMatch = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
++    const baseCommit = featureMatch === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.base}^{commit}`]);
++    const candidateCommit = baseCommit === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]);
++    if (candidateCommit !== null) {
++      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: featureMatch[1], baseCommit, candidateCommit,
++        deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") });
++      if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
++      else if (derivation.status === "ambiguous") {
++        const reason = `An exact registration commit is required: ${derivation.commits.length} commits qualify (${derivation.commits.join(", ")}); the preflight never picks one. Pass --registration-commit with the commit that registered the evidence of this round.`;
++        fail("CDP-ARGUMENT", "An exact registration commit is required.", { reason, registrationCommitDerivation: { status: "ambiguous", commits: derivation.commits } });
++      }
++    }
++  }
+   if (Object.keys(selectors).length !== 0) {
+     if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
+     if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", "An exact registration commit is required.");
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index bbe402a2e..6abd89f57 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1408,14 +1408,22 @@ test("CCI preflight (1) a range without state or retained-result paths admits as
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
+-test("CCI preflight (2) a range with the handover file changed and no bindings field is refused CDP-CORRECTION-INPUT-REQUIRED with a verb-first message", () => {
++// Restated (D223 slice 3, 2026-10-31). Intent of the original case: a range containing project-state paths must never reach the Critic
++// without bindings. That intent is kept; the route changed: with NO bindings field the preflight derives the bindings itself (in memory,
++// the function the derive verb calls), judges them exactly as it judges a given file, and reports them in its result. The old refusal
++// CDP-CORRECTION-INPUT-REQUIRED can no longer occur.
++test("CCI preflight (2) a range with the handover file changed and no bindings field is derived in memory and reported (restated: was CDP-CORRECTION-INPUT-REQUIRED)", () => {
+   const fx = cciPreflightFixture({ "docs/state.md": "state v1\n" });
+   try {
+-    const error = cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
+-    assert.ok(error.message.startsWith("Run "));
+-    assert.ok(error.message.includes("critic-correction-input-bindings.mjs derive"));
+-    assert.equal(error.message.includes("\n"), false);
+-    assert.ok(error.message.length <= 220);
++    const result = preflightCriticDispatch(input(fx));
++    assert.equal(result.status, "packet-ready");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: fx.candidate });
++    assert.equal(result.correctionInputBindings.path, null);
++    assert.equal(result.correctionInputBindings.derived, true);
++    assert.equal(result.correctionInputBindings.digestSha256, doc.digestSha256);
++    assert.deepEqual(result.correctionInputBindings.bindings, doc, "the result carries the derived document");
++    assert.equal(result.correctionInputBindings.bindings.exclusions.find((entry) => entry.path === "docs/state.md").role, "project-state record");
++    assert.equal(fs.existsSync(join(fx.root, "scratch", "bindings.json")), false, "the preflight stays read-only: it writes no bindings file");
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
+@@ -1443,10 +1451,14 @@ test("CCI preflight (4) a bindings file written for another head, or an unreadab
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
+-test("CCI preflight (5) a retained prior result under the Critic results location triggers the requirement", () => {
++// Restated (D223 slice 3): intent kept (a retained prior result under the Critic results location is always bound as an exclusion); the
++// route changed from "refused until the caller derives a file" to "derived and reported by the preflight itself".
++test("CCI preflight (5) a retained prior result under the Critic results location is bound as an exclusion, derived when no file is given (restated: was REQUIRED)", () => {
+   const fx = cciPreflightFixture({ "specs/feat-x/evidence/critic/p1/result.md": "retained\n" });
+   try {
+-    cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
++    const derivedResult = preflightCriticDispatch(input(fx));
++    assert.equal(derivedResult.correctionInputBindings.derived, true);
++    assert.equal(derivedResult.correctionInputBindings.bindings.exclusions[0].role, "retained prior result");
+     cciWriteBindings(fx, fx.candidate);
+     assert.equal(preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/bindings.json" })).status, "packet-ready");
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 10c53ec0e..16edc5419 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -77,6 +77,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "     trustBoundaryChanged    true when the correction moves a trust boundary",
+   "     impactAmbiguous         true when the impact cannot be told",
+   "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
++  "     If <input.json> does not exist yet, step 5 writes a PATH SKELETON there (the changed paths, an empty list each; never the four judgment fields) and refuses (FPR-DELTA-INPUT-PATH); complete it and rerun.",
+   "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
+   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
