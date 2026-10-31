@@ -116,12 +116,19 @@ test("AC1 typed budget refusal names Elephant self-verification or an explicit P
   assert.doesNotMatch(src, /at most one (?:re-review|follow-up)/iu);
 });
 
-test("AC3 coordinator next-action text offers the Critic dispatch only with the delta-only batch rule", () => {
+// Restated for D212 (N33, 2026-10-30): intent unchanged -- the close refusal offers the Critic dispatch only with the delta-only
+// follow-up rule. The round-cap wording ("one full review plus at most three correction-diff reviews", "Elephant self-verification
+// or an explicit PO decision") is dropped because D190/D199 removed the cap; a stale cap in the refusal sent an operator holding a
+// passed course receipt to a dead end. The cap-free rule and the addendum route replace it (pinned behaviourally by the close
+// coordinator pin, case (h)).
+test("AC3 coordinator next-action text offers the Critic dispatch only with the delta-only follow-up rule (restated D212)", () => {
   const src = read("scripts/close-coordinator.mjs");
   assert.match(src, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
   assert.match(src, /follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate/u);
-  assert.match(src, /one full review plus at most three correction-diff reviews per declared batch/u);
-  assert.match(src, /Elephant self-verification or an explicit PO decision/u);
+  assert.match(src, /no round cap since D190\/D199; a further correction-diff Critic round is always allowed/u);
+  assert.match(src, /--critic-addendum <request\.json>/u);
+  assert.doesNotMatch(src, /one full review plus at most three correction-diff reviews per declared batch/u);
+  assert.doesNotMatch(src, /never another Critic/u);
 });
 
 // AC-142 chain: the refusal and the sanctioned route are tested apart elsewhere; this drives one valid pre-rule feature through both.

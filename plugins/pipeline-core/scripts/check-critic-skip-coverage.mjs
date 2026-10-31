@@ -516,6 +516,47 @@ function readCriticDispositionAddenda(root) {
   return { entriesByPath, findings };
 }
 
+const COMMIT_OID = /^[a-f0-9]{40}$/u;
+/** True when `ancestor` is an ancestor of, or equal to, `descendant`; false only on git's "not an ancestor" exit (1). Anything else throws. */
+function gitIsAncestor(gitRead, ancestor, descendant) {
+  try { gitRead(["merge-base", "--is-ancestor", ancestor, descendant]); return true; }
+  catch (error) { if (error?.status === 1) return false; throw error; }
+}
+
+/**
+ * D212 (N33 B): a consumed, passed Critic receipt whose packet carries ANOTHER task id (a feature-wide Critic course) satisfies a
+ * required record when the record's commit lies inside the receipt's reviewed range.
+ *
+ * The reviewed range is read from the validated receipt, `bound.critic.reviewRange = { base, commit, diffSha256 }`.
+ * `readBoundConsumedCriticReceipt` has already proved that it equals the consumed packet's `diff` and that its `commit` is the
+ * review candidate; a receipt always names a `base` (the receipt validator requires one). The range is the half-open set
+ * (base, commit]: the record's commit must be an ancestor of, or equal to, the review candidate and must NOT be an ancestor of, or
+ * equal to, the base. A course packet never lists the record as reviewed evidence, so the record-binding checks of the task-bound
+ * route do not apply; the private snapshot, when present, keeps its exact key shape and its assurance (null or orchestrator-attested).
+ */
+function courseReceiptFinding(addendum, bound, gitRead) {
+  const prefix = "Critic addendum does not match a passed, consumed Critic receipt of this task or a course receipt whose reviewed range contains the record's commit";
+  const range = bound.critic.reviewRange;
+  if (range === null || typeof range !== "object" || !COMMIT_OID.test(range.base ?? "") || range.commit !== addendum.reviewCandidateCommit) {
+    return `${prefix} (the receipt names no reviewed range ending at the review candidate)`;
+  }
+  const local = bound.packet?.coordinatorOnly?.localDispatchEvidence;
+  if (local !== undefined) {
+    const legacyForm = !Object.hasOwn(local ?? {}, "assurance");
+    try {
+      exactObject(local, legacyForm
+        ? ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"]
+        : ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
+    } catch { return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record"; }
+    if (!legacyForm && local.assurance !== null && local.assurance !== "orchestrator-attested") {
+      return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+    }
+  }
+  if (!gitIsAncestor(gitRead, addendum.candidateCommit, range.commit)) return `${prefix} (the commit is not an ancestor of the reviewed candidate)`;
+  if (gitIsAncestor(gitRead, addendum.candidateCommit, range.base)) return `${prefix} (the commit is not after the reviewed range base)`;
+  return null;
+}
+
 function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
   try {
     const readBound = options.readBoundCriticReceipt ?? ((input) => readBoundConsumedCriticReceipt(input));
@@ -532,11 +573,15 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
     const tree = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}^{tree}`]);
     const bound = readBound({ gitCommonDir, criticPacketId: addendum.criticPacketId,
       candidate: { commit: addendum.reviewCandidateCommit, tree } });
-    if (bound?.packet?.request?.taskId !== addendum.taskId
-      || bound?.critic?.reviewPass !== true
+    if (bound?.critic?.reviewPass !== true
       || bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
       || bound.criticReceiptSha256 !== addendum.criticReceiptSha256) {
       return "Critic addendum does not match a passed, consumed, task-bound Critic receipt";
+    }
+    if (bound?.packet?.request?.taskId !== addendum.taskId) {
+      // D212 (N33 B): task-id equality stays sufficient (below); a receipt of another task id is a course receipt and satisfies the
+      // record only when the record's commit lies inside the receipt's reviewed range.
+      return courseReceiptFinding(addendum, bound, gitRead);
     }
     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
     if (localDispatchEvidence !== undefined) {
@@ -601,6 +646,17 @@ function resolvedCriticAddendumFinding(root, entry, addendumEntry, options) {
   if (evidenceFinding) return evidenceFinding;
   const reviewFinding = boundCriticReviewFinding(root, addendumEntry.addendum, entry.bytes, options);
   return reviewFinding ? `${addendumEntry.path}: ${reviewFinding}` : null;
+}
+
+/**
+ * Finding (string) or null for an addendum that is NOT yet on disk: the same evidence and receipt checks the coverage evaluation
+ * applies to a published addendum, so the sanctioned writer can refuse an unbound addendum before its exclusive, irreplaceable
+ * publication (D212 C). Additive export; shares resolvedCriticAddendumFinding with every other consumer.
+ */
+export function criticAddendumBindingFinding({ root, addendum, record, recordBytes, options = {} } = {}) {
+  return resolvedCriticAddendumFinding(root,
+    { path: addendum.recordPath, bytes: recordBytes, record },
+    { path: criticDispositionAddendumPath(addendum.taskId), addendum }, options);
 }
 
 /** Single-record readback for authorship consumers; does not waive corpus coverage. */

@@ -10,6 +10,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
+import { criticAddendumBindingFinding } from "./check-critic-skip-coverage.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
 import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
@@ -522,6 +523,12 @@ export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dep
   validateCriticDispositionAddendum(addendum, { recordPath: addendum.recordPath, recordBytes, record });
   const evidenceBytes = readPhysicalRequest(root, addendum.criticEvidence.path, dependencies);
   if (createHash("sha256").update(evidenceBytes).digest("hex") !== addendum.criticEvidence.sha256) fail("critic-evidence", "critic evidence digest mismatch");
+  if (typeof dependencies.verifyBinding === "function") {
+    // The publication below is exclusive: a wrongly bound addendum could never be replaced, so the sanctioned CLI route proves the
+    // consumed receipt BEFORE it writes (the object route keeps its documented behaviour: coverage verifies afterwards).
+    const finding = dependencies.verifyBinding({ root, addendum, record, recordBytes });
+    if (finding) fail("addendum-unbound", `the addendum is not bound by a consumed, passed Critic receipt, so it was not written: ${finding}`);
+  }
   const bytes = Buffer.from(`${JSON.stringify(addendum, null, 2)}\n`, "utf8");
   const digest = publishExclusiveBytes(root, target, addendum.taskId, bytes, dependencies, "critic-addendum");
   return { schema: "pipeline.critic-disposition-addendum-write-receipt.v1", target, sha256: digest,
@@ -600,23 +607,41 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
   return writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
 }
 
-const USAGE = "usage: dispatch-record-write.mjs --repo-root <path> (--request <repo-relative-json> | --attested-request <repo-relative-json>)";
+/**
+ * D212 (N33 C) Elephant-side CLI mode: publish the byte-bound Critic addendum for a Critic-required record. The request file IS the
+ * `pipeline.critic-disposition-addendum.v1` object (recordPath, recordSha256, taskId, candidateCommit, reviewCandidateCommit,
+ * criticPacketId, criticReceiptSha256, criticEvidence). It is written only when the consumed Critic receipt binds it, either by the
+ * record's own task id or as a course receipt whose reviewed range contains the record's commit (check-critic-skip-coverage.mjs).
+ */
+export function runCriticAddendumRequest({ repoRoot, criticAddendumPath }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  const path = attestedInputPath(criticAddendumPath, "criticAddendumPath");
+  const bytes = readPhysicalRequest(root, path, dependencies);
+  let addendum;
+  try { addendum = parseStrictJson(bytes); } catch (error) { fail("addendum-shape", `critic addendum request is not strict JSON: ${error.message}`); }
+  const verifyBinding = dependencies.verifyBinding
+    ?? ((input) => criticAddendumBindingFinding({ ...input, options: dependencies.coverageOptions ?? {} }));
+  return writeCriticDispositionAddendumObject({ repoRoot: root, addendum }, { ...dependencies, verifyBinding });
+}
+
+const USAGE = "usage: dispatch-record-write.mjs --repo-root <path> (--request <repo-relative-json> | --attested-request <repo-relative-json> | --critic-addendum <repo-relative-json>)";
 export function parseArgs(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index]; const value = argv[index + 1];
-    if (!["--repo-root", "--request", "--attested-request"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", USAGE);
+    if (!["--repo-root", "--request", "--attested-request", "--critic-addendum"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", USAGE);
     values[key] = value;
   }
-  if (!values["--repo-root"] || (values["--request"] === undefined) === (values["--attested-request"] === undefined)) fail("usage", USAGE);
-  return values["--request"] !== undefined
-    ? { repoRoot: values["--repo-root"], requestPath: values["--request"] }
-    : { repoRoot: values["--repo-root"], attestedRequestPath: values["--attested-request"] };
+  const modes = ["--request", "--attested-request", "--critic-addendum"].filter((key) => values[key] !== undefined);
+  if (!values["--repo-root"] || modes.length !== 1) fail("usage", USAGE);
+  if (modes[0] === "--request") return { repoRoot: values["--repo-root"], requestPath: values["--request"] };
+  if (modes[0] === "--critic-addendum") return { repoRoot: values["--repo-root"], criticAddendumPath: values["--critic-addendum"] };
+  return { repoRoot: values["--repo-root"], attestedRequestPath: values["--attested-request"] };
 }
 if (isDirectInvocation(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    process.stdout.write(`${JSON.stringify(args.attestedRequestPath !== undefined ? runAttestedRequest(args) : writeDispatchRecord(args))}\n`);
+    process.stdout.write(`${JSON.stringify(args.criticAddendumPath !== undefined ? runCriticAddendumRequest(args) : args.attestedRequestPath !== undefined ? runAttestedRequest(args) : writeDispatchRecord(args))}\n`);
   }
   catch (error) { process.stderr.write(`DISPATCH-RECORD-WRITE-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
 }

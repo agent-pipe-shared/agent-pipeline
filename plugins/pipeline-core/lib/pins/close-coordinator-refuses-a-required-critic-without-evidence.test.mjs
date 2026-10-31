@@ -8,13 +8,19 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
+import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../critic-disposition-addendum.mjs";
+import { readBoundConsumedCriticReceipt } from "../critic-verify-lifecycle.mjs";
+import { registerGenericCriticBatch } from "../critic-generic-batch.mjs";
+import { reportSha256 } from "../dispatch-record.mjs";
+import { planVerifySelection } from "../verify-selection.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../scripts/session-critic-finalizer.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
 import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
 
@@ -180,6 +186,103 @@ test("(a) only the uncovered course slice is named", () => {
     ...evidenceFile("TASK-DONE"),
   });
   assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-OPEN"], notNamed: ["TASK-DONE"] });
+});
+
+// N33 (D212): the refusal stated a round cap (D190/D199 removed it) and named no command to write the addendum, so an operator holding a
+// passed Critic course receipt had no route from the refusal to a satisfied gate.
+test("(h) the refusal states the current rule and names the addendum command, with no stale round-cap wording (D212)", () => {
+  const repo = checkpointed("h", {
+    ...courseFile(FEATURE, ["TASK-IN-COURSE"]),
+    ...recordFile("TASK-IN-COURSE", { criticRequired: required() }),
+  });
+  const refused = repo.planPrepared();
+  assertRefusedForMissingCritic(refused, { named: ["TASK-IN-COURSE"] });
+  const message = refused.body.message;
+  assert.match(message, /node <plugin-root>\/scripts\/dispatch-record-write\.mjs --repo-root <repo-root> --critic-addendum <request\.json>/u);
+  assert.match(message, /no round cap/u);
+  assert.match(message, /a further correction-diff Critic round is always allowed/u);
+  assert.match(message, /reviewed range contains the record's commit/u);
+  assert.doesNotMatch(message, /at most three|never another Critic|once spent|Elephant self-verification/u);
+});
+
+// N33 A+B (D212): two orchestrator-attested records, one commit each, covered by ONE consumed, passed Critic course receipt whose
+// task id is the FIRST delivery's (TASK-ONE), so it covers TASK-TWO only by range. The receipt is a REAL consumed packet (generic batch -> admit -> finalize) under the fixture's
+// .git/agent-pipeline/critic-packets, the same machinery the audit-lifecycle test uses; the coordinator reads it with no injection.
+const sha = (value) => createHash("sha256").update(value).digest("hex");
+const attestedV4 = (taskId, commit) => {
+  const text = "Orchestrator-committed hand-back.";
+  return { schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: commit, resultSha256: reportSha256(text), outcome: "completed-orchestrator-attested",
+    commits: [commit], log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }],
+    report: { text, changedFiles: [`src/${taskId}.mjs`] }, criticRequired: required(),
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" },
+    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "1".repeat(64), handbackSha256: "2".repeat(64) } };
+};
+/** afterFixture hook: history P0 <- base <- R1 <- R2 <- candidate; a passed course Critic over (base, candidate]; both records; both addenda. */
+const attestedWithCourseReceipt = ({ secondInsideRange }) => (root) => {
+  const put = (path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
+  const commit = (message, paths) => { git(root, ["add", "--", ...paths]); git(root, ["commit", "-m", message]); return git(root, ["rev-parse", "HEAD"]); };
+  put("src/before.mjs", "export const before = 1;\n");
+  const beforeBase = commit("before the reviewed range", ["src/before.mjs"]);
+  put("specs/critic/spec.md", "# Spec\nAC-1 AC-2\n");
+  put(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
+  put("specs/review-unit.json", JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Close the feature as one delivery",
+    specPath: "specs/critic/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"], deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null }));
+  const baseCommit = commit("reviewed range base", ["specs/critic/spec.md", ".claude/pipeline.yaml", "specs/review-unit.json"]);
+  put("src/TASK-ONE.mjs", "export const one = 1;\n");
+  const first = commit("feat(x): one", ["src/TASK-ONE.mjs"]);
+  put("src/TASK-TWO.mjs", "export const two = 2;\n");
+  const second = commit("feat(x): two", ["src/TASK-TWO.mjs"]);
+  const secondCommit = secondInsideRange ? second : beforeBase;
+  const records = { "TASK-ONE": attestedV4("TASK-ONE", first), "TASK-TWO": attestedV4("TASK-TWO", secondCommit) };
+  for (const [taskId, value] of Object.entries(records)) put(`evidence/dispatch-record-${taskId}.json`, json(value));
+  const candidate = (() => { commit("persist the attested dispatch records", Object.keys(records).map((taskId) => `evidence/dispatch-record-${taskId}.json`));
+    return { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) }; })();
+  const common = git(root, ["rev-parse", "--git-common-dir"]);
+  const controlRoot = join(root, common, "agent-pipeline", "critic-packets");
+  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+  chmodSync(join(root, common, "agent-pipeline"), 0o700);
+  chmodSync(controlRoot, 0o700);
+  const changedPaths = git(root, ["diff", "--name-only", baseCommit, candidate.commit]).split("\n").filter(Boolean).sort();
+  put("evidence/critic-diagnostic.json", JSON.stringify({ schema: "pipeline.verify-evidence.v0", commit: candidate.commit, tree: candidate.tree, candidate, exitCode: 0,
+    selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit, changedPaths, registeredSuiteIds: ["test"],
+      policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
+    steps: [{ name: "test", exitCode: 0 }] }));
+  const packetId = "1".repeat(32);
+  const review = { preflightInput: { root, base: baseCommit, candidate: candidate.commit, specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      evidencePaths: ["evidence/critic-diagnostic.json"], priorCriticEvidencePath: null },
+    taskId: "TASK-ONE", projectId: "fixture", sessionId: "close-review-1", packetId,
+    route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
+    verdict: { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true } };
+  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId: "TASK-ONE", baseCommit, candidateCommit: candidate.commit,
+    logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
+  admitSessionCriticReview(review);
+  finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: join(root, common), criticPacketId: packetId, candidate });
+  for (const [taskId, value] of Object.entries(records)) {
+    const bytes = Buffer.from(json(value));
+    const criticBytes = `Independent Critic course review covering ${taskId}.\n`;
+    put(`evidence/critic-${taskId}.md`, criticBytes);
+    put(criticDispositionAddendumPath(taskId), json({ schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha(bytes),
+      taskId, candidateCommit: value.candidateCommit, reviewCandidateCommit: candidate.commit, criticPacketId: packetId, criticReceiptSha256: bound.criticReceiptSha256,
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: value.candidateCommit, path: `evidence/critic-${taskId}.md`, sha256: sha(criticBytes) } }));
+  }
+};
+
+test("(i) two orchestrator-attested records covered by one consumed course receipt whose reviewed range contains both commits plan (D212 A+B)", () => {
+  const repo = checkpointed("i", courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), attestedWithCourseReceipt({ secondInsideRange: true }));
+  const planned = repo.planPrepared();
+  assert.equal(planned.status, 0, JSON.stringify(planned.body));
+  assert.equal(planned.body.phase, "feature-close-prepared");
+  assert.equal(invokeAction(planned.body.nextAction).body.status, "applied");
+});
+
+test("(i) the same course receipt does not cover a record whose commit lies before the reviewed range: the close names only that record", () => {
+  const repo = checkpointed("i-out", courseFile(FEATURE, ["TASK-ONE", "TASK-TWO"]), attestedWithCourseReceipt({ secondInsideRange: false }));
+  const before = repo.snapshot();
+  assertRefusedForMissingCritic(repo.planPrepared(), { named: ["TASK-TWO"], notNamed: ["TASK-ONE"] });
+  assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
 });
 
 test("(b) the same record with matching Critic evidence plans", () => {

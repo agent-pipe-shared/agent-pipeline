@@ -46,6 +46,12 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
   const authored = record?.outcomeClassification?.kind === "authored-commit"
     && Array.isArray(record.commits) && record.commits.length === 1
     && record.commits[0] === addendum.candidateCommit;
+  // D212 (N33 A): an orchestrator-attested v4 record is an authored delivery with a weaker assurance (review admission already
+  // reads it that way); it is admitted on the same conditions as authored-commit: exactly one commit, equal to the candidate.
+  const attested = record?.schema === DISPATCH_RECORD_SCHEMA
+    && record?.outcomeClassification?.kind === "orchestrator-attested"
+    && Array.isArray(record.commits) && record.commits.length === 1
+    && record.commits[0] === addendum.candidateCommit;
   const authoredV3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
     && isTerminalOutcome(record.outcome) && !isNoDeliveryOutcome(record.outcome)
     && Array.isArray(record.commits) && record.commits.length > 0
@@ -58,6 +64,6 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
     || record.taskId !== addendum.taskId
     || record.candidateCommit !== addendum.candidateCommit
     || !Object.hasOwn(record, "criticRequired")
-    || (!undelivered && !interrupted && !authored && !authoredV3)) throw new TypeError("critic addendum does not bind an immutable Critic-required authored v3/v4 record");
+    || (!undelivered && !interrupted && !authored && !attested && !authoredV3)) throw new TypeError("critic addendum does not bind an immutable Critic-required authored v3/v4 record");
   return addendum;
 }

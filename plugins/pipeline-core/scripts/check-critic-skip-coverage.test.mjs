@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -12,7 +12,7 @@ import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDE
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
-import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE } from "../lib/dispatch-record.mjs";
+import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE, reportSha256 } from "../lib/dispatch-record.mjs";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
@@ -1125,4 +1125,140 @@ test("CSC-A8 the zero-target refusal names the attested-request CLI and no longe
   assert.match(text, /node plugins\/pipeline-core\/scripts\/dispatch-record-write\.mjs --repo-root \. --attested-request <request\.json>/u);
   assert.doesNotMatch(text, /PO decision/u);
   assert.doesNotMatch(text, /writeOrchestratorAttestedDispatchRecord/u);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// N33 A+B (D212, backlog 2026-10-30-close-gate-rejects-critic-evidence-for-attested-records). Criterion: a Critic-
+// required, orchestrator-attested record is satisfiable by an addendum (A), and a consumed, passed Critic course
+// receipt whose reviewed range contains the record's commit satisfies it without task-id equality (B).
+// ---------------------------------------------------------------------------------------------------------------
+const N33_CRITIC_BYTES = "Independent Critic review (course receipt) for an attested delivery.\n";
+function attestedDelivery(taskId, commit) {
+  const text = "Orchestrator-committed hand-back.";
+  return deliveredV4(taskId, "orchestrator-attested", { candidateCommit: commit, commits: [commit], resultSha256: reportSha256(text), report: { text, changedFiles: ["src/change.txt"] },
+    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], outcome: "completed-orchestrator-attested" });
+}
+function n33Addendum(taskId, recordBytes, commit, reviewCommit) {
+  return { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha256(recordBytes),
+    taskId, candidateCommit: commit, reviewCandidateCommit: reviewCommit, criticPacketId, criticReceiptSha256,
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: commit, path: `evidence/critic-${taskId}.md`, sha256: sha256(N33_CRITIC_BYTES) } };
+}
+/** A real repository: base <- first <- second <- head on main, and a side commit on a branch off base. */
+function courseRepository() {
+  const root = fixture({ "evidence/.keep": "" });
+  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
+  const commit = (name) => {
+    writeFileSync(join(root, name), `${name}\n`);
+    git("add", name);
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", name);
+    return git("rev-parse", "HEAD");
+  };
+  git("init", "-q", "-b", "main");
+  const base = commit("base.txt"); const first = commit("first.txt"); const second = commit("second.txt"); const head = commit("head.txt");
+  git("checkout", "-q", "-b", "side", base);
+  const side = commit("side.txt");
+  git("checkout", "-q", "main");
+  return { root, base, first, second, head, side };
+}
+/** Writes one attested record plus its addendum; the reviewed Critic packet belongs to another task id (a feature-wide course). */
+function writeAttested(root, taskId, commit, reviewCommit, { record = attestedDelivery(taskId, commit) } = {}) {
+  const recordBytes = json(record);
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
+  writeFileSync(join(root, `evidence/critic-${taskId}.md`), N33_CRITIC_BYTES);
+  writeFileSync(join(root, criticDispositionAddendumPath(taskId)), json(n33Addendum(taskId, recordBytes, commit, reviewCommit)));
+  return recordBytes;
+}
+const courseReceiptReader = ({ base, head, taskId = "FEATURE-COURSE", reviewPass = true, receiptSha = criticReceiptSha256, range = { base, commit: head, diffSha256: "9".repeat(64) }, throwing = false }) => ({
+  readBoundCriticReceipt: () => {
+    if (throwing) throw Object.assign(new Error("no consumed receipt"), { code: "CVL-CRITIC-UNAVAILABLE" });
+    return { packet: { request: { taskId }, candidate: { base, commit: head }, references: [] },
+      critic: { reviewPass, candidate: { base, commit: head }, ...(range === null ? {} : { reviewRange: range }) }, criticReceiptSha256: receiptSha };
+  },
+});
+
+test("N33A the addendum validator admits a v4 orchestrator-attested record with exactly one commit equal to the candidate (D212 A)", () => {
+  const taskId = "ATT-VALID";
+  const record = attestedDelivery(taskId, SHA);
+  const recordBytes = Buffer.from(json(record));
+  const entry = n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit);
+  const context = { recordPath: `evidence/dispatch-record-${taskId}.json`, recordBytes, record };
+  assert.equal(validateCriticDispositionAddendum(entry, context), entry);
+  for (const refused of [
+    { ...record, commits: [SHA, "b".repeat(40)] },
+    { ...record, commits: ["b".repeat(40)] },
+    { ...record, commits: [] },
+  ]) assert.throws(() => validateCriticDispositionAddendum(entry, { ...context, record: refused }), /authored v3\/v4/u);
+});
+
+test("N33A an authored-commit record with two commits still refuses an addendum", () => {
+  const taskId = "AUT-TWO";
+  const record = deliveredV4(taskId, "authored-commit", { commits: [SHA, "b".repeat(40)], candidateCommit: SHA });
+  const recordBytes = Buffer.from(json(record));
+  assert.throws(() => validateCriticDispositionAddendum(n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit),
+    { recordPath: `evidence/dispatch-record-${taskId}.json`, recordBytes, record }), /authored v3\/v4/u);
+});
+
+test("N33A an attested record is covered by an addendum with a task-id-matching receipt (equality stays sufficient)", () => {
+  const taskId = "ATT-EQUAL";
+  const record = attestedDelivery(taskId, SHA);
+  const recordBytes = json(record);
+  const root = fixture({ [`evidence/dispatch-record-${taskId}.json`]: recordBytes, [`evidence/critic-${taskId}.md`]: N33_CRITIC_BYTES,
+    [criticDispositionAddendumPath(taskId)]: json(n33Addendum(taskId, recordBytes, SHA, reviewCandidateCommit)) });
+  const result = evaluate(root, ["src/change.txt"], boundReview(recordBytes, taskId));
+  assert.equal(result.ok, true, result.readFindings.join("\n"));
+  assert.equal(result.criticEvidenceRecordCount, 1);
+  assert.equal(result.requiredRecordCount, 0);
+});
+
+test("N33B two attested records are covered by one course receipt whose reviewed range contains both commits (D212 B)", () => {
+  const repo = courseRepository();
+  writeAttested(repo.root, "ATT-ONE", repo.first, repo.head);
+  writeAttested(repo.root, "ATT-TWO", repo.second, repo.head);
+  const options = courseReceiptReader({ base: repo.base, head: repo.head });
+  const scoped = evaluate(repo.root, ["src/change.txt"], { ...options, taskIds: ["ATT-ONE", "ATT-TWO"] });
+  assert.equal(scoped.ok, true, scoped.readFindings.join("\n"));
+  assert.equal(scoped.criticEvidenceRecordCount, 2);
+  assert.equal(scoped.requiredRecordCount, 0);
+  assert.deepEqual(scoped.requiredTaskIds, []);
+  // The push gate reads the same evidence through the single-record readback.
+  for (const taskId of ["ATT-ONE", "ATT-TWO"]) {
+    const bytes = Buffer.from(readFileSync(join(repo.root, `evidence/dispatch-record-${taskId}.json`)));
+    assert.equal(verifyCriticDispositionAddendumForRecord({ root: repo.root, taskId, record: JSON.parse(bytes), recordBytes: bytes, options }).code, "critic-addendum-bound");
+  }
+});
+
+test("N33B a course receipt that does not contain the record's commit still refuses", () => {
+  const cases = [
+    ["the commit is the range base (outside the half-open range)", (repo) => repo.base, (repo) => ({ base: repo.base, head: repo.head }), /not after the reviewed range base/u],
+    ["the commit is older than the range base", (repo) => repo.first, (repo) => ({ base: repo.second, head: repo.head }), /not after the reviewed range base/u],
+    ["the commit is not an ancestor of the reviewed candidate", (repo) => repo.side, (repo) => ({ base: repo.base, head: repo.head }), /unavailable or invalid/u],
+  ];
+  for (const [label, commitOf, receiptOf, reason] of cases) {
+    const repo = courseRepository();
+    writeAttested(repo.root, "ATT-OUT", commitOf(repo), repo.head);
+    const result = evaluate(repo.root, ["src/change.txt"], { ...courseReceiptReader(receiptOf(repo)), taskIds: ["ATT-OUT"] });
+    assert.equal(result.ok, false, label);
+    assert.match(result.readFindings.join("\n"), reason, label);
+    assert.deepEqual(result.requiredTaskIds, ["ATT-OUT"], label);
+    assert.equal(result.criticEvidenceRecordCount, 0, label);
+  }
+});
+
+test("N33B a failed, unconsumed, mis-digested or range-less course receipt still refuses", () => {
+  const repo = courseRepository();
+  writeAttested(repo.root, "ATT-RCPT", repo.first, repo.head);
+  const base = { base: repo.base, head: repo.head };
+  for (const [label, receipt, reason] of [
+    ["failed", { ...base, reviewPass: false }, /does not match a passed, consumed, task-bound/u],
+    ["unconsumed", { ...base, throwing: true }, /unavailable or invalid/u],
+    ["wrong receipt digest", { ...base, receiptSha: "f".repeat(64) }, /does not match a passed, consumed, task-bound/u],
+    ["no reviewed range", { ...base, range: null }, /names no reviewed range/u],
+    ["range names another review commit", { ...base, range: { base: repo.base, commit: repo.second, diffSha256: "9".repeat(64) } }, /names no reviewed range/u],
+  ]) {
+    const result = evaluate(repo.root, ["src/change.txt"], { ...courseReceiptReader(receipt), taskIds: ["ATT-RCPT"] });
+    assert.equal(result.ok, false, label);
+    assert.match(result.readFindings.join("\n"), reason, label);
+    assert.deepEqual(result.requiredTaskIds, ["ATT-RCPT"], label);
+  }
 });

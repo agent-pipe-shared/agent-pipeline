@@ -621,7 +621,89 @@ check("attested CLI: a second call for the same task is refused and the first re
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 31, "the complete dispatch-record writer corpus must be registered before execution begins");
+// N33 A+B+C (D212): the sanctioned addendum route. `--critic-addendum <request>` is the command the close gate's refusal names;
+// the request file IS the addendum object. The route refuses an addendum that no consumed, passed Critic receipt binds BEFORE it
+// publishes, because the publication is exclusive and a wrongly written addendum could never be replaced.
+const N33_BASE = "1".repeat(40);
+const N33_HEAD = "2".repeat(40);
+function n33Fixture({ commits = [ATT_COMMIT] } = {}) {
+  const root = attestedRoot();
+  const value = attestedRecord({ commits, candidateCommit: commits.at(-1) });
+  const parents = Object.fromEntries(commits.map((commit, index) => [commit, [index === 0 ? ATT_BASE : commits[index - 1]]]));
+  const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: value }, gitReaders({ parents }));
+  const criticBytes = Buffer.from("Independent Critic review of the feature course.\n");
+  writeFileSync(join(root, "evidence/critic-NVA-ATT-1.md"), criticBytes);
+  const addendum = { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: "evidence/dispatch-record-NVA-ATT-1.json", recordSha256: receipt.sha256,
+    taskId: "NVA-ATT-1", candidateCommit: value.candidateCommit, reviewCandidateCommit: N33_HEAD, criticPacketId: "d".repeat(32), criticReceiptSha256: "c".repeat(64),
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-ATT-1", candidateCommit: value.candidateCommit, path: "evidence/critic-NVA-ATT-1.md",
+      sha256: createHash("sha256").update(criticBytes).digest("hex") } };
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, "scratch/addendum-request.json"), `${JSON.stringify(addendum)}\n`);
+  return { root, value, addendum };
+}
+/** A course receipt of ANOTHER task whose reviewed range is (N33_BASE, N33_HEAD]; ATT_COMMIT lies inside it unless `outside` names it the base. */
+function n33CoverageOptions({ outside = false } = {}) {
+  return { coverageOptions: {
+    gitRead: (args) => {
+      if (args[1] === "--git-common-dir") return ".git";
+      if (args[0] === "rev-parse") return N33_HEAD;
+      if (args[0] === "merge-base" && outside && args[2] === ATT_COMMIT && args[3] === N33_BASE) return "";
+      if (args[0] === "merge-base" && args[3] === N33_BASE) { throw Object.assign(new Error("not an ancestor"), { status: 1 }); }
+      return "";
+    },
+    readBoundCriticReceipt: () => ({ packet: { request: { taskId: "FEATURE-COURSE" }, candidate: { base: N33_BASE, commit: N33_HEAD }, references: [] },
+      critic: { reviewPass: true, candidate: { base: N33_BASE, commit: N33_HEAD }, reviewRange: { base: N33_BASE, commit: N33_HEAD, diffSha256: "9".repeat(64) } }, criticReceiptSha256: "c".repeat(64) }),
+  } };
+}
+
+check("N33 addendum writer admits an orchestrator-attested one-commit record and refuses a two-commit one (D212 A)", () => {
+  const { root, addendum } = n33Fixture();
+  try {
+    const receipt = writeCriticDispositionAddendumObject({ repoRoot: root, addendum });
+    assert.equal(receipt.target, "evidence/dispatch-critic-addendum-NVA-ATT-1.json");
+    assert.deepEqual(JSON.parse(readFileSync(join(root, receipt.target), "utf8")), addendum);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  const two = n33Fixture({ commits: ["8".repeat(40), ATT_COMMIT] });
+  try {
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: two.root, addendum: two.addendum }), /authored v3\/v4/u);
+    assert.equal(existsSync(join(two.root, criticDispositionAddendumPath("NVA-ATT-1"))), false);
+  } finally { rmSync(two.root, { recursive: true, force: true }); }
+});
+
+check("N33 --critic-addendum is the third mutually exclusive mode and keeps the usage refusals", () => {
+  assert.deepEqual(writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "scratch/a.json"]), { repoRoot: "r", criticAddendumPath: "scratch/a.json" });
+  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--request", "b.json"]));
+  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--attested-request", "b.json"]));
+  refusedWith("usage", () => writerModule.parseArgs(["--repo-root", "r", "--critic-addendum", "a.json", "--critic-addendum", "b.json"]));
+});
+
+check("N33 --critic-addendum publishes an addendum a course receipt binds, and refuses one it does not bind without writing", () => {
+  const bound = n33Fixture();
+  try {
+    const receipt = writerModule.runCriticAddendumRequest({ repoRoot: bound.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions());
+    assert.equal(receipt.schema, "pipeline.critic-disposition-addendum-write-receipt.v1");
+    assert.equal(existsSync(join(bound.root, receipt.target)), true);
+    refusedWith("target-exists", () => writerModule.runCriticAddendumRequest({ repoRoot: bound.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions()));
+  } finally { rmSync(bound.root, { recursive: true, force: true }); }
+  const outside = n33Fixture();
+  try {
+    refusedWith("addendum-unbound", () => writerModule.runCriticAddendumRequest({ repoRoot: outside.root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions({ outside: true })));
+    assert.equal(existsSync(join(outside.root, criticDispositionAddendumPath("NVA-ATT-1"))), false, "an unbound addendum must never be published");
+  } finally { rmSync(outside.root, { recursive: true, force: true }); }
+});
+
+check("N33 --critic-addendum refuses an absolute, out-of-tree or non-JSON request path", () => {
+  const { root } = n33Fixture();
+  try {
+    for (const path of ["/etc/passwd", "src/addendum.json", "scratch/../src/a.json"]) {
+      refusedWith("attested-request-path", () => writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: path }, n33CoverageOptions()));
+    }
+    writeFileSync(join(root, "scratch/not-json.json"), "{ nope");
+    refusedWith("addendum-shape", () => writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: "scratch/not-json.json" }, n33CoverageOptions()));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 35, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

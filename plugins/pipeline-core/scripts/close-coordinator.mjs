@@ -439,7 +439,12 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
   try { coverage = evaluateRepositoryCriticSkipCoverage({ root, taskIds: ids }); }
   catch { fail("CLOSE-CRITIC-EVIDENCE-UNAVAILABLE", "Critic evidence coverage for the feature's delivery course could not be evaluated"); }
   if (coverage.requiredTaskIds.length > 0) {
-    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; one full review plus at most three correction-diff reviews per declared batch; once spent, Elephant self-verification or an explicit PO decision, never another Critic`);
+    // D212 (N33): name WHY an addendum that exists does not bind (only findings about the uncovered ids), the route that writes the
+    // addendum, and the current rule. The round cap this text used to state was removed by D190/D199.
+    const reasons = coverage.readFindings.filter((finding) => coverage.requiredTaskIds.some((id) => finding.includes(id))).slice(0, 3)
+      .map((finding) => (finding.length > 300 ? `${finding.slice(0, 300)}...` : finding));
+    const why = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
+    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed`);
   }
   // D52: a Critic slice of THIS course that is still scheduled (ready, no terminal dispatch record) means the
   // independent review has not happened; the close must not reach feature-close-prepared past it. Legacy v1

@@ -52,6 +52,24 @@ candidate. The plan's `courseAuthorship` names each slice's record:
 `dispatchRecord`, `orchestratorCommit`, or `unrecorded`. An `unrecorded` slice
 has no record of either kind. Report it to the PO before applying.
 
+The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
+dispatch record that requires a Critic and carries no bound evidence (an
+orchestrator-attested record included). A record is immutable, so the evidence
+is a separate addendum. Write one request file under `scratch/`, `evidence/` or
+`specs/` holding the `pipeline.critic-disposition-addendum.v1` object
+(`recordPath`, `recordSha256`, `taskId`, `candidateCommit`,
+`reviewCandidateCommit`, `criticPacketId`, `criticReceiptSha256`, and a
+`criticEvidence` reference to a file under `evidence/` whose bytes you digest),
+then run `node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root
+<repo-root> --critic-addendum <request.json>` and plan the transition again.
+The command refuses, and writes nothing, unless a consumed, passed Critic
+receipt binds the addendum: either the receipt of the record's own task id, or a
+feature-wide Critic course (one task id, any number of rounds) whose reviewed
+range, the commits after the receipt's base up to its reviewed candidate,
+contains the record's commit. The addendum is exclusive and cannot be
+replaced. Rounds are not capped (D190/D199): a further correction-diff Critic
+round is always allowed.
+
 The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):
 
