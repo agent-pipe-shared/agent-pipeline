@@ -148,3 +148,14 @@ Driver patch: 35790 bytes, six files, `git apply --check` on the candidate clone
 1. `guard-maintenance-window.mjs` lists `push-init.mjs`, `critic-dispatch-preflight.mjs` and `dispatch-record-write.mjs` as protected
    paths; held-patch apply needs the bundle's usual inventory rebaseline and reader-input sync. Not run here.
 2. Batch Critic, full Verify, the consumer's real close and PO acceptance stay pending.
+
+## Coordinator sweep after the return (2026-10-31)
+
+- The two guard suites the Goldfish could not finish, run in the edited clone: `guard-lifecycle-ready` 420 pass,
+  0 fail (log `c4`); `guard-gate-strength` 40 pass, 1 fail, GST33 (logs `c4`, `c5`).
+- GST33 fails identically on the plain candidate (`base4`, `base5`). It is pre-existing since a31acd0df and is
+  recorded as item 5 in `backlog/items/2026-10-30-pre-existing-reds-hide-new-cases.md`. The preflight's write-API
+  import closure is the same 362 modules with and without this patch: `dispatch-record-write.mjs` was already in it,
+  via `native-goldfish-host-finalizer.mjs`.
+- Further callers of the unchanged library `preflightCriticDispatch`, run in the edited clone (log `c6`):
+  `session-critic-finalizer` 91/0, `critic-course-admission` 82/0, the round-cap pin 10/0.

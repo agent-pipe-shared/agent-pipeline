@@ -29,6 +29,14 @@ Red on the plain candidate (identical in every baseline clone this session):
 4. `project-onboarding-v3-argv-closure` ("mini retains early acknowledgement ..."), `project-onboarding-e2e`
    ("in-process driver ... Codex legacy-advisory approval boundary"), `measure-tofu-push-e2e` (1),
    three-runner happy-path pin (3).
+5. `hooks/guard-gate-strength.test.mjs` GST33 (found 2026-10-31 in the N33b downstream sweep): the one shell
+   exemption, `scripts/critic-dispatch-preflight.mjs`, is no longer write-free across its import closure. Since
+   a31acd0df the preflight imports `evaluateReviewAdmission` from `scripts/check-critic-skip-coverage.mjs`, which
+   writes a temp tree for the signed-import parity check and pulls in 362 modules, more than a hundred of them naming a
+   write API (`historical-fresh-review-admission`, `pipeline-state`, `project-onboarding-v3`, ...). The exemption's own
+   reason ("zero filesystem-write calls") is therefore untrue at the closure level. GST33b caps the accepted
+   exceptions at two, so a third exception needs a PO decision; the alternative is a read-only admission module the
+   preflight imports instead.
 
 ## Wanted
 
