@@ -1,0 +1,43 @@
+diff --git a/plugins/pipeline-core/lib/backlog-state.test.mjs b/plugins/pipeline-core/lib/backlog-state.test.mjs
+index 9f8624ace..dff50462d 100644
+--- a/plugins/pipeline-core/lib/backlog-state.test.mjs
++++ b/plugins/pipeline-core/lib/backlog-state.test.mjs
+@@ -611,6 +611,8 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
+   write(root, "backlog/items/example.md", renderBacklogItem(closed));
+   write(root, "backlog/transitions.ndjson", `${canonicalJson(close)}\n`);
+   write(root, "specs/result.md", "# Result\n");
++  // A closure's cited evidence must be tracked (BS24), so this fixture tracks it as a real closing checkout does.
++  git(root, ["init", "-q"]); git(root, ["add", "specs/result.md"]);
+   const written = writeBacklogProjections(root, { checkCommit: false });
+   const valid = checkBacklogState(root, { checkCommit: false });
+   write(root, "backlog/STATUS.md", "stale\n");
+@@ -837,6 +839,8 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
+   write(root, "backlog/transitions.ndjson", `${canonicalJson(historical)}\n${canonicalJson(unrelatedEvent)}\n`);
+   write(root, "specs/old-result.md", "# Old result\n");
+   write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`);
++  // Cited closure evidence must be tracked (BS24); the amendment later cites current-result.md too.
++  git(root, ["init", "-q"]); git(root, ["add", "specs/old-result.md", "specs/current-result.md"]);
+   writeBacklogProjections(root, { checkCommit: false });
+   const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+   const itemBodyBefore = closed.body;
+@@ -878,8 +882,10 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
+   const closed = item({ id: "pipeline.source-available-commercial-licensing", status: "closed", closed_at: "2026-07-17", closure_repository: "self", closure_commit: oldCommit, closure_evidence: "specs/old-result.md" });
+   const historical = event({ id: "pipeline.source-available-commercial-licensing", to: "closed", evidence: { kind: "implementation", commit: oldCommit, reference: "specs/old-result.md" }, reason: "Historical close." });
+   write(root, "backlog/items/example.md", renderBacklogItem(closed)); write(root, "backlog/transitions.ndjson", `${canonicalJson(historical)}\n`);
+-  write(root, "specs/old-result.md", "# Old\n"); write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`); writeBacklogProjections(root, { checkCommit: false });
+-  const before = ["backlog/items/example.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
++  write(root, "specs/old-result.md", "# Old\n"); write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`);
++  git(root, ["init", "-q"]); git(root, ["add", "specs/old-result.md", "specs/current-result.md"]); // cited closure evidence must be tracked (BS24)
++  writeBacklogProjections(root, { checkCommit: false });
++  const before =["backlog/items/example.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+   let writes = 0;
+   const interrupted = applyBacklogEvidenceAmendment(root, { id: "pipeline.source-available-commercial-licensing", at: "2026-07-23", actor: "sentinel-evidence", reason: "Bind evidence.", evidence: { kind: "evidence-amendment", commit: newCommit, reference: "specs/current-result.md", resultSha256: resultRecord.resultSha256, privateLicenseGateSha256: resultRecord.gates.private.projectionSha256, neutralPublicLicenseGateSha256: resultRecord.gates["neutral-public"].projectionSha256 }, closure: { repository: "self", commit: newCommit, evidence: "specs/current-result.md" } }, { checkCommit: false, atomicWrite(path, content) { writeFileSync(path, content); if (++writes === 2) throw new Error("simulated interruption"); } });
+   const after = ["backlog/items/example.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+@@ -1084,6 +1090,7 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
+   write(root, "backlog/transitions.ndjson", `${canonicalJson(initial)}\n${canonicalJson(inProgress)}\n${canonicalJson(close)}\n`);
+   write(root, "specs/result.md", "# Result\n");
+   write(root, "receipts/example-app-close.json", `${JSON.stringify(receipt)}\n`);
++  git(root, ["init", "-q"]); git(root, ["add", "specs/result.md"]); // cited closure evidence must be tracked (BS24)
+   const written = writeBacklogProjections(root, { checkCommit: false });
+   const valid = checkBacklogState(root, { checkCommit: false });
+   write(root, "receipts/example-app-close.json", `${JSON.stringify({ arbitrary: "receipt" })}\n`);
