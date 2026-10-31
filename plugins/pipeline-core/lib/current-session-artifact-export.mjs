@@ -28,6 +28,26 @@ function physical(path, kind) {
   } catch { return false; }
 }
 
+/** True when `path` is an absolute, symlink-free (every ancestor included) directory, or a single-link regular file. */
+export const artifactPathIsPhysical = physical;
+
+/**
+ * The established Antigravity brain layout, as ONE shared predicate (G13; AC-175 part B reads the same layout): a conversation
+ * id, its artifact root `<...>/brain/<conversationId>` with no repository, credential, plugin or cache part, the fixed transcript
+ * `<artifactRoot>/.system_generated/logs/transcript.jsonl`, an exact workspace match for `root`, and physical (non-symlink)
+ * `root` and artifact root. It reads nothing and admits nothing by itself.
+ */
+export function antigravityArtifactLayoutIsValid(host, root) {
+  if (!host || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(host.conversationId ?? '')) return false;
+  const artifactRoot = host.artifactDirectoryPath;
+  return !(typeof artifactRoot !== 'string' || basename(artifactRoot) !== host.conversationId
+    || basename(dirname(artifactRoot)) !== 'brain'
+    || artifactRoot.split(sep).some((part) => /^(?:\.git|\.ssh|\.aws|\.codex|\.claude|plugins?|cache|marketplaces?|installations?|credentials?|keys?)$/iu.test(part))
+    || host.transcriptPath !== join(artifactRoot, '.system_generated', 'logs', 'transcript.jsonl')
+    || !Array.isArray(host.workspacePaths) || !host.workspacePaths.includes(root)
+    || !physical(root, 'directory') || !physical(artifactRoot, 'directory'));
+}
+
 /** A permission check only: never copies or reads a transcript. Exact new PNG
  * at the current host root, one regular project PNG source, no extra operands.
  * The registered AGY adapter reconstructs the context from original top-level
@@ -36,14 +56,8 @@ function physical(path, kind) {
 export function isCurrentSessionArtifactExport(input, root, { runner } = {}) {
   if (runner !== 'antigravity' || input?.tool_name !== 'Bash') return false;
   const host = input.antigravity_artifact_host;
-  if (!host || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(host.conversationId ?? '')) return false;
+  if (!antigravityArtifactLayoutIsValid(host, root)) return false;
   const artifactRoot = host.artifactDirectoryPath;
-  if (typeof artifactRoot !== 'string' || basename(artifactRoot) !== host.conversationId
-    || basename(dirname(artifactRoot)) !== 'brain'
-    || artifactRoot.split(sep).some((part) => /^(?:\.git|\.ssh|\.aws|\.codex|\.claude|plugins?|cache|marketplaces?|installations?|credentials?|keys?)$/iu.test(part))
-    || host.transcriptPath !== join(artifactRoot, '.system_generated', 'logs', 'transcript.jsonl')
-    || !Array.isArray(host.workspacePaths) || !host.workspacePaths.includes(root)
-    || !physical(root, 'directory') || !physical(artifactRoot, 'directory')) return false;
   const parsed = parseGuardCommand(input.tool_input?.command, root, { platform: 'linux' });
   if (parsed.parseStatus !== 'accepted' || parsed.operators.length || parsed.redirects.length || parsed.segments.length !== 1) return false;
   const segment = parsed.segments[0];

@@ -14,6 +14,7 @@ import * as recovery from "./runner-transcript-recovery.mjs";
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename } from "node:path";
+import { antigravityArtifactHostContext } from "../lib/current-session-artifact-export.mjs";
 
 function transcript(path, { cwd, sessionId, entries = [], malformed = false } = {}) {
   mkdirSync(join(path, "sessions", "2026", "09"), { recursive: true });
@@ -214,11 +215,11 @@ function withExportFixture(run) {
   }
 }
 
-function codexSegment(codexHome, fileName, { cwd, sessionId, metaTimestamp, records = [], rawLines = [] }) {
+function codexSegment(codexHome, fileName, { cwd, sessionId, metaTimestamp, records = [], rawLines = [], metaExtra = {} }) {
   const directory = join(codexHome, "sessions", "2026", "09");
   mkdirSync(directory, { recursive: true });
   const target = join(directory, fileName);
-  const meta = { type: "session_meta", payload: { cwd, session_id: sessionId } };
+  const meta = { type: "session_meta", payload: { cwd, session_id: sessionId, ...metaExtra } };
   if (metaTimestamp !== undefined) meta.timestamp = metaTimestamp;
   writeFileSync(target, `${[JSON.stringify(meta), ...records.map((record) => JSON.stringify(record)), ...rawLines].join("\n")}\n`);
   return target;
@@ -303,8 +304,9 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
       "childSessions", "completeness", "firstTimestamp", "incompleteReasons", "lastTimestamp", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
-      "segments", "sessionId", "status", "unparsedLineCount", "usage",
+      "segments", "sessionId", "status", "turns", "unparsedLineCount", "usage",
     ]);
+    // Justification (AC-175 part B): the key set stays pinned on purpose; `turns` is the new turn-boundary marker block.
     // Justification (G23.forensics Slice A): the key set is pinned on purpose; the three new keys are the completeness marker.
     assert.equal(result.completeness, "partial", "this session holds a damaged line");
     for (const segment of result.segments) {
@@ -444,13 +446,16 @@ test("per-runner usage extraction is a pure function of the records and never in
   assert.deepEqual(recovery.extractRunnerUsage("unknown-runner", [{ type: "turn.completed", usage: { input_tokens: 3 } }]), NO_USAGE);
 });
 
-test("export of an Antigravity or unknown runner stays typed unavailable because no storage layout is established", () => {
+test("export of an unknown runner stays typed unavailable, and Antigravity without a host context names that precise reason", () => {
+  // Justification (AC-175 part B): the Antigravity layout IS established now (brain layout), so its reason is no longer the
+  // generic source-unavailable one; an unknown runner keeps the old reason unchanged.
   withExportFixture(({ project, codexHome, claudeHome }) => {
     codexSegment(codexHome, "s.jsonl", { cwd: project, sessionId: "some-session" });
+    const reasons = { antigravity: "antigravity-host-context-unavailable", "unknown-runner": "runner-transcript-source-unavailable" };
     for (const runner of ["antigravity", "unknown-runner"]) {
       assert.deepEqual(
         recovery.exportRunnerTranscript({ rootDir: project, runner, excludeSession: "current-session", sessionId: "some-session", env: { CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome } }),
-        { schema: SCHEMA, status: "unavailable", runner, reason: "runner-transcript-source-unavailable" },
+        { schema: SCHEMA, status: "unavailable", runner, reason: reasons[runner] },
       );
     }
   });
@@ -506,7 +511,7 @@ test("the export CLI operation prints the same data-minimised JSON and rejects e
 // G23.forensics Slice A: the export says whether it saw the whole session, and why not.
 // ---------------------------------------------------------------------------------------------
 
-test("export marks completeness: a clean session is complete, a skipped line makes it partial, children are never inferred", () => {
+test("export marks completeness: a clean session is complete, a skipped line makes it partial, a session without children lists none", () => {
   withExportFixture(({ project, codexHome }) => {
     codexSegment(codexHome, "clean.jsonl", { cwd: project, sessionId: "clean", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
     codexSegment(codexHome, "damaged.jsonl", { cwd: project, sessionId: "damaged", metaTimestamp: stamp("06:00:00"), records: [tokenCount(stamp("06:01:00"), 9)], rawLines: ["{ damaged"] });
@@ -515,12 +520,14 @@ test("export marks completeness: a clean session is complete, a skipped line mak
     assert.equal(clean.status, "available");
     assert.equal(clean.completeness, "complete");
     assert.deepEqual(clean.incompleteReasons, []);
-    assert.equal(clean.childSessions, "not-inferred");
+    // Justification (AC-175 part B, Acceptance "merges ... child sessions"): the runner records children, so a session
+    // without any now reports an empty list; "not-inferred" is no longer a possible answer for Codex and Claude.
+    assert.deepEqual(clean.childSessions, []);
     const damaged = recovery.exportRunnerTranscript({ ...args, sessionId: "damaged" });
     assert.equal(damaged.status, "available");
     assert.equal(damaged.completeness, "partial");
     assert.deepEqual(damaged.incompleteReasons, ["records-skipped"]);
-    assert.equal(damaged.childSessions, "not-inferred");
+    assert.deepEqual(damaged.childSessions, []);
   });
 });
 
@@ -536,7 +543,7 @@ test("export reports candidate-bound-reached for Codex and Claude when the enume
       assert.equal(cut.status, "available", runner);
       assert.equal(cut.completeness, "partial", runner);
       assert.ok(cut.incompleteReasons.includes("candidate-bound-reached"), runner);
-      assert.equal(cut.childSessions, "not-inferred", runner);
+      assert.deepEqual(cut.childSessions, [], runner);
     }
     // Exactly at the cap nothing was left unread: the Codex store holds only 2 of the 'exact' files in a directory of its own.
     const exactCodex = join(codexHome, "exact-store");
@@ -633,5 +640,288 @@ test("the CLI refuses a claimed current session that conflicts with the host ide
     }
     const ok = JSON.parse(runMain(["export", "--root", project, "--runner", "codex", "--exclude-session", "host-session", "--session-id", "prior"], hostEnv));
     assert.equal(ok.status, "available");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// AC-175 part B (item pipeline.forensics-and-audit-evidence-not-reconstructable, Acceptance "merges
+// segments, child sessions and turn boundaries ... for all three runners"; PO decision D210): child
+// provenance and turn markers for Claude and Codex, and the Antigravity export through the brain layout.
+// ---------------------------------------------------------------------------------------------
+
+const claudeToolUse = (sessionId, cwd, timestamp, id, toolUseId, subagentType = "pipeline-core:goldfish-deep") => ({
+  type: "assistant", sessionId, cwd, timestamp,
+  message: {
+    id, role: "assistant", model: "claude-sonnet-5-5", usage: { input_tokens: 1, output_tokens: 1 },
+    content: [{ type: "tool_use", id: toolUseId, name: "Agent", input: { subagent_type: subagentType, prompt: SECRET } }],
+  },
+});
+const claudeToolResult = (sessionId, cwd, timestamp, toolUseId) => ({
+  type: "user", sessionId, cwd, timestamp,
+  message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content: SECRET }] },
+});
+const sidechain = (sessionId, cwd, timestamp, agentId, extra = {}) => ({ type: "user", sessionId, cwd, timestamp, isSidechain: true, agentId, message: { role: "user", content: SECRET }, ...extra });
+
+/** The recorded Claude layout: <projects>/<project>/<sessionId>/subagents/agent-<id>.jsonl beside agent-<id>.meta.json. */
+function claudeChild(claudeHome, project, sessionId, agentId, { meta, lines }) {
+  const directory = join(claudeHome, "projects", realpathSync(project).replace(/[^A-Za-z0-9]/gu, "-"), sessionId, "subagents");
+  mkdirSync(directory, { recursive: true });
+  const target = join(directory, `agent-${agentId}.jsonl`);
+  writeFileSync(target, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+  if (meta !== undefined) writeFileSync(join(directory, `agent-${agentId}.meta.json`), JSON.stringify(meta));
+  return target;
+}
+
+test("AC-175B: the Claude export lists child sessions with agent type, turn span and transcript digest, and marks turn boundaries", () => {
+  withExportFixture(({ fixture, project, foreign, claudeHome }) => {
+    const S = "claude-parent";
+    claudeSegment(claudeHome, project, "parent.jsonl", [
+      claudeUser(S, project, stamp("09:00:00")),
+      claudeAssistant(S, project, stamp("09:00:01"), "msg_1", { input_tokens: 1, output_tokens: 1 }),
+      claudeToolUse(S, project, stamp("09:00:02"), "msg_2", "toolu_A"),
+      claudeToolUse(S, project, stamp("09:00:03"), "msg_2", "toolu_A"),
+      claudeToolResult(S, project, stamp("09:00:30"), "toolu_A"),
+      claudeToolUse(S, project, stamp("09:01:00"), "msg_3", "toolu_B", "pipeline-core:critic"),
+      claudeAssistant(S, project, stamp("09:01:05"), "msg_4", { input_tokens: 1, output_tokens: 1 }),
+      claudeToolResult(S, project, stamp("09:02:00"), "toolu_B"),
+    ]);
+    claudeSegment(claudeHome, project, "current.jsonl", [claudeUser("current-session", project, stamp("09:30:00"))]);
+    const childA = claudeChild(claudeHome, project, S, "aaa111", {
+      meta: { agentType: "pipeline-core:goldfish-deep", description: SECRET, toolUseId: "toolu_A", spawnDepth: 1 },
+      lines: [sidechain(S, project, stamp("09:00:05"), "aaa111"), claudeAssistant(S, project, stamp("09:00:20"), "msg_c1", { input_tokens: 10, output_tokens: 2 })],
+    });
+    claudeChild(claudeHome, project, S, "bbb222", {
+      meta: { agentType: "pipeline-core:critic", description: "review", toolUseId: "toolu_B", spawnDepth: 1 },
+      lines: [sidechain(S, project, stamp("09:01:10"), "bbb222")],
+    });
+    claudeChild(claudeHome, project, S, "ccc333", {
+      meta: { agentType: "pipeline-core:plan-verifier", toolUseId: "toolu_not_in_parent", spawnDepth: 2 },
+      lines: [sidechain(S, project, stamp("09:03:00"), "ccc333")],
+    });
+    // Two files that must never be listed: another session's records, and another project's records.
+    claudeChild(claudeHome, project, S, "ddd444", { meta: { agentType: "x", toolUseId: "toolu_A", spawnDepth: 1 }, lines: [sidechain("someone-else", project, stamp("09:00:06"), "ddd444")] });
+    claudeChild(claudeHome, project, S, "eee555", { meta: { agentType: "x", toolUseId: "toolu_A", spawnDepth: 1 }, lines: [sidechain(S, foreign, stamp("09:00:07"), "eee555")] });
+
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "claude", excludeSession: "current-session", sessionId: S, env: { CLAUDE_CONFIG_DIR: claudeHome } });
+    assert.equal(result.status, "available");
+    assert.equal(result.segmentCount, 1, "child transcripts are never merged into the parent's segments");
+    assert.equal(result.recordCount, 8);
+    assert.ok(Array.isArray(result.childSessions), "the runner records children, so the answer is a list, not a reason");
+    assert.deepEqual(result.childSessions.map((child) => [child.childId, child.agentType, child.spawnDepth, child.startTurnIndex, child.endTurnIndex]), [
+      ["aaa111", "pipeline-core:goldfish-deep", 1, 1, 1],
+      ["bbb222", "pipeline-core:critic", 1, 2, 3],
+      ["ccc333", "pipeline-core:plan-verifier", 2, null, null],
+    ]);
+    assert.deepEqual(result.childSessions[0].transcript, {
+      sha256: sha256Of(readFileSync(childA)), byteLength: readFileSync(childA).length, recordCount: 2, unparsedLineCount: 0,
+      firstTimestamp: stamp("09:00:05"), lastTimestamp: stamp("09:00:20"),
+    });
+    assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "claude-assistant-message-usage", observations: 1, counters: { input_tokens: 10, output_tokens: 2 } });
+    assert.deepEqual(result.turns, {
+      model: "claude-assistant-message-id", count: 4, markersTruncated: false,
+      markers: [
+        { index: 0, record: 1, timestamp: stamp("09:00:01") }, { index: 1, record: 2, timestamp: stamp("09:00:02") },
+        { index: 2, record: 5, timestamp: stamp("09:01:00") }, { index: 3, record: 6, timestamp: stamp("09:01:05") },
+      ],
+    });
+    assert.equal(result.completeness, "partial", "two child files failed authentication");
+    assert.deepEqual(result.incompleteReasons, ["child-session-rejected"]);
+    const serialized = JSON.stringify(result);
+    for (const forbidden of [SECRET, fixture, basename(fixture), "subagents", ".jsonl", "agent-", "description", "claude-home", "ddd444", "eee555"]) {
+      assert.equal(serialized.includes(forbidden), false, `the export must not carry ${forbidden}`);
+    }
+  });
+});
+
+test("AC-175B: a Claude session without a subagent directory lists no children, and unsafe or linked child storage is a typed reason", () => {
+  withExportFixture(({ fixture, project, claudeHome }) => {
+    const args = { rootDir: project, runner: "claude", excludeSession: "current-session", env: { CLAUDE_CONFIG_DIR: claudeHome } };
+    claudeSegment(claudeHome, project, "plain.jsonl", [claudeUser("plain", project, stamp("08:00:00")), claudeAssistant("plain", project, stamp("08:00:01"), "msg_p", { input_tokens: 1, output_tokens: 1 })]);
+    const plain = recovery.exportRunnerTranscript({ ...args, sessionId: "plain" });
+    assert.deepEqual(plain.childSessions, []);
+    assert.equal(plain.completeness, "complete");
+    assert.deepEqual(plain.turns, { model: "claude-assistant-message-id", count: 1, markersTruncated: false, markers: [{ index: 0, record: 1, timestamp: stamp("08:00:01") }] });
+
+    claudeSegment(claudeHome, project, "linked.jsonl", [claudeUser("linked", project, stamp("08:10:00"))]);
+    const projectDirectory = join(claudeHome, "projects", realpathSync(project).replace(/[^A-Za-z0-9]/gu, "-"));
+    const outside = join(fixture, "outside-subagents");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "agent-zzz999.jsonl"), `${JSON.stringify(sidechain("linked", project, stamp("08:10:05"), "zzz999"))}\n`);
+    mkdirSync(join(projectDirectory, "linked"));
+    symlinkSync(outside, join(projectDirectory, "linked", "subagents"), "junction");
+    const linked = recovery.exportRunnerTranscript({ ...args, sessionId: "linked" });
+    assert.equal(linked.status, "available");
+    assert.equal(linked.childSessions, "child-storage-unavailable", "a linked subagent directory is never followed");
+    assert.equal(JSON.stringify(linked).includes("zzz999"), false);
+
+    // A linked child file inside a real subagent directory is skipped, never read.
+    claudeSegment(claudeHome, project, "filelink.jsonl", [claudeUser("filelink", project, stamp("08:20:00"))]);
+    const real = join(projectDirectory, "filelink", "subagents");
+    mkdirSync(real, { recursive: true });
+    symlinkSync(join(outside, "agent-zzz999.jsonl"), join(real, "agent-yyy888.jsonl"));
+    assert.deepEqual(recovery.exportRunnerTranscript({ ...args, sessionId: "filelink" }).childSessions, []);
+  });
+});
+
+test("AC-175B: the Codex export lists spawned child sessions with turn span, role and digest, and marks turn boundaries", () => {
+  withExportFixture(({ project, foreign, codexHome }) => {
+    const P = "codex-parent";
+    const spawned = (parent) => ({ source: { subagent: { thread_spawn: { parent_thread_id: parent, depth: 1 } } } });
+    const call = (timestamp, name, call_id, args) => ({ timestamp, type: "response_item", payload: { type: "function_call", name, call_id, arguments: JSON.stringify(args) } });
+    const output = (timestamp, call_id, value) => ({ timestamp, type: "response_item", payload: { type: "function_call_output", call_id, output: JSON.stringify(value) } });
+    const started = (timestamp) => ({ timestamp, type: "event_msg", payload: { type: "task_started" } });
+    codexSegment(codexHome, "parent.jsonl", {
+      cwd: project, sessionId: P, metaTimestamp: stamp("10:00:00"),
+      records: [
+        started(stamp("10:00:01")),
+        call(stamp("10:00:02"), "spawn_agent", "c1", { message: SECRET }),
+        output(stamp("10:00:03"), "c1", { agent_id: "codex-child-1" }),
+        { timestamp: stamp("10:00:04"), type: "event_msg", payload: { type: "task_complete" } },
+        started(stamp("10:05:00")),
+        call(stamp("10:05:01"), "wait_agent", "c2", { targets: ["codex-child-1"] }),
+        output(stamp("10:05:02"), "c2", {}),
+        call(stamp("10:05:03"), "spawn_agent", "c3", { message: SECRET }),
+        output(stamp("10:05:04"), "c3", { agent_id: "codex-child-2" }),
+        started(stamp("10:10:00")),
+      ],
+    });
+    const child1 = codexSegment(codexHome, "child-1.jsonl", {
+      cwd: project, sessionId: "codex-child-1", metaTimestamp: stamp("10:00:05"), metaExtra: { ...spawned(P), agent_role: "worker" },
+      records: [tokenCount(stamp("10:04:00"), 40), { timestamp: stamp("10:04:30"), type: "response_item", payload: { text: SECRET } }],
+    });
+    codexSegment(codexHome, "child-2.jsonl", { cwd: project, sessionId: "codex-child-2", metaTimestamp: stamp("10:05:05"), metaExtra: spawned(P), records: [] });
+    codexSegment(codexHome, "child-3.jsonl", { cwd: project, sessionId: "codex-child-3", metaTimestamp: stamp("10:06:00"), metaExtra: spawned(P), records: [] });
+    // Never listed: another parent's child, a child recorded for another project, and a fork (a copy of history, not a spawned child).
+    codexSegment(codexHome, "other-child.jsonl", { cwd: project, sessionId: "codex-other-child", metaTimestamp: stamp("10:07:00"), metaExtra: spawned("someone-else") });
+    codexSegment(codexHome, "foreign-child.jsonl", { cwd: foreign, sessionId: "codex-foreign-child", metaTimestamp: stamp("10:07:00"), metaExtra: spawned(P) });
+    codexSegment(codexHome, "fork.jsonl", { cwd: project, sessionId: "codex-fork", metaTimestamp: stamp("10:07:00"), metaExtra: { forked_from_id: P } });
+    codexSegment(codexHome, "current.jsonl", { cwd: project, sessionId: "current-session" });
+
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: P, env: { CODEX_HOME: codexHome } });
+    assert.equal(result.status, "available");
+    assert.equal(result.segmentCount, 1);
+    assert.deepEqual(result.childSessions.map((child) => [child.childId, child.agentType, child.spawnDepth, child.startTurnIndex, child.endTurnIndex]), [
+      ["codex-child-1", "worker", 1, 0, 1],
+      ["codex-child-2", null, 1, 1, 1],
+      ["codex-child-3", null, 1, null, null],
+    ]);
+    assert.equal(result.childSessions[0].transcript.sha256, sha256Of(readFileSync(child1)));
+    assert.equal(result.childSessions[0].transcript.recordCount, 3);
+    assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "codex-token-count-total", observations: 1, counters: codexCounters(40) });
+    assert.deepEqual(result.turns, {
+      model: "codex-task-started", count: 3, markersTruncated: false,
+      markers: [{ index: 0, record: 1, timestamp: stamp("10:00:01") }, { index: 1, record: 5, timestamp: stamp("10:05:00") }, { index: 2, record: 10, timestamp: stamp("10:10:00") }],
+    });
+    assert.equal(result.completeness, "complete");
+    const serialized = JSON.stringify(result);
+    for (const forbidden of [SECRET, "codex-home", "child-1.jsonl", ".jsonl", "codex-other-child", "codex-foreign-child", "codex-fork"]) {
+      assert.equal(serialized.includes(forbidden), false, `the export must not carry ${forbidden}`);
+    }
+  });
+});
+
+// The recorded Antigravity layout: <home>/.gemini/.../brain/<conversationId>/.system_generated/logs/transcript.jsonl.
+const AGY_CONVERSATION = "11111111-2222-4333-8444-555555555555";
+// The credential screen's two machine-plane lookups are stubbed so no test reads a real machine plane or home directory.
+const NO_MACHINE_PLANE = { machinePlaneRead: () => ({ status: "absent" }), repoKeyDirectory: () => ({ status: "absent" }) };
+const AGY_SENTINEL ="SENTINEL-OAUTH-CREDENTIAL-never-read";
+
+function agyFixture(fixture, project, lines, { brainParent = join(".gemini", "antigravity", "brain") } = {}) {
+  const home = join(realpathSync(fixture), "agy-home");
+  const artifacts = join(home, brainParent, AGY_CONVERSATION);
+  const logs = join(artifacts, ".system_generated", "logs");
+  mkdirSync(logs, { recursive: true });
+  mkdirSync(join(home, ".gemini"), { recursive: true });
+  writeFileSync(join(home, ".gemini", "oauth_creds.json"), AGY_SENTINEL);
+  const transcriptPath = join(logs, "transcript.jsonl");
+  writeFileSync(transcriptPath, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+  // The host context exactly as the Antigravity pretool hook derives it from the original envelope.
+  const host = antigravityArtifactHostContext({
+    toolCall: { name: "run_command" }, conversationId: AGY_CONVERSATION, artifactDirectoryPath: artifacts, transcriptPath, workspacePaths: [realpathSync(project)],
+  });
+  return { home, artifacts, logs, transcriptPath, host };
+}
+
+const AGY_LINES = [
+  { type: "turn.started", timestamp: stamp("11:00:00") },
+  { type: "tool.call", timestamp: stamp("11:00:01"), text: SECRET },
+  { type: "turn.completed", timestamp: stamp("11:00:02"), usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3 } },
+  { type: "turn.started", timestamp: stamp("11:05:00") },
+  { type: "turn.completed", timestamp: stamp("11:05:09"), usage: { input_tokens: 5, output_tokens: 1 } },
+];
+
+test("AC-175B: the Antigravity export reads the current conversation through the brain layout from the host context only", () => {
+  withExportFixture(({ fixture, project, codexHome }) => {
+    const agy = agyFixture(fixture, project, AGY_LINES);
+    const options = { rootDir: project, runner: "antigravity", excludeSession: AGY_CONVERSATION, sessionId: AGY_CONVERSATION, env: {}, homedirFn: () => agy.home, credentialScreen: NO_MACHINE_PLANE };
+    const result = recovery.exportRunnerTranscript({ ...options, antigravityArtifactHost: agy.host });
+    assert.equal(result.status, "available");
+    assert.equal(result.runner, "antigravity");
+    assert.equal(result.sessionId, AGY_CONVERSATION);
+    assert.equal(result.segmentCount, 1);
+    assert.equal(result.recordCount, 5);
+    assert.equal(result.segments[0].sha256, sha256Of(readFileSync(agy.transcriptPath)));
+    assert.equal(result.firstTimestamp, stamp("11:00:00"));
+    assert.equal(result.lastTimestamp, stamp("11:05:09"));
+    assert.equal(result.completeness, "complete");
+    assert.deepEqual(result.usage, { status: "available", source: "antigravity-turn-completed", observations: 2, counters: { input_tokens: 15, cached_input_tokens: 2, output_tokens: 4 } });
+    assert.deepEqual(result.turns, {
+      model: "antigravity-turn-started", count: 2, markersTruncated: false,
+      markers: [{ index: 0, record: 0, timestamp: stamp("11:00:00") }, { index: 1, record: 3, timestamp: stamp("11:05:00") }],
+    });
+    assert.equal(result.childSessions, "antigravity-child-sessions-not-recorded");
+    const serialized = JSON.stringify(result);
+    for (const forbidden of [SECRET, AGY_SENTINEL, fixture, basename(fixture), "brain", "transcript.jsonl", ".gemini", ".system_generated", "agy-home"]) {
+      assert.equal(serialized.includes(forbidden), false, `the export must not carry ${forbidden}`);
+    }
+    // The context is a host field: the admitted CLI argv cannot carry it, so the CLI names that precise reason and reads nothing.
+    const printed = JSON.parse(runMain(["export", "--root", project, "--runner", "antigravity", "--exclude-session", AGY_CONVERSATION, "--session-id", AGY_CONVERSATION], {}));
+    assert.deepEqual(printed, { schema: SCHEMA, status: "unavailable", runner: "antigravity", reason: "antigravity-host-context-unavailable" });
+    // Claude and Codex cannot select the Antigravity route with that option.
+    codexSegment(codexHome, "s.jsonl", { cwd: project, sessionId: "some-session" });
+    const codexWith = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: AGY_CONVERSATION, env: { CODEX_HOME: codexHome }, antigravityArtifactHost: agy.host });
+    assert.deepEqual(codexWith, { schema: SCHEMA, status: "unavailable", runner: "codex", reason: "requested-session-unavailable" });
+  });
+});
+
+test("AC-175B: the Antigravity export refuses an absent, foreign, aliased or credential-located context and reads no credential", () => {
+  withExportFixture(({ fixture, project, foreign }) => {
+    const agy = agyFixture(fixture, project, AGY_LINES);
+    const base = { rootDir: project, runner: "antigravity", excludeSession: AGY_CONVERSATION, sessionId: AGY_CONVERSATION, env: {}, homedirFn: () => agy.home, credentialScreen: NO_MACHINE_PLANE };
+    const reason = (extra) => recovery.exportRunnerTranscript({ ...base, antigravityArtifactHost: agy.host, ...extra });
+    const typed = (why) => ({ schema: SCHEMA, status: "unavailable", runner: "antigravity", reason: why });
+    assert.deepEqual(recovery.exportRunnerTranscript(base), typed("antigravity-host-context-unavailable"));
+    // Own session only: a different requested id, and a claim that differs from the host conversation.
+    assert.deepEqual(reason({ sessionId: "11111111-2222-4333-8444-666666666666" }), typed("requested-session-unavailable"));
+    assert.equal(reason({ excludeSession: "11111111-2222-4333-8444-666666666666" }).reason, IDENTITY_CONFLICT);
+    // Own project only, exact layout only.
+    for (const delta of [
+      { workspacePaths: [realpathSync(foreign)] },
+      { conversationId: "bad" },
+      { artifactDirectoryPath: join(agy.artifacts, "..", "11111111-2222-4333-8444-666666666666") },
+      { transcriptPath: join(agy.artifacts, ".system_generated", "logs", "other.jsonl") },
+    ]) {
+      assert.deepEqual(reason({ antigravityArtifactHost: { ...agy.host, ...delta } }), typed("antigravity-host-context-invalid"), JSON.stringify(Object.keys(delta)));
+    }
+    // A linked transcript pointing at a credential is never followed.
+    rmSync(agy.transcriptPath);
+    symlinkSync(join(agy.home, ".gemini", "oauth_creds.json"), agy.transcriptPath);
+    const linked = reason({});
+    assert.deepEqual(linked, typed("antigravity-host-context-invalid"));
+    assert.equal(JSON.stringify(linked).includes(AGY_SENTINEL), false);
+    // A missing transcript is invalid, not an empty export.
+    rmSync(agy.transcriptPath);
+    assert.deepEqual(reason({}), typed("antigravity-host-context-invalid"));
+  });
+});
+
+test("AC-175B: an Antigravity layout located under a credential root is refused even though its path shape is valid", () => {
+  withExportFixture(({ fixture, project }) => {
+    const agy = agyFixture(fixture, project, AGY_LINES, { brainParent: join(".config", "gcloud", "brain") });
+    const result = recovery.exportRunnerTranscript({
+      rootDir: project, runner: "antigravity", excludeSession: AGY_CONVERSATION, sessionId: AGY_CONVERSATION, env: {},
+      homedirFn: () => agy.home, credentialScreen: NO_MACHINE_PLANE, antigravityArtifactHost: agy.host,
+    });
+    assert.deepEqual(result, { schema: SCHEMA, status: "unavailable", runner: "antigravity", reason: "antigravity-host-context-invalid" });
   });
 });

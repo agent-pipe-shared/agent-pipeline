@@ -19,6 +19,8 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 import { auditCurrentRunnerSession } from "../lib/runner-own-session-audit.mjs";
+import { antigravityArtifactLayoutIsValid, artifactPathIsPhysical } from "../lib/current-session-artifact-export.mjs";
+import { isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 import { repositoryPathIdentityOrSelf, windowsNotationCandidate } from "../lib/repository-path-identity.mjs";
@@ -33,6 +35,9 @@ const MAX_EXCERPT_ENTRIES = 8;
 const MAX_EXCERPT_DETAIL_BYTES = 600;
 const PROJECT_PATH_KEYS = new Set(["cwd", "workspace", "workspace_path", "workspacePath", "project_root", "projectRoot"]);
 const SESSION_ID_KEYS = new Set(["session_id", "sessionId", "thread_id", "threadId"]);
+// An id or label that is safe as a single path component and as an emitted value (no separator, no traversal, bounded).
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u;
+const SAFE_LABEL = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 function unavailable(runner, reason) {
   return { schema: SCHEMA, status: "unavailable", runner, reason };
@@ -179,18 +184,35 @@ function candidateMetadata(filePath, projectIdentity) {
   if (identities.some((identity) => identity === null) || !identities.every((identity) => identity === projectIdentity)) return null;
   const uniqueSessionIds = [...new Set(sessionIds)];
   if (uniqueSessionIds.length !== 1) return null;
-  try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs }; } catch { return null; }
+  try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs, spawn: spawnProvenance(metas) }; } catch { return null; }
+}
+
+/**
+ * The parent a Codex session was SPAWNED from, as its own session_meta records it (`source.subagent.thread_spawn`; the same
+ * spelling lib/runner-own-session-audit.mjs assumes -- not verified against a live store). A fork (`forked_from_id`) copies
+ * history and is not a child. Null unless exactly one valid parent is declared.
+ */
+function spawnProvenance(metas) {
+  const found = metas.map((meta) => {
+    const body = meta.payload !== null && typeof meta.payload === "object" ? meta.payload : meta;
+    const spawn = body?.source?.subagent?.thread_spawn;
+    if (spawn === null || typeof spawn !== "object" || typeof spawn.parent_thread_id !== "string" || !SAFE_ID.test(spawn.parent_thread_id)) return null;
+    const role = [body.agent_role, spawn.agent_role].find((value) => typeof value === "string" && SAFE_LABEL.test(value));
+    return { parentId: spawn.parent_thread_id, depth: Number.isSafeInteger(spawn.depth) && spawn.depth >= 0 ? spawn.depth : null, role: role ?? null };
+  }).filter((entry) => entry !== null);
+  return found.length > 0 && found.every((entry) => entry.parentId === found[0].parentId) ? found[0] : null;
 }
 
 /**
  * A claimed current session (`--exclude-session`) is only a claim. When the host resolves its own
  * identity for this runner and it disagrees (or the host's own sources conflict), refuse with the
  * typed identity code instead of reading a transcript on the strength of a wrong claim. An identity the
- * host cannot supply is not a conflict: nothing is compared.
+ * host cannot supply is not a conflict: nothing is compared. `hostHookSessionId` is the identity the
+ * Antigravity hook supplied (no environment variable carries it).
  */
-function claimedSessionConflict({ runner, excludeSession, env = process.env } = {}) {
+function claimedSessionConflict({ runner, excludeSession, env = process.env, hostHookSessionId = null } = {}) {
   if (typeof excludeSession !== "string" || excludeSession.trim() === "") return null;
-  const host = resolveModelRoleHostSessionIdentity({ runner, env });
+  const host = resolveModelRoleHostSessionIdentity({ runner, env, hostHookSessionId });
   if (host.code === "MODEL-ROLE-SESSION-IDENTITY-CONFLICT"
     || (host.ok && host.sessionId !== excludeSession)) {
     return unavailable(runner ?? "unknown", "MODEL-ROLE-SESSION-IDENTITY-CONFLICT");
@@ -376,9 +398,27 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
 //   claude       <CLAUDE_CONFIG_DIR or ~/.claude>/projects/<project path, every non-alphanumeric
 //                character replaced by "-">/<id>.jsonl, direct children only. A file is a segment of
 //                session S when its records declare exactly one sessionId, S, and every cwd they
-//                declare is this project. Child (sub-agent) sessions are not inferred.
-//   antigravity  typed unavailable: its transcript layout is not established, so none is invented.
-//                Its usage extractor below is still pure and exported.
+//                declare is this project. Child (sub-agent) sessions live beside it, never as segments:
+//                <project directory>/<S>/subagents/agent-<agentId>.jsonl with agent-<agentId>.meta.json
+//                ({agentType, toolUseId, spawnDepth}; the layout guard-dispatch-budget.mjs and
+//                usage-ledger.mjs already rely on). A child is listed only when its own records declare
+//                session S and this project; its turn span in S comes from the meta toolUseId matched to
+//                the parent's tool_use / tool_result blocks.
+//   codex        a child is a project-authenticated session whose own session_meta declares
+//                source.subagent.thread_spawn.parent_thread_id = S (the spelling lib/runner-own-session-audit.mjs
+//                assumes; not verified against a live store). Its turn span comes from the parent's
+//                spawn_agent call/output and the last parent call or output naming the child.
+//   antigravity  the established brain layout (lib/current-session-artifact-export.mjs): the artifact root
+//                <...>/brain/<conversationId> and <artifactRoot>/.system_generated/logs/transcript.jsonl,
+//                resolved ONLY from the host context the Antigravity pretool hook supplies
+//                (`antigravityArtifactHost`, shaped by antigravityArtifactHostContext); no directory is listed or
+//                guessed, and no environment variable carries it, so the CLI (which cannot receive it) names that
+//                reason. The export is of the CURRENT conversation only. Child sessions are not recorded there.
+//
+// Turn model (emitted as `turns.model`): claude = one distinct assistant message.id (usage-ledger.mjs convention);
+// codex = one event_msg task_started record; antigravity = one turn.started record. A child's startTurnIndex is the
+// parent turn that issued it and endTurnIndex the parent turn in progress at the last parent record that names it
+// (Claude: its tool_result; Codex: the last call or output naming it); null where the runner does not record it.
 // ---------------------------------------------------------------------------------------------
 const CLAUDE_RUNNER = "claude";
 const ANTIGRAVITY_RUNNER = "antigravity";
@@ -532,13 +572,323 @@ function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, h
     } catch { /* An unreadable candidate is not evidence. */ }
   }
   if (candidates.length === 0) return { unavailable: unavailable(CLAUDE_RUNNER, "no-prior-project-matching-transcript") };
-  return { candidates, boundReached };
+  return { candidates, boundReached, projectDirectory };
 }
 
 function exportCandidates(options) {
   // Codex, Antigravity and unknown runners resolve through the Codex adapter, which types every non-Codex
   // runner as `runner-transcript-source-unavailable`; only Claude has a second adapter.
   return options.runner === CLAUDE_RUNNER ? claudeProjectCandidates(options) : priorProjectMatchingCandidates(options);
+}
+
+/** Segment order: first timestamped record (none last), then mtime, then path. */
+function compareSegments(left, right) {
+  if ((left.firstMs === null) !== (right.firstMs === null)) return left.firstMs === null ? 1 : -1;
+  if (left.firstMs !== right.firstMs) return left.firstMs - right.firstMs;
+  return left.mtimeMs - right.mtimeMs
+    || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0);
+}
+
+const MAX_CHILD_SESSIONS = 256;
+const MAX_TURN_MARKERS = 500;
+const MAX_CHILD_META_BYTES = 64 * 1024;
+const TURN_MODELS = { claude: "claude-assistant-message-id", codex: "codex-task-started", antigravity: "antigravity-turn-started" };
+
+const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * Turn markers over the merged records. `turnAt[i]` is the turn in progress at record i (null before the first turn);
+ * for a Claude assistant row it is the turn of its own message, so a message re-appearing in a later segment keeps its turn.
+ */
+function describeTurns(runner, records) {
+  const markers = [];
+  const turnAt = new Array(records.length).fill(null);
+  let latest = null;
+  if (runner === CLAUDE_RUNNER) {
+    const ordinalOf = new Map();
+    records.forEach((row, index) => {
+      const message = row?.type === "assistant" && isObject(row.message) && row.message.model !== "<synthetic>" ? row.message : null;
+      if (message !== null) {
+        const id = typeof message.id === "string" && message.id !== "" ? message.id : null;
+        let ordinal = id === null ? undefined : ordinalOf.get(id);
+        if (ordinal === undefined) {
+          ordinal = markers.length;
+          if (id !== null) ordinalOf.set(id, ordinal);
+          markers.push({ index: ordinal, record: index, timestamp: isoOrNull(recordTimestampMs(row)) });
+          latest = ordinal;
+        }
+        turnAt[index] = ordinal;
+      } else {
+        turnAt[index] = latest;
+      }
+    });
+  } else {
+    const isTurnStart = runner === CODEX_RUNNER
+      ? (row) => row?.type === "event_msg" && row.payload?.type === "task_started"
+      : (row) => row?.type === "turn.started";
+    records.forEach((row, index) => {
+      if (isTurnStart(row)) {
+        latest = markers.length;
+        markers.push({ index: latest, record: index, timestamp: isoOrNull(recordTimestampMs(row)) });
+      }
+      turnAt[index] = latest;
+    });
+  }
+  return {
+    turns: { model: TURN_MODELS[runner] ?? "unknown", count: markers.length, markersTruncated: markers.length > MAX_TURN_MARKERS, markers: markers.slice(0, MAX_TURN_MARKERS) },
+    turnAt,
+  };
+}
+
+/** One regular, single-link file read under before/after physical-identity checks; throws when it is unsafe or changed. */
+function readStableFile(filePath, maximumBytes = Infinity) {
+  const before = lstatSync(filePath);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size > maximumBytes) throw new Error("file-unsafe");
+  const bytes = readTranscriptBytes(filePath);
+  const after = lstatSync(filePath);
+  if (bytes === null || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size
+    || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || bytes.length !== after.size
+    || !after.isFile() || after.nlink !== 1) throw new Error("file-changed");
+  return bytes;
+}
+
+/** The recorded fields of a child transcript; counts, digest and timestamps only. */
+function childTranscriptSummary(runner, chunks) {
+  const bytes = Buffer.concat(chunks);
+  const { records, unparsedLineCount } = parseJsonLinesCounted(bytes);
+  const stamps = records.map(recordTimestampMs).filter((ms) => ms !== null);
+  return {
+    records,
+    transcript: {
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      byteLength: bytes.length,
+      recordCount: records.length,
+      unparsedLineCount,
+      firstTimestamp: isoOrNull(stamps.length > 0 ? stamps[0] : null),
+      lastTimestamp: isoOrNull(stamps.length > 0 ? stamps[stamps.length - 1] : null),
+    },
+    usage: extractRunnerUsage(runner, records),
+  };
+}
+
+function childEntry(childId, agentType, spawnDepth, span, summary) {
+  return {
+    childId, agentType, spawnDepth,
+    startTurnIndex: span.start, endTurnIndex: span.end,
+    transcript: summary.transcript, usage: summary.usage,
+  };
+}
+
+function sortedChildren(children) {
+  return children.sort((left, right) => {
+    if ((left.startTurnIndex === null) !== (right.startTurnIndex === null)) return left.startTurnIndex === null ? 1 : -1;
+    if (left.startTurnIndex !== right.startTurnIndex) return left.startTurnIndex - right.startTurnIndex;
+    return left.childId < right.childId ? -1 : left.childId > right.childId ? 1 : 0;
+  });
+}
+
+function childResult(children, flags) {
+  const reasons = [
+    ...(flags.rejected > 0 ? ["child-session-rejected"] : []),
+    ...(flags.boundReached ? ["child-bound-reached"] : []),
+    ...(flags.skippedRecords ? ["child-records-skipped"] : []),
+    ...(flags.nested ? ["nested-workflow-children-not-listed"] : []),
+  ];
+  return { value: sortedChildren(children), incompleteReasons: reasons };
+}
+
+const typedChildren = (reason) => ({ value: reason, incompleteReasons: [] });
+
+/**
+ * Claude: the parent's own tool_use / tool_result blocks locate the child in the parent's turns through the meta toolUseId.
+ * Returns where the call (`start`) and its first result (`end`) sit, by turn.
+ */
+function claudeToolSpans(records, turnAt) {
+  const calls = new Map();
+  const results = new Map();
+  records.forEach((row, index) => {
+    const content = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
+    for (const block of content) {
+      if (!isObject(block)) continue;
+      if (row.type === "assistant" && block.type === "tool_use" && typeof block.id === "string" && !calls.has(block.id)) calls.set(block.id, index);
+      if (row.type === "user" && block.type === "tool_result" && typeof block.tool_use_id === "string" && !results.has(block.tool_use_id)) results.set(block.tool_use_id, index);
+    }
+  });
+  return (toolUseId) => {
+    if (toolUseId === null || !calls.has(toolUseId)) return { start: null, end: null };
+    return { start: turnAt[calls.get(toolUseId)], end: results.has(toolUseId) ? turnAt[results.get(toolUseId)] : null };
+  };
+}
+
+function claudeChildMeta(directory, agentId) {
+  const none = { agentType: null, toolUseId: null, spawnDepth: null };
+  try {
+    const meta = JSON.parse(readStableFile(join(directory, `agent-${agentId}.meta.json`), MAX_CHILD_META_BYTES).toString("utf8"));
+    if (!isObject(meta)) return none;
+    return {
+      agentType: typeof meta.agentType === "string" && SAFE_LABEL.test(meta.agentType) ? meta.agentType : null,
+      toolUseId: typeof meta.toolUseId === "string" && SAFE_LABEL.test(meta.toolUseId) ? meta.toolUseId : null,
+      spawnDepth: Number.isSafeInteger(meta.spawnDepth) && meta.spawnDepth >= 0 ? meta.spawnDepth : null,
+    };
+  } catch { return none; }
+}
+
+/** Claude child sessions of `sessionId`: <project directory>/<sessionId>/subagents/agent-<id>.jsonl, never followed through a link. */
+function claudeChildSessions({ projectDirectory, sessionId, records, turnView, projectIdentity }) {
+  const unavailableStorage = typedChildren("child-storage-unavailable");
+  if (typeof projectDirectory !== "string" || !SAFE_ID.test(sessionId)) return unavailableStorage;
+  const sessionDirectory = join(projectDirectory, sessionId);
+  const subagents = join(sessionDirectory, "subagents");
+  let directory;
+  try {
+    for (const candidate of [sessionDirectory, subagents]) {
+      let stat;
+      try { stat = lstatSync(candidate); } catch (error) { if (error?.code === "ENOENT") return childResult([], {}); throw error; }
+      if (stat.isSymbolicLink() || !stat.isDirectory()) return unavailableStorage;
+    }
+    directory = realpathSync(subagents);
+    if (!pathInside(projectDirectory, directory) || directory === projectDirectory) return unavailableStorage;
+  } catch { return unavailableStorage; }
+  let entries;
+  try { entries = readdirSync(directory, { withFileTypes: true }); } catch { return unavailableStorage; }
+  entries.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false };
+  const spanOf = claudeToolSpans(records, turnView.turnAt);
+  const children = [];
+  for (const entry of entries) {
+    if (entry.name === "workflows" && entry.isDirectory()) { flags.nested = true; continue; }
+    const named = /^agent-([A-Za-z0-9][A-Za-z0-9_.-]{0,127})\.jsonl$/u.exec(entry.name);
+    // A linked entry is skipped, never read.
+    if (named === null || entry.isSymbolicLink() || !entry.isFile()) continue;
+    if (children.length + flags.rejected >= MAX_CHILD_SESSIONS) { flags.boundReached = true; break; }
+    const agentId = named[1];
+    let bytes;
+    try { bytes = readStableFile(join(directory, entry.name)); } catch { flags.rejected += 1; continue; }
+    const summary = childTranscriptSummary(CLAUDE_RUNNER, [bytes]);
+    const declaredSessions = summary.records.flatMap((row) => (typeof row?.sessionId === "string" ? [row.sessionId] : []));
+    const declaredAgents = summary.records.flatMap((row) => (typeof row?.agentId === "string" ? [row.agentId] : []));
+    const declaredPaths = summary.records.flatMap((row) => (typeof row?.cwd === "string" && row.cwd.trim() !== "" ? [row.cwd] : []));
+    const authentic = declaredSessions.length > 0 && declaredSessions.every((id) => id === sessionId)
+      && declaredAgents.every((id) => id === agentId)
+      && declaredPaths.length > 0 && declaredPaths.map(metadataIdentity).every((identity) => identity !== null && identity === projectIdentity);
+    if (!authentic) { flags.rejected += 1; continue; }
+    if (summary.transcript.unparsedLineCount > 0) flags.skippedRecords = true;
+    const meta = claudeChildMeta(directory, agentId);
+    children.push(childEntry(agentId, meta.agentType, meta.spawnDepth, spanOf(meta.toolUseId), summary));
+  }
+  return childResult(children, flags);
+}
+
+/** The text of a function-call payload as parsed JSON when it is JSON, else the raw string. */
+function payloadValue(raw) {
+  if (typeof raw !== "string") return raw;
+  try { return JSON.parse(raw); } catch { return raw; }
+}
+
+/** Codex child sessions: project-authenticated candidates whose own session_meta names `sessionId` as the spawning parent. */
+function codexChildSessions({ found, sessionId, records, turnView, projectIdentity }) {
+  const spawned = (found?.candidates ?? []).filter((candidate) => candidate.spawn?.parentId === sessionId && candidate.sessionId !== sessionId);
+  const byChild = new Map();
+  for (const candidate of spawned) byChild.set(candidate.sessionId, [...(byChild.get(candidate.sessionId) ?? []), candidate]);
+  const spawnCalls = new Map();
+  const spawnOutputs = new Map();
+  records.forEach((row, index) => {
+    const payload = row?.type === "response_item" && isObject(row.payload) ? row.payload : null;
+    if (payload === null) return;
+    if (payload.type === "function_call" && payload.name === "spawn_agent" && typeof payload.call_id === "string") spawnCalls.set(payload.call_id, index);
+    if (payload.type === "function_call_output") {
+      const value = payloadValue(payload.output);
+      const agentId = isObject(value) && typeof value.agent_id === "string" ? value.agent_id : null;
+      if (agentId !== null && !spawnOutputs.has(agentId)) spawnOutputs.set(agentId, { index, callId: payload.call_id });
+    }
+  });
+  const spanOf = (childId) => {
+    const output = spawnOutputs.get(childId);
+    if (output === undefined) return { start: null, end: null };
+    const startRecord = spawnCalls.get(output.callId) ?? output.index;
+    let lastRecord = output.index;
+    records.forEach((row, index) => {
+      const payload = row?.type === "response_item" && isObject(row.payload) ? row.payload : null;
+      if (payload !== null && (payload.type === "function_call" || payload.type === "function_call_output")
+        && index > lastRecord && JSON.stringify(payload).includes(childId)) lastRecord = index;
+    });
+    return { start: turnView.turnAt[startRecord], end: turnView.turnAt[lastRecord] };
+  };
+  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false };
+  const children = [];
+  for (const [childId, segments] of [...byChild.entries()].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))) {
+    if (children.length + flags.rejected >= MAX_CHILD_SESSIONS) { flags.boundReached = true; break; }
+    try {
+      const read = segments.map((segment) => {
+        const bytes = readStableFile(segment.filePath);
+        if (candidateMetadata(segment.filePath, projectIdentity)?.sessionId !== childId) throw new Error("segment-identity-changed");
+        const summary = childTranscriptSummary(CODEX_RUNNER, [bytes]);
+        return { bytes, mtimeMs: statSync(segment.filePath).mtimeMs, filePath: segment.filePath, firstMs: recordTimestampMs(summary.records[0]), spawn: segment.spawn };
+      }).sort(compareSegments);
+      const chunks = [];
+      for (const segment of read) {
+        if (chunks.length > 0 && chunks[chunks.length - 1].at(-1) !== 10) chunks.push(Buffer.from("\n"));
+        chunks.push(segment.bytes);
+      }
+      const summary = childTranscriptSummary(CODEX_RUNNER, chunks);
+      if (summary.transcript.unparsedLineCount > 0) flags.skippedRecords = true;
+      children.push(childEntry(childId, read[0].spawn.role, read[0].spawn.depth, spanOf(childId), summary));
+    } catch { flags.rejected += 1; }
+  }
+  return childResult(children, flags);
+}
+
+/** Child provenance per runner: a list where the runner records children, otherwise a typed reason. */
+function childProvenance({ runner, sessionId, found, options, records, turnView }) {
+  if (runner === ANTIGRAVITY_RUNNER) return typedChildren("antigravity-child-sessions-not-recorded");
+  const root = realDirectory(options.rootDir);
+  if (root === null) return typedChildren("child-storage-unavailable");
+  const projectIdentity = repositoryPathIdentityOrSelf(root);
+  if (runner === CLAUDE_RUNNER) return claudeChildSessions({ projectDirectory: found.projectDirectory, sessionId, records, turnView, projectIdentity });
+  if (runner === CODEX_RUNNER) return codexChildSessions({ found, sessionId, records, turnView, projectIdentity });
+  return typedChildren("child-storage-unavailable");
+}
+
+/**
+ * Antigravity: the CURRENT conversation only. The brain root and transcript come from the host context the pretool hook supplies
+ * and from nowhere else: no directory is listed or guessed, the layout is the one shared with the artifact-copy route, and the
+ * transcript must be a physical (non-symlink) regular file outside every credential root.
+ */
+function exportAntigravityTranscript(sessionId, options) {
+  const host = options.antigravityArtifactHost;
+  if (!isObject(host)) return unavailable(ANTIGRAVITY_RUNNER, "antigravity-host-context-unavailable");
+  if (typeof options.excludeSession !== "string" || options.excludeSession.trim() === "") {
+    return unavailable(ANTIGRAVITY_RUNNER, "current-session-identity-unavailable");
+  }
+  const root = realDirectory(options.rootDir);
+  if (root === null) return unavailable(ANTIGRAVITY_RUNNER, "project-root-unavailable");
+  const invalid = () => unavailable(ANTIGRAVITY_RUNNER, "antigravity-host-context-invalid");
+  const homeDirectory = typeof options.homedirFn === "function" ? options.homedirFn : homedir;
+  // The credential screen is the shared one (PASSIVE_READ_CREDENTIAL_ROOTS); only its two machine-plane lookups are seams, so a
+  // test never touches a real machine plane. Any failure of the screen counts as "credential" (fail closed).
+  const seams = isObject(options.credentialScreen) ? options.credentialScreen : {};
+  let credential = true;
+  try {
+    credential = [host.transcriptPath, host.artifactDirectoryPath].some((target) => isCredentialReadTarget(target, {
+      rootDir: root, homeDir: homeDirectory(),
+      ...(typeof seams.machinePlaneRead === "function" ? { machinePlaneRead: seams.machinePlaneRead } : {}),
+      ...(typeof seams.repoKeyDirectory === "function" ? { repoKeyDirectory: seams.repoKeyDirectory } : {}),
+    }));
+  } catch { credential = true; }
+  if (!antigravityArtifactLayoutIsValid(host, root) || !artifactPathIsPhysical(host.transcriptPath, "file") || credential) return invalid();
+  const conflict = claimedSessionConflict({ ...options, runner: ANTIGRAVITY_RUNNER, hostHookSessionId: host.conversationId });
+  if (conflict !== null) return conflict;
+  if (sessionId !== host.conversationId) return unavailable(ANTIGRAVITY_RUNNER, "requested-session-unavailable");
+  let snapshots;
+  try {
+    snapshots = snapshotExportSegments({
+      segments: [{ filePath: host.transcriptPath, sessionId }],
+      sessionId,
+      authenticate: (filePath) => (artifactPathIsPhysical(filePath, "file") ? { sessionId } : null),
+      refreshedPaths: () => (artifactPathIsPhysical(host.transcriptPath, "file") ? [host.transcriptPath] : []),
+    });
+  } catch { return unavailable(ANTIGRAVITY_RUNNER, "requested-session-unavailable"); }
+  return describeExport({ runner: ANTIGRAVITY_RUNNER, sessionId, snapshots, options, found: {} });
 }
 
 /** Read every segment under physical-identity checks, then recheck membership and identity before any output. */
@@ -574,6 +924,7 @@ function snapshotExportSegments({ segments, sessionId, authenticate, refreshedPa
  */
 export function exportRunnerTranscript({ sessionId, ...options } = {}) {
   const runner = typeof options.runner === "string" && options.runner !== "" ? options.runner : "unknown";
+  if (runner === ANTIGRAVITY_RUNNER) return exportAntigravityTranscript(sessionId, options);
   const conflict = claimedSessionConflict(options);
   if (conflict !== null) return conflict;
   const found = exportCandidates(options);
@@ -595,6 +946,11 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
         .filter((candidate) => candidate.sessionId === sessionId).map((candidate) => candidate.filePath),
     });
   } catch { return failed(); }
+  return describeExport({ runner, sessionId, snapshots, options, found });
+}
+
+/** The data-minimised description of one authenticated session: merged-segment counts, turns, child provenance and usage. */
+function describeExport({ runner, sessionId, snapshots, options, found }) {
   const parsed = snapshots.map((snapshot) => {
     // Optional seam ceiling: only the whole lines inside the ceiling are described; the digest and length
     // still identify the whole file, and the export is marked partial instead of failing or truncating silently.
@@ -617,18 +973,17 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
       lastMs: stamps.length > 0 ? stamps[stamps.length - 1] : null,
     };
   });
-  parsed.sort((left, right) => {
-    if ((left.firstMs === null) !== (right.firstMs === null)) return left.firstMs === null ? 1 : -1;
-    if (left.firstMs !== right.firstMs) return left.firstMs - right.firstMs;
-    return left.mtimeMs - right.mtimeMs
-      || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0);
-  });
+  parsed.sort(compareSegments);
   const firsts = parsed.map((segment) => segment.firstMs).filter((ms) => ms !== null);
   const lasts = parsed.map((segment) => segment.lastMs).filter((ms) => ms !== null);
+  const mergedRecords = parsed.flatMap((segment) => segment.records);
+  const turnView = describeTurns(runner, mergedRecords);
+  const children = childProvenance({ runner, sessionId, found, options, records: mergedRecords, turnView });
   const incompleteReasons = [
     ...(parsed.some((segment) => segment.unparsedLineCount > 0) ? ["records-skipped"] : []),
     ...(found.boundReached === true ? ["candidate-bound-reached"] : []),
     ...(parsed.some((segment) => segment.overCeiling) ? ["byte-ceiling"] : []),
+    ...children.incompleteReasons,
   ];
   return {
     schema: SCHEMA,
@@ -638,7 +993,9 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
     // Totals below are only totals of what was read: a consumer must read this field with them.
     completeness: incompleteReasons.length === 0 ? "complete" : "partial",
     incompleteReasons,
-    childSessions: "not-inferred",
+    // A list when the runner records its children (empty when none), otherwise a typed reason; never a guess.
+    childSessions: children.value,
+    turns: turnView.turns,
     segmentCount: parsed.length,
     segmentOrder: EXPORT_SEGMENT_ORDER,
     recordCount: parsed.reduce((total, segment) => total + segment.records.length, 0),
@@ -654,7 +1011,7 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
       firstTimestamp: isoOrNull(segment.firstMs),
       lastTimestamp: isoOrNull(segment.lastMs),
     })),
-    usage: extractRunnerUsage(runner, parsed.flatMap((segment) => segment.records)),
+    usage: extractRunnerUsage(runner, mergedRecords),
   };
 }
 
