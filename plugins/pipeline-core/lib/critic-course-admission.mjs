@@ -748,6 +748,24 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
 }
 function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',affectedInvariantIds:[]}};}
 export function readCriticCourseAdmission(input){try{const c=runtimeCompose(input);return deriveCriticCourseAdmissionV2({source:{courseIdentity:c.resolved.courseIdentity,source:c.source},acceptedCriterion:c.criterion,consumedHistory:c.history,deltaRequest:c.delta,deterministicEvidence:c.evidence,budgets:c.budgets});}catch(error){return emptyProjection(input,error);}}
+// D223 slice 3: the registration commit of a round, derived (read-only) by the rule the admission itself applies. A candidate commit is
+// registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to
+// HEAD are the only possible registration commits; one qualifies when this module's own admission, asked with that commit as the
+// registration commit, ADMITS the request. Exactly one -> derived; none or more than one -> never guessed, never the latest.
+export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCommit,candidateCommit,deltaRequestPath=null,limit=32}){
+ const none={status:'none',commits:[]};
+ try{
+  if(!FEATURE_ID.test(featureId??'')||![baseCommit,candidateCommit].every(v=>OID.test(v??'')))return none;
+  const root=realpathSync(repoRoot),head=gitBytes(root,['rev-parse','HEAD'],'CCA-RANGE-READ').toString('utf8').trim();
+  const chain=range(root,candidateCommit,head);
+  if(chain.length===0||chain.length>limit)return none;
+  const admitted=[];
+  for(const registrationCommit of chain){
+   const admission=readCriticCourseAdmission({repoRoot:root,featureId,baseCommit,candidateCommit,registrationCommit,requestedMode:deltaRequestPath===null?'full':'delta',acceptedReference:null,criterionLocator:null,deltaRequestPath});
+   if(admission?.decision?.status==='admitted')admitted.push(registrationCommit);
+  }
+  return admitted.length===1?{status:'derived',commit:admitted[0],commits:admitted}:{status:admitted.length===0?'none':'ambiguous',commits:admitted};
+ }catch{return none;}}
 function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
 export function prepareRegisteredCriticDeltaRequest(input){try{
  if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');

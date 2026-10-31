@@ -72,9 +72,23 @@ function findingRecordsOf(calibration) {
   return [...new Set(listed)].sort();
 }
 
+// D223 slice 3 (Toolbox N41, PO decision 2026-10-31): the block-history file and the archived state files are a BUILT-IN convention of the
+// project-state record role, with no calibration entry: the role is an exclusion binding only (the Critic verifies blob digest and mode and
+// never reads the file), so the forbidden-material rule for history (CR-01a) keeps its meaning. The set is deliberately closed and exact.
+export const PROJECT_STATE_CONVENTION_FILES = Object.freeze(["docs/HISTORY.md"]);
+export const PROJECT_STATE_CONVENTION_DIRECTORIES = Object.freeze(["docs/state-archive/"]);
+// A markdown or text file whose basename starts with "history" is block-history-shaped. Narrow on purpose: a source file such as
+// lib/command-history.mjs never matches (it neither starts with the word nor has a markdown/text extension).
+const HISTORY_BASENAME = /^history[^/]*\.(?:md|markdown|txt)$/iu;
+/** The source paths of a derived bindings document that look like block history and are neither convention files nor calibrated (CDP-HISTORY-IN-RANGE). */
+export function historyPathsInBindings(document) {
+  return (document?.sourcePaths ?? []).filter((path) => HISTORY_BASENAME.test(posix.basename(path))).sort();
+}
+
 function classify(path, handover, findingRecords = []) {
   if (handover !== null && path === handover) return ROLE_PROJECT_STATE_RECORD;
   if (handover !== null && posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
+  if (PROJECT_STATE_CONVENTION_FILES.includes(path) || PROJECT_STATE_CONVENTION_DIRECTORIES.some((directory) => path.startsWith(directory))) return ROLE_PROJECT_STATE_RECORD;
   if (RETAINED_PATTERN.test(path)) return ROLE_RETAINED_PRIOR_RESULT;
   if (findingRecords.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry))) return ROLE_FINDING_DISPOSITION_RECORD;
   return "source";

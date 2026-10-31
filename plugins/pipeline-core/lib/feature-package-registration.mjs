@@ -681,6 +681,21 @@ export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {
  */
 const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
 const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"trustBoundaryChanged":false,"impactAmbiguous":false}';
+// The four fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
+const DELTA_JUDGMENT_FIELDS = ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
+/** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": []}}) at the missing input path and refuses; wx: never overwrites. */
+function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
+  const names = gitOut(root, ["diff", "--name-only", "-z", baseCommit, candidate, "--"]);
+  if (names === null) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the changed paths of ${baseCommit}..${candidate} could not be read`, { inputPath });
+  const changedPaths = names.split("\0").filter(Boolean).sort();
+  const target = join(root, inputPath);
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
+    writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
+  } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
+  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool - then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
+}
 export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
   let root;
@@ -690,17 +705,22 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds exactly these keys and nothing else: ${DELTA_INPUT_KEYS.join(", ")}; expected shape: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
   // The input file: a repository-relative regular file, no link on the way (the same refusals as the diagnostic file).
   const seen = repositoryRelative(inputPath) ? inspect(root, inputPath) : { kind: "invalid" };
-  if (seen.kind !== "file") return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
-  try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); }
-  let input;
-  try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
-  if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
-  const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
-  if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
-  const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
-  if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
-  if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
-  for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
+  // D223 (slice 3): an input file that does not exist yet is not a dead end. The checks below that need no input run first (feature, lineage,
+  // correction commit); then a PATH SKELETON is written at the expected path and the verb refuses. An existing file is never touched.
+  const absent = seen.kind === "absent";
+  if (seen.kind !== "file" && !absent) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
+  if (!absent) { try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); } }
+  let input = null;
+  if (!absent) {
+    try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
+    if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
+    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
+    if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
+    const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
+    if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
+    if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
+    for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
+  }
   // The single registered feature course.
   let features = [];
   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
@@ -733,6 +753,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     candidate = oid; break;
   }
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
+  if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate });
   const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
   const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, trustBoundaryChanged: input.trustBoundaryChanged, impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
   if (!compiled.ok) {

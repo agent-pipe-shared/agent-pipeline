@@ -96,8 +96,19 @@ an unbound version, or an ambiguous role rejects the input preparation; neither
 silently carve out source nor hand the mixed artifact to the fresh reviewer.
 
 The role project-state record is admissible only for the file the project
-calibration names as its handover/state file and a `pipeline-handover*.md` file
-in the same directory. It is an exclusion binding only: the Critic verifies the
+calibration names as its handover/state file, a `pipeline-handover*.md` file
+in the same directory, and the built-in convention set `docs/HISTORY.md` and
+everything under `docs/state-archive/` (no calibration entry is needed or read
+for the convention set). Any other markdown or text file whose basename starts
+with `history` (case-insensitive) in the reviewed range, that is neither in this
+set nor listed in `criticFindingRecordPaths`, is refused by the dispatch
+preflight before any packet is reserved (CDP-HISTORY-IN-RANGE); its repair is to
+list the path in `criticFindingRecordPaths` of `project/pipeline.json` and its
+byte-equal mirror `.claude/pipeline.json`. When the caller passes no bindings
+file, the preflight derives the bindings itself (the same derivation as the
+derive command), judges them exactly as a given file, and reports them in its
+result; a given file is still compared with the derivation and refused
+(CDP-CORRECTION-INPUT-STALE) on mismatch. It is an exclusion binding only: the Critic verifies the
 blob SHA-256 and mode without emitting bytes and never reads it, and the
 forbidden-material rule for handover, state and history is not relaxed. The
 Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`

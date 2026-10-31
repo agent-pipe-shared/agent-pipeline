@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 
-import { CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+import { CriticCorrectionInputBindingsError, PROJECT_STATE_CONVENTION_DIRECTORIES, PROJECT_STATE_CONVENTION_FILES, deriveCriticCorrectionInputBindings, historyPathsInBindings } from "../lib/critic-correction-input-bindings.mjs";
 
 /**
  * Read-only admission for a path-only Critic dispatch.
@@ -33,7 +33,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
@@ -209,9 +209,18 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
     const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
     fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
   }
+  // N41: a block-history-shaped file in the range collides with the Critic's reference boundary (CR-01a); refuse here, before anything is reserved.
+  const historyPaths = historyPathsInBindings(derived);
+  if (historyPaths.length > 0) {
+    const reason = `The range changes block-history-shaped file(s) that are neither a built-in project-state record (${[...PROJECT_STATE_CONVENTION_FILES, ...PROJECT_STATE_CONVENTION_DIRECTORIES].join(", ")}) nor listed in criticFindingRecordPaths: ${historyPaths.join(", ")}. The Critic may not read history, so the review would stop after its packet was reserved.`;
+    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in project/pipeline.json AND to its byte-equal mirror .claude/pipeline.json (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
+    fail("CDP-HISTORY-IN-RANGE", reason, { reason, paths: historyPaths, repair });
+  }
   if (reference === null || reference === undefined) {
+    // D223 (slice 3): no bindings file given, so the preflight uses its own in-memory derivation (the same function the derive verb calls)
+    // and reports it, so the Critic packet and the evidence carry it. A given file is still compared below and never silently replaced.
     if (derived.exclusions.length === 0) return null;
-    fail("CDP-CORRECTION-INPUT-REQUIRED", `${hint}; the range contains project-state or retained-result paths.`);
+    return { path: null, derived: true, digestSha256: derived.digestSha256, bindings: derived };
   }
   const path = normalizePath(reference, "correction input bindings path");
   if (!path.startsWith("scratch/")) fail("CDP-PATH", "correction input bindings path must be under scratch/.");
@@ -472,7 +481,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       fail("CDP-COURSE-CONTEXT", "Course identity does not bind the requested feature Spec.");
     }
     const { decision, ...subject } = admission;
-    courseAdmission = Object.freeze({ featureId: context.featureId,
+    courseAdmission = Object.freeze({ featureId: context.featureId, registrationCommit: context.registrationCommit,
       sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
       round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount,
       ...(fallbackFull ? { fallbackFull: true, reason: admission.decision.reason ?? null, courseBase: baseCommit ?? baseTree } : {}) });
@@ -638,6 +647,25 @@ export function parseCriticDispatchPreflightArgs(argv) {
     }
     else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
     index += 1;
+  }
+  // D223 (slice 3): no --registration-commit given. The registration commit is the ONE commit after the candidate (an evidence-only chain, as
+  // the admission's own transport check requires) at which the existing course admission admits the request; derived here, at parse time, so
+  // every later step (admit, finalize, the reservation) sees the same explicit commit. None qualifying keeps today's behaviour; more than one
+  // is refused, nothing is guessed. A caller-given commit (or --accepted-contract, hashed at that commit) is never replaced.
+  if (selectors["--registration-commit"] === undefined && selectors["--accepted-contract"] === undefined && values.sweepEvidenceTaskId === null
+    && typeof values.root === "string" && typeof values.base === "string" && typeof values.candidate === "string") {
+    const featureMatch = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
+    const baseCommit = featureMatch === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.base}^{commit}`]);
+    const candidateCommit = baseCommit === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]);
+    if (candidateCommit !== null) {
+      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: featureMatch[1], baseCommit, candidateCommit,
+        deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") });
+      if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
+      else if (derivation.status === "ambiguous") {
+        const reason = `An exact registration commit is required: ${derivation.commits.length} commits qualify (${derivation.commits.join(", ")}); the preflight never picks one. Pass --registration-commit with the commit that registered the evidence of this round.`;
+        fail("CDP-ARGUMENT", "An exact registration commit is required.", { reason, registrationCommitDerivation: { status: "ambiguous", commits: derivation.commits } });
+      }
+    }
   }
   if (Object.keys(selectors).length !== 0) {
     if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");

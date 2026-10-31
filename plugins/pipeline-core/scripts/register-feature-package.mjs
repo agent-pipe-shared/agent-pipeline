@@ -77,6 +77,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "     trustBoundaryChanged    true when the correction moves a trust boundary",
   "     impactAmbiguous         true when the impact cannot be told",
   "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
+  "     If <input.json> does not exist yet, step 5 writes a PATH SKELETON there (the changed paths, an empty list each; never the four judgment fields) and refuses (FPR-DELTA-INPUT-PATH); complete it and rerun.",
   "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",

@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,6 +124,52 @@ function registerDiagnostic(root, candidate, tag) {
   return { diagnosticPath, registration: commitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`) };
 }
 
+/** A further evidence-only registration commit (one more immutable candidate-evidence file in the manifest): the admission admits at it as well. */
+function registerExtraEvidence(root, tag) {
+  const manifestPath = `specs/${FEATURE}/lifecycle.json`, path = `specs/${FEATURE}/evidence/extra-${tag}.json`;
+  put(root, path, JSON.stringify({ note: `extra evidence ${tag}` }));
+  const manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
+  return commitPaths(root, [manifestPath, path], `register extra evidence ${tag}`);
+}
+
+/** The entries under the repository's critic packet control root (a packet or reservation file would show up here). */
+function listControl(root) {
+  const dir = join(root, git(root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
+  return existsSync(dir) ? readdirSync(dir, { recursive: true }).map(String).sort() : [];
+}
+
+/**
+ * W9 slice 3 (D223): the delta request through the missing-input route. The input file does not exist: the verb writes a PATH SKELETON
+ * (the derived changed paths, an empty list per path, none of the four judgment fields) and refuses; the Coordinator fills the judgment
+ * and the invariant map; the verb then succeeds. Returns what each step observed.
+ */
+function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
+  const inputPath = `scratch/delta-skeleton-${Object.keys(observed.skeletons ?? {}).length + 1}.json`;
+  assert.equal(existsSync(join(root, inputPath)), false, "the input file does not exist before the verb runs");
+  const first = addCriticDeltaRequest({ root, inputPath });
+  assert.equal(first.status, "refused", JSON.stringify(first));
+  assert.equal(first.code, "FPR-DELTA-INPUT-PATH", JSON.stringify(first));
+  assert.ok(first.reason.includes(inputPath), "the refusal names the skeleton file");
+  for (const field of ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(first.reason.includes(field), `the refusal says ${field} stays a Coordinator judgment: ${first.reason}`);
+  const skeletonBytes = readFileSync(join(root, inputPath));
+  const skeleton = JSON.parse(skeletonBytes.toString("utf8"));
+  assert.deepEqual(Object.keys(skeleton), ["pathInvariantMap"], "the skeleton carries the path map only; no judgment field is filled, defaulted or inferred");
+  assert.ok(Object.keys(skeleton.pathInvariantMap).length > 0 && Object.values(skeleton.pathInvariantMap).every((list) => Array.isArray(list) && list.length === 0), "every changed path maps to an empty list");
+  // The skeleton never makes the verb succeed, and an existing file is never overwritten.
+  const again = addCriticDeltaRequest({ root, inputPath });
+  assert.equal(again.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(again));
+  assert.deepEqual(readFileSync(join(root, inputPath)), skeletonBytes, "the existing input file is not overwritten");
+  // The Coordinator's judgment: the four fields and the invariant lists.
+  put(root, inputPath, JSON.stringify({ changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags,
+    pathInvariantMap: Object.fromEntries(Object.keys(skeleton.pathInvariantMap).map((path) => [path, ["inv-one"]])) }));
+  const added = addCriticDeltaRequest({ root, inputPath });
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  (observed.skeletons ??= {})[inputPath] = Object.keys(skeleton.pathInvariantMap).sort();
+  return { added, registration: commitPaths(root, added.commitPaths, "register the delta request"), skeleton: inputPath };
+}
+
 function deltaRequest(root, claims, flags) {
   const base = { changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
   put(root, "scratch/delta-input.json", JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
@@ -167,7 +213,12 @@ function acceptResidual(root, packetId, { boundToPacket = packetId } = {}) {
  * { kind: "full" | "delta" | "fallback", verdict, accept }; `slices` the task ids whose records are written through the attested route.
  * Returns the repository and a log of what every step observed.
  */
-function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null }) {
+function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null,
+  derived = false, skeletonDelta = false, extraCorrectionFiles = null, listedExtra = null, duplicateDiagAtRound = null }) {
+  // W9 slice 3 options: `derived` passes NEITHER a bindings file NOR a registration commit (the preflight derives both);
+  // `skeletonDelta` creates the delta request through the missing-input skeleton route; `extraCorrectionFiles` = { round, files } adds
+  // files to that round's correction commit; `listedExtra` lists one more path in criticFindingRecordPaths of BOTH calibration mirrors
+  // (committed in the base commit); `duplicateDiagAtRound` registers a second diagnostic of that round's candidate.
   const root = mkdtempSync(join(tmpdir(), `w8-walk-${label}-`));
   const observed = { rounds: [], acceptances: [], bindings: [] };
   git(root, ["init", "-q", "-b", "main"]);
@@ -176,7 +227,8 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
   put(root, "governance/policies/checklist.md", "- verify\n");
   // The consumer's shape: the project State is not a tracked file, scratch and the captured diagnostic logs are not either.
   put(root, ".gitignore", "/project/pipeline-state.json\n/.claude/pipeline-state.json\n/scratch/\n/evidence/*-targeted-*.log\n");
-  put(root, "project/pipeline.json", json({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] }));
+  put(root, "project/pipeline.json", json({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md", ...(listedExtra === null ? [] : [listedExtra])] }));
+  if (listedExtra !== null) put(root, ".claude/pipeline.json", readFileSync(join(root, "project/pipeline.json"), "utf8"));
   put(root, "docs/state.md", "state v1\n");
   put(root, "docs/findings.md", "findings quoted here\n");
   put(root, "pipeline.user.yaml", "gates:\n  human_approval: chat\n");
@@ -237,7 +289,9 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
       put(root, "docs/findings.md", `findings quoted here\n${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
       put(root, "docs/state.md", `state v${n}\n`);
       if (unlistedFindingFile) put(root, "docs/other-findings.md", `${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
-      const correctionPaths = [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : [])];
+      const extraFiles = extraCorrectionFiles !== null && extraCorrectionFiles.round === n ? Object.entries(extraCorrectionFiles.files) : [];
+      for (const [path, text] of extraFiles) put(root, path, text);
+      const correctionPaths = [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : []), ...extraFiles.map(([path]) => path)];
       if (guardCorrections) {
         // W9: the correction commit passes the commit-path guard (the predicate the commit-msg hook runs) at the real staged index.
         git(root, ["add", "-f", "--", ...correctionPaths]);
@@ -252,8 +306,9 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
     }
     const diag = registerDiagnostic(root, candidate, tag);
     registrationCommit = diag.registration;
+    if (duplicateDiagAtRound === n) registerExtraEvidence(root, tag); // a second evidence-only registration commit after the first one
     if (n > 1) {
-      delta = deltaRequest(root, [`fix-${n}`], round.kind === "fallback" ? { trustBoundaryChanged: true } : {});
+      delta = (skeletonDelta ? deltaRequestViaSkeleton : deltaRequest)(root, [`fix-${n}`], round.kind === "fallback" ? { trustBoundaryChanged: true } : {}, observed);
       registrationCommit = delta.registration; deltaRequestPath = delta.added.deltaRequestPath;
     }
     const base = n === 1 ? genesis : previousCandidate;
@@ -266,11 +321,17 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
       assert.equal(derived.status, 0, `bindings ${tag}: ${derived.text}`);
       step.bindings = { base: bindingsBase, digest: derived.body.digestSha256, counts: derived.body.counts };
     }
-    const argv = ["--root", root, "--base", base, "--candidate", candidate, "--spec", SPEC_PATH, "--evidence", diag.diagnosticPath, "--registration-commit", registrationCommit,
-      ...(deltaRequestPath === null ? [] : ["--delta-request", deltaRequestPath]), ...(bindingsPath === null ? [] : ["--correction-input-bindings", bindingsPath])];
+    // W9 slice 3 (D223): in `derived` mode the caller passes NO registration commit and NO bindings file; the preflight derives both.
+    const argv = ["--root", root, "--base", base, "--candidate", candidate, "--spec", SPEC_PATH, "--evidence", diag.diagnosticPath, ...(derived ? [] : ["--registration-commit", registrationCommit]),
+      ...(deltaRequestPath === null ? [] : ["--delta-request", deltaRequestPath]), ...(bindingsPath === null || derived ? [] : ["--correction-input-bindings", bindingsPath])];
+    step.controlBefore = listControl(root);
+    step.expectedRegistration = registrationCommit;
     const preflight = cli("critic-dispatch-preflight.mjs", argv);
     step.preflight = preflight;
     step.argv = argv;
+    step.bindingsPath = bindingsPath;
+    step.derivedEcho = preflight.body?.correctionInputBindings ?? null;
+    step.registrationEcho = preflight.body?.coordinatorOnly?.courseAdmission?.registrationCommit ?? null;
     if (preflight.status !== 0 || preflight.body?.status !== "packet-ready") { observed.rounds.push(step); observed.refusedAt = { round: n, step: "preflight", body: preflight.body, text: preflight.text }; return { root, observed, genesis }; }
     step.reviewBase = preflight.body.base.commit;
     step.fallbackFull = preflight.body.coordinatorOnly.courseAdmission.fallbackFull === true;
@@ -778,4 +839,125 @@ test("W9 NEGATIVE (4): a lineage write refusal leaves the round evidence exporte
     // The manifest is back: the write now succeeds, as the refusal text promised it could before the next correction commit.
     assert.equal(finalizer.writeCriticRoundLineage({ root: fx.root, packetId }).status, "written");
   } finally { cleanup(fx); }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Path W9 slice 3 (D223): the preflight derives the correction-input bindings and the registration commit; the delta request input is
+// prepared as a path skeleton; block history files are a built-in project-state exclusion with an early report (Toolbox N41).
+// Seams (named, as above): the Critic model call (fixed verdict), the PO residual acceptance (chat mode), the Critic's own dispatch
+// record, the guard adapter (the exported predicate the commit-msg hook calls). The delta verb is called as the exported function the
+// register-feature-package CLI calls (the CLI additionally needs the project authority State, which this fixture does not carry).
+// ---------------------------------------------------------------------------------------------------------------------------------
+const HISTORY_FILES = { "docs/HISTORY.md": "block history\n", "docs/state-archive/2026-10.md": "archived state\n", "lib/command-history.mjs": "export const history = 1;\n" };
+
+test("W9 SLICE 3 CHAIN: three rounds with NO bindings file and NO registration commit: skeleton delta input, derived values echoed, history files excluded, close plans", () => {
+  const fx = walkCourse({ label: "w9s3-chain", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: minors("r2"), accept: true }, { kind: "fallback", verdict: PASS }],
+    slices: ["TASK-ONE"], guardCorrections: true, derived: true, skeletonDelta: true, extraCorrectionFiles: { round: 3, files: HISTORY_FILES } });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const [r1, r2, r3] = fx.observed.rounds;
+    for (const step of [r1, r2, r3]) {
+      assert.ok(!step.argv.includes("--registration-commit") && !step.argv.includes("--correction-input-bindings"), "the caller passes neither a registration commit nor a bindings file");
+      assert.match(step.registrationEcho, /^[a-f0-9]{40}$/u, "the registration commit the preflight derived is echoed");
+      assert.equal(step.registrationEcho, step.expectedRegistration, "the derived registration commit is the commit the registration verbs produced");
+    }
+    assert.equal(r1.derivedEcho, null, "round 1 has no project-state or retained-result path: no bindings");
+    for (const step of [r2, r3]) {
+      assert.equal(step.derivedEcho.path, null, "derived bindings have no file");
+      assert.equal(step.derivedEcho.digestSha256, step.bindings.digest, "the derived digest equals the digest the derive verb produces for the range");
+      assert.deepEqual(JSON.parse(readFileSync(join(fx.root, step.bindingsPath), "utf8")), step.derivedEcho.bindings, "the echoed document is what the derive verb writes");
+    }
+    assert.equal(r2.fallbackFull, false);
+    assert.equal(r3.fallbackFull, true, "round 3 is the effective FULL round over the whole feature range");
+    assert.equal(r3.bindings.base, fx.genesis);
+    // (5) the history files are project-state exclusions with no calibration entry; (7) lib/command-history.mjs is a source path.
+    const roles = Object.fromEntries(r3.derivedEcho.bindings.exclusions.map((entry) => [entry.path, entry.role]));
+    assert.equal(roles["docs/HISTORY.md"], "project-state record");
+    assert.equal(roles["docs/state-archive/2026-10.md"], "project-state record");
+    assert.ok(r3.derivedEcho.bindings.sourcePaths.includes("lib/command-history.mjs"), "a source file whose name merely contains history is never matched");
+    assert.deepEqual(JSON.parse(readFileSync(join(fx.root, "project/pipeline.json"), "utf8")).criticFindingRecordPaths, ["docs/findings.md"], "no calibration entry is involved");
+    // The skeleton route ran in rounds 2 and 3 (once each) and the changed paths came from the range.
+    assert.equal(Object.keys(fx.observed.skeletons).length, 2);
+    const addenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(addenda["TASK-ONE"].status, 0, addenda["TASK-ONE"].text);
+    const closed = closeToPrepared(fx);
+    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+    assert.equal(closed.apply().status, "applied");
+  } finally { cleanup(fx); }
+});
+
+test("W9 SLICE 3 NEGATIVE (1): a bindings file the caller passes is compared with the derivation and refused CDP-CORRECTION-INPUT-STALE on mismatch", () => {
+  const fx = walkCourse({ label: "w9s3-stale", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const round = fx.observed.rounds[1];
+    // Bindings for the course range (genesis..candidate) are not the bindings of this correction range.
+    const other = cli("critic-correction-input-bindings.mjs", ["derive", "--root", fx.root, "--base", fx.genesis, "--head", round.candidate, "--out", "scratch/bindings-other.json"]);
+    assert.equal(other.status, 0, other.text);
+    const refused = cli("critic-dispatch-preflight.mjs", [...round.argv, "--correction-input-bindings", "scratch/bindings-other.json"]);
+    assert.equal(refused.status, 1);
+    assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-STALE", refused.text);
+  } finally { cleanup(fx); }
+});
+
+test("W9 SLICE 3 NEGATIVE (2): a range the derivation refuses stays CDP-CORRECTION-INPUT-REFUSED (a rename across classes)", () => {
+  const fx = walkCourse({ label: "w9s3-refused", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+  try {
+    const [round] = fx.observed.rounds;
+    git(fx.root, ["mv", "src/TASK-ONE.mjs", "docs/HISTORY.md"]);
+    const crossing = commitPaths(fx.root, ["src", "docs/HISTORY.md"], "move a source file onto the block history file");
+    const refused = cli("critic-dispatch-preflight.mjs", ["--root", fx.root, "--base", round.candidate, "--candidate", crossing, "--spec", SPEC_PATH, "--evidence", `specs/${FEATURE}/evidence/diagnostic-r1.json`]);
+    assert.equal(refused.status, 1);
+    assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-REFUSED", refused.text);
+  } finally { cleanup(fx); }
+});
+
+test("W9 SLICE 3 NEGATIVE (3): two commits qualify as registration commit: refused with the typed argument refusal, nothing guessed, nothing reserved", () => {
+  const fx = walkCourse({ label: "w9s3-ambiguous", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true, duplicateDiagAtRound: 1 });
+  try {
+    const refusal = fx.observed.refusedAt;
+    assert.equal(refusal?.round, 1, JSON.stringify(refusal));
+    assert.equal(refusal.body.code, "CDP-ARGUMENT", refusal.text);
+    assert.match(refusal.body.reason, /^An exact registration commit is required: 2 commits qualify/u, "the typed argument refusal of today, extended with the candidates");
+    assert.equal(refusal.body.registrationCommitDerivation.status, "ambiguous");
+    assert.equal(refusal.body.registrationCommitDerivation.commits.length, 2);
+    assert.deepEqual(listControl(fx.root), fx.observed.rounds[0].controlBefore, "no packet or reservation was created");
+    // The explicit input is still honoured: passing either one of the two commits is the caller's choice.
+    const explicit = cli("critic-dispatch-preflight.mjs", [...fx.observed.rounds[0].argv, "--registration-commit", refusal.body.registrationCommitDerivation.commits[0]]);
+    assert.equal(explicit.body?.status, "packet-ready", explicit.text);
+  } finally { cleanup(fx); }
+});
+
+test("W9 SLICE 3 NEGATIVE (4): an existing delta input of the wrong shape is refused FPR-DELTA-INPUT-SHAPE and never overwritten", () => {
+  const fx = walkCourse({ label: "w9s3-shape", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+  try {
+    put(fx.root, "src/fix2.mjs", "export const fix2 = 2;\n");
+    const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
+    registerDiagnostic(fx.root, candidate, "r2");
+    const wrong = JSON.stringify({ pathInvariantMap: { "src/fix2.mjs": [] } });
+    put(fx.root, "scratch/delta-wrong.json", wrong);
+    const refused = addCriticDeltaRequest({ root: fx.root, inputPath: "scratch/delta-wrong.json" });
+    assert.equal(refused.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(refused));
+    assert.equal(readFileSync(join(fx.root, "scratch/delta-wrong.json"), "utf8"), wrong, "the file is not overwritten");
+  } finally { cleanup(fx); }
+});
+
+test("W9 SLICE 3 NEGATIVE (6): a history-named file in the range is refused CDP-HISTORY-IN-RANGE with the exact repair before anything is reserved; listing it in BOTH calibration mirrors admits it", () => {
+  const files = { "docs/history-notes.md": "notes about the history of the block\n" };
+  const fx = walkCourse({ label: "w9s3-history", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true, extraCorrectionFiles: { round: 2, files } });
+  try {
+    const refusal = fx.observed.refusedAt;
+    assert.equal(refusal?.round, 2, JSON.stringify(refusal));
+    assert.equal(refusal.body.code, "CDP-HISTORY-IN-RANGE", refusal.text);
+    assert.deepEqual(refusal.body.paths, ["docs/history-notes.md"]);
+    assert.ok(refusal.body.repair.includes("criticFindingRecordPaths") && refusal.body.repair.includes("project/pipeline.json") && refusal.body.repair.includes(".claude/pipeline.json") && refusal.body.repair.includes("docs/history-notes.md"), refusal.body.repair);
+    assert.deepEqual(listControl(fx.root), fx.observed.rounds.at(-1).controlBefore, "no packet or reservation file exists after the refusal");
+  } finally { cleanup(fx); }
+  const listed = walkCourse({ label: "w9s3-history-listed", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], derived: true, skeletonDelta: true,
+    extraCorrectionFiles: { round: 2, files }, listedExtra: "docs/history-notes.md" });
+  try {
+    assert.equal(listed.observed.refusedAt, undefined, JSON.stringify(listed.observed.refusedAt));
+    const role = listed.observed.rounds[1].derivedEcho.bindings.exclusions.find((entry) => entry.path === "docs/history-notes.md")?.role;
+    assert.equal(role, "finding-disposition record", "the calibrated file is an exclusion binding");
+  } finally { cleanup(listed); }
 });

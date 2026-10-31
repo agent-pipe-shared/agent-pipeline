@@ -1408,14 +1408,22 @@ test("CCI preflight (1) a range without state or retained-result paths admits as
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
-test("CCI preflight (2) a range with the handover file changed and no bindings field is refused CDP-CORRECTION-INPUT-REQUIRED with a verb-first message", () => {
+// Restated (D223 slice 3, 2026-10-31). Intent of the original case: a range containing project-state paths must never reach the Critic
+// without bindings. That intent is kept; the route changed: with NO bindings field the preflight derives the bindings itself (in memory,
+// the function the derive verb calls), judges them exactly as it judges a given file, and reports them in its result. The old refusal
+// CDP-CORRECTION-INPUT-REQUIRED can no longer occur.
+test("CCI preflight (2) a range with the handover file changed and no bindings field is derived in memory and reported (restated: was CDP-CORRECTION-INPUT-REQUIRED)", () => {
   const fx = cciPreflightFixture({ "docs/state.md": "state v1\n" });
   try {
-    const error = cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
-    assert.ok(error.message.startsWith("Run "));
-    assert.ok(error.message.includes("critic-correction-input-bindings.mjs derive"));
-    assert.equal(error.message.includes("\n"), false);
-    assert.ok(error.message.length <= 220);
+    const result = preflightCriticDispatch(input(fx));
+    assert.equal(result.status, "packet-ready");
+    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: fx.candidate });
+    assert.equal(result.correctionInputBindings.path, null);
+    assert.equal(result.correctionInputBindings.derived, true);
+    assert.equal(result.correctionInputBindings.digestSha256, doc.digestSha256);
+    assert.deepEqual(result.correctionInputBindings.bindings, doc, "the result carries the derived document");
+    assert.equal(result.correctionInputBindings.bindings.exclusions.find((entry) => entry.path === "docs/state.md").role, "project-state record");
+    assert.equal(fs.existsSync(join(fx.root, "scratch", "bindings.json")), false, "the preflight stays read-only: it writes no bindings file");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
@@ -1443,10 +1451,14 @@ test("CCI preflight (4) a bindings file written for another head, or an unreadab
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
-test("CCI preflight (5) a retained prior result under the Critic results location triggers the requirement", () => {
+// Restated (D223 slice 3): intent kept (a retained prior result under the Critic results location is always bound as an exclusion); the
+// route changed from "refused until the caller derives a file" to "derived and reported by the preflight itself".
+test("CCI preflight (5) a retained prior result under the Critic results location is bound as an exclusion, derived when no file is given (restated: was REQUIRED)", () => {
   const fx = cciPreflightFixture({ "specs/feat-x/evidence/critic/p1/result.md": "retained\n" });
   try {
-    cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
+    const derivedResult = preflightCriticDispatch(input(fx));
+    assert.equal(derivedResult.correctionInputBindings.derived, true);
+    assert.equal(derivedResult.correctionInputBindings.bindings.exclusions[0].role, "retained prior result");
     cciWriteBindings(fx, fx.candidate);
     assert.equal(preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/bindings.json" })).status, "packet-ready");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
