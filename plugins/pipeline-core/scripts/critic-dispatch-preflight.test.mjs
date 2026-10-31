@@ -1060,6 +1060,11 @@ test("N43 (a) the missing-guardrails refusal for a changed calibration names the
       assert.ok(reason.includes(`--base ${fx.candidate}`), reason);
       assert.match(reason, /derives the required guardrails itself/u);
       assert.match(reason, /never pass a protected calibration path by --guardrail/u);
+      // Toolbox follow-up: the base stays the preflight base, the diagnostic is made while HEAD is the candidate, a second one binds to the delta request.
+      assert.match(reason, /Keep --base exactly as printed/u);
+      assert.match(reason, /a base equal to the candidate derives an empty set/u);
+      assert.match(reason, /still the candidate and the tree is clean \(CDI-DIRTY-CANDIDATE/u);
+      assert.match(reason, /CCA-DELTA-BINDING/u);
       assert.equal(error.details.diagnosticBase, fx.candidate);
       return true;
     });

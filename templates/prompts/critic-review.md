@@ -256,7 +256,11 @@ environment dump or a credential read; it reads such strings as text only.
   The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
   (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
   record is admissible only for the file the project calibration names as its
-  handover/state file and a `pipeline-handover*.md` file in the same directory;
+  handover/state file, a `pipeline-handover*.md` file in the same directory,
+  and the built-in convention set `docs/HISTORY.md` and everything under
+  `docs/state-archive/` (no calibration entry); the dispatch preflight refuses
+  any other history-named markdown or text file in the range before a packet is
+  reserved (CDP-HISTORY-IN-RANGE);
   it is an exclusion binding only: verify its blob SHA-256 and mode without
   emitting bytes and never read it. The forbidden-material rule for handover,
   state and history is NOT relaxed. A finding-disposition record is admissible

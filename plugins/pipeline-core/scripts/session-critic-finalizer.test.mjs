@@ -2122,13 +2122,22 @@ function d1Admit(fx, request, name = "d1-request.json") {
   return runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, name, request)]);
 }
 
-test("D1 walk (1) admit without the bindings field is refused and the detail names the derive command", () => {
+// W9 slice 3 restatement: the preflight derives the bindings in memory when the request carries none, so admit without the field is admitted and the
+// packet binds the derived echo ({ path: null, derived: true, ... }) instead of the old refusal CDP-CORRECTION-INPUT-REQUIRED.
+test("D1 walk (1) admit without the bindings field is admitted with the derived bindings and the packet binds the derived echo", () => {
   const fx = fixture({ handover: true });
   try {
-    const result = d1Admit(fx, d1Request(fx));
-    assert.equal(result.exitCode, 2);
-    assert.match(result.output.detail, /CDP-CORRECTION-INPUT-REQUIRED/u);
-    assert.match(result.output.detail, /critic-correction-input-bindings\.mjs derive/u);
+    const request = d1Request(fx);
+    const result = d1Admit(fx, request);
+    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
+    const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
+    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
+    const expected = preflightCriticDispatch({ root: fx.root, base: fx.base, candidate: fx.candidate, specPath: "specs/spec.md",
+      guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null });
+    assert.equal(expected.correctionInputBindings.derived, true);
+    assert.equal(expected.correctionInputBindings.path, null);
+    assert.match(expected.correctionInputBindings.digestSha256, /^[0-9a-f]{64}$/u);
+    assert.equal(readback.packet.request.sessionBinding.preflightSha256, createHash("sha256").update(canonicalJson(expected)).digest("hex"));
   } finally { cleanup(fx); }
 });
 

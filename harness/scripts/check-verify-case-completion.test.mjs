@@ -150,6 +150,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // unchanged classifier: agy-item-delivery 33->36, critic-course-admission 259->329, critic-dispatch-preflight 246->314 (N33b adds 18),
   // critic-generic-batch 79->115, guard-dispatch-budget-checkpoint 143->154, slice-queue-cli 125->132. Only these six numbers change;
   // names, paths, classifications, the identity digest and the counts stay as pinned, and no assertion is weakened.
+  // Restated 2026-10-31 (candidate 15, own hunk): two sites counts moved with the D223 slices and the Toolbox fixes, measured on the stacked candidate with
+  // the unchanged classifier: critic-course-admission 329->334, critic-dispatch-preflight 352->382 (the
+  // stack was already at 373 before slice 3, which adds 5, and the N43 follow-up text assertions add 4). Only these two numbers change.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -171,8 +174,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",329],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",352],
+    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",334],
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",382],
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",115],
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
