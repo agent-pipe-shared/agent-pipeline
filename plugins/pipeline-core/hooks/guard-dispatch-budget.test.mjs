@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 
 const GUARD = fileURLToPath(new URL("./guard-dispatch-budget.mjs", import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
-const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
+const SCRATCH_ROOT = join(REPO_ROOT, "scratch"); mkdirSync(SCRATCH_ROOT, { recursive: true }); // a fresh clone has no scratch/ yet
 function activeGovernanceRoot(prefix) {
   const root = mkdtempSync(join(SCRATCH_ROOT, `guard-budget-active-${prefix}-`));
   execFileSync("git", ["init", "--quiet"], { cwd: root });
