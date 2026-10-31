@@ -1462,6 +1462,16 @@ function parentRound(root, { featureId, taskId, packetId, base, candidate, regis
   parentAdmit(request, {});
   const finalized = parentFinalize(request, { readOriginalSourceReturnFn: parentOrigin });
   assert.equal(finalized.status, "completed", JSON.stringify(finalized));
+  return finalized;
+}
+// W9 / D223: the finalizer WRITES the lineage when a round finishes. The fixture asserts that write (status "written"), then the explicit
+// register call as an idempotent replay ("already-registered"); the registered files are then committed as before.
+function parentWrittenLineage(root, packetId, finalized) {
+  assert.equal(finalized.lineage?.status, "written", `the finalizer writes the lineage: ${JSON.stringify(finalized.lineage)}`);
+  const replay = parentAddLineage({ root, packetId });
+  assert.equal(replay.status, "already-registered", JSON.stringify(replay));
+  assert.equal(replay.lineagePath, finalized.lineage.lineagePath);
+  return finalized.lineage;
 }
 /** The consumer's shape: rounds 1 and 2 registered as lineage, round 3 passed but not registered, correction commits after it. */
 function parentLineageFixture({ afterRound = null } = {}) {
@@ -1492,18 +1502,21 @@ function parentLineageFixture({ afterRound = null } = {}) {
   writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
   const c1 = commit(root, "integrate feature behavior");
   const d1 = parentRegisterDiagnostic(root, featureId, c1, "r1");
-  parentRound(root, { featureId, taskId: "parent-task-1", packetId: "9a".repeat(16), base: genesis, candidate: c1, registrationCommit: d1.registration, deltaRequestPath: null, diagnosticPath: d1.diagnosticPath, verdict: PARENT_FAIL });
-  const l1 = parentAddLineage({ root, packetId: "9a".repeat(16) });
-  assert.equal(l1.status, "lineage-added", JSON.stringify(l1)); parentCommitPaths(root, l1.commitPaths, "register lineage of round 1");
+  const f1 = parentRound(root, { featureId, taskId: "parent-task-1", packetId: "9a".repeat(16), base: genesis, candidate: c1, registrationCommit: d1.registration, deltaRequestPath: null, diagnosticPath: d1.diagnosticPath, verdict: PARENT_FAIL });
+  const l1 = parentWrittenLineage(root, "9a".repeat(16), f1);
+  parentCommitPaths(root, l1.commitPaths, "register lineage of round 1");
   const correct = (name) => { mkdirSync(join(root, "src"), { recursive: true }); writeFileSync(join(root, `src/${name}.mjs`), `export const ${name} = 1;\n`); return commit(root, `correction ${name}`); };
   const c2 = correct("fix2"); const d2 = parentRegisterDiagnostic(root, featureId, c2, "r2"); const q2 = parentDeltaRequest(root);
-  parentRound(root, { featureId, taskId: "parent-task-2", packetId: "9b".repeat(16), base: c1, candidate: c2, registrationCommit: q2.registration, deltaRequestPath: q2.added.deltaRequestPath, diagnosticPath: d2.diagnosticPath, verdict: PARENT_FAIL });
-  const l2 = parentAddLineage({ root, packetId: "9b".repeat(16) });
-  assert.equal(l2.status, "lineage-added", JSON.stringify(l2)); parentCommitPaths(root, l2.commitPaths, "register lineage of round 2");
+  const f2 = parentRound(root, { featureId, taskId: "parent-task-2", packetId: "9b".repeat(16), base: c1, candidate: c2, registrationCommit: q2.registration, deltaRequestPath: q2.added.deltaRequestPath, diagnosticPath: d2.diagnosticPath, verdict: PARENT_FAIL });
+  const l2 = parentWrittenLineage(root, "9b".repeat(16), f2);
+  parentCommitPaths(root, l2.commitPaths, "register lineage of round 2");
   if (afterRound === 2) return { root, featureId, specPath, genesis, c1, c2, correct };
   const c3 = correct("fix3"); const d3 = parentRegisterDiagnostic(root, featureId, c3, "r3"); const q3 = parentDeltaRequest(root);
-  parentRound(root, { featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
-  // Round 3 passed but its lineage is never registered; correction commits follow it.
+  const f3 = parentRound(root, { featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
+  // Round 3 passed but its lineage is never registered; correction commits follow it. Since D223 the finalizer wrote it into the tree, so the
+  // fixture undoes that write to keep the pre-finalizer consumer state this case is about (the step under test is not stubbed).
+  assert.equal(f3.lineage?.status, "written", JSON.stringify(f3.lineage));
+  git(root, ["checkout", "--", manifestPath]); rmSync(join(root, f3.lineage.lineagePath), { force: true });
   const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
   return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
 }

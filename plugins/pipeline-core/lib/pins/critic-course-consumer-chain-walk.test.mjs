@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,10 @@ import test from "node:test";
 import { parseCriticDispatchPreflightArgs } from "../../scripts/critic-dispatch-preflight.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../scripts/session-critic-finalizer.mjs";
 import { addCriticDeltaRequest, addCriticReviewLineage } from "../feature-package-registration.mjs";
+// W9 (D223): the namespace imports keep a missing export a failure of the new cases only, never a load failure of the whole walk.
+import * as registration from "../feature-package-registration.mjs";
+import * as finalizer from "../../scripts/session-critic-finalizer.mjs";
+import * as hookInstaller from "../../scripts/commit-msg-hook-install.mjs";
 import * as courseAdmission from "../critic-course-admission.mjs";
 const { resolveRegisteredCriticCourseHistory } = courseAdmission;
 import { produceCriticDiagnostic } from "../critic-diagnostic-producer.mjs";
@@ -131,6 +135,11 @@ function deltaRequest(root, claims, flags) {
   return { added, registration: commitPaths(root, added.commitPaths, "register the delta request") };
 }
 
+/** The commit-path guard's answer for the commit about to be created: the exported predicate the commit-msg hook calls, at the real staged index. */
+function guardVerdict(root) {
+  return registration.checkCriticLineageBeforeCommit({ root });
+}
+
 const packetIdOf = (round) => `a${round.toString(16)}`.repeat(16);
 
 /** Residual acceptance of exactly the minor findings of a consumed round (the PO's chat-mode acceptance; seam named in the header). */
@@ -158,7 +167,7 @@ function acceptResidual(root, packetId, { boundToPacket = packetId } = {}) {
  * { kind: "full" | "delta" | "fallback", verdict, accept }; `slices` the task ids whose records are written through the attested route.
  * Returns the repository and a log of what every step observed.
  */
-function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null }) {
+function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null }) {
   const root = mkdtempSync(join(tmpdir(), `w8-walk-${label}-`));
   const observed = { rounds: [], acceptances: [], bindings: [] };
   git(root, ["init", "-q", "-b", "main"]);
@@ -228,7 +237,18 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
       put(root, "docs/findings.md", `findings quoted here\n${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
       put(root, "docs/state.md", `state v${n}\n`);
       if (unlistedFindingFile) put(root, "docs/other-findings.md", `${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
-      candidate = commitPaths(root, [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : [])], `fix: round ${n} correction`);
+      const correctionPaths = [`src/fix${n}.mjs`, "docs/findings.md", "docs/state.md", ...(unlistedFindingFile ? ["docs/other-findings.md"] : [])];
+      if (guardCorrections) {
+        // W9: the correction commit passes the commit-path guard (the predicate the commit-msg hook runs) at the real staged index.
+        git(root, ["add", "-f", "--", ...correctionPaths]);
+        step.correctionGuard = guardVerdict(root);
+        assert.equal(step.correctionGuard.decision, "allow", `the correction commit of round ${n} is admitted once the lineage is registered: ${JSON.stringify(step.correctionGuard)}`);
+        assert.equal(step.correctionGuard.reason, "lineage-registered", `the guard engaged and read the registered lineage: ${JSON.stringify(step.correctionGuard)}`);
+        git(root, ["commit", "-qm", `fix: round ${n} correction`]);
+        candidate = git(root, ["rev-parse", "HEAD"]);
+      } else {
+        candidate = commitPaths(root, correctionPaths, `fix: round ${n} correction`);
+      }
     }
     const diag = registerDiagnostic(root, candidate, tag);
     registrationCommit = diag.registration;
@@ -261,13 +281,37 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
     const preflightInput = parseCriticDispatchPreflightArgs(argv);
     const request = { preflightInput, taskId, projectId: "pipeline", sessionId: `session-${n}`, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: verdictOf(round.verdict) };
     admitSessionCriticReview(request, {});
+    // W9 negative (4): the manifest of the feature package is not in the working tree when the round finishes (the packet is on no
+    // registered feature package): the finalizer must still finish the round and return the lineage refusal instead of throwing.
+    const manifestBytes = readFileSync(join(root, manifestPath));
+    if (sabotageLineageAtRound === n) rmSync(join(root, manifestPath));
     const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: origin });
     step.finalized = finalized.status;
     assert.equal(finalized.status, "completed", `finalize ${tag}: ${JSON.stringify(finalized)}`);
+    if (sabotageLineageAtRound === n) {
+      const reportPath = "scratch/critic-notes-sabotage.md";
+      put(root, reportPath, "# Critic notes\n\nOne round.\n");
+      put(root, "scratch/export-request-sabotage.json", json({ schema: finalizer.SESSION_CRITIC_EXPORT_REQUEST_SCHEMA, packetId, reportPath, outDir: `specs/${FEATURE}/evidence/critic/${packetId}` }));
+      const exported = cli("session-critic-finalizer.mjs", ["export", "--root", root, "--request", "scratch/export-request-sabotage.json"]);
+      writeFileSync(join(root, manifestPath), manifestBytes);
+      observed.sabotage = { n, packetId, finalizedLineage: finalized.lineage, exported };
+      observed.rounds.push(step);
+      return { root, observed, genesis };
+    }
+    // D223 (slice 1): the FINALIZER itself writes the lineage into the working tree when the round finishes, without any
+    // register-feature-package call, and never stages or commits.
+    const written = finalized.lineage;
+    assert.equal(written?.status, "written", `the finalizer writes the lineage of ${tag}: ${JSON.stringify(written)}`);
+    step.lineageWritten = written;
+    step.lineageInTree = written.commitPaths.every((path) => existsSync(join(root, path)));
+    step.stagedAfterFinalize = git(root, ["diff", "--cached", "--name-only"]);
+    step.headAfterFinalize = git(root, ["rev-parse", "HEAD"]);
+    if (leaveLineageUncommittedAt === n) { observed.pending = { n, packetId, written, candidate }; observed.rounds.push(step); return { root, observed, genesis }; }
+    // The explicit registration of today is now an idempotent replay (the restated step of this walk: it asserted "lineage-added").
     const lineage = addCriticReviewLineage({ root, packetId });
     step.lineage = lineage.status;
-    assert.equal(lineage.status, "lineage-added", `lineage ${tag}: ${JSON.stringify(lineage)}`);
-    head = commitPaths(root, lineage.commitPaths, `register lineage of round ${n}`);
+    assert.equal(lineage.status, "already-registered", `lineage ${tag}: ${JSON.stringify(lineage)}`);
+    head = commitPaths(root, written.commitPaths, `register lineage of round ${n}`);
     step.packetId = packetId; step.candidate = candidate; step.base = base;
     for (const finding of round.verdict.findings) priorFindings.push({ n, gap: finding.gap });
     if (round.accept) {
@@ -549,4 +593,189 @@ test("PATH C, course ending in an accepted failed round: the chain covers every 
     }
     refusedForMissingCritic(closeToPrepared(wrong).planned, ["TASK-ONE", "TASK-TWO"]);
   } finally { cleanup(wrong); }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Path W9 (D223, slice 1): the finalizer writes the lineage when a round finishes; the commit path refuses a correction commit while
+// the last finished round's lineage is missing. Seams (named): the Critic model call (the fixed verdict), the PO residual acceptance
+// (chat mode), the Critic's own dispatch record, and the guard adapter: the walk calls the exported predicate the commit-msg hook calls
+// at the REAL staged index of the fixture repository; the hook adapter itself is exercised by a real `git commit` in
+// commit-msg-hook-install.test.mjs. The walk reaches feature-close-prepared (the step that reads the registered chain), as the other
+// paths do; closed-local needs verify and cleanup evidence that has nothing to do with the Critic course.
+// ---------------------------------------------------------------------------------------------------------------------------------
+const W9_ROUNDS = () => [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: minors("r2"), accept: true }, { kind: "delta", verdict: PASS }];
+
+test("W9 CHAIN: three rounds to the close with no register-feature-package call; every round's lineage is written by the finalizer and every correction commit passes the guard", () => {
+  const fx = walkCourse({ label: "w9-chain", rounds: W9_ROUNDS(), slices: ["TASK-ONE"], guardCorrections: true });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const [r1, r2, r3] = fx.observed.rounds;
+    for (const step of [r1, r2, r3]) {
+      assert.equal(step.lineageWritten.status, "written", JSON.stringify(step.lineageWritten));
+      assert.equal(step.lineageInTree, true, "the lineage and the manifest are in the working tree when the finalizer returns");
+      assert.equal(step.stagedAfterFinalize, "", "the finalizer stages nothing");
+      assert.match(step.lineageWritten.commitInstruction, /commit|Commit/u, "the result names the exact commit instruction");
+      assert.deepEqual(step.lineageWritten.commitPaths.length, 2);
+    }
+    assert.equal(r2.fallbackFull, false, "round 2 is admitted as a delta of the course (the course chain has round 1)");
+    assert.equal(r2.reviewBase, r1.candidate);
+    assert.equal(r3.fallbackFull, false);
+    assert.equal(r3.reviewBase, r2.candidate);
+    for (const step of [r2, r3]) assert.equal(step.correctionGuard.reason, "lineage-registered");
+    const head = git(fx.root, ["rev-parse", "HEAD"]);
+    const history = courseAdmission.resolveRetainedCriticCourseRecords({ repoRoot: fx.root, featureId: FEATURE, candidateCommit: head }).history;
+    assert.equal(history.length, 3, "the registered chain covers all three rounds");
+    // Idempotent: the same write again changes nothing and says so (the finalizer itself cannot be re-run: SCF-FIRST-CONSUME-REPLAY).
+    const before = git(fx.root, ["status", "--porcelain"]);
+    const again = finalizer.writeCriticRoundLineage({ root: fx.root, packetId: fx.observed.lastPacketId });
+    assert.equal(again.status, "already-registered", JSON.stringify(again));
+    assert.equal(git(fx.root, ["status", "--porcelain"]), before, "the second write changes nothing in the tree");
+    const addenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(addenda["TASK-ONE"].status, 0, addenda["TASK-ONE"].text);
+    const closed = closeToPrepared(fx);
+    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+    assert.equal(closed.apply().status, "applied");
+  } finally { cleanup(fx); }
+});
+
+test("W9 NEGATIVE (1)+(2): a correction commit before the lineage is committed is refused with the exact repair; the same commit that carries the manifest and the lineage file is admitted", () => {
+  const fx = walkCourse({ label: "w9-guard", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], leaveLineageUncommittedAt: 1 });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const { packetId, written } = fx.observed.pending;
+    const [manifestPath, lineagePath] = written.commitPaths;
+    put(fx.root, "src/correction.mjs", "export const correction = 1;\n");
+    git(fx.root, ["add", "-f", "--", "src/correction.mjs"]);
+    const refusedVerdict = guardVerdict(fx.root);
+    assert.equal(refusedVerdict.decision, "refuse", JSON.stringify(refusedVerdict));
+    assert.equal(refusedVerdict.code, "CRL-LINEAGE-UNREGISTERED");
+    assert.equal(refusedVerdict.packetId, packetId);
+    assert.ok(refusedVerdict.repair.includes(`register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}`), refusedVerdict.repair);
+    assert.ok(refusedVerdict.repair.includes(manifestPath) && refusedVerdict.repair.includes(lineagePath), "the repair names the manifest and the lineage file it wrote");
+    assert.ok(refusedVerdict.repair.includes("inspect-course-takeover") && refusedVerdict.repair.includes("supersede-course-takeover"), "after a correction commit the takeover recovery is the only route, and the text says so");
+    // The index carrying the manifest but not the lineage file stays refused.
+    git(fx.root, ["add", "-f", "--", manifestPath]);
+    assert.equal(guardVerdict(fx.root).code, "CRL-LINEAGE-UNREGISTERED");
+    // (2) The commit that carries both is the registration commit: admitted.
+    git(fx.root, ["add", "-f", "--", lineagePath]);
+    const admitted = guardVerdict(fx.root);
+    assert.equal(admitted.decision, "allow", JSON.stringify(admitted));
+    assert.equal(admitted.reason, "registration-commit");
+    git(fx.root, ["commit", "-qm", "register lineage together with the next change"]);
+    // From here the lineage is registered at HEAD: a plain correction is admitted.
+    put(fx.root, "src/correction2.mjs", "export const correction2 = 2;\n");
+    git(fx.root, ["add", "-f", "--", "src/correction2.mjs"]);
+    assert.equal(guardVerdict(fx.root).reason, "lineage-registered");
+  } finally { cleanup(fx); }
+});
+
+test("W9 NEGATIVE (1b): a round whose lineage was never written is refused with the register command; the manual route still clears the guard", () => {
+  const fx = walkCourse({ label: "w9-guard-manual", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], leaveLineageUncommittedAt: 1 });
+  try {
+    const { packetId, written } = fx.observed.pending;
+    const [manifestPath, lineagePath] = written.commitPaths;
+    // Take the written files away again: the tree is as an older build leaves it (round finished, nothing registered).
+    git(fx.root, ["checkout", "--", manifestPath]);
+    rmSync(join(fx.root, lineagePath));
+    put(fx.root, "src/correction.mjs", "export const correction = 1;\n");
+    git(fx.root, ["add", "-f", "--", "src/correction.mjs"]);
+    const refusedVerdict = guardVerdict(fx.root);
+    assert.equal(refusedVerdict.code, "CRL-LINEAGE-UNREGISTERED", JSON.stringify(refusedVerdict));
+    assert.ok(refusedVerdict.repair.includes(`--add-review-lineage --packet ${packetId}`));
+    const registered = cli("register-feature-package.mjs", ["--root", fx.root, "--add-review-lineage", "--packet", packetId]);
+    assert.equal(registered.status, 0, registered.text);
+    assert.equal(registered.body.status, "lineage-added");
+    git(fx.root, ["add", "-f", "--", ...registered.body.commitPaths]);
+    assert.equal(guardVerdict(fx.root).decision, "allow");
+  } finally { cleanup(fx); }
+});
+
+test("W9 NEGATIVE (3): a repository without any Critic course commits freely (the guard fails open)", () => {
+  const root = mkdtempSync(join(tmpdir(), "w9-nocourse-"));
+  try {
+    git(root, ["init", "-q", "-b", "main"]);
+    // An unborn repository: nothing to decide.
+    put(root, "a.txt", "a\n");
+    git(root, ["add", "--", "a.txt"]);
+    assert.deepEqual([guardVerdict(root).decision, guardVerdict(root).reason], ["allow", "not-decidable"]);
+    git(root, ["commit", "-qm", "base"]);
+    put(root, "b.txt", "b\n");
+    git(root, ["add", "--", "b.txt"]);
+    assert.deepEqual([guardVerdict(root).decision, guardVerdict(root).reason], ["allow", "no-critic-course"]);
+    // A feature package without a Critic review unit is no Critic course either.
+    put(root, `specs/${FEATURE}/lifecycle.json`, JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 1 }, state: "approved", artifacts: [] }));
+    git(root, ["add", "-f", "--", `specs/${FEATURE}/lifecycle.json`]);
+    git(root, ["commit", "-qm", "package without a review unit"]);
+    put(root, "c.txt", "c\n");
+    git(root, ["add", "--", "c.txt"]);
+    assert.equal(guardVerdict(root).decision, "allow");
+    // Not a repository at all: the predicate answers allow rather than throwing.
+    const plain = mkdtempSync(join(tmpdir(), "w9-plain-"));
+    try { assert.equal(registration.checkCriticLineageBeforeCommit({ root: plain }).decision, "allow"); } finally { rmSync(plain, { recursive: true, force: true }); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("W9 REAL HOOK: the installed commit-msg hook refuses a correction commit while the lineage is missing (CRL-LINEAGE-UNREGISTERED) and admits the registration commit", () => {
+  const fx = walkCourse({ label: "w9-hook", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], leaveLineageUncommittedAt: 1 });
+  // The hook snapshots the plugin tree twice, so it installs from a frozen copy exactly as commit-msg-hook-install.test.mjs does.
+  const frozen = mkdtempSync(join(tmpdir(), "w9-hook-plugin-"));
+  try {
+    cpSync(fileURLToPath(new URL("../../", import.meta.url)), frozen, { recursive: true });
+    const { root } = fx;
+    // Governance enrollment as the guard suites do it; the writer refuses while a continuity State exists, so the untracked State is set aside.
+    const statePath = join(root, ".claude/pipeline-state.json"), stateBytes = readFileSync(statePath);
+    rmSync(statePath);
+    const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-host-state") });
+    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-walk-fixture" });
+    controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    writeFileSync(statePath, stateBytes);
+    put(root, "project/guard-config.json", json({ commitTrailerPolicy: "off" }));
+    const installed = hookInstaller.applyInstall({ rootDir: root, pluginLibDir: join(frozen, "lib") });
+    assert.equal(installed.status, "installed", JSON.stringify(installed));
+    const commit = (subject) => spawnSync("git", ["-c", "user.name=Walk", "-c", "user.email=walk@example.invalid", "-C", root, "commit", "-q", "-m", `${subject}\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n`], { encoding: "utf8", shell: false, env: ENV });
+    const { written } = fx.observed.pending;
+    put(root, "docs/state.md", "state after the correction\n");
+    git(root, ["add", "-f", "--", "docs/state.md"]);
+    const refusedCommit = commit("docs: correction before the lineage is committed");
+    assert.equal(refusedCommit.status, 1, `${refusedCommit.stdout}${refusedCommit.stderr}`);
+    assert.match(refusedCommit.stderr, /CRL-LINEAGE-UNREGISTERED/u);
+    assert.ok(refusedCommit.stderr.includes(written.commitPaths[1]), "the refusal names the lineage file");
+    git(root, ["add", "-f", "--", ...written.commitPaths]);
+    const admittedCommit = commit("chore(evidence): register the lineage with the correction");
+    assert.equal(admittedCommit.status, 0, `${admittedCommit.stdout}${admittedCommit.stderr}`);
+    put(root, "docs/state.md", "state after a second correction\n");
+    git(root, ["add", "-f", "--", "docs/state.md"]);
+    const afterwards = commit("docs: a further correction");
+    assert.equal(afterwards.status, 0, `${afterwards.stdout}${afterwards.stderr}`);
+  } finally { rmSync(frozen, { recursive: true, force: true }); cleanup(fx); }
+});
+
+test("W9 course repository without a consumed round, or with an unreadable owner store, still commits freely", () => {
+  const fx = walkCourse({ label: "w9-open", rounds: [], slices: ["TASK-ONE"] });
+  try {
+    put(fx.root, "src/early.mjs", "export const early = 1;\n");
+    git(fx.root, ["add", "-f", "--", "src/early.mjs"]);
+    const verdict = guardVerdict(fx.root);
+    assert.deepEqual([verdict.decision, verdict.reason], ["allow", "no-consumed-round"], JSON.stringify(verdict));
+  } finally { cleanup(fx); }
+});
+
+test("W9 NEGATIVE (4): a lineage write refusal leaves the round evidence exported and returns the typed code in the lineage field", () => {
+  const fx = walkCourse({ label: "w9-refusal", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], sabotageLineageAtRound: 1 });
+  try {
+    const { packetId, finalizedLineage, exported } = fx.observed.sabotage;
+    assert.equal(finalizedLineage.status, "not-written", JSON.stringify(finalizedLineage));
+    assert.equal(finalizedLineage.code, "FPR-LINEAGE-NO-COURSE-CLAIM");
+    assert.equal(typeof finalizedLineage.detail, "string");
+    assert.equal(exported.status, 0, exported.text);
+    assert.equal(exported.body.status, "exported");
+    assert.equal(exported.body.lineage.status, "not-written");
+    assert.equal(exported.body.lineage.code, "FPR-LINEAGE-NO-COURSE-CLAIM");
+    assert.ok(exported.body.next.includes("supersede-course-takeover"), "the takeover pointer stays for the case the lineage could not be written");
+    for (const name of ["receipt.json", "report.md", "index.json"]) assert.ok(existsSync(join(fx.root, `specs/${FEATURE}/evidence/critic/${packetId}/${name}`)), `${name} is exported`);
+    const common = join(gitCommonOf(fx.root), "agent-pipeline", "critic-packets");
+    assert.equal(readConsumedCandidateReceipt({ controlRoot: common, packetId }).receipt.packetId, packetId, "the consumed round evidence is intact");
+    // The manifest is back: the write now succeeds, as the refusal text promised it could before the next correction commit.
+    assert.equal(finalizer.writeCriticRoundLineage({ root: fx.root, packetId }).status, "written");
+  } finally { cleanup(fx); }
 });

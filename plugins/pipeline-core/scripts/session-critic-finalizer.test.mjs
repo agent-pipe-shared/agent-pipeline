@@ -1990,8 +1990,12 @@ test("PF94 export (1) the export result names the lineage registration before th
     assert.ok(result.next.includes("supersede-course-takeover"));
     assert.ok(!result.next.includes("\n"), "next is one line");
     assert.ok(!result.next.includes("/home/"), "next carries no absolute path");
+    // W9 (D223) restates the pinned key list: the export result now also carries the `lineage` field. This fixture has no registered
+    // feature package, so the lineage is "not-written" with a typed code, and `next` keeps the takeover pointer for exactly that case.
+    assert.equal(result.lineage.status, "not-written");
+    assert.match(result.lineage.code, /^FPR-/u);
     assert.deepEqual(Object.keys(result).sort(),
-      ["indexSha256", "next", "outDir", "packetId", "paths", "receiptSha256", "reportSha256", "schema", "status"]);
+      ["indexSha256", "lineage", "next", "outDir", "packetId", "paths", "receiptSha256", "reportSha256", "schema", "status"]);
   } finally { cleanup(fx); }
 });
 

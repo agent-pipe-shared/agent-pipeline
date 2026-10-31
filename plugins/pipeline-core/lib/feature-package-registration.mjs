@@ -120,7 +120,9 @@ export function renderResultRecord({ featureId }) {
 export const CRITIC_REVIEW_UNIT_SCHEMA = "pipeline.critic-review-unit.v1";
 // The id grammar is the binding's own (CRITERION_ID_SOURCE); no leading letter/digit/hyphen, no trailing digit/hyphen,
 // so AC-1 inside AC-12 or AC-E1-03-32 is never matched a second time.
-const REVIEW_UNIT_CRITERION = new RegExp(`(?<![A-Za-z0-9-])${CRITERION_ID_SOURCE}(?![0-9-])`, "gu");
+// Built at first use, not at module load: the session Critic finalizer imports this module (D223) and a load-time read of the
+// import below fails when the module graph is entered through critic-accepted-contract (an import cycle through the finalizer).
+const reviewUnitCriterion = () => new RegExp(`(?<![A-Za-z0-9-])${CRITERION_ID_SOURCE}(?![0-9-])`, "gu");
 export const criticReviewUnitPath = (featureId) => `specs/${featureId}/design/critic-review-unit.json`;
 const REVIEW_UNIT_ARTIFACT = Object.freeze({ authority: false, mutability: "immutable", retention: "retain" });
 
@@ -136,7 +138,7 @@ function primaryMainRef(root) {
 
 /** The unit's bytes, or the reason none is written. */
 export function renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef }) {
-  const criterionIds = [...new Set(String(specBytes ?? "").match(REVIEW_UNIT_CRITERION) ?? [])].sort().slice(0, 128);
+  const criterionIds = [...new Set(String(specBytes ?? "").match(reviewUnitCriterion()) ?? [])].sort().slice(0, 128);
   if (criterionIds.length === 0) return { ok: false, reason: `the Spec ${specPath} names no criterion id (AC-<n> or AC-E<epic>-<story>-<nn>), which the review unit binds` };
   if (typeof mainRef !== "string") return { ok: false, reason: "the primary checkout is on no branch, which the review unit names as its delivery boundary" };
   const unit = {
@@ -492,7 +494,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
  */
 const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
 const DELTA_REQUEST_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-delta-request-[a-f0-9]{64}\.json$/u;
-export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract } = {}) {
+export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract, dryRun = false } = {}) {
   if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
   let root;
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
@@ -565,6 +567,8 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
   if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}${String(compiled.code).startsWith("CRL-HISTORY-CHAIN:") ? ": the chain to the last registered round broke at the named condition; parent-review-id and previous-sha256 mean the parent is not the last registered round, review-id-repeated that the review id is not new, fresh-from, lane-id-equal and context-equal that the round is not an independent run after its parent" : ""}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: compiled.code, packetId });
   const artifact = compiled.value.artifact;
+  // D223 guard: `dryRun` answers "would this write succeed right now" with the SAME derivation, and writes nothing.
+  if (dryRun === true) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-registrable", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`, commitPaths: [manifestPath, artifact.path] };
   const target = join(root, artifact.path), created = !existsSync(target);
   const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
   const temp = join(root, `${manifestPath}.lineage-${process.pid}.tmp`);
@@ -587,6 +591,85 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
     commitMessageHint: `chore(evidence): register Critic lineage review-${round} of ${featureId}`,
     next: "commit commitPaths in one evidence-only commit BEFORE any correction commit, then continue the course (delta request) against that registration commit",
   };
+}
+
+/**
+ * D223 (slice 1): the commit-path guard. ONE core predicate; the commit-msg hook (every runner's `git commit` reaches it) is the thin
+ * adapter. It refuses the commit being created while a finished Critic round has no registered lineage and the lineage can STILL be
+ * registered, because a correction commit on top of an unregistered round makes the lineage unregisterable (the takeover recovery is
+ * then the only route). It reads only the COMMITTED tree (HEAD), the STAGED index and the git-common-dir owner store (never the
+ * gitignored project State, never the working tree for a decision other than "would the write succeed"), and fails OPEN on anything
+ * it cannot read: a repository without a Critic course is never blocked.
+ *   allow reasons: not-decidable | no-critic-course | no-consumed-round | lineage-registered | registration-commit | not-registrable
+ *   refuse: CRL-LINEAGE-UNREGISTERED
+ * "Registrable" is decided by `addCriticReviewLineage({ dryRun: true })`, the exact derivation of the write, so the guard never names
+ * a repair that would itself be refused: a round whose lineage can no longer be registered (history older than this guard) is allowed.
+ */
+export const CRITIC_LINEAGE_COMMIT_CHECK_SCHEMA = "pipeline.critic-lineage-commit-check.v1";
+export const CRITIC_LINEAGE_UNREGISTERED = "CRL-LINEAGE-UNREGISTERED";
+const COMMIT_CHECK_PACKET_DIR = /^[a-f0-9]{32}$/u;
+const COMMIT_CHECK_MAX_ROUNDS = 8;
+const lineageCheckAllow = (reason, extra = {}) => ({ schema: CRITIC_LINEAGE_COMMIT_CHECK_SCHEMA, decision: "allow", reason, ...extra });
+function committedOrStagedBlob(root, spec) {
+  const shown = spawnSync("git", ["-C", root, "show", spec], { encoding: "buffer", shell: false, timeout: 10000, maxBuffer: 4 * 1024 * 1024 });
+  return shown.status === 0 ? shown.stdout : null;
+}
+/** True when the manifest at `prefix` (`HEAD:` committed, `:0:` staged) lists a lineage file at the same revision that records the packet. */
+function lineageRowRegisteredAt(root, prefix, featureId, packetId) {
+  const manifestBytes = committedOrStagedBlob(root, `${prefix}specs/${featureId}/lifecycle.json`);
+  if (manifestBytes === null) return false;
+  let manifest;
+  try { manifest = JSON.parse(manifestBytes.toString("utf8")); } catch { return false; }
+  for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
+    if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string" || !LINEAGE_FILE.test(entry.path)) continue;
+    const bytes = committedOrStagedBlob(root, `${prefix}${entry.path}`);
+    if (bytes === null) continue;
+    try { if (JSON.parse(bytes.toString("utf8"))?.consumedResult?.packetId === packetId) return true; } catch { /* an unreadable row registers nothing */ }
+  }
+  return false;
+}
+function decideCriticLineageCommit(rootInput) {
+  const root = realpathSync(resolve(rootInput));
+  if (!gitOut(root, ["rev-parse", "--verify", "--quiet", "HEAD"])) return lineageCheckAllow("not-decidable");
+  const listing = spawnSync("git", ["-C", root, "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "specs"], { encoding: "utf8", shell: false, timeout: 10000, maxBuffer: 16 * 1024 * 1024 });
+  if (listing.status !== 0) return lineageCheckAllow("not-decidable");
+  const tracked = new Set(listing.stdout.split("\0").filter((path) => path !== ""));
+  const features = [...tracked].map((path) => /^specs\/([a-z0-9-]+)\/lifecycle\.json$/u.exec(path)?.[1]).filter((id) => id !== undefined && SAFE_ID.test(id) && tracked.has(criticReviewUnitPath(id)));
+  if (features.length === 0) return lineageCheckAllow("no-critic-course");
+  if (features.length > 1) return lineageCheckAllow("not-decidable", { detail: "more than one feature has a Critic review unit" });
+  const featureId = features[0];
+  const common = gitOut(root, ["rev-parse", "--git-common-dir"]);
+  if (!common) return lineageCheckAllow("not-decidable");
+  let controlRoot, names;
+  try { controlRoot = join(realpathSync(resolve(root, common)), "agent-pipeline", "critic-packets"); names = readdirSync(controlRoot).filter((name) => COMMIT_CHECK_PACKET_DIR.test(name)); } catch { return lineageCheckAllow("no-consumed-round"); }
+  const recent = names.map((name) => { try { return { name, mtimeMs: lstatSync(join(controlRoot, name)).mtimeMs }; } catch { return null; } })
+    .filter((entry) => entry !== null).sort((a, b) => b.mtimeMs - a.mtimeMs).slice(0, COMMIT_CHECK_MAX_ROUNDS);
+  const consumed = [];
+  for (const { name } of recent) {
+    try { if (readConsumedCandidateResult({ controlRoot, packetId: name })?.receipt) consumed.push(name); } catch { /* not consumed or unreadable: not a finished round */ }
+  }
+  if (consumed.length === 0) return lineageCheckAllow("no-consumed-round");
+  let headRegistered = false, indexRegistered = false;
+  for (const packetId of consumed) {
+    if (lineageRowRegisteredAt(root, "HEAD:", featureId, packetId)) { headRegistered = true; continue; }
+    if (lineageRowRegisteredAt(root, ":0:", featureId, packetId)) { indexRegistered = true; continue; }
+    const probe = addCriticReviewLineage({ root, packetId, dryRun: true });
+    if (probe.status !== "lineage-registrable" && probe.status !== "already-registered") continue;
+    const written = probe.status === "already-registered";
+    const manifestPath = `specs/${featureId}/lifecycle.json`;
+    const commitPaths = [manifestPath, probe.lineagePath];
+    const register = `node <plugin-root>/scripts/register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}`;
+    const repair = `${written
+      ? `The lineage of this round is already written in the working tree but neither committed nor staged: commit ${commitPaths.join(" and ")} (git add -f -- ${commitPaths.join(" ")}), together with or before this change. Running ${register} again is safe (it reports already-registered).`
+      : `Register the lineage NOW: ${register}; then commit the manifest and the lineage file it names (${commitPaths.join(" and ")}).`} `
+      + "This must happen BEFORE any correction commit: once a correction commit exists, the lineage can no longer be registered and the takeover recovery is the only route (session-critic-finalizer.mjs inspect-course-takeover, then supersede-course-takeover, then rerun round 1 on the course path; section \"Continuing a Critic course\" of the critic-review skill).";
+    return { schema: CRITIC_LINEAGE_COMMIT_CHECK_SCHEMA, decision: "refuse", code: CRITIC_LINEAGE_UNREGISTERED, packetId, reviewId: probe.reviewId ?? null, featureId, written, commitPaths,
+      detail: `the finished Critic round of packet ${packetId} has no registered lineage at HEAD and this commit does not carry it`, repair };
+  }
+  return lineageCheckAllow(indexRegistered ? "registration-commit" : headRegistered ? "lineage-registered" : "not-registrable");
+}
+export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {
+  try { return decideCriticLineageCommit(rootInput); } catch { return lineageCheckAllow("not-decidable"); }
 }
 
 /**

@@ -17,6 +17,7 @@ import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGove
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
+import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
 import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
@@ -547,6 +548,37 @@ export function sessionCriticReceiptForResult(result) {
   return receiptFor(result);
 }
 
+/**
+ * D223 (slice 1): when a Critic round finishes, the lineage of that round is WRITTEN into the working tree by the very function
+ * `register-feature-package.mjs --add-review-lineage --packet <id>` calls (addCriticReviewLineage; its derivation is not duplicated).
+ * It writes the manifest and the lineage file; it NEVER stages and NEVER commits. It is idempotent (a second call reports
+ * `already-registered` and changes nothing) and it never throws: a lineage that cannot be written (no registered feature package, not a
+ * course path, a refusal of addCriticReviewLineage) comes back as `{ status: "not-written", code, detail }`, because the round evidence
+ * the caller holds must never be lost over a lineage write.
+ */
+export function writeCriticRoundLineage({ root, packetId } = {}, deps = {}) {
+  let outcome;
+  try { outcome = (deps.addCriticReviewLineageFn ?? addCriticReviewLineage)({ root, packetId }); }
+  catch (error) {
+    const code = typeof error?.code === "string" && /^[A-Z][A-Z0-9-]{1,63}$/u.test(error.code) ? error.code : "SCF-LINEAGE-UNAVAILABLE";
+    return Object.freeze({ status: "not-written", code, detail: "the lineage write failed before it produced a verdict; the round evidence is unaffected", packetId: packetId ?? null });
+  }
+  if (outcome?.status === "lineage-added") {
+    const paths = outcome.commitPaths.join(" ");
+    return Object.freeze({
+      status: "written", packetId, reviewId: outcome.reviewId, manifestPath: outcome.manifestPath, lineagePath: outcome.lineagePath,
+      commitPaths: Object.freeze([...outcome.commitPaths]), commitMessageHint: outcome.commitMessageHint,
+      commitInstruction: `The lineage of this round was written into the working tree and nothing was staged or committed. Commit exactly these paths in one evidence-only commit BEFORE the next correction commit: git add -f -- ${paths}; then git commit (suggested subject: ${outcome.commitMessageHint}).`,
+    });
+  }
+  if (outcome?.status === "already-registered") {
+    return Object.freeze({ status: "already-registered", packetId, manifestPath: outcome.manifestPath, lineagePath: outcome.lineagePath,
+      detail: "the lineage of this round is already registered in the manifest; nothing was changed. If it is not committed yet, commit the manifest and the lineage file BEFORE the next correction commit." });
+  }
+  const code = typeof outcome?.code === "string" && /^[A-Z][A-Z0-9-]{1,63}$/u.test(outcome.code) ? outcome.code : "SCF-LINEAGE-UNAVAILABLE";
+  return Object.freeze({ status: "not-written", code, detail: String(outcome?.reason ?? "the lineage write produced no verdict").slice(0, 2000), packetId: packetId ?? null });
+}
+
 /** Complete one fresh session against its *pre-existing* prelaunch admission. */
 export function finalizeSessionCriticReview(options, deps = {}) {
   const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
@@ -656,6 +688,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
         ...independence,
         code: error?.code ?? "GRA-OUTPUT-UNAVAILABLE",
         retry: buildGovernanceReviewRetry({ eventOutPath: options.eventOutPath, event }),
+        lineage: writeCriticRoundLineage({ root, packetId }, deps),
       });
     }
   }
@@ -668,6 +701,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     receipt,
     ...independence,
     ...(event === null ? {} : { event }),
+    lineage: writeCriticRoundLineage({ root, packetId }, deps),
   });
 }
 
@@ -675,7 +709,7 @@ const EXPORT_REQUEST_KEYS = Object.freeze(["schema", "packetId", "reportPath", "
 const EXPORT_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const EXPORT_MAX_REPORT_BYTES = 1024 * 1024;
 
-/** The git common directory read from the filesystem alone; the export route never runs git. */
+/** The git common directory read from the filesystem alone; the export route itself never needs git (the lineage write that follows it, D223, does and degrades to a typed `not-written` when git is absent). */
 function commonDirWithoutGit(root) {
   try {
     const dotGit = join(root, ".git");
@@ -782,6 +816,13 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
     try { rmSync(target, { recursive: true, force: true }); } catch { /* the directory is ours alone; best effort */ }
     fail("SCF-EXPORT-WRITE");
   }
+  // D223: the exported evidence is on disk first; the lineage write after it can only add to the result, never undo or alter the export.
+  const lineage = writeCriticRoundLineage({ root, packetId }, deps);
+  const next = lineage.status === "not-written"
+    ? `The lineage of this round could not be written (${lineage.code}). If more review rounds follow, register the lineage of this round NOW, before the next correction commit: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}; then commit the manifest and the lineage file it names. If correction commits already follow this round, the lineage can no longer be registered: continue with session-critic-finalizer.mjs inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path (section "Continuing a Critic course" of the critic-review skill gives the full order).`
+    : lineage.status === "written"
+      ? `The lineage of this round is written in the working tree (${lineage.commitPaths.join(", ")}); nothing was staged or committed. Commit those paths, and the exported evidence under ${outDir}, BEFORE the next correction commit.`
+      : `The lineage of this round is already registered (${lineage.lineagePath}); nothing was changed. If the manifest and the lineage file are not committed yet, commit them BEFORE the next correction commit.`;
   return Object.freeze({
     schema: SESSION_CRITIC_EXPORT_RESULT_SCHEMA,
     status: "exported",
@@ -791,7 +832,8 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
     receiptSha256: index.receiptSha256,
     reportSha256: index.reportSha256,
     indexSha256: sha256(indexBytes),
-    next: `If more review rounds follow, register the lineage of this round NOW, before the next correction commit: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}; then commit the manifest and the lineage file it names. If correction commits already follow this round, the lineage can no longer be registered: continue with session-critic-finalizer.mjs inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path (section "Continuing a Critic course" of the critic-review skill gives the full order).`,
+    lineage,
+    next,
   });
 }
 

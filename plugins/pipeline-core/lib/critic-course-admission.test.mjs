@@ -844,16 +844,31 @@ export function consumedCourseRoundFixture({ course = true, failing = false, fea
   const finalized = finalizeSessionCriticReview(request, deps);
   assert.equal(finalized.status, "completed");
   const courseRequest = { repoRoot: root, featureId, baseCommit: base, candidateCommit: candidate, registrationCommit, requestedMode: "full", acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
-  return { root, featureId, base, candidate, registrationCommit, packetId, manifestPath, courseRequest, decisionBefore: readCriticCourseAdmission(courseRequest).decision, deltaBefore: readCriticCourseAdmission({ ...courseRequest, requestedMode: "delta" }).decision };
+  return { root, featureId, base, candidate, registrationCommit, packetId, manifestPath, courseRequest, finalizedLineage: finalized.lineage, decisionBefore: readCriticCourseAdmission(courseRequest).decision, deltaBefore: readCriticCourseAdmission({ ...courseRequest, requestedMode: "delta" }).decision };
 }
 const pf94Lineage = (fx) => addCriticReviewLineage({ root: fx.root, packetId: fx.packetId });
+// W9 / D223: the finalizer WRITES the lineage into the working tree when a round finishes. The cases below that used to register it by
+// hand (and asserted "lineage-added") now assert the finalizer's own write first (status "written", no register call), then the
+// explicit register call as an idempotent replay ("already-registered"). Their other assertions and intents are unchanged.
+const pf94WrittenOf = (root, packetId, written) => {
+  assert.equal(written?.status, "written", `the finalizer writes the lineage when the round finishes: ${JSON.stringify(written)}`);
+  const replay = addCriticReviewLineage({ root, packetId });
+  assert.equal(replay.status, "already-registered", `the explicit register call is a replay: ${JSON.stringify(replay)}`);
+  assert.equal(replay.lineagePath, written.lineagePath);
+  return written;
+};
+const pf94Written = (fx) => pf94WrittenOf(fx.root, fx.packetId, fx.finalizedLineage);
+// The tree an older build leaves (round finished, nothing registered yet): the cases that need that pre-finalizer state drive it by
+// undoing the finalizer's write; the production step under test is not stubbed.
+const pf94UnwrittenOf = (root, manifestPath, written) => { git(root, ["checkout", "--", manifestPath]); rmSync(join(root, written.lineagePath), { force: true }); };
+const pf94Unwritten = (fx) => pf94UnwrittenOf(fx.root, fx.manifestPath, fx.finalizedLineage);
 test("PF94 LINEAGE (a) the verb registers the lineage of a real consumed course round and the next admission asks for the delta request", () => {
   const fx = consumedCourseRoundFixture();
   console.log("PF94 fixture admission before:", JSON.stringify(fx.decisionBefore), JSON.stringify(fx.deltaBefore));
   assert.equal(fx.decisionBefore.code, "RE-FIRST-FULL");
   assert.equal(fx.deltaBefore.code, "CCA-REQUESTED-MODE");
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   assert.match(added.lineagePath, new RegExp(`^specs/${fx.featureId}/evidence/critic-lineage-[a-f0-9]{64}\\.json$`, "u"));
   assert.deepEqual(added.commitPaths, [fx.manifestPath, added.lineagePath]);
   const registration = pf94Commit(fx.root, "register the lineage");
@@ -867,8 +882,8 @@ test("PF97 LINEAGE (special file names) the real registration route of a consume
   const specialPaths = ["src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx", "src/with space.ts", `src/m${String.fromCodePoint(252)}ller.ts`, "src/a+b=c,d~e.ts", "src/with:colon.ts"];
   let fx;
   assert.doesNotThrow(() => { fx = consumedCourseRoundFixture({ extraCandidateFiles: specialPaths }); }, "step fixture: preflight, admission and finalize accept the special paths");
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", `step addCriticReviewLineage: ${JSON.stringify(added)}`);
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", `step finalizer lineage write: ${JSON.stringify(added)}`);
   const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   const expected = execFileSync("git", ["diff", "--name-only", "-z", fx.base, fx.candidate], { cwd: fx.root, encoding: "utf8" }).split("\0").filter(Boolean);
   for (const p of specialPaths) assert.ok(expected.includes(p), `step expected range paths hold ${p}`);
@@ -907,8 +922,8 @@ test("PF94 LINEAGE (d) upgrade state: a round finalized outside the course (call
 });
 test("PF94 LINEAGE (g) a failing round with an open finding: after the lineage is registered the delta admission asks for the delta request", () => {
   const fx = consumedCourseRoundFixture({ failing: true });
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   const registration = pf94Commit(fx.root, "register the lineage");
   mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
   const correction = pf94Commit(fx.root, "correction after the failing round");
@@ -935,8 +950,8 @@ test("PF94 LINEAGE (h) the receipt carries no coverage fields, only the reviewed
   assert.deepEqual(Object.keys(consumed.receipt).filter((k) => /coverage|package|edge|complete/iu.test(k)), []);
   assert.deepEqual(consumed.receipt.reviewRange, { base: consumed.packet.candidate.base, commit: consumed.packet.candidate.commit, diffSha256: consumed.packet.diff.sha256 });
   assert.equal(consumed.receipt.reviewPass, false);
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   assert.equal(record.coverage.receiptSha256, record.consumedResult.receiptSha256);
   assert.deepEqual(record.coverage.changedPaths, consumed.packet.diffPaths);
@@ -945,6 +960,9 @@ test("PF94 LINEAGE (h) the receipt carries no coverage fields, only the reviewed
 });
 test("PF94 LINEAGE (e) HEAD behind a correction commit is refused FPR-LINEAGE-TRANSPORT and says to register before the next correction", () => {
   const fx = consumedCourseRoundFixture();
+  // Pre-finalizer state (D223): the round finished but nothing is registered; the correction commit then follows it.
+  assert.equal(fx.finalizedLineage.status, "written");
+  pf94Unwritten(fx);
   mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
   pf94Commit(fx.root, "correction after the round");
   const actual = pf94Lineage(fx);
@@ -977,7 +995,8 @@ const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDelta
 function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true, verdict = null } = {}) {
   const fx = consumedCourseRoundFixture({ failing, verdict });
   let lineageAdded = null;
-  if (lineage) { lineageAdded = pf94Lineage(fx); assert.equal(lineageAdded.status, "lineage-added", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
+  if (lineage) { lineageAdded = pf94Written(fx); assert.equal(lineageAdded.status, "written", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
+  else pf94Unwritten(fx); // no registered lineage yet: the tree an older build leaves (D223)
   let correctionCommit = null, evidenceRegistration = null;
   if (correction) { mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n"); correctionCommit = pf94Commit(fx.root, "correction after the failing round"); }
   if (correction && diagnostic) {
@@ -1012,7 +1031,7 @@ test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the v
 });
 test("D199 CONTINUATION a real commit after a consumed PASS is admitted as a diff round on the passed record (Glossover CCA-PARENT)", () => {
   const fx = pf94DeltaFixture({ failing: false });
-  assert.equal(fx.lineageAdded.status, "lineage-added", JSON.stringify(fx.lineageAdded));
+  assert.equal(fx.lineageAdded.status, "written", JSON.stringify(fx.lineageAdded));
   pf94WriteInput(fx);
   const added = pf94Delta(fx);
   assert.equal(added.status, "delta-request-added", `the delta request verb accepts a passed parent: ${JSON.stringify(added)}`);
@@ -1046,8 +1065,8 @@ test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2
   let finalized;
   assert.doesNotThrow(() => { finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin }); }, "step round 2 finalize does not refuse");
   assert.equal(finalized.status, "completed", `step round 2 finalize completes: ${JSON.stringify(finalized)}`);
-  const lineageAdded = addCriticReviewLineage({ root: fx.root, packetId });
-  assert.equal(lineageAdded.status, "lineage-added", `step addCriticReviewLineage of round 2: ${JSON.stringify(lineageAdded)}`);
+  const lineageAdded = pf94WrittenOf(fx.root, packetId, finalized.lineage);
+  assert.equal(lineageAdded.status, "written", `step finalizer lineage write of round 2: ${JSON.stringify(lineageAdded)}`);
   const lineage = JSON.parse(readFileSync(join(fx.root, lineageAdded.lineagePath), "utf8"));
   assert.equal(lineage.course.reviewRound, 2, "step lineage record is round 2");
   assert.equal(lineage.parentReviewId, round1Lineage.reviewId, "step lineage parent is the review id of round 1");
@@ -1074,6 +1093,9 @@ test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request 
   admitSessionCriticReview(request, {});
   const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
   assert.equal(finalized.status, "completed", `step round 2 finalize completes: ${JSON.stringify(finalized)}`);
+  // Pre-finalizer state (D223): the finalizer already wrote the lineage; undo that write to test the manual route's refusal.
+  assert.equal(finalized.lineage.status, "written", JSON.stringify(finalized.lineage));
+  pf94UnwrittenOf(fx.root, fx.manifestPath, finalized.lineage);
   // The delta request leaves the manifest (working tree only): the lineage must not guess one.
   const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
   manifest.artifacts = manifest.artifacts.filter((a) => a.path !== delta.deltaRequestPath);
@@ -1127,8 +1149,8 @@ const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration, bi
   let finalized;
   assert.doesNotThrow(() => { finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin }); }, `round ${n} finalize`);
   assert.equal(finalized.status, "completed", JSON.stringify(finalized));
-  const lineageAdded = addCriticReviewLineage({ root: fx.root, packetId });
-  assert.equal(lineageAdded.status, "lineage-added", `round ${n} lineage: ${JSON.stringify(lineageAdded)}`);
+  const lineageAdded = pf94WrittenOf(fx.root, packetId, finalized.lineage);
+  assert.equal(lineageAdded.status, "written", `round ${n} lineage: ${JSON.stringify(lineageAdded)}`);
   const lineage = JSON.parse(readFileSync(join(fx.root, lineageAdded.lineagePath), "utf8"));
   pf94CommitPaths(fx.root, lineageAdded.commitPaths, `register the lineage of round ${n}`);
   return { preflight, lineage };
@@ -1308,20 +1330,21 @@ function exportConsumedRound(fx) {
 test("N23 the lineage of a consumed round registers after its own export commit; a commit beside the export still drifts", () => {
   const fx = consumedCourseRoundFixture();
   exportConsumedRound(fx);
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   const mixed = consumedCourseRoundFixture();
   exportConsumedRound(mixed);
   writeFileSync(join(mixed.root, "notes.txt"), "not evidence\n");
   pf94CommitPaths(mixed.root, ["notes.txt"], "a commit that is not evidence");
+  pf94Unwritten(mixed); // pre-finalizer state (D223): nothing registered when the non-evidence commit followed the round
   const drifted = pf94Lineage(mixed);
   assert.equal(drifted.code, "FPR-LINEAGE-TRANSPORT", JSON.stringify(drifted));
 });
 test("full round over 300 changed paths: the real route admits, finalizes and registers its lineage (consumer 357 paths)", () => {
   const extra = Array.from({ length: 300 }, (_, index) => `src/many/file-${String(index).padStart(3, "0")}.mjs`);
   const fx = consumedCourseRoundFixture({ extraCandidateFiles: extra });
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   assert.ok(lineage.diff.changedPaths.length > 300, String(lineage.diff.changedPaths.length));
 });
@@ -1330,7 +1353,7 @@ test("full round over 300 changed paths: the real route admits, finalizes and re
 test("D207 a PASS with a minor finding registers its lineage as findings and the next admission reads it back", () => {
   const minor = { ...pf94Verdict, pass: true, findings: [{ gap: "wording drift", risk: "reader confusion", severity: "minor", evidence: "specs/held-feature/spec.md:1", spec_ref: "AC-1" }] };
   const fx = pf94DeltaFixture({ failing: false, verdict: minor });
-  assert.equal(fx.lineageAdded.status, "lineage-added", JSON.stringify(fx.lineageAdded));
+  assert.equal(fx.lineageAdded.status, "written", JSON.stringify(fx.lineageAdded));
   const lineage = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
   assert.equal(lineage.verdict.status, "findings");
   assert.ok(lineage.findings.some((f) => f.status === "open"), JSON.stringify(lineage.findings));
@@ -1359,14 +1382,14 @@ function n20SecondRoundInSameSession(fx, { sessionId = "feature-held-review" } =
   admitSessionCriticReview(request, {});
   const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
   assert.equal(finalized.status, "completed", JSON.stringify(finalized));
-  return { delta, registration, packetId };
+  return { delta, registration, packetId, lineage: finalized.lineage };
 }
 test("N20 (a) two session-mode rounds in the same hosting session: the lineage of round 2 registers, has its own lane, and the next admission reads both rounds back", () => {
   const fx = pf94DeltaFixture();
   const round1 = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
   const second = n20SecondRoundInSameSession(fx);
-  const added = addCriticReviewLineage({ root: fx.root, packetId: second.packetId });
-  assert.equal(added.status, "lineage-added", `the lineage of a follow-up round of the same session registers: ${JSON.stringify(added)}`);
+  const added = pf94WrittenOf(fx.root, second.packetId, second.lineage);
+  assert.equal(added.status, "written", `the lineage of a follow-up round of the same session registers: ${JSON.stringify(added)}`);
   const round2 = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   assert.equal(round2.parentReviewId, round1.reviewId);
   assert.notEqual(round2.lane.laneId, round1.lane.laneId, "each round's lane identifies its own Critic run");
@@ -1378,8 +1401,8 @@ test("N20 (a) two session-mode rounds in the same hosting session: the lineage o
 });
 test("N20 (b) a registered round 1 with the legacy lane (hosting session id and digest of the session) stays valid for the next round", () => {
   const fx = consumedCourseRoundFixture({ failing: true });
-  const added = pf94Lineage(fx);
-  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  const added = pf94Written(fx);
+  assert.equal(added.status, "written", JSON.stringify(added));
   const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
   const session = { id: "feature-held-review", freshContext: true, historyInherited: false, mayDelegate: false };
   record.lane.laneId = session.id; record.lane.contextSha256 = sha256Canonical(session);

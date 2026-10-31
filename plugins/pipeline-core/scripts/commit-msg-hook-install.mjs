@@ -306,6 +306,24 @@ async function main() {
     block(["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + "."]);
     return;
   }
+  // D223: a correction commit on top of a finished Critic round whose lineage is not registered makes that lineage unregisterable.
+  // The predicate is ONE core function (feature-package-registration.mjs, checkCriticLineageBeforeCommit); this hook is its thin
+  // adapter and the Git boundary every runner's \`git commit\` reaches. It fails OPEN on every problem: a repository without a
+  // Critic course (no review unit at HEAD), an unloadable module or an unreadable state never blocks a commit here.
+  try {
+    const courseListing = spawnSync("git", ["ls-tree", "-r", "--name-only", "HEAD", "--", "specs"], { cwd: root, encoding: "utf8", timeout: 10_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+    if (courseListing.status === 0 && /^specs\\/[a-z0-9-]+\\/design\\/critic-review-unit\\.json$/mu.test(courseListing.stdout ?? "")) {
+      const { checkCriticLineageBeforeCommit } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "feature-package-registration.mjs")).href);
+      const lineageVerdict = typeof checkCriticLineageBeforeCommit === "function" ? checkCriticLineageBeforeCommit({ root }) : null;
+      if (lineageVerdict && lineageVerdict.decision === "refuse") {
+        console.error("BLOCKED (agent-pipeline commit-msg): " + lineageVerdict.code + ": " + lineageVerdict.detail + ".");
+        console.error("  - " + lineageVerdict.repair);
+        console.error("Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.");
+        process.exitCode = 1;
+        return;
+      }
+    }
+  } catch { /* fail open */ }
   let projectConfig = null;
   try {
     const authority = resolveProjectAuthorityPaths({ rootDir: root });
