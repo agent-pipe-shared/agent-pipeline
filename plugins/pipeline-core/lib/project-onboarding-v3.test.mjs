@@ -3524,7 +3524,11 @@ test("the ready status observation is unaffected by the ask-window change, check
 // drift this dispatch was told not to add.
 test("the five-wrapper pending-asks composition is expressed exactly once in the library source", () => {
   const source = readFileSync(fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url)), "utf8");
-  const composedChain = "withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(";
+  // W7-R4: the chain is now six wrappers long -- 4ea7a86b7 (the 0.7.0 held-patch bundle) inserted
+  // withPendingProjectAttributesGapAsk between the pending-asks merge and the project-ignore ask. The
+  // case's intent is unchanged (the composition is spelled out exactly once, through one named helper), so
+  // only the pinned spelling follows the current chain; the case keeps its name.
+  const composedChain = "withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(";
   const occurrences = source.split(composedChain).length - 1;
   assert.equal(occurrences, 1,
     "the five-wrapper ask chain must be composed through one named helper, never hand-copied a second time");
@@ -5105,7 +5109,6 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
       rootDir: path, profile: "feature", featureId: "promo-lang-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN", admitSpecCriterion: true });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({
       runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true,
@@ -5120,6 +5123,14 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
 
     const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
     assert.equal(authority.ok, true, JSON.stringify(authority));
+    // W7-R4 (fixture restated to the current contract, intent unchanged): submit-plan now also requires
+    // the governed architecture design package (ARCHITECTURE-FITNESS-NOT-READY). Its scoped PO
+    // disposition is bound to the repository candidate commit and tree it was decided on
+    // (buildAdoptionSubject in architecture-adoption-authority.mjs), and its scope covers
+    // pipeline.user.yaml, which promotion rewrites. The package is therefore materialized after
+    // promotion and before submit-plan -- the same order the sibling cases above use after kickoff
+    // apply -- instead of before promotion, where it predated the final tree.
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN", admitSpecCriterion: true });
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -5239,6 +5250,13 @@ test("a coordinator-sourced bind whose generated PRD's po-language marker is edi
     // above exercises once its own drift-probe edit lands.
     const observation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local" });
     const prdAbsolutePath = join(path, observation.prd.path);
+    // W7-R4 (fixture restated to the current contract, intent unchanged): the bind planner refuses a
+    // generated skeleton that is still unauthored (BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED, "author
+    // the generated PRD and Spec before binding their bytes"; stagingDesignNeedsAuthoring in
+    // onboarding-continuity.mjs). A fixture standing for the coordinator who edited the generated
+    // PRD must therefore finish the draft first, exactly as the sibling bootstrap-binding cases do
+    // with completeGeneratedStagingDraft(); the language mismatch is then applied on top of it.
+    completeGeneratedStagingDraft({ path, observation, intakeDeps: localDeps });
     const prdBefore = readFileSync(prdAbsolutePath, "utf8");
     assert.ok(prdBefore.includes("<!-- po-language: en -->"));
     const prdMismatched = `${prdBefore.replace("<!-- po-language: en -->", "<!-- po-language: de -->")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`;

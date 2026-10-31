@@ -2135,8 +2135,19 @@ function observeCleanupRecoveryBounded(observe, deps) {
 }
 
 function partialCleanupRecoveryResult(args) {
-  const result = partialCleanupRecoveryResultCore(args);
   const { root, intent, observation = null, deps = {} } = args;
+  const warningsBefore = observation?.warnings?.length ?? 0;
+  const result = partialCleanupRecoveryResultCore(args);
+  if (result === null && intent === "session" && observation !== null
+    && observation.warnings.slice(warningsBefore).some((entry) => entry?.code === "cleanup_recovery_deferred")) {
+    // D48 deferral (ee9416a25) answers "the requester's own binding is created later"; it must not hide a
+    // FOREIGN zero-authority residue that ALFRED-RDY-20261005 (0b9af703a) reports as its own typed
+    // cleanup_residue_foreign warning with the digest-bound archive actions. Both warnings are true,
+    // both are admitted by the ready gate (READY_RESULT_WARNING_CODES), so both are carried.
+    const foreign = foreignDescriptorResidueWarning({ root, deps });
+    if (foreign !== null) pushReadyWarning(observation, foreign);
+    return null;
+  }
   if (result === null || intent !== "session" || observation === null) return result;
   // Only a descriptor-caused block (the typed human-recovery / cleanup actions) is downgraded; a
   // binding-hygiene action (release-binding, release-orphan-binding) or an unobservable cleanup state
