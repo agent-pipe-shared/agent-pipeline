@@ -135,6 +135,7 @@
 | pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | closed | defect | pipeline | — | 2026-08-11 | 2026-09-10 | — |
 | pipeline.authority-signing-terminal-contract | closed | workflow-improvement | pipeline | — | 2026-08-06 | — | — |
 | pipeline.auto-install-pre-push-hook-with-the-plugin | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
+| pipeline.automate-critic-course-and-gate-registrations | open | workflow-improvement | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.backlog-closure-metadata-missing-across-historical-items | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | — | 2026-07-25 | — | Nova A / issue #57 |
@@ -1064,7 +1065,7 @@
 
 ## Counts
 
-- open: 368
+- open: 369
 - in_progress: 0
 - closed: 674
 - rejected: 3

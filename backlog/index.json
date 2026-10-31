@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ea1870bd329893a39344cb2a87647ee2de95e6e0344b0e29d3326fd35aa05f62"
+    "transitionHead": "84ca0ec82332eda573654a7896c50764fa14edbc89a5d39723172c8cb86a5348"
   },
   "counts": {
-    "open": 368,
+    "open": 369,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -1617,6 +1617,16 @@
       "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
       "deferred": false,
       "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.automate-critic-course-and-gate-registrations",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "PO decision D223 (2026-10-31) after the Glossover Critic-course loops: every refusal names the next command, but a human or agent still has to run it at every round",
+      "deferred": false,
       "sprint": "alfred"
     },
     {
