@@ -1,0 +1,26 @@
+diff --git a/backlog/items/2026-10-29-a-recurring-housekeeping-job-collects-growing-runtime-state.md b/backlog/items/2026-10-29-a-recurring-housekeeping-job-collects-growing-runtime-state.md
+index 674ddc54d..4b249892f 100644
+--- a/backlog/items/2026-10-29-a-recurring-housekeeping-job-collects-growing-runtime-state.md
++++ b/backlog/items/2026-10-29-a-recurring-housekeeping-job-collects-growing-runtime-state.md
+@@ -6,7 +6,7 @@ owner: pipeline
+ status: open
+ created: 2026-10-29
+ priority: P2
+-release: 0.7.x
++release: 0.7.1
+ sprint: none
+ source: "PO direction 2026-10-29 (chat): after moving about 2.3 GB of unused git-hook runtime snapshots aside by hand, the PO wants a regular housekeeping job for this and for comparable growing state, not only for the snapshots"
+ done_when: manual
+diff --git a/backlog/items/2026-10-30-candidate11-follow-ups.md b/backlog/items/2026-10-30-candidate11-follow-ups.md
+index 29a970c1c..7823b48c3 100644
+--- a/backlog/items/2026-10-30-candidate11-follow-ups.md
++++ b/backlog/items/2026-10-30-candidate11-follow-ups.md
+@@ -1,7 +1,7 @@
+ ---
+ schema: pipeline.backlog-item.v1
+ id: pipeline.candidate11-follow-ups
+-type: improvement
++type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-10-30

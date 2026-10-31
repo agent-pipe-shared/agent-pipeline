@@ -1,0 +1,219 @@
+diff --git a/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs b/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
+index 0edf5eb3b..e1562d203 100644
+--- a/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
+@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { classifyVerifyCommand, run } from "../../scripts/pipeline-state.mjs";
+ import { checkVerifyContractConfigured } from "../../scripts/push-gate-satisfiability.mjs";
++import { materializeArchitectureDesignFixture } from "../architecture-design-test-fixture.mjs";
+ import { prepareDesignBootstrapVerifyFixture } from "../test-design-bootstrap-verify-fixture.mjs";
+ 
+ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
+@@ -164,7 +165,11 @@ test("A3: a real command is supplied once, written to both calibration twins, an
+   assert.equal(classifyVerifyCommand(neutral.verify), "configured");
+   assert.equal(checkVerifyContractConfigured(root).status, "configured");
+   // Replay (reopen to design, re-enter): the command is already configured, no flag needed, no rewrite.
++  // The governed profile is the calibration bytes, so the written command moved it away from the approved adoption (class 9);
++  // the design package's decision is bound again to the configured profile before the feature re-enters implementation.
+   const state = readJson(join(root, "project", "pipeline-state.json"));
++  materializeArchitectureDesignFixture({ rootDir: root, planPath: state.activeFeature.planPath, sourcePath: "src/change.mjs",
++    decisionRef: "TEST-D124-A3-REBIND", by: "Synthetic fixture PO" });
+   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({ ...state, activeFeature: { ...state.activeFeature, phase: "design" } }, null, 2));
+   const bytes = readFileSync(join(root, "project", "pipeline.json"), "utf8");
+   assert.equal(quiet(() => run(["set-phase", "--phase", "implementation"], deps)).result, 0);
+diff --git a/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs b/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+index b06180f1f..66b98986d 100644
+--- a/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
++++ b/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+@@ -374,6 +374,11 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
+     const specText = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Continuity is initialized by set-feature. |\n";
+     writeFileSync(join(root, planPath), prdText, "utf8");
+     writeFileSync(join(root, specPath), specText, "utf8");
++    // submit-plan binds the physical plan and spec bytes at a real Git candidate, so both are committed first.
++    for (const args of [["add", "--", planPath, specPath], ["commit", "-q", "--no-verify", "-m", "author the plan sources"]]) {
++      const committed = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
++      assert.equal(committed.status, 0, committed.stderr);
++    }
+ 
+     const planSha256 = sha256Hex(prdText);
+     const specSha256 = sha256Hex(specText);
+@@ -401,6 +406,8 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
+           specSha256,
+         },
+       }),
++      // Continuity initialization is the subject here, not the architecture gate: the readiness reader is injected as ready.
++      architectureEntryReadiness: () => ({ status: "ready" }),
+     };
+ 
+     // Step 1: set-feature
+diff --git a/plugins/pipeline-core/lib/test-design-bootstrap-verify-fixture.mjs b/plugins/pipeline-core/lib/test-design-bootstrap-verify-fixture.mjs
+index fed126396..e7510521b 100644
+--- a/plugins/pipeline-core/lib/test-design-bootstrap-verify-fixture.mjs
++++ b/plugins/pipeline-core/lib/test-design-bootstrap-verify-fixture.mjs
+@@ -4,15 +4,11 @@ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+-import { fileURLToPath } from "node:url";
+ import { prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
+-import { prepareAdoptionAuthority } from "./architecture-adoption-authority.mjs";
++import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
+ import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
+-import { applyAdoptionDecision } from "../scripts/architecture-adoption.mjs";
+ import { observeCurrentPlanApprovalForCalibration } from "../scripts/pipeline-state.mjs";
+ 
+-const SOURCE_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+-
+ export function prepareDesignBootstrapVerifyFixture({ root, verify, now }) {
+   prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
+   mkdirSync(join(root, "project"), { recursive: true });
+@@ -26,20 +22,14 @@ export function prepareDesignBootstrapVerifyFixture({ root, verify, now }) {
+   };
+   git("add", "--", ...twins);
+   git("commit", "-q", "-m", "seed baseline calibration fixture");
+-  cpSync(join(SOURCE_ROOT, "architecture"), join(root, "architecture"), { recursive: true });
+-  cpSync(join(SOURCE_ROOT, "AGENTS.md"), join(root, "AGENTS.md"));
+-  const adoption = { rootDir: root, decision: "deferred", scope: ["specs/", "architecture/map/"],
+-    rationale: "Contained synthetic fixture architecture deferral", decidedAt: now,
+-    reviewDate: "2099-01-01", decisionRef: "TEST-D124-A3" };
+-  const approvalRequest = prepareAdoptionAuthority(adoption);
+-  applyAdoptionDecision({ ...adoption, approvalRequest, chatApproval: {
+-    mode: "chat-attributed-unattested", by: "Synthetic fixture PO", decisionRef: "TEST-D124-A3",
+-    intentSha256: approvalRequest.intent.sha256,
+-  } });
+-  // Keep the original pin's neutral State readbacks on a supported private tier.
+-  cpSync(join(root, ".claude/pipeline.yaml"), join(root, "project/pipeline.yaml"));
+   const legacyState = join(root, ".claude/pipeline-state.json");
+   const state = JSON.parse(readFileSync(legacyState, "utf8"));
++  // A legacy deferred adoption is answered with ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED since D162; the fixture
++  // therefore carries a real approved-scoped design package over the feature's own surface.
++  materializeArchitectureDesignFixture({ rootDir: root, planPath: state.activeFeature.planPath, sourcePath: "src/change.mjs",
++    decisionRef: "TEST-D124-A3", by: "Synthetic fixture PO" });
++  // Keep the original pin's neutral State readbacks on a supported private tier.
++  cpSync(join(root, ".claude/pipeline.yaml"), join(root, "project/pipeline.yaml"));
+   state.activeFeature.phase = "design";
+   writeFileSync(join(root, "project/pipeline-state.json"), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+   rmSync(legacyState);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
+index 64eb6633a..14d7cf252 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
+@@ -34,10 +34,24 @@ function freshDir() {
+   return dir;
+ }
+ 
++const PLAN_TEXT = "# PRD\nRequirements here.\n";
++const SPEC_TEXT = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The approve-plan output names the next step. |\n";
++
++// submit-plan binds the physical plan and spec bytes at a real Git candidate, so the fixture authors and commits both.
++function authorPlanSources(dir, planPath) {
++  const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
++  mkdirSync(join(dir, planPath.slice(0, planPath.lastIndexOf("/"))), { recursive: true });
++  writeFileSync(join(dir, planPath), PLAN_TEXT, "utf8");
++  writeFileSync(join(dir, specPath), SPEC_TEXT, "utf8");
++  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { windowsHide: true });
++  git("add", "--", planPath, specPath);
++  git("commit", "-q", "--no-verify", "-m", "author the plan sources");
++}
++
+ function injectedPoGateAuthority(planPath) {
+-  const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
++  const planSha256 = createHash("sha256").update(PLAN_TEXT).digest("hex");
+   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+-  const specSha256 = createHash("sha256").update(`fixture:${specPath}`).digest("hex");
++  const specSha256 = createHash("sha256").update(SPEC_TEXT).digest("hex");
+   const value = {
+     schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
+     humanFacing: "en",
+@@ -79,6 +93,8 @@ function lifecycleDeps(dir, planPath) {
+     poGateAuthority: injectedPoGateAuthority(planPath),
+     poGateProfile: injectedPoGateProfile(),
+     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
++    // The announce text is the subject here, not the architecture gate: the readiness reader is injected as ready.
++    architectureEntryReadiness: () => ({ status: "ready" }),
+   };
+ }
+ 
+@@ -149,7 +165,8 @@ test("approve-plan success output announces the required set-phase --phase imple
+   const dir = freshDir();
+   try {
+     const planPath = ".claude/plans/approve-announce.md";
+-    const initCode = run(["set-feature", "--id", "approve-announce", "--plan-path", planPath], { dir, now: FIXED_NOW });
++    authorPlanSources(dir, planPath);
++    const initCode =run(["set-feature", "--id", "approve-announce", "--plan-path", planPath], { dir, now: FIXED_NOW });
+     assert.equal(initCode, 0);
+     const continuityInit = initializeLifecycleContinuity(dir, "approve-announce", planPath);
+     assert.equal(continuityInit, 0);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
+index c462480f9..b26be8a82 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
+@@ -10,10 +10,9 @@ import { join, resolve } from "node:path";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { fileURLToPath } from "node:url";
+ import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+-import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
++import { materializeArchitectureDesignFixture } from "../lib/architecture-design-test-fixture.mjs";
+ import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
+ import { inspectCalibrationVerifyCommitTransition, inspectCurrentCalibrationVerifyReady } from "../lib/calibration-verify-commit-transition.mjs";
+-import { applyAdoptionDecision } from "./architecture-adoption.mjs";
+ import { observeCurrentPlanApprovalForCalibration, run } from "./pipeline-state.mjs";
+ 
+ const BASELINE = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
+@@ -34,13 +33,10 @@ function fixture({ design = true } = {}) {
+   for (const path of ["project/pipeline.json", ".claude/pipeline.json"]) writeFileSync(join(root, path), `${JSON.stringify(calibration, null, 2)}\n`);
+   git(root, "add", "--", "project/pipeline.json", ".claude/pipeline.json");
+   git(root, "commit", "-q", "--no-verify", "-m", "baseline calibration fixture");
+-  cpSync(join(SOURCE_REPO,"architecture"),join(root,"architecture"),{recursive:true});
+-  cpSync(join(SOURCE_REPO,"AGENTS.md"),join(root,"AGENTS.md"));
+-  const adoption={rootDir:root,decision:"deferred",scope:["specs/","architecture/map/"],
+-    rationale:"Contained fixture physical architecture deferral",decidedAt:"2026-10-24T12:00:00.000Z",reviewDate:"2099-01-01",decisionRef:"TEST-K156"};
+-  const request=prepareAdoptionAuthority(adoption);
+-  applyAdoptionDecision({...adoption,approvalRequest:request,chatApproval:{mode:"chat-attributed-unattested",
+-    by:"Synthetic fixture PO",decisionRef:"TEST-K156",intentSha256:request.intent.sha256}});
++  // A legacy deferred adoption is answered with ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED since D162; the fixture carries
++  // a real approved-scoped design package over the feature's own surface instead.
++  materializeArchitectureDesignFixture({rootDir:root,planPath:"specs/unit/prd_unit.md",sourcePath:"src/change.mjs",
++    decisionRef:"TEST-K156",by:"Synthetic fixture PO"});
+   const readiness=inspectArchitectureEntryReadiness({rootDir:root,taskScope:"specs/unit/prd_unit.md"});
+   assert.equal(readiness.status,"ready",readiness.code);
+   const statePath = join(root, ".claude/pipeline-state.json");
+@@ -106,7 +102,11 @@ test("set-phase produces a sanctioned commit-ready verify transition", () => {
+   assert.deepEqual(inspectCalibrationVerifyCommitTransition({ rootDir: root, stagedPaths: paths }), { ok: true, code: "CVCT-COMMIT-READY", paths });
+   git(root, "commit", "-q", "--no-verify", "-m", "configured calibration fixture", "--", ...paths);
+   const configured = paths.map(path => bytes(root, path));
+-  const restarted = spawnSync(process.execPath, [fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)), "configure-verify", "--verify-command", COMMAND], { cwd: root, encoding: "utf8" });
++  // The governed profile is the calibration bytes: the configured command moved it away from the approved adoption (class 9),
++  // so the design package's decision is bound again to the configured profile before the feature re-enters implementation.
++  materializeArchitectureDesignFixture({rootDir:root,planPath:"specs/unit/prd_unit.md",sourcePath:"src/change.mjs",
++    decisionRef:"TEST-K156-REBIND",by:"Synthetic fixture PO"});
++  const restarted =spawnSync(process.execPath, [fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)), "configure-verify", "--verify-command", COMMAND], { cwd: root, encoding: "utf8" });
+   assert.equal(restarted.status, 0, restarted.stderr);
+   assert.deepEqual(paths.map(path => bytes(root, path)), configured, "restart replay is zero-write");
+   const statePath = join(root, ".claude/pipeline-state.json");
+@@ -275,7 +275,11 @@ test("fresh pre-State retry ignores forged journal and refuses stale or dirty So
+   altered.facts.statePostSha256 = "f".repeat(64);
+   writeFileSync(preparedPath, `${JSON.stringify(altered, null, 2)}\n`, { mode: 0o600 });
+   assert.equal(spawnSync(process.execPath, [cli, "recover-verify-transition"], { cwd: root }).status, 2, "unshipped journal route remains unavailable");
+-  const retry = (command = COMMAND) => run(["set-phase", "--phase", "implementation", "--verify-command", command],
++  // The interrupted child already wrote the configured calibration, which moved the governed profile away from the approved
++  // adoption (class 9); the decision is bound again so the retries below are refused or admitted for their own reasons.
++  materializeArchitectureDesignFixture({rootDir:root,planPath:"specs/unit/prd_unit.md",sourcePath:"src/change.mjs",
++    decisionRef:"TEST-K156-REBIND",by:"Synthetic fixture PO"});
++  const retry =(command = COMMAND) => run(["set-phase", "--phase", "implementation", "--verify-command", command],
+     { dir: root });
+   const statePath = join(root, ".claude/pipeline-state.json");
+   const statePreimage = readFileSync(statePath);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+index b983ed1ea..d893ae411 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+@@ -42,6 +42,7 @@ const ROUTE = "continuity-authority-revision-plan";
+ const ORIGINAL_KEYS = [
+   "schema", "generatedAt", "status", "activeFeature", "phase", "planApproved", "lifecycle",
+   "mixedPlanRecovery", "pushApproval", "closedFeaturesCount", "phoenixEpicHistory", "nextAction", "nextActionText",
++  "publicHandoverDuty",
+ ];
+ const HEX64 = /^[0-9a-f]{64}$/u;
+ const sha = (value) => createHash("sha256").update(value).digest("hex");
