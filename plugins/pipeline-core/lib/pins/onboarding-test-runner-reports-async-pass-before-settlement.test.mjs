@@ -9,8 +9,9 @@
 //      current dependency closure (both scanner diagnostics modules copied)
 //   A3 a child with no B8 coverage is valid; missing/invalid/duplicate reports fail;
 //      an entirely unobserved corpus cannot pass
-//   A4 (complete-suite consistency) the corpus declares 216 unique cases that the
-//      12 children partition exactly; the full-suite run itself is NOT run here
+//   A4 (complete-suite consistency) the corpus declares its own EXPECTED_CASE_COUNT of unique cases (read from the
+//      suite source; 240 = 12 children x 20 at 2026-10-31, was 216 = 12 x 18) that the children partition exactly;
+//      the full-suite run itself is NOT run here
 //
 // Fixtures live under the repository's scratch/ (never the OS temp dir). No case here
 // needs directory mode bits or directory symlinks, so none is skipped for the
@@ -207,7 +208,17 @@ describe("A2: the original installed-plugin scanner fixture completes with the c
 });
 
 // ---- A3 -------------------------------------------------------------------
-const SHARDS = 6, CHUNKS = 2, EXPECTED = 216;
+// The partition numbers are read from the suite's own declaration (SHARD_COUNT, CHUNK_COUNT, EXPECTED_CASE_COUNT), so adding
+// a closed-partition batch of cases (216 -> 240 = 6 x 2 x 20, the suite's own 228 + 12 note) does not re-red this pin. The
+// cross-check stays independent: A4 below still compares the declared constant to the corpus actually registered.
+function declaredSuiteConstant(name) {
+  const match = new RegExp(`^const ${name} = (\\d+);$`, "mu").exec(suiteSource);
+  assert.ok(match, `${name} must be declared as a numeric literal in the suite source`);
+  return Number(match[1]);
+}
+const SHARDS = declaredSuiteConstant("SHARD_COUNT");
+const CHUNKS = declaredSuiteConstant("CHUNK_COUNT");
+const EXPECTED = declaredSuiteConstant("EXPECTED_CASE_COUNT");
 const assigned = (index, shard, chunk) => index % SHARDS === shard && Math.floor(index / SHARDS) % CHUNKS === chunk;
 
 function expectedFor(shard, chunk) {
@@ -254,7 +265,7 @@ describe("A3: per-child coverage reports", () => {
       "wrong schema": { ...good, schema: "other" },
       "extra key": { ...good, extra: 1 },
       "wrong chunk": { ...good, chunk: 1 },
-      "wrong declared count": { ...good, declaredCount: 215 },
+      "wrong declared count": { ...good, declaredCount: EXPECTED - 1 },
       "missing result": { ...good, results: good.results.slice(1) },
       "wrong id": { ...good, results: [{ ...good.results[0], id: "POV-x" }, ...good.results.slice(1)] },
       "bad disposition": { ...good, results: [{ ...good.results[0], disposition: "skipped" }, ...good.results.slice(1)] },
@@ -283,7 +294,7 @@ describe("A3: per-child coverage reports", () => {
 
   it("an entirely unobserved corpus cannot pass: the parent requires nonempty coverage across successful children (structural pin)", () => {
     // The aggregate decision is inline in the suite's direct-invocation parent block and is
-    // not exported, so it is pinned structurally (full behavior needs the 216-case run).
+    // not exported, so it is pinned structurally (full behavior needs the full-corpus run).
     assert.match(suiteSource,
       /if \(failed\.length === 0\) \{[\s\S]*?const classes = new Set\(results\.flatMap\(\(result\) => result\.coverage\)\);\s*assert\.ok\(classes\.size > 0, "B8 corpus must reach at least one real session command"\);/u);
     assert.match(suiteSource, /classes: \[\.\.\.b8ObservedCommandClasses\]\.sort\(\)/u, "children must report coverage once over IPC");
@@ -295,8 +306,9 @@ describe("A3: per-child coverage reports", () => {
 
 // ---- A4 -------------------------------------------------------------------
 describe("A4: case-count consistency (complete suite run itself is out of this pin's scope)", () => {
-  it("216 unique declared cases are partitioned exactly once by the 12 children, 18 each", () => {
+  it("the declared unique cases are partitioned exactly once by the children, an equal share each", () => {
     const cases = suite.ONBOARDING_TEST_CASES;
+    assert.ok(Number.isInteger(EXPECTED / (SHARDS * CHUNKS)), "declared case count must divide evenly across the closed child partition");
     assert.equal(cases.length, EXPECTED);
     assert.equal(new Set(cases.map((c) => c.id)).size, EXPECTED);
     assert.deepEqual(cases.map((c) => c.index), Array.from({ length: EXPECTED }, (_, i) => i));

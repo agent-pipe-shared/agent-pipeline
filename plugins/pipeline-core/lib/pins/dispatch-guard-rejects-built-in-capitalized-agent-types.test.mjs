@@ -5,7 +5,8 @@
  * Acceptance points (backlog item, Acceptance):
  *   A1 role normalisation accepts the runner's real agent-type spellings; a batch without the
  *      prohibition line is `not-applicable` before any role parsing can reject it.
- *   A2 Explore, Plan, general-purpose and pipeline-core:* types dispatch, alone and in parallel batches.
+ *   A2 Explore, Plan, general-purpose and pipeline-core:* types are recognised, alone and in parallel batches (at the hook
+ *      the write-carrier rule, D185, admits only direct Explore; Plan/general-purpose are refused by it, never by an APB- code).
  *   A3 an invalid role produces its own code (APB-ROLE-UNPARSEABLE) naming the offending value.
  * The real module and the real hook CLI are exercised; the RED cases run a scratch MIRROR of the
  * production function carrying the original defect, never an edit of production.
@@ -46,18 +47,36 @@ function guard(payload) {
 const PROHIBITION = `- ${ADVISOR_PROHIBITION_LINE} (MP-26)`;
 
 // ---- A1/A2: the real hook CLI, exact live tool_input shapes ----
-for (const type of ["Explore", "Plan", "general-purpose"]) {
-  test(`A1/A2 CLI: Agent ${type} without a prohibition line is admitted`, () => {
+// Restated to the decided write-carrier contract (2026-10-31 R8; PO decision D185 / commit 90fa209cf: "the guard order
+// stays and the tests follow"; rule introduced by a0feac3a4). The pin's intent is unchanged: a capitalised built-in agent
+// type is recognised by the role normalisation and never produces an APB-* (Advisor-binding) denial. What changed is the
+// admission outcome of the write-capable built-ins: `writeCapableCarrierAdmission` admits only the read-only direct `Explore`
+// carrier; `Plan` and `general-purpose` can write, so the hook refuses them with DISPATCH-WRITE-CARRIER-REQUIRED -- before
+// any role/prompt/Advisor check, which is why that refusal carries no APB- code. The carrier rule is not loosened here.
+const CARRIER_CODE = /DISPATCH-WRITE-CARRIER-REQUIRED/u;
+
+test("A1/A2 CLI: Agent Explore without a prohibition line is admitted", () => {
+  const { code, stderr } = guard({
+    tool_use_id: "pin-Explore", tool_name: "Agent",
+    tool_input: { subagent_type: "Explore", model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+  });
+  assert.equal(code, 0, stderr.slice(0, 300));
+  assert.doesNotMatch(stderr, /APB-/u);
+});
+
+for (const type of ["Plan", "general-purpose"]) {
+  test(`A1/A2 CLI: Agent ${type} is recognised (no APB- denial) and refused only by the write-carrier rule`, () => {
     const { code, stderr } = guard({
       tool_use_id: `pin-${type}`, tool_name: "Agent",
       tool_input: { subagent_type: type, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
     });
-    assert.equal(code, 0, stderr.slice(0, 300));
+    assert.equal(code, 2, stderr.slice(0, 300));
+    assert.match(stderr, CARRIER_CODE);
     assert.doesNotMatch(stderr, /APB-/u);
   });
 }
 
-test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is admitted", () => {
+test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is recognised and refused only by the write-carrier rule", () => {
   const { code, stderr } = guard({
     tool_use_id: "pin-batch", tool_name: "Workflow",
     tool_input: { script: `
@@ -67,7 +86,8 @@ test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is 
       agent({ agentType: 'Explore', prompt: 'Read d and report.' })
     ` },
   });
-  assert.equal(code, 0, stderr.slice(0, 300));
+  assert.equal(code, 2, stderr.slice(0, 300));
+  assert.match(stderr, CARRIER_CODE);
   assert.doesNotMatch(stderr, /APB-/u);
 });
 
@@ -136,14 +156,17 @@ test("A3 module: an invalid role gets APB-ROLE-UNPARSEABLE naming the value", ()
   assert.ok(long.message.length < 300);
 });
 
-test("A3 CLI: the hook blocks an unparseable role with APB-ROLE-UNPARSEABLE naming it", () => {
+// Restated to the decided guard order (D185 / 90fa209cf): the write-carrier check runs before the role, prompt and Advisor
+// checks, so an unparseable role is blocked at the hook by DISPATCH-WRITE-CARRIER-REQUIRED (exit 2, before any model call)
+// and never reaches the Advisor binding. The own code APB-ROLE-UNPARSEABLE and the value-naming message stay pinned at
+// module level by "A3 module" above (the code path the hook would take once a carrier is selected).
+test("A3 CLI: the hook blocks an unparseable role at the write-carrier check, never with the generic Advisor denial", () => {
   const { code, stderr } = guard({
     tool_use_id: "pin-bad", tool_name: "Agent",
     tool_input: { subagent_type: "bad role", model: "sonnet", description: "r", prompt: `${PROHIBITION}\nRead and report.` },
   });
   assert.equal(code, 2, stderr.slice(0, 300));
-  assert.match(stderr, /APB-ROLE-UNPARSEABLE/u);
-  assert.match(stderr, /"bad role"/u);
+  assert.match(stderr, CARRIER_CODE);
   assert.doesNotMatch(stderr, /APB-DISPATCH-INVALID/u);
 });
 
