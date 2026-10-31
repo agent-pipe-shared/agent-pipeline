@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+index ac3091cb8..b494c057c 100644
+--- a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+@@ -35,6 +35,7 @@ import { verifyEvidenceFixture } from "../verify-selection-fixture.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+ import { criticBoundVerifyRemedy } from "../../scripts/push-prepare.mjs";
+ import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
++import { resolvePublicationReviewRequirement } from "../publication-review-requirement.mjs";
+ 
+ const SCRIPTS = fileURLToPath(new URL("../../scripts/", import.meta.url));
+ const ENV = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+@@ -53,7 +54,10 @@ function git(root, args) {
+   return result.stdout.trim();
+ }
+ const put = (root, path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
+-const commitPaths = (root, paths, message) => { git(root, ["add", "-f", "--", ...paths]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++// A whole-tree commit (".") honours the consumer's .gitignore: the project State file is gitignored in a consumer, so it must NOT be in
++// the pushed tree (D214; forcing it in made the push step stop at the published-Continuity baseline check, a fixture artefact).
++// Explicit paths are still added with -f (the fixture's evidence files may sit under an ignored pattern).
++const commitPaths = (root, paths, message) => { git(root, paths.length === 1 && paths[0] === "." ? ["add", "--", "."] : ["add", "-f", "--", ...paths]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
+ 
+ /** Run one real command line entry point; stdout (or, on a refusal, stderr) is its typed JSON line. */
+ function cli(script, args, { cwd } = {}) {
+@@ -320,7 +324,7 @@ const cleanup = (fx) => rmSync(fx.root, { recursive: true, force: true });
+ 
+ /**
+  * The push step as it behaves today: push-prepare's remedy base for the registered course, and the real guard-push hook on a push of
+- * the closed candidate. The consumer's project State is not a tracked file, so the pushed commit carries none (D214 is separate).
++ * the closed candidate. The consumer's project State is not a tracked file, so the pushed commit carries none (D214).
+  */
+ function pushStep(fx) {
+   const { root } = fx;
+@@ -346,7 +350,14 @@ function pushStep(fx) {
+   rmSync(join(root, ".claude/pipeline-state.json"));
+   const guardWithoutState = runGuard();
+   writeFileSync(join(root, ".claude/pipeline-state.json"), stateBytes);
+-  return { head, remedy, guard, guardWithoutState };
++  // The review decision the guard takes from the PUSHED tree (guard-push pushedStateRequiresReview), asked of the same resolver with the same
++  // pushed-tree reader. Two answers: the consumer shape (no State at the pushed commit) and, as the control, the same candidate read through
++  // the State file the consumer gitignores (the route a repository that commits its State uses today).
++  const pushedState = git(root, ["ls-tree", "-r", "--name-only", head]).split("\n").filter((path) => /(?:^|\/)pipeline-state\.json$/u.test(path));
++  const readPushed = (path) => { const shown = spawnSync("git", ["-C", root, "show", `${head}:${path}`], { encoding: null, shell: false, env: ENV }); return shown.status === 0 ? shown.stdout : null; };
++  const consumerShape = pushedState.length === 0 ? resolvePublicationReviewRequirement(null, { readSource: readPushed }) : null;
++  const ignoredStateRoute = resolvePublicationReviewRequirement(JSON.parse(stateBytes.toString("utf8")), { readSource: readPushed });
++  return { head, remedy, guard, guardWithoutState, pushedState, consumerShape, ignoredStateRoute };
+ }
+ 
+ // ---------------------------------------------------------------------------------------------------------------------------------
+@@ -482,13 +493,25 @@ test("PATH C (multi-round consumer course, several slices): bindings per round r
+     const closed = closeToPrepared(fx);
+     assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+     assert.equal(closed.apply().status, "applied");
+-    // The push step as it behaves today (the State file is not tracked, so the pushed commit carries none).
++    // The push step in the REAL consumer shape (D214): the State file is gitignored, so the pushed commit carries none. The earlier
++    // answer (the published-Continuity baseline check, "no unambiguous runtime.sessionCleanup baseline") was a FIXTURE ARTEFACT of this
++    // walk (its whole-tree commit force-added the gitignored State file); guard-push returns null from that check when no State is in the
++    // pushed commit, so the push step now reaches the pushed-state review decision.
+     const push = pushStep(fx);
+     assert.ok(push.remedy.includes(`--base ${r4.candidate}`) && push.remedy.includes(FEATURE), push.remedy);
+-    assert.equal(push.guard.code, 2, push.guard.stderr);
+-    assert.match(push.guard.stderr, /published Pipeline Continuity has no unambiguous runtime\.sessionCleanup baseline/u, "recorded answer today: the published-Continuity baseline check answers first");
+-    assert.equal(push.guardWithoutState.code, 2, push.guardWithoutState.stderr);
+-    assert.match(push.guardWithoutState.stderr, /published Pipeline Continuity has no unambiguous runtime\.sessionCleanup baseline/u, "recorded answer today: the same answer with no State file in the working tree; the pushed-state review decision is not reached (D214 is the separate slice)");
++    assert.deepEqual(push.pushedState, [], "the pushed commit of a consumer carries no project State file");
++    for (const answer of [push.guard, push.guardWithoutState]) {
++      assert.equal(answer.code, 2, answer.stderr);
++      assert.doesNotMatch(answer.stderr, /runtime\.sessionCleanup/u, "the published-Continuity baseline check no longer answers first");
++      assert.match(answer.stderr, /candidate-bound independent review and Verify are unavailable/u, "the push step reaches the review decision: the independent review is required");
++    }
++    // The typed answer of that decision for this candidate (D214): the Critic COURSE (the registered package of
++    // FEATURE) and the review WAIVER are different questions. The waiver reads only the closing feature's approved low-rigor State, and a
++    // consumer's pushed commit has none, so even a mini feature stays "required" (REVIEW-STATE-UNAVAILABLE). A feature with a registered
++    // package is "required" by REVIEW-PACKAGE-REQUIRED whatever its approval says.
++    assert.deepEqual(push.consumerShape, { required: true, code: "REVIEW-STATE-UNAVAILABLE" });
++    // Control: the same candidate read through the State file this consumer gitignores is the one route that waives today.
++    assert.deepEqual(push.ignoredStateRoute, { required: false, code: "REVIEW-LOW-RIGOR" }, "the State-file route works where a repository commits its State; it is unchanged");
+   } finally { cleanup(fx); }
+ });
+ 
