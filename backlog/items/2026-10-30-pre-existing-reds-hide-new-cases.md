@@ -61,10 +61,20 @@ Red on the plain candidate (identical in every baseline clone this session):
 - codex-pretool-guard case 7 (slow push guard share, 7502188da) was red under every runner: a missing scratch/ and a
   runner HOME nobody sets. It is fixed in the candidate-13 CPG patch.
 - Item 3: R2 fixes the harness pipeline-state crash and makes RGr deterministic.
-- Item 4: R5 restates the e2e in-process driver case to the design-authoring stop that 5e939278b introduced. Still
-  open, with the same cause: `measure-tofu-push-e2e.test.mjs:147` (expects the old order) and
-  `scripts/measure-fresh-repo-onboarding-turns.mjs:489` (has no design-authoring-required branch);
-  `project-onboarding-v3-argv-closure` and the three-runner happy-path pin have not been re-read.
+- Item 4: R5 restates the e2e in-process driver case to the design-authoring stop that 5e939278b introduced. R6
+  gives `scripts/measure-fresh-repo-onboarding-turns.mjs` the matching design-authoring-required branch and restates
+  the TOFU case (it now stops typed at the plan acknowledgement's signature request) and the argv-closure case
+  (feature and epic are refused with BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED before one authoring pass). The AC-264
+  pin classifies `approve-residual-acceptance` (c3898ac93) as off the happy path, since it exists only after a failed
+  Critic round; the happy path still needs exactly two per-feature approvals. Left open by R6:
+  - A product question: the restated TOFU walk shows that mini's retained early plan acknowledgement asks for a PO
+    signature, while spec 21.3 says that acknowledgement is folded into enrollment consent or removed. Whether it is
+    the folded plan decision or an extra signature needs a PO decision.
+  - `scripts/measure-tofu-push-e2e.mjs` cannot measure the signed push until it has an encrypted-key fixture and a
+    passphrase feed (the signing step refuses unencrypted keys, PO-KEY-UNENCRYPTED); the TOFU case is restated again
+    then.
+  - Run standalone for codex and antigravity, the measurement helper stops at INTAKE-CAPTURE-TEXT-FILE-UNREADABLE
+    before authoring, with and without R6 (a separate helper drift).
 - VCR01: six outgrown sites counts are restated in the candidate-13 VCR01 patch.
 
 ## Wanted
