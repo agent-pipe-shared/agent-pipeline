@@ -40,7 +40,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -380,6 +380,7 @@ export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
 } = {}) {
   const scratchDir = join(REPO_ROOT, "scratch");
+  mkdirSync(scratchDir, { recursive: true }); // a fresh clone has no scratch/ yet
   const fixtureHome = mkdtempSync(join(scratchDir, "measure-tofu-e2e-home-"));
   const dir = mkdtempSync(join(scratchDir, "measure-tofu-e2e-fresh-"));
   const keyDir = mkdtempSync(join(scratchDir, "measure-tofu-e2e-key-"));
