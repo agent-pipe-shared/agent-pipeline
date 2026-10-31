@@ -999,7 +999,7 @@ try {
     }
   });
 
-  check("GST39 the refusal of either calibration mirror names the other mirror and the Verify drift code (Toolbox N42)", () => {
+  check("GST41 the refusal of either calibration mirror names the other mirror, the Verify drift code and the commit order (Toolbox N42)", () => {
     // The two calibration files must stay byte-equal (PCI-CALIBRATION-DRIFT) and each override covers exactly one file. The first refusal used to say
     // nothing about the mirror, so the second signature was discovered only when Verify went red. The warning belongs to the refusal itself, before any override.
     const root = governed();
@@ -1012,6 +1012,9 @@ try {
       assert.match(refused.stderr, new RegExp(otherId, "u"), `the refusal of ${path} names the mirror's rule ${otherId}`);
       assert.match(refused.stderr, /PCI-CALIBRATION-DRIFT/u, path);
       assert.match(refused.stderr, /own (PO-approved )?override/u, path);
+      // Toolbox follow-up: every signature binds to the exact HEAD, so the second ceremony can only run after the first commit.
+      assert.match(refused.stderr, /binds to the exact HEAD/u, path);
+      assert.match(refused.stderr, /commit this file first/u, path);
     }
     // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
     const rootManifest = ask(root, "pipeline.json");
