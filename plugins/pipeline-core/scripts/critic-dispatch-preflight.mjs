@@ -247,7 +247,7 @@ function localEvidence(root, path) {
   return readFileSync(absolute);
 }
 
-function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, root, spec, guardrails) {
+function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, root, spec, guardrails, diagnosticBase = null) {
   let value;
   try { value = JSON.parse(bytes); } catch { fail("CDP-EVIDENCE-JSON", `Evidence is not JSON: ${path}`); }
   // Verify evidence uses the candidate at its root, whereas Security and gate
@@ -274,7 +274,12 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, 
     const diagnosticCode = error.code ?? "CDI-INVALID";
     if (diagnosticCode === "CDI-GUARDRAILS") {
       const requiredGuardrailPaths = guardrails.map((entry) => entry.path);
-      fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths });
+      // N43: a changed calibration makes `.claude/pipeline.json` required, and the shell guard refuses any command that names that protected path, so the
+      // route is the producer's own derivation (`--base`), never a typed `--guardrail`. The exact base is the one this preflight derived the list over.
+      const reason = diagnosticBase === null
+        ? `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}); this review has no commit base to derive them over, so re-produce the diagnostic with one --guardrail per listed path that is not a protected calibration path`
+        : `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}). Re-produce the diagnostic so the producer derives the required guardrails itself: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log <evidence log> --out <evidence file> --candidate ${candidateCommit} --base ${diagnosticBase} -- <command>; with --base it adds every required guardrail on its own, so never pass a protected calibration path by --guardrail (the shell guard refuses that command)`;
+      fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths, diagnosticBase, reason });
     }
     const reason = value?.schema === "pipeline.verify-evidence.v0"
       ? `A Verify evidence of mode critic is required (${diagnosticCode}); ${path} is not one. Produce it for the exact candidate: node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <evidence file>`
@@ -401,7 +406,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       { reason: refusal.lines.join("\n"), staleContracts: refusal.staleContracts, repair: refusal.remedy });
   }
   stage = "evidence";
-  const evidenceReadback =evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
+  const evidenceReadback =evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback, baseCommit));
   stage = "prior-evidence";
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);

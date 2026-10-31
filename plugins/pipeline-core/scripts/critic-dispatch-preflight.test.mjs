@@ -20,6 +20,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+import { runCriticDiagnosticCli } from "./critic-diagnostic-evidence.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
@@ -1028,6 +1029,68 @@ test("a diagnostic lacking required guardrails fails CDI-GUARDRAILS and the fail
       assert.equal(error.details.diagnosticCode, "CDI-GUARDRAILS");
       assert.deepEqual(error.details.requiredGuardrailPaths, required);
       for (const path of required) assert.ok(error.message.includes(path), error.message);
+      return true;
+    });
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// N43 (Toolbox hand-over 2026-10-31): a candidate that changes the calibration makes `.claude/pipeline.json` a required guardrail, and the shell guard
+// refuses any command that names that protected path (so `--guardrail .claude/pipeline.json` can never be typed). The producer already derives the
+// required guardrails itself when it is given `--base`; the refusal must say so, with the exact base, instead of leaving the agent without a route.
+function n43CalibrationChange(fx) {
+  writeFileSync(join(fx.root, ".claude", "pipeline.json"), "{}\n");
+  return commit(fx.root, "change the calibration");
+}
+const n43Cli = (fx, name, extra) => runCriticDiagnosticCli(["--root", fx.root, "--spec", "specs/spec.md", "--log", `evidence/${name}.log`, "--out", `evidence/${name}.json`, ...extra, "--", process.execPath, "-e", "process.exit(0)"]);
+const N43_EXPLICIT = ["--guardrail", ".claude/pipeline.yaml", "--guardrail", "governance/guidelines/review.md", "--guardrail", "governance/policies/checklist.md"];
+const n43Input = (fx, candidate, name) => input(fx, { base: fx.candidate, candidate, evidencePaths: [`evidence/${name}.json`], priorCriticEvidencePath: null });
+
+test("N43 (a) the missing-guardrails refusal for a changed calibration names the producer derivation with the exact base and warns against the protected flag", () => {
+  const fx = fixture();
+  try {
+    const candidate = n43CalibrationChange(fx);
+    n43Cli(fx, "n43a", N43_EXPLICIT);
+    assert.throws(() => preflightCriticDispatch(n43Input(fx, candidate, "n43a")), (error) => {
+      assert.ok(error instanceof CriticDispatchPreflightError);
+      assert.equal(error.code, "CDP-EVIDENCE-MODE");
+      assert.equal(error.details.diagnosticCode, "CDI-GUARDRAILS");
+      assert.ok(error.details.requiredGuardrailPaths.includes(".claude/pipeline.json"), JSON.stringify(error.details.requiredGuardrailPaths));
+      const reason = String(error.details.reason);
+      assert.match(reason, /critic-diagnostic-evidence\.mjs/u);
+      assert.ok(reason.includes(`--base ${fx.candidate}`), reason);
+      assert.match(reason, /derives the required guardrails itself/u);
+      assert.match(reason, /never pass a protected calibration path by --guardrail/u);
+      assert.equal(error.details.diagnosticBase, fx.candidate);
+      return true;
+    });
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("N43 (b) following that repair end to end: the producer with --base derives the calibration guardrail without any flag naming it and the preflight admits", () => {
+  const fx = fixture();
+  try {
+    const candidate = n43CalibrationChange(fx);
+    n43Cli(fx, "n43a", N43_EXPLICIT);
+    assert.throws(() => preflightCriticDispatch(n43Input(fx, candidate, "n43a")), (error) => error.code === "CDP-EVIDENCE-MODE");
+    n43Cli(fx, "n43b", ["--base", fx.candidate]);
+    const diagnostic = JSON.parse(readFileSync(join(fx.root, "evidence", "n43b.json"), "utf8"));
+    assert.ok(diagnostic.guardrails.some((entry) => entry.path === ".claude/pipeline.json"), JSON.stringify(diagnostic.guardrails.map((entry) => entry.path)));
+    const result = preflightCriticDispatch(n43Input(fx, candidate, "n43b"));
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("N43 (c) negatives: a base that is not a commit is refused CDI-BASE by the producer and writes nothing; a diagnostic that lacks a different required guardrail keeps today's refusal", () => {
+  const fx = fixture();
+  try {
+    const candidate = n43CalibrationChange(fx);
+    assert.throws(() => n43Cli(fx, "n43c", ["--base", "refs/heads/does-not-exist"]), (error) => error.code === "CDI-BASE");
+    assert.throws(() => readFileSync(join(fx.root, "evidence", "n43c.json")));
+    n43Cli(fx, "n43d", ["--guardrail", ".claude/pipeline.json", "--guardrail", ".claude/pipeline.yaml", "--guardrail", "governance/guidelines/review.md"]);
+    assert.throws(() => preflightCriticDispatch(n43Input(fx, candidate, "n43d")), (error) => {
+      assert.equal(error.code, "CDP-EVIDENCE-MODE");
+      assert.equal(error.details.diagnosticCode, "CDI-GUARDRAILS");
+      assert.ok(error.details.requiredGuardrailPaths.includes("governance/policies/checklist.md"));
       return true;
     });
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
