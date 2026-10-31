@@ -1,0 +1,144 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push-scratch-advisory.test.mjs b/plugins/pipeline-core/hooks/guard-push-scratch-advisory.test.mjs
+index c02c34b82..4a13a3018 100644
+--- a/plugins/pipeline-core/hooks/guard-push-scratch-advisory.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-scratch-advisory.test.mjs
+@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+ import { bindScratchDescriptor } from "../lib/session-cleanup-recovery.mjs";
+-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
++import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+ function enrollFixtureGovernance(root) {
+@@ -113,7 +113,10 @@ function signedPushRepo(prefix) {
+   gitAt(dir, "commit", "-q", "-m", "threat model");
+   const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+ 
+-  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
++  // The advisory under test is surfaced on the all-green path, which a push reaches only when the pushed
++  // commit's own state is an approved low-rigor plan (otherwise a candidate-bound independent review is
++  // required first). The working-tree state written below is the push-approval record and does not undo it.
++  const head = commitApprovedMiniFixtureState(dir);
+   writeManifest(dir, manifestPush({ approval: "required" }));
+   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+   const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
+diff --git a/plugins/pipeline-core/hooks/guard-push-v2.test.mjs b/plugins/pipeline-core/hooks/guard-push-v2.test.mjs
+index 23a52a8fa..78c733fa3 100644
+--- a/plugins/pipeline-core/hooks/guard-push-v2.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-v2.test.mjs
+@@ -30,15 +30,21 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
++import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+ const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
+ 
+ const ALL_DIRS = [];
+ 
+-/** Fresh temp dir with a real git repo (one commit) so `git rev-parse HEAD` resolves. */
+-function freshRepo(prefix) {
++/**
++ * Fresh temp dir with a real git repo (one commit) so `git rev-parse HEAD` resolves.
++ * `approvedMini` (opt-in, default off) commits an approved low-rigor plan state as the pushed commit:
++ * the publication-review duty is resolved from the PUSHED commit's own state, and a bare candidate
++ * always requires a candidate-bound independent review. Only allow cases whose point is the security
++ * evidence (not the review) opt in; every block case stays bare and keeps refusing for its own reason.
++ */
++function freshRepo(prefix, { approvedMini = false } = {}) {
+   const dir = mkdtempSync(join(tmpdir(), `guard-push-v2-${prefix}-`));
+   ALL_DIRS.push(dir);
+   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+@@ -55,7 +61,7 @@ function freshRepo(prefix) {
+   const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
+   const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+   if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture governance enrollment did not activate enforcement");
+-  const head = git("rev-parse", "HEAD").stdout.trim();
++  const head = approvedMini ? commitApprovedMiniFixtureState(dir) : git("rev-parse", "HEAD").stdout.trim();
+   const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
+   return { dir, head, tree };
+ }
+@@ -82,13 +88,13 @@ function canonicalJson(value) {
+ }
+ 
+ /** Mirrors guard-push.test.mjs's own `exactSecurityEvidence` v1 fixture exactly. */
+-function exactSecurityEvidence({ head, tree }) {
++function exactSecurityEvidence({ head, tree, repositorySha256 = "b".repeat(64) }) {
+   const payload = {
+     schema: "pipeline.security-evidence.v1",
+     exitCode: 0,
+     commit: head,
+     candidate: {
+-      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256: "b".repeat(64),
++      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256,
+       inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
+       snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
+     },
+@@ -235,17 +241,26 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
+ }
+ 
+ /** Shared all-green base: verify fresh + v1 security fresh + standing-approved. */
+-function allGreenBase() {
+-  const { dir, head, tree } = freshRepo("all-green-base");
++function allGreenBase({ approvedMini = false } = {}) {
++  const { dir, head, tree } = freshRepo("all-green-base", { approvedMini });
+   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
+   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+-  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
++  // A case that must reach ALLOW also needs its v1 security evidence to bind the effective push destination:
++  // repositorySha256 is the digest of the remote's single push URL. Block cases stay on the placeholder digest.
++  let repositorySha256;
++  if (approvedMini) {
++    const pushUrl = "https://example.invalid/all-green-base.git";
++    gitAt(dir, "remote", "add", "origin", pushUrl);
++    repositorySha256 = createHash("sha256").update(pushUrl).digest("hex");
++  }
++  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree, repositorySha256 }));
+   return { dir, head, tree };
+ }
+ 
+ // ---- PGV2-01 fresh+bound+non-blocking v2 is a byte-identical no-op (DoD5/6a) -----------
+ {
+-  const { dir, head, tree } = allGreenBase();
++  // approvedMini: the point is the v2 consult being a no-op, so the pushed state is an approved low-rigor plan.
++  const { dir, head, tree } = allGreenBase({ approvedMini: true });
+   writeExactV2Pair(dir, { head, tree }); // default: cap.secrets PASS -> pass -> blocking:false
+   check("PGV2-01 allow  fresh+bound+non-blocking v2 pair is a no-op alongside all-green v1", PUSH_CMD, dir, ALLOW, {
+     stderrEmpty: true,
+@@ -339,7 +354,7 @@ function allGreenBase() {
+ 
+ // ---- PGV2-06 security gate off skips v2 consult entirely, matching existing v1 skip (DoD6f) --
+ {
+-  const { dir, head } = freshRepo("v2-gate-off");
++  const { dir, head } = freshRepo("v2-gate-off", { approvedMini: true });
+   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "off" }));
+   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+   // Neither v1 nor v2 security evidence exists at all -- gate is off, must not matter.
+diff --git a/plugins/pipeline-core/scripts/worktree-target-binding.test.mjs b/plugins/pipeline-core/scripts/worktree-target-binding.test.mjs
+index f93e23a94..abcac2936 100644
+--- a/plugins/pipeline-core/scripts/worktree-target-binding.test.mjs
++++ b/plugins/pipeline-core/scripts/worktree-target-binding.test.mjs
+@@ -19,7 +19,7 @@ function enrollFixtureGovernance(root) {
+   const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+   if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+ }
+-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
++import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+ const GUARD = fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url));
+ const root = mkdtempSync(join(tmpdir(), "btm-d1-linked-")), primary = join(root, "primary"), target = join(root, "target");
+ const git = (cwd, ...args) => spawnSync("git", args, { cwd, encoding: "utf8" });
+@@ -39,7 +39,10 @@ const completionCases = [
+   const targetActive = targetController.applyDecision(targetPlan, { activate: true, planSha256: targetPlan.planSha256 });
+   assert.equal(targetActive.state, "active");
+   assert.equal(targetActive.requiresEnforcement, true);
+-  writeFileSync(join(target, "README.md"), "B\n"); git(target, "commit", "-qam", "B"); b = git(target, "rev-parse", "HEAD").stdout.trim(); a = git(primary, "rev-parse", "HEAD").stdout.trim();
++  writeFileSync(join(target, "README.md"), "B\n"); git(target, "commit", "-qam", "B");
++  // The pushed commit (target tip) carries an approved low-rigor plan state, so the publication-review duty is waived and
++  // WTB002/WTB003 reach the evidence binding they test; the primary tip stays bare (it is never the pushed source).
++  b = commitApprovedMiniFixtureState(target); a = git(primary, "rev-parse", "HEAD").stdout.trim();
+   const listed = git(primary, "worktree", "list", "--porcelain").stdout; assert.ok(listed.includes(primary) && listed.includes(target));
+   assert.equal(git(primary, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.trim(), git(target, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.trim());
+   assert.notEqual(git(primary, "rev-parse", "--path-format=absolute", "--git-dir").stdout.trim(), git(target, "rev-parse", "--path-format=absolute", "--git-dir").stdout.trim());
