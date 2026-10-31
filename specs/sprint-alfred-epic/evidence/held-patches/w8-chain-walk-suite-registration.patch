@@ -1,3 +1,15 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index e3dbdbac7..226da153c 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -714,6 +714,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-consumer-approved-plan-reaches-the-first-item-host-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-consumer-spec-criterion-binds-the-first-item-delivery-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-critic-course-consumer-chain-walk-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-critic-round-cap-and-delta-scope-are-not-enforced-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-critic-scratch-notes-write-is-refused-again-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-cross-runner-chat-intake-reference-needs-host-capture-tests",
 diff --git a/harness/verify-suites.json b/harness/verify-suites.json
 index 68d6adfbe..385944bbc 100644
 --- a/harness/verify-suites.json
