@@ -1,0 +1,42 @@
+diff --git a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
+index e33c93f10..05516d4c5 100644
+--- a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
++++ b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+-import { mkdirSync, lstatSync, realpathSync, readFileSync, readdirSync } from 'node:fs';
++import { mkdirSync, lstatSync, realpathSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+ import { join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { createHash } from 'node:crypto';
+@@ -63,6 +63,29 @@ export function prepareStoppedClaudeProject() {
+   cli(['intake-design-questions-apply', '--root', root, '--runner', 'claude', '--answers-json', '{"disposition":"no-open-questions"}', '--activate']);
+   const generatedPlan = cli(['intake-generate-plan', '--root', root, '--runner', 'claude', '--verbose']);
+   returned(generatedPlan.nextAction, 'intake-generate-apply');
++  // Since 5e939278b the generated staging PRD and Spec must be authored before bootstrap binding is offered
++  // (stagingDesignNeedsAuthoring); the fixture authors the minimal package the way project-onboarding-e2e.test.mjs does.
++  const draft = cli(['inspect', '--root', root, '--runner', 'claude', '--intent', 'session']);
++  assert.equal(draft.nextAction?.kind, 'design-authoring-required');
++  const prdFile = join(root, draft.nextAction.prdPath), specFile = join(root, draft.nextAction.specPath);
++  const draftPrd = readFileSync(prdFile, 'utf8'), draftSpec = readFileSync(specFile, 'utf8');
++  const draftSpecDigest = draftPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
++  assert.match(draftSpecDigest ?? '', /^[a-f0-9]{64}$/u);
++  const skeletonCriterion = '| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |';
++  const skeletonTraceability = '| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |';
++  assert.ok(draftSpec.includes(skeletonCriterion) && draftSpec.includes(skeletonTraceability));
++  const authoredSpec = draftSpec
++    .replace(skeletonCriterion, '| AC-1 | WHEN a report is requested, the system SHALL print the public text report. | tests/report.test.mjs |')
++    .replace(skeletonTraceability, '| design-input.md | The public text report is printed. | AC-1 | tests/report.test.mjs |');
++  const authoredPrd = draftPrd
++    .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, '')
++    .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Public text report."')
++    .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the whole report."')
++    .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "public-report"')
++    .replace(draftSpecDigest, createHash('sha256').update(Buffer.from(authoredSpec)).digest('hex'));
++  assert.notEqual(authoredPrd, draftPrd);
++  writeFileSync(specFile, authoredSpec);
++  writeFileSync(prdFile, authoredPrd);
+   const observed = cli(['inspect', '--root', root, '--runner', 'claude', '--intent', 'session']);
+   assert.equal(observed.status, 'bootstrap-binding-required');
+   assert.equal(observed.root, realpathSync(root));
