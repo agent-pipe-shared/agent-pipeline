@@ -151,7 +151,8 @@ test("P5: the real CLI prints scanner lines in the formatter shape and the verdi
   assert.ok(res.status === 0 || res.status === 1 || res.status === 2, `cli exit ${res.status}: ${res.stderr}`);
   const out = res.stdout;
   assert.match(out, /^semgrep: \S+ \[[^\]]+\] \(\d+ findings\)/m);
-  assert.match(out, /^Verdict: (CLEAN|WARNING|BLOCKING) /m);
+  // PATH is emptied above, so the scanner is not found: the verdict is INCOMPLETE (or PARTIAL where a scanner still ran), never a clean pass.
+  assert.match(out, /^Verdict: (CLEAN|WARNING|BLOCKING|INCOMPLETE|PARTIAL) /m);
 });
 
 test("cleanup fixtures (best effort: scratch/ is gitignored; host may refuse deleting read-only git objects)", () => {

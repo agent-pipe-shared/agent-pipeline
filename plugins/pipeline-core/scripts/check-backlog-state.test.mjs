@@ -425,7 +425,13 @@ try {
       acceptedLostReconciliationBatch.map((entry) => entry.finding),
       // The rebased ledger has been reconciled; a historical exception is not
       // itself evidence that the current checkout still has unreachable OIDs.
-      [],
+      // D222 (2026-10-31): the PO accepted the two events whose evidence commit
+      // never reached this checkout (2356, 2358) as lost reconciliation, so
+      // exactly those two stay reported as accepted drift.
+      [
+        "ledger event 2356: evidence.commit is not a reachable local Git commit",
+        "ledger event 2358: evidence.commit is not a reachable local Git commit",
+      ],
     );
     assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
   });

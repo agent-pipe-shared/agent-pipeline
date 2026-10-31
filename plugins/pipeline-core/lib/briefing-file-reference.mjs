@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // D183: a Claude Agent dispatch prompt may carry the generator marker line and ONE pointer line
 //   pipeline-briefing-file: <repository-relative path> sha256=<digest>
 // instead of the full generated briefing. This pure module parses the pointer and loads the verified file text;

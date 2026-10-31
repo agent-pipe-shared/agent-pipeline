@@ -248,7 +248,7 @@ function binaryContainsAny(path, needles) {
 
 const HOOKS_ANCHOR = [
   '            "command": "node \\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\\"",\n',
-  '            "timeout": 120\n',
+  '            "timeout": 330\n',
   "          }\n",
   "        ]\n",
   "      },\n",

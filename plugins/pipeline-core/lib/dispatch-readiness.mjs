@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Aggregate dispatch readiness (G18 Slice A). Pure: every probe is an injected observer.
 // A probe is { area, observe() } where observe() returns { ok: true } or { code, nextAction }.
 // All failing probes are listed in input order; a probe never aborts the assessment.

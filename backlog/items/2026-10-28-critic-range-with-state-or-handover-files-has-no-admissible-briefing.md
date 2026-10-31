@@ -4,6 +4,7 @@ id: pipeline.critic-range-with-state-or-handover-files-has-no-admissible-briefin
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-10-28
 sprint: alfred
 source: "Hit live, 2026-10-28, by a consumer repository: a feature-course Critic stopped with a briefing violation before reading anything; checked afterwards against templates/prompts/critic-review.md, harness/review-protocol.md section 2.2 and roles/critic.md."

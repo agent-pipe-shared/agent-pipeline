@@ -122,7 +122,27 @@
           "TCP030",
           "TCP031",
           "TCP032",
-          "TCP033"
+          "TCP033",
+          "TCP034",
+          "TCP035",
+          "TCP036",
+          "TCP037",
+          "TCP038",
+          "TCP039",
+          "TCP040",
+          "TCP041",
+          "TCP042",
+          "TCP043",
+          "TCP044",
+          "TCP045",
+          "TCP046",
+          "TCP047",
+          "TCP048",
+          "TCP049",
+          "TCP050",
+          "TCP051",
+          "TCP052",
+          "TCP053"
         ],
         "maxBytes": 65536
       }
@@ -214,9 +234,13 @@
           "DABX005",
           "DABX006",
           "DABX007",
-          "DABX008"
+          "DABX008",
+          "DABX009",
+          "DABX010",
+          "DABX011",
+          "DABX012"
         ],
-        "maxBytes": 16384
+        "maxBytes": 65536
       }
     },
     {
@@ -277,6 +301,11 @@
       "caseCompletion": {
         "schema": "pipeline.verify-case-completion-policy.v1",
         "caseIds": [
+          "D177-a-memo-per-admission",
+          "D177-b-member-records-once-per-admission",
+          "D177-c-batch-member-records-equal-single",
+          "D177-differential-settled",
+          "D177-slow-phase-releases-lock",
           "NGHS01",
           "NGHS02",
           "NGHS03",
@@ -295,7 +324,47 @@
           "NGHS16",
           "NGHS17",
           "NGHS18",
-          "NGHS19"
+          "NGHS19",
+          "NGHS20",
+          "NGHS21",
+          "NGHS22",
+          "NGHS23",
+          "NGHS24",
+          "NGHS25",
+          "NGHS26",
+          "NGHS27",
+          "NGHS28",
+          "NGHS29",
+          "NGHS30",
+          "NGHS31",
+          "NGHS32",
+          "NGHS33",
+          "NGHS34",
+          "NGHS35",
+          "NGHS36",
+          "NGHS37",
+          "NGHS38",
+          "NGHS39",
+          "NGHS40",
+          "NGHS41",
+          "NGHS42",
+          "NGHS43",
+          "NGHS44",
+          "NGHS45",
+          "NGHS46",
+          "NGHS47",
+          "NGHS48",
+          "NGHS49",
+          "NGHS50",
+          "NGHS51",
+          "NGHS52",
+          "NGHS53",
+          "NGHS54",
+          "NGHS55",
+          "NGHS56",
+          "NGHS57",
+          "NGHS58",
+          "NGHS59"
         ],
         "maxBytes": 65536
       }
@@ -499,9 +568,36 @@
         "schema": "pipeline.verify-case-completion-policy.v1",
         "caseIds": [
           "NGHF01",
+          "NGHF01-DEEP",
+          "NGHF01-P3",
           "NGHF02",
           "NGHF03",
-          "NGHF04"
+          "NGHF04",
+          "NGHF05",
+          "NGHF06",
+          "NGHF07",
+          "NGHF08",
+          "NGHF09",
+          "NGHF10",
+          "NGHF11",
+          "NGHF12",
+          "NGHF13",
+          "NGHF14",
+          "NGHF15",
+          "NGHF16",
+          "NGHF17",
+          "NGHF18",
+          "NGHF18b",
+          "NGHF18c",
+          "NGHF19",
+          "NGHF20",
+          "NGHF21",
+          "NGHF22",
+          "NGHF23",
+          "NGHF24",
+          "NGHF25",
+          "NGHF26",
+          "NGHF27"
         ],
         "maxBytes": 65536
       }
@@ -606,6 +702,31 @@
           "CGB009",
           "CGB010",
           "CGB011",
+          "CGB012",
+          "CGB013",
+          "CGB014",
+          "CGB015",
+          "CGB016",
+          "CGB017",
+          "CGB018",
+          "CGB019",
+          "CGB020",
+          "CGB021",
+          "CGB022",
+          "CGB023",
+          "CGB024",
+          "CGB025",
+          "CGB026",
+          "CGB027",
+          "CGB028",
+          "CGB029",
+          "CGB030",
+          "CGB031",
+          "CGB032",
+          "CGB033",
+          "CGB034",
+          "CGB035",
+          "CGB036",
           "CGB037",
           "CGB038"
         ],
@@ -698,7 +819,23 @@
           "DLR033",
           "DLR034",
           "DLR035",
-          "DLR036"
+          "DLR036",
+          "DLR037",
+          "DLR038",
+          "DLR039",
+          "DLR040",
+          "DLR041",
+          "DLR042",
+          "DLR043",
+          "DLR044",
+          "DLR045",
+          "DLR046",
+          "DLR047",
+          "DLR048",
+          "DLR049",
+          "DLR050",
+          "DLR051",
+          "DLR052"
         ],
         "maxBytes": 65536
       }
@@ -907,7 +1044,8 @@
           "PCF033",
           "PCF034",
           "PCF035",
-          "PCF036"
+          "PCF036",
+          "PCF037"
         ],
         "maxBytes": 65536
       }
@@ -918,7 +1056,9 @@
       "caseCompletion": {
         "schema": "pipeline.verify-case-completion-policy.v1",
         "caseIds": [
-          "PHARI001"
+          "PHARI001",
+          "PHARI002",
+          "PHARI003"
         ],
         "maxBytes": 65536
       }
@@ -1061,7 +1201,9 @@
         "caseIds": [
           "GDM01",
           "GDM02",
-          "GDM03"
+          "GDM03",
+          "GDM04",
+          "GDM05"
         ],
         "maxBytes": 65536
       }
@@ -1111,7 +1253,18 @@
           "DMP003",
           "DMP004",
           "DMP005",
-          "DMP006"
+          "DMP006",
+          "DMP007",
+          "DMP008",
+          "DMP009",
+          "DMP010",
+          "DMP011",
+          "DMP012",
+          "DMP013",
+          "DMP014",
+          "DMP015",
+          "DMP016",
+          "DMP017"
         ],
         "maxBytes": 65536
       }
@@ -1131,7 +1284,37 @@
           "SAR07",
           "SAR08",
           "SAR09",
-          "SAR10"
+          "SAR10",
+          "SAR11",
+          "SAR12",
+          "SAR13",
+          "SAR14",
+          "SAR15",
+          "SAR16",
+          "SAR17",
+          "SAR18",
+          "SAR19",
+          "SAR20",
+          "SAR21",
+          "SAS01",
+          "SAS02",
+          "SAS03",
+          "SAS04",
+          "SAS05",
+          "SAS06",
+          "SAS07",
+          "SAS08",
+          "SAS09",
+          "SAS10",
+          "SAS11",
+          "SAS12",
+          "SAS13",
+          "SAS14",
+          "SAS15",
+          "SAS16",
+          "SAS17",
+          "SAS18",
+          "SAS19"
         ],
         "maxBytes": 65536
       }
@@ -1149,7 +1332,8 @@
           "GND005",
           "GND006",
           "GND007",
-          "GND008"
+          "GND008",
+          "GND009"
         ],
         "maxBytes": 65536
       }
@@ -1569,7 +1753,23 @@
           "OBC305",
           "OBC306",
           "OBC307",
-          "OBC308"
+          "OBC308",
+          "OBC309",
+          "OBC310",
+          "OBC311",
+          "OBC312",
+          "OBC313",
+          "OBC314",
+          "OBC315",
+          "OBC316",
+          "OBC317",
+          "OBC318",
+          "OBC319",
+          "OBC320",
+          "OBC321",
+          "OBC322",
+          "OBC323",
+          "OBC324"
         ],
         "maxBytes": 65536
       }
@@ -2267,6 +2467,292 @@
         "maxBytes": 65536
       },
       "previousPolicySha256": "7d8f44eb0fd795b4c1191c50bd3077593412291de402fdab28f3d9b544e73bfa"
+    },
+    {
+      "name": "native-goldfish-host-return-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHR01",
+          "NGHR02",
+          "NGHR03",
+          "NGHR04",
+          "NGHR05",
+          "NGHR06",
+          "NGHR07",
+          "NGHR08",
+          "NGHR09"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "0c71ffc24e73864142d2e1e498f88ece2cc02372ada9e358184c237b4211f5c1"
+    },
+    {
+      "name": "native-goldfish-host-commit-execution-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHC01",
+          "NGHC02",
+          "NGHC03",
+          "NGHC04",
+          "NGHC05",
+          "NGHC06",
+          "NGHC07"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "e1cacc0b56a2f35c6bde434ba7cd4ccac2d58e034576b5a3273951234abafb88"
+    },
+    {
+      "name": "security-scanner-diagnostics-tests",
+      "file": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G13D001",
+          "G13D002",
+          "G13D003",
+          "G13D004",
+          "G13D005",
+          "G13D006",
+          "G13D007",
+          "G13D008",
+          "G13D009",
+          "G13D010",
+          "G13D011",
+          "G13D012",
+          "G13D013",
+          "G13D014",
+          "G13D015",
+          "G13D016",
+          "G13D017",
+          "G13D018",
+          "G13D019",
+          "G13D020",
+          "G13D021",
+          "G13D022",
+          "G13D023",
+          "G13D024",
+          "G13D025",
+          "G13D026",
+          "G13D027",
+          "G13D028",
+          "G13D029",
+          "G13D030",
+          "G13D031",
+          "G13D032"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "917569eda892d43004893a058773e5d2f8d681bc0957e1c88db7da19c2d6a45b"
+    },
+    {
+      "name": "audit-pack-tests",
+      "file": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AUDPK001",
+          "AUDPK002",
+          "AUDPK003",
+          "AUDPK004",
+          "AUDPK005"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "6783f021b91181551f53f3a61693cefa7409224fd02b9119bfd3a7ef031bcb83"
+    },
+    {
+      "name": "guard-dispatch-budget-checkpoint-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GDBC01",
+          "GDBC02",
+          "GDBC03",
+          "GDBC04",
+          "GDBC05",
+          "GDBC06",
+          "GDBC07",
+          "GDBC08",
+          "GDBC09",
+          "GDBC10",
+          "GDBC11",
+          "GDBC12",
+          "GDBC13",
+          "GDBC14",
+          "GDBC15",
+          "GDBC16",
+          "GDBC17"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "f0fec1c695d45695bf7c42b25743dd7f91c87a6994db5dad489dba485a4d4361"
+    },
+    {
+      "name": "windows-authority-readiness-tests",
+      "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "WAR001",
+          "WAR002",
+          "WAR003",
+          "WAR004",
+          "WAR005",
+          "WAR006",
+          "WAR007",
+          "WAR008",
+          "WAR009",
+          "WAR010",
+          "WAR011",
+          "WAR012",
+          "WAR013",
+          "WAR014",
+          "WAR015",
+          "WAR016",
+          "WAR017",
+          "WAR018"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "134079dd4f20353556fbb5f0fb1021f5cd1bf81e4e4a6c5d5bb015216b9f8527"
+    },
+    {
+      "name": "po-human-approval-signing-handoff-tests",
+      "file": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHS001",
+          "PHS002",
+          "PHS003",
+          "PHS004",
+          "PHS005"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "3296d11fc9b8299491720967123600f0bcc73e4a9270307b09a81b85737c9e08"
+    },
+    {
+      "name": "current-session-artifact-export-tests",
+      "file": "plugins/pipeline-core/lib/current-session-artifact-export.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G13A001",
+          "G13A002",
+          "G13A003",
+          "G13A004",
+          "G13A005",
+          "G13A006",
+          "G13A007"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "72d461d271d62e0d1896c4cde4c4996584f3e30eff34d5e3f498134d89ed17db"
+    },
+    {
+      "name": "public-handover-duty-tests",
+      "file": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHD001",
+          "PHD002",
+          "PHD003",
+          "PHD004",
+          "PHD005",
+          "PHD006",
+          "PHD007",
+          "PHD008",
+          "PHD009",
+          "PHD010",
+          "PHD011"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "07950603a5b00c3fd299ab9b54742a41fd66dd97dfbf740bed2f2f82140424b5"
+    },
+    {
+      "name": "model-family-host-store-tests",
+      "file": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFHS001",
+          "MFHS002",
+          "MFHS003",
+          "MFHS004",
+          "MFHS005",
+          "MFHS006",
+          "MFHS007",
+          "MFHS008",
+          "MFHS009",
+          "MFHS010",
+          "MFHS011",
+          "MFHS012",
+          "MFHS013",
+          "MFHS014",
+          "MFHS015",
+          "MFHS016",
+          "MFHS017",
+          "MFHS018",
+          "MFHS019",
+          "MFHS020",
+          "MFHS021",
+          "MFHS022",
+          "MFHS023",
+          "MFHS024",
+          "MFHS025",
+          "MFHS026",
+          "MFHS027",
+          "MFHS028",
+          "MFHS029",
+          "MFHS030",
+          "MFHS031",
+          "MFHS032",
+          "MFHS033"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "8bb81e781d515407c22b048ce90f10301a3c25cfe4938be570bbb769def1cea1"
+    },
+    {
+      "name": "codex-advisor-execution-tests",
+      "file": "plugins/pipeline-core/lib/codex-advisor-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC06C001",
+          "RC06C002",
+          "RC06C003",
+          "RC06C004",
+          "RC06C005",
+          "RC06C006",
+          "RC06C007",
+          "RC06C008"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "2e43543da0924c3c52d8086e6d1a12700143e9eebdd7aabf4401031610d0e2b9"
+    },
+    {
+      "name": "design-workflow-package-v2-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC12C001",
+          "RC12C002"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "2d3dcca820d8757f48b8cb01e5bbbb2d7e868d50c2e519580a1b62cf186dd745"
     }
   ]
 }

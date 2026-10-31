@@ -37,6 +37,7 @@ import { appendEvent, fanoutStatePath, readEvents } from "../lib/fanout-ledger.m
 import { HANDBACK_OUTCOMES, loadSliceQueue } from "../lib/slice-queue.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
+import { buildGeneratedGoldfishBriefing, prepareGeneratedDispatchRoot } from "../lib/test-generated-goldfish-briefing-fixture.mjs";
 
 const gd = await import("./guard-dispatch.mjs");
 const dp = await import("../lib/dispatch-policy.mjs");
@@ -489,18 +490,29 @@ function requireEnrollment() {
   assert.equal(observeGovernanceScope({ rootDir: hookRepo }).requiresEnforcement, true, "the fixture repository must be governance-enrolled");
 }
 
-function runHook(c, prompt, config) {
-  writeFileSync(join(hookRepo, "slice-queue.json"), `${JSON.stringify(QUEUE, null, 2)}\n`);
-  const payload = { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt } };
-  const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo, PIPELINE_FANOUT_CONFIG: JSON.stringify({ queuePath: "slice-queue.json", commonDir: c.commonDir, ...config }) };
-  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
+// D185 (2026-10-29): a write-capable dispatch needs a Goldfish carrier and a briefing from the generator, which resolves against an approved
+// course, so each hook-level case runs in its own approved-course repository (an admitted dispatch reserves its slice and write scope) with
+// a generated briefing. The queue below declares B1 with its check file, because the briefing's write scope is its paths plus the check.
+const HOOK_QUEUE = queueOf([slice("A1", ["src/a/"]), slice("B1", ["src/a/x.mjs", "src/a/x.test.mjs"], ["A1"]), slice("C1", ["src/c/"])]);
+function hookBriefing(repo, sliceId, paths) {
+  const check = `${paths[0].replace(/\.mjs$/u, "")}.test.mjs`;
+  return buildGeneratedGoldfishBriefing(repo, sliceId, { paths, check, newFiles: [...paths, check] });
+}
+function hookPayload(repo, prompt) {
+  return { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: repo, tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt } };
+}
+function runHook(c, repo, prompt, config) {
+  writeFileSync(join(repo, "slice-queue.json"), `${JSON.stringify(HOOK_QUEUE, null, 2)}\n`);
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: repo, PIPELINE_FANOUT_CONFIG: JSON.stringify({ queuePath: "slice-queue.json", commonDir: c.commonDir, ...config }) };
+  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(hookPayload(repo, prompt)), env, encoding: "utf8", cwd: repo });
 }
 
 test("hook: shadow + overlap exits 0 and appends the launch", { skip: enrollmentSkip ?? false }, () => {
   requireEnrollment();
-  const c = makeCase("hook-shadow");
+  const c = makeCase("hook-shadow", HOOK_QUEUE);
   makeLive(c, "A1");
-  const result = runHook(c, overlapB1, {});
+  const repo = courseRepo("hook-shadow");
+  const result = runHook(c, repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]), {});
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stderr, /BLOCKED/u);
   assert.ok(ledger(c).some((e) => e.type === "launch" && e.sliceId === "B1"));
@@ -509,9 +521,10 @@ test("hook: shadow + overlap exits 0 and appends the launch", { skip: enrollment
 
 test("hook: enforce + overlap exits 2 naming FANOUT-SCOPE-OVERLAP and appends no launch", { skip: enrollmentSkip ?? false }, () => {
   requireEnrollment();
-  const c = makeCase("hook-enforce");
+  const c = makeCase("hook-enforce", HOOK_QUEUE);
   makeLive(c, "A1");
-  const result = runHook(c, declaredB1, { mode: "enforce" });
+  const repo = courseRepo("hook-enforce");
+  const result = runHook(c, repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]), { mode: "enforce" });
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /FANOUT-SCOPE-OVERLAP/u);
   assert.equal(ledger(c).filter((e) => e.type === "launch" && e.sliceId === "B1").length, 0);
@@ -519,9 +532,10 @@ test("hook: enforce + overlap exits 2 naming FANOUT-SCOPE-OVERLAP and appends no
 
 test("hook: enforce + the same slice already live exits 2 naming FANOUT-SLICE-NOT-READY", { skip: enrollmentSkip ?? false }, () => {
   requireEnrollment();
-  const c = makeCase("hook-not-ready");
+  const c = makeCase("hook-not-ready", HOOK_QUEUE);
   makeLive(c, "A1");
-  const result = runHook(c, `Implement it.\nSlice: A1\n${MODEL}Write scope: src/a/\n`, { mode: "enforce" });
+  const repo = courseRepo("hook-not-ready");
+  const result = runHook(c, repo, hookBriefing(repo, "A1", ["src/a/y.mjs"]), { mode: "enforce" });
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /FANOUT-SLICE-NOT-READY/u);
   assert.equal(ledger(c).filter((e) => e.type === "launch" && e.sliceId === "A1").length, 1, "only the fixture's own launch exists");
@@ -530,10 +544,11 @@ test("hook: enforce + the same slice already live exits 2 naming FANOUT-SLICE-NO
 test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentSkip ?? false }, () => {
   requireEnrollment();
   const c = makeCase("hook-noconfig");
-  const payload = { tool_name: "Agent", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: overlapB1 } };
-  const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo };
+  const repo = courseRepo("hook-noconfig");
+  const payload = hookPayload(repo, hookBriefing(repo, "B1", ["src/a/x.mjs"]));
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: repo };
   delete env.PIPELINE_FANOUT_CONFIG;
-  const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
+  const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: repo });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(ledgerPath(c)), false);
 });
@@ -543,25 +558,31 @@ test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentS
 // judged by the declared write scopes alone: no PIPELINE_FANOUT_CONFIG, no queue. The default is enforce; the explicit
 // switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. Each case uses its own enrolled repository, because an open
 // dispatch record of one case must not be seen by another.
-const goldfishTemplate = () => {
-  const raw = readFileSync(fileURLToPath(new URL("../../../templates/prompts/goldfish-task.md", import.meta.url)), "utf8");
-  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
-  return raw.slice(raw.indexOf(marker) + marker.length)
-    .replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
-    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses")
-    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
-};
-const scoped = (id, scope) => `${goldfishTemplate()}\n${id === null ? "" : `Slice: ${id}\n`}${scope === null ? "" : `Write scope: ${scope}\n`}`;
+// D185 (2026-10-29): every productive Goldfish dispatch is admitted only with a briefing from the generator, which resolves against an
+// approved course. A batch (several dispatches in one call, the Antigravity and Workflow shape) has no item reservation adapter, so an
+// item-governed repository refuses it as a class (SQ-NATIVE-ITEM-ADMISSION-REQUIRED); the K93 cases therefore dispatch into an enrolled
+// repository that is NOT item governed (the shape guard-dispatch.test.mjs uses for its other batch cases), with briefings that the real
+// generator rendered in one approved-course repository. The briefing's write scope is the package paths plus its check file, so the
+// check is named per slice (inside no overlapping scope) and, like a scope the dispatch creates, listed as a new file.
+const scopeRepos = [];
+process.once("exit", () => { for (const repo of scopeRepos) rmSync(repo, { recursive: true, force: true }); });
+function courseRepo(name) {
+  const repo = prepareGeneratedDispatchRoot(`fanout-${name}-`);
+  scopeRepos.push(repo);
+  return repo;
+}
 function scopeRepo(name) {
   const repo = join(root, name);
   mkdirSync(join(repo, ".claude"), { recursive: true });
   execFileSync("git", ["init", "-q"], { cwd: repo });
   recordConsentGiven({ rootDir: repo });
-  // Enrolled but NOT item governed (the shape guard-dispatch.test.mjs uses for its productive Goldfish cases).
+  // Enrolled but NOT item governed.
   writeFileSync(join(repo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   writeFileSync(join(repo, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
   return repo;
 }
+let generatorRoot = null;
+const scoped = (id, paths) => buildGeneratedGoldfishBriefing(generatorRoot ??= courseRepo("generator"), id, { paths, check: `k93/${id}.test.mjs`, newFiles: [...paths, `k93/${id}.test.mjs`] });
 function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
   const Subagents = prompts.map((Prompt) => ({ TypeName: "pipeline-core:goldfish-implementor", Prompt }));
   const payload = { tool_name: "invoke_subagent", tool_use_id: "toolu_k93", session_id: SESSION, cwd: repo, tool_input: { Subagents, ...toolInput } };
@@ -573,7 +594,7 @@ function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
 
 test("K93 hook: two dispatches of one call with overlapping write scopes are refused by default, without a queue, naming both, the paths and the repair", { skip: enrollmentSkip ?? false }, () => {
   const repo = scopeRepo("k93-enforce");
-  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs, src/shared/b.mjs, src/own/x.mjs"), scoped("K93-BETA", "src/shared/")]);
+  const result = runBatch(repo, [scoped("K93-ALPHA", ["src/shared/a.mjs", "src/shared/b.mjs", "src/own/x.mjs"]), scoped("K93-BETA", ["src/shared"])]);
   assert.equal(result.status, 2, result.stderr);
   for (const needle of ["GUARD-DISPATCH-SCOPE-OVERLAP", "K93-ALPHA", "K93-BETA", "src/shared/a.mjs", "src/shared/b.mjs", "isolation: \"worktree\"", "PIPELINE_FANOUT_SCOPE_MODE=shadow"]) {
     assert.ok(result.stderr.includes(needle), `stderr must name ${needle}: ${result.stderr.slice(0, 900)}`);
@@ -586,7 +607,7 @@ test("K93 hook: two dispatches of one call with overlapping write scopes are ref
 test("K93 hook: more than five overlapping paths name the first five and then a count", { skip: enrollmentSkip ?? false }, () => {
   const repo = scopeRepo("k93-many");
   const files = Array.from({ length: 8 }, (_, i) => `src/m/f${i}.mjs`);
-  const result = runBatch(repo, [scoped("K93-M1", files.join(", ")), scoped("K93-M2", "src/m/")]);
+  const result = runBatch(repo, [scoped("K93-M1", files), scoped("K93-M2", ["src/m"])]);
   assert.equal(result.status, 2, result.stderr);
   assert.ok(result.stderr.includes("src/m/f4.mjs") && !result.stderr.includes("src/m/f5.mjs"), result.stderr.slice(0, 900));
   assert.match(result.stderr, /and 3 more/u);
@@ -594,30 +615,30 @@ test("K93 hook: more than five overlapping paths name the first five and then a 
 
 test("K93 hook: the explicit shadow switch admits the same overlap with a warning that names the paths", { skip: enrollmentSkip ?? false }, () => {
   const repo = scopeRepo("k93-shadow");
-  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs"), scoped("K93-BETA", "src/shared/")], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
+  const result = runBatch(repo, [scoped("K93-ALPHA", ["src/shared/a.mjs"]), scoped("K93-BETA", ["src/shared"])], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
   assert.ok(result.stderr.includes("src/shared/a.mjs"));
 });
 
 test("K93 hook: disjoint write scopes, and an isolated call, are admitted without a scope finding", { skip: enrollmentSkip ?? false }, () => {
-  const disjoint = runBatch(scopeRepo("k93-disjoint"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", "src/b/")]);
+  const disjointRepo = scopeRepo("k93-disjoint");
+  const disjoint = runBatch(disjointRepo, [scoped("K93-ALPHA", ["src/a"]), scoped("K93-BETA", ["src/b"])]);
   assert.equal(disjoint.status, 0, disjoint.stderr);
   assert.doesNotMatch(disjoint.stderr, /GUARD-DISPATCH-SCOPE/u);
-  const isolated = runBatch(scopeRepo("k93-isolated"), [scoped("K93-ALPHA", "src/s/"), scoped("K93-BETA", "src/s/")], { toolInput: { isolation: "worktree" } });
+  const isolatedRepo = scopeRepo("k93-isolated");
+  const isolated = runBatch(isolatedRepo, [scoped("K93-ALPHA", ["src/s"]), scoped("K93-BETA", ["src/s"])], { toolInput: { isolation: "worktree" } });
   assert.equal(isolated.status, 0, isolated.stderr);
   assert.doesNotMatch(isolated.stderr, /GUARD-DISPATCH-SCOPE/u);
 });
 
-test("K93 hook: a scope that cannot be read warns only, in a batch and against an open record", { skip: enrollmentSkip ?? false }, () => {
-  const batch = runBatch(scopeRepo("k93-unknown-batch"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", null)]);
-  assert.equal(batch.status, 0, batch.stderr);
-  assert.match(batch.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
-  assert.ok(batch.stderr.includes("K93-BETA"));
+// D185: a generated briefing always carries a write scope, so the "briefing without a scope" half of this case (a batch member the
+// guard cannot read) has no admitted shape any more; the open dispatch record without a scope still does.
+test("K93 hook: an open dispatch record whose scope cannot be read warns only", { skip: enrollmentSkip ?? false }, () => {
   const repo = scopeRepo("k93-unknown-record");
   mkdirSync(join(repo, "evidence"), { recursive: true });
   writeFileSync(join(repo, "evidence", "dispatch-record-K93-OPEN.json"), JSON.stringify({ taskId: "K93-OPEN", outcome: "in-progress" }));
-  const record = runBatch(repo, [scoped("K93-ALPHA", "src/a/")]);
+  const record = runBatch(repo, [scoped("K93-ALPHA", ["src/a"]), scoped("K93-BETA", ["src/b"])]); // two members: a single dispatch would be bound to the generator repository HEAD
   assert.equal(record.status, 0, record.stderr);
   assert.match(record.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
   assert.ok(record.stderr.includes("K93-OPEN"));

@@ -4,6 +4,7 @@ id: pipeline.push-review-waiver-has-no-committed-approval-evidence
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 release: 0.7.0
 created: 2026-10-31
 sprint: alfred

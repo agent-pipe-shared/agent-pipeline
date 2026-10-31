@@ -248,10 +248,15 @@ function freshGeneratedConsumerFixture() {
     const originalMaterial = "Document the original fixture material only.\n";
     // The public route captures original material before its first restart;
     // follow the producer's returned action rather than assuming runtime first.
-    const consented = applyCollectedOnboardingAction(root, portable, {
+    // G15 / D210: the first round is one merged ask; the intake consent step travels as its `precedingApplyAction`
+    // (it also captures the original material), the typed initial-answers command stays unexecuted as before.
+    const mergedAsk = portable.nextAction?.pendingAsks?.find((candidate) => candidate?.precedingApplyAction !== undefined);
+    const consentStep = mergedAsk === undefined ? portable : { nextAction: { kind: "collect-input", applyAction: mergedAsk.precedingApplyAction } };
+    const consented = applyCollectedOnboardingAction(root, consentStep, {
       "<PO_INTAKE_GIT_AUTHOR_NAME>": "Greenfield Fixture",
       "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "greenfield@example.invalid",
       "<PO_INTAKE_LANGUAGE>": "en",
+      "<de|en>": "en",
       "<PO_INTAKE_PROFILE>": "feature",
     }, originalMaterial);
     const runtimePlan = runOnboarding(root, ["plan-runtime", "--root", root, "--runner", "codex"]);
@@ -499,8 +504,24 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     const prdPath = join(created.root, prd);
     const specPath = join(created.root, spec);
     const scratchPath = join(created.root, "scratch", "nested", "greenfield-boundary.md");
-    const prdBytes = `${readFileSync(prdPath, "utf8")}\nReviewed fixture wording.\n`;
-    const specBytes = `${readFileSync(specPath, "utf8")}\nReviewed fixture specification.\n`;
+    // Since 5e939278b the generated staging PRD and Spec must be authored (draft framing and REPLACE markers removed) before
+    // bootstrap binding is offered, so the persisted bytes are the minimal authored package the way project-onboarding-e2e.test.mjs writes it.
+    const draftPrd = readFileSync(prdPath, "utf8");
+    const draftSpec = readFileSync(specPath, "utf8");
+    const draftSpecDigest = draftPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+    assert.match(draftSpecDigest ?? "", /^[a-f0-9]{64}$/u);
+    const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
+    const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
+    assert.ok(draftSpec.includes(skeletonCriterion) && draftSpec.includes(skeletonTraceability));
+    const specBytes = draftSpec
+      .replace(skeletonCriterion, "| AC-1 | WHEN a guard fixture is requested, the system SHALL admit generated staging authoring. | tests/guard.test.mjs |")
+      .replace(skeletonTraceability, "| design-input.md | Generated staging authoring is admitted. | AC-1 | tests/guard.test.mjs |");
+    const prdBytes = draftPrd
+      .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
+      .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Guard fixture."')
+      .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the fixture."')
+      .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "guard-fixture"')
+      .replace(draftSpecDigest, sha256(specBytes));
     const scratchBytes = "bounded scratch evidence\n";
     writeFileSync(prdPath, prdBytes, "utf8");
     writeFileSync(specPath, specBytes, "utf8");
@@ -509,17 +530,7 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     assert.equal(readFileSync(prdPath, "utf8"), prdBytes);
     assert.equal(readFileSync(specPath, "utf8"), specBytes);
     assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
-    const markerPending = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
-    assert.equal(markerPending.status, "bootstrap-binding-required", JSON.stringify(markerPending));
-    assert.equal(markerPending.nextAction?.kind, "command", JSON.stringify(markerPending));
-    assert.equal(markerPending.nextAction.argv[1], "intake-spec-marker-apply", JSON.stringify(markerPending));
-    assert.equal(markerPending.nextAction.requiresConfirmation, false);
-    const markerDigestIndex = markerPending.nextAction.argv.indexOf("--plan-sha256");
-    assert.notEqual(markerDigestIndex, -1);
-    assert.match(markerPending.nextAction.argv[markerDigestIndex + 1], /^[a-f0-9]{64}$/u);
-    const markerRepaired = followOnboardingAction(created.root, markerPending, "intake-spec-marker-apply");
-    assert.equal(markerRepaired.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
-    assert.equal(markerRepaired.status, "applied", JSON.stringify(markerRepaired));
+    // The authored package carries its Spec digest, so no marker repair step is offered between authoring and binding.
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
     // This fixture uses the "feature" intake profile. Since 1bd1d7bf6 a feature/epic

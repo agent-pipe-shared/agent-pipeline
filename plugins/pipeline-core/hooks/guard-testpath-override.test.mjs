@@ -388,7 +388,8 @@ try {
     assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "signature mode must offer the signed route");
     assert.match(stderr, /authorize-by-signature\b/u);
     assert.doesNotMatch(stderr, /--activate\b/u, "signature mode must not offer the in-session activate step");
-    assert.match(stderr, /outside\s+this session/u);
+    // The signing itself happens outside the session: the person receives exactly one sign-intent command after the agent's prepare step.
+    assert.match(stderr, /prepare-for-signature \(it needs no external key[^)]*\); the person then receives exactly one sign-intent command/u);
   });
 
   check("OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route", () => {

@@ -21,13 +21,15 @@ export function prepareGeneratedDispatchRoot(prefix = "generated-dispatch-") {
 /**
  * Build one generated Goldfish briefing for `sliceId` in `root`. `goal` varies the bytes of the briefing without changing its slice
  * (an amended re-dispatch); the generator runs in process with an injected ruleset identity and route (no real plugin registry).
+ * `check` is the binding check file and, with `paths`, the briefing's write scope: two slices with disjoint scopes need disjoint checks.
+ * A path the package names must exist unless it is listed in `newFiles` (a scope the dispatch is to create).
  */
-export function buildGeneratedGoldfishBriefing(root, sliceId, { goal = "Fixture goal text.", paths = ["src/change.mjs"] } = {}) {
+export function buildGeneratedGoldfishBriefing(root, sliceId, { goal = "Fixture goal text.", paths = ["src/change.mjs"], check = "src/change.test.mjs", newFiles } = {}) {
   const packagePath = `scratch/pkg-${sliceId}.json`;
   writeFileSync(join(root, packagePath), JSON.stringify({
     id: sliceId, item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", modelId: "claude-sonnet-5-5", modelWhy: "role default",
-    check: "src/change.test.mjs", paths, spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal,
-    context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+    check, paths, ...(newFiles === undefined ? {} : { newFiles }), spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal,
+    context: ["`src/change.mjs` -- the module."], targeted: [`\`node --test ${check}\` (green)`], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
   }));
   const built = runDispatchBriefing(["build", "--root", root, "--package", packagePath], {
     observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),

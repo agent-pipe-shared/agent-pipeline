@@ -725,9 +725,13 @@ for (const [name, source] of [
     p.worktypes.mini.design_phase.effort === "high" && p.worktypes.mini.execution_phase.effort === "high",
   );
   ok("applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness, models UNCHANGED)", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
+  // D184 moved the direct Deep default to high; the legacy migration preset keeps its historical xhigh, so parity is asserted with that one delta named.
+  const defaults = buildDefaultAnswers();
   ok(
-    "applyAboPreset max: matches buildDefaultAnswers() worktypes + models",
-    JSON.stringify(p.worktypes) === JSON.stringify(buildDefaultAnswers().worktypes) && JSON.stringify(p.models) === JSON.stringify(buildDefaultAnswers().models),
+    "applyAboPreset max: matches buildDefaultAnswers() worktypes + models, except the Deep effort D184 lowered on the direct default (legacy preset xhigh, default high)",
+    defaults.models.deep.effort === "high" &&
+      JSON.stringify(p.worktypes) === JSON.stringify(defaults.worktypes) &&
+      JSON.stringify({ ...p.models, deep: { ...p.models.deep, effort: "high" } }) === JSON.stringify(defaults.models),
   );
 }
 {
@@ -855,7 +859,8 @@ for (const [name, source] of [
   ok(
     "resolveRoutingAnswers: fresh install (defaults as previous) + empty answers == applyAboPreset('max') (no-op vs. old behaviour)",
     JSON.stringify(resolved.worktypes) === JSON.stringify(applyAboPreset("max").worktypes) &&
-      JSON.stringify(resolved.models) === JSON.stringify(applyAboPreset("max").models),
+      JSON.stringify({ ...resolved.models, deep: { ...resolved.models.deep, effort: "xhigh" } }) === JSON.stringify(applyAboPreset("max").models) &&
+      resolved.models.deep.effort === "high",
   );
 }
 
@@ -1199,7 +1204,7 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
   );
   ok(
     "renderPipelineYaml: goldfish_deep mirrors direct deep duty (MP-27 3-tier completeness)",
-    /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: xhigh/.test(yaml),
+    /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: high/.test(yaml),
     yaml,
   );
   ok(

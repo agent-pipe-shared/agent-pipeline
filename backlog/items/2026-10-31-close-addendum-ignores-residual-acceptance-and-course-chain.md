@@ -4,6 +4,7 @@ id: pipeline.close-addendum-ignores-residual-acceptance-and-course-chain
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 release: 0.7.0
 created: 2026-10-31
 sprint: alfred
