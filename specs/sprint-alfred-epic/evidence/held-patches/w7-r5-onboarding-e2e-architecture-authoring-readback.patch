@@ -1,0 +1,235 @@
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index 10913131f..1207028e2 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -50,9 +50,9 @@ import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy
+ import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+ import { verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
+-import { observeOnboardingBootstrapPlanApproval, readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
++import { observeOnboardingBootstrapPlanApproval, planOnboardingBootstrapBind, readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
+ import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
+-import { renderArchitectureDesignSkeleton } from "../lib/design-authoring.mjs";
++import { renderArchitectureDesignSkeleton, stagingDesignNeedsAuthoring } from "../lib/design-authoring.mjs";
+ // This fixture exercises historical v1 admission, not v2 initial provenance.
+ import { coordinateLegacyDesignAdvisory as coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
+ import {
+@@ -1238,69 +1238,129 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
+       ]), path, env);
+ 
+-      // Applying the answers leaves initialization on the returned driver
+-      // chain. Advance that chain to its explicit architecture authoring stop
+-      // before observing the state and generated PRD it actually materializes.
++      // Contract change (5e939278b, stagingDesignNeedsAuthoring; sibling pins: codex-pretool-guard.test.mjs,
++      // project-onboarding-v3.test.mjs): the generated PRD and Spec must be authored before bootstrap binding, so the
++      // returned chain stops at `design-authoring-required` BEFORE the pipeline-state inspect that publishes
++      // `repair-required` / ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE; that readback is asserted after the first authoring pass.
+       const architectureAuthoring = freshDriver(path, runner, env, privateKey);
+       assert.equal(architectureAuthoring.outcome, "unsupported-next-action",
+-        `${runner}: the returned driver stops for architecture authoring ${JSON.stringify(architectureAuthoring)}`);
+-      const architectureAuthoringAction = architectureAuthoring.final?.nextAction;
+-      assert.deepEqual({ kind: architectureAuthoringAction?.kind, code: architectureAuthoringAction?.code },
+-        { kind: "repair-required", code: "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE" },
+-        `${runner}: returned architecture authoring readback ${JSON.stringify(architectureAuthoring)}`);
+-      assert.equal(architectureAuthoring.final.status, "draft");
+-      assert.equal(architectureAuthoring.final.planApproved, false);
+-      assert.deepEqual(architectureAuthoring.final.lifecycle,
+-        { ok: true, code: "PLAN-LIFECYCLE-CURRENT", status: "draft" },
+-        `${runner}: the unfinished architecture draft is anchored to the current lifecycle`);
++        `${runner}: the returned driver stops for design authoring ${JSON.stringify(architectureAuthoring)}`);
++      const designAuthoringAction = architectureAuthoring.final?.nextAction;
++      assert.equal(architectureAuthoring.final?.schema, "pipeline.onboarding-intake-generate-apply.v1");
++      assert.equal(designAuthoringAction?.kind, "design-authoring-required",
++        `${runner}: returned design authoring readback ${JSON.stringify(architectureAuthoring)}`);
++      assert.equal(designAuthoringAction.mutation, false);
++      assert.equal(designAuthoringAction.requiresConfirmation, false);
++      assert.equal(designAuthoringAction.prdPath, architectureAuthoring.final.targets.prd.path);
++      assert.equal(designAuthoringAction.specPath, architectureAuthoring.final.targets.spec.path);
+       assert.equal(architectureAuthoring.steps.some((step) => ["submit-plan", "present-plan", "approve-plan"].includes(step.argv[1])), false,
+         `${runner}: authoring is reached without an early submission, presentation or PO signature`);
+-      const architectureInspectStep = architectureAuthoring.steps.at(-1);
+-      assert.equal(architectureInspectStep?.argv?.[1], "inspect");
+-      const stateScript = architectureInspectStep.argv[0];
+-      assert.equal(stateScript.endsWith("pipeline-state.mjs"), true);
++      // Inspecting again returns the lifecycle form of the same stop instead of offering to bind unauthored bytes.
++      const reinspectedStop = freshDriver(path, runner, env, privateKey);
++      assert.equal(reinspectedStop.outcome, "unsupported-next-action", `${runner}: ${JSON.stringify(reinspectedStop)}`);
++      assert.equal(reinspectedStop.final?.status, "bootstrap-binding-required");
++      assert.deepEqual({ kind: reinspectedStop.final.nextAction?.kind, prdPath: reinspectedStop.final.nextAction?.prdPath,
++        specPath: reinspectedStop.final.nextAction?.specPath },
++      { kind: "design-authoring-required", prdPath: designAuthoringAction.prdPath, specPath: designAuthoringAction.specPath });
++      assert.equal(reinspectedStop.steps.some((step) => ["submit-plan", "present-plan", "approve-plan"].includes(step.argv[1])), false);
+       const stateDriver = publicDriverRun(path, []);
+-      const beforeArchitectureSubmission = readFixtureState(path);
+-      assert.equal(beforeArchitectureSubmission.planSubmission, undefined,
+-        `${runner}: architecture is authored before plan submission`);
+-      assert.equal(beforeArchitectureSubmission.planPresentation, undefined,
+-        `${runner}: architecture authoring creates no presentation or signature request`);
+-      const prdPath = beforeArchitectureSubmission.activeFeature?.planPath;
+-      assert.equal(typeof prdPath, "string", "the initialized design state names its exact generated PRD");
+-      assert.equal(prdPath, architectureAuthoring.final.activeFeature?.planPath,
+-        `${runner}: the canonical state names the PRD anchored by the returned authoring readback`);
++      assert.deepEqual(readPipelineState(path), { status: "absent" },
++        `${runner}: architecture is authored before any state, plan submission, presentation or signature request exists`);
++      const prdPath = designAuthoringAction.prdPath;
++      assert.equal(typeof prdPath, "string", "the design authoring stop names its exact generated PRD");
+       const prdFile = join(path, prdPath);
+       assert.equal(existsSync(prdFile), true, "the named generated PRD exists before it may be edited");
+       const generatedPrdBeforeRefusal = readFileSync(prdFile, "utf8");
+       const refusalSourceMatch = generatedPrdBeforeRefusal.match(/^- Source: `(specs\/[^`\n]+\/design-input\.md)` \(sha256:([a-f0-9]{64})\)/mu);
+-      assert.ok(refusalSourceMatch,
+-        `${runner}: the pre-submit refusal fixture references the intake provenance record`);
++      assert.ok(refusalSourceMatch, `${runner}: the pre-submit refusal fixture references the intake provenance record`);
+       assert.equal(refusalSourceMatch[2], sha256(readFileSync(join(path, refusalSourceMatch[1]))),
+         `${runner}: the Source line carries the exact digest of the generated provenance record`);
+-      assert.match(generatedPrdBeforeRefusal, /## Sanitised input summary \(agent-authored\)/u,
+-        `${runner}: the pre-submit refusal fixture reserves the sanitised-summary section`);
+-      assert.doesNotMatch(generatedPrdBeforeRefusal, /## Captured material input|mini HTML game/u,
+-        `${runner}: the pre-submit refusal fixture does not repeat the original intake material`);
++      assert.match(generatedPrdBeforeRefusal, /## Sanitised input summary \(agent-authored\)/u, `${runner}: the pre-submit refusal fixture reserves the sanitised-summary section`);
++      assert.doesNotMatch(generatedPrdBeforeRefusal, /## Captured material input|mini HTML game/u, `${runner}: the pre-submit refusal fixture does not repeat the original intake material`);
+       const refusalSpecDigest = generatedPrdBeforeRefusal.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+-      assert.match(refusalSpecDigest ?? "", /^[a-f0-9]{64}$/u,
+-        `${runner}: the generated PRD already carries its Spec binding`);
+-      const untouchedDraftSubmit = stateDriver(architectureInspectStep.executable,
+-        [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
+-      assert.equal(untouchedDraftSubmit.status, 2,
+-        `${runner}: submit-plan rejects the untouched reserved architecture draft`);
+-      assert.match(untouchedDraftSubmit.stderr, /ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE/u);
+-      const afterUntouchedDraftSubmission = readFixtureState(path);
+-      assert.equal(afterUntouchedDraftSubmission.planSubmission, undefined,
+-        `${runner}: the untouched draft rejection records no submission`);
+-      assert.equal(afterUntouchedDraftSubmission.planPresentation, undefined,
+-        `${runner}: the untouched draft rejection creates no presentation or signature request`);
++      assert.match(refusalSpecDigest ?? "", /^[a-f0-9]{64}$/u, `${runner}: the generated PRD already carries its Spec binding`);
++      // The untouched draft is refused by the bind planner (5e939278b) before any feature is bound or plan submitted.
++      const specFileBeforeAuthoring = join(path, designAuthoringAction.specPath);
++      const generatedSpecBeforeRefusal = readFileSync(specFileBeforeAuthoring, "utf8");
++      assert.equal(stagingDesignNeedsAuthoring(generatedPrdBeforeRefusal, generatedSpecBeforeRefusal), true,
++        `${runner}: the untouched generated PRD and Spec are the staging draft the stop names`);
++      assert.throws(() => planOnboardingBootstrapBind({ rootDir: path }),
++        (error) => error?.code === "BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED",
++        `${runner}: the bind planner refuses the untouched draft`);
+       assert.equal(readFileSync(prdFile, "utf8"), generatedPrdBeforeRefusal,
+         `${runner}: rejection leaves the generated architecture draft unchanged`);
+-      const missingArchitecturePrd = stripGeneratedArchitectureTemplate(generatedPrdBeforeRefusal, { required: true });
+-      assert.equal(missingArchitecturePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], refusalSpecDigest,
++      assert.equal(readFileSync(specFileBeforeAuthoring, "utf8"), generatedSpecBeforeRefusal);
++      // Generation publishes the exact reserved template once; removing only it leaves the Spec binding untouched.
++      const missingTemplatePrd = stripGeneratedArchitectureTemplate(generatedPrdBeforeRefusal, { required: true });
++      assert.equal(missingTemplatePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], refusalSpecDigest,
+         `${runner}: removing only the reserved draft leaves the generated Spec digest intact`);
++      assert.deepEqual(readPipelineState(path), { status: "absent" },
++        `${runner}: the untouched draft rejection records no state, submission, presentation or signature request`);
++      // First authoring pass: stagingDesignNeedsAuthoring only reads the banner, responsibility/rationale/profileId and table rows,
++      // so one reserved REPLACE value (nonResponsibilities) lets the package bind while parseArchitectureDesign stays the authority.
++      const skeletonCriterion = "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |";
++      const skeletonTraceability = "| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |";
++      assert.ok(generatedSpecBeforeRefusal.includes(skeletonCriterion), `${runner}: the generated Spec carries the skeleton criterion placeholder`);
++      assert.ok(generatedSpecBeforeRefusal.includes(skeletonTraceability), `${runner}: the generated Spec carries the skeleton traceability placeholder`);
++      const partialSpec = generatedSpecBeforeRefusal
++        .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
++        .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
++      const partialPrd = generatedPrdBeforeRefusal
++        .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
++        .replace('"responsibility": "REPLACE: application responsibility"', '"responsibility": "Local keyboard game."')
++        .replace('"rationale": "REPLACE: why the proposed module boundaries fit this design"', '"rationale": "A single module owns the whole local game."')
++        .replace('"profileId": "REPLACE: project fitness profile"', '"profileId": "local-game"')
++        .replace(refusalSpecDigest, sha256(Buffer.from(partialSpec)));
++      assert.notEqual(partialPrd, generatedPrdBeforeRefusal);
++      assert.match(partialPrd, /"REPLACE: excluded responsibility"/u,
++        `${runner}: the first authoring pass leaves one reserved value for the architecture parser to refuse`);
++      assert.equal(stagingDesignNeedsAuthoring(partialPrd, partialSpec), false,
++        `${runner}: the first authoring pass satisfies the staging design signal`);
++      writeFileSync(specFileBeforeAuthoring, partialSpec);
++      writeFileSync(prdFile, partialPrd);
++      // Continue the driver: it binds the authored package and reaches the architecture authoring stop behind the bind.
++      const authoredStop = freshDriver(path, runner, env, privateKey);
++      assert.equal(authoredStop.outcome, "unsupported-next-action",
++        `${runner}: the continued driver stops for architecture authoring ${JSON.stringify(authoredStop)}`);
++      const architectureAuthoringAction = authoredStop.final?.nextAction;
++      assert.deepEqual({ kind: architectureAuthoringAction?.kind, code: architectureAuthoringAction?.code },
++        { kind: "repair-required", code: "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE" },
++        `${runner}: returned architecture authoring readback ${JSON.stringify(authoredStop)}`);
++      assert.equal(authoredStop.final.status, "draft");
++      assert.equal(authoredStop.final.planApproved, false);
++      assert.deepEqual(authoredStop.final.lifecycle,
++        { ok: true, code: "PLAN-LIFECYCLE-CURRENT", status: "draft" },
++        `${runner}: the unfinished architecture draft is anchored to the current lifecycle`);
++      assert.equal(authoredStop.steps.some((step) => ["submit-plan", "present-plan", "approve-plan"].includes(step.argv[1])), false,
++        `${runner}: authoring is reached without an early submission, presentation or PO signature`);
++      const architectureInspectStep = authoredStop.steps.at(-1);
++      assert.equal(architectureInspectStep?.argv?.[1], "inspect");
++      const stateScript = architectureInspectStep.argv[0];
++      assert.equal(stateScript.endsWith("pipeline-state.mjs"), true);
++      const boundState = readFixtureState(path);
++      assert.equal(boundState.activeFeature?.planPath, prdPath,
++        `${runner}: the canonical state names the PRD anchored by the returned authoring readback`);
++      assert.equal(authoredStop.final.activeFeature?.planPath, prdPath);
++      assert.equal(boundState.planSubmission, undefined);
++      assert.equal(boundState.planPresentation, undefined);
++      const unfinishedDraftSubmit = stateDriver(architectureInspectStep.executable,
++        [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
++      assert.equal(unfinishedDraftSubmit.status, 2,
++        `${runner}: submit-plan rejects the unfinished reserved architecture draft`);
++      assert.match(unfinishedDraftSubmit.stderr, /ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE/u);
++      const afterUnfinishedDraftSubmission = readFixtureState(path);
++      assert.equal(afterUnfinishedDraftSubmission.planSubmission, undefined,
++        `${runner}: the unfinished draft rejection records no submission`);
++      assert.equal(afterUnfinishedDraftSubmission.planPresentation, undefined,
++        `${runner}: the unfinished draft rejection creates no presentation or signature request`);
++      assert.equal(readFileSync(prdFile, "utf8"), partialPrd,
++        `${runner}: rejection leaves the authored-but-unfinished architecture draft unchanged`);
++      const missingArchitecturePrd = partialPrd.replace(/^```pipeline-architecture-design\r?\n[\s\S]*?^```\s*$\n?/mu, "");
++      assert.doesNotMatch(missingArchitecturePrd, /```pipeline-architecture-design/u);
++      assert.equal(missingArchitecturePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], sha256(Buffer.from(partialSpec)),
++        `${runner}: removing only the architecture block leaves the authored Spec digest intact`);
+       writeFileSync(prdFile, missingArchitecturePrd);
+-      const refusedSubmit = stateDriver(architectureInspectStep.executable,
++      const refusedSubmit = stateDriver("node",
+         [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
+       assert.equal(refusedSubmit.status, 2, `${runner}: submit-plan refuses the now-missing architecture block`);
+       assert.match(refusedSubmit.stderr, /ARCHITECTURE-DESIGN-PACKAGE-REQUIRED/u);
+@@ -1330,12 +1390,9 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+           ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
+       const generatedPrdBeforeAuthoring = readFileSync(prdFile, "utf8");
+       const generatedSpecDigest = generatedPrdBeforeAuthoring.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+-      assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u,
+-        `${runner}: final authoring starts from the generated PRD's existing Spec binding`);
+-      assert.match(generatedPrdBeforeAuthoring, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu,
+-        `${runner}: authoring preserves the intake provenance reference`);
+-      assert.match(generatedPrdBeforeAuthoring, /## Sanitised input summary \(agent-authored\)/u,
+-        `${runner}: authoring preserves the sanitised-summary section`);
++      assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u, `${runner}: final authoring starts from the generated PRD's existing Spec binding`);
++      assert.match(generatedPrdBeforeAuthoring, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu, `${runner}: authoring preserves the intake provenance reference`);
++      assert.match(generatedPrdBeforeAuthoring, /## Sanitised input summary \(agent-authored\)/u, `${runner}: authoring preserves the sanitised-summary section`);
+       const authoringBase = stripGeneratedArchitectureTemplate(generatedPrdBeforeAuthoring);
+       assert.match(authoringBase, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu);
+       assert.match(authoringBase, /## Sanitised input summary \(agent-authored\)/u);
+@@ -1350,18 +1407,15 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         `${runner}: final authoring removes the reserved template markers before approval`);
+       assert.equal(authoredPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], generatedSpecDigest);
+       // AC-264 / D85 (PO decision 2026-10-22): the generated Spec is a staging draft that says its acceptance criteria "must be authored ...
+-      // before the plan is submitted", and a governed project's submit-plan now refuses a Spec with no admitted criterion row. The agent's
+-      // authoring step therefore replaces the skeleton's placeholder criterion (AC-01, a leading-zero id the criterion parser cannot locate)
+-      // with a supported one and moves the PRD's Spec binding to the authored bytes (a real digest, not a constant). Everything asserted
+-      // about the GENERATED bytes above is unchanged.
++      // before the plan is submitted", and a governed project's submit-plan now refuses a Spec with no admitted criterion row. The first
++      // authoring pass above (the design-authoring stop, 5e939278b) already replaced the skeleton's placeholder criterion (AC-01, a leading-zero
++      // id the criterion parser cannot locate) with a supported one and moved the PRD's Spec binding to those authored bytes (a real digest,
++      // not a constant); this final pass only adds the finished architecture block and keeps that binding.
+       const authoredSpecFile = join(path, dirname(prdPath), "spec.md");
+-      const generatedSpecText = readFileSync(authoredSpecFile, "utf8");
+-      const skeletonCriterion = "- AC-01: WHEN <trigger>, the system SHALL <observable result>.";
+-      assert.ok(generatedSpecText.includes(skeletonCriterion), `${runner}: the generated Spec carries the skeleton criterion placeholder`);
+-      writeFileSync(authoredSpecFile, generatedSpecText.replace(skeletonCriterion, "- **AC-1:** WHEN the player presses a key, the game exports playable=true."));
+-      writeFileSync(prdFile, authoredPrd.replace(generatedSpecDigest, sha256(readFileSync(authoredSpecFile))));
++      assert.equal(readFileSync(authoredSpecFile, "utf8"), partialSpec);
++      assert.equal(generatedSpecDigest, sha256(readFileSync(authoredSpecFile)));
+       const sourceBase = dirname(prdPath);
+-      const featureId = beforeArchitectureSubmission.activeFeature.id;
++      const featureId = boundState.activeFeature.id;
+       const fixtureSources = [
+         [`${sourceBase}/design-input.md`, `Original request for ${featureId}.\n`],
+         [`${sourceBase}/design.md`, `Revised design for ${featureId}.\n`],
