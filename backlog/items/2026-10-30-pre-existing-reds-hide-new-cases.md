@@ -74,12 +74,17 @@ Red on the plain candidate (identical in every baseline clone this session):
     passphrase feed (the signing step refuses unencrypted keys, PO-KEY-UNENCRYPTED); the TOFU case is restated again
     then.
   - Run standalone for codex and antigravity, the measurement helper stops at INTAKE-CAPTURE-TEXT-FILE-UNREADABLE
-    before authoring, with and without R6 (a separate helper drift).
+    before authoring, with and without R6 (a separate helper drift; fixed in a later candidate-13 patch, below).
 - VCR01: six outgrown sites counts are restated in the candidate-13 VCR01 patch.
 - Found in the R6 sweep and fixed in two more candidate-13 patches: `measure-tofu-push-e2e.mjs` failed with ENOENT in
   a fresh clone (no scratch/ yet, the same class as the codex guard case), and `dispatch-budget-calibration.test.mjs`
   had been red on HEAD since 88afb9b94 raised the deep and implementor `maxTurns` to 400 while its rule helper still
-  said 76/80.
+  said 76/80. That case pinned the helper's limits to the definitions; the pin is replaced on purpose by a rule built
+  from the derived limits (the skew check now skews that rule), because the helper's small what-if limits are what
+  the tier-cap formula case needs. A third patch closes the R6 runner red: the measurement helper now answers the
+  Codex and Antigravity `projectDescription` consent step by writing the scratch text file the action names, so
+  standalone Codex stops at its restart-process boundary and Antigravity, like Claude, at the missing PO signing-key
+  directory.
 
 ## Wanted
 
