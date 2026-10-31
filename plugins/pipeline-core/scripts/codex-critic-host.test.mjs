@@ -2267,6 +2267,11 @@ await checkAsync("codex-critic-app-server consumer accepts a complete, valid chi
     "lib/passive-read-policy.mjs",
     "lib/machine-plane.mjs",
     "lib/po-key-directory.mjs",
+    "lib/host-skill-catalog.mjs",
+    "lib/private-boundary.mjs",
+    "lib/hardened-private-directory.mjs",
+    "lib/windows-private-state.mjs",
+    "lib/successful-spawn.mjs",
   ].map((path) => ({ path, sha256: createHash("sha256").update(readFileSync(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core", path))).digest("hex") }));
   expectedBindings.childModuleGraphSha256 = createHash("sha256").update(`${JSON.stringify(graph)}\n`).digest("hex");
   assert.deepEqual(result.rulesetBindings, expectedBindings);

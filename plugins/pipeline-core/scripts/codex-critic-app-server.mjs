@@ -123,6 +123,12 @@ function snapshotRuleset(candidateRoot) {
     [null, "lib/passive-read-policy.mjs"],
     [null, "lib/machine-plane.mjs"],
     [null, "lib/po-key-directory.mjs"],
+    // passive-read-policy.mjs imports the declared host skill catalog (AC-209), which reaches the private-boundary chain.
+    [null, "lib/host-skill-catalog.mjs"],
+    [null, "lib/private-boundary.mjs"],
+    [null, "lib/hardened-private-directory.mjs"],
+    [null, "lib/windows-private-state.mjs"],
+    [null, "lib/successful-spawn.mjs"],
   ];
   const files = definitions.map(([binding, relativePath]) => {
     const path = physicalRulesetFile(relativePath);
