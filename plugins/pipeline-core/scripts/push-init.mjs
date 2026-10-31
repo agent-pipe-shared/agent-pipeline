@@ -125,6 +125,7 @@ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from
 import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
 import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
 import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
+import { criticCoverageAdvisory, listUncoveredCriticRecords } from "./dispatch-record-write.mjs";
 
 export const SCHEMA = "pipeline.push-init.v1";
 export const RECOVERY_SCHEMA = "pipeline.push-init-recovery.v1";
@@ -377,6 +378,41 @@ export function assessVerifiedCandidateDelivery({ root, remote, destination, rea
 }
 
 /**
+ * D212 (N33 D): which Critic-required dispatch records are still without covering Critic evidence, asked through the SAME shared
+ * evaluation the feature close uses (check-critic-skip-coverage.mjs, reached via dispatch-record-write.mjs), so a consumer learns it
+ * here and not first at the close. The records asked about are those this push would carry: `--base`..HEAD when a base was given,
+ * else the local commits not yet on the destination branch's remote-tracking ref, else (no tracking ref, no HEAD) every record.
+ * It deliberately does not go through the injected `run`, which stands in for the reconciliation subprocess only.
+ */
+function inspectPushCriticCoverage({ root, base, remote, destination }) {
+  const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawnSync);
+  if (head === null || !OID_TEXT.test(head)) return listUncoveredCriticRecords({ root });
+  let from = base;
+  if (from === null && typeof destination === "string" && destination.startsWith("refs/heads/")) {
+    const tracked = gitText(root, ["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${destination.slice("refs/heads/".length)}^{commit}`], spawnSync);
+    from = tracked !== null && OID_TEXT.test(tracked) ? tracked : null;
+  }
+  return listUncoveredCriticRecords({ root, range: { base: from, head } });
+}
+
+/**
+ * The driver. The sequence itself is `drivePushInitCore`; this wrapper adds the early Critic-coverage notice to its result as one
+ * additive, advisory field (`criticCoverageAdvisory`, absent when nothing is uncovered). It is not a step, not a check and not a
+ * blocker: the outcome, the exit status and the recovery block are those of the core, and the close gate stays the only refusing gate.
+ * `inspectCriticCoverage` is the injection seam (default: the real inspection above).
+ */
+export function drivePushInit(options = {}) {
+  const { inspectCriticCoverage = inspectPushCriticCoverage, ...rest } = options;
+  const result = drivePushInitCore(rest);
+  if (rest.checkpoint === true || typeof result?.root !== "string" || result.outcome === "usage-error") return result;
+  let listing;
+  try { listing = inspectCriticCoverage({ root: result.root, base: rest.base ?? null, remote: rest.remote, destination: rest.destination }); }
+  catch (error) { listing = { records: [], totalCount: 0, unavailable: `the Critic coverage evaluation could not run (${String(error?.message ?? error).split("\n")[0].slice(0, 200)})` }; }
+  const advisory = criticCoverageAdvisory(listing);
+  return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
+}
+
+/**
  * The driver loop itself. Three injection seams -- `run` (spawnSync-shaped, for the one
  * real subprocess step), `inspectArchitectureCurrency` (the early guard-push architecture
  * map currency check, N25), `assessPushGateSatisfiability`/`satisfiabilityDeps` and
@@ -386,7 +422,7 @@ export function assessVerifiedCandidateDelivery({ root, remote, destination, rea
  * push-prepare.test.mjs's own `readyDeps()` idiom. `exists` is injectable for the same
  * reason `deps.exists` is threaded through push-prepare.mjs itself.
  */
-export function drivePushInit({
+function drivePushInitCore({
   rootDir, by, remote, destination, base = null, candidate = null, recordRef = null, checkpoint = false,
   run = spawnSync,
   exists = existsSync,

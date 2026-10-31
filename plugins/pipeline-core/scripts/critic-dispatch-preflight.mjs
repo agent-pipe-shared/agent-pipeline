@@ -23,6 +23,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
+import { criticCoverageAdvisory, listUncoveredCriticRecords } from "./dispatch-record-write.mjs";
 import {
   CriticGuardrailDerivationError,
   deriveRequiredCriticGuardrails,
@@ -521,6 +522,21 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
 }
 
 /**
+ * D212 (N33 D) early detection for the ready result that is PRINTED to a person or script: the Critic-required dispatch records whose
+ * commit lies in the reviewed range (base, candidate] and that no Critic evidence covers yet, so the Critic dispatch can include them
+ * and the addendum command is known before the feature close. Additive and advisory: the status stays packet-ready, nothing new
+ * refuses, and `preflightCriticDispatch` itself is untouched. That separation is deliberate: the session finalizer binds the library
+ * result by digest at admit and again at finalize, so a field that changes while a review runs (a record or an addendum written in
+ * between) would turn this notice into a refusal there. The coverage rule is the shared evaluation; this only supplies the range.
+ */
+export function preflightCriticDispatchWithCoverage(input, observer = null) {
+  const result = preflightCriticDispatch(input, observer);
+  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return result;
+  const advisory = criticCoverageAdvisory(listUncoveredCriticRecords({ root: input.root, range: { base: result.base?.commit ?? null, head: result.candidate.commit } }));
+  return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
+}
+
+/**
  * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
  * task id, across every location ADR-0063 names as an evidence home. This is
  * NOT part of `preflightCriticDispatch()` and never affects its pass/fail
@@ -625,7 +641,7 @@ if (isDirectInvocation(import.meta.url)) {
       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } else {
-      const result = preflightCriticDispatch(args);
+      const result = preflightCriticDispatchWithCoverage(args);
       process.stdout.write(`${JSON.stringify(result)}\n`);
       if (result.status !== "packet-ready") process.exitCode = 1;
     }

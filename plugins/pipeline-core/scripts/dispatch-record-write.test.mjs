@@ -703,7 +703,79 @@ check("N33 --critic-addendum refuses an absolute, out-of-tree or non-JSON reques
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 35, "the complete dispatch-record writer corpus must be registered before execution begins");
+// N33 D (D212): early detection. A Critic-required record without covering Critic evidence is named when it is written, with the next
+// command, instead of first at the feature close. Advisory only: the record is always written and the close gate stays the one refusing gate.
+const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
+
+check("N33B an attested request writes the record and its result carries a typed, non-refusing advisory naming the record and the next command", () => {
+  const root = cliFixture();
+  try {
+    const receipt = runCli(root);
+    assert.equal(existsSync(join(root, receipt.target)), true, "the advisory must never replace the write");
+    const advisory = receipt.criticCoverageAdvisory;
+    assert.ok(advisory, "an attested Critic-required record without covering evidence must be named when it is written");
+    assert.equal(advisory.schema, "pipeline.critic-coverage-advisory.v1");
+    assert.equal(advisory.code, "CRITIC-COVERAGE-PENDING");
+    assert.equal(advisory.severity, "advisory");
+    assert.deepEqual(advisory.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
+    assert.equal(advisory.records[0].recordPath, receipt.target);
+    assert.equal(advisory.records[0].recordSha256, receipt.sha256);
+    assert.equal(advisory.records[0].candidateCommit, ATT_COMMIT);
+    assert.equal(advisory.records[0].appliedRow, "T3");
+    assert.equal(advisory.command, N33B_COMMAND);
+    assert.equal(writerModule.CRITIC_ADDENDUM_COMMAND, N33B_COMMAND);
+    assert.ok(advisory.line.includes("NVA-ATT-1") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("\n"), advisory.line);
+    assert.match(advisory.nextStep, /passed, consumed Critic receipt/u);
+    assert.match(advisory.nextStep, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
+    // The feature close names the same command: one spelling, no second version that could drift.
+    assert.ok(readFileSync(join(import.meta.dirname, "close-coordinator.mjs"), "utf8").includes(N33B_COMMAND), "close-coordinator.mjs must spell the same command");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("N33B the named command accepts what the advisory names, and a record is silent only once a bound addendum covers it", () => {
+  const { root, addendum } = n33Fixture();
+  try {
+    const before = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions() });
+    assert.deepEqual(before.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
+    assert.equal(before.unavailable, null);
+    assert.equal(writerModule.criticCoverageAdvisory(before).records[0].recordSha256, addendum.recordSha256);
+    // The command the advisory names, run exactly as named, publishes the addendum ...
+    const written = writerModule.runCriticAddendumRequest({ repoRoot: root, criticAddendumPath: "scratch/addendum-request.json" }, n33CoverageOptions());
+    assert.equal(existsSync(join(root, written.target)), true);
+    // ... and the record is covered: no listing, no advisory.
+    const after = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions() });
+    assert.deepEqual(after.records, []);
+    assert.equal(writerModule.criticCoverageAdvisory(after), null);
+    // A published addendum whose receipt does not hold the commit is still uncovered.
+    const stillUnbound = writerModule.listUncoveredCriticRecords({ root, ...n33CoverageOptions({ outside: true }) });
+    assert.deepEqual(stillUnbound.records.map((entry) => entry.taskId), ["NVA-ATT-1"]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("N33B a repository with no dispatch records, or only skipped ones, has nothing to name and an advisory builder that says nothing", () => {
+  const root = attestedRoot();
+  try {
+    const none = writerModule.listUncoveredCriticRecords({ root });
+    assert.deepEqual(none.records, []);
+    assert.equal(writerModule.criticCoverageAdvisory(none), null);
+    writeFileSync(join(root, "evidence/dispatch-record-NVA-SKIP-1.json"), `${JSON.stringify(record({ taskId: "NVA-SKIP-1" }))}\n`);
+    const skipped = writerModule.listUncoveredCriticRecords({ root });
+    assert.deepEqual(skipped.records, []);
+    assert.equal(writerModule.criticCoverageAdvisory(skipped), null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("N33B an evaluation that cannot run is named as unavailable, never thrown, and never refuses", () => {
+  const advisory = writerModule.criticCoverageAdvisory({ records: [], totalCount: 0, unavailable: "the repository root is unreadable" });
+  assert.equal(advisory.code, "CRITIC-COVERAGE-UNAVAILABLE");
+  assert.equal(advisory.severity, "advisory");
+  assert.match(advisory.line, /unreadable/u);
+  const listing = writerModule.listUncoveredCriticRecords({ root: join(tmpdir(), "n33b-no-such-root-ever") });
+  assert.equal(typeof listing.unavailable, "string");
+  assert.deepEqual(listing.records, []);
+});
+
+assert.equal(cases.length, 39, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

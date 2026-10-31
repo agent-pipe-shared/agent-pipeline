@@ -991,6 +991,102 @@ test("drivePushInit (N25): only the stale verdict is an early check -- a structu
 });
 
 // ---------------------------------------------------------------------------
+// N33 D (D212): early detection. push-init names every Critic-required dispatch record that has no covering Critic evidence, with the
+// next command, before the push gates (and the feature close) do. Advisory only: the outcome, the exit status and every check are unchanged.
+// ---------------------------------------------------------------------------
+
+const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
+function n33bRequiredRecord(root, taskId, commitSha) {
+  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [commitSha], candidateCommit: commitSha, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["a.txt"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), `${JSON.stringify(record)}\n`);
+}
+/** A real, remote-less repository with two commits, so the default coverage inspection derives its range from git. */
+function n33bPushRepo() {
+  const root = freshFixtureRoot();
+  const git = (...args) => { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
+  git("init", "-q");
+  const commit = (name) => { writeFileSync(join(root, "a.txt"), `${name}\n`); git("add", "a.txt"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", name); return git("rev-parse", "HEAD"); };
+  const first = commit("first");
+  const second = commit("second");
+  return { root, first, second };
+}
+const n33bDrive = (root, extra = {}) => drivePushInit({
+  rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+  satisfiabilityDeps: satisfiabilityDepsAllGreen(), pushPrepareReport: () => chatPrepareResult("chat"),
+  inspectArchitectureCurrency: () => ({ ok: true, applicable: false }), assessPushHookBackstop: () => ({ blocking: false }), ...extra,
+});
+
+test("drivePushInit (N33 D): an injected inspection result is carried as one advisory line on the ready outcome and on the refused one, and changes neither", () => {
+  const root = freshFixtureRoot();
+  try {
+    const listing = { records: [{ taskId: "N33B-ONE", recordPath: "evidence/dispatch-record-N33B-ONE.json", recordSha256: "d".repeat(64), candidateCommit: "e".repeat(40), appliedRow: "T1" }], totalCount: 1, unavailable: null };
+    const plain = n33bDrive(root);
+    assert.equal(plain.outcome, "chat-ready", JSON.stringify(plain));
+    assert.equal(Object.hasOwn(plain, "criticCoverageAdvisory"), false, "a repository with nothing uncovered is silent");
+    const ready = n33bDrive(root, { inspectCriticCoverage: () => listing });
+    assert.equal(ready.outcome, "chat-ready");
+    assert.deepEqual(ready.steps, plain.steps, "advisory, not a step");
+    assert.equal(ready.criticCoverageAdvisory.code, "CRITIC-COVERAGE-PENDING");
+    assert.deepEqual(ready.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-ONE"]);
+    assert.equal(ready.criticCoverageAdvisory.command, N33B_COMMAND);
+    assert.ok(ready.criticCoverageAdvisory.line.includes("N33B-ONE") && ready.criticCoverageAdvisory.line.includes(N33B_COMMAND) && !ready.criticCoverageAdvisory.line.includes("\n"));
+    const { criticCoverageAdvisory: _advisory, ...rest } = ready;
+    assert.deepEqual(rest, plain);
+    const refused = n33bDrive(root, { inspectCriticCoverage: () => listing, pushPrepareReport: () => ({ ok: true, report: { ready: false, checks: [{ id: "working-tree-clean", ok: false, message: "dirty" }] }, lines: {} }) });
+    assert.equal(refused.outcome, "precondition-unmet");
+    assert.deepEqual(refused.checks.map((check) => check.id), ["working-tree-clean"], "the advisory is never a check and never a blocker");
+    assert.ok(refused.criticCoverageAdvisory, "the refused outcome carries it too");
+    assert.equal(refused.recovery.blockers.some((blocker) => /critic-coverage/iu.test(blocker.id)), false);
+    const unavailable = n33bDrive(root, { inspectCriticCoverage: () => { throw new Error("evaluation exploded"); } });
+    assert.equal(unavailable.outcome, "chat-ready", "an evaluation that cannot run never flips the outcome");
+    assert.equal(unavailable.criticCoverageAdvisory.code, "CRITIC-COVERAGE-UNAVAILABLE");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit (N33 D): the default inspection runs the shared coverage evaluation, names the uncovered record with the next command, and is re-entrant", () => {
+  const repo = n33bPushRepo();
+  try {
+    n33bRequiredRecord(repo.root, "N33B-PUSH-1", repo.second);
+    const first = n33bDrive(repo.root);
+    assert.equal(first.outcome, "chat-ready", JSON.stringify(first));
+    assert.deepEqual(first.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-PUSH-1"]);
+    assert.equal(first.criticCoverageAdvisory.records[0].recordPath, "evidence/dispatch-record-N33B-PUSH-1.json");
+    assert.equal(first.criticCoverageAdvisory.command, N33B_COMMAND);
+    assert.deepEqual(n33bDrive(repo.root), first, "two calls from unchanged state are byte-identical");
+  } finally { rmSync(repo.root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit (N33 D): with --base only the records of base..HEAD are named", () => {
+  const repo = n33bPushRepo();
+  try {
+    n33bRequiredRecord(repo.root, "N33B-BEFORE-BASE", repo.first);
+    n33bRequiredRecord(repo.root, "N33B-IN-RANGE", repo.second);
+    const ranged = n33bDrive(repo.root, { base: repo.first, candidate: repo.second });
+    assert.deepEqual(ranged.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-IN-RANGE"]);
+    const unbounded = n33bDrive(repo.root);
+    assert.deepEqual(unbounded.criticCoverageAdvisory.records.map((entry) => entry.taskId).sort(), ["N33B-BEFORE-BASE", "N33B-IN-RANGE"]);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit (N33 D): a usage error carries no advisory, and the printed ready result carries it and keeps exit status 0", () => {
+  const repo = n33bPushRepo();
+  try {
+    n33bRequiredRecord(repo.root, "N33B-PUSH-1", repo.second);
+    const usage = drivePushInit({ rootDir: repo.root, by: "", remote: "origin", destination: "refs/heads/main" });
+    assert.equal(usage.outcome, "usage-error");
+    assert.equal(Object.hasOwn(usage, "criticCoverageAdvisory"), false);
+    let printed = "";
+    const code = main(["--root", repo.root, "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], {
+      write: (text) => { printed += text; }, writeError: () => {},
+      drive: (options) => n33bDrive(options.rootDir),
+    });
+    assert.equal(code, 0);
+    assert.equal(JSON.parse(printed).criticCoverageAdvisory.records[0].taskId, "N33B-PUSH-1");
+  } finally { rmSync(repo.root, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------
 // N27b / D206: delivery of the verified candidate when HEAD is ahead only by handover or Critic-export commits.
 // ---------------------------------------------------------------------------
 

@@ -11,6 +11,7 @@ const completionCases = [];
 function test(name, run) { completionCases.push({id: "CDPF" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 
 import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
+import * as preflightModule from "./critic-dispatch-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import childProcess from "node:child_process";
 import fs from "node:fs";
@@ -1543,6 +1544,62 @@ test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming 
     writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(current, git(fx.root, ["rev-parse", `${current}^{tree}`])))}\n`);
     const admitted = preflightCriticDispatch(input(fx, { candidate: current }));
     assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// N33 D (D212): early detection. The ready result a person or script reads lists the Critic-required records of the reviewed range that no
+// Critic evidence covers yet, so the Critic dispatch can include them. Additive and advisory: no refusal, and the library result the
+// session finalizer binds by digest is left byte-identical.
+const N33B_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
+function n33bRequiredRecord(root, taskId, commitSha) {
+  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [commitSha], candidateCommit: commitSha, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["specs/spec.md"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), `${JSON.stringify(record)}\n`);
+}
+test("N33B the ready result lists the Critic-required records of the reviewed range without covering evidence, with the next command; a record outside the range is not listed; the library result is unchanged", () => {
+  const fx = fixture();
+  try {
+    n33bRequiredRecord(fx.root, "N33B-INSIDE", fx.candidate);
+    n33bRequiredRecord(fx.root, "N33B-AT-BASE", fx.base);
+    const library = preflightCriticDispatch(input(fx));
+    assert.equal(library.status, "packet-ready");
+    assert.equal(Object.hasOwn(library, "criticCoverageAdvisory"), false, "the library result is digest-bound by the session finalizer and must not vary with evidence written during a review");
+    const ready = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
+    assert.equal(ready.status, "packet-ready", "early detection must never refuse");
+    const advisory = ready.criticCoverageAdvisory;
+    assert.equal(advisory.schema, "pipeline.critic-coverage-advisory.v1");
+    assert.equal(advisory.code, "CRITIC-COVERAGE-PENDING");
+    assert.deepEqual(advisory.records.map((entry) => entry.taskId), ["N33B-INSIDE"]);
+    assert.equal(advisory.records[0].recordPath, "evidence/dispatch-record-N33B-INSIDE.json");
+    assert.equal(advisory.records[0].candidateCommit, fx.candidate);
+    assert.equal(advisory.command, N33B_COMMAND);
+    assert.ok(advisory.line.includes("N33B-INSIDE") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("N33B-AT-BASE"), advisory.line);
+    const { criticCoverageAdvisory: _advisory, ...rest } = ready;
+    assert.deepEqual(rest, library, "the advisory is the only difference from the library result");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("N33B with no uncovered Critic-required record in the range the ready result is silent and identical to the library result", () => {
+  const fx = fixture();
+  try {
+    const none = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
+    assert.equal(Object.hasOwn(none, "criticCoverageAdvisory"), false);
+    assert.deepEqual(none, preflightCriticDispatch(input(fx)));
+    n33bRequiredRecord(fx.root, "N33B-AT-BASE", fx.base);
+    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithCoverage(input(fx)), "criticCoverageAdvisory"), false, "a record at the review base lies outside (base, candidate]");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("N33B the command line prints the advisory in the ready result and still exits 0", () => {
+  const fx = fixture();
+  try {
+    n33bRequiredRecord(fx.root, "N33B-INSIDE", fx.candidate);
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("./critic-dispatch-preflight.mjs", import.meta.url)), "--root", fx.root, "--base", fx.base, "--candidate", fx.candidate,
+      "--spec", "specs/spec.md", "--evidence", "evidence/verify.json", "--prior-critic", "evidence/prior-critic.json"], { encoding: "utf8" });
+    assert.equal(run.status, 0, run.stderr);
+    const printed = JSON.parse(run.stdout);
+    assert.equal(printed.status, "packet-ready");
+    assert.deepEqual(printed.criticCoverageAdvisory.records.map((entry) => entry.taskId), ["N33B-INSIDE"]);
+    assert.equal(printed.criticCoverageAdvisory.command, N33B_COMMAND);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 

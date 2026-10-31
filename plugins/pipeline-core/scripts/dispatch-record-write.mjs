@@ -10,7 +10,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
-import { criticAddendumBindingFinding } from "./check-critic-skip-coverage.mjs";
+import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
 import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
@@ -19,7 +19,7 @@ import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation, readNa
 
 import { readNativeCodexPending, readNativeGoldfishPending } from "../lib/native-goldfish-host-state.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
-import { CRITIC_REQUIRED_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_REQUIRED_SCHEMA, criticDisposition } from "../lib/critic-skip-decision.mjs";
 
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
@@ -604,7 +604,71 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
     attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested",
       briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex") },
   };
-  return writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
+  const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
+  // D212 (N33 D) early detection, AFTER the write and never instead of it: every attested record is Critic-required, so name the
+  // missing coverage and the next command now rather than first at the feature close. Advisory only; it cannot refuse or throw.
+  const advisory = criticCoverageAdvisory(listUncoveredCriticRecords({ root, taskIds: [record.taskId], coverageOptions: dependencies.coverageOptions ?? {} }));
+  return advisory === null ? receipt : { ...receipt, criticCoverageAdvisory: advisory };
+}
+
+export const CRITIC_COVERAGE_ADVISORY_SCHEMA = "pipeline.critic-coverage-advisory.v1";
+/** The one spelling of the command that publishes the addendum; the feature close (close-coordinator.mjs) and the close-feature skill name the same command. */
+export const CRITIC_ADDENDUM_COMMAND = "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>";
+const COVERAGE_LISTING_CAP = 25;
+
+function reachableCommits(root, range) {
+  if (range === null) return null;
+  const base = range.base ?? null;
+  for (const ref of [base, range.head]) {
+    if (ref !== null && (typeof ref !== "string" || ref === "" || ref.startsWith("-") || /[\s\0]/u.test(ref))) throw new Error("the review range must name plain git refs");
+  }
+  const output = execFileSync("git", ["-C", root, "rev-list", base === null ? range.head : `${base}..${range.head}`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+  return new Set(output.split("\n").filter(Boolean));
+}
+
+/**
+ * D212 (N33 D): the Critic-required v3/v4 dispatch records that the shared coverage evaluation (check-critic-skip-coverage.mjs
+ * `evaluateRepositoryCriticSkipCoverage`, scoped by task id exactly as the feature close scopes it) reports without covering Critic
+ * evidence. This function only chooses WHICH records to ask about (optionally those whose candidate commit lies in `range`, the git
+ * half-open set (base, head], or the whole history up to head when base is null); the coverage rule itself is not reimplemented.
+ * Never throws: a failure is returned as `unavailable`. `coverageOptions` is the injection seam the coverage evaluation already has.
+ */
+export function listUncoveredCriticRecords({ root, range = null, taskIds, coverageOptions = {} } = {}) {
+  try {
+    const physical = physicalRoot(root);
+    const members = reachableCommits(physical, range);
+    const candidates = walkDispatchRecords(physical).records.filter(({ record }) => (record?.schema === DISPATCH_RECORD_SCHEMA || record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA)
+      && criticDisposition(record) === "required"
+      && (taskIds === undefined || taskIds.includes(record.taskId))
+      && (members === null || (typeof record.candidateCommit === "string" && members.has(record.candidateCommit))));
+    if (candidates.length === 0) return { records: [], totalCount: 0, unavailable: null };
+    const owners = [...new Set(candidates.map(({ record }) => (typeof record.sliceId === "string" ? record.sliceId : record.taskId)))];
+    const open = new Set(evaluateRepositoryCriticSkipCoverage({ ...coverageOptions, root: physical, taskIds: owners }).requiredTaskIds);
+    const uncovered = candidates.filter(({ record }) => open.has(record.taskId))
+      .map(({ path, sha256, record }) => ({ taskId: record.taskId, recordPath: path, recordSha256: sha256, candidateCommit: record.candidateCommit, appliedRow: record.criticRequired?.appliedRow ?? null }))
+      .sort((left, right) => (left.recordPath < right.recordPath ? -1 : left.recordPath > right.recordPath ? 1 : 0));
+    return { records: uncovered.slice(0, COVERAGE_LISTING_CAP), totalCount: uncovered.length, unavailable: null };
+  } catch (error) {
+    return { records: [], totalCount: 0, unavailable: `the Critic coverage evaluation could not run (${String(error?.message ?? error).split("\n")[0].slice(0, 200)})` };
+  }
+}
+
+/**
+ * The typed, plain-JSON advisory every runner reads the same way (writer result, Critic preflight output, push-init result), or null
+ * when there is nothing to say. Advisory by construction: it carries no refusal, and the feature close
+ * (CLOSE-CRITIC-EVIDENCE-MISSING) stays the one refusing gate.
+ */
+export function criticCoverageAdvisory({ records = [], totalCount = records.length, unavailable = null } = {}) {
+  if (typeof unavailable === "string") {
+    return { schema: CRITIC_COVERAGE_ADVISORY_SCHEMA, code: "CRITIC-COVERAGE-UNAVAILABLE", severity: "advisory", message: unavailable,
+      line: `Critic coverage could not be checked early: ${unavailable}; the feature close still refuses a Critic-required record without covering evidence (CLOSE-CRITIC-EVIDENCE-MISSING).` };
+  }
+  if (!Array.isArray(records) || records.length === 0) return null;
+  const nextStep = `a passed, consumed Critic receipt must cover each record (the receipt of its own task id, or a Critic course whose reviewed range contains its commit; run the Critic dispatch when none does), then write the byte-bound addendum with ${CRITIC_ADDENDUM_COMMAND} (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill); the feature close refuses with CLOSE-CRITIC-EVIDENCE-MISSING until then, and this notice itself refuses nothing`;
+  const named = records.map((entry) => `${entry.recordPath} (${entry.appliedRow ?? "Critic required"}, commit ${String(entry.candidateCommit).slice(0, 12)})`).join(", ");
+  const omitted = totalCount > records.length ? ` and ${totalCount - records.length} more` : "";
+  return { schema: CRITIC_COVERAGE_ADVISORY_SCHEMA, code: "CRITIC-COVERAGE-PENDING", severity: "advisory", totalCount, records, command: CRITIC_ADDENDUM_COMMAND, nextStep,
+    line: `Critic evidence is still missing for ${totalCount} Critic-required dispatch record(s): ${named}${omitted}. Next: ${nextStep}.` };
 }
 
 /**
