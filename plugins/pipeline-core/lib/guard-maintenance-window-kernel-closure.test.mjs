@@ -224,7 +224,7 @@ const DYNAMIC_IMPORT_EDGES = {
   "plugins/pipeline-core/lib/consumer-verify.mjs": [
     "../scripts/consumer-verify-check.mjs",
   ],
-  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these eight via
+  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these ten via
   // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
   // install-time-bound absolute path, not a literal specifier the static scanner can read.
   // CLOSURE-REPAIR (Ruling 86a): the declaration had drifted from the source (six declared, eight
@@ -238,6 +238,8 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/project-authority.mjs",
     "../lib/checkpoint-push-approval.mjs",
     "../lib/critical-human-proof-policy.mjs",
+    "../lib/critical-action-authorization.mjs",
+    "../lib/published-tag-push.mjs",
   ],
   // CLOSURE-REPAIR (Ruling 86a): the start preflight loads the toolchain/readiness coordinator and
   // the model-role bootstrap lazily, so both are edges of the kernel closure.

@@ -159,7 +159,14 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/security-completeness-gate.mjs`,
   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
   `lib/checkpoint-push-audit.mjs`, and
-  `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
+  `scripts/pre-push-hook-install.mjs`. A later refresh of the same table
+  (2026-10-31: the install hook's declared dynamic-import edges had drifted from
+  eight to ten sites, and `push-init.mjs` and `critic-dispatch-preflight.mjs`
+  had gained a static import) added `lib/published-tag-push.mjs`, which decides
+  whether a push targets a published tag, and `lib/architecture-push-currency.mjs`,
+  which holds the architecture-currency check both entry scripts consult before
+  a push or a Critic dispatch, so a window covering either would let one edit
+  change what the push or dispatch gate admits. A fourth closure gap (NVA-KERNELDOC-1,
   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
   `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
   the shared predicate that decides when the GS-15 refusal stands down for the
