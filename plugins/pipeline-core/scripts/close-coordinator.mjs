@@ -3,7 +3,7 @@
 
 import { createHash } from "node:crypto";
 import {
-  existsSync, lstatSync, readFileSync, realpathSync,
+  existsSync, lstatSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import {
@@ -20,7 +20,11 @@ import { requiresPublicationReview } from "../lib/publication-review-requirement
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
-import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { writeCriticDispositionAddendumObject } from "./dispatch-record-write.mjs";
+import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
@@ -88,9 +92,10 @@ function emit(value, code = 0) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
   process.exitCode = code;
 }
-function fail(code, message) {
+function fail(code, message, { criticAddenda } = {}) {
   const error = new Error(message);
   error.code = code;
+  if (criticAddenda !== undefined) error.criticAddenda = criticAddenda;
   throw error;
 }
 function exactArgs(argv, valueNames, booleanNames = new Set()) {
@@ -415,7 +420,104 @@ function hasTerminalRecord(root, taskId) {
   catch { return false; }
   return isTerminalOutcome(value.outcome);
 }
-function assertCourseCriticEvidence(root, feature, { audited }) {
+const ADDENDA_COMMIT_SUBJECT = "chore(evidence): bind the Critic course to the delivery records";
+const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/u;
+const criticDispositionEvidencePath = (taskId) => `evidence/critic-disposition-evidence-${taskId}.md`;
+/** The evidence file the derived addendum points at: a pointer to the consumed receipt that binds the record, never a second verdict. */
+const criticDispositionEvidenceText = ({ taskId, recordPath, recordSha256, candidateCommit, criticPacketId, reviewCandidateCommit, criticReceiptSha256 }) => [
+  `Critic disposition evidence for ${taskId} (derived by the close coordinator, D223)`,
+  "",
+  `Record: ${recordPath} (sha256 ${recordSha256})`,
+  `Record commit: ${candidateCommit}`,
+  `Critic packet: ${criticPacketId}`,
+  `Review candidate: ${reviewCandidateCommit}`,
+  `Critic receipt sha256: ${criticReceiptSha256}`,
+  "",
+  "Exactly one passed (or PO-residual-accepted), consumed Critic receipt or registered Critic course binds this record under the coverage rules",
+  "of check-critic-skip-coverage. This file only points at that receipt; the review itself is the consumed receipt, which every read of the",
+  `addendum (${criticDispositionAddendumPath(taskId)}) proves again.`,
+  "",
+].join("\n");
+/** Every consumed Critic receipt of the repository's private packet store, as the facts an addendum names; an unreadable packet covers nothing. */
+function consumedCriticReceipts(root) {
+  const controlRoot = join(gitCommonDir(root), "agent-pipeline", "critic-packets");
+  let names;
+  try { names = readdirSync(controlRoot); } catch { return []; }
+  const receipts = [];
+  for (const packetId of names.filter((name) => CRITIC_PACKET_ID.test(name)).sort()) {
+    try {
+      const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId });
+      const reviewCandidateCommit = receipt?.candidate?.commit;
+      if (typeof reviewCandidateCommit === "string" && OID.test(reviewCandidateCommit)) {
+        receipts.push({ packetId, reviewCandidateCommit, criticReceiptSha256: sha256(criticPacketCanonicalJson(receipt)) });
+      }
+    } catch { /* not a consumed packet: it covers nothing */ }
+  }
+  return receipts;
+}
+/**
+ * D223 (slice 2): for each uncovered record, write the byte-bound addendum when EXACTLY ONE consumed receipt binds it. The deciding rule is
+ * the existing one, not a copy: a draft addendum naming the receipt is asked of criticAddendumBindingFinding (the function the sanctioned
+ * `dispatch-record-write --critic-addendum` verb verifies with), which applies the receipt of the record's own task id, the receipt whose
+ * reviewed range contains the record's commit, the registered course chain named by its last round, and the rule that a failed receipt
+ * binds only through a recorded PO residual acceptance (the coordinator never creates or infers one). Zero covers, two or more covers, an
+ * addendum already present, or any read that fails: nothing is written for that record and the refusal stays today's. The writer is the
+ * exported one of the verb (writeCriticDispositionAddendumObject, verifying the binding again before its exclusive publication).
+ * Nothing is staged or committed. A write failure removes every file this call created and refuses with its typed code.
+ */
+function deriveCriticAddenda(root, uncoveredIds) {
+  const plans = [];
+  try {
+    const receipts = consumedCriticReceipts(root);
+    if (receipts.length === 0) return { written: [], commitPaths: [] };
+    const entries = walkDispatchRecords(root).records;
+    for (const taskId of [...uncoveredIds].sort()) {
+      try {
+        const recordPath = `evidence/dispatch-record-${taskId}.json`;
+        const entry = entries.find(({ path }) => path === recordPath);
+        const addendumPath = criticDispositionAddendumPath(taskId);
+        if (entry === undefined || entry.record?.taskId !== taskId || existsSync(join(root, addendumPath))) continue;
+        const draft = (receipt, path, digest) => ({ schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath, recordSha256: entry.sha256, taskId,
+          candidateCommit: entry.record.candidateCommit, reviewCandidateCommit: receipt.reviewCandidateCommit, criticPacketId: receipt.packetId,
+          criticReceiptSha256: receipt.criticReceiptSha256,
+          criticEvidence: { schema: CRITIC_EVIDENCE_SCHEMA, taskId, candidateCommit: entry.record.candidateCommit, path, sha256: digest } });
+        // The probe's evidence reference is the record itself (an existing file under evidence/): the binding finding never depends on it.
+        const covers = receipts.filter((receipt) => {
+          try { return criticAddendumBindingFinding({ root, addendum: draft(receipt, recordPath, entry.sha256), record: entry.record, recordBytes: entry.bytes }) === null; }
+          catch { return false; }
+        });
+        if (covers.length !== 1) continue;
+        const [cover] = covers;
+        const evidencePath = criticDispositionEvidencePath(taskId);
+        const evidenceBytes = Buffer.from(criticDispositionEvidenceText({ taskId, recordPath, recordSha256: entry.sha256, candidateCommit: entry.record.candidateCommit,
+          criticPacketId: cover.packetId, reviewCandidateCommit: cover.reviewCandidateCommit, criticReceiptSha256: cover.criticReceiptSha256 }), "utf8");
+        if (existsSync(join(root, evidencePath)) && !readFileSync(join(root, evidencePath)).equals(evidenceBytes)) continue;
+        plans.push({ taskId, addendumPath, evidencePath, evidenceBytes, cover, addendum: draft(cover, evidencePath, sha256(evidenceBytes)) });
+      } catch { /* this record is not derivable */ }
+    }
+  } catch { return { written: [], commitPaths: [] }; }
+  const created = [];
+  const written = [];
+  let current = null;
+  try {
+    for (const plan of plans) {
+      current = plan.taskId;
+      if (!existsSync(join(root, plan.evidencePath))) {
+        writeFileSync(join(root, plan.evidencePath), plan.evidenceBytes, { flag: "wx" });
+        created.push(join(root, plan.evidencePath));
+      }
+      const receipt = writeCriticDispositionAddendumObject({ repoRoot: root, addendum: plan.addendum }, { verifyBinding: criticAddendumBindingFinding });
+      created.push(join(root, receipt.target));
+      written.push({ taskId: plan.taskId, addendumPath: plan.addendumPath, evidencePath: plan.evidencePath, addendumSha256: receipt.sha256,
+        criticPacketId: plan.cover.packetId, reviewCandidateCommit: plan.cover.reviewCandidateCommit, criticReceiptSha256: plan.cover.criticReceiptSha256 });
+    }
+  } catch (error) {
+    for (const path of created.reverse()) { try { unlinkSync(path); } catch { /* already gone */ } }
+    fail("CLOSE-CRITIC-ADDENDA-WRITE-FAILED", `feature close preparation could not write the Critic addendum for ${current} (${error?.code ?? "write-failed"}); every file this attempt created was removed again and nothing was staged or committed; repair: remove what blocks the path or write the addendum by hand with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>, then plan the transition again`);
+  }
+  return { written, commitPaths: written.flatMap((entry) => [entry.addendumPath, entry.evidencePath]).sort() };
+}
+function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = false }) {
   const directory = dirname(feature.planPath);
   const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
   let size;
@@ -441,10 +543,22 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
   if (coverage.requiredTaskIds.length > 0) {
     // D212 (N33): name WHY an addendum that exists does not bind (only findings about the uncovered ids), the route that writes the
     // addendum, and the current rule. The round cap this text used to state was removed by D190/D199.
-    const reasons = coverage.readFindings.filter((finding) => coverage.requiredTaskIds.some((id) => finding.includes(id))).slice(0, 3)
-      .map((finding) => (finding.length > 300 ? `${finding.slice(0, 300)}...` : finding));
-    const why = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
-    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> once for EACH uncovered record (one addendum file per record; the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; a failed receipt never binds without a PO residual acceptance of its minor findings (the PO's own attended step: node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>), and a course closed by a residual acceptance covers the records of all its registered rounds when the addendum names the course's last round (its criticPacketId and reviewCandidateCommit are that round's); otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed`);
+    const missingMessage = (ids) => {
+      const reasons = coverage.readFindings.filter((finding) => ids.some((id) => finding.includes(id))).slice(0, 3)
+        .map((finding) => (finding.length > 300 ? `${finding.slice(0, 300)}...` : finding));
+      const why = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
+      return (`feature close preparation is blocked: ${ids.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> once for EACH uncovered record (one addendum file per record; the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; a failed receipt never binds without a PO residual acceptance of its minor findings (the PO's own attended step: node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>), and a course closed by a residual acceptance covers the records of all its registered rounds when the addendum names the course's last round (its criticPacketId and reviewCandidateCommit are that round's); otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed`);
+    };
+    // D223 (slice 2): only plan-transition derives; apply-transition re-runs this check and must stay a pure check.
+    const derived = deriveAddenda ? deriveCriticAddenda(root, coverage.requiredTaskIds) : { written: [], commitPaths: [] };
+    if (derived.written.length > 0) {
+      const remaining = coverage.requiredTaskIds.filter((id) => !derived.written.some((entry) => entry.taskId === id));
+      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Commit exactly these paths in one evidence-only commit: git add -f -- ${derived.commitPaths.join(" ")}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
+      const covered = derived.written.map((entry) => `${entry.taskId} (Critic packet ${entry.criticPacketId})`).join(", ");
+      fail("CLOSE-CRITIC-ADDENDA-WRITTEN", `feature close preparation wrote the byte-bound Critic addendum for ${covered}, because exactly one passed, consumed Critic receipt (or one registered Critic course) covers each of these records and no other does. ${commitInstruction}${remaining.length > 0 ? ` Still uncovered after that commit: ${missingMessage(remaining)}` : ""}`,
+        { criticAddenda: { schema: "pipeline.close-critic-addenda-written.v1", written: derived.written, commitPaths: derived.commitPaths, commitInstruction, planAgain: true } });
+    }
+    fail("CLOSE-CRITIC-EVIDENCE-MISSING", missingMessage(coverage.requiredTaskIds));
   }
   // D52: a Critic slice of THIS course that is still scheduled (ready, no terminal dispatch record) means the
   // independent review has not happened; the close must not reach feature-close-prepared past it. Legacy v1
@@ -463,7 +577,7 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
   }
   return authorship;
 }
-async function transitionPlan(values) {
+async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || !COORDINATOR_PHASES.includes(values.phase)
     || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "transition identity is invalid");
@@ -544,7 +658,7 @@ async function transitionPlan(values) {
         if (entries.length !== 1 || entries[0].path !== path || entries[0].sha256 !== digest) fail("CLOSE-PACKAGE-AUTHORITY", `registered package ${kind} does not bind current State authority`);
       }
     }
-    courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
+    courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined, deriveAddenda: deriveCriticAddenda });
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.
     // The audit route below reads the consumed Critic packet and exact Verify
@@ -1007,7 +1121,7 @@ try {
     };
     if (command === "plan-transition") {
       if (parsed.values["plan-sha256"] || parsed.booleans.activate) fail("CLOSE-ARGS", "plan-transition is read-only");
-      emit(await transitionPlan(values));
+      emit(await transitionPlan(values, { deriveCriticAddenda: true }));
     } else {
       if (!parsed.booleans.activate || !SHA256.test(parsed.values["plan-sha256"] ?? "")) fail("CLOSE-ACTIVATE", "apply-transition requires exact digest and activation");
       emit(await applyTransition(values, parsed.values["plan-sha256"]));
@@ -1021,5 +1135,6 @@ try {
     status: "refused",
     code: error?.code ?? "CLOSE-FAILED",
     message: error instanceof Error ? error.message : "close coordinator failed",
+    ...(error?.criticAddenda === undefined ? {} : { criticAddenda: error.criticAddenda }),
   }, 2);
 }
