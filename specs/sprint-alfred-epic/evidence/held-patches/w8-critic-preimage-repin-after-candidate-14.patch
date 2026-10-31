@@ -1,0 +1,37 @@
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 53716b6ff..a04c097d2 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -4,11 +4,11 @@
+   "files": [
+     {
+       "path": "harness/review-protocol.md",
+-      "rawSha256": "f015d1fe97e9d27e7f68120d0fc3af53026e933a6422f706c093d024167b217c"
++      "rawSha256": "a51e9f75d2b8bff51638953ff2d73f444746372f4ef9ac8a4e2b858b7fbfaf2c"
+     },
+     {
+       "path": "plugins/pipeline-core/agents/critic.md",
+-      "rawSha256": "a79b00961433b6558527550933d74fc42a295b65553434107184d1936f27466d"
++      "rawSha256": "a75e17f9a4bb35c23ddd440c2b45d70e230671193e67294e392d827dbc1bf8ab"
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
+@@ -32,15 +32,15 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "f14e829b9d240acff182909a59d7a363ef486e144f0b91c62158bd3f65d40fc2"
++      "rawSha256": "d6619a4718da6b87315ea57867ff7b8ac5f5e0c85f6f395c5ee41490d8c5a0a9"
+     },
+     {
+       "path": "roles/critic.md",
+-      "rawSha256": "005591b0b81193270aee601312903ee840636f681ecc374471d70b267ce6421a"
++      "rawSha256": "7e348d4a3d1bc6738eb0bb3c6009e49536db4f1db90c79fcd8ad01827a83275b"
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "51f08086f3878285756918859d4c21da2b5ec1a34c98561eba6df287a9a526ad"
++      "rawSha256": "d96dfba383352d5cd5b232addf6bf3e187a8225b40e246c01186b7471eaa090c"
+     }
+   ]
+ }
