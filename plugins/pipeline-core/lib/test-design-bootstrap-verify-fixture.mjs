@@ -4,14 +4,10 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
-import { prepareAdoptionAuthority } from "./architecture-adoption-authority.mjs";
+import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
 import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
-import { applyAdoptionDecision } from "../scripts/architecture-adoption.mjs";
 import { observeCurrentPlanApprovalForCalibration } from "../scripts/pipeline-state.mjs";
-
-const SOURCE_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 export function prepareDesignBootstrapVerifyFixture({ root, verify, now }) {
   prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
@@ -26,20 +22,14 @@ export function prepareDesignBootstrapVerifyFixture({ root, verify, now }) {
   };
   git("add", "--", ...twins);
   git("commit", "-q", "-m", "seed baseline calibration fixture");
-  cpSync(join(SOURCE_ROOT, "architecture"), join(root, "architecture"), { recursive: true });
-  cpSync(join(SOURCE_ROOT, "AGENTS.md"), join(root, "AGENTS.md"));
-  const adoption = { rootDir: root, decision: "deferred", scope: ["specs/", "architecture/map/"],
-    rationale: "Contained synthetic fixture architecture deferral", decidedAt: now,
-    reviewDate: "2099-01-01", decisionRef: "TEST-D124-A3" };
-  const approvalRequest = prepareAdoptionAuthority(adoption);
-  applyAdoptionDecision({ ...adoption, approvalRequest, chatApproval: {
-    mode: "chat-attributed-unattested", by: "Synthetic fixture PO", decisionRef: "TEST-D124-A3",
-    intentSha256: approvalRequest.intent.sha256,
-  } });
-  // Keep the original pin's neutral State readbacks on a supported private tier.
-  cpSync(join(root, ".claude/pipeline.yaml"), join(root, "project/pipeline.yaml"));
   const legacyState = join(root, ".claude/pipeline-state.json");
   const state = JSON.parse(readFileSync(legacyState, "utf8"));
+  // A legacy deferred adoption is answered with ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED since D162; the fixture
+  // therefore carries a real approved-scoped design package over the feature's own surface.
+  materializeArchitectureDesignFixture({ rootDir: root, planPath: state.activeFeature.planPath, sourcePath: "src/change.mjs",
+    decisionRef: "TEST-D124-A3", by: "Synthetic fixture PO" });
+  // Keep the original pin's neutral State readbacks on a supported private tier.
+  cpSync(join(root, ".claude/pipeline.yaml"), join(root, "project/pipeline.yaml"));
   state.activeFeature.phase = "design";
   writeFileSync(join(root, "project/pipeline-state.json"), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
   rmSync(legacyState);

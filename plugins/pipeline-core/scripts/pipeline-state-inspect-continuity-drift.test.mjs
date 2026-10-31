@@ -42,6 +42,7 @@ const ROUTE = "continuity-authority-revision-plan";
 const ORIGINAL_KEYS = [
   "schema", "generatedAt", "status", "activeFeature", "phase", "planApproved", "lifecycle",
   "mixedPlanRecovery", "pushApproval", "closedFeaturesCount", "phoenixEpicHistory", "nextAction", "nextActionText",
+  "publicHandoverDuty",
 ];
 const HEX64 = /^[0-9a-f]{64}$/u;
 const sha = (value) => createHash("sha256").update(value).digest("hex");

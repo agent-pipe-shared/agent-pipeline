@@ -374,6 +374,11 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
     const specText = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Continuity is initialized by set-feature. |\n";
     writeFileSync(join(root, planPath), prdText, "utf8");
     writeFileSync(join(root, specPath), specText, "utf8");
+    // submit-plan binds the physical plan and spec bytes at a real Git candidate, so both are committed first.
+    for (const args of [["add", "--", planPath, specPath], ["commit", "-q", "--no-verify", "-m", "author the plan sources"]]) {
+      const committed = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
+      assert.equal(committed.status, 0, committed.stderr);
+    }
 
     const planSha256 = sha256Hex(prdText);
     const specSha256 = sha256Hex(specText);
@@ -401,6 +406,8 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
           specSha256,
         },
       }),
+      // Continuity initialization is the subject here, not the architecture gate: the readiness reader is injected as ready.
+      architectureEntryReadiness: () => ({ status: "ready" }),
     };
 
     // Step 1: set-feature

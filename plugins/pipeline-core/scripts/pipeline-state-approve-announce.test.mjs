@@ -34,10 +34,24 @@ function freshDir() {
   return dir;
 }
 
-function injectedPoGateAuthority(planPath) {
-  const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
+const PLAN_TEXT = "# PRD\nRequirements here.\n";
+const SPEC_TEXT = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The approve-plan output names the next step. |\n";
+
+// submit-plan binds the physical plan and spec bytes at a real Git candidate, so the fixture authors and commits both.
+function authorPlanSources(dir, planPath) {
   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
-  const specSha256 = createHash("sha256").update(`fixture:${specPath}`).digest("hex");
+  mkdirSync(join(dir, planPath.slice(0, planPath.lastIndexOf("/"))), { recursive: true });
+  writeFileSync(join(dir, planPath), PLAN_TEXT, "utf8");
+  writeFileSync(join(dir, specPath), SPEC_TEXT, "utf8");
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { windowsHide: true });
+  git("add", "--", planPath, specPath);
+  git("commit", "-q", "--no-verify", "-m", "author the plan sources");
+}
+
+function injectedPoGateAuthority(planPath) {
+  const planSha256 = createHash("sha256").update(PLAN_TEXT).digest("hex");
+  const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+  const specSha256 = createHash("sha256").update(SPEC_TEXT).digest("hex");
   const value = {
     schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
     humanFacing: "en",
@@ -79,6 +93,8 @@ function lifecycleDeps(dir, planPath) {
     poGateAuthority: injectedPoGateAuthority(planPath),
     poGateProfile: injectedPoGateProfile(),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    // The announce text is the subject here, not the architecture gate: the readiness reader is injected as ready.
+    architectureEntryReadiness: () => ({ status: "ready" }),
   };
 }
 
@@ -149,7 +165,8 @@ test("approve-plan success output announces the required set-phase --phase imple
   const dir = freshDir();
   try {
     const planPath = ".claude/plans/approve-announce.md";
-    const initCode = run(["set-feature", "--id", "approve-announce", "--plan-path", planPath], { dir, now: FIXED_NOW });
+    authorPlanSources(dir, planPath);
+    const initCode =run(["set-feature", "--id", "approve-announce", "--plan-path", planPath], { dir, now: FIXED_NOW });
     assert.equal(initCode, 0);
     const continuityInit = initializeLifecycleContinuity(dir, "approve-announce", planPath);
     assert.equal(continuityInit, 0);

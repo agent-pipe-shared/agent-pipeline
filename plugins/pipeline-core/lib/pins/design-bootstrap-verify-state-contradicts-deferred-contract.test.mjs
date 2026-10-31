@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 
 import { classifyVerifyCommand, run } from "../../scripts/pipeline-state.mjs";
 import { checkVerifyContractConfigured } from "../../scripts/push-gate-satisfiability.mjs";
+import { materializeArchitectureDesignFixture } from "../architecture-design-test-fixture.mjs";
 import { prepareDesignBootstrapVerifyFixture } from "../test-design-bootstrap-verify-fixture.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
@@ -164,7 +165,11 @@ test("A3: a real command is supplied once, written to both calibration twins, an
   assert.equal(classifyVerifyCommand(neutral.verify), "configured");
   assert.equal(checkVerifyContractConfigured(root).status, "configured");
   // Replay (reopen to design, re-enter): the command is already configured, no flag needed, no rewrite.
+  // The governed profile is the calibration bytes, so the written command moved it away from the approved adoption (class 9);
+  // the design package's decision is bound again to the configured profile before the feature re-enters implementation.
   const state = readJson(join(root, "project", "pipeline-state.json"));
+  materializeArchitectureDesignFixture({ rootDir: root, planPath: state.activeFeature.planPath, sourcePath: "src/change.mjs",
+    decisionRef: "TEST-D124-A3-REBIND", by: "Synthetic fixture PO" });
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({ ...state, activeFeature: { ...state.activeFeature, phase: "design" } }, null, 2));
   const bytes = readFileSync(join(root, "project", "pipeline.json"), "utf8");
   assert.equal(quiet(() => run(["set-phase", "--phase", "implementation"], deps)).result, 0);
