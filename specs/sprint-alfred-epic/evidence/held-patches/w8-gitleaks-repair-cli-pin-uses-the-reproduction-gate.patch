@@ -1,0 +1,103 @@
+diff --git a/plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs b/plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs
+index 0eb9119fc..c58f1ac03 100644
+--- a/plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs
++++ b/plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs
+@@ -34,7 +34,8 @@ const RULE = "fixture-rule";
+ const COLUMN = 7;
+ const OLD_LINE = 3;
+ const NEW_LINE = 48;
+-const SECRET = "fixture-secret-value-cli";
++// The reproduction gate (gitleaks-reproduction-gate.mjs) admits only a plain domain as the reviewed value.
++const SECRET = "fixture-cli.example-studio.example";
+ 
+ const PRELOAD = `
+ if (require("node:path").basename(String(process.argv[1] || "")) === "detect") {
+@@ -57,9 +58,21 @@ function makeFixture() {
+   writeFileSync(join(root, ".gitleaksignore"), `${staleLine}\n`);
+   writeFileSync(join(root, "fake-report.json"), JSON.stringify([liveFinding]));
+   writeFileSync(join(root, "preload.cjs"), PRELOAD);
++  // The public CLI needs the manually reviewed value in a regular file under root/scratch (see prepareGate).
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  writeFileSync(join(root, "scratch", "reviewed-value.txt"), SECRET);
+   return { root, staleLine, expectedNew };
+ }
+ 
++const gateFlags = (root) => ["--reviewed-value-file", join(root, "scratch", "reviewed-value.txt"), "--gate-file", join(root, "scratch", "gate.json")];
++
++/** Phase one of the public repair: bind the reviewed value to the reproduced live finding (writes only digest metadata). */
++function prepareGate(root) {
++  const args = ["--prepare-gate", "--path", REL, "--rule", RULE, "--line", String(NEW_LINE), "--column", String(COLUMN), "--root", root, ...gateFlags(root)];
++  const r = spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", env: env(root), cwd: REPO_ROOT, shell: false, timeout: 60000 });
++  assert.equal(r.status, 0, `prepare-gate stderr=${r.stderr}`);
++}
++
+ function env(root) {
+   const preload = join(root, "preload.cjs").replace(/\\/gu, "/");
+   return {
+@@ -71,7 +84,7 @@ function env(root) {
+ }
+ 
+ function runCli(root, cliArg, extra = [], opts = {}) {
+-  const args = ["--path", REL, "--rule", RULE, "--column", String(COLUMN), "--old-line", String(OLD_LINE), "--root", root, ...extra];
++  const args = ["--path", REL, "--rule", RULE, "--column", String(COLUMN), "--old-line", String(OLD_LINE), "--root", root, ...gateFlags(root), ...extra];
+   return spawnSync(process.execPath, [cliArg, ...args], { encoding: "utf8", env: env(root), cwd: opts.cwd ?? REPO_ROOT, shell: false, timeout: 60000 });
+ }
+ 
+@@ -90,6 +103,7 @@ test("source uses the shared isDirectInvocation helper, not the argv[1] string c
+ 
+ test("CLI run as a child process ACTS: exit 0, reports the replacement, rewrites the stale entry", async () => {
+   await withFixture(({ root, staleLine, expectedNew }) => {
++    prepareGate(root);
+     const r = runCli(root, CLI);
+     assert.equal(r.status, 0, `stderr=${r.stderr}`);
+     assert.match(r.stdout, new RegExp(`replaced stale entry \\(line ${OLD_LINE} -> ${NEW_LINE}\\)`, "u"));
+@@ -114,6 +128,7 @@ test("CLI still acts when argv[1] is a lower-case drive-letter / backslash / rel
+       continue;
+     }
+     await withFixture(({ root, expectedNew }) => {
++      prepareGate(root);
+       const arg = make(relative(REPO_ROOT, CLI));
+       const r = runCli(root, arg, [], { cwd: REPO_ROOT });
+       assert.equal(r.status, 0, `${label}: stderr=${r.stderr}`);
+@@ -125,6 +140,7 @@ test("CLI still acts when argv[1] is a lower-case drive-letter / backslash / rel
+ 
+ test("--recompute acts (prints the reviewed entry) and leaves the ignore file unchanged", async () => {
+   await withFixture(({ root, staleLine, expectedNew }) => {
++    prepareGate(root);
+     const r = runCli(root, CLI, ["--recompute"]);
+     assert.equal(r.status, 0, `stderr=${r.stderr}`);
+     assert.match(r.stdout, /ignore file unchanged/u);
+@@ -139,7 +155,8 @@ test("CLI failures are loud: missing flags and no matching entry exit 1 with a m
+     assert.equal(missing.status, 1);
+     assert.match(missing.stderr, /missing required flag/u);
+ 
+-    const nomatch = spawnSync(process.execPath, [CLI, "--path", REL, "--rule", RULE, "--column", String(COLUMN), "--old-line", "99", "--root", root], { encoding: "utf8", env: env(root), cwd: REPO_ROOT, shell: false });
++    prepareGate(root);
++    const nomatch = spawnSync(process.execPath, [CLI, "--path", REL, "--rule", RULE, "--column", String(COLUMN), "--old-line", "99", "--root", root, ...gateFlags(root)], { encoding: "utf8", env: env(root), cwd: REPO_ROOT, shell: false });
+     assert.equal(nomatch.status, 1);
+     assert.match(nomatch.stderr, /nothing to repair/u);
+     assert.equal(readFileSync(join(root, ".gitleaksignore"), "utf8"), `${staleLine}\n`, "failed repair must not touch the file");
+@@ -148,12 +165,14 @@ test("CLI failures are loud: missing flags and no matching entry exit 1 with a m
+ 
+ test("CLI refuses a value-binding mismatch with exit 1 and does not rewrite", async () => {
+   await withFixture(({ root, staleLine }) => {
++    prepareGate(root); // the reviewed value is reproduced first; the scanner then reports a different value
+     const other = JSON.parse(readFileSync(join(root, "fake-report.json"), "utf8"));
+     other[0].Secret = "a-different-unreviewed-value";
+     writeFileSync(join(root, "fake-report.json"), JSON.stringify(other));
+     const r = runCli(root, CLI);
+     assert.equal(r.status, 1);
+-    assert.match(r.stderr, /value-binding-mismatch/u);
++    // Through the public CLI the reproduction gate refuses first; the repair core's own value-binding refusal stays as the second line.
++    assert.match(r.stderr, /finding or exact reviewed value mismatch|value-binding-mismatch/u);
+     assert.equal(readFileSync(join(root, ".gitleaksignore"), "utf8"), `${staleLine}\n`);
+   });
+ });
+@@ -193,6 +212,7 @@ test("CLI acts when invoked through a file symlink (host-limited: skipped when s
+       t.skip(`host-limitation: file symlink creation unavailable (${error.code ?? "error"})`);
+       return;
+     }
++    prepareGate(fx.root);
+     const r = runCli(fx.root, link);
+     assert.equal(r.status, 0, `stderr=${r.stderr}`);
+     assert.match(r.stdout, /replaced stale entry/u);
