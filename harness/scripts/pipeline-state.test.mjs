@@ -64,6 +64,7 @@ import {
 import { sha256CanonicalJson } from "../../plugins/pipeline-core/lib/plan-spec-state-v2.mjs";
 import { materializeArchitectureDesignFixture } from "../../plugins/pipeline-core/lib/architecture-design-test-fixture.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../../plugins/pipeline-core/lib/critical-action-approval-request.mjs";
+import { withPrivateCriticalApprovals } from "../../plugins/pipeline-core/lib/critical-action-authorization.mjs";
 import { materializeTestDesignWorkflowPackage } from "../../plugins/pipeline-core/lib/test-design-workflow-fixture.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
@@ -766,10 +767,38 @@ if (process.env.PIPELINE_STATE_PS53_ONLY === "1") {
   process.exit(0);
 }
 
-function injectedPoGateAuthority(planPath) {
-  const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
+// QG-04 (class b, stale fixture; W7-R2): submit-plan binds the PHYSICAL authoring sources
+// (pipeline-state.mjs inspectSubmissionSources: planPath/specPath read from disk, their sha256 must equal
+// the authority's, and the Spec must pass the criterion-row scan) and needs a readable git candidate. The
+// old helper invented planSha256/specSha256 as sha256("fixture:<path>"), so every lifecycle fixture was
+// refused PLAN-SUBMIT-SOURCE-DRIFT. With `dir` the helper now keeps real plan and spec files under the
+// fixture root (an existing file is kept as it is) and derives both hashes from those bytes; without
+// `dir` (bind-plan-spec cases that never read the sources) the legacy path-derived hashes stay.
+// Same git-candidate shape the maintained plugin suites inject (gitCandidate: () => ({ ok: true, commit, tree })).
+const LIFECYCLE_GIT_CANDIDATE = { commit: "c".repeat(40), tree: "d".repeat(40) };
+function seedLifecycleSources(dir, planPath) {
   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
-  const specSha256 = createHash("sha256").update(`fixture:${specPath}`).digest("hex");
+  const sourceBytes = new Map([
+    [specPath, Buffer.from("# Test Spec\n", "utf8")],
+  ]);
+  sourceBytes.set(planPath, Buffer.from(`${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n<!-- technical-spec-sha256: ${createHash("sha256").update(sourceBytes.get(specPath)).digest("hex")} -->\n# Test PRD\n`, "utf8"));
+  for (const [relativePath, bytes] of sourceBytes) {
+    const absolute = join(dir, ...relativePath.split("/"));
+    mkdirSync(dirname(absolute), { recursive: true });
+    if (!existsSync(absolute)) writeFileSync(absolute, bytes);
+  }
+  return {
+    specPath,
+    planSha256: createHash("sha256").update(readFileSync(join(dir, ...planPath.split("/")))).digest("hex"),
+    specSha256: createHash("sha256").update(readFileSync(join(dir, ...specPath.split("/")))).digest("hex"),
+  };
+}
+
+function injectedPoGateAuthority(planPath, dir = null) {
+  const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+  const physical = dir === null ? null : seedLifecycleSources(dir, planPath);
+  const planSha256 = physical?.planSha256 ?? createHash("sha256").update(`fixture:${planPath}`).digest("hex");
+  const specSha256 = physical?.specSha256 ?? createHash("sha256").update(`fixture:${specPath}`).digest("hex");
   const value = {
     schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
     humanFacing: "de",
@@ -804,12 +833,31 @@ function injectedPoGateProfile() {
   });
 }
 
+// QG-04 (class b, stale fixture; W7-R2): `set-phase --phase implementation --verify-command <cmd>` is now the guarded
+// calibration transition (calibration-verify-commit-transition.mjs): it needs a real Git repository with the baseline
+// calibration COMMITTED and refuses CVCT-* otherwise. These lifecycle cases test the phase transition, not that
+// calibration rewrite (pipeline-state-calibration-recovery.test.mjs owns it), so they follow the maintained
+// check-state-phase-consistency.test.mjs shape: the project starts with a configured verify command and
+// `set-phase --phase implementation` is run without --verify-command. The assertions are unchanged.
+const LIFECYCLE_VERIFY_COMMAND = `${process.execPath} -e "process.exit(0)"`;
+function seedConfiguredCalibration(dir) {
+  const file = join(dir, "project", "pipeline.json");
+  if (existsSync(file)) return;
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify({ project: "lifecycle-fixture", verify: LIFECYCLE_VERIFY_COMMAND, handover: "docs/state.md" }, null, 2)}\n`);
+}
+function enterImplementation(dir, deps) {
+  seedConfiguredCalibration(dir);
+  return run(["set-phase", "--phase", "implementation"], deps);
+}
+
 function lifecycleDeps(dir, planPath, overrides = {}) {
   return {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority(planPath),
+    poGateAuthority: injectedPoGateAuthority(planPath, dir),
     poGateProfile: injectedPoGateProfile(),
+    gitCandidate: () => ({ ok: true, ...LIFECYCLE_GIT_CANDIDATE }),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
     architectureEntryReadiness: () => ({ status: "ready" }),
     ...overrides,
@@ -854,7 +902,7 @@ function lifecycleContinuity(featureId, authority) {
 }
 
 function initializeLifecycleContinuity(dir, featureId, planPath) {
-  const observed = injectedPoGateAuthority(planPath)();
+  const observed = injectedPoGateAuthority(planPath, dir)();
   if (!observed.ok) return 2;
   const requestFile = writeRequest(
     dir,
@@ -1201,6 +1249,13 @@ function canonicalFixtureJson(value) {
       && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
   );
   ok("PS06e activeFeature preserved from set-feature", state.activeFeature?.id === "ap1-pipeline-tuning");
+  // W7-R2: the submission binds the bytes that are physically on disk (inspectSubmissionSources), not an invented digest.
+  ok(
+    "PS06f submitted Plan and Spec digests equal the sha256 of the files the fixture wrote",
+    state.planSubmission?.planSha256 === createHash("sha256").update(readFileSync(join(dir, ".claude", "plans", "x.md"))).digest("hex")
+      && state.planSubmission?.specSha256 === createHash("sha256").update(readFileSync(join(dir, ".claude", "plans", "spec.md"))).digest("hex")
+      && state.planApproval?.poGateAuthority?.planSha256 === state.planSubmission?.planSha256,
+  );
 }
 
 // ---- PS07: set-feature resets planApproved to false + phase design ---------------------
@@ -1282,7 +1337,7 @@ function canonicalFixtureJson(value) {
       && afterSeal.planApproval?.submissionSha256 === beforeSeal.planApproval?.submissionSha256
       && JSON.stringify(afterSeal.planApproval?.poGateAuthority) === JSON.stringify(beforeSeal.planApproval?.poGateAuthority),
   );
-  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], successorDeps) === 0);
+  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", enterImplementation(dir, successorDeps) === 0);
   const beforeReplay = readFileSync(statePath(dir), "utf8");
   const replay = captureConsoleError(() => run(["seal-plan-approval"], successorDeps));
   ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V4-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
@@ -1322,7 +1377,7 @@ function canonicalFixtureJson(value) {
   const dir = freshDir("set-phase");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   submitAndApprove(dir, "p1.md");
-  const code = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], lifecycleDeps(dir, "p1.md"));
+  const code = enterImplementation(dir, lifecycleDeps(dir, "p1.md"));
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS09b phase updated (inside activeFeature, F1 fix)", state.activeFeature?.phase === "implementation");
@@ -1362,7 +1417,14 @@ function canonicalFixtureJson(value) {
   const head = git("rev-parse", "HEAD").stdout.trim();
 
   const planPath = "specs/e2e/prd_e2e.md";
+  // W7-R2: submit-plan now consults architecture readiness, so this real-repo fixture materializes the same small
+  // design package PS14 does. Plan approval is cleared in chat mode (as in PS14); the push gate keeps its signature
+  // default, which PS12c still refuses without a proof.
+  writeFileSync(join(dir, "pipeline.user.yaml"), "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\ngates:\n  human_approval: chat\n");
+  git("add", "pipeline.user.yaml");
+  git("commit", "-qm", "fixture: add pipeline policy source", "--", "pipeline.user.yaml");
   seedSubprocessPoGateAuthority(dir, planPath);
+  materializeArchitectureDesignFixture({ rootDir: dir, planPath });
   const res1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "e2e", "--plan-path", planPath], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
@@ -1473,6 +1535,11 @@ function canonicalFixtureJson(value) {
   git("add", "pipeline.user.yaml");
   git("commit", "-qm", "fixture: add pipeline policy source", "--", "pipeline.user.yaml");
   seedSubprocessPoGateAuthority(dir, planPath);
+  // W7-R2: configured calibration committed with the repository (see seedConfiguredCalibration); set-phase below
+  // runs without --verify-command.
+  seedConfiguredCalibration(dir);
+  git("add", "--", "project/pipeline.json");
+  git("commit", "-qm", "fixture: configured verify calibration", "--", "project/pipeline.json");
   materializeArchitectureDesignFixture({ rootDir: dir, planPath });
 
   const env = { ...process.env, CLAUDE_PROJECT_DIR: dir };
@@ -1496,7 +1563,7 @@ function canonicalFixtureJson(value) {
   ok("PS14a2 F1-integration: real present-plan subprocess exit 0", presented.status === 0, `stderr: ${presented.stderr}`);
   const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
-  const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { encoding: "utf8", env });
+  const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
   ok("PS14c F1-integration: real set-phase subprocess exit 0", r3.status === 0, `stderr: ${r3.stderr}`);
 
   // Feed the REAL resulting file into stop-suggest.mjs's OWN real loader/resolver (not a
@@ -3873,7 +3940,7 @@ function runAuthorityRevisionTests() {
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDepsForFx);
   const presented = run(["present-plan", "--by", "coordinator"], lifecycleDepsForFx);
   const approved = run(["approve-plan", "--by", "po-test"], lifecycleDepsForFx);
-  const phased = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], lifecycleDepsForFx);
+  const phased = run(["set-phase", "--phase", "implementation"], lifecycleDepsForFx);
   ok("AR03h-setup a real plan-approval lifecycle moves the active feature to implementation phase after the AR plan was already built",
     submitted === 0 && approved === 0 && phased === 0, `submit=${submitted} approve=${approved} phase=${phased}`);
   ok("AR03h-setup-1 present-plan exit 0", presented === 0, `got ${presented}`);
@@ -4401,6 +4468,16 @@ function pac08GatesYaml(base, mode) {
   git("commit", "-q", "-m", "fixture");
 }
 
+// QG-04 (class b, stale fixture; W7-R2, D206): the reconcile approval and its proof consumption no longer land in the
+// tracked state file but in the private store under the git common directory (defaultFeaturePackageReconcileApproval ->
+// writeCriticalApproval). The RG cases below keep their intent -- a verified approval is durably recorded, commit-bound,
+// attributed and replay-protected -- and read it through the one shared overlay every gate uses (the maintained
+// plugins/pipeline-core/scripts/pipeline-state.test.mjs approvalReadThroughStore does the same). No assertion is changed.
+function readStateThroughCriticalStore(dir) {
+  const observed = readState(dir);
+  return observed.status === "ok" ? { ...observed, state: withPrivateCriticalApprovals(observed.state, dir) } : observed;
+}
+
 /** A GOVERNING session for `defaultFeaturePackageReconcileApproval` -- deliberately separate
  * from `--root` (the repository being reconciled): the default approval reads
  * `gates.reconcile_approval` and Continuity State from THIS directory, never from `--root`
@@ -4827,7 +4904,7 @@ function runFeaturePackageReconcileTests() {
     "--by", "PO", "--proof-request", proofA.requestPath, "--proof-authority", proofA.authorityPath, "--proof", proofA.proofPath,
   ], commonDeps(fxA));
   ok("RGo first signature-mode reconcile applies", appliedA.value === 0, appliedA.out || appliedA.err);
-  const stateAfterA = readState(governingDir);
+  const stateAfterA = readStateThroughCriticalStore(governingDir);
   ok("RGo governing state records featurePackageReconcileApproval.lastApproved with approvedBy/approvedAt/forCommit and a real criticalProof",
     stateAfterA.status === "ok"
     && stateAfterA.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
@@ -4851,7 +4928,7 @@ function runFeaturePackageReconcileTests() {
   ok("RGq-setup the fresh package's subject (manifestRel/planSha256) is byte-identical to RGo's, so proofA's subject binding still matches",
     fxB.manifestRel === fxA.manifestRel && digestB === digestA, `${fxB.manifestRel}/${digestB} vs ${fxA.manifestRel}/${digestA}`);
   const beforeManifestB = readFileSync(join(fxB.dir, fxB.manifestRel));
-  const stateBeforeB = readState(governingDir);
+  const stateBeforeB = readStateThroughCriticalStore(governingDir);
   const refusedB = reconcileApplyCmd(fxB.dir, [
     "--manifest", fxB.manifestRel, "--plan-sha256", digestB,
     "--by", "PO", "--proof-request", proofA.requestPath, "--proof-authority", proofA.authorityPath, "--proof", proofA.proofPath,
@@ -4860,7 +4937,7 @@ function runFeaturePackageReconcileTests() {
     refusedB.value === 2 && /external proof was already consumed \(CRITICAL-PROOF-REPLAY\)/.test(refusedB.err)
     && !/FTP-RECONCILE-APPROVAL-REJECTED/.test(refusedB.err)
     && readFileSync(join(fxB.dir, fxB.manifestRel)).equals(beforeManifestB), refusedB.err);
-  const stateAfterB = readState(governingDir);
+  const stateAfterB = readStateThroughCriticalStore(governingDir);
   ok("RGq the governing session's state is byte-identical after the refused replay -- no second consumption entry, no lastApproved overwrite",
     JSON.stringify(stateAfterB) === JSON.stringify(stateBeforeB), JSON.stringify(stateAfterB));
 
@@ -4874,10 +4951,12 @@ function runFeaturePackageReconcileTests() {
   const appliedC = reconcileApplyCmd(fxC.dir, [
     "--manifest", fxC.manifestRel, "--plan-sha256", digestC,
     "--by", "PO", "--proof-request", proofC.requestPath, "--proof-authority", proofC.authorityPath, "--proof", proofC.proofPath,
-  ], commonDeps(fxC));
+  // One second after RGo: the private store orders approvals by approvedAt, and two records with the same instant
+  // are ordered by a digest of their random proof keys, so "lastApproved is RGr's" held only by chance.
+  ], { ...commonDeps(fxC), now: () => new Date(Date.parse(PAC08_NOW) + 1000).toISOString() });
   ok("RGr a different, never-before-used genuine proof against the SAME governing dir succeeds",
     appliedC.value === 0, appliedC.out || appliedC.err);
-  const stateAfterC = readState(governingDir);
+  const stateAfterC = readStateThroughCriticalStore(governingDir);
   ok("RGr the governing state now carries TWO consumption entries (RGo's + RGr's), both tagged feature-package-reconcile, and lastApproved now reflects RGr's own distinct proof",
     Array.isArray(stateAfterC.state.criticalProofConsumption) && stateAfterC.state.criticalProofConsumption.length === 2
     && stateAfterC.state.criticalProofConsumption.every((entry) => entry.kind === "feature-package-reconcile")
@@ -4900,7 +4979,7 @@ function runFeaturePackageReconcileTests() {
   };
   const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
   ok("RGp chat-mode reconcile applies", applied.value === 0, applied.out || applied.err);
-  const governingState = readState(governingDir);
+  const governingState = readStateThroughCriticalStore(governingDir);
   ok("RGp chat-mode approval is commit-bound and attributed even though criticalProof is null",
     governingState.status === "ok"
     && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
@@ -4966,7 +5045,7 @@ function runFeaturePackageReconcileTests() {
   const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
   ok("RGs-2 the manifest was actually rewritten in the self-governing topology, not a no-op",
     persisted.artifacts[0].sha256 === sha256Hex(grownPrd), JSON.stringify(persisted));
-  const governingState = readState(fx.dir);
+  const governingState = readStateThroughCriticalStore(fx.dir);
   ok("RGs-3 the SAME directory's governing state now carries both the reconcile's usual approval side effects (lastApproved/criticalProofConsumption) proving the write genuinely happened despite sharing the lock path",
     governingState.status === "ok"
     && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
