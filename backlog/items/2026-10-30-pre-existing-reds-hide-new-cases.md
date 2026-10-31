@@ -62,7 +62,10 @@ Red on the plain candidate (identical in every baseline clone this session):
    `lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types` A1-A3 (Plan and general-purpose now refused with
    DISPATCH-WRITE-CARRIER-REQUIRED), `lib/pins/onboarding-test-runner-reports-async-pass-before-settlement` (pins 216
    declared onboarding cases, the suite now declares 240), `lib/pins/security-scanner-failure-provenance` P1-P3 (the
-   fixture projects have no remote, so the scan stops at remote-missing). Slice R8.
+   fixture projects have no remote, so the scan stops at remote-missing). R8 restates the three pins (test-only, held
+   with candidate 13); the hook-level A3 case no longer asserts APB-ROLE-UNPARSEABLE because the carrier refusal now
+   precedes it, and the module-level A3 case still pins that code. On the 26-patch result, 20 of 21 cross suites are
+   green in fresh clones; onboarding-v3 is red only for the seeded push gate and SECGATE-1 (item 1).
 
 ### Status after the candidate-13 held patches (2026-10-31, not yet applied)
 
