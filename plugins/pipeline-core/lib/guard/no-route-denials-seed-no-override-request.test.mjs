@@ -35,6 +35,9 @@ test("NRS01 refusals with no override route seed no request", () => {
     ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
     ["Bash", { command: "node -e \"process.exit(0)\"" }, "GUARD-LIFECYCLE-NOT-READY"],
+    // A target outside the physical project root is HGO-NONOVERRIDABLE-CROSS-BOUNDARY (constants.mjs, "Measured boundary"):
+    // the denial prints the typed no-route line and seeds nothing.
+    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
   ]) {
     const { result, seeded } = seededRequests(toolName, toolInput);
     assert.equal(result.exitCode, 2, `${toolInput.command}`);
@@ -48,7 +51,6 @@ test("NRS02 refusals that offer a human override seed exactly one request", () =
     ["Bash", { command: "echo a; echo b" }, "GUARD-PARSE-UNSUPPORTED"],
     ["Bash", { command: "cat a.txt > b.txt" }, "GUARD-REDIRECT-UNAPPROVED"],
     ["Bash", { command: "cat a.txt | tee b.txt" }, "GUARD-OPERATOR-UNAPPROVED"],
-    ["Write", { file_path: "../outside.txt", content: "x" }, "GUARD-CROSS-REPO-MUTATION"],
   ]) {
     const { result, seeded } = seededRequests(toolName, toolInput);
     assert.equal(result.exitCode, 2, JSON.stringify(toolInput));

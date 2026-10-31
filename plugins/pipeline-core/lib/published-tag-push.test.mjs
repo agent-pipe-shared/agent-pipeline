@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
 // Pins lib/published-tag-push.mjs (N27a / D206): the one predicate guard-push and the generated pre-push hook share.
-// NOTE: this file needs registration in the project's Verify suite list (harness/scripts/verify.mjs) -- it is not run by Verify before that.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
