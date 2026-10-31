@@ -1,0 +1,24 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs b/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
+index a4dc6fff3..f9f7724bb 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
+@@ -232,12 +232,16 @@ test("calibration validation: the rule's tier limits must equal the agent defini
+   assert.deepEqual(Object.keys(derived), [...DISPATCH_BUDGET_TIERS]);
+   for (const tier of DISPATCH_BUDGET_TIERS) assert.equal(derived[tier], readAgentMaxTurns(DISPATCH_BUDGET_TIER_AGENTS[tier]), tier);
+   assert.equal(Object.isFrozen(derived), true);
+-  assert.equal(codeOf(() => evaluateDispatchBudgetCalibration({ rule: rule(), samples: [sample()], pluginRoot: PLUGIN_ROOT })), null,
+-    "the rule helper's what-if limits equal the shipped definitions (update the helper when a definition changes)");
++  // A rule whose limits are the shipped definitions validates. Restated after 88afb9b94 (D191 raised the deep and
++  // implementor runtime stop to 400): the limits come from the derived map, so the formula cases below keep the rule
++  // helper's small what-if limits, which the tier-cap case needs to truncate a formula.
++  const shipped = rule({ maxTurnsByTier: { ...derived } });
++  assert.equal(codeOf(() => evaluateDispatchBudgetCalibration({ rule: shipped, samples: [sample()], pluginRoot: PLUGIN_ROOT })), null,
++    "a rule carrying the shipped definitions' limits validates against them");
+ 
+   // A limit that differs from the definition in any one tier is refused.
+   for (const tier of DISPATCH_BUDGET_TIERS) {
+-    const skewed = rule({ maxTurnsByTier: { ...rule().maxTurnsByTier, [tier]: derived[tier] + 1 } });
++    const skewed = rule({ maxTurnsByTier: { ...derived, [tier]: derived[tier] + 1 } });
+     assert.equal(codeOf(() => evaluateDispatchBudgetCalibration({ rule: skewed, samples: [sample()], pluginRoot: PLUGIN_ROOT })), "DBC-MAXTURNS-MISMATCH", tier);
+   }
+ 
