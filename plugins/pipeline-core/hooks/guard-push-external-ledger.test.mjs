@@ -51,12 +51,12 @@ import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { appendExternalPushLedgerConsumption } from "../lib/external-push-ledger.mjs";
-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 const ALL_DIRS = [];
 
-function freshRepo(prefix) {
+function freshRepo(prefix, { approvedMini = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-xledger-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
@@ -68,7 +68,8 @@ function freshRepo(prefix) {
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
   enrollFixtureGovernance(dir);
-  const head = git("rev-parse", "HEAD").stdout.trim();
+  // An ALLOW case opts in to an approved low-rigor pushed state; a bare fixture requires a candidate-bound Critic review.
+  const head = approvedMini ? commitApprovedMiniFixtureState(dir) : git("rev-parse", "HEAD").stdout.trim();
   return { dir, head };
 }
 
@@ -126,8 +127,8 @@ function pushKeypair() {
  * proof, approval) binds to the commit that already carries the gates file -- committing it
  * afterwards would move HEAD out from under the already-signed candidate.
  */
-function signedPushRepo(prefix, { key = pushKeypair(), remote = "origin", destination = "refs/heads/feature-test", userYamlGates = null } = {}) {
-  const { dir } = freshRepo(prefix);
+function signedPushRepo(prefix, { key = pushKeypair(), remote = "origin", destination = "refs/heads/feature-test", userYamlGates = null, approvedMini = false } = {}) {
+  const { dir } = freshRepo(prefix, { approvedMini });
   if (userYamlGates !== null) writeUserYamlCommitted(dir, userYamlGates);
 
   // The threat model file must be committed, not merely written, BEFORE `head`/`tree` are
@@ -223,7 +224,7 @@ const ALLOW = 0, BLOCK = 2;
 
 // ---- PGXL01: no pipeline.user.yaml at all -> gate off -> unaffected allow -----------------
 {
-  const { dir } = signedPushRepo("no-user-yaml");
+  const { dir } = signedPushRepo("no-user-yaml", { approvedMini: true });
   const home = mkdtempSync(join(tmpdir(), "guard-push-xledger-home-"));
   ALL_DIRS.push(home);
   check("PGXL01 allow  signed push, no gates.push_external_ledger configured at all", PUSH_CMD, dir, home, ALLOW);
@@ -231,7 +232,7 @@ const ALLOW = 0, BLOCK = 2;
 
 // ---- PGXL02: gate explicitly off (committed) -> unaffected allow --------------------------
 {
-  const { dir } = signedPushRepo("gate-off", { userYamlGates: "gates:\n  push_external_ledger: \"off\"\n" });
+  const { dir } = signedPushRepo("gate-off", { userYamlGates: "gates:\n  push_external_ledger: \"off\"\n", approvedMini: true });
   const home = mkdtempSync(join(tmpdir(), "guard-push-xledger-home-"));
   ALL_DIRS.push(home);
   check("PGXL02 allow  signed push, gates.push_external_ledger: off", PUSH_CMD, dir, home, ALLOW);
@@ -249,7 +250,7 @@ const ALLOW = 0, BLOCK = 2;
 
 // ---- PGXL04: gate required, correct ledger record present -> allow ------------------------
 {
-  const { dir, proofSha256 } = signedPushRepo("gate-required-present", { userYamlGates: "gates:\n  push_external_ledger: \"required\"\n" });
+  const { dir, proofSha256 } = signedPushRepo("gate-required-present", { userYamlGates: "gates:\n  push_external_ledger: \"required\"\n", approvedMini: true });
   const home = mkdtempSync(join(tmpdir(), "guard-push-xledger-home-"));
   ALL_DIRS.push(home);
   const appended = appendExternalPushLedgerConsumption({

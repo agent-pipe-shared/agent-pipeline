@@ -27,7 +27,7 @@ import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critic
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 function enrollFixtureGovernance(root) {
@@ -42,7 +42,7 @@ function enrollFixtureGovernance(root) {
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 const ALL_DIRS = [];
 
-function freshRepo(prefix) {
+function freshRepo(prefix, { approvedMini = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-decref-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
@@ -54,6 +54,8 @@ function freshRepo(prefix) {
   writeFileSync(join(dir, "README.md"), "fixture\n");
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
+  // An ALLOW case opts in to an approved low-rigor pushed state; a bare fixture requires a candidate-bound Critic review.
+  if (approvedMini) commitApprovedMiniFixtureState(dir);
   return dir;
 }
 
@@ -104,8 +106,8 @@ function fingerprintFor(dir) {
  * `decisionReference` is applied to the approval record only when the case asks for it -- the
  * `undefined` default is the regression witness for "absent leaves the record untouched".
  */
-function signedPushRepo(prefix, { decisionReference, forCommitOverride } = {}) {
-  const dir = freshRepo(prefix);
+function signedPushRepo(prefix, { decisionReference, forCommitOverride, approvedMini = false } = {}) {
+  const dir = freshRepo(prefix, { approvedMini });
   const key = pushKeypair();
 
   // The threat model file must be committed, not merely written, BEFORE `head`/`tree` are
@@ -221,7 +223,7 @@ function check(id, dir, expectExit, { stderrIncludes = [], stderrExcludes = [] }
 
 // ---- GPDR01: absent decisionReference -> prior behavior, byte-for-byte (regression witness) --
 {
-  const { dir } = signedPushRepo("absent");
+  const { dir } = signedPushRepo("absent", { approvedMini: true });
   check("GPDR01 allow  signed push, no decisionReference on the record at all", dir, ALLOW, {
     stderrExcludes: [DISAGREEMENT, "decision-reference"],
   });
@@ -229,7 +231,7 @@ function check(id, dir, expectExit, { stderrIncludes = [], stderrExcludes = [] }
 
 // ---- GPDR02: present and agreeing -> the transition proceeds ---------------------------------
 {
-  const { dir, head, tree } = signedPushRepo("agreeing");
+  const { dir, head, tree } = signedPushRepo("agreeing", { approvedMini: true });
   const state = readState(dir);
   state.pushApproval.lastApproved.decisionReference = reference({ commit: head, tree, fingerprint: fingerprintFor(dir) });
   writeFile(dir, STATE_REL, state);

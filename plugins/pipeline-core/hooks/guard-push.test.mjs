@@ -17,7 +17,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync 
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
@@ -38,7 +38,7 @@ const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 const ALL_DIRS = [];
 
 /** Fresh temp dir with a real git repo (one commit) so `git rev-parse HEAD` resolves. */
-function freshRepo(prefix) {
+function freshRepo(prefix, { approvedMini = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
@@ -51,7 +51,10 @@ function freshRepo(prefix) {
   writeFileSync(join(dir, "README.md"), "fixture\n");
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
-  const head = git("rev-parse", "HEAD").stdout.trim();
+  // The push gate reads the publication-review duty from the pushed commit's own state; a bare fixture
+  // carries none, so it requires a candidate-bound Critic review. An ALLOW case about something else
+  // opts in to an approved low-rigor state; every block case stays bare.
+  const head = approvedMini ? commitApprovedMiniFixtureState(dir) : git("rev-parse", "HEAD").stdout.trim();
   return { dir, head };
 }
 
@@ -90,13 +93,13 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-function exactSecurityEvidence({ head, tree }) {
+function exactSecurityEvidence({ head, tree, repositorySha256 = "b".repeat(64) }) {
   const payload = {
     schema: "pipeline.security-evidence.v1",
     exitCode: 0,
     commit: head,
     candidate: {
-      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256: "b".repeat(64),
+      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256,
       inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
       snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
     },
@@ -347,7 +350,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
 
 // ---- PG09 security check skipped when security mode off -------------------------------
 {
-  const { dir, head } = freshRepo("security-skipped");
+  const { dir, head } = freshRepo("security-skipped", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "off" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   // security-latest.json absent, but security gate is off -> must NOT be reported, all-green.
@@ -359,7 +362,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
 // must respect that gate's OWN configured mode -- security.mode=warn is a promise that a
 // security finding is advisory, and push.mode=blocking must not silently override it.
 {
-  const { dir, head } = freshRepo("security-warn-only-failure");
+  const { dir, head } = freshRepo("security-warn-only-failure", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "warn" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   // security-latest.json intentionally absent -> a security-only failure.
@@ -380,12 +383,16 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
-// ---- PG10 standing-approved passes without any state file ------------------------------
+// ---- PG10 standing-approved passes without any push-approval record ---------------------
+// Restated: the original intent was "no state file at all". Since 272d0f668 a pushed commit that carries no
+// project state at all requires a candidate-bound Critic review (REVIEW-STATE-UNAVAILABLE), so the fixture now
+// carries the smallest state a real candidate has -- an approved low-rigor plan -- and the intent that remains
+// is that standing-approved needs no `pushApproval` record in it.
 {
-  const { dir, head } = freshRepo("standing-approved");
+  const { dir, head } = freshRepo("standing-approved", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  check("PG10 allow  standing-approved passes without any state file", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  check("PG10 allow  standing-approved passes without any push-approval record (pushed state is an approved low-rigor plan)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 
 // ---- PG11a required + absent approval (no state file at all) -> exit 2 -----------------
@@ -552,7 +559,7 @@ const PUSH_WAIVER = {
   waivedKinds: [{ kind: "push", reason: "operator decision recorded for this fixture" }],
 };
 {
-  const { dir, head } = freshRepo("required-waived");
+  const { dir, head } = freshRepo("required-waived", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   writeProofPolicy(dir, PUSH_WAIVER);
@@ -633,7 +640,7 @@ const PUSH_WAIVER = {
   // except the push command is the bare branch name and the local branch it names really
   // exists at the approved commit -- the regression test the DoD asks for: identical
   // authorizeRecordedPush outcome to the fully-qualified form.
-  const { dir, head } = freshRepo("bare-refspec-resolve");
+  const { dir, head } = freshRepo("bare-refspec-resolve", { approvedMini: true });
   gitAt(dir, "checkout", "-q", "-b", "feature-test");
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
@@ -654,7 +661,7 @@ const PUSH_WAIVER = {
   // A colon-less refspec whose source is already a full ref resolves as identity
   // (refs/heads/feature-test -> refs/heads/feature-test), not double-prefixed into
   // refs/heads/refs/heads/feature-test.
-  const { dir, head } = freshRepo("bare-refspec-resolve-full-ref");
+  const { dir, head } = freshRepo("bare-refspec-resolve-full-ref", { approvedMini: true });
   gitAt(dir, "checkout", "-q", "-b", "feature-test");
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
@@ -704,7 +711,7 @@ const PUSH_WAIVER = {
   // ADR-0056: the operator-facing control is gates.push_approval in the project's own
   // source of truth. `chat` stands the external signature down; the commit binding and
   // the labelled record stay exactly as strict.
-  const { dir } = freshRepo("required-chat-mode");
+  const { dir } = freshRepo("required-chat-mode", { approvedMini: true });
   // Committed, not merely written. Since the C1 fix a working-tree copy that differs from
   // HEAD is untrusted and resolves to `signature`, so a written-only fixture would assert
   // that an UNCOMMITTED chat setting authorizes a push -- precisely the hole C1 closed.
@@ -778,7 +785,7 @@ const PUSH_WAIVER = {
   // Ed25519 signature lane and never the chat waiver at all, so `chat` mode opened every
   // branch except the one that matters most. Same fixture shape as PG12c; destination is
   // main instead of feature-test.
-  const { dir } = freshRepo("required-chat-mode-main");
+  const { dir } = freshRepo("required-chat-mode-main", { approvedMini: true });
   writeFileSync(join(dir, "pipeline.user.yaml"),
     'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
   gitAt(dir, "add", "pipeline.user.yaml");
@@ -853,9 +860,9 @@ function signedPushRepo(prefix, {
   key = pushKeypair(), remote = "origin", destination = "refs/heads/feature-test",
   expiresAt = "2099-01-01T00:00:00.000Z", keyReference = "po-key-1", anchorKey = null,
   planSha256 = SIGNED_PLAN_SHA, specSha256 = SIGNED_SPEC_SHA, featureId = "fixture-feature",
-  recordProof = true, consume = true, commitOverride = null, mutateApproval = null,
+  recordProof = true, consume = true, commitOverride = null, mutateApproval = null, approvedMini = false,
 } = {}) {
-  const { dir } = freshRepo(prefix);
+  const { dir } = freshRepo(prefix, { approvedMini });
   writeManifest(dir, manifestPush({ approval: "required" }));
   const threatModelBody = "# fixture threat model\n";
   writeEvidence(dir, THREAT_MODEL_REL, threatModelBody);
@@ -914,14 +921,14 @@ function signedPushRepo(prefix, {
 {
   // PG12s1 -- the point of the whole block: an ordinary branch push, in signature mode,
   // attested by the key holder for exactly this commit/remote/ref, is allowed.
-  const { dir } = signedPushRepo("signed-allow");
+  const { dir } = signedPushRepo("signed-allow", { approvedMini: true });
   check("PG12s1 allow a signature-mode push the key holder attested for this exact action", PUSH_CMD, dir, ALLOW);
 }
 {
   // PG12s2 -- `main` is not special-cased. The PO's requirement was every branch, main
   // included, when the human has cleared it; the destination is simply part of what is
   // signed, so main gets no extra permission and no extra refusal.
-  const { dir } = signedPushRepo("signed-allow-main", { destination: "refs/heads/main" });
+  const { dir } = signedPushRepo("signed-allow-main", { destination: "refs/heads/main", approvedMini: true });
   check("PG12s2 allow an attested push to main -- the ref is signed, not special-cased",
     "git push origin main:refs/heads/main", dir, ALLOW);
 }
@@ -1039,7 +1046,7 @@ function signedPushRepo(prefix, {
   // PG12u2 -- the block is scoped to those three directories, and stays scoped. An
   // uncommitted file anywhere else is not this guard's business and must not become a
   // push refusal. guard-push.mjs:1659 is the only working-tree status check in the file.
-  const { dir } = signedPushRepo("signed-uncommitted-elsewhere");
+  const { dir } = signedPushRepo("signed-uncommitted-elsewhere", { approvedMini: true });
   writeFileSync(join(dir, "stray-note.md"), "uncommitted work\n");
   check("PG12u2 allow an attested push while an unrelated path carries uncommitted work", PUSH_CMD, dir, ALLOW);
 }
@@ -1176,7 +1183,7 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
   // attestation at all. The four refusals below would each also pass against a guard that
   // resolved nothing, and that is the property being pinned -- ambiguity, or a resolved
   // ref nothing attests, may cost a refusal but must never become permission.
-  const { dir } = signedPushRepo("bare-resolved", { destination: "refs/heads/main" });
+  const { dir } = signedPushRepo("bare-resolved", { destination: "refs/heads/main", approvedMini: true });
   check("PG12s16 allow a bare `git push origin main` attested for the ref it resolves to",
     "git push origin main", dir, ALLOW);
 }
@@ -1259,11 +1266,15 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
 
 // ---- PG13 all-green (standing-approved + verify + security both fresh) -> allow --------
 {
-  const { dir, head } = freshRepo("all-green");
+  const { dir, head } = freshRepo("all-green", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
-  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
+  // Security evidence binds the effective push destination: its repositorySha256 is the digest of the
+  // remote's single push URL, so an all-green candidate needs a configured remote and a matching digest.
+  const pushUrl = "https://example.invalid/all-green.git";
+  gitAt(dir, "remote", "add", "origin", pushUrl);
+  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree, repositorySha256: createHash("sha256").update(pushUrl).digest("hex") }));
   writeEvidence(dir, "evidence/security-latest.v2.json", {
     schema: "pipeline.security-evidence.v2",
     policy: { configurationSha256: "e".repeat(64) },
@@ -1337,7 +1348,7 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
 // ---- PG17 actual repository and explicit source OID bind every artifact ----------------
 {
   const decoy = freshRepo("binding-decoy");
-  const target = freshRepo("binding-target");
+  const target = freshRepo("binding-target", { approvedMini: true });
   writeManifest(decoy.dir, manifestPush({ approval: "standing-approved" }));
   writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 0, commit: decoy.head });
@@ -1356,7 +1367,7 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
   });
 }
 {
-  const primary = freshRepo("source-worktree-evidence");
+  const primary = freshRepo("source-worktree-evidence", { approvedMini: true });
   const targetDir = join(primary.dir, "target-worktree");
   gitAt(primary.dir, "worktree", "add", "-q", "-b", "target", targetDir);
   writeFileSync(join(targetDir, "target.txt"), "target\n");
@@ -1376,7 +1387,7 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
   );
 }
 {
-  const { dir, head: verifiedOid } = freshRepo("source-oid");
+  const { dir, head: verifiedOid } = freshRepo("source-oid", { approvedMini: true });
   gitAt(dir, "branch", "verified", verifiedOid);
   const verifiedDir = join(dir, "verified-worktree");
   gitAt(dir, "worktree", "add", "-q", verifiedDir, "verified");
@@ -1422,7 +1433,7 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
   });
 }
 {
-  const { dir } = freshRepo("strict-shapes");
+  const { dir } = freshRepo("strict-shapes", { approvedMini: true });
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   const blockedShapes = [
     ["PG17j multiple refspecs", "git push origin main other"],
@@ -1929,7 +1940,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
 
 // ---- PG26 anonymous-public self-application range -----------------------------------------------
 {
-  const { dir } = freshRepo("anonymous-public-green");
+  const { dir } = freshRepo("anonymous-public-green", { approvedMini: true });
   const { command, env } = prepareAnonymousPublicPush(dir);
   check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true, env });
 }
@@ -2205,7 +2216,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
 // ---- PG30 the fault sentinel is inert without the exact env var + value: an ordinary
 // all-green push is unaffected -- confirms the injection seam cannot accidentally fire.
 {
-  const { dir, head } = freshRepo("fault-inert");
+  const { dir, head } = freshRepo("fault-inert", { approvedMini: true });
   writeManifest(dir, manifestPush({ mode: "blocking", approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check("PG30 allow  the fault sentinel env var alone (wrong value) never fires", PUSH_CMD, dir, ALLOW, {
@@ -2238,7 +2249,7 @@ function checkDeclared(id, ok, detail) {
     console.log(`FAIL  ${id} -- ${detail}`);
   }
 }
-function freshRepoIn(parentDir, name) {
+function freshRepoIn(parentDir, name, { approvedMini = false } = {}) {
   const dir = join(parentDir, name);
   mkdirSync(dir);
   const initialized = gitAt(dir, "init", "-q", "-b", "main");
@@ -2249,12 +2260,12 @@ function freshRepoIn(parentDir, name) {
   writeFileSync(join(dir, "README.md"), "fixture\n");
   gitAt(dir, "add", "README.md");
   gitAt(dir, "commit", "-q", "-m", "init");
-  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  const head = approvedMini ? commitApprovedMiniFixtureState(dir) : gitAt(dir, "rev-parse", "HEAD").stdout.trim();
   return { dir, head };
 }
 {
   // D4a: absolute declaredCwd is used as-is (bare-candidate resolution branch).
-  const target = freshRepo("d4a-target");
+  const target = freshRepo("d4a-target", { approvedMini: true });
   const decoy = freshRepo("d4a-decoy"); // actual spawn cwd; manifest present, no evidence -> BLOCK if ever used
   writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
@@ -2267,7 +2278,7 @@ function freshRepoIn(parentDir, name) {
   // D4b: relative declaredCwd resolves against process.cwd() (bare-candidate branch).
   const parent = mkdtempSync(join(tmpdir(), "d4b-parent-"));
   ALL_DIRS.push(parent);
-  const { dir: relTarget, head: relHead } = freshRepoIn(parent, "target-repo");
+  const { dir: relTarget, head: relHead } = freshRepoIn(parent, "target-repo", { approvedMini: true });
   writeManifest(relTarget, manifestPush({ approval: "standing-approved" }));
   writeEvidence(relTarget, "evidence/verify-latest.json", { exitCode: 0, commit: relHead });
   {
@@ -2283,7 +2294,7 @@ function freshRepoIn(parentDir, name) {
   // required-but-missing evidence blocks) and green after (line ~452 uses resolveShellCwd()).
   const cParent = mkdtempSync(join(tmpdir(), "d4c-parent-"));
   ALL_DIRS.push(cParent);
-  const { dir: cTarget, head: cHead } = freshRepoIn(cParent, "target-repo");
+  const { dir: cTarget, head: cHead } = freshRepoIn(cParent, "target-repo", { approvedMini: true });
   writeManifest(cTarget, manifestPush({ approval: "standing-approved" }));
   writeEvidence(cTarget, "evidence/verify-latest.json", { exitCode: 0, commit: cHead });
   const cDecoy = freshRepo("d4c-decoy"); // spawn cwd; unrelated to cParent
