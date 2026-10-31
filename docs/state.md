@@ -13,9 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **272 items:all at75;index75.0%** (`0cf2cba73` 10-30, candidate 11 installed, read back
-`0.7.0+claude.20261030170444.85c269e`: N29, D207, N20, reinstall, N26, N25, N27 join at75; open: consumer
-retests (Glossover D207/N20 route, Toolbox N29), 0.7.1 items in
+contains **281 items:all at75;index75.0%** (`a2099ff5f` 10-31, candidate 13 installed, read back
+`0.7.0+claude.20261031060558.62b553e`: AC-175 and G15 to75, 26 held patches; red and named: onboarding-v3
+push gate and SECGATE-1; open: consumer retests (Glossover D207/N20 route, Toolbox N29), 0.7.1 items in
 `backlog/items/2026-10-30-candidate11-follow-ups.md`; PF-95/PF-94 history (`20c50d267`) in the matrix; PF-94, 2026-10-28: Glossover could
 not run round 2 of its Critic course (no sanctioned takeover of a consumed non-course batch, no lineage
 record writer, no delta request writer); the PF-94 bundle v2 was applied as one operator commit
