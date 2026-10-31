@@ -45,7 +45,12 @@ function sourceProjection(routeSource) {
     || !Array.isArray(routeSource.configuredRoutes)) return null;
   const tasks = new Map();
   for (const t of routeSource.taskRoutes) {
-    if (!own(t, ["taskRoute", "runner", "role", "effort", "state", "selector"])
+    // Antigravity rows carry its native tier (dc8204a28); the key is admitted only there and only with a closed value.
+    const hasTier = t !== null && typeof t === "object" && Object.hasOwn(t, "nativeTier");
+    if (hasTier && (t.runner !== "antigravity" || ![undefined, "pro", "flash"].includes(t.nativeTier))) return null;
+    if (!own(t, hasTier
+      ? ["taskRoute", "runner", "role", "effort", "state", "selector", "nativeTier"]
+      : ["taskRoute", "runner", "role", "effort", "state", "selector"])
       || typeof t.taskRoute !== "string" || !/^(profile|duty)\.[a-z0-9_.]+$/u.test(t.taskRoute)
       || !["codex", "claude", "antigravity"].includes(t.runner) || !ROLES.has(t.role)
       || typeof t.effort !== "string" || !EFFORTS.has(t.effort)
