@@ -11472,7 +11472,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         if (twins.status === "unavailable" && committedLayout.status === "unavailable") {
           console.error("Error: configure-verify refused calibration tiers (unavailable); zero calibration write.");
         } else {
-          console.error(`Error: configure-verify requires exact committed baseline or this command's verify-field delta (${twins.code??twins.status}); zero calibration write.`);
+          console.error(`Error: configure-verify requires exact committed baseline or this command's verify-field delta (${twins.code??twins.status}); zero calibration write; repair: ${configureVerifyRepair(twins.code??twins.status)}`);
         }
         return 2;
       }
