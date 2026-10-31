@@ -1,5 +1,5 @@
 diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
-index 642c24b0a..3e33efccf 100644
+index 642c24b0a..c18e5d485 100644
 --- a/harness/scripts/pipeline-state.test.mjs
 +++ b/harness/scripts/pipeline-state.test.mjs
 @@ -64,6 +64,7 @@ import {
@@ -215,8 +215,14 @@ index 642c24b0a..3e33efccf 100644
    ok("RGq the governing session's state is byte-identical after the refused replay -- no second consumption entry, no lastApproved overwrite",
      JSON.stringify(stateAfterB) === JSON.stringify(stateBeforeB), JSON.stringify(stateAfterB));
  
-@@ -4877,7 +4954,7 @@ function runFeaturePackageReconcileTests() {
-   ], commonDeps(fxC));
+@@ -4874,10 +4951,12 @@ function runFeaturePackageReconcileTests() {
+   const appliedC = reconcileApplyCmd(fxC.dir, [
+     "--manifest", fxC.manifestRel, "--plan-sha256", digestC,
+     "--by", "PO", "--proof-request", proofC.requestPath, "--proof-authority", proofC.authorityPath, "--proof", proofC.proofPath,
+-  ], commonDeps(fxC));
++  // One second after RGo: the private store orders approvals by approvedAt, and two records with the same instant
++  // are ordered by a digest of their random proof keys, so "lastApproved is RGr's" held only by chance.
++  ], { ...commonDeps(fxC), now: () => new Date(Date.parse(PAC08_NOW) + 1000).toISOString() });
    ok("RGr a different, never-before-used genuine proof against the SAME governing dir succeeds",
      appliedC.value === 0, appliedC.out || appliedC.err);
 -  const stateAfterC = readState(governingDir);
@@ -224,7 +230,7 @@ index 642c24b0a..3e33efccf 100644
    ok("RGr the governing state now carries TWO consumption entries (RGo's + RGr's), both tagged feature-package-reconcile, and lastApproved now reflects RGr's own distinct proof",
      Array.isArray(stateAfterC.state.criticalProofConsumption) && stateAfterC.state.criticalProofConsumption.length === 2
      && stateAfterC.state.criticalProofConsumption.every((entry) => entry.kind === "feature-package-reconcile")
-@@ -4900,7 +4977,7 @@ function runFeaturePackageReconcileTests() {
+@@ -4900,7 +4979,7 @@ function runFeaturePackageReconcileTests() {
    };
    const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
    ok("RGp chat-mode reconcile applies", applied.value === 0, applied.out || applied.err);
@@ -233,7 +239,7 @@ index 642c24b0a..3e33efccf 100644
    ok("RGp chat-mode approval is commit-bound and attributed even though criticalProof is null",
      governingState.status === "ok"
      && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
-@@ -4966,7 +5043,7 @@ function runFeaturePackageReconcileTests() {
+@@ -4966,7 +5045,7 @@ function runFeaturePackageReconcileTests() {
    const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
    ok("RGs-2 the manifest was actually rewritten in the self-governing topology, not a no-op",
      persisted.artifacts[0].sha256 === sha256Hex(grownPrd), JSON.stringify(persisted));

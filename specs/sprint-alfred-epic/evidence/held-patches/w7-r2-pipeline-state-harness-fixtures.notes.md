@@ -91,3 +91,21 @@ and used only here.
   and is outside this slice.
 - Production code: nothing looked wrong; every refusal met was the documented current contract.
 - Pre-existing reds outside this slice (R1 guard-push family, unregistered suites, VCR01, onboarding-v3 chunk 0).
+
+## Coordinator follow-up after the return (2026-10-31)
+
+The first dry run of the full candidate-13 stack failed one case, the third clause of `RGr the governing state now
+carries TWO consumption entries ...`. R2 alone on HEAD failed the same way, and a second run in the same clone passed.
+The case is flaky, and no other patch is involved.
+
+Cause: RGo and RGr both apply with `now() === PAC08_NOW`, so both private approval records carry the same `approvedAt`.
+The private store names a record `<approvedAt ms>-<digest of the envelope>` and treats the name that sorts highest as
+the latest. With equal instants, the digest of the randomly keyed proof decides, so "lastApproved is RGr's" held about
+half of the time.
+
+Fix (Elephant, in the clone): RGr applies one second after RGo (`now: PAC08_NOW + 1 s`, still before `PAC08_EXPIRES`).
+The assertion is unchanged. Three consecutive runs (`c10`, `c11`, `c12`) each report `531/531 cases passed.` The
+patch was regenerated: 18161 bytes, the same single file, apply-check exit 0.
+
+The production ordering ties only when two approvals of the same kind land within the same millisecond, so it is
+left as it is.
