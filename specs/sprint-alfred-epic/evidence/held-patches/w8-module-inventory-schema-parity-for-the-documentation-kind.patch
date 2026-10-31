@@ -1,0 +1,17 @@
+diff --git a/schemas/pipeline.module-inventory.v1.json b/schemas/pipeline.module-inventory.v1.json
+index 093b0da60..b4c956de8 100644
+--- a/schemas/pipeline.module-inventory.v1.json
++++ b/schemas/pipeline.module-inventory.v1.json
+@@ -72,6 +72,12 @@
+     "profileSource": {
+       "type": "string"
+     },
++    "kind": {
++      "type": "string",
++      "enum": [
++        "documentation"
++      ]
++    },
+     "provisional": {
+       "type": "boolean"
+     },
