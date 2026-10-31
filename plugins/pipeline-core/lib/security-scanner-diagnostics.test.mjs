@@ -203,7 +203,9 @@ function producerFixture(){
  writeFileSync(join(root,'.gitignore'),'evidence/\n');
  writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n');
  const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',shell:false});assert.equal(r.status,0,r.stderr);};
- git(['init','-q']);git(['config','user.name','G13 Synthetic Fixture']);git(['config','user.email','g13@example.invalid']);git(['add','-A']);git(['commit','-qm','G13 fixture']);
+ git(['init','-q']);git(['config','user.name','G13 Synthetic Fixture']);git(['config','user.email','g13@example.invalid']);
+ // G32-SECURITY-REMOTE: the candidate snapshot is bound to the effective push remote, so the producer needs one.
+ git(['remote','add','origin','https://example.invalid/pipeline/g13-fixture.git']);git(['add','-A']);git(['commit','-qm','G13 fixture']);
  const binary=join(base,'synthetic-semgrep');writeFileSync(binary,'synthetic selected child, never executed\n',{mode:0o600});
  return {base,root,binary};
 }

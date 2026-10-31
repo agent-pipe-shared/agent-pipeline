@@ -2037,7 +2037,10 @@ assertEqual(
   // independent from host-installed system and standard per-user scanners.
   const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: { ...baseEnv, HOME: rootDir, USERPROFILE: "", APPDATA: "", LOCALAPPDATA: "", PATH: "", Path: "" }, shell: false });
   assertEqual("CLI: bare rootDir -> exit 0", res.status, 0);
-  assertIncludes("CLI: all scanners skipped does not report a clean scan", res.stdout, "Verdict: INCOMPLETE (policy exit 0)");
+  // A blank PATH cannot hide a scanner installed in a standard system location (for example gitleaks in /usr/local/bin), so the
+  // verdict is exact for what actually ran: INCOMPLETE when no scanner succeeded, PARTIAL when at least one did. Never CLEAN.
+  const anyScannerRan = /^[a-z-]+: OK \[success\]/mu.test(res.stdout);
+  assertIncludes("CLI: all scanners skipped does not report a clean scan", res.stdout, anyScannerRan ? "Verdict: PARTIAL (policy exit 0)" : "Verdict: INCOMPLETE (policy exit 0)");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");
   assertTrue("CLI: evidence file actually created", existsSync(join(rootDir, "evidence", "security-latest.json")), "no evidence file");
 }
