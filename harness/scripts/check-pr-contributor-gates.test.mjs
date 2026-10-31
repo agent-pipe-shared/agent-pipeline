@@ -243,6 +243,8 @@ async function realScanFixture({ osvAvailable }) {
   git(root, "init", "-q");
   git(root, "config", "user.name", AUTHOR_NAME);
   git(root, "config", "user.email", AUTHOR_EMAIL);
+  // G32-SECURITY-REMOTE: the candidate snapshot is bound to the effective push remote, so the real scan needs one.
+  git(root, "remote", "add", "origin", "https://example.invalid/pipeline/contributor-gates-fixture.git");
   writeFileSync(join(root, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
   writeFileSync(join(claRoot, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
   mkdirSync(join(claRoot, ".claude"), { recursive: true });
