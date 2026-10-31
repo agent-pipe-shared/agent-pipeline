@@ -1,0 +1,903 @@
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 0f7d36ff5..4767dbff3 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -20,7 +20,8 @@ import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandid
+ import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
+ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
+ import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
+-export { RESIDUAL_ACCEPTANCE_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
++export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
++export { RESIDUAL_REASON_CLASS, residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
+ 
+ 
+ export const CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v1";
+@@ -40,10 +41,12 @@ function recordPath(privateRoot, id) {
+ }
+ 
+ /** The subject a PO residual acceptance is bound to; one definition for the signature route and the chat route. */
+-export function residualAcceptanceSubject({ receipt, findings }) {
++export function residualAcceptanceSubject({ receipt, findings, reasonClass }) {
++  // D227: the reason class is an extra signed key and exists only when named; a minor-only subject keeps its exact baseline bytes.
+   return { criticReceiptSha256: sha256(canonicalJson(receipt)),
+     findings: findings.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
+-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
++      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
++    ...(reasonClass === undefined ? {} : { reasonClass }) };
+ }
+ 
+ const ROUTE_NOT_REGISTERED = Object.freeze({ state: "unavailable", reasonCode: "RRP-ROLE-NOT-REGISTERED", evidence: "" });
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index bf94bdf0a..f3a914f9c 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
+-import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualFindingId } from "./critic-verify-lifecycle.mjs";
++import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualAcceptanceSubject, residualFindingId } from "./critic-verify-lifecycle.mjs";
+ import { inspectCriticBoundVerify } from "./critic-verify-readiness.mjs";
+ import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
+ import { checkCurrentCriticBoundVerify } from "../scripts/check-critic-bound-verify.mjs";
+@@ -466,3 +466,75 @@ test("N22 readiness admits a failed all-minor receipt through the private accept
+   assert.equal(admitted.code, "critic-bound-verify-valid");
+   assert.equal(admitted.privateLifecycleBound, true);
+ });
++// D227 / N45: a MAJOR open finding is accepted only when the acceptance names the reason class uncorrectable-past-authorship; the
++// accepted-major fragment carries the class and a second basis, a minor-only fragment keeps its exact four keys and its basis.
++const PAST_AUTHORSHIP = "uncorrectable-past-authorship";
++test("D227 a failed receipt with a major finding qualifies through an acceptance that names the class; the receipt shows the class and the major", t => {
++  const common = fixture(t);
++  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "major")], a => ({ ...a, reasonClass: PAST_AUTHORSHIP }));
++  let verifyInput = null;
++  const seen = { ...deps, verifyResidualAcceptanceFn: (input) => { verifyInput = input; return { authorized: true, mode: deps.residualAcceptance.mode }; } };
++  const recorded = record(common, failed, seen);
++  assert.equal(verifyInput.reasonClass, PAST_AUTHORSHIP, "the verifier is told the class so it can bind it");
++  const fragment = recorded.receipt.residualAcceptance;
++  assert.equal(fragment.basis, "po-acceptance-of-residual-findings-with-reason-class");
++  assert.equal(fragment.reasonClass, PAST_AUTHORSHIP);
++  assert.deepEqual(fragment.findings.map(f => f.severity).sort(), ["major", "minor"]);
++  assert.equal(recorded.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v3");
++  const read = readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify.json", evidence }, seen);
++  assert.equal(read.receiptSha256, recorded.receiptSha256);
++  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: failed.packetId, candidate }, seen);
++  assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP);
++});
++test("D227 a major without the class, another class, a blocker with the class, or a class on a minor-only list leaves the receipt refused", t => {
++  const cases = [
++    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => a },
++    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => ({ ...a, reasonClass: "other-class" }) },
++    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => ({ ...a, reasonClass: null }) },
++    { findings: [finding("a", "minor"), finding("b", "blocker")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
++    { findings: [finding("a", "major"), finding("b", "blocker")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
++    { findings: [finding("a", "minor"), finding("b", "minor")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
++  ];
++  for (const { findings, mutate } of cases) {
++    const { failed, deps } = residualSetup(findings, mutate);
++    assert.throws(() => record(fixture(t), failed, deps), error => error.code === "CVL-CRITIC-FAILED", JSON.stringify(mutate({})));
++  }
++});
++test("D227 residualAcceptanceSubject: the minor-only subject is byte-identical to the baseline and the class key appears only when given", () => {
++  const cand = { commit: "a".repeat(40), tree: "b".repeat(40) };
++  const receipt = { schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: "c".repeat(32), candidate: cand };
++  const minors = [{ gap: "g1", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" }, { gap: "g2", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" }];
++  assert.equal(JSON.stringify(residualAcceptanceSubject({ receipt, findings: minors })),
++    '{"criticReceiptSha256":"78ca0c8c095a436f51150503222f357a36934217d2c6d6dc4db884cc39070106","findings":[{"id":"5f781b4e1e9e7602d42eceaadd25bed03a3fe26c2b17f98aeeb65b50bf140f8b","severity":"minor"},{"id":"a250750cdb2e2ccb2dd2628008c663c8b5d5df60880dd412846336921d2950d3","severity":"minor"}]}');
++  assert.equal(residualAcceptanceSubject({ receipt, findings: minors, reasonClass: PAST_AUTHORSHIP }).reasonClass, PAST_AUTHORSHIP);
++  assert.equal(Object.hasOwn(residualAcceptanceSubject({ receipt, findings: minors, reasonClass: undefined }), "reasonClass"), false);
++});
++test("D227 a minor-only acceptance keeps its fragment byte for byte: exactly basis, mode, acceptanceSha256 and findings", t => {
++  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "minor")]);
++  const fragment = record(fixture(t), failed, deps).receipt.residualAcceptance;
++  assert.deepEqual(Object.keys(fragment).sort(), ["acceptanceSha256", "basis", "findings", "mode"]);
++  assert.equal(fragment.basis, "po-acceptance-of-residual-minor-findings");
++  assert.equal(fragment.acceptanceSha256, sha256(canonicalJson(deps.residualAcceptance)));
++});
++test("D227 the private record carries the class to the lifecycle deps, and the verifier receives it", t => {
++  const common = fixture(t);
++  const failed = critic({ reviewPass: false, findingCount: 1 });
++  const findings = [finding("a", "major")];
++  const { receiptSha, record: stored } = privateAcceptance(failed, findings, { reasonClass: PAST_AUTHORSHIP });
++  assert.equal(readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record: stored, consumption: null }).ok, true);
++  let seen = null;
++  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha,
++    authorizeFn: (arg) => { seen = arg; return { authorized: true, mode: stored.mode }; } });
++  assert.equal(loaded.residualAcceptance.reasonClass, PAST_AUTHORSHIP);
++  const base = { readConsumedCandidateReceiptFn: () => consumed(failed), readOpenFindingsFn: () => findings };
++  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: failed.packetId, candidate }, { ...base, ...loaded });
++  assert.equal(seen.reasonClass, PAST_AUTHORSHIP);
++  assert.equal(bound.residual.basis, "po-acceptance-of-residual-findings-with-reason-class");
++  assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP);
++  // A minor-only private record yields a loader result with no reasonClass key at all.
++  const minorFailed = critic({ reviewPass: false, findingCount: 1, verdictSha256: sha("4") });
++  const minor = privateAcceptance(minorFailed, [finding("a", "minor")]);
++  readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: minor.receiptSha, record: minor.record, consumption: null });
++  const minorLoaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: minor.receiptSha });
++  assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
++});
+diff --git a/plugins/pipeline-core/lib/critic-verify-readiness-read.mjs b/plugins/pipeline-core/lib/critic-verify-readiness-read.mjs
+index 8e50ca96c..d006c1f6c 100644
+--- a/plugins/pipeline-core/lib/critic-verify-readiness-read.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-readiness-read.mjs
+@@ -45,10 +45,13 @@ export function loadResidualAcceptanceDeps({ gitCommonDir, projectDir = null, cr
+     const state = { ...projectState, residualAcceptance: { lastAccepted: record },
+       criticalProofConsumption: stored.consumption === null || stored.consumption === undefined ? [] : [stored.consumption] };
+     return {
++      // D227: the reason class travels only when the private record carries it (a minor-only record yields the exact old shape).
+       residualAcceptance: { candidate: { commit: record.forCommit, tree: record.forTree },
+-        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings },
+-      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256: bondSha, findings }) =>
+-        authorizeFn({ projectDir, state, candidate: bound, criticReceiptSha256: bondSha, findings, now: now() }),
++        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings,
++        ...(record.reasonClass === undefined ? {} : { reasonClass: record.reasonClass }) },
++      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256: bondSha, findings, reasonClass }) =>
++        authorizeFn({ projectDir, state, candidate: bound, criticReceiptSha256: bondSha, findings, now: now(),
++          ...(reasonClass === undefined ? {} : { reasonClass }) }),
+     };
+   } catch { return null; }
+ }
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+index 781e7c5bd..b1da840cb 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+@@ -24,6 +24,17 @@ check("valid exact proof verifies", () => assert.equal(verifyCriticalActionAppro
+ check("candidate drift is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: { ...candidate, commit: "c".repeat(40) }, expectedAction: action, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH"));
+ check("cross-kind use is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: { ...action, kind: "deploy" }, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH"));
+ check("expired proof is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: action, now: "2026-08-02T19:00:00.001Z" }).code, "CRITICAL-ACTION-PROOF-EXPIRED"));
++// D227: a minor-only residual-acceptance subject keeps its digest byte for byte (the literal was measured against the baseline
++// before the reason class existed); a reason class is an extra signed key and changes the digest.
++check("D227 the minor-only residual acceptance subject digest is unchanged and a reason class changes it", () => {
++  const residualSubject = { criticReceiptSha256: "78ca0c8c095a436f51150503222f357a36934217d2c6d6dc4db884cc39070106", findings: [
++    { id: "5f781b4e1e9e7602d42eceaadd25bed03a3fe26c2b17f98aeeb65b50bf140f8b", severity: "minor" },
++    { id: "a250750cdb2e2ccb2dd2628008c663c8b5d5df60880dd412846336921d2950d3", severity: "minor" }] };
++  const kind = "accept-residual-critic-findings";
++  assert.equal(criticalActionSubjectSha256({ kind, candidate, subject: residualSubject }), "ea782ff58b4c44c7d988c0a7611d49802de076f3bf277abe71e69b6b1151e7c1");
++  assert.notEqual(criticalActionSubjectSha256({ kind, candidate, subject: { ...residualSubject, reasonClass: "uncorrectable-past-authorship" } }),
++    criticalActionSubjectSha256({ kind, candidate, subject: residualSubject }));
++});
+ check("subject digest changes with target", () => assert.notEqual(subjectSha256, criticalActionSubjectSha256({ kind: "push", candidate, subject: { source: candidate.commit, remote: "origin", destination: "refs/heads/other" } })));
+ 
+ // ADR-0064: release-preflight is a fourth kind, not a reuse of an existing one. The source's
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+index 6bfa66e5b..0eb55d8f7 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+@@ -201,32 +201,53 @@ const residualInputValid = ({ projectDir, anchorDir, state, candidate, criticRec
+   typeof projectDir === "string" && typeof anchorDir === "string" && object(state) && validCandidate(candidate)
+   && SHA256.test(criticReceiptSha256 ?? "") && residualFindingList(findings) !== null;
+ 
+-// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list.
+-function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings }, prefix) {
++// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list, and (D227) the reason class the caller names.
++function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings, reasonClass }, prefix) {
+   if (!object(recorded) || recorded.forCommit !== candidate.commit) return `${prefix}-COMMIT-MISMATCH`;
+   const observed = residualFindingList(findings);
+   const bound = residualFindingList(recorded.findings);
+   if (recorded.forTree !== candidate.tree || recorded.criticReceiptSha256 !== criticReceiptSha256
+-    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)) {
++    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)
++    || (reasonClass !== undefined && recorded.reasonClass !== reasonClass)) {
+     return `${prefix}-BINDING-MISMATCH`;
+   }
+   return null;
+ }
+ 
+-const residualSeverityRefused = (findings) => residualFindingList(findings).some((finding) => finding.severity !== "minor");
++/**
++ * D227 (N45): the one reason class under which a MAJOR finding can be accepted, and the one rule for it. A blocker is never
++ * accepted; a major only with exactly this class; a list without a major never carries a class. Returns null when the
++ * (findings, class) pair is acceptable, else the typed suffix: SEVERITY (blocker, or a major without a class) or CLASS (an unknown
++ * value, or a class on a list that has no major). `findings` need only carry a `severity` each; `undefined` means "no class named".
++ */
++export const RESIDUAL_REASON_CLASS = "uncorrectable-past-authorship";
++export function residualReasonClassRefusal(findings, reasonClass) {
++  const list = Array.isArray(findings) ? findings : [];
++  if (list.length === 0 || list.some((finding) => finding?.severity === "blocker" || !["minor", "major"].includes(finding?.severity))) return "SEVERITY";
++  if (list.some((finding) => finding.severity === "major")) {
++    if (reasonClass === undefined) return "SEVERITY";
++    return reasonClass === RESIDUAL_REASON_CLASS ? null : "CLASS";
++  }
++  return reasonClass === undefined ? null : "CLASS";
++}
++
++// The class in force for a call: the one the caller names, else the one the recorded acceptance carries.
++const residualEffectiveClass = (reasonClass, state) => reasonClass !== undefined ? reasonClass : state?.residualAcceptance?.lastAccepted?.reasonClass;
+ 
+ /**
+- * D190: authorize the acceptance of residual MINOR Critic findings by a detached signature,
+- * modelled on `authorizeRecordedPush`. A major or blocker finding is refused here, never accepted.
++ * D190: authorize the acceptance of residual Critic findings by a detached signature, modelled on `authorizeRecordedPush`.
++ * A blocker is refused here, never accepted; D227: a major is accepted only when the signed acceptance names the reason class
++ * `uncorrectable-past-authorship`, which then is part of the signed subject. A minor-only subject carries no class key at all.
+  * The record lives at `state.residualAcceptance.lastAccepted`.
+  */
+ export function authorizeRecordedResidualAcceptance({
+-  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, now, machinePlaneDeps = {}, pinTrustAnchor = null,
++  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, reasonClass, now, machinePlaneDeps = {}, pinTrustAnchor = null,
+ } = {}) {
+   const prefix = "RESIDUAL-PROOF";
+-  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
++  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings, reasonClass };
+   if (!residualInputValid(input) || !validNow(now)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
+-  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  const earlyRefusal = residualReasonClassRefusal(findings, residualEffectiveClass(reasonClass, state));
++  if (earlyRefusal !== null) return { authorized: false, code: `${prefix}-${earlyRefusal}` };
+ 
+   const trust = trustAnchorsFor(anchorDir, prefix);
+   if (!trust.ok) return { authorized: false, code: trust.code };
+@@ -238,11 +259,12 @@ export function authorizeRecordedResidualAcceptance({
+   if (!object(approval) || !object(recorded)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
+   const binding = residualBindingCode(approval, input, prefix);
+   if (binding !== null) return { authorized: false, code: binding };
+-  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  const recordRefusal = residualReasonClassRefusal(approval.findings, approval.reasonClass);
++  if (recordRefusal !== null) return { authorized: false, code: `${prefix}-${recordRefusal}` };
+ 
+   const verified = verifySignedAction({
+     state, kind: RESIDUAL_KIND, prefix, candidate, recorded, anchors: trust.anchors, now,
+-    subject: { criticReceiptSha256, findings: residualFindingList(findings) },
++    subject: { criticReceiptSha256, findings: residualFindingList(findings), ...(approval.reasonClass === undefined ? {} : { reasonClass: approval.reasonClass }) },
+   });
+   if (!verified.ok) return { authorized: false, code: verified.code };
+ 
+@@ -264,12 +286,13 @@ export function authorizeRecordedResidualAcceptance({
+ 
+ /** Chat route of the same acceptance, modelled on `authorizeRecordedChatPush`; follows `gates.push_approval`. */
+ export function authorizeRecordedChatResidualAcceptance({
+-  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings,
++  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, reasonClass,
+ } = {}) {
+   const prefix = "RESIDUAL-PROOF";
+-  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
++  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings, reasonClass };
+   if (!residualInputValid(input)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
+-  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  const earlyRefusal = residualReasonClassRefusal(findings, residualEffectiveClass(reasonClass, state));
++  if (earlyRefusal !== null) return { authorized: false, code: `${prefix}-${earlyRefusal}` };
+   let waiver;
+   try { waiver = criticalProofWaiverFor(anchorDir, RESIDUAL_KIND); }
+   catch { return { authorized: false, code: `${prefix}-CHAT-POLICY-UNREADABLE` }; }
+@@ -283,7 +306,8 @@ export function authorizeRecordedChatResidualAcceptance({
+   if (!object(approval)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
+   const binding = residualBindingCode(approval, input, prefix);
+   if (binding !== null) return { authorized: false, code: binding };
+-  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  const recordRefusal = residualReasonClassRefusal(approval.findings, approval.reasonClass);
++  if (recordRefusal !== null) return { authorized: false, code: `${prefix}-${recordRefusal}` };
+   if (approval.criticalProof !== null) return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
+   const recordedWaiver = approval.criticalProofWaiver;
+   if (!object(recordedWaiver) || recordedWaiver.kind !== RESIDUAL_KIND
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+index 43faf2156..923e0fe1b 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+@@ -671,10 +671,13 @@ try {
+   const RA_KIND = "accept-residual-critic-findings";
+   const RA_RECEIPT = "e".repeat(64);
+   const RA_FINDINGS = [{ id: "1".repeat(64), severity: "minor" }, { id: "2".repeat(64), severity: "minor" }];
+-  const raRecord = ({ key, findings = RA_FINDINGS, receipt = RA_RECEIPT, candidate = { commit: COMMIT, tree: TREE }, signWith = key.privateKey }) => {
++  // D227: `reasonClass` sets both the class the subject was signed with and the class the record carries; `signedClass` /
++  // `recordClass` override one side to prove the binding both ways. Absent (undefined) adds no key, so every older case is unchanged.
++  const raRecord = ({ key, findings = RA_FINDINGS, receipt = RA_RECEIPT, candidate = { commit: COMMIT, tree: TREE }, signWith = key.privateKey,
++    reasonClass, signedClass = reasonClass, recordClass = reasonClass }) => {
+     const action = {
+       kind: RA_KIND,
+-      subjectSha256: criticalActionSubjectSha256({ kind: RA_KIND, candidate, subject: { criticReceiptSha256: receipt, findings } }),
++      subjectSha256: criticalActionSubjectSha256({ kind: RA_KIND, candidate, subject: { criticReceiptSha256: receipt, findings, ...(signedClass === undefined ? {} : { reasonClass: signedClass }) } }),
+       expiresAt: EXPIRES,
+     };
+     const intent = createPoApprovalIntent({
+@@ -690,7 +693,8 @@ try {
+     const proofSha256 = createHash("sha256").update(canon(proof)).digest("hex");
+     return {
+       approvedBy: "Human", approvedAt: NOW, forCommit: candidate.commit, forTree: candidate.tree,
+-      criticReceiptSha256: receipt, findings, criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
++      criticReceiptSha256: receipt, findings, ...(recordClass === undefined ? {} : { reasonClass: recordClass }),
++      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+     };
+   };
+   const raState = (record) => ({
+@@ -806,6 +810,73 @@ try {
+     assert.equal(raCall(authorizeRecordedResidualAcceptanceByMode, sigRoot, raState(raChatRecord())).authorized, false);
+   });
+ 
++  // D227 / N45: a MAJOR finding is acceptable only when the signed acceptance names the reason class
++  // uncorrectable-past-authorship; a blocker is never acceptable; a minor-only list never carries a class.
++  const RA_CLASS = "uncorrectable-past-authorship";
++  const RA_MAJOR = [RA_FINDINGS[0], { id: "2".repeat(64), severity: "major" }];
++  const RA_BLOCKER = [RA_FINDINGS[0], { id: "2".repeat(64), severity: "blocker" }];
++  const raSigRoot = () => {
++    const key = keypair();
++    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    return { key, root };
++  };
++
++  check("RA9 signature mode: a major list accepted with the signed reason class verifies; the minor-only subject carries no class key", () => {
++    const { key, root } = raSigRoot();
++    const ok = raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS })), { findings: RA_MAJOR });
++    assert.equal(ok.authorized, true, JSON.stringify(ok));
++    assert.equal(ok.code, "RESIDUAL-PROOF-VERIFIED");
++    // The same major list with the input class given explicitly verifies as well (both sides agree).
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS })),
++      { findings: RA_MAJOR, reasonClass: RA_CLASS }).authorized, true);
++    // A minor-only list signed without any class key still verifies byte for byte as before.
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key }))).code, "RESIDUAL-PROOF-VERIFIED");
++  });
++
++  check("RA10 signature mode: the class binds both ways and a blocker or misplaced class is refused with typed codes", () => {
++    const { key, root } = raSigRoot();
++    const run = (record, overrides = {}) => raCall(authorizeRecordedResidualAcceptance, root, raState(record), { findings: RA_MAJOR, ...overrides });
++    // a major without the class: SEVERITY (record has no class, proof signed without it)
++    const noClass = run(raRecord({ key, findings: RA_MAJOR }));
++    assert.equal(noClass.authorized, false);
++    assert.equal(noClass.code, "RESIDUAL-PROOF-SEVERITY");
++    // proof signed WITH the class, but the record lost it: SEVERITY, never a pass
++    assert.equal(run(raRecord({ key, findings: RA_MAJOR, signedClass: RA_CLASS, recordClass: undefined })).code, "RESIDUAL-PROOF-SEVERITY");
++    // record carries the class but the proof was signed WITHOUT it: the subject differs, the proof does not verify
++    const unsigned = run(raRecord({ key, findings: RA_MAJOR, signedClass: undefined, recordClass: RA_CLASS }));
++    assert.equal(unsigned.authorized, false);
++    assert.notEqual(unsigned.code, "RESIDUAL-PROOF-VERIFIED");
++    assert.notEqual(unsigned.code, "RESIDUAL-PROOF-SEVERITY");
++    // proof signed with the class, record or caller names another class: CLASS
++    assert.equal(run(raRecord({ key, findings: RA_MAJOR, signedClass: RA_CLASS, recordClass: "other-class" })).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(run(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS }), { reasonClass: "other-class" }).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(run(raRecord({ key, findings: RA_MAJOR, reasonClass: "other-class" })).code, "RESIDUAL-PROOF-CLASS");
++    // a blocker is refused with or without the class
++    for (const record of [raRecord({ key, findings: RA_BLOCKER, reasonClass: RA_CLASS }), raRecord({ key, findings: RA_BLOCKER })]) {
++      const blocker = run(record, { findings: RA_BLOCKER });
++      assert.equal(blocker.authorized, false);
++      assert.equal(blocker.code, "RESIDUAL-PROOF-SEVERITY");
++    }
++    // a class on a minor-only list is a misplaced class: CLASS
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, reasonClass: RA_CLASS }))).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key })), { reasonClass: RA_CLASS }).code, "RESIDUAL-PROOF-CLASS");
++  });
++
++  check("RA11 chat mode: the same class rules hold on the chat route", () => {
++    const chatRoot = raChatRoot("chat");
++    const chat = (record, overrides = {}) => raCall(authorizeRecordedChatResidualAcceptance, chatRoot, raState(record), overrides);
++    const ok = chat(raChatRecord({ findings: RA_MAJOR, reasonClass: RA_CLASS }), { findings: RA_MAJOR });
++    assert.equal(ok.authorized, true, JSON.stringify(ok));
++    assert.equal(ok.code, "RESIDUAL-PROOF-WAIVED");
++    assert.equal(chat(raChatRecord({ findings: RA_MAJOR }), { findings: RA_MAJOR }).code, "RESIDUAL-PROOF-SEVERITY");
++    assert.equal(chat(raChatRecord({ findings: RA_MAJOR, reasonClass: "other-class" }), { findings: RA_MAJOR }).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(chat(raChatRecord({ findings: RA_MAJOR, reasonClass: RA_CLASS }), { findings: RA_MAJOR, reasonClass: "other-class" }).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(chat(raChatRecord({ findings: RA_BLOCKER, reasonClass: RA_CLASS }), { findings: RA_BLOCKER }).code, "RESIDUAL-PROOF-SEVERITY");
++    assert.equal(chat(raChatRecord({ reasonClass: RA_CLASS })).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(chat(raChatRecord(), { reasonClass: RA_CLASS }).code, "RESIDUAL-PROOF-CLASS");
++    assert.equal(chat(raChatRecord()).code, "RESIDUAL-PROOF-WAIVED");
++  });
++
+   check("RA8 the existing kinds behave as before (push still authorizes; kind list is a superset)", () => {
+     const key = keypair();
+     const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
+diff --git a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+index 130be53ff..e6b4db9f9 100644
+--- a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+@@ -31,7 +31,8 @@ import * as courseAdmission from "../critic-course-admission.mjs";
+ const { resolveRegisteredCriticCourseHistory } = courseAdmission;
+ import { produceCriticDiagnostic } from "../critic-diagnostic-producer.mjs";
+ import { criticDispositionAddendumPath, CRITIC_DISPOSITION_ADDENDUM_SCHEMA } from "../critic-disposition-addendum.mjs";
+-import { residualFindingId } from "../critic-verify-lifecycle.mjs";
++import { readBoundConsumedCriticReceipt, residualFindingId } from "../critic-verify-lifecycle.mjs";
++import { run as pipelineStateRun } from "../../scripts/pipeline-state.mjs";
+ import { loadResidualAcceptanceDepsForPacket, writeResidualAcceptanceRecord } from "../critic-verify-readiness.mjs";
+ import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../../scripts/critic-packet-preflight.mjs";
+ import { SLICE_QUEUE_SCHEMA } from "../slice-queue.mjs";
+@@ -539,6 +540,118 @@ test("PATH B at a repository root commit: the course genesis base is the root co
+   } finally { cleanup(fx); }
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------------------------
++// Path C (D227 / N45): a Critic round FAILED with one MAJOR finding that no commit can correct (commit trailers of past commits). The PO
++// accepts it through the REAL verb `pipeline-state approve-residual-acceptance --reason-class uncorrectable-past-authorship`; the close
++// then plans and the receipt names the accepted major and the class. Seams (named): the Critic model call (fixed verdict, as above) and
++// the PO's attended chat confirmation (the verb's isattyFn / readLineFn dependencies return the confirmation code the verb printed,
++// exactly as the pipeline-state suite does; a spawned process has no attended terminal). No record is hand-written.
++// ---------------------------------------------------------------------------------------------------------------------------------
++const MAJOR_PAST_AUTHORSHIP = { findings: [{ gap: "stage-0 trailers on past commits violate the criterion", risk: "authorship cannot be corrected", severity: "major", evidence: `${SPEC_PATH}:1`, spec_ref: "AC-1" }], pass: false };
++const BLOCKER_ONE = { findings: [{ gap: "fatal gap", risk: "consumer breaks", severity: "blocker", evidence: `${SPEC_PATH}:1`, spec_ref: "AC-1" }], pass: false };
++const PAST_AUTHORSHIP_CLASS = "uncorrectable-past-authorship";
++
++/** One real `approve-residual-acceptance` call (the exported function the CLI calls) against the walk repository. */
++function acceptViaVerb(fx, packetId, { reasonClass } = {}) {
++  const controlRoot = join(gitCommonOf(fx.root), "agent-pipeline", "critic-packets");
++  const receiptSha = sha256(packetCanonicalJson(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt));
++  const code = `ACCEPT-${receiptSha.slice(0, 8).toUpperCase()}`;
++  const lines = [];
++  let prompted = 0;
++  const originalError = console.error, originalLog = console.log;
++  console.error = (...args) => { lines.push(args.join(" ")); };
++  console.log = (...args) => { lines.push(args.join(" ")); };
++  let status;
++  try {
++    status = pipelineStateRun(["approve-residual-acceptance", "--by", "PO", "--critic-packet", packetId, ...(reasonClass === undefined ? [] : ["--reason-class", reasonClass])],
++      { dir: fx.root, now: () => new Date().toISOString(), isattyFn: () => true, readLineFn: (prompt) => { prompted += 1; lines.push(prompt); return code; } });
++  } finally { console.error = originalError; console.log = originalLog; }
++  return { status, lines, text: lines.join("\n"), prompted, receiptSha };
++}
++
++/** The bound receipt reader the close addendum and Verify use, with the acceptance the verb recorded. */
++function boundWithAcceptance(fx) {
++  const { root, observed } = fx;
++  const tree = git(root, ["rev-parse", `${observed.lastCandidate}^{tree}`]);
++  const deps = loadResidualAcceptanceDepsForPacket({ gitCommonDir: gitCommonOf(root), projectDir: root, criticPacketId: observed.lastPacketId });
++  return { deps, bound: deps === null ? null : readBoundConsumedCriticReceipt({ gitCommonDir: gitCommonOf(root), criticPacketId: observed.lastPacketId, candidate: { commit: observed.lastCandidate, tree } }, deps) };
++}
++
++test("PATH C (D227 major with the reason class): accept the major through the real verb, then the close plans and the receipt names the major and the class", () => {
++  const fx = walkCourse({ label: "c-major", rounds: [{ kind: "full", verdict: MAJOR_PAST_AUTHORSHIP }], slices: ["TASK-ONE"] });
++  try {
++    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
++    const packetId = fx.observed.lastPacketId;
++    // negatives on the real verb: the same major without the class, and an unknown class, are refused with typed codes, nothing recorded
++    const withoutClass = acceptViaVerb(fx, packetId);
++    assert.equal(withoutClass.status, 2, withoutClass.text);
++    assert.match(withoutClass.text, /RESIDUAL-PROOF-SEVERITY/u);
++    assert.equal(withoutClass.prompted, 0, "a refused acceptance consumes no confirmation");
++    const unknown = acceptViaVerb(fx, packetId, { reasonClass: "some-other-class" });
++    assert.equal(unknown.status, 2, unknown.text);
++    assert.match(unknown.text, /RESIDUAL-PROOF-CLASS/u);
++    assert.equal(boundWithAcceptance(fx).deps, null, "nothing was recorded by a refused acceptance");
++    assert.throws(() => readBoundConsumedCriticReceipt({ gitCommonDir: gitCommonOf(fx.root), criticPacketId: packetId, candidate: { commit: fx.observed.lastCandidate, tree: git(fx.root, ["rev-parse", `${fx.observed.lastCandidate}^{tree}`]) } }, {}), (error) => error.code === "CVL-CRITIC-FAILED");
++    // the close is still refused while the major is open: no addendum can bind the failed receipt
++    const refusedAddenda = writeAddenda(fx, ["TASK-ONE"]);
++    assert.notEqual(refusedAddenda["TASK-ONE"].status, 0, "the failed receipt does not bind without the acceptance");
++    // the acceptance with the class
++    const accepted = acceptViaVerb(fx, packetId, { reasonClass: PAST_AUTHORSHIP_CLASS });
++    assert.equal(accepted.status, 0, accepted.text);
++    assert.equal(accepted.prompted, 1);
++    assert.match(accepted.text, /reason class: uncorrectable-past-authorship/u, "the PO sees the class before confirming");
++    assert.match(accepted.text, /major [a-f0-9]{64}/u, "the PO sees the severity word next to the finding");
++    const { bound } = boundWithAcceptance(fx);
++    assert.notEqual(bound, null, "the failed receipt now binds through the acceptance");
++    assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP_CLASS, "the receipt names the reason class");
++    assert.equal(bound.residual.basis, "po-acceptance-of-residual-findings-with-reason-class");
++    assert.deepEqual(bound.residual.findings.map((entry) => entry.severity), ["major"], "the receipt names the accepted major");
++    const addenda = writeAddenda(fx, ["TASK-ONE"]);
++    assert.equal(addenda["TASK-ONE"].status, 0, `${addenda["TASK-ONE"].text}${addenda["TASK-ONE"].stderr}`);
++    const closed = closeToPrepared(fx);
++    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
++    assert.equal(closed.planned.body.phase, "feature-close-prepared");
++    assert.equal(closed.apply().status, "applied");
++  } finally { cleanup(fx); }
++});
++
++test("PATH C negative: a blocker is refused with the class (RESIDUAL-PROOF-SEVERITY) and nothing is recorded", () => {
++  const fx = walkCourse({ label: "c-blocker", rounds: [{ kind: "full", verdict: BLOCKER_ONE }], slices: ["TASK-ONE"] });
++  try {
++    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
++    for (const reasonClass of [PAST_AUTHORSHIP_CLASS, undefined]) {
++      const refused = acceptViaVerb(fx, fx.observed.lastPacketId, { reasonClass });
++      assert.equal(refused.status, 2, refused.text);
++      assert.match(refused.text, /RESIDUAL-PROOF-SEVERITY/u);
++      assert.equal(refused.prompted, 0);
++    }
++    assert.equal(boundWithAcceptance(fx).deps, null);
++  } finally { cleanup(fx); }
++});
++
++test("PATH C negative and control: a class on a minor-only list is refused RESIDUAL-PROOF-CLASS; the minor-only acceptance without a class works unchanged and its receipt carries no class", () => {
++  const fx = walkCourse({ label: "c-minor", rounds: [{ kind: "full", verdict: minors("c") }], slices: ["TASK-ONE"] });
++  try {
++    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
++    const packetId = fx.observed.lastPacketId;
++    const misplaced = acceptViaVerb(fx, packetId, { reasonClass: PAST_AUTHORSHIP_CLASS });
++    assert.equal(misplaced.status, 2, misplaced.text);
++    assert.match(misplaced.text, /RESIDUAL-PROOF-CLASS/u);
++    assert.equal(misplaced.prompted, 0);
++    assert.equal(boundWithAcceptance(fx).deps, null);
++    const accepted = acceptViaVerb(fx, packetId);
++    assert.equal(accepted.status, 0, accepted.text);
++    assert.doesNotMatch(accepted.text, /reason class/u, "the minor-only confirmation is unchanged");
++    const { bound } = boundWithAcceptance(fx);
++    assert.equal(bound.residual.basis, "po-acceptance-of-residual-minor-findings");
++    assert.equal(Object.hasOwn(bound.residual, "reasonClass"), false);
++    const addenda = writeAddenda(fx, ["TASK-ONE"]);
++    assert.equal(addenda["TASK-ONE"].status, 0, `${addenda["TASK-ONE"].text}${addenda["TASK-ONE"].stderr}`);
++    const closed = closeToPrepared(fx);
++    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
++  } finally { cleanup(fx); }
++});
++
+ test("PATH B negative: a tampered chain (a registered lineage row with changed bytes) never covers the records: CLOSE-CRITIC-EVIDENCE-MISSING", () => {
+   const fx = walkCourse({ label: "b-tamper", rounds: PATH_B_ROUNDS(), slices: ["TASK-ONE", "TASK-TWO"] });
+   try {
+diff --git a/plugins/pipeline-core/lib/review-admission-read.mjs b/plugins/pipeline-core/lib/review-admission-read.mjs
+index 6f7df9cd0..e0b98b5b9 100644
+--- a/plugins/pipeline-core/lib/review-admission-read.mjs
++++ b/plugins/pipeline-core/lib/review-admission-read.mjs
+@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
+ import { criticDecisionPathFinding, criticDisposition } from "./critic-skip-decision.mjs";
+ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
+ import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
++import { residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
+ import { resolveRetainedCriticCourseRecords } from "./critic-course-admission.mjs";
+ import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord, isSafeTaskId } from "./dispatch-record.mjs";
+ import { parseStrictJson } from "./governance-event.mjs";
+@@ -1160,6 +1161,8 @@ export function revalidateHistoricalFreshReviewPacketBinding(binding){
+ }
+ 
+ export const RESIDUAL_ACCEPTANCE_BASIS = "po-acceptance-of-residual-minor-findings";
++// D227 (N45): the basis of a receipt whose accepted findings include a MAJOR one; the fragment then also carries `reasonClass`.
++export const RESIDUAL_ACCEPTANCE_CLASS_BASIS = "po-acceptance-of-residual-findings-with-reason-class";
+ export const CVL_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ export const PACKET = /^[a-f0-9]{32}$/u;
+ export function cvlFail(code, message) { const error = new Error(message); error.code = code; throw error; }
+@@ -1181,16 +1184,22 @@ function residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSh
+     const readOpen = deps.readOpenFindingsFn ?? (({ controlRoot, packetId }) => readConsumedCandidateResult({ controlRoot, packetId }).result.verdict.findings);
+     const open = readOpen({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId });
+     if (!Array.isArray(open) || open.length === 0 || open.length !== critic.findingCount
+-      || !open.every(finding => finding !== null && typeof finding === "object" && finding.severity === "minor")) return null;
++      || !open.every(finding => finding !== null && typeof finding === "object" && (finding.severity === "minor" || finding.severity === "major"))) return null;
++    // D227: a major is accepted only when the acceptance names the reason class; a minor-only list carries none; a blocker never qualifies.
++    if (residualReasonClassRefusal(open, acceptance.reasonClass) !== null) return null;
++    const withMajor = open.some(finding => finding.severity === "major");
+     const expected = open.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
+       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+     if (acceptance.candidate?.commit !== critic.candidate.commit || acceptance.candidate?.tree !== critic.candidate.tree
+       || acceptance.criticReceiptSha256 !== criticReceiptSha256
+       || canonicalJson(acceptance.findings) !== canonicalJson(expected)) return null;
+-    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected });
++    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected,
++      ...(acceptance.reasonClass === undefined ? {} : { reasonClass: acceptance.reasonClass }) });
+     if (verdict?.authorized !== true || typeof verdict.mode !== "string" || verdict.mode.length === 0) return null;
+-    return Object.freeze({ basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode,
+-      acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
++    // A minor-only fragment keeps its exact four keys (it is part of recorded v3 lifecycle receipts); only an accepted major adds the class.
++    return Object.freeze(withMajor
++      ? { basis: RESIDUAL_ACCEPTANCE_CLASS_BASIS, mode: verdict.mode, acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected, reasonClass: acceptance.reasonClass }
++      : { basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode, acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
+   } catch { return null; }
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 630a1ea35..7bb1fdaa6 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -551,7 +551,7 @@ import {
+   readCloseCoordinator,
+ } from "./publication-close-journal.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+-import { readCriticVerifyLifecycle, residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
++import { RESIDUAL_REASON_CLASS, readCriticVerifyLifecycle, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
+ import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
+ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
+@@ -9398,6 +9398,8 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+   }
+   const waived = configured.waived === true;
+   const names = waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"];
++  // D227: ONE optional flag; the finding list itself is never typed. Present only when the PO names the reason class.
++  if (rest.includes("--reason-class")) names.push("reason-class");
+   const parsed = parseExactFlags(rest, new Set(names));
+   const flags = parsed.value ?? {};
+   if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
+@@ -9435,11 +9437,16 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
+     return 2;
+   }
+-  const { criticReceiptSha256, findings } = residualAcceptanceSubject({
+-    receipt, findings: rawFindings,
+-  });
+-  if (findings.length === 0 || findings.some((finding) => finding.severity !== "minor")) {
+-    console.error("Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker or major finding never.");
++  const reasonClass = flags["reason-class"];
++  const subject = residualAcceptanceSubject({ receipt, findings: rawFindings, reasonClass });
++  const { criticReceiptSha256, findings } = subject;
++  const classRefusal = residualReasonClassRefusal(findings, reasonClass);
++  if (classRefusal === "SEVERITY") {
++    console.error(`Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker never, and a major finding only when the acceptance names --reason-class ${RESIDUAL_REASON_CLASS} (a defect of past authorship that no commit can correct).`);
++    return 2;
++  }
++  if (classRefusal === "CLASS") {
++    console.error(`Error: approve-residual-acceptance refused (RESIDUAL-PROOF-CLASS); --reason-class takes exactly ${RESIDUAL_REASON_CLASS} and only for a list that contains a major finding.`);
+     return 2;
+   }
+   const summaryLines = [
+@@ -9447,6 +9454,10 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     `  candidate: ${candidate.commit}`,
+     `  critic receipt: ${criticReceiptSha256}`,
+     ...findings.map((finding) => `  ${finding.severity} ${finding.id}`),
++    ...(reasonClass === undefined ? [] : [
++      `  reason class: ${reasonClass}`,
++      "  this acceptance includes a MAJOR finding that no commit can correct; it is not a Critic pass, and a blocker is never accepted.",
++    ]),
+   ];
+   const approvedAt = now();
+   if (waived) {
+@@ -9467,7 +9478,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+   }
+   const verified = verifyCriticalHumanProof({
+     dir, state: base, kind, candidate,
+-    subject: { criticReceiptSha256, findings },
++    subject,
+     flags, now: approvedAt, required: true,
+   });
+   if (!verified.ok) {
+@@ -9495,6 +9506,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     candidate,
+     criticReceiptSha256,
+     findings,
++    ...(reasonClass === undefined ? {} : { reasonClass }),
+     approvedBy: flags.by,
+     approvedAt,
+     criticalProof: verified.proof,
+@@ -9517,7 +9529,9 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     console.error(`Error: approve-residual-acceptance refused (${stored.code}).`);
+     return 2;
+   }
+-  console.log(`Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`);
++  console.log(reasonClass === undefined
++    ? `Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`
++    : `Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} finding(s) including ${findings.filter((finding) => finding.severity === "major").length} major under reason class ${reasonClass} on critic receipt ${criticReceiptSha256}.`);
+   return 0;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 6e3cc897f..1211d8845 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3371,9 +3371,9 @@ function c11Lifecycle(fx, cand, findings) {
+   });
+ }
+ 
+-function c11SignatureFiles(fx, findings, { cand = candidate } = {}) {
++function c11SignatureFiles(fx, findings, { cand = candidate, reasonClass } = {}) {
+   const external = mktempProjectDir();
+-  const subjectSha256 = criticalActionSubjectSha256({ kind: C11_KIND, candidate: cand, subject: { criticReceiptSha256: fx.made.receiptSha256, findings: c11Findings(findings) } });
++  const subjectSha256 = criticalActionSubjectSha256({ kind: C11_KIND, candidate: cand, subject: { criticReceiptSha256: fx.made.receiptSha256, findings: c11Findings(findings), ...(reasonClass === undefined ? {} : { reasonClass }) } });
+   const request = createCriticalActionApprovalRequest({ candidate: cand, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: C11_KIND, subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
+   const keys = generateKeyPairSync("ed25519");
+   const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+@@ -3490,8 +3490,98 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
+   } finally { fx.cleanup(); }
+ });
+ 
++// D227 / N45: a MAJOR finding is accepted when the PO's acceptance names the reason class uncorrectable-past-authorship
++// (--reason-class on the same verb); a blocker is never accepted; a minor-only acceptance takes no class and stays unchanged.
++const C11_CLASS = "uncorrectable-past-authorship";
++const c11Major = [c11Finding("gap one", "minor"), c11Finding("trailers of past commits", "major")];
++
++c11Case("C11-f chat mode accepts a major finding with --reason-class, shows the class and the major before the confirmation, and the lifecycle qualifies", () => {
++  const fx = c11Fixture({ chat: true, findings: c11Major });
++  try {
++    let prompted = 0;
++    const prompts = [];
++    // In chat mode the summary the PO reads is the prompt handed to the attended line reader (the seam), not stderr.
++    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: (prompt) => { prompted += 1; prompts.push(prompt); return fx.expectedCode; } };
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--reason-class", C11_CLASS], deps));
++    assert.equal(outcome.result, 0, outcome.lines.join(" "));
++    assert.equal(prompted, 1);
++    const text = prompts.join("\n");
++    assert.match(text, /reason class: uncorrectable-past-authorship/u, "the confirmation shows the class");
++    assert.match(text, /major [a-f0-9]{64}/u, "the confirmation shows the severity word next to the finding");
++    const accepted = c11Private(fx).record;
++    assert.equal(accepted.reasonClass, C11_CLASS);
++    assert.deepEqual(accepted.findings, c11Findings(c11Major));
++    const lifecycle = c11Lifecycle(fx, candidate, c11Major);
++    assert.equal(lifecycle.receipt.residualAcceptance.reasonClass, C11_CLASS, "the close names the class");
++    assert.ok(lifecycle.receipt.residualAcceptance.findings.some((f) => f.severity === "major"), "the close names the accepted major");
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-g signature mode accepts a major with the signed class; a proof signed without the class, or a flag that differs from the signed class, is refused", () => {
++  const fx = c11Fixture({ chat: false, findings: c11Major });
++  try {
++    const argv = (flags, extra = []) => ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...extra, ...flags];
++    // signed WITHOUT the class, flag given: the rebuilt subject differs, nothing is recorded
++    const unsigned = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major), ["--reason-class", C11_CLASS]), fx.deps));
++    assert.notEqual(unsigned.result, 0, unsigned.lines.join(" "));
++    assert.equal(existsSync(c11PrivatePath(fx)), false);
++    // signed WITH the class, flag omitted: a major without the class
++    const omitted = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major, { reasonClass: C11_CLASS })), fx.deps));
++    assert.equal(omitted.result, 2);
++    assert.ok(omitted.lines.some((line) => line.includes("RESIDUAL-PROOF-SEVERITY")), omitted.lines.join(" "));
++    assert.equal(existsSync(c11PrivatePath(fx)), false);
++    // signed with the class and the flag given
++    const ok = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major, { reasonClass: C11_CLASS }), ["--reason-class", C11_CLASS]), fx.deps));
++    assert.equal(ok.result, 0, ok.lines.join(" "));
++    const stored = c11Private(fx);
++    assert.equal(stored.record.reasonClass, C11_CLASS);
++    assert.equal(stored.consumption.kind, C11_KIND);
++    const text = ok.lines.join("\n");
++    assert.match(text, /reason class: uncorrectable-past-authorship/u);
++    assert.match(text, /major [a-f0-9]{64}/u);
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-h a blocker with the class, a class on a minor-only list and an unknown class are refused with typed codes, nothing prompted or written", () => {
++  const cases = [
++    { findings: [c11Finding("gap one", "minor"), c11Finding("fatal", "blocker")], flag: C11_CLASS, code: "RESIDUAL-PROOF-SEVERITY" },
++    { findings: [c11Finding("big", "major"), c11Finding("fatal", "blocker")], flag: C11_CLASS, code: "RESIDUAL-PROOF-SEVERITY" },
++    { findings: c11Minor, flag: C11_CLASS, code: "RESIDUAL-PROOF-CLASS" },
++    { findings: c11Major, flag: "some-other-class", code: "RESIDUAL-PROOF-CLASS" },
++  ];
++  for (const { findings, flag, code } of cases) {
++    const fx = c11Fixture({ chat: true, findings });
++    try {
++      const before = readFileSync(fx.statePathFile);
++      let prompted = 0;
++      const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => { prompted += 1; return fx.expectedCode; } };
++      const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--reason-class", flag], deps));
++      assert.equal(outcome.result, 2, outcome.lines.join(" "));
++      assert.ok(outcome.lines.some((line) => line.includes(code)), `${code}: ${outcome.lines.join(" ")}`);
++      assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical");
++      assert.equal(prompted, 0, "no prompt may be consumed for a refused acceptance");
++      assert.equal(existsSync(c11PrivatePath(fx)), false);
++    } finally { fx.cleanup(); }
++  }
++});
++
++c11Case("C11-i a minor-only acceptance records no reasonClass key at all and its confirmation text is unchanged", () => {
++  const fx = c11Fixture({ chat: true, findings: c11Minor });
++  try {
++    const prompts = [];
++    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: (prompt) => { prompts.push(prompt); return fx.expectedCode; } };
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId], deps));
++    assert.equal(outcome.result, 0, outcome.lines.join(" "));
++    assert.equal(Object.hasOwn(c11Private(fx).record, "reasonClass"), false);
++    assert.equal(prompts.length, 1);
++    assert.doesNotMatch(prompts.join("\n"), /reason class/u);
++    const lifecycle = c11Lifecycle(fx, candidate, c11Minor);
++    assert.equal(Object.hasOwn(lifecycle.receipt.residualAcceptance, "reasonClass"), false);
++  } finally { fx.cleanup(); }
++});
++
+ assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
+-console.log("D190 residual acceptance C11-a..e complete.");
++console.log("D190 residual acceptance C11-a..i complete.");
+ 
+ // W7 N26 / D206: a signature approval must not dirty the tracked state file. approve-push and the
+ // feature-package reconcile approval write the approval and the proof consumption to a private store
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 8ff7c2113..7d4ecc2b4 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -31,7 +31,7 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+-import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
++import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
+ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+@@ -1032,7 +1032,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
+     const key = tokens[index]; const value = tokens[index + 1];
+     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
+     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
+-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
++    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "reasonClass", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+     supplied.add(normalized); values[normalized] = value; index += 1;
+   }
+   // GF-104: keyReference always carries a default ("local-po-key") even when the
+@@ -1102,6 +1102,8 @@ export function parseHumanArgs(argv, dependencies = {}) {
+   if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
+   // D190: the residual acceptance subject is computed from the consumed Critic packet and from nothing else.
+   if (values.criticPacket !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--critic-packet is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
++  // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
++  if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
+   if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
+     if (values.subject !== undefined) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} takes no --subject: the subject is computed from the consumed Critic packet named by --critic-packet.` };
+     if (!/^[a-f0-9]{32}$/u.test(values.criticPacket ?? "")) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} requires --critic-packet <32 lowercase hexadecimal characters>.` };
+@@ -1817,8 +1819,12 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
+     findings = (dependencies.readOpenFindingsFn ?? (({ controlRoot: root, packetId: id }) => readConsumedCandidateResult({ controlRoot: root, packetId: id }).result.verdict.findings))({ controlRoot, packetId });
+   } catch (error) { fail(`critical approval request is invalid: the consumed Critic packet could not be read (${typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"})`); }
+   if (!receipt || !Array.isArray(findings)) fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
+-  if (findings.length === 0 || findings.some((finding) => finding?.severity !== "minor")) {
+-    fail("critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker or major finding never");
++  const classRefusal = residualReasonClassRefusal(findings, args.reasonClass);
++  if (classRefusal === "SEVERITY") {
++    fail(`critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker never, and a major finding only with --reason-class ${RESIDUAL_REASON_CLASS} (a defect of past authorship that no commit can correct)`);
++  }
++  if (classRefusal === "CLASS") {
++    fail(`critical approval request is invalid (RESIDUAL-PROOF-CLASS): --reason-class takes exactly ${RESIDUAL_REASON_CLASS} and only for a list that contains a major finding`);
+   }
+   // N22: the subject (and the request) bind the candidate the Critic reviewed, exactly as the writer does,
+   // never the checkout's current HEAD; the clean-tree observation stays the caller's precondition.
+@@ -1826,7 +1832,7 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
+   if (typeof reviewed.commit !== "string" || typeof reviewed.tree !== "string") {
+     fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
+   }
+-  const subject = residualAcceptanceSubject({ receipt, findings });
++  const subject = residualAcceptanceSubject({ receipt, findings, reasonClass: args.reasonClass });
+   const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate: reviewed, subject });
+   if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
+     fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
+@@ -1840,7 +1846,10 @@ function residualAcceptanceConfirmationLines(kind, subject) {
+   return [
+     `critic receipt sha256: ${subject.criticReceiptSha256}`,
+     ...subject.findings.map((finding) => `accepted finding: ${finding.severity} ${finding.id}`),
+-    "this approval accepts ONLY the minor findings listed above as residual for the candidate above; it is not a Critic pass, it does not accept any finding that is not listed, and a new finding blocks again.",
++    ...(subject.reasonClass === undefined
++      ? ["this approval accepts ONLY the minor findings listed above as residual for the candidate above; it is not a Critic pass, it does not accept any finding that is not listed, and a new finding blocks again."]
++      : [`reason class: ${subject.reasonClass}`,
++        "this approval accepts ONLY the findings listed above as residual for the candidate above and it includes a MAJOR finding that no commit can correct (past authorship); it is not a Critic pass, it does not accept any finding that is not listed, a blocker is never accepted, and a new finding blocks again."]),
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index b2e128178..f6acc4032 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -6264,3 +6264,77 @@ test("prepare-critical --kind accept-residual-critic-findings writes a request b
+     cleanup(dirs);
+   }
+ });
++
++// D227 / N45: --reason-class uncorrectable-past-authorship lets the request carry a MAJOR finding; the class rides in the signed subject.
++const RESIDUAL_ROUTE_CLASS = "uncorrectable-past-authorship";
++const RESIDUAL_ROUTE_MAJOR = Object.freeze([
++  ...RESIDUAL_ROUTE_MINOR,
++  { severity: "major", title: "stage-0 trailers on commits that violate the criterion", location: "history" },
++]);
++const residualRouteClassSubject = (findings, reasonClass) => ({ ...residualRouteExpectedSubject(findings), reasonClass });
++
++test("prepare-critical --kind accept-residual-critic-findings --reason-class binds the class and the major list into the request digest", () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteClassSubject(RESIDUAL_ROUTE_MAJOR, RESIDUAL_ROUTE_CLASS) });
++    const result = runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--reason-class", RESIDUAL_ROUTE_CLASS]), residualRouteDependencies(RESIDUAL_ROUTE_MAJOR));
++    assert.equal(result.ok, true);
++    assert.equal(result.action.subjectSha256, expected, "the class is part of the signed subject");
++    const withoutClass = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MAJOR) });
++    assert.notEqual(expected, withoutClass, "a proof signed without the class cannot match this request");
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("authorize-critical with --reason-class shows the class and the accepted major before the signature, and not the minor-only sentence", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    const prompts = [];
++    const result = runHumanApproval(residualRouteArgv("authorize-critical", dirs, ["--reason-class", RESIDUAL_ROUTE_CLASS]), residualRouteDependencies(RESIDUAL_ROUTE_MAJOR, {
++      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
++    }));
++    assert.equal(result.ok, true);
++    assert.equal(prompts.length, 1);
++    assert.match(prompts[0], /reason class: uncorrectable-past-authorship/u);
++    assert.match(prompts[0], /accepted finding: major [a-f0-9]{64}/u);
++    assert.match(prompts[0], /includes a MAJOR finding/u);
++    assert.doesNotMatch(prompts[0], /accepts ONLY the minor findings/u);
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("accept-residual-critic-findings refuses a major without the class (SEVERITY), a blocker with it (SEVERITY), a class on minor-only or an unknown class (CLASS), and --reason-class on another kind", () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    const blocker = [...RESIDUAL_ROUTE_MINOR, { severity: "blocker", title: "fatal", location: "x" }];
++    const attempts = [
++      { findings: RESIDUAL_ROUTE_MAJOR, extra: [], pattern: /RESIDUAL-PROOF-SEVERITY/u },
++      { findings: blocker, extra: ["--reason-class", RESIDUAL_ROUTE_CLASS], pattern: /RESIDUAL-PROOF-SEVERITY/u },
++      { findings: RESIDUAL_ROUTE_MINOR, extra: ["--reason-class", RESIDUAL_ROUTE_CLASS], pattern: /RESIDUAL-PROOF-CLASS/u },
++      { findings: RESIDUAL_ROUTE_MAJOR, extra: ["--reason-class", "some-other-class"], pattern: /RESIDUAL-PROOF-CLASS/u },
++    ];
++    for (const { findings, extra, pattern } of attempts) {
++      let confirmationAsked = false;
++      assert.throws(() => runHumanApproval(residualRouteArgv("authorize-critical", dirs, extra), residualRouteDependencies(findings, {
++        readConfirmation: () => { confirmationAsked = true; return "approve"; },
++      })), pattern);
++      assert.equal(confirmationAsked, false);
++      assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), false);
++    }
++    assert.throws(
++      () => runHumanApproval([
++        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
++        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
++        "--kind", "push", "--reason-class", RESIDUAL_ROUTE_CLASS, "--subject-sha256", "a".repeat(64), "--expires-at", futureExpiry(),
++      ], residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
++      /--reason-class is only valid for --kind accept-residual-critic-findings/u,
++    );
++  } finally {
++    cleanup(dirs);
++  }
++});
