@@ -2637,6 +2637,23 @@ function freshRepoIn(parentDir, name, { approvedMini = false } = {}) {
   check("PG-N27-TAG-11 block  a remote addressed by URL cannot be matched to a remote-tracking ref and stays gated", `git push https://example.invalid/fixture.git ${head}:refs/tags/rollback/2026-10-30-url`, dir, BLOCK, { stderrIncludes: EVIDENCE_MISSING });
 }
 
+// ---- PG-N27-TAG release adapter: a tag that triggers a declared release adapter keeps the full gate even on a published commit
+// (a deployment is not "nothing new"); a tag the adapter does not trigger on still passes. The adapter triggers on rollback/*, so the
+// namespace that PG-N27-TAG-01..03 pass without an adapter is the one TAG-12 must keep gated.
+// Measured limit (mutation check): the deploy branch refuses an adapter-triggering tag on its own, so deleting the `!triggersReleaseAdapter`
+// carve-out in guard-push.mjs does NOT turn TAG-12 green-to-red. These cases pin the observable outcome; the carve-out itself is defense in depth.
+{
+  const { dir, head } = freshRepo("n27-tag-release-adapter");
+  writeManifest(dir, releaseManifest({
+    triggerRefs: ["refs/tags/rollback/*"],
+    extraTop: "gates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n",
+  }));
+  gitAt(dir, "remote", "add", "origin", "https://example.invalid/fixture.git");
+  gitAt(dir, "update-ref", "refs/remotes/origin/main", head);
+  check("PG-N27-TAG-12 block  a tag on a published commit stays gated when it matches a declared release adapter trigger", `git push origin ${head}:refs/tags/rollback/2026-11-01-adapter`, dir, BLOCK, { stderrIncludes: ["deploy-triggering ref", "unused deployApproval"] });
+  check("PG-N27-TAG-13 allow  a tag on a published commit that the release adapter does not trigger on still passes", `git push origin ${head}:refs/tags/checkpoint-2026-11-01`, dir, ALLOW);
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
