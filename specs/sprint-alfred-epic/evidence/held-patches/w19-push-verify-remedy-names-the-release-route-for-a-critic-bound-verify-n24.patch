@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index af7bf63f6..2722bbab1 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -201,11 +201,15 @@ export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
+   };
+ }
+ 
++// N24 (PO tile answer 2026-11-01): when the push needs a Critic-bound Verify, --mode push refuses the Critic carry input (VEP-CRITIC-CARRY-INPUT).
++// The route that worked for a consumer is release mode with the same base and carry inputs and a fresh output file; the producer never overwrites.
++const CRITIC_BOUND_VERIFY_RELEASE_ROUTE = "If the push needs a Critic-bound Verify (--critic-packet-id with --critic-evidence-feature-id), --mode push refuses it (VEP-CRITIC-CARRY-INPUT): run the same command with --mode release and those Critic inputs and --out evidence/verify-latest.json instead. The producer never overwrites, so move an existing evidence/verify-latest.json aside first.";
++
+ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
+   const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
+   if (plan.kind === "manual") return plan.reason;
+   const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
+-  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}`;
++  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
+ }
+ 
+ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 2876202bc..15ebfdaf1 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -255,6 +255,10 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
+   assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+   assert.doesNotMatch(remedy, /node custom\/verify/u);
+   assert.match(remedy, /not executable until an explicit verified base/u);
++  // N24: the Critic-bound route is named (push mode refuses the carry input), including what to do with an existing output file.
++  assert.match(remedy, /VEP-CRITIC-CARRY-INPUT/u);
++  assert.match(remedy, /--mode release/u);
++  assert.match(remedy, /move an existing evidence\/verify-latest\.json aside/u);
+   const plan = resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/verify-latest.json", { verifyBase: "origin/main" });
+   assert.deepEqual(plan.produce.argv.slice(-6), ["--mode", "push", "--base", "origin/main", "--out", "evidence/verify-latest.json"]);
+   assert.equal(plan.produce.executableNow, true);
