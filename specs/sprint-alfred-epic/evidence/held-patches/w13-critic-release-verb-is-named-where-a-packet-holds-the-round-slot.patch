@@ -1,0 +1,48 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index a019c0b15..42ad1ebfc 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -176,7 +176,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",334],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",382],
+-    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",115],
++    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",116],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+     ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",20],
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index e5f5375a0..ac0f011ab 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -745,7 +745,7 @@ const TAKEOVER_REPAIR = {
+   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
+   "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key) and it has no unregistered round to retire; its registered lineage cannot be reset. Continue the course in delta mode from the last registered round.",
+   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
+-  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first.",
++  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
+ };
+ function featureOwnership(c, courseKey, work) {
+   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
+@@ -956,7 +956,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       if(retained) {
+         if(retained.packetId!==input.packetId || retained.packetDigest!==packetDigest(packet)
+           || retained.claimSha256!==packetDigest(observed.claim) || retained.preflightSha256!==input.preflightSha256
+-          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET",`Round ${ordinal} of this batch is already reserved for packet ${retained.packetId}, and this request carries a different packet, claim, preflight, source or decision digest. A new commit (for example an evidence commit) changes those digests; resume the reserved packet, or finish it before asking for the same round again. If the reserved round can no longer be finished (its lineage cannot be registered because a commit follows the round candidate), retire it with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (they retire only the rounds above the registered lineage; nothing is deleted) and ask for the round again.`);
++          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET",`Round ${ordinal} of this batch is already reserved for packet ${retained.packetId}, and this request carries a different packet, claim, preflight, source or decision digest. A new commit (for example an evidence commit) changes those digests; resume the reserved packet, or finish it before asking for the same round again. If the reserved round can no longer be finished (its lineage cannot be registered because a commit follows the round candidate), retire it with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (they retire only the rounds above the registered lineage; nothing is deleted) and ask for the round again. If the reserved packet expired (CPP-EXPIRED) or was claimed by an abandoned attempt, release it with the session-critic-finalizer verb release (request schema pipeline.session-critic-release-request.v1 with packetId and reason) and ask for the round again.`);
+         return {reservation:retained,replay:true};
+       }
+       if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET",`The course asks for round ${ordinal}, but this batch holds ${prior.length} admitted round(s) and needs ${ordinal-1} before round ${ordinal}. An earlier round was reviewed outside this batch or its reservation is missing; register the missing round or take the batch over with the session-critic-finalizer verbs. Nothing is deleted.`);
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 6540757c0..87a5f7eab 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -673,6 +673,8 @@ test("W7 round takeover (1) inspect decides by the tail above the registered lin
+     assert.equal(noTail.scope,"batch");assert.deepEqual(noTail.tailOrdinals,[]);
+     const open=CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:0});
+     assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");assert.equal(open.scope,"batch");assert.deepEqual(open.tailOrdinals,[]);
++    // N21 (D232 batch): the text names the release verb and its request schema, not only "release it".
++    assert.ok(open.repair.includes("session-critic-finalizer.mjs release")&&open.repair.includes("pipeline.session-critic-release-request.v1"),open.repair);
+     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:true,registeredRounds:0}))?.code,"CGB-SHAPE");
+     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:1}))?.code,"CGB-SHAPE");
+     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:-1}))?.code,"CGB-SHAPE");
