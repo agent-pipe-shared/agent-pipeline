@@ -255,6 +255,10 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
   assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
   assert.doesNotMatch(remedy, /node custom\/verify/u);
   assert.match(remedy, /not executable until an explicit verified base/u);
+  // N24: the Critic-bound route is named (push mode refuses the carry input), including what to do with an existing output file.
+  assert.match(remedy, /VEP-CRITIC-CARRY-INPUT/u);
+  assert.match(remedy, /--mode release/u);
+  assert.match(remedy, /move an existing evidence\/verify-latest\.json aside/u);
   const plan = resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/verify-latest.json", { verifyBase: "origin/main" });
   assert.deepEqual(plan.produce.argv.slice(-6), ["--mode", "push", "--base", "origin/main", "--out", "evidence/verify-latest.json"]);
   assert.equal(plan.produce.executableNow, true);

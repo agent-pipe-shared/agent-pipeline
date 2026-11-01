@@ -201,11 +201,15 @@ export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
   };
 }
 
+// N24 (PO tile answer 2026-11-01): when the push needs a Critic-bound Verify, --mode push refuses the Critic carry input (VEP-CRITIC-CARRY-INPUT).
+// The route that worked for a consumer is release mode with the same base and carry inputs and a fresh output file; the producer never overwrites.
+const CRITIC_BOUND_VERIFY_RELEASE_ROUTE = "If the push needs a Critic-bound Verify (--critic-packet-id with --critic-evidence-feature-id), --mode push refuses it (VEP-CRITIC-CARRY-INPUT): run the same command with --mode release and those Critic inputs and --out evidence/verify-latest.json instead. The producer never overwrites, so move an existing evidence/verify-latest.json aside first.";
+
 export function resolveVerifyRemedy(dir, relPath, deps = {}) {
   const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
   if (plan.kind === "manual") return plan.reason;
   const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
-  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}`;
+  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
