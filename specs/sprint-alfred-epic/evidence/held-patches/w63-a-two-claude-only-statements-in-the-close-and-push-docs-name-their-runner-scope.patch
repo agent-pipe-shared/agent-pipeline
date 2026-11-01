@@ -1,0 +1,34 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 30382b5b3..46ab49996 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -576,6 +576,13 @@ That matters because the harness classifier and the remote both refuse *after*
+ the guard has already consumed the token — which cost two armings in the 0.5.3
+ release.
+ 
++*Runner scope of this second gate:* the paragraphs below describe Claude Code's
++own classifier. Codex and Antigravity have their own approval prompts and
++sandboxes, which this document has not measured; on those runners a push that
++the Pipeline admitted can still stop at the runner's prompt. Treat that as the
++runner's gate, not as a Pipeline refusal, and ask the PO rather than editing
++runner settings.
++
+ **Separately, and invisibly to the Pipeline**, Claude Code's own harness-level
+ "auto mode classifier" may refuse the actual `git push`/`git restore`
+ invocation regardless of Pipeline-side clearance — this is outside the
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index b39a19565..0659e7dc1 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -31,7 +31,10 @@ ledger CLI:
+ node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<feature-id>"
+ ```
+ 
+-(Windows: `"%USERPROFILE%\.claude\projects"`.) Append the printed row to the project's
++(Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
++only. On Codex or Antigravity it has no source: skip the step and say in the close report that the
++telemetry row is unavailable for this runner. Do not point the command at another runner's directory and
++do not invent a row. Append the printed row to the project's
+ `telemetry/costs.md`. If that file does not exist yet, note that explicitly and SKIP this step --
+ do not fail the close over a missing telemetry file. This is per-SESSION cost data only; it is NOT
+ a feature-wide cost total (see "Explicitly out of scope" below).
