@@ -1,0 +1,146 @@
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 4767dbff3..3bddf2d7d 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -19,6 +19,7 @@ import { isAbsolute, join, resolve } from "node:path";
+ import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
+ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
++import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
+ import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
+ export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
+ export { RESIDUAL_REASON_CLASS, residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
+@@ -187,6 +188,16 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+     verifyEvidenceSha256: receipt.verify.evidenceSha256 }) !== id) {
+     fail("CVL-RECEIPT-IDENTITY", "Private lifecycle identity differs from its candidate and Verify binding.");
+   }
++  // The close-side readers pass no residual deps. A receipt that records a PO residual acceptance would then always read as an
++  // unresolved failed Critic receipt, although the acceptance sits in the private record next to the packet. Load it for that
++  // receipt only (a passing receipt is untouched); the loader still re-verifies the acceptance now, so an expired or revoked one refuses.
++  let readDeps = deps;
++  if (residualRecord && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
++    const loaded = loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: typeof repoRoot === "string" ? repoRoot : null,
++      criticPacketId: receipt.critic.packetId, readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn,
++      authorizeFn: deps.residualAuthorizeFn });
++    if (loaded !== null) readDeps = { ...loaded, ...deps };
++  }
+   let carry = null;
+   if (carrying) {
+     if (typeof repoRoot !== "string" || !isAbsolute(repoRoot)
+@@ -197,7 +208,7 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+     }
+     carry = inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonDir,
+       featureId: receipt.carryForward.proof.featureId,
+-      criticPacketId: receipt.critic.packetId, targetCandidate: sourceCandidate }, deps);
++      criticPacketId: receipt.critic.packetId, targetCandidate: sourceCandidate }, readDeps);
+     if (carry.proofSha256 !== receipt.carryForward.proofSha256
+       || canonicalJson(carry.proof) !== canonicalJson(receipt.carryForward.proof)
+       || receipt.critic.reviewRange.commit !== carry.proof.reviewedCandidate.commit) {
+@@ -205,7 +216,7 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+     }
+   }
+   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId: receipt.critic.packetId,
+-    candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, deps);
++    candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, readDeps);
+   if ((bound.residual === null) !== !residualRecord
+     || (residualRecord && canonicalJson(receipt.residualAcceptance) !== canonicalJson(bound.residual))) {
+     fail("CVL-CRITIC-DRIFT", "Private lifecycle residual acceptance differs from the consumed review and acceptance.");
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index f3a914f9c..d9f2fbda9 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -466,6 +466,31 @@ test("N22 readiness admits a failed all-minor receipt through the private accept
+   assert.equal(admitted.code, "critic-bound-verify-valid");
+   assert.equal(admitted.privateLifecycleBound, true);
+ });
++// Candidate 16 (Toolbox, feature close): the close-side readers call readCriticVerifyLifecycle with no residual deps. A lifecycle receipt
++// that records a PO residual acceptance must still read there, because the acceptance sits in the private record next to the packet; the
++// reader loads it for that receipt only, so a passing receipt is unchanged and an unauthorized or missing acceptance still refuses.
++test("candidate 16: a residual-accepted lifecycle receipt reads without caller-supplied deps through the private record, and an expired or missing record refuses", t => {
++  const common = fixture(t);
++  const failed = critic({ reviewPass: false, findingCount: 1 });
++  const findings = [finding("a", "minor")];
++  const fullEvidence = { ...evidence, commit: candidate.commit, tree: candidate.tree,
++    verifyRun: { status: "passed", terminalSha256: sha("c") }, steps: [{ name: "configured-verify", exitCode: 0 }] };
++  const { receiptSha, record } = privateAcceptance(failed, findings);
++  readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record, consumption: null });
++  const base = { readConsumedCandidateReceiptFn: () => consumed(failed), readOpenFindingsFn: () => findings };
++  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha,
++    authorizeFn: () => ({ authorized: true, mode: record.mode }) });
++  const recorded = recordCriticVerifyLifecycle({ gitCommonDir: common, criticPacketId: failed.packetId, candidate,
++    evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, { ...base, ...loaded });
++  const read = (extra = {}) => readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate,
++    evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, { ...base, ...extra });
++  assert.equal(read({ residualAuthorizeFn: () => ({ authorized: true, mode: record.mode }) }).receiptSha256, recorded.receiptSha256, "no deps: the private record is loaded");
++  assert.throws(() => read({ residualAuthorizeFn: () => ({ authorized: false }) }), error => error.code === "CVL-CRITIC-FAILED" && /no longer verifies.*approve-residual-acceptance --by <name> --critic-packet /u.test(error.message),
++    "an acceptance that no longer authorizes (expired) refuses and the text names the route");
++  const lone = fixture(t);
++  assert.throws(() => readCriticVerifyLifecycle({ gitCommonDir: lone, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, base),
++    error => error.code === "CVL-RECEIPT-UNAVAILABLE", "another common dir has neither receipt nor record");
++});
+ // D227 / N45: a MAJOR open finding is accepted only when the acceptance names the reason class uncorrectable-past-authorship; the
+ // accepted-major fragment carries the class and a second basis, a minor-only fragment keeps its exact four keys and its basis.
+ const PAST_AUTHORSHIP = "uncorrectable-past-authorship";
+diff --git a/plugins/pipeline-core/lib/review-admission-read.mjs b/plugins/pipeline-core/lib/review-admission-read.mjs
+index e0b98b5b9..703d5e2e7 100644
+--- a/plugins/pipeline-core/lib/review-admission-read.mjs
++++ b/plugins/pipeline-core/lib/review-admission-read.mjs
+@@ -1239,7 +1239,13 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
+   let residual = null;
+   if (failedReceipt) {
+     residual = residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps);
+-    if (residual === null) cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
++    if (residual === null) {
++      // N36: with an acceptance on record the usual cause is that it no longer verifies (the signature window is short), not that none exists.
++      if (deps.residualAcceptance !== undefined && deps.residualAcceptance !== null) {
++        cvlFail("CVL-CRITIC-FAILED", `Critic findings remain unresolved and the recorded PO residual acceptance no longer verifies (most often it has expired, the signature window is short, or it does not match the open findings); capture it again with pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet ${criticPacketId} and approve it again, then retry`);
++      }
++      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
++    }
+   }
+   const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
+   return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute, residual });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index a98caa158..a7dff3b8a 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -296,7 +296,7 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
+       evidence: evidence.value,
+     });
+   } catch (error) {
+-    fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", "feature close requires the exact private Critic/Verify lifecycle receipt");
++    fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", `feature close requires the exact private Critic/Verify lifecycle receipt (${error?.message ?? "unavailable"})`);
+   }
+   return { evidence, lifecycle };
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+index f79b11d44..6e2471306 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+@@ -265,8 +265,9 @@ test("a package with no candidate walks implementing -> verifying -> completed a
+   const apply = (nextState) => {
+     const planned = captureLog(() => run(["feature-package-plan", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState]));
+     assert.equal(planned.value, 0, planned.out);
+-    const plan = JSON.parse(planned.logs.at(-1));
+-    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", sha256CanonicalJson(plan)]));
++    const { planSha256, ...plan } = JSON.parse(planned.logs.at(-1));
++    assert.equal(planSha256, sha256CanonicalJson(plan), "the plan prints the digest apply expects");
++    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", planSha256]));
+     assert.equal(applied.value, 0, applied.out);
+     return JSON.parse(applied.logs.at(-1));
+   };
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f25a21407..ab7e68219 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -8602,7 +8602,9 @@ function runFeaturePackageReadCommand(sub, argv) {
+       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
+     }
+     const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root) });
+-    console.log(JSON.stringify(plan, null, 2));
++    // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
++    // computed before this field is added), so a consumer does not have to re-derive it.
++    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
+     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
+   }
+   if (flags.proposal === undefined) {
