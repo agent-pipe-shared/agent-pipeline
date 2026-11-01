@@ -12744,14 +12744,17 @@ test("TR-B T74/T77 control: the already-admitted rg and grep spellings admit an 
   }
 });
 
-test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.mjs, are admitted; path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED", () => {
+test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.mjs and (D232) a negated bounded filter, are admitted; path, recursive and hidden/escaping negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED", () => {
   const path = trbFixture();
   try {
     qp4WithoutAppDataRoots(() => {
       qp4Admit('rg -n -g "*.md" apply scratch/notes.md', path);
       qp4Admit('rg -n apply scratch/notes.md --glob "*.md"', path);
       qp4Admit('rg -n -g "*.test.mjs" apply scratch/notes.md', path);
-      for (const glob of ['"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
+      // D232: a negation can only narrow a search that already names an admitted target, so a bounded negated filter is admitted.
+      qp4Admit('rg -n -g "!*.md" apply scratch/notes.md', path);
+      qp4Admit('rg -n -g "!*.patch" apply scratch/notes.md', path);
+      for (const glob of ['"**/*.md"', '"scratch/*.md"', '"!scratch/*.md"', '"!.git"', '"!../*.md"', '"!*"']) {
         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
       }
     });
