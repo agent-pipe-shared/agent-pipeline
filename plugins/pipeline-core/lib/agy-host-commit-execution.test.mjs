@@ -251,7 +251,34 @@ test("AHE13 a concurrent HEAD advance during readback cannot produce authored su
   assert.notEqual(git(root, "rev-parse", "HEAD"), result.commit);
 }));
 
-assert.equal(cases.length, 13, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
+const BLANK_CONTEXT_PATCH = "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1,3 +1,3 @@\n one\n \n-two\n+three\n";
+
+test("AHE14 a held patch file whose blank context lines end in a space is committed, not refused as trailing whitespace", () => fixture(({ root, parent, baseline }) => {
+  writeFileSync(join(root, "held.patch"), BLANK_CONTEXT_PATCH);
+  writeFileSync(join(root, "held.diff"), BLANK_CONTEXT_PATCH);
+  const result = commitFromObservedAdmission({
+    baseline, final: { outcome: "succeeded", changedPaths: ["held.diff", "held.patch"] },
+    allowedPaths: ["held.diff", "held.patch"], taskId: "AGY-EXAMPLE-14",
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.deepEqual(result.paths, ["held.diff", "held.patch"]);
+  assert.equal(git(root, "show", "HEAD:held.patch"), BLANK_CONTEXT_PATCH.trimEnd());
+  assert.equal(git(root, "status", "--porcelain"), "");
+}));
+
+test("AHE15 trailing whitespace in any other file is still refused by the diff check, and a patch file beside it does not excuse it", () => fixture(({ root, parent, baseline }) => {
+  writeFileSync(join(root, "held.patch"), BLANK_CONTEXT_PATCH);
+  writeFileSync(join(root, "file.txt"), "after \n");
+  const result = commitFromObservedAdmission({
+    baseline, final: { outcome: "succeeded", changedPaths: ["file.txt", "held.patch"] },
+    allowedPaths: ["file.txt", "held.patch"], taskId: "AGY-EXAMPLE-15",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "AGY-HOST-COMMIT-DIFF-CHECK");
+  assert.equal(git(root, "rev-parse", "HEAD"), parent);
+}));
+
+assert.equal(cases.length, 15, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

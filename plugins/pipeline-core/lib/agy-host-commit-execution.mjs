@@ -127,7 +127,10 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
   if (admitted.admittedBlobs.some(({ path, oid }) => stagedBlob(root, path, spawn) !== oid)) {
     return fail(code("HOST-COMMIT-CONTENT-DRIFT"));
   }
-  if (git(root, ["diff", "--cached", "--check"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
+  // A patch or diff file stores its context lines as " " + the line, so every blank context line is a trailing-whitespace "error" in
+  // the file that carries it: the check must not read those files as source, or every Goldfish that delivers a held patch fails here
+  // (measured 2026-11-01: 16 stop failures, 12 of them in the last two days, and a member left armed for the repair to clear).
+  if (git(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
   const stagedTree = git(root, ["write-tree"], spawn)?.trim();
   if (!stagedTree) return fail(code("HOST-COMMIT-TREE"));
   // Neither --no-verify nor a temporary hooksPath is permitted here. A hook
