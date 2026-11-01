@@ -1,0 +1,281 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index bd39c0837..135320b58 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -582,7 +582,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   }
+   if (input?.toolCall?.name === "invoke_subagent"
+     && normalized.nativeSubagents?.some(isNativeImplementationSubagent)) {
+-    deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-implementation-dispatch.mjs.");
++    deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding for goldfish-implementor or goldfish-mechanic, so it is not a route for implementation. The one sanctioned entry is scripts/elephant-implementation-dispatch.mjs (argv: dispatch --root <repo> --request <role-dispatch-request.json under the repo> --result-path <new relative file> --session-id <id> --descriptor-sha256 <sha256>), which is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered). Make at most ONE attempt, do not retry a launched job, and if it does not return authored-commit-recorded stop and ask the PO how implementation is to be dispatched. Do not write the implementation yourself unless the PO decides so. Read-only roles (critic, readiness-reviewer, plan-verifier, consult-advisor) are the native route: references/antigravity-native-dispatch.md.");
+   }
+ 
+   // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 80ae45c80..b50885b2d 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -888,6 +888,12 @@ check("Antigravity native implementation dispatch is refused even when candidate
+   const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
+   assert.equal(res.decision, "deny");
+   assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
++  // 17: the refusal is honest about the route it names (Codex-to-Antigravity, unproven from an AGY-hosted Elephant) and tells the Elephant to stop and ask.
++  assert.match(res.reason, /elephant-implementation-dispatch\.mjs \(argv: dispatch --root/u);
++  assert.match(res.reason, /Codex-to-Antigravity route/u);
++  assert.match(res.reason, /at most ONE attempt/u);
++  assert.match(res.reason, /ask the PO/u);
++  assert.match(res.reason, /Read-only roles \(critic, readiness-reviewer, plan-verifier, consult-advisor\)/u);
+   rmSync(root, { recursive: true, force: true });
+ });
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index c9821623d..3a6c7593d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -250,7 +250,7 @@ export function writeCapableCarrierAdmission({ subagentType, transport = "direct
+   if (transport === "codex" && type === "explorer") return null;
+   if (transport === "direct" && type === "Explore") return null;
+   if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
+-  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; repair: select a shipped pipeline-core:goldfish-* or pipeline-core:critic role and dispatch its generated or required role briefing` };
++  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role, and dispatch its generated or required role briefing` };
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 6513e50ba..2243c5d96 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -241,7 +241,7 @@ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
+     tool_use_id: `gd2i-${builtIn}`,
+     tool_name: "Agent",
+     tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+-  }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
++  }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", `"${builtIn}" is not a shipped Pipeline role`, "pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor"] });
+ }
+ // QG-04 justification: a Workflow agent() Explore has transport `workflow`, and the carrier policy admits Explore only over a
+ // direct call (guard-dispatch.mjs writeCapableCarrierAdmission); the direct-call Explore stays ALLOW in GD2i above.
+diff --git a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+index e0988128d..df7e011e0 100644
+--- a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+@@ -197,6 +197,21 @@ test("AC-108: the AGY Goldfish dispatch reference forbids parallel file writes i
+   assert.match(text, /A Goldfish makes no parallel file writes in one turn until the hook race is fixed/u);
+ });
+ 
++// 17 (AGY greenfield): the reference says which route each role takes, names the implementation entry with its argv and its caveat, and
++// says to end the parent turn after a read-only subagent was dispatched.
++test("17: the AGY dispatch reference names the route per role, the implementation entry with its caveat, and the end-of-turn rule", () => {
++  const text = readFileSync(join(REPO, "plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md"), "utf8").replace(/\s+/gu, " ");
++  assert.match(text, /## Which route a role takes on Antigravity/u);
++  assert.match(text, /`critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` \(read-only\)/u);
++  assert.match(text, /A runner-native type such as `research` is not a Pipeline role and is refused \(`DISPATCH-WRITE-CARRIER-REQUIRED`\)/u);
++  assert.match(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
++  assert.match(text, /elephant-implementation-dispatch\.mjs dispatch --root <repository-root> --request/u);
++  assert.match(text, /documented as the Codex-to-Antigravity route/u);
++  assert.match(text, /Make at most one attempt and never retry a launched job/u);
++  assert.match(text, /end the parent turn without further tool calls/u);
++  assert.doesNotMatch(text, /do not start another `agy` process/u, "the old sentence contradicted the implementation route");
++});
++
+ test("AC-108: the start preflight reports a sandbox-unreachable node with a typed code and the one-time remedy, and unknown is never ready", async () => {
+   const { observeNodeSandboxProbe } = await import(
+     pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index c65b08be5..7a8221935 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -898,7 +898,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       refuse("DBG-MODEL-FAMILY", `model id ${modelId} is not the model the Codex route ${taskRoute} selects for ${agentType} (${expected}); repair: pass --model-id ${expected} together with --runner codex, or omit --runner for a Claude dispatch`);
+     }
+   } else if (!modelBelongsToFamily(modelId, resolved.model)) {
+-    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)`);
++    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? "; a Gemini id belongs to an Antigravity dispatch, and an Antigravity dispatch does not use this generator: its implementation route reads a pipeline.role-dispatch-request.v1 packet and its own V3 route, not a native-goldfish-host-commit briefing (references/antigravity-native-dispatch.md)" : ""}`);
+   }
+   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
+   // Claude (W2-R2): the Claude Agent tool cannot pass an effort (MP-29), so the agent definition's frontmatter effort is what the run
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 0d03140ac..95e5b0b22 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1304,6 +1304,20 @@ test("K142 the Claude family refusal names a repair and keeps naming the alias f
+   assert.match(result.message, /MP-29/u, "the escalation route stays named: only the tool-layer model parameter selects the model");
+ });
+ 
++// 17 (AGY greenfield): a Gemini id on the default (Claude) path is not a model mistake to repair with a Claude id; the Antigravity
++// dispatch does not use this generator, and the refusal says so. A Claude-family mistake keeps the unchanged repair.
++test("17 a Gemini model id is told that an Antigravity dispatch does not use this generator", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const gemini = runDispatchBriefing(argvOf(fx, { "--model-id": "gemini-3.8-flash-medium" }), depsOf(fx));
++  assert.equal(gemini.code, "DBG-MODEL-FAMILY");
++  assert.match(gemini.message, /an Antigravity dispatch does not use this generator/u);
++  assert.match(gemini.message, /pipeline\.role-dispatch-request\.v1/u);
++  const claude = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
++  assert.equal(claude.code, "DBG-MODEL-FAMILY");
++  assert.doesNotMatch(claude.message, /Antigravity/u, "the Claude-family refusal is unchanged");
++});
++
+ test("K142 build: a package that names runner codex renders a Codex briefing that parses back and verifies (needs the package-key part of the protected diff)", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { verifyGeneratedBriefing } = await buildLib();
+diff --git a/plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs b/plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs
+index 9577a8ecb..43d2d46ed 100644
+--- a/plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs
+@@ -14,6 +14,7 @@
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+ import { isAbsolute, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
+ 
+ import {
+   dispatchElephantAgyImplementation,
+@@ -37,7 +38,7 @@ function physicalRequestUnderRoot(root, path) {
+   } catch { return null; }
+ }
+ 
+-function receipt({ status, code, selected = false, inner = null } = {}) {
++function receipt({ status, code, selected = false, inner = null, advisory = null } = {}) {
+   return {
+     schema: ELEPHANT_IMPLEMENTATION_DISPATCH_SCHEMA,
+     status,
+@@ -48,9 +49,15 @@ function receipt({ status, code, selected = false, inner = null } = {}) {
+       fallbackRequirement: "new-po-decision",
+     },
+     inner,
++    ...(advisory === null ? {} : { advisory }),
+   };
+ }
+ 
++// 17 (AGY greenfield): this selector is the Codex-to-Antigravity implementation entry. Launched from an Antigravity-hosted Elephant it has
++// not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered), so the receipt says so and
++// names the only safe way on: one bounded attempt, no retry of a launched job, then the PO decides. It refuses nothing by itself.
++export const AGY_HOSTED_ADVISORY = "AGY-HOSTED-ELEPHANT-UNPROVEN: this route is documented as Codex-to-Antigravity; from an Antigravity-hosted Elephant it has not been shown to return. Make at most one attempt, do not retry a launched job, and if the status is not authored-commit-recorded stop and ask the PO how implementation is to be dispatched; do not write the implementation yourself unless the PO decides so.";
++
+ /**
+  * The actual production selector.  Its dependencies are tests seams only;
+  * callers cannot nominate a provider, model, effort, role, or fallback.
+@@ -66,21 +73,24 @@ export async function dispatchElephantImplementation(input = {}, dependencies =
+   if (packet.transport !== "antigravity") {
+     return receipt({ status: "unavailable", code: "ELEPHANT-IMPLEMENTATION-ROUTE-NOT-SELECTED" });
+   }
++  const hostRunner = (dependencies.resolveHostRunner ?? resolveActiveRunner)({ env: dependencies.env ?? process.env });
++  const advisory = hostRunner === "antigravity" ? AGY_HOSTED_ADVISORY : null;
++  const answer = (value) => receipt({ ...value, advisory });
+   const runAgy = dependencies.dispatchElephantAgyImplementation ?? dispatchElephantAgyImplementation;
+   let inner;
+   try { inner = await runAgy(input, dependencies); }
+   catch {
+     // The selected route may already have launched a child. Preserve a typed
+     // recovery state, not an unstructured CLI error or a retry suggestion.
+-    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-EXCEPTION", selected: true });
++    return answer({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-EXCEPTION", selected: true });
+   }
+   if (!inner || typeof inner !== "object" || Array.isArray(inner)) {
+-    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-INVALID", selected: true });
++    return answer({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-INVALID", selected: true });
+   }
+   if (inner.modelCalls > 0 && !["authored-commit-recorded", "final-pending-host-commit", "completed-undelivered", "interrupted-recorded", "recovery-required"].includes(inner.status)) {
+-    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-LAUNCHED-NONFINAL", selected: true });
++    return answer({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-LAUNCHED-NONFINAL", selected: true });
+   }
+-  return receipt({
++  return answer({
+     status: inner?.status === "authored-commit-recorded" ? "authored-commit-recorded" : inner?.status === "final-pending-host-commit" ? "final-pending-host-commit" : inner?.status === "completed-undelivered" ? "completed-undelivered" : inner?.status === "interrupted-recorded" ? "interrupted-recorded" : inner?.status === "recovery-required" ? "recovery-required" : inner?.status === "unavailable" ? "unavailable" : "rejected",
+     code: inner?.code ?? "AGY-ELEPHANT-ROUTE-UNAVAILABLE",
+     selected: true,
+diff --git a/plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs b/plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs
+index d55193f67..c10856912 100644
+--- a/plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs
+@@ -145,6 +145,29 @@ test("absence, stale session, altered route, scope and request binding fail on t
+   assert.equal(invalidInput.launches(), 0);
+ });
+ 
++// 17 (AGY greenfield): the selector is the Codex-to-Antigravity route. Called from an Antigravity-hosted Elephant it says so in the receipt
++// and names the way on (one attempt, then the PO), and it still launches exactly as before; from any other host the receipt is unchanged.
++test("an Antigravity-hosted Elephant gets the unproven-route advisory, any other host gets the unchanged receipt", async () => {
++  const hosted = fixture();
++  const withAdvisory = await dispatchElephantImplementation(input(hosted), { ...hosted.dependencies, resolveHostRunner: () => "antigravity" });
++  assert.equal(withAdvisory.status, "completed-undelivered");
++  assert.equal(hosted.launches(), 1, "the advisory refuses nothing");
++  assert.match(withAdvisory.advisory, /^AGY-HOSTED-ELEPHANT-UNPROVEN:/u);
++  assert.match(withAdvisory.advisory, /at most one attempt/u);
++  assert.match(withAdvisory.advisory, /ask the PO/u);
++  for (const runner of ["codex", "claude"]) {
++    const other = fixture();
++    const plain = await dispatchElephantImplementation(input(other), { ...other.dependencies, resolveHostRunner: () => runner });
++    assert.equal(Object.hasOwn(plain, "advisory"), false, `${runner}: no advisory key`);
++    assert.equal(other.launches(), 1);
++  }
++  const thrown = fixture();
++  const failed = await dispatchElephantImplementation(input(thrown), { ...thrown.dependencies, resolveHostRunner: () => "antigravity",
++    dispatchElephantAgyImplementation: async () => { throw new Error("x"); } });
++  assert.equal(failed.code, "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-EXCEPTION");
++  assert.match(failed.advisory, /^AGY-HOSTED-ELEPHANT-UNPROVEN:/u, "the advisory also rides on a recovery receipt");
++});
++
+ test("outer CLI has the same closed argument surface as the sealed implementation route", () => {
+   assert.deepEqual(parseArgs(["dispatch", "--root", "/repo", "--request", "/repo/request.json", "--result-path", "results/out.json", "--session-id", "session-1", "--descriptor-sha256", SHA]), { root: "/repo", dispatchRequestPath: "/repo/request.json", resultPath: "results/out.json", sessionId: "session-1", descriptorSha256: SHA });
+   assert.throws(() => parseArgs(["dispatch", "--root", "/repo", "--fallback", "codex"]), /usage/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index a7d6e0f97..43aea45c2 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -2,9 +2,37 @@
+ 
+ Load this reference before an Elephant or other authorized dispatcher builds
+ an Antigravity `invoke_subagent` call whose complete `Subagents` array includes
+-a Pipeline role. It is a preparation and admission route, not a launcher: do
+-not start another `agy` process, execute a model, add approval, or replace the
+-existing Workflow/worktree route.
++a Pipeline role. It is a preparation and admission route, not a launcher: this
++step does not start an `agy` process, execute a model, add approval, or replace
++the existing Workflow/worktree route.
++
++## Which route a role takes on Antigravity
++
++| Role | Route | Notes |
++|---|---|---|
++| `critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` (read-only) | this reference: prepare, then native `invoke_subagent` | Name the shipped Pipeline role as the `TypeName`. A runner-native type such as `research` is not a Pipeline role and is refused (`DISPATCH-WRITE-CARRIER-REQUIRED`): it carries no read-only guarantee. |
++| `goldfish-implementor` | not native: `invoke_subagent` is refused (`AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE`) | The one sanctioned entry is `scripts/elephant-implementation-dispatch.mjs` (below). It is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return. |
++| `goldfish-mechanic`, `goldfish-deep` | not available | The V3 registry marks both `unavailable` on Antigravity; only the implementor is opt-in. |
++
++`dispatch-briefing.mjs` builds the Claude and Codex briefing block. An
++Antigravity dispatch does not use it (a Gemini model id is refused there with
++a note saying so); the implementation route reads a
++`pipeline.role-dispatch-request.v1` packet (`transport: "antigravity"`,
++`resultDestination: { kind: "return" }`) and takes provider, model, effort and
++scope from its own V3 route and the stored session consent.
++
++### Implementation from an Antigravity-hosted Elephant
++
++```text
++node <loaded-plugin-root>/scripts/elephant-implementation-dispatch.mjs dispatch --root <repository-root> --request <role-dispatch-request.json under the root> --result-path <new relative output file> --session-id <session id> --descriptor-sha256 <descriptor sha256>
++```
++
++Make at most one attempt and never retry a launched job. The receipt carries an
++`advisory` (`AGY-HOSTED-ELEPHANT-UNPROVEN`) when the caller is an Antigravity
++session. If the status is anything but `authored-commit-recorded`, stop and ask
++the PO how implementation is to be dispatched; do not write the implementation
++yourself unless the PO decides so. The child gets no stdin and is killed after
++its bounded timeout.
+ 
+ Resolve the already loaded plugin root first. The required entrypoint is
+ `scripts/antigravity-native-dispatch-prepare.mjs` below that root. Build one
+@@ -29,6 +57,15 @@ artifact; the immediate PreTool check consumes it, rechecks those bindings,
+ and rejects replay, expiry, candidate movement, packet staleness, mutation,
+ and partial or reordered mixed arrays.
+ 
++After a read-only role was dispatched with `invoke_subagent`, end the parent
++turn without further tool calls. Observed in the first greenfield run: the
++Critic's message stayed under `.system_generated/messages/undelivered/` and the
++subagent never ran while the parent kept working in the same turn; the review
++was then finalized in the main context, which is not an independent review.
++The runner's delivery rule itself is not verified here, so treat ending the
++turn as the safe form. Read the result in the next turn, from the files the
++Critic or reviewer wrote.
++
+ A Goldfish makes no parallel file writes in one turn until the hook race is
+ fixed: state this in every Goldfish briefing built for this route, and have the
+ Goldfish issue its `write_to_file` and Edit calls one at a time, each after the
