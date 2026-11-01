@@ -1,0 +1,101 @@
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index f7e6002ed..7181c26a8 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -29,6 +29,26 @@ export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.
+ export const ARCHITECTURE_ENTRY_SCOPE = "architecture/map/";
+ 
+ /** The single definition of which planning-surface paths are architecture contracts (library and guard share it). */
++/** The outcomes that decide a blocked planning fitness: everything except the report-only ones, and only finding/unavailable/unknown/unsupported. */
++export function blockingFitnessOutcomes(outcomes, reportOnly = []) {
++  const skipped = new Set(Array.isArray(reportOnly) ? reportOnly : []);
++  return (Array.isArray(outcomes) ? outcomes : [])
++    .filter((outcome) => !skipped.has(outcome) && outcome?.outcome !== "pass" && outcome?.outcome !== "excepted")
++    .map((outcome) => ({
++      classId: outcome.classId,
++      propertyId: typeof outcome.propertyId === "string" ? outcome.propertyId : null,
++      outcome: outcome.outcome,
++      violations: (Array.isArray(outcome.violations) ? outcome.violations : []).slice(0, 5).map((violation) => {
++        const text = typeof violation === "string" ? violation : JSON.stringify(violation);
++        return text.length > 300 ? `${text.slice(0, 300)}...` : text;
++      }),
++    }));
++}
++export function describeBlockingOutcome(outcome) {
++  const first = outcome.violations[0];
++  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}`;
++}
++
+ export function architectureTouchedContracts(paths) {
+   return (Array.isArray(paths) ? paths : []).filter((candidate) => /^(architecture\/|docs\/adr\/|schemas\/)/u.test(candidate));
+ }
+@@ -459,13 +479,24 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
+     });
+   }
+   if (!(fitnessProjection.blockingOverallStatus === "pass" || fitnessProjection.blockingOverallStatus === "excepted")) {
+-    return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {
++    // Candidate 17: name the blocking classes and their first violations in the result, and answer with a repair action. The default
++    // next action is an adoption-disposition prompt with no selectable values, which is not what blocks here.
++    const blockingOutcomes = blockingFitnessOutcomes(fitness.outcomes, fitnessProjection.reportOnly);
++    return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`
++      + (blockingOutcomes.length === 0 ? "" : `; blocking: ${blockingOutcomes.map(describeBlockingOutcome).join("; ")}`), artifacts, disposition, {
+       overallStatus: fitness.overallStatus,
+       blockingOverallStatus: fitnessProjection.blockingOverallStatus,
+       reportOnly: fitnessProjection.reportOnly,
++      blockingOutcomes,
+       outcomes: fitness.outcomes,
+       summary: fitness.summary,
+       planningSurface: surface,
++    }, {
++      kind: "repair-required",
++      code: "ARCHITECTURE-FITNESS-REPAIR",
++      blockingOutcomes,
++      planningSurfacePaths: surface.paths,
++      guidance: "Planning fitness runs over every path the PRD names (the planning surface listed here) and one or more of the ten fitness classes reports a finding or is unavailable. Fix the cause named in blockingOutcomes (the PRD path list, the fitness model, the baseline or the architecture map), then submit again. No adoption disposition is asked for here.",
+     });
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index e362ec585..b26e6284c 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -341,6 +341,39 @@ test("calibration-unavailable class 10 is preserved as report-only while other c
+   assert.equal(result.fitness.reportOnly.length, 1);
+ });
+ 
++// Candidate 17 (Toolbox, ARCHITECTURE-FITNESS-NOT-READY): the refusal names the blocking classes and answers with a repair action instead of
++// an unanswerable adoption-disposition prompt.
++test("a blocked planning fitness names the blocking classes and does not ask for an adoption disposition", () => {
++  const surfacePaths = ["package.json", "app/api/indexnow/route.ts"];
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/security-deps.md", paths: surfacePaths },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
++      checkPlanningAdoptionDisposition: readyDisposition,
++      evaluateArchitectureFitness: () => ({
++        overallStatus: "blocked",
++        summary: { passCount: 7, findingCount: 1, exceptedCount: 0, unavailableCount: 2, unsupportedCount: 0, unknownCount: 0, totalClasses: 10 },
++        outcomes: [
++          ...Array.from({ length: 6 }, (_, index) => ({ classId: index + 1, outcome: "pass" })),
++          { classId: 7, propertyId: "module-boundaries", outcome: "finding", violations: ["app/api/indexnow/route.ts imports outside its module"] },
++          { classId: 8, outcome: "pass" },
++          { classId: 9, outcome: "pass" },
++          { classId: 10, outcome: "unavailable", evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } },
++        ],
++      }),
++    },
++  });
++  assert.equal(result.status, "blocked");
++  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
++  assert.deepEqual(result.fitness.blockingOutcomes.map((outcome) => outcome.classId), [7], "the report-only class 10 is not listed");
++  assert.match(result.message, /class 7 \(module-boundaries\) finding: app\/api\/indexnow\/route\.ts imports outside its module/u);
++  assert.equal(result.nextAction.kind, "repair-required");
++  assert.equal(result.nextAction.code, "ARCHITECTURE-FITNESS-REPAIR");
++  assert.deepEqual(result.nextAction.planningSurfacePaths, surfacePaths);
++  assert.equal(result.nextAction.input, undefined, "no unanswerable collect-input");
++  assert.equal(result.nextAction.kind === "collect-input", false);
++});
++
+ test("malformed or incomplete fitness outcomes fail closed", () => {
+   const result = inspectArchitectureEntryReadiness({
+     rootDir: repoRoot,
