@@ -1,0 +1,113 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 779a1bcc3..b36af1057 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -197,8 +197,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
+     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
+     ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
+-    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",17],
+-    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",19],
++    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",18],
++    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",20],
+     ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
+     ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
+     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 7cb79853c..a10f20020 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -48,6 +48,11 @@ function isBoundedFilenameFilter(value) {
+   // dotted/glob/path expressions (including the existing *.tar.gz negative).
+   if (typeof value !== "string") return false;
+   if (/^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
++  // PO tile answer 2026-11-01: a POSITIVE recursive basename filter (`**/*.md`) and a multi-dot extension (`*.tar.gz`, `**/*.d.ts`) are admitted too.
++  // `**/` before a bare basename pattern names the same files as the pattern alone (a basename glob already matches at any depth), and up to three
++  // literal dot-separated segments stay bounded filename data. Still refused: any other path segment (`scratch/*.md`), a brace group, `[]`, `?`,
++  // a leading dot or a wildcard inside an extension.
++  if (/^(?:\*\*\/)?\*\.(?:[A-Za-z0-9][A-Za-z0-9_-]{0,15}\.){0,2}[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
+   // D232 (PO instruction, 2026-11-01): a NEGATED filter only excludes. It can never add a file the unfiltered search would not
+   // visit, never lifts an ignore rule (only a positive glob overrides one) and never reaches a hidden name, so it narrows the
+   // traversal and is read-only. Admitted exclusions: a bounded extension (`!*.patch`, `!*.min.js`, `!**/*.log`) and a plain
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 86f81cad8..8fe511560 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -12754,7 +12754,10 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
+       // D232: a negation can only narrow a search that already names an admitted target, so a bounded negated filter is admitted.
+       qp4Admit('rg -n -g "!*.md" apply scratch/notes.md', path);
+       qp4Admit('rg -n -g "!*.patch" apply scratch/notes.md', path);
+-      for (const glob of ['"**/*.md"', '"scratch/*.md"', '"!scratch/*.md"', '"!.git"', '"!../*.md"', '"!*"']) {
++      // PO tile answer 2026-11-01: a positive `**/` basename filter and a multi-dot extension are admitted as well (same files as the bare basename filter).
++      qp4Admit('rg -n -g "**/*.md" apply scratch/notes.md', path);
++      qp4Admit('rg -n -g "*.tar.gz" apply scratch/notes.md', path);
++      for (const glob of ['"scratch/*.md"', '"**/*"', '"**/sub/*.md"', '"*.a.b.c.d"', '"!scratch/*.md"', '"!.git"', '"!../*.md"', '"!*"']) {
+         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
+       }
+     });
+diff --git a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+index 35426f02d..6ce30649b 100644
+--- a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+@@ -52,16 +52,18 @@ test("quoted operators remain inert regex data in the stdin sink", () => fixture
+     assert.equal(isBoundedReadOnlyPipeline(parse(command), root), true);
+     assert.equal(guard(command).exitCode, 0);
+   }
++  for (const glob of ["*.tar.gz", "*.test.tar.gz", "**/*.mjs"]) {
++    assert.equal(guard(`rg --files plugins/pipeline-core -g '${glob}' | rg owner`).exitCode, 0, glob);
++  }
+ }));
+ 
+ test("unsupported filters, executable flags and shell effects stay refused", () => fixture(({ guard }) => {
+   for (const command of [
+-    "rg --files plugins/pipeline-core -g '*.tar.gz' | rg owner",
+-    "rg --files plugins/pipeline-core -g '*.test.tar.gz' | rg owner",
++    // PO tile answer 2026-11-01 (restated): `*.tar.gz`, `*.test.tar.gz` and `**/*.mjs` moved to the admitted list of the test above; SEC-11 intent unchanged.
+     "rg --files plugins/pipeline-core -g '*.test..mjs' | rg owner",
+     "rg --files plugins/pipeline-core -g '.*' | rg owner",
+     "rg --files plugins/pipeline-core -g '../*.mjs' | rg owner",
+-    "rg --files plugins/pipeline-core -g '**/*.mjs' | rg owner",
++    "rg --files plugins/pipeline-core -g '**/sub/*.mjs' | rg owner",
+     "rg --pre inert owner plugins/pipeline-core | rg owner",
+     "rg --files plugins/pipeline-core | rg --pre inert owner",
+     "rg --files plugins/pipeline-core | rg --output out owner",
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 342d5464f..27d29afb1 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -28,7 +28,12 @@ test("G23 bounded repeated rg globs preserve hidden and credential exclusions",
+       assert.equal(isBoundedSingleRg(["-l", "safe", "docs", "-g", "*.md", "-g", good], root), true, good);
+     }
+     assert.equal(isBoundedSingleRg(["safe", "docs", "--glob", "!*.patch"], root), true, "negated filter alone, long spelling");
+-    for (const bad of [".*", "../*.md", "**/*.md", "*.tar.gz", "!.*", "!../x", "!/abs", "!a/b", "!*.{md,txt}", "!", "!*", "!-x", "!*.a.b.c.d"]) {
++    // PO tile answer 2026-11-01 (restated, intent kept: a filter stays a bounded basename filter): a positive `**/` basename filter and a multi-dot
++    // extension (up to three literal segments) are admitted; they name the same files a basename glob already names at any depth.
++    for (const good of ["**/*.md", "*.tar.gz", "**/*.d.ts", "**/*.test.mjs", "*.a.b.c"]) {
++      assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", good], root), true, good);
++    }
++    for (const bad of [".*", "../*.md", "scratch/*.md", "**/sub/*.md", "**/**/*.md", "**/*", "**/.*", "**/*.{md,txt}", "*.m*", "*.a.b.c.d", "!.*", "!../x", "!/abs", "!a/b", "!*.{md,txt}", "!", "!*", "!-x", "!*.a.b.c.d"]) {
+       assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", bad], root), false, bad);
+     }
+     assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "--pre", "run"], root), false);
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index bd46b6349..a78ac431f 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -119,13 +119,15 @@ test("AP3 the rg flags the item names (--no-heading, -m N) on an in-repo target
+   // QG-04 restatement (2026-11-01, D232, PO instruction "glob ... nur reads"): `!*.md` moved from the refused list to the admitted list below.
+   // SEC-11 intent unchanged: no glob can reach a hidden, credential or parent path. A NEGATED filter only excludes files the search
+   // would otherwise visit, so it cannot reach anything; every positive filter outside the closed extension grammar stays refused.
+-  for (const good of ["!*.md", "!*.min.js", "!node_modules"]) {
++  // QG-04 restatement (2026-11-01, PO tile answer): `**/*.md` moved from the refused list to this admitted list, with the multi-dot extension. A `**/` basename filter names
++  // the same files as the bare basename filter, so the SEC-11 intent is unchanged; a real path segment, `**/*`, a brace group and a hidden name stay refused below.
++  for (const good of ["!*.md", "!*.min.js", "!node_modules", "**/*.md", "*.tar.gz"]) {
+     const command = `rg -l -S lifecycle plugins -g "*.mjs" -g "${good}"`;
+     assert.equal(verdict(bash(command), path).exitCode, 0, command);
+     assert.equal(verdict(bash(`${command} | head -n 180`), path).exitCode, 0, `${command} | head -n 180`);
+     assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", good], path), true, `single-command predicate: ${good}`);
+   }
+-  for (const bad of [".*", "../*.md", "**/*.md", "!.*", "!../x", "!*.{md,txt}"]) {
++  for (const bad of [".*", "../*.md", "scratch/*.md", "**/*", "**/*.{md,txt}", "!.*", "!../x", "!*.{md,txt}"]) {
+     const command = `rg -l -S lifecycle plugins -g "*.mjs" -g "${bad}"`;
+     assert.equal(verdict(bash(command), path).exitCode, 2, command);
+     assert.equal(verdict(bash(`${command} | head -n 180`), path).exitCode, 2, `${command} | head -n 180`);
