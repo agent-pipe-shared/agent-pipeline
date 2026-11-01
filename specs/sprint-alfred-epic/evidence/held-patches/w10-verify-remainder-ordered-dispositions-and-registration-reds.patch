@@ -1,0 +1,171 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 0d6087aad..3bf363491 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -106,7 +106,8 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/critic-skip-decision.mjs`,
+   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
+   `lib/dispatch-record.mjs`,
+-  `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
++  `lib/entrypoint.mjs`, `lib/feature-package-registration.mjs`,
++  `lib/feature-package-topology.mjs`,
+   `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
+   `lib/human-guard-override.mjs`, `lib/human-role-labels.mjs`,
+   `lib/machine-plane.mjs`, `lib/manifest.mjs`, `lib/onboarding-continuity.mjs`,
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 7dce994f4..71eb4715c 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -552,7 +552,10 @@
+           "CDPF083",
+           "CDPF084",
+           "CDPF085",
+-          "CDPF086"
++          "CDPF086",
++          "CDPF087",
++          "CDPF088",
++          "CDPF089"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/scripts/check-verify-case-completion.mjs b/harness/scripts/check-verify-case-completion.mjs
+index 3dcaf57f2..5aec56b56 100644
+--- a/harness/scripts/check-verify-case-completion.mjs
++++ b/harness/scripts/check-verify-case-completion.mjs
+@@ -245,7 +245,12 @@ function hasOnboardingParentRecorder(source, suitePath, bindings) {
+   const shardsClose = matchingClose(source, shardsOpen, "{", "}", true);
+   if (shardsClose === -1) return false;
+   const shardBody = masked.slice(shardsOpen + 1, shardsClose);
+-  return /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) recorder\.dispose\(result\.id, result\.disposition\);/u.test(shardBody);
++  // The close-observed producer only collects; the single recorder.dispose runs afterwards in declared case order,
++  // because Verify's parser requires the DISPOSED records ordinal by ordinal while shards finish in arrival order.
++  return /const collectedDispositions = new Map\(\);/u.test(shardBody)
++    && /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) collectedDispositions\.set\(result\.id, result\.disposition\);/u.test(shardBody)
++    && /const chunkResults = await runAllChunks\(CHUNK_COUNT, runChunk\);\s*for \(const id of ONBOARDING_CASE_IDS\) \{\s*if \(collectedDispositions\.has\(id\)\) recorder\.dispose\(id, collectedDispositions\.get\(id\)\);\s*\}\s*return chunkResults;/u.test(shardBody)
++    && [...shardBody.matchAll(/recorder\.dispose\(/gu)].length === 1;
+ }
+ 
+ function closedCompletionRegistration(source, start) {
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index d624f8534..a019c0b15 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -723,7 +723,9 @@ registerTestCaseCompletion({ cases() {}, fd: 3, maxBytes: 4096 });
+     ["exit before shards", (source) => source.replace("const results = await runShards(recorder);", "process.exit(0);\n  const results = await runShards(recorder);")],
+     ["foreign recorder argument", (source) => source.replace("const results = await runShards(recorder);", "const results = await runShards(other);")],
+     ["absent close validation", (source) => source.replace("const receipt = receiver.close(code, signal);", "const receipt = receiver.receipt;")],
+-    ["fabricated pass disposition", (source) => source.replace("recorder.dispose(result.id, result.disposition)", 'recorder.dispose(result.id, "pass")')],
++    ["fabricated pass disposition", (source) => source.replace("collectedDispositions.set(result.id, result.disposition)", 'collectedDispositions.set(result.id, "pass")')],
++    ["fabricated pass at replay", (source) => source.replace("recorder.dispose(id, collectedDispositions.get(id))", 'recorder.dispose(id, "pass")')],
++    ["arrival-order disposal", (source) => source.replace("collectedDispositions.set(result.id, result.disposition);", "recorder.dispose(result.id, result.disposition);")],
+     ["noncanonical declaration", (source) => source.replace("ONBOARDING_TEST_CASES.map((entry) => entry.id).sort()", "unrelatedIds")],
+   ];
+   for (const [name, mutate, path] of mutations) {
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index 5f531ba07..af705cb93 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -308,6 +308,7 @@ const DYNAMIC_IMPORT_EDGES = {
+     "../lib/project-authority.mjs",
+     "../lib/guard-devplan-policy.mjs",
+     "../lib/administrative-commit-policy.mjs",
++    "../lib/feature-package-registration.mjs",
+   ],
+   // closure repair ALF-C-P3-01D: lazily loaded modules of newly reached kernel files.
+   "plugins/pipeline-core/scripts/po-human-approval.mjs": [
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index ab3ff069a..c51830967 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -187,6 +187,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // node:child_process's spawnSync), not just static imports -- `project-onboarding-v3.mjs`
+   // above reaches these two writer scripts (and everything THEY import) through the
+   // process boundary, not an import.
++  "plugins/pipeline-core/lib/feature-package-registration.mjs",
+   "plugins/pipeline-core/lib/feature-package-topology.mjs",
+   "plugins/pipeline-core/lib/gate-estimate.mjs",
+   "plugins/pipeline-core/lib/git-cmd.mjs",
+diff --git a/plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs b/plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs
+index 15785b241..5a00f0bf7 100644
+--- a/plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs
++++ b/plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs
+@@ -124,7 +124,11 @@ function staleStage() {
+ }
+ function currentStage(state, order) {
+   const { root, head, stale, moved } = state;
+-  for (let i = 0; i < 16; i++) {
++  // The stale digest is random, so a wanted order is reached per attempt with probability s (or 1-s). Measured: a bound of 16
++  // failed 7 runs in 30 (three pairs, each failing with probability 1/17 on average); 192 still failed 1 in 40. The loop stops
++  // at the first digest that sorts as requested, so a large bound costs nothing in the common case and only bounds the tail:
++  // 1024 attempts leave about one run in three hundred.
++  for (let i = 0; i < 1024; i++) {
+     const { req, plan } = requestAndPlan(root, 5000 + i);
+     if (!(order === "stale-first" ? stale < plan.planSha256 : plan.planSha256 < stale)) continue;
+     const current = armPlanned(root, 5000 + i, input, req, plan);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index e6c0268a0..1e9f2060d 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -374,6 +374,9 @@ async function assertEveryChunkRunsContract() {
+ }
+ async function runShards(recorder) {
+   const suitePath = fileURLToPath(import.meta.url);
++  // Shards finish in arrival order, but Verify's completion parser requires the DISPOSED records in the declared
++  // (sorted) case order, so the parent collects every child's dispositions and records them in that order afterwards.
++  const collectedDispositions = new Map();
+   const runChunk = async (selectedChunk) => {
+     const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
+     const expectedCases = ONBOARDING_TEST_CASES.filter((entry) => assignedToChunk(entry.index, index, selectedChunk));
+@@ -404,7 +407,7 @@ async function runShards(recorder) {
+         try {
+           const receipt = receiver.close(code, signal);
+           coverage = receipt.classes;
+-          for (const result of receipt.results) recorder.dispose(result.id, result.disposition);
++          for (const result of receipt.results) collectedDispositions.set(result.id, result.disposition);
+         } catch (failure) { error = failure; }
+       }
+       const childEndedAtNs = process.hrtime.bigint();
+@@ -416,7 +419,11 @@ async function runShards(recorder) {
+     }));
+     return Promise.all(children);
+   };
+-  return runAllChunks(CHUNK_COUNT, runChunk);
++  const chunkResults = await runAllChunks(CHUNK_COUNT, runChunk);
++  for (const id of ONBOARDING_CASE_IDS) {
++    if (collectedDispositions.has(id)) recorder.dispose(id, collectedDispositions.get(id));
++  }
++  return chunkResults;
+ }
+ // `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
+ // `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index a04c097d2..e86b71410 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -4,7 +4,7 @@
+   "files": [
+     {
+       "path": "harness/review-protocol.md",
+-      "rawSha256": "a51e9f75d2b8bff51638953ff2d73f444746372f4ef9ac8a4e2b858b7fbfaf2c"
++      "rawSha256": "fc0077b34a1db0a3526fdf57ed2b18e812c6eb8d23c1d4b582ad8419c7e23f07"
+     },
+     {
+       "path": "plugins/pipeline-core/agents/critic.md",
+@@ -32,7 +32,7 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "d6619a4718da6b87315ea57867ff7b8ac5f5e0c85f6f395c5ee41490d8c5a0a9"
++      "rawSha256": "2e39049d62cfae91728c72e36439a18715acf94d62487be4d163c975f93deb26"
+     },
+     {
+       "path": "roles/critic.md",
+@@ -40,7 +40,7 @@
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "d96dfba383352d5cd5b232addf6bf3e187a8225b40e246c01186b7471eaa090c"
++      "rawSha256": "0e71395c4e5767b4cf3baa14e522229c3c758821908261f8d2c870c0e4284441"
+     }
+   ]
+ }
