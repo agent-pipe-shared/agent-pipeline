@@ -5,8 +5,8 @@ and does NOT apply on the bare tree, because its hunk sits next to the pin hunk 
 
 ## What
 
-`harness/scripts/check-verify-case-completion.test.mjs`: the pinned `top-level-assertions` count of `critic-course-admission-tests` 334 -> 340, plus a dated comment line
-(QG-04: only this number changes; names, paths, classifications and the identity digest stay). The 6 comes from the one case `w18` appends to the suite (6 `assert.` occurrences).
+`harness/scripts/check-verify-case-completion.test.mjs`: the pinned `top-level-assertions` count of `critic-course-admission-tests` 334 -> 337, plus a dated comment line
+(QG-04: only this number changes; names, paths, classifications and the identity digest stay). The 3 comes from the one case `w18` appends to the suite (3 `assert.` occurrences; the first version of that case had 6).
 
 ## Evidence
 
