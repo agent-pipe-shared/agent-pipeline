@@ -33,3 +33,6 @@ refused: `FPR-LINEAGE-COMPILE` with `CCA-DELTA-BINDING`. The candidate was not h
 Pick the newest matching request, or refuse a second diagnostic for a candidate that already has a registered delta request, at the moment it is
 registered, naming the consequence. Preflight and admit should check the same evidence selection the lineage compile uses, and the refusal
 should name the paths that differ. Meanwhile: register exactly one diagnostic per candidate.
+
+Triage 2026-11-01 (candidate 15c): the selection half is held as `w37` (the lineage compile takes the newest matching request). The
+early refusal at registration time and the preflight/admit selection check are not built.
