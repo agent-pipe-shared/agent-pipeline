@@ -296,3 +296,98 @@ for (const command of ["winpty gh 2>/dev/null --version", "echo gh 2>/dev/null p
     assert.equal(result.kind, "none", `control must keep its current result for: ${command}`);
   });
 }
+
+// ---- D230 (PO tile, 2026-11-01): the closed `gh run` class ---------------------------------------------------------
+// `gh run rerun <numeric id> [--failed]` is its own kind `ci-rerun` (no guard refuses it); `gh run watch <numeric id>` and
+// `gh run view|list` are read-only; every other `gh run` shape stays unclassified. Inputs are only text for the classifier.
+const D230_RERUN = [
+  ["gh run rerun 12345", "12345", false],
+  ["gh run rerun 12345 --failed", "12345", true],
+  ["gh run rerun --failed 12345", "12345", true],
+  ["gh run rerun '12345'", "12345", false],
+  ["cd repo && gh run rerun 7 --failed", "7", true],
+  ["GH_TOKEN=x gh run rerun 7", "7", false],
+  ["/usr/bin/gh run rerun 7", "7", false],
+];
+
+for (const [command, runId, failedOnly] of D230_RERUN) {
+  test(`D230: ci-rerun: ${command}`, () => {
+    const result = classifyGhCommand(command);
+    assert.equal(result.kind, "ci-rerun");
+    assert.equal(result.action, "ci-rerun");
+    assert.equal(result.runId, runId);
+    assert.equal(result.failedOnly, failedOnly);
+    assert.equal(result.code, undefined, "a ci-rerun result carries no refusal code");
+  });
+}
+
+const D230_READ_ONLY = [
+  "gh run watch 12345",
+  "gh run watch 12345 --exit-status",
+  "gh run watch 12345 --exit-status --compact --interval 20",
+  "gh run watch 12345 -i 5",
+  "gh run view 12345",
+  "gh run view 12345 --log-failed",
+  "gh run list",
+  "gh run list --branch main",
+];
+
+for (const command of D230_READ_ONLY) {
+  test(`D230: read-only: ${command}`, () => {
+    assertClassification(readOnly(command));
+  });
+}
+
+const D230_UNCLASSIFIED = [
+  "gh run rerun",
+  "gh run rerun abc",
+  "gh run rerun 12345 67890",
+  "gh run rerun 12345 --job 99",
+  "gh run rerun 12345 -j 99",
+  "gh run rerun 12345 --debug",
+  "gh run rerun 12345 --repo other/repo",
+  "gh run rerun 12345 --failed=true",
+  "gh run rerun 12345abc",
+  "gh run rerun 12345; echo x && gh run rerun 6 7",
+  "gh run watch",
+  "gh run watch abc",
+  "gh run watch 12345 --interval x",
+  "gh run watch 12345 --repo other/repo",
+  "gh run cancel 12345",
+  "gh run delete 12345",
+  "gh run download 12345",
+  "gh run",
+  "gh run frobnicate 1",
+];
+
+for (const command of D230_UNCLASSIFIED) {
+  test(`D230: unclassified: ${command}`, () => {
+    assertClassification(refused(UNCLASSIFIED, command));
+  });
+}
+
+test("D230: two reruns in one command are refused unclassified", () => {
+  assertClassification(refused(UNCLASSIFIED, "gh run rerun 1 && gh run rerun 2"));
+});
+
+test("D230: a GH_REPO or GH_HOST assignment beside a rerun is a cross-repo refusal", () => {
+  assertClassification(refused(CROSS_REPO, "GH_REPO=other/repo gh run rerun 12345"));
+  assertClassification(refused(CROSS_REPO, "export GH_HOST=example.invalid && gh run rerun 12345"));
+});
+
+// Residue, pinned as known and not widened by D230: the marker rule of this module names pr/api/release/repo/gist, so a `gh run`
+// shape hidden behind an UNLISTED wrapper (`winpty gh run cancel 1`, `env -S'gh run rerun 1'`) reads as `none`, exactly as before
+// D230 for `gh run cancel`. Adding `run` to the marker would make every `git commit -m "... gh run ..."` an unclassified refusal.
+test("D230: substitution or a shell wrapper hiding the rerun is never ci-rerun and never none", () => {
+  for (const command of ["gh run rerun $(echo 1)", "gh run rerun `echo 1`", "bash -c 'gh run rerun 1'"]) {
+    const result = classifyGhCommand(command);
+    assert.notEqual(result.kind, "ci-rerun", `must not be ci-rerun: ${command}`);
+    assert.notEqual(result.kind, "none", `must not be none: ${command}`);
+  }
+});
+
+test("D230: the most severe result wins: a rerun beside a pull request create stays delivery, beside a merge stays refused", () => {
+  assert.equal(classifyGhCommand("gh run rerun 1 && gh pr create --base main --head feat/x").kind, "delivery");
+  assert.equal(classifyGhCommand("gh run rerun 1 && gh pr merge 1").kind, "refused");
+  assert.equal(classifyGhCommand("gh run watch 1 && gh run rerun 1").kind, "ci-rerun");
+});

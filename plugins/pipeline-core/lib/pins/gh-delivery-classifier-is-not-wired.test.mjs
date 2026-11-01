@@ -84,6 +84,19 @@ test("safe controls: read-only gh, pr create with explicit head/base, and non-gh
   }
 });
 
+test("D230: a rerun by numeric id and a run watch pass guard-push; cancel, delete and a rerun with a free flag are still refused", () => {
+  for (const command of ["gh run rerun 12345", "gh run rerun 12345 --failed", "gh run watch 12345 --exit-status", "gh run view 12345"]) {
+    const { code, stderr } = runGuard(command);
+    assert.equal(code, 0, `${command}: ${stderr}`);
+    assert.doesNotMatch(stderr, /DELIVERY-/, command);
+  }
+  for (const command of ["gh run cancel 12345", "gh run delete 12345", "gh run rerun 12345 --debug", "gh run rerun", "gh run watch"]) {
+    const { code, stderr } = runGuard(command);
+    assert.equal(code, 2, command);
+    assert.match(stderr, /DELIVERY-GH-UNCLASSIFIED/, command);
+  }
+});
+
 test("wiring: guard-push imports the classifier and consults it before the git-push fast path", () => {
   const source = readFileSync(GUARD, "utf8");
   assert.match(source, /import \{ classifyGhCommand \} from "\.\.\/lib\/gh-cmd\.mjs";/);

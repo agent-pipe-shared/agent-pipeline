@@ -22,10 +22,18 @@
  *   classifyGhCommand(command) -> one of
  *     { kind: "none" }                                  no `gh` invocation (a `gh` ARGUMENT, `echo gh pr merge 1`, is data)
  *     { kind: "read-only" }                             a `gh` invocation that cannot deliver or mutate
+ *     { kind: "ci-rerun", action: "ci-rerun", runId, failedOnly }   D230: `gh run rerun <numeric id> [--failed]`, nothing else
  *     { kind: "delivery", action: "pr-create", ... }    the one admitted delivery action of this slice
  *     { kind: "refused", code, reason }                 code is a member of GH_DELIVERY_CODES
  * A compound command is split into simple commands and the MOST SEVERE result wins:
- * refused > delivery > read-only > none.
+ * refused > delivery > ci-rerun > read-only > none.
+ *
+ * D230 (PO tile, 2026-11-01): `gh run rerun <numeric run id> [--failed]` executes an already pushed commit's workflow again. It
+ * changes no code, no ref and no push state, so it is neither read-only nor a delivery: it is its own kind, which no guard
+ * refuses. `gh run watch <numeric run id> [--exit-status] [--compact] [--interval <n>]` only waits and reads, so it is
+ * read-only. Every other `gh run` shape (`cancel`, `delete`, `download`, a rerun with `--job`, `--debug`, `--repo`, no id,
+ * a non-numeric id or a second id) stays DELIVERY-GH-UNCLASSIFIED; more than one rerun in one command is refused, and a
+ * `GH_REPO=` / `GH_HOST=` assignment beside a rerun is DELIVERY-UNSUPPORTED-CROSS-REPO.
  *
  * The rule, in order (per reading of a backslash, see READINGS):
  *   1. GH WORD. `gh` or `gh.exe` at an executable boundary of the raw text, of the dequoted view, or of any dequoted
@@ -93,7 +101,7 @@ const READINGS = [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL];
 
 const NONE = Object.freeze({ kind: "none" });
 const READ_ONLY = Object.freeze({ kind: "read-only" });
-const SEVERITY = { none: 0, "read-only": 1, delivery: 2, refused: 3 };
+const SEVERITY = { none: 0, "read-only": 1, "ci-rerun": 2, delivery: 3, refused: 4 };
 
 const refused = (code, reason) => ({ kind: "refused", code, reason });
 const unclassified = (reason) => refused(UNCLASSIFIED, reason);
@@ -320,6 +328,30 @@ function classifyPr(args) {
   }
 }
 
+// D230: the closed `gh run` class. A run id is digits only; `watch` without an id opens an interactive picker and is not admitted.
+const RUN_ID_RE = /^[0-9]{1,20}$/u;
+const RUN_INTERVAL_RE = /^[0-9]{1,4}$/u;
+const RUN_RERUN_SPEC = { longValue: new Set(), longBool: new Set(["failed"]), shortValue: new Map(), shortBool: new Map() };
+const RUN_WATCH_SPEC = {
+  longValue: new Set(["interval"]),
+  longBool: new Set(["exit-status", "compact"]),
+  shortValue: new Map([["i", "interval"]]),
+  shortBool: new Map(),
+};
+
+function classifyRun(args) {
+  const [sub, ...rest] = args;
+  if (sub === "view" || sub === "list") return READ_ONLY;
+  if (sub !== "rerun" && sub !== "watch") return unclassified("a gh run subcommand outside the allowlist");
+  const { values, positionals, unknown } = parseFlags(rest, sub === "rerun" ? RUN_RERUN_SPEC : RUN_WATCH_SPEC);
+  const intervals = values.get("interval") ?? [];
+  if (unknown || positionals.length !== 1 || !RUN_ID_RE.test(positionals[0]) || !intervals.every((v) => RUN_INTERVAL_RE.test(v))) {
+    return unclassified(`gh run ${sub} needs exactly one numeric run id and only its admitted flags`);
+  }
+  if (sub === "watch") return READ_ONLY;
+  return { kind: "ci-rerun", action: "ci-rerun", runId: positionals[0], failedOnly: values.has("failed") };
+}
+
 const MERGE_MUTATION_RE = /\b(?:mergePullRequest|enablePullRequestAutoMerge)\b/u;
 const MERGE_ENDPOINT_RE = /(?:^|\/)pulls\/[^/]+\/merge\/*$/iu;
 const UPLOADS_HOST_RE = /(?:^|\/\/|\.)uploads\.github\.com(?:[/:]|$)/iu;
@@ -356,7 +388,6 @@ function classifyApi(args) {
 const READ_ONLY_SUBCOMMANDS = {
   issue: ["view", "list", "status"],
   repo: ["view", "list"],
-  run: ["view", "list"],
   workflow: ["view", "list"],
   auth: ["status"],
   label: ["list"],
@@ -379,6 +410,7 @@ function classifyGhArgs(args) {
   }
   if (top === "api") return classifyApi(rest);
   if (top === "pr") return classifyPr(rest);
+  if (top === "run") return classifyRun(rest);
   const sub = rest[0];
   if (top === "release") {
     if (sub === "upload") return refused(ARTIFACT_HANDOFF, "gh release upload hands an artifact over");
@@ -526,12 +558,18 @@ function classifyUnderReading(command, reading) {
   }
   let result = NONE;
   let deliveries = 0;
+  let reruns = 0;
   for (const segment of lexed.segments) {
     const simple = classifySimple(scanShell(segment, reading).words);
     if (simple.kind === "delivery") deliveries += 1;
+    if (simple.kind === "ci-rerun") reruns += 1;
     result = moreSevere(result, simple);
     if (result.kind === "refused") break;
   }
+  if (result.kind === "ci-rerun" && hasCrossRepoAssignment(scan.words)) {
+    return refused(CROSS_REPO, "GH_REPO or GH_HOST is assigned in the command, so the rerun would not target this repository");
+  }
+  if (reruns > 1) return unclassified("more than one gh run rerun in one command");
   if (result.kind === "delivery" && hasCrossRepoAssignment(scan.words)) {
     return refused(CROSS_REPO, "GH_REPO or GH_HOST is assigned in the command, so the pull request would not target this repository");
   }
