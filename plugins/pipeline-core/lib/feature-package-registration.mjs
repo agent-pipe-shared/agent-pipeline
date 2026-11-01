@@ -545,7 +545,7 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
   return {
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "verify-evidence-added", manifestPath, verifyEvidencePath: evidenceRel,
     registered: [{ path: evidenceRel, sha256: evidenceSha256 }], manifestSha256: digest(bytes),
-    next: "do NOT commit: the package candidate must stay equal to HEAD. Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
+    next: "do NOT commit until the close-feature audit plan has used this package: the package candidate must stay equal to HEAD (a commit in between makes that plan refuse with FCA-PACKAGE, and the package must then be registered again for the new HEAD; the close's own commits come after the plan). Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
   };
 }
 

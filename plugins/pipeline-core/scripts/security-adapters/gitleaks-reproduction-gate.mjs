@@ -14,6 +14,26 @@ const domain = value => typeof value === "string" && value.length <= 253
 const safePath = value => typeof value === "string" && value.length > 0 && !isAbsolute(value)
   && !value.includes("\\") && value.split("/").every(part => part && part !== "." && part !== "..");
 
+// Candidate 16b (PO decision 2026-11-01): a deliberately public value may be reviewed besides a plain domain. The shape is closed:
+// a hex key of 32..64 characters that the project itself publishes as the tracked file `public/<key>.txt` whose whole content is that
+// key (the IndexNow protocol). The proof is checked here, not claimed: a regular non-linked file, tracked by Git, identical content.
+// Any other credential-shaped value stays refused, and the refusal text names what is accepted.
+export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, or a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key";
+const PUBLIC_KEY = /^[a-f0-9]{32,64}$/u;
+export function reviewedValueClass(rootDir, value, gitFn = spawnSync) {
+  if (domain(value)) return "domain";
+  if (typeof value !== "string" || !PUBLIC_KEY.test(value) || typeof rootDir !== "string") return null;
+  try {
+    const rel = `public/${value}.txt`;
+    const file = join(rootDir, rel);
+    const info = lstatSync(file);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size > 4096) return null;
+    if (readFileSync(file, "utf8").replace(/\r?\n$/u, "") !== value) return null;
+    const tracked = gitFn("git", ["ls-files", "--error-unmatch", "--", rel], { cwd: rootDir, encoding: "utf8", shell: false });
+    return tracked.status === 0 ? "public-key-file" : null;
+  } catch { return null; }
+}
+
 function fileDigest(path) {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("source must be a regular file");
@@ -37,7 +57,7 @@ function fields(f) {
 
 export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
   reviewedValue, spawnFn = spawnSync, env = process.env }) {
-  if (!domain(reviewedValue)) return { ok: false, reason: "reviewed value is not a plain domain" };
+  if (reviewedValueClass(rootDir, reviewedValue) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
   if (!safePath(path) || typeof rule !== "string" || !/^[a-z0-9][a-z0-9._-]*$/iu.test(rule)
     || !Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
     return { ok: false, reason: "invalid finding selector" };
@@ -95,7 +115,7 @@ export async function verifyReproductionGate({ gate, ...options }) {
 export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, reviewedValue, rawReport, observedReportSha256 }) {
   try {
     const configPath = resolveGitleaksConfigPath();
-    return domain(reviewedValue) && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+    return reviewedValueClass(rootDir, reviewedValue) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
       && digest(reviewedValue) === gate.valueSha256
       && (typeof rawReport === "string" ? digest(rawReport) : observedReportSha256) === gate.reportSha256
       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256

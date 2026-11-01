@@ -58,11 +58,19 @@ test("missing policy is actionable, no fabricated defaults or extra signature", 
 
 test("candidate changes, incomplete Result, stale or diagnostic Verify do not qualify", async t => {
   const f = fixture(t);
-  for (const state of ["draft", "verifying"]) { f.manifest.state = state; f.save(); assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-PACKAGE"); }
+  for (const state of ["draft", "verifying"]) {
+    f.manifest.state = state; f.save();
+    const refused = await planFeatureCloseAudit(f.options);
+    assert.equal(refused.code, "FCA-PACKAGE");
+    assert.match(refused.remedy, new RegExp(`the package state is ${state}, completed is required`, "u"), "16b: the refusal names the failing condition");
+  }
   f.manifest.state = "completed"; f.save();
   const evidence = f.manifest.artifacts.find(a => a.class === "candidate-evidence");
   writeFileSync(join(f.root, evidence.path), "{}"); evidence.sha256 = digest("{}"); f.save();
-  assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-QUALIFICATION");
+  const unqualified = await planFeatureCloseAudit(f.options);
+  assert.equal(unqualified.code, "FCA-QUALIFICATION");
+  assert.match(unqualified.remedy, /--mode candidate/u, "16b: the refusal names the mode the evidence needs");
+  assert.ok(unqualified.remedy.includes(`${evidence.path}: not Verify evidence (schema)`), "16b: the refusal names the rejected evidence file and why");
   f.git(["commit", "--allow-empty", "-qm", "later candidate"]);
   assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-CANDIDATE-CHANGED");
 });

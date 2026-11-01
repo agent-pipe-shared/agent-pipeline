@@ -21,7 +21,8 @@
  * PATH/PIPELINE_GITLEAKS_PATH-resolved gitleaks binary via gitleaks.mjs's own isInstalled().
  *
  * Public use first calls --prepare-gate with the exact current --line and a manually reviewed
- * plain-domain value in a regular file under root/scratch. It writes only digest metadata under
+ * plain-domain value (or, with --reason, a hex key of 32..64 characters that the project publishes as the
+ * tracked file public/<key>.txt containing exactly that key; candidate 16b) in a regular file under root/scratch. It writes only digest metadata under
  * scratch. A later --approve-new or stale --old-line repair re-runs the scanner and checks that
  * same gate, value, source file, config and binary before touching `.gitleaksignore`. The low-level
  * exported repair primitive retains its injected-spawn test seam; ordinary production calls to
@@ -38,7 +39,7 @@ import {
   isInstalled,
 } from "./security-adapters/gitleaks.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { reproduceReviewedFinding, reproductionGateFactsStillMatch, verifyReproductionGate } from "./security-adapters/gitleaks-reproduction-gate.mjs";
+import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reproductionGateFactsStillMatch, reviewedValueClass, verifyReproductionGate } from "./security-adapters/gitleaks-reproduction-gate.mjs";
 import { assessTrustedExecutablePath } from "./tool-identity.mjs";
 
 const IGNORE_FILE = ".gitleaksignore";
@@ -265,7 +266,7 @@ export async function recomputeStaleIgnoreEntry(options) {
 /** Closed CLI: no raw secret, arbitrary flag, duplicate selector or positional operand. */
 export function parseArgv(argv) {
   const args = {};
-  const values = new Set(["root", "path", "rule", "column", "old-line", "line", "gate-file", "reviewed-value-file"]);
+  const values = new Set(["root", "path", "rule", "column", "old-line", "line", "gate-file", "reviewed-value-file", "reason"]);
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === "--recompute") {
@@ -328,7 +329,7 @@ async function main() {
   const missing = required.filter((k) => args[k] === undefined);
   if (missing.length > 0) {
     console.error(`gitleaks-repair-ignore: missing required flag(s): ${missing.map((k) => `--${k}`).join(", ")}`);
-    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
+    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>] [--reason \"<why>\", required when the value is a public key published as tracked public/<key>.txt]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
     process.exitCode = 1;
     return;
   }
@@ -347,13 +348,25 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  // Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is admitted besides a plain
+  // domain, but only with a written reason, which is printed so the chat confirmation and the close report can quote it.
+  const valueClass = reviewedValueClass(rootDir, reviewedValue);
+  if (valueClass === null) { console.error(`gitleaks-repair-ignore: ${REVIEWED_VALUE_REFUSAL}`); process.exitCode = 1; return; }
+  if (valueClass === "public-key-file") {
+    if (typeof args.reason !== "string" || args.reason.trim().length < 10) {
+      console.error("gitleaks-repair-ignore: a public value needs --reason \"<why this value is public by design>\" (at least 10 characters)");
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`gitleaks-repair-ignore: public-by-design value (tracked public/<key>.txt matches); reason: ${args.reason.trim()}`);
+  }
   if (args["prepare-gate"]) {
     const produced = await reproduceReviewedFinding({ rootDir, binaryPath, path: args.path,
       rule: args.rule, line: Number(args.line), column: Number(args.column), reviewedValue });
     if (!produced.ok) { console.error(`gitleaks-repair-ignore: ${produced.reason}`); process.exitCode = 1; return; }
     try { writeFileSync(gatePath, `${JSON.stringify(produced.gate, null, 2)}\n`, { flag: "wx", mode: 0o600 }); }
     catch { console.error("gitleaks-repair-ignore: gate file could not be created exclusively"); process.exitCode = 1; return; }
-    console.log("gitleaks-repair-ignore: reproduced exact reviewed domain; sanitized gate prepared");
+    console.log(`gitleaks-repair-ignore: reproduced exact reviewed ${valueClass === "domain" ? "domain" : "public value"}; sanitized gate prepared`);
     return;
   }
   let gate;
@@ -394,7 +407,7 @@ async function main() {
       gate, rootDir, binaryPath, reviewedValue, observedReportSha256: verified.observedReportSha256,
     }));
     if (!published.ok) { console.error(`gitleaks-repair-ignore: ${published.reason}`); process.exitCode = 1; return; }
-    console.log("gitleaks-repair-ignore: approved one reproduced exact domain finding");
+    console.log(`gitleaks-repair-ignore: approved one reproduced exact ${valueClass === "domain" ? "domain" : "public value"} finding`);
     return;
   }
   const action = args.recompute ? recomputeStaleIgnoreEntry : repairStaleIgnoreEntry;

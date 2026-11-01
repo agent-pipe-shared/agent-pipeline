@@ -132,6 +132,10 @@ input, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, for t
 (`<git-common-dir>/agent-pipeline/publication-close/<lifecycle>/evidence/<name>.json`, absolute path,
 `pipeline.close-final-verification.v1`) with `candidateOid` and `candidateTree` equal to the frozen
 candidate, `verifyStatus` and `securityStatus` exactly `green`, and `verifySha256` / `securitySha256`.
+Every private evidence file of the coordinator (this one, the publication receipts and the cleanup receipt) must be a
+regular file with mode 0600 and a single link, with a name of `[A-Za-z0-9._-]{1,160}.json` and a size of 2 bytes to
+1 MiB, in that evidence directory, which itself carries no group or world bits; otherwise the plan refuses with
+`PB-FILE` ("must be a mode-0600 single-link regular file") or `CLOSE-EVIDENCE-PATH`.
 Write `green` only when the Verify run (`--mode candidate`, full) passed and `security-scan.mjs --root
 <root>` did not report `BLOCKING` for the frozen candidate; the coordinator does not read either result.
 
@@ -144,7 +148,26 @@ must then name the new candidate. Findings you judge not relevant are put on the
 route BEFORE the freeze, with a reason: gitleaks through `.gitleaksignore` (`gitleaks-repair-ignore.mjs`),
 dependency findings through the project's `osv-scanner.toml` (`[[IgnoredVulns]]` with `id`, `ignoreUntil`
 and `reason`). The shipped gitleaks configuration already exempts the bare hex digests the close itself
-writes into `audit-bundles/<feature>/<commit>/` and the State file; a real key in those files is still found.
+writes into `audit-bundles/<feature>/<commit>/` and the State file (bare hex values of 32 to 64 characters);
+a real key in those files is still found.
+
+A value that is public by design (for example an IndexNow key) is reviewed through the same route
+(`gitleaks-repair-ignore.mjs --prepare-gate`, then `--approve-new`) when the project publishes it as the
+tracked file `public/<key>.txt` containing exactly that key (hex, 32 to 64 characters): put the key alone in
+the reviewed-value file under `scratch/` and add `--reason "<why this value is public by design>"` (at least
+10 characters; the command prints it, quote it in the chat confirmation and the close report). Any other
+value is refused with a text that names what is accepted. The suppression is an entry in `.gitleaksignore`,
+so commit it BEFORE the freeze, or renew the freeze as above.
+
+`cleanup-complete` takes one private evidence file, `pipeline.close-cleanup-receipt.v1`, with exactly the keys
+`schema`, `status` (`complete` or `uncertain`), `evidenceDigest` (64 hex characters; only its format is checked),
+`candidateOid` and `candidateTree` (the frozen candidate, after a re-freeze the renewed one). No command
+produces this file: write it yourself. `uncertain` is accepted by `cleanup-complete`, but `closed-local` is then
+refused with `CLOSE-CLEANUP`; a later `cleanup-complete` with `complete` replaces it. With a session
+descriptor, its cleanup status is the evidence to digest. A project WITHOUT a session descriptor
+(`sessionCleanup` null) may write `complete` with the SHA-256 of the empty input (`e3b0c442…b855`, as above)
+as `evidenceDigest` (PO decision 2026-11-01), provided the close report or handover states explicitly that no
+descriptor existed and the digest is the empty-input digest.
 
 Without separately authorized publication, confirmed descriptor-bound cleanup
 may end at `closed-local`. Publication, readback, release and promotion are

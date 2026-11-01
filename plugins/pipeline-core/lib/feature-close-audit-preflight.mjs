@@ -33,7 +33,14 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
     const root = realpathSync(resolve(repositoryRoot));
     safePath(root, manifestPath);
     const check = validateFeaturePackage(root, manifestPath);
-    if (!check.ok || check.receipt.featureId !== featureId || check.receipt.state !== "completed" || !same(check.receipt.candidate, candidate)) return blocked("FCA-PACKAGE", "Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning.");
+    if (!check.ok || check.receipt.featureId !== featureId || check.receipt.state !== "completed" || !same(check.receipt.candidate, candidate)) {
+      // Candidate 16b: say which condition failed. A commit made after the registration moves HEAD away from the package's candidate.
+      const why = !check.ok ? `the package does not validate (${check.code ?? check.reason ?? "invalid"})`
+        : check.receipt.featureId !== featureId ? `the package belongs to feature ${check.receipt.featureId}, not ${featureId}`
+        : check.receipt.state !== "completed" ? `the package state is ${check.receipt.state}, completed is required`
+        : `the package candidate ${String(check.receipt.candidate?.commit).slice(0, 12)} is not the requested candidate ${candidate.commit.slice(0, 12)} (HEAD moved after the registration: register the package again for the current HEAD)`;
+      return blocked("FCA-PACKAGE", `Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning. Observed: ${why}.`);
+    }
     const git = args => {
       const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000 });
       return result.status === 0 ? result.stdout.trim() : null;
@@ -43,13 +50,23 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
     const manifest = JSON.parse(manifestBytes);
     const results = manifest.artifacts.filter(a => a.class === "result");
     if (results.length !== 1 || readFileSync(safePath(root, results[0].path)).length === 0) return blocked("FCA-RESULT", "Provide one non-empty digest-bound Result in the validated feature package.");
-    const qualification = manifest.artifacts.filter(a => a.class === "candidate-evidence").find(a => {
+    // Candidate 16b: a refusal names the evidence it examined and why each file was rejected (the boundary rule was invisible before).
+    const rejection = a => {
       try {
         const value = JSON.parse(readFileSync(safePath(root, a.path), "utf8"));
-        return value.schema === "pipeline.verify-evidence.v0" && value.exitCode === 0 && same(value.candidate, candidate) && value.commit === candidate.commit && value.tree === candidate.tree && verifyEvidenceSatisfiesBoundary(value, "candidate");
-      } catch { return false; }
-    });
-    if (!qualification) return blocked("FCA-QUALIFICATION", "Produce passing candidate-bound Verify evidence and bind it into the package. Diagnostic or stale evidence is not qualification.");
+        if (value.schema !== "pipeline.verify-evidence.v0") return "not Verify evidence (schema)";
+        if (value.exitCode !== 0) return `the run did not pass (exit code ${value.exitCode})`;
+        if (!same(value.candidate, candidate) || value.commit !== candidate.commit || value.tree !== candidate.tree) return `it is bound to another candidate (${String(value.commit).slice(0, 12)}), not ${candidate.commit.slice(0, 12)}`;
+        if (!verifyEvidenceSatisfiesBoundary(value, "candidate")) return "it does not satisfy the candidate boundary: the run must use --mode candidate, be full and omit nothing (a release-mode run satisfies only release/push)";
+        return null;
+      } catch { return "unreadable or not JSON"; }
+    };
+    const evidenceFiles = manifest.artifacts.filter(a => a.class === "candidate-evidence");
+    const qualification = evidenceFiles.find(a => rejection(a) === null);
+    if (!qualification) {
+      const seen = evidenceFiles.map(a => `${a.path}: ${rejection(a)}`).join("; ") || "the package holds no candidate-evidence file";
+      return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
+    }
     let bundlePlan;
     try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs }); }
     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
