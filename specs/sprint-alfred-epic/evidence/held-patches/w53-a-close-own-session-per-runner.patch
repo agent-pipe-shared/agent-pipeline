@@ -109,11 +109,11 @@ index 000000000..978db4bf1
 +  return { runner, descriptorSessionId, derivation: "observed", reason: `${runner} session id read from the process environment` };
 +}
 diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
-index 36afd73a5..f8ad68d35 100644
+index 1e484e794..78acacd41 100644
 --- a/plugins/pipeline-core/scripts/close-coordinator.mjs
 +++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
-@@ -36,8 +36,7 @@ import {
- import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+@@ -37,8 +37,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
  import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
  import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 -import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
@@ -122,8 +122,8 @@ index 36afd73a5..f8ad68d35 100644
  import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
  import {
    LEGACY_STATE,
-@@ -922,8 +921,10 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
-     fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`);
+@@ -929,8 +928,10 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+       + (behind ? ". Cleanup is already behind this lifecycle and the coordinator has no way back from it: the receipt recorded at cleanup-complete stays the close evidence (nothing was written). Use the producer at the next close, before cleanup-complete." : ""));
    }
    if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
 -  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
@@ -135,7 +135,7 @@ index 36afd73a5..f8ad68d35 100644
    const descriptors = listDescriptors(root).map((descriptor) => {
      const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
      if (!observed || observed.schema !== "pipeline.session-owner-status.v1" || observed.sessionId !== descriptor.sessionId
-@@ -931,7 +932,7 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+@@ -938,7 +939,7 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
      return { sessionId: observed.sessionId, descriptorSha256: observed.descriptorSha256, status: observed.status };
    });
    const built = buildCleanupReceipt({
@@ -144,7 +144,7 @@ index 36afd73a5..f8ad68d35 100644
    });
    const directory = ensurePrivateDirectory(join(publicationClosePaths(common, values.lifecycle).directory, "evidence"));
    const receiptPath = join(directory, "cleanup-receipt.json");
-@@ -947,9 +948,15 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+@@ -954,9 +955,15 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
      excludedOwnSession: built.observation.excludedOwnSession,
      ownSessionDerived: built.observation.ownSessionDerived,
      otherActiveDescriptors: built.observation.otherActiveDescriptors,
@@ -162,7 +162,7 @@ index 36afd73a5..f8ad68d35 100644
  }
  
 diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
-index 4d27a3d6c..409fb97c0 100644
+index 937abd0ba..cde7efa7a 100644
 --- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
 +++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
 @@ -27,6 +27,7 @@ import {
@@ -173,7 +173,7 @@ index 4d27a3d6c..409fb97c0 100644
  import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
  
  const h = (c, n = 64) => c.repeat(n);
-@@ -725,6 +726,94 @@ test("process: write-cleanup-receipt produces the private receipt the coordinato
+@@ -732,6 +733,94 @@ test("process: write-cleanup-receipt produces the private receipt the coordinato
    rmSync(frozen.root, { recursive: true, force: true });
  });
  
@@ -326,10 +326,10 @@ index 39e0c7ff1..1fada2c7c 100644
      const planSha256 = required(flags, "plan-sha256");
      const planPromotionRecovery = dependencies.planOnboardingKickoffPromotionCleanupRecoveryFn
 diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
-index 6a134ebef..495503550 100644
+index b9ab1f3fe..b39a19565 100644
 --- a/plugins/pipeline-core/skills/close-feature/SKILL.md
 +++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
-@@ -165,16 +165,21 @@ so commit it BEFORE the freeze, or renew the freeze as above.
+@@ -171,16 +171,21 @@ so commit it BEFORE the freeze, or renew the freeze as above.
  `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (from `final-verify-green`,
  or `readback-confirmed` after a publication; candidate 16d). The command lists the active session descriptors and
  EXCLUDES the closing session's own: that session is still running, so its descriptor can only ever report

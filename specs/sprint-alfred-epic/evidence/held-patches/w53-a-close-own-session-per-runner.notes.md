@@ -4,6 +4,9 @@ The close cleanup receipt (`close-coordinator.mjs write-cleanup-receipt`) and th
 for the closing session's OWN descriptor. On Codex the own descriptor (`codex-<session id>`) was therefore counted as a foreign session: the receipt could never become
 `complete`, and the text said "other sessions remain" when the true cause was "own session not derived". On Antigravity nothing could be derived at all.
 
+Rebuilt on the real apply chain (2026-11-01): `scripts/close-coordinator.mjs` is also changed by w49-b, so this patch applies after w48 through w52 (apply order
+w48, w49-a, w49-b, w50, w51, w52, w53, w54; the rehearsal of `scratch/po-apply-0.7-candidate17.sh` is the check).
+
 ## Change
 
 - `lib/own-session-descriptor.mjs` (new): `invokingRunnerFromEnv(env, explicit)` (explicit valid runner wins; `CLAUDECODE=1` is Claude; the Antigravity markers are
