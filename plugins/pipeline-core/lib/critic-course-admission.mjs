@@ -13,6 +13,7 @@ import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
@@ -293,6 +294,65 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
   } catch { return false; }
 }
 
+const ADDENDUM_PATH = /^evidence\/dispatch-critic-addendum-([^/]+)\.json$/u;
+const ADDENDUM_EVIDENCE_PATH = /^(?:backlog\/)?evidence\/[^/]+\.md$/u;
+/**
+ * Candidate 15g (consumer finding, close deadlock): the byte-bound Critic disposition addenda the feature close itself instructs the
+ * operator to commit ("commit exactly these paths in one evidence-only commit") can only exist AFTER the last Critic round, because they
+ * name its packet. Counted as corrections they made the Critic carry-forward to HEAD unsolvable. A commit is an addendum-only commit when
+ * it adds, replaces or removes nothing but `evidence/dispatch-critic-addendum-<task>.json` files and the markdown evidence files they
+ * reference, every addendum (the new version, or the removed one as it stood in the parent) validates against the immutable dispatch
+ * record it names, and every added or replaced markdown file is referenced by an added or replaced addendum, every removed one by a
+ * removed addendum, each with its exact digest. A later round retires the addenda of an earlier one (they name its packet), so removing
+ * and re-adding them is part of the same evidence flow. Nothing executable or reviewable can ride along: any other path, an extra or
+ * unreferenced file, or a source change ends the classification.
+ */
+export function criticAddendumOnlyCommit(root, commit) {
+  try {
+    const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
+    if (parents.length !== 2) return false;
+    const fields = gitBytes(root, ["diff", "--name-status", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
+    if (fields.length === 0 || fields.length % 2 !== 0) return false;
+    const live = [];
+    const dropped = [];
+    const liveEvidence = new Set();
+    const droppedEvidence = new Set();
+    for (let index = 0; index < fields.length; index += 2) {
+      const status = fields[index];
+      const path = fields[index + 1];
+      if (!["A", "M", "D"].includes(status)) return false;
+      if (ADDENDUM_PATH.test(path)) (status === "D" ? dropped : live).push(path);
+      else if (ADDENDUM_EVIDENCE_PATH.test(path)) (status === "D" ? droppedEvidence : liveEvidence).add(path);
+      else return false;
+    }
+    if (live.length + dropped.length === 0) return false;
+    // `at` is the commit whose tree holds the addendum: the commit itself for an added or replaced one, its parent for a removed one.
+    const referencesOf = (paths, at) => {
+      const referenced = new Set();
+      for (const path of paths) {
+        regularBlobAt(root, at, path);
+        const addendum = JSON.parse(gitBytes(root, ["show", `${at}:${path}`], "CCA-EVIDENCE-READ").toString("utf8"));
+        const taskId = ADDENDUM_PATH.exec(path)[1];
+        if (!object(addendum) || addendum.taskId !== taskId) return null;
+        const recordPath = `evidence/dispatch-record-${taskId}.json`;
+        regularBlobAt(root, at, recordPath);
+        const recordBytes = gitBytes(root, ["show", `${at}:${recordPath}`], "CCA-EVIDENCE-READ");
+        validateCriticDispositionAddendum(addendum, { recordPath, recordBytes, record: JSON.parse(recordBytes.toString("utf8")) });
+        const reference = addendum.criticEvidence;
+        regularBlobAt(root, at, reference.path);
+        if (digest(gitBytes(root, ["show", `${at}:${reference.path}`], "CCA-EVIDENCE-READ")) !== reference.sha256) return null;
+        referenced.add(reference.path);
+      }
+      return referenced;
+    };
+    const liveReferenced = referencesOf(live, commit);
+    const droppedReferenced = referencesOf(dropped, parents[1]);
+    if (liveReferenced === null || droppedReferenced === null) return false;
+    return [...liveEvidence].every((path) => liveReferenced.has(path))
+      && [...droppedEvidence].every((path) => droppedReferenced.has(path));
+  } catch { return false; }
+}
+
 const CRITIC_EXPORT_PATH = /^specs\/([^/]+)\/evidence\/critic\/[a-f0-9]{32}\/[^/]+$/u;
 /**
  * N27b / D206: which commits lie between a verified candidate and HEAD, and are all of them delivery tail? A commit is tail
@@ -401,7 +461,8 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   const correction = [];
   for (const commit of source.rangeCommits) {
     (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
-      || (admitCriticExports === true && criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn))
+      || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
+        || criticAddendumOnlyCommit(root, commit)))
       ? evidenceOnly : correction).push(commit);
   }
   return Object.freeze({

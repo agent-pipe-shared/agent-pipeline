@@ -376,6 +376,92 @@ test("N23 the export commit of the consumed review carries the Critic; a forged,
   "without a consumed packet in the private store nothing carries");
 });
 
+// Candidate 15g (consumer finding, close deadlock): the byte-bound Critic disposition addenda the close instructs the operator to commit can only
+// exist after the last Critic round, because they name its packet. Their commit carries the Critic when it adds nothing but addenda that validate
+// against the committed dispatch record, and the markdown evidence they digest; anything else stays unreviewed content.
+test("15g the addendum-only commit carries the Critic; an extra, changed, unreferenced or forged one does not", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const featureId = "addendum-feature", taskId = "task-one";
+  git(["init", "--quiet"]);
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, "source.txt"), "authored source\n");
+  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
+    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const authored = commitAll("authored source");
+  const record = { schema: "pipeline.dispatch-record.v4", taskId, candidateCommit: authored.commit, criticRequired: true,
+    outcomeClassification: { kind: "authored-commit" }, commits: [authored.commit] };
+  const recordText = `${JSON.stringify(record)}\n`;
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordText);
+  const reviewed = commitAll("dispatch record");
+  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
+    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
+  const deps = { readConsumedCandidateReceiptFn: () => read };
+  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
+    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
+  const evidenceText = "# Critic disposition\n\nPass with minors.\n";
+  const addendumAt = (message, { evidence = evidenceText, evidenceSha = sha256(evidence), extra = null, source = null,
+    unreferenced = null, filenameTask = taskId, recordSha = sha256(recordText), base = reviewed.commit } = {}) => {
+    git(["checkout", "--quiet", "--detach", base]);
+    const evidencePath = `evidence/critic-disposition-evidence-${taskId}.md`;
+    writeFileSync(join(root, evidencePath), evidence);
+    writeFileSync(join(root, `evidence/dispatch-critic-addendum-${filenameTask}.json`), `${JSON.stringify({
+      schema: "pipeline.critic-disposition-addendum.v1", recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: recordSha,
+      taskId, candidateCommit: authored.commit, reviewCandidateCommit: reviewed.commit,
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: authored.commit, path: evidencePath, sha256: evidenceSha },
+      criticPacketId: read.receipt.packetId, criticReceiptSha256: sha("2") })}\n`);
+    if (extra) writeFileSync(join(root, extra), "extra\n");
+    if (unreferenced) writeFileSync(join(root, unreferenced), "unreferenced\n");
+    if (source) writeFileSync(join(root, "source.txt"), source);
+    return commitAll(message);
+  };
+  const good = addendumAt("commit the addendum");
+  assert.deepEqual(carry(good).proof.evidenceOnlyCommits, [good.commit]);
+  assert.deepEqual(courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed.commit,
+    candidateCommit: good.commit }).correctionCommits, [good.commit], "course counters are unchanged without the option");
+  const forged = {
+    "evidence bytes differ from the digest": { evidence: "# Critic disposition\n\nRewritten.\n", evidenceSha: sha256(evidenceText) },
+    "record digest differs": { recordSha: sha256("another record\n") },
+    "an extra file": { extra: "notes.txt" },
+    "an unreferenced markdown file": { unreferenced: "evidence/other.md" },
+    "a source change in the same commit": { source: "changed with the addendum\n" },
+    "a filename that names another task": { filenameTask: "task-two" },
+  };
+  for (const [name, variant] of Object.entries(forged)) {
+    assert.throws(() => carry(addendumAt(name, variant)), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
+  }
+  // A later round retires the addenda of an earlier one: removing them (with the evidence they digest), replacing them in place, or
+  // removing and adding in two commits are the same evidence flow. A removal that takes anything else with it is not.
+  const addendumFile = `evidence/dispatch-critic-addendum-${taskId}.json`, evidenceFile = `evidence/critic-disposition-evidence-${taskId}.md`;
+  const afterGood = (message, edit) => { git(["checkout", "--quiet", "--detach", good.commit]); edit(); return commitAll(message); };
+  const removed = afterGood("retire the addendum", () => { git(["rm", "--quiet", addendumFile, evidenceFile]); });
+  assert.equal(courseAdmission.criticAddendumOnlyCommit(root, removed.commit), true, "removing an addendum with its evidence is evidence-only");
+  const replaced = afterGood("replace the addendum in place", () => {
+    writeFileSync(join(root, evidenceFile), "# Critic disposition\n\nPass, second wording.\n");
+    const old = JSON.parse(git(["show", `HEAD:${addendumFile}`]));
+    old.criticEvidence.sha256 = sha256("# Critic disposition\n\nPass, second wording.\n");
+    writeFileSync(join(root, addendumFile), `${JSON.stringify(old)}\n`);
+  });
+  assert.equal(carry(replaced).proof.evidenceOnlyCommits.length, 2, "an in-place replacement carries");
+  const readded = addendumAt("add it again after the removal", { base: removed.commit });
+  assert.equal(carry(readded).proof.evidenceOnlyCommits.length, 3, "remove, then add again: all three carry");
+  const badRemovals = {
+    "removing only the referenced evidence": () => { git(["rm", "--quiet", evidenceFile]); },
+    "removing the dispatch record with the addendum": () => { git(["rm", "--quiet", addendumFile, evidenceFile, `evidence/dispatch-record-${taskId}.json`]); },
+    "removing a source file with the addendum": () => { git(["rm", "--quiet", addendumFile, evidenceFile, "source.txt"]); },
+  };
+  for (const [name, edit] of Object.entries(badRemovals)) {
+    assert.equal(courseAdmission.criticAddendumOnlyCommit(root, afterGood(name, edit).commit), false, name);
+  }
+});
+
 // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
 // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
 import * as readiness from "./critic-verify-readiness.mjs";
