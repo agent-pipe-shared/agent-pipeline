@@ -157,6 +157,19 @@ function findingIdsAreAcceptable(ids) {
   return true;
 }
 
+/**
+ * Toolbox D23: why `findingIdsAreAcceptable` refuses, in words a caller can act on (the library answers with the code alone).
+ * Returns null for an acceptable list; it never decides, the predicate above does.
+ */
+export function describeDesignReviewFindingIdRefusal(ids) {
+  if (!Array.isArray(ids) || findingIdsAreAcceptable([...ids].sort(compareUnits))) return null;
+  const rule = `an id is upper-case letters and digits, starts with a letter, has 2 to 8 parts joined by "-" (for example AC-155 or DESIGN-REVIEW-3), at most ${MAX_FINDING_ID_LENGTH} characters; at most ${MAX_FINDING_IDS} distinct ids`;
+  const bad = ids.filter((id) => typeof id !== "string" || id.length > MAX_FINDING_ID_LENGTH || !FINDING_ID.test(id));
+  if (bad.length > 0) return `${bad.map((id) => JSON.stringify(id)).join(", ")} ${bad.length === 1 ? "is not a valid finding id" : "are not valid finding ids"}: ${rule}`;
+  if (new Set(ids).size !== ids.length) return `a finding id is given twice: ${rule}`;
+  return `${ids.length} finding ids are given: ${rule}`;
+}
+
 /** First failing code of a decoded receipt value, in the contract order, or null. */
 function receiptRefusal(receipt) {
   const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");

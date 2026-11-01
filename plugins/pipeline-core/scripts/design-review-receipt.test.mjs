@@ -296,6 +296,13 @@ test("the command line reports role, requested route and observed identity separ
 test("library refusals pass through under their own code and write nothing", withRepo((repo) => {
   const badFinding = createReceiptFromDisk(request(repo, { openFindingIds: ["not an id"] }), { env: CLAUDE, now });
   assert.deepEqual([badFinding.ok, badFinding.code], [false, "DRR-FINDING-IDS"]);
+  // D23: the refusal names the offending id and what an id looks like (F1 has no hyphen and is refused the same way).
+  assert.match(badFinding.message, /"not an id" is not a valid finding id: an id is upper-case letters and digits.*AC-155/u);
+  const f1 = createReceiptFromDisk(request(repo, { openFindingIds: ["F1", "AC-155"] }), { env: CLAUDE, now });
+  assert.match(f1.message, /"F1" is not a valid finding id/u);
+  assert.doesNotMatch(f1.message, /"AC-155"/u, "a valid id is not named as wrong");
+  const twice = createReceiptFromDisk(request(repo, { openFindingIds: ["AC-155", "AC-155"] }), { env: CLAUDE, now });
+  assert.match(twice.message, /a finding id is given twice/u);
   const sameSources = createReceiptFromDisk(request(repo, { specPath: PRD }), { env: CLAUDE, now });
   assert.equal(sameSources.code, "DRR-SOURCES");
   const badFeature = createReceiptFromDisk(request(repo, { featureId: "Not A Feature" }), { env: CLAUDE, now });

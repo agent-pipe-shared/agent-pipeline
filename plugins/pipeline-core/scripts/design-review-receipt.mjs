@@ -33,7 +33,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
-import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
@@ -241,6 +241,11 @@ export function createReceiptFromDisk(input, deps = {}) {
     // recorded non-significance reason; the library names the unresolved decisions.
     if (created.code === "DRR-DECISION-TRACE") {
       return refuse(created.code, `design review receipt refused: DRR-DECISION-TRACE: foundational Spec decision(s) without an ADR/register reference or a recorded non-significance reason: ${created.unresolved.join(", ")}. Under the "Foundational decisions" heading give each entry "ADR: ADR-NNNN", "Register: <id>" or "Not significant: <reason>".`);
+    }
+    // Toolbox D23: the library answers with the code alone; say which id is wrong and what an id looks like.
+    if (created.code === "DRR-FINDING-IDS") {
+      const why = describeDesignReviewFindingIdRefusal(openFindingIds);
+      if (why !== null) return refuse(created.code, `design review receipt refused: DRR-FINDING-IDS: ${why}`);
     }
     return refuse(created.code, `design review receipt refused: ${created.code}`);
   }
