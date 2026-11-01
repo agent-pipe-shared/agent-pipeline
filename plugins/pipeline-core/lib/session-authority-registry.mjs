@@ -1129,6 +1129,21 @@ function companionInventory(row,images){
   return {memberships:baseline.memberships,legacyOperationsSha256:digest(legacy)};
 }
 function companionConserveFacts(before,after,preimages,postimages){if(!equal(before.filter(f=>!companionFactMatches(f,preimages)),after.filter(f=>!companionFactMatches(f,postimages))))fail('SDC-AUTHORITY-CAS','companion-unscoped-source-effects');}
+// D231 (PO decision 2026-11-01, option a): a RELEASED onboarding-continuity member is no historical writer when (1) its release terminal is
+// continuity-released or lost-binding-recovered AND (2) the State image it was BOUND at equals the State image in its release evidence (and the
+// image the next write starts from). The bound image is the sha256 the owner recorded in its immutable execution journal at the bind (found by the
+// member's bindingSha256); the release evidence is the selected-state fact of the release record. A member that wrote moved its own facts to the
+// postimage, so its journal sha differs from a later image or from its release evidence: it stays blocking, as does every other terminal.
+function releasedMemberNeverChangedState(repo,row,member,preimages){
+  try{
+    if(row.participant.producerId!=='onboarding-continuity'||!member.release||!['continuity-released','lost-binding-recovered'].includes(member.release.value.terminal))return false;
+    const bound=onboarding.readOnboardingContinuityMemberBoundStateSha256({repository:repo,bindingSha256:member.value.bindingSha256});
+    if(typeof bound!=='string')return false;
+    const released=member.release.value.sourceFacts.filter(f=>f.namespaceId==='selected-state');
+    if(!released.length||released.some(f=>f.sha256!==bound))return false;
+    return member.value.sourceFacts.filter(f=>companionFactMatches(f,preimages)).every(f=>f.sha256===bound);
+  }catch{return false;}
+}
 export function inspectSourceOwnedSessionAuthorityCompanionRefresh(input){
   exact(input,['boundary','producerPort','companionWriteHandle','ownerWitness'],'companion-refresh-input');
   const {boundary:token,producerPort,companionWriteHandle:handle,ownerWitness}=input,repo=boundary(token),ticket=companionRefreshTickets.get(ownerWitness);
@@ -1161,7 +1176,7 @@ export function executeSourceOwnedSessionAuthorityCompanionWrite(input){
   const pairs=boundaryPorts(token),before=stateRead(repo,pairs),preimages=plan.effects.map(e=>e.preimage),pre=before.rows.map(r=>companionInventory(r,preimages));
   const affected=[];for(let i=0;i<before.rows.length;i++){
     const row=before.rows[i];if(!equal(pre[i].memberships,row.record.value.baseline))fail('SDC-AUTHORITY-CAS','companion-preexisting-drift');
-    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
+    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))&&!releasedMemberNeverChangedState(repo,row,m,preimages)))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
     const overlap=[...pre[i].memberships.flatMap(m=>m.sourceFacts),...row.members.filter(m=>m.value.phase!=='released').flatMap(m=>m.value.sourceFacts)].some(f=>companionFactMatches(f,preimages));
     const declared=plan.affectedProducerIds.includes(row.participant.producerId);
     if(overlap&&!declared)fail('SDC-AUTHORITY-UNAVAILABLE','companion-unknown-overlapping-owner');

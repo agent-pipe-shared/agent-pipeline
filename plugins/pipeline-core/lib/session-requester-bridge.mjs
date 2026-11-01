@@ -24,6 +24,7 @@ import { parseStrictJson } from './governance-event.mjs';
 import { derivePlanLifecycle as deriveApprovedControllerPlanLifecycle } from './plan-spec-state-v2.mjs';
 import { readAcceptedDeliveryContract as readApprovedControllerAcceptedContract } from '../scripts/pipeline-state.mjs';
 import { validateVerifySuiteReceipt } from './verify-resume.mjs';
+import { COORDINATOR_PHASES as ownerRouteCoordinatorPhases, readCloseCoordinator as readOwnerRouteCloseCoordinator } from '../scripts/publication-close-journal.mjs';
 import { validateVerifyCaseCompletionPolicy, validateVerifyCaseCompletionAttestation, verifyCaseCompletionPolicySha256 } from './verify-case-completion-receipt.mjs';
 
 const SHA = /^[a-f0-9]{64}$/u, ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u;
@@ -1649,4 +1650,151 @@ export function inspectSourceOwnedApprovedControllerCourse(input){
   return freeze({status:'current',repository,course:approved.course,selectedStateRef:approved.selectedStateRef,
     approvalRefs:approved.refs,expectedStateSha256:approved.selectedStateRef.sha256,
     expectedRevision:approved.observed.revision,sessionCleanup:null});
+}
+
+// ---- Continuity owner route (PO decision D231, option A, 2026-11-01) --------------------------------------------------
+// A second fixed production issuer, mirroring the approved-controller precedent above. A plain-terminal process may own the
+// State write of exactly four Close-route entries, in exactly one closed script, only AFTER the Close lifecycle has started.
+// Owner identity is a FRESH per-invocation descriptor (controller-<random>): neither the host session nor the hook-observed
+// owner (documented as unauthenticated). The issuer admits nothing else: it reads no caller JSON, takes no session/PID input.
+const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply']);
+const OWNER_ROUTE_SCHEMA='pipeline.continuity-owner-route-invocation.v1';
+const OWNER_ROUTE_PRODUCER='continuity-owner-route';
+const ownerRouteRuntimes=new Map();
+function ownerRouteRefuse(code,reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;throw error;}
+const ownerRouteRefusal=error=>typeof error?.code==='string'&&error.code.startsWith('COR-');
+/** The new bridge-side course predicate: reads the real selected State and the Close coordinator; admits nothing else. */
+function ownerRouteCourse(rootDir,lifecycleId,currentStatePath=null){
+  let observed;
+  try{
+    if(currentStatePath===null)observed=continuityVerificationIssuer.observeSessionCleanupState(rootDir);
+    else{
+      // Between bind and release the State legitimately carries the binding; recheck only real bytes, as the precedent does.
+      const before=osvPhysicalRef(currentStatePath),bytes=readFileSync(currentStatePath);
+      if(hash(bytes)!==before.sha256)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State changed while it was read');
+      observed={path:currentStatePath,state:parseStrictJson(bytes),stateSha256:before.sha256};
+    }
+  }catch(error){if(ownerRouteRefusal(error))throw error;ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State cannot be read ('+(error?.code??'unreadable')+')');}
+  const state=observed.state;
+  if(state?.schema!=='pipeline.state.v0'||!state.activeFeature||typeof state.activeFeature.id!=='string'||!state.continuity
+    ||state.continuity.featureId!==state.activeFeature.id)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the State has no active feature with Continuity');
+  if(currentStatePath===null){
+    if(observed.orphanBinding||observed.sessionCleanup!==null)ownerRouteRefuse('COR-BINDING-HELD','a session-cleanup binding is already held');
+    if(!observed.neutral||observed.mode!=='active')ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State is not the neutral active State');
+  }
+  let coordinator;
+  try{coordinator=readOwnerRouteCloseCoordinator(retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(rootDir).commonDir,lifecycleId).coordinator;}
+  catch{ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','no Close coordinator record exists for lifecycle '+lifecycleId);}
+  if(coordinator.featureId!==state.activeFeature.id||ownerRouteCoordinatorPhases.indexOf(coordinator.phase)<ownerRouteCoordinatorPhases.indexOf('checkpointed'))
+    ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','the Close lifecycle of this feature has not reached checkpointed');
+  // Each of the four entries is legal only before the Close transition exists; the entry's own gates decide everything finer.
+  if(state.continuity.closeTransition!==null&&state.continuity.closeTransition!==undefined)ownerRouteRefuse('COR-STATE-PHASE','the Close transition already exists, so these entries are past their phase');
+  const selectedStateRef=osvPhysicalRef(observed.path);
+  if(currentStatePath===null){const again=continuityVerificationIssuer.observeSessionCleanupState(rootDir);
+    if(digest(again.state)!==digest(state)||again.path!==observed.path||again.revision!==observed.revision)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State changed while it was inspected');}
+  osvPhysical(selectedStateRef);
+  return {observed,selectedStateRef,course:{featureId:state.activeFeature.id,lifecycleId}};
+}
+function ownerRouteProgram(rootDir){
+  const controller=osvObservedProcess(process.pid),program=osvProgram(controller);
+  const module=fileURLToPath(new URL('../scripts/continuity-owner-route.mjs',import.meta.url));
+  const args=process.argv.slice(2);
+  // run --root <root> --lifecycle <id> -- <entry> <entry argv...>: the lifecycle id is part of the authenticated argv, so a
+  // process cannot be admitted for a Close lifecycle it did not name (a directory scan cannot tell several lifecycles apart).
+  if(program.module.path!==module||program.cwd!==rootDir||args.length<7||args.length>262||args[0]!=='run'||args[1]!=='--root'||args[2]!==rootDir
+    ||args[3]!=='--lifecycle'||!ID.test(args[4])||args[5]!=='--'||!OWNER_ROUTE_ENTRIES.includes(args[6])
+    ||args.slice(6).some(value=>typeof value!=='string'||value.length<1||value.length>4096||/[\0\r\n]/u.test(value)))osvFail('OSV-OWNER-UNAVAILABLE');
+  osvSame(program.argv,[process.argv0,...process.execArgv,module,...args]);
+  return {controller,program,lifecycleId:args[4],entry:args[6],entryArgvSha256:digest(args.slice(6))};
+}
+function ownerRouteValidRoot(rootDir){
+  if(typeof rootDir!=='string'||!isAbsolute(rootDir)||resolve(rootDir)!==rootDir)osvFail('OSV-OWNER-UNAVAILABLE');
+}
+/** Read-only course facts with TYPED refusals for the CLI to print; arms nothing and returns no handle. */
+export function inspectSourceOwnedContinuityOwnerRouteCourse(input){
+  osvExact(input,['rootDir','lifecycleId']);ownerRouteValidRoot(input.rootDir);
+  if(typeof input.lifecycleId!=='string'||!ID.test(input.lifecycleId))return Object.freeze({status:'refused',code:'COR-LIFECYCLE-NOT-STARTED',reason:'the lifecycle id is not valid'});
+  const repository=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
+  if(repository.primaryRoot!==input.rootDir)osvFail('OSV-OWNER-UNAVAILABLE');
+  try{
+    const approved=ownerRouteCourse(repository.primaryRoot,input.lifecycleId);
+    return Object.freeze({status:'current',course:Object.freeze({...approved.course}),expectedStateSha256:approved.selectedStateRef.sha256,expectedRevision:approved.observed.revision});
+  }catch(error){if(ownerRouteRefusal(error))return Object.freeze({status:'refused',code:error.code,reason:error.reason??error.message});throw error;}
+}
+/** Fixed production entry only; no session/PID/origin/dependency issuer inputs. */
+export function createSourceOwnedContinuityOwnerRouteRequesterRuntime(input){
+  osvExact(input,['rootDir']);ownerRouteValidRoot(input.rootDir);
+  const r=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
+  if(r.primaryRoot!==input.rootDir||ownerRouteRuntimes.has(repositoryHash(r)))osvFail('OSV-REPLAY');
+  const capture=ownerRouteProgram(r.primaryRoot);
+  const course=(path=null)=>{try{return ownerRouteCourse(r.primaryRoot,capture.lifecycleId,path);}catch(error){if(ownerRouteRefusal(error))osvFail('OSV-COURSE-UNAVAILABLE');throw error;}};
+  const approved=course();
+  if(approved.observed.sessionCleanup!==null)osvFail('OSV-OWNER-UNAVAILABLE');
+  const key=repositoryHash(r),lifetime={live:true};ownerRouteRuntimes.set(key,lifetime);
+  let runtimePort;
+  try{
+    const started=startSessionDescriptor(r.primaryRoot,{sessionId:'controller-'+randomBytes(12).toString('hex')});
+    const descriptorHandle=createSourceOwnedDescriptorHandle({repository:r,sessionId:started.sessionId,expectedDescriptorSha256:started.descriptorSha256,ownerNonceFile:null});
+    const source={schema:OWNER_ROUTE_SCHEMA,repositorySha256:key,sessionId:started.sessionId,process:capture.controller,program:capture.program,
+      lifecycleId:capture.lifecycleId,entry:capture.entry,entryArgvSha256:capture.entryArgvSha256,course:approved.course,initialStateRef:approved.selectedStateRef,
+      assurance:'physical-readback',eventId:randomBytes(16).toString('hex')};
+    const sourceRef=publish(r,join(ensureNamespace(r),'invocations','owner-route-'+randomBytes(12).toString('hex')+'.json'),source);
+    runtimePort=runtimePortFor({repository:r,disposed:false,children:new Set()});
+    const recheck=()=>{
+      if(!lifetime.live)osvFail('OSV-OWNER-UNAVAILABLE');
+      const freshProgram=ownerRouteProgram(r.primaryRoot),freshCourse=course(approved.selectedStateRef.path);
+      if(!osvSameProcess(capture.controller,freshProgram.controller))osvFail('OSV-OWNER-UNAVAILABLE');
+      osvSame(capture.program,freshProgram.program);osvSame(approved.course,freshCourse.course);readPrivate(r,sourceRef);
+    };
+    const currentInvocationHandle=opaque(invocations,{repository:r,process:capture.controller,sourceRef,
+      invocationBindingSha256:digest(source),producerId:OWNER_ROUTE_PRODUCER,assurance:'physical-readback',port:runtimePort,sourceOwnerRecheck:recheck});
+    const bound=bindSourceOwnedRequesterInvocation({repository:r,descriptorHandle,currentInvocationHandle},runtimePort);
+    return Object.freeze({descriptorHandle,currentInvocationHandle,runtimePort,...bound,
+      sessionCleanup:Object.freeze({sessionId:started.sessionId,descriptorSha256:started.descriptorSha256}),
+      entry:capture.entry,entryArgv:Object.freeze(process.argv.slice(8)),
+      expectedStateSha256:approved.selectedStateRef.sha256,expectedRevision:approved.observed.revision,
+      run:callback=>withSourceOwnedAuthorityContext({requesterHandle:bound.requesterHandle,runtimePort},callback),
+      dispose:async()=>{lifetime.live=false;const port=ports.get(runtimePort);port.disposed=true;
+        // Expiry never releases descriptor/history or a still-held Registry member.
+        return {status:[...port.children].some(child=>!child.closed)?'held':'closed',sourceRefs:[sourceRef,bound.bindingRef]};}});
+  }catch(error){lifetime.live=false;if(runtimePort)ports.get(runtimePort).disposed=true;throw error;}
+}
+/** True only while the active requester context was issued by the owner-route issuer above (a fixture requester never is). */
+export function isSourceOwnedContinuityOwnerRouteRequester(input){
+  osvExact(input,['repository']);
+  const r=repository(input.repository),context=active.getStore();
+  if(!context?.lifetime.live||!sameRepository(r,context.repository))return false;
+  const entry=requesters.get(context.requesterHandle),invocation=entry?.currentInvocationHandle?invocations.get(entry.currentInvocationHandle):null;
+  return Boolean(invocation&&invocation.producerId===OWNER_ROUTE_PRODUCER&&invocation.assurance==='physical-readback');
+}
+function ownerRouteProcessStatus(recorded){
+  try{
+    if(process.platform==='win32')return 'unknown';
+    const observed=observePosixProcess(recorded.pid);
+    if(observed===null||['Z','X'].includes(observed.state))return 'dead';
+    if(observed.start!==recorded.start||observed.bootSha256!==recorded.bootSha256)return 'dead';
+    return sameProcess(recorded,observed)?'live':'unknown';
+  }catch{return 'unknown';}
+}
+/** Read-only: the owner-route invocation record of one cleanup session, with the proven liveness of its process (dead only on proof). */
+export function inspectSourceOwnedContinuityOwnerRouteInvocation(input){
+  osvExact(input,['rootDir','sessionId']);ownerRouteValidRoot(input.rootDir);
+  if(typeof input.sessionId!=='string'||!ID.test(input.sessionId))return Object.freeze({status:'absent'});
+  const repository=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
+  const directory=join(repository.commonDir,'agent-pipeline','run','session-requesters','invocations');
+  if(!existsSync(directory))return Object.freeze({status:'absent'});
+  for(const name of readdirSync(directory).sort()){
+    if(!/^owner-route-[a-f0-9]{24}\.json$/u.test(name))continue;
+    const path=join(directory,name);
+    let value;
+    try{
+      const before=lstatSync(path);
+      if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.uid!==process.getuid()||(before.mode&0o077)!==0||before.size>MAX)continue;
+      value=parseStrictJson(readFileSync(path));
+    }catch{continue;}
+    if(value?.schema!==OWNER_ROUTE_SCHEMA||value.sessionId!==input.sessionId||value.repositorySha256!==repositoryHash(repository)
+      ||!Number.isSafeInteger(value.process?.pid))continue;
+    return Object.freeze({status:'found',sessionId:value.sessionId,lifecycleId:value.lifecycleId,entry:value.entry,ownerStatus:ownerRouteProcessStatus(value.process)});
+  }
+  return Object.freeze({status:'absent'});
 }

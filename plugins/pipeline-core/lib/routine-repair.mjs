@@ -14,10 +14,11 @@ export const ROUTINE_REPAIR_RECORD_SCHEMA = "pipeline.routine-repair-record.v1";
 export const ROUTINE_REPAIR_LIST_SCHEMA = "pipeline.routine-repair-list.v1";
 const SAR = fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url));
 const SLICE_QUEUE = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+const OWNER_ROUTE = fileURLToPath(new URL("../scripts/continuity-owner-route.mjs", import.meta.url));
 
 /** The closed list (D194). Frozen; nothing registers into it at runtime. */
 export const ROUTINE_REPAIRS = Object.freeze([
-  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
+  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
   Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
@@ -275,7 +276,8 @@ export function runRoutineRepair(request, deps = {}) {
   if (!plan.ok) result = plan;
   else if (commonDir === null) result = refuse("RR-ROOT", "--root is not a git repository");
   else {
-    try { result = execute(plan, { root, commonDir, spawn, now, moved, retained }); }
+    // ownerRouteSpawn (tests only): the owner-route orphan release is its own delegate, separate from the session-authority-repair stub.
+    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained }); }
     catch (error) { result = refuse("RR-FAILED", short(error)); }
   }
   const code = result.ok ? (result.code ?? "done") : result.code;
@@ -337,9 +339,24 @@ function retireSettledPending(ctx, inspect) {
   return { retiredPending, keptPending: kept, retiredOrphanAuthority: orphans.retire, keptOrphanAuthority: orphans.kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
 }
 
+/** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
+function releaseOwnerRouteOrphan(spawn, root) {
+  try {
+    const json = parseJson(spawn(OWNER_ROUTE, ["release-orphan", "--root", root], root).stdout);
+    if (json === null || typeof json.status !== "string") return { status: "unverifiable", reason: "continuity-owner-route release-orphan did not report, so no owner-route binding was classified" };
+    const { schema, ...rest } = json;
+    return rest;
+  } catch (error) { return { status: "unverifiable", reason: short(error) }; }
+}
+
 function execute(plan, ctx) {
   const { root, commonDir, spawn, now } = ctx;
   if (plan.kind === "heal") {
+    // D231 (E): an owner-route CLI call killed between bind and release leaves a held binding and an armed member that would block the
+    // next call and the close. The release runs FIRST, in its own process, so the delegate below heals a consistent namespace. Only a
+    // binding with an owner-route invocation record whose process is proven dead is released; a live or unverifiable owner is reported.
+    const ownerRoute = releaseOwnerRouteOrphan(ctx.ownerSpawn, root);
+    if (ownerRoute.status === "refused" && /^COR-ORPHAN-RELEASE/u.test(ownerRoute.code ?? "")) return refuse(ownerRoute.code ?? "RR-OWNER-ROUTE-RELEASE", ownerRoute.message ?? "the owner-route orphan release was refused", `node ${OWNER_ROUTE} release-orphan --root ${root}`);
     // W7: the settled pending states leave BEFORE the delegate runs, so heal re-anchors the registry on the namespace as it stays.
     let settledPending;
     try {
@@ -351,7 +368,7 @@ function execute(plan, ctx) {
     // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
     const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
     const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
-    return { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+    return { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
   }
   if (plan.kind === "settled-pending-aside") {
     const run = spawn(SAR, ["inspect", "--root", root], root);

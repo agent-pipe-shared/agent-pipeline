@@ -101,6 +101,7 @@ import {
   inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
+  retireSessionDescriptor,
   observeOwnedSessionDescriptorOwnerHandle,
   observeOwnedSessionDescriptorClosureHandle, inspectOwnedSessionDescriptorClosure, inspectSignedDescriptorCustodyRepository,
 } from "./worktree-lifecycle.mjs";
@@ -114,7 +115,8 @@ import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrust
 import { readMachinePlane } from "./machine-plane.mjs";
 import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
   inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation, withSourceOwnedRetiredOwnerTerminalContext,
-  inspectSourceOwnedRetiredOwnerTerminalContext } from "./session-requester-bridge.mjs";
+  inspectSourceOwnedRetiredOwnerTerminalContext, isSourceOwnedContinuityOwnerRouteRequester,
+  inspectSourceOwnedContinuityOwnerRouteInvocation } from "./session-requester-bridge.mjs";
 import { withSessionAuthorityBoundary, advanceSessionAuthorityMember, reserveSessionAuthorityMember, releaseSessionAuthorityMember,
   inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord,
   inspectSourceOwnedSessionAuthorityStateRefresh, inspectSourceOwnedSessionAuthorityCompanionRefresh,
@@ -10009,6 +10011,91 @@ export function releaseOnboardingSessionCleanup(request={}) {
   return operation.terminalOwnerResult;
 }
 
+/**
+ * D231 (option a): the State sha256 an onboarding-continuity owner recorded in its immutable execution journal right after the bind,
+ * found by the member's bindingSha256; null when no such journal exists. Read-only; the registry compares it with the release evidence.
+ */
+export function readOnboardingContinuityMemberBoundStateSha256({repository, bindingSha256} = {}) {
+  if (!SHA256_RE.test(bindingSha256 ?? '')) return null;
+  const actual = continuityAuthorityRepository(repository);
+  const directory = privateCleanupPaths(actual.primaryRoot).directory;
+  if (!existsSync(directory)) return null;
+  for (const name of readdirSync(directory).sort()) {
+    if (!/^continuity-authority-execution-[a-f0-9]{32}\.json$/u.test(name)) continue;
+    try {
+      const body = JSON.parse(assertPrivateCleanupFile(join(directory,name),'continuity execution journal').toString('utf8'));
+      if (body?.schema === 'pipeline.continuity-authority-observation.v1' && body.stage === 'execution' && body.bindingSha256 === bindingSha256
+          && SHA256_RE.test(body.source?.stateSha256 ?? '')) return body.source.stateSha256;
+    } catch { /* an unreadable journal proves nothing, so it never exempts */ }
+  }
+  return null;
+}
+
+// D231 (PO decision 2026-11-01, option A): the one closed list of State entries a plain-terminal OWNER ROUTE process may run for
+// the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
+// for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
+const CONTINUITY_OWNER_ROUTE_ENTRIES = new Set([
+  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply',
+]);
+/**
+ * Runs exactly one allowlisted entry through the existing port.executeCompanionOperation for the CURRENT process's direct binding
+ * (the handles are process-local WeakMap capabilities, so this is the only place that can reach them). Every gate of
+ * continuityExecuteCompanionOperation still runs; this adds one more: the active requester must be the owner-route issuer's.
+ */
+export function executeOnboardingContinuityOwnerRouteEntry(request = {}) {
+  if (!exactKeys(request, new Set(['rootDir','sessionCleanup','entry','argv','expectedStateSha256'])))
+    fail('COR-REQUEST','owner-route entry request is invalid');
+  if (!CONTINUITY_OWNER_ROUTE_ENTRIES.has(request.entry))
+    fail('COR-ENTRY-OUTSIDE-ALLOWLIST',`the owner route runs only ${[...CONTINUITY_OWNER_ROUTE_ENTRIES].join(', ')}`);
+  const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
+  if (!isSourceOwnedContinuityOwnerRouteRequester({repository}))
+    fail('COR-REQUESTER-NOT-OWNER-ROUTE','the active requester was not issued by the continuity owner-route issuer');
+  const owned = continuityAuthorityDirectBindings.get(continuityAuthorityDirectKey(repository,request.sessionCleanup));
+  if (!owned || !continuityAuthorityEqual(repository,owned.repository))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owner-route binding unavailable in this process');
+  const operation = continuityAuthorityOperations.get(owned.prepared.operationHandle);
+  return owned.port.executeCompanionOperation({operationHandle:owned.prepared.operationHandle,
+    executionHandle:owned.executed.executionHandle,expectedMemberRef:continuityAuthorityReadMemberRef(repository,operation.expectedMemberRef),
+    expectedStateSha256:request.expectedStateSha256,entry:request.entry,argv:[...request.argv]});
+}
+
+/**
+ * D231 (E): releases the binding an owner-route CLI call left behind when it was killed between bind and release. Not a new
+ * authority: it is the existing lost-binding sequence (descriptor retired, registry member released FIRST, binding second,
+ * registry healed and read back) applied only to a session that (1) the State names as the held binding, (2) carries an
+ * owner-route invocation record of this repository, and (3) whose recorded process is PROVEN dead. A live or unverifiable owner
+ * is reported and left alone; any other binding (a real session, the approved controller) is `none` and stays with its own recovery.
+ */
+export function releaseDeadContinuityOwnerRouteBinding({ rootDir } = {}) {
+  const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(rootDir));
+  let observed;
+  try { observed = observeSessionCleanupState(rootDir); }
+  catch { return {status:'none',reason:'the selected State cannot be observed, so no owner-route binding can be classified'}; }
+  const tuple = observed.sessionCleanup;
+  if (tuple === null || tuple === undefined) return {status:'none',reason:'no session-cleanup binding is held'};
+  const invocation = inspectSourceOwnedContinuityOwnerRouteInvocation({rootDir:repository.primaryRoot,sessionId:tuple.sessionId});
+  if (invocation.status !== 'found') return {status:'none',reason:'the held binding is not an owner-route binding; the existing recovery decides it'};
+  if (invocation.ownerStatus === 'live') return {status:'live',sessionId:tuple.sessionId,reason:'the owner-route process is still running; its own call releases the binding'};
+  if (invocation.ownerStatus !== 'dead') return {status:'unverifiable',sessionId:tuple.sessionId,reason:'the owner-route process cannot be proven dead on this platform'};
+  let loaded = null;
+  try { loaded = loadSessionDescriptor(repository.primaryRoot,tuple.sessionId,{expectedDescriptorSha256:tuple.descriptorSha256}); }
+  catch (error) { if (error?.code !== 'WT-SESSION-MISSING') throw error; }
+  if (loaded !== null) retireSessionDescriptor(repository.primaryRoot,{sessionId:tuple.sessionId,descriptorSha256:tuple.descriptorSha256,ownerNonce:loaded.ownerNonce});
+  const step = runOrphanSessionAuthorityMemberStep({repository,target:{sessionId:tuple.sessionId,descriptorSha256:tuple.descriptorSha256},
+    codePrefix:'COR-ORPHAN-RELEASE',rerun:'routine-repair.mjs run heal',
+    recheck:() => {
+      const current = observeSessionCleanupState(rootDir);
+      if (!continuityAuthorityEqual(current.sessionCleanup,tuple) || current.stateSha256 !== observed.stateSha256 || current.revision !== observed.revision)
+        fail('COR-ORPHAN-RELEASE-CAS','State changed since the owner-route orphan was observed');
+    },
+    releaseBinding:() => {
+      const released = releaseOnboardingSessionCleanupInternal({rootDir,expectedStateSha256:observed.stateSha256,expectedRevision:observed.revision,sessionCleanup:tuple});
+      if (released.status !== 'released' || released.sessionCleanup !== null) fail('COR-ORPHAN-RELEASE-READBACK','the owner-route binding release did not read back as released');
+    }});
+  if (observeSessionCleanupState(rootDir).sessionCleanup !== null) fail('COR-ORPHAN-RELEASE-READBACK','the owner-route binding is still held after the release');
+  return {status:'released',sessionId:tuple.sessionId,descriptorRetired:loaded !== null,member:step.member,registry:step.registry};
+}
+
 // Source-owned selected-State bookkeeping. No public constructor mints a witness.
 const continuitySharedStateWitnesses = new WeakMap();
 const continuityAuthorityPortCache = new Map();
@@ -10857,6 +10944,19 @@ function continuityRefreshCompanionKnownOwnerAlias(data,snapshot) {
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity companion lifetime bound');
   data.legacy.set(key,value.operation.operationHandle);
 }
+// D231 option (a): the owner-side twin of the registry's exemption. A released member is no historical writer only when its terminal is
+// continuity-released or lost-binding-recovered AND the State sha it was bound at (its immutable execution journal) equals every
+// selected-state fact of the member and of its release evidence. A member that wrote moved its facts to the postimage and never matches.
+function continuityReleasedMemberNeverChangedState(data,item) {
+  try {
+    if (!['continuity-released','lost-binding-recovered'].includes(item.releaseRecord?.terminal)) return false;
+    const bound=readOnboardingContinuityMemberBoundStateSha256({repository:data.repository,bindingSha256:item.record.bindingSha256});
+    if (typeof bound!=='string') return false;
+    const released=item.releaseRecord.sourceFacts.filter(fact=>fact.namespaceId==='selected-state');
+    return released.length>0 && released.every(fact=>fact.sha256===bound)
+      && item.record.sourceFacts.filter(fact=>fact.namespaceId==='selected-state').every(fact=>fact.sha256===bound);
+  } catch { return false; }
+}
 function continuityObserveCompanionStateWrite(data,port,methods,handle,context) {
   if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
       || !isOwnedStateAuthorityCompanionWriteHandle(handle,{repository:data.repository}))
@@ -10883,7 +10983,8 @@ function continuityObserveCompanionStateWrite(data,port,methods,handle,context) 
       || !continuityAuthorityEqual(members.map(item=>item.record),context.memberRecords)
       || !continuityAuthorityEqual(members.filter(item=>item.releaseRecord!==null).map(item=>item.releaseRecord),context.releaseRecords)
       || members.some(item=>item.record.phase==='terminal-observed'
-        || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage')))))
+        || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage'))
+          &&!continuityReleasedMemberNeverChangedState(data,item))))
     fail('SDC-AUTHORITY-CAS','continuity companion record authentication failed');
   const snapshot=continuityAuthoritySnapshot(data.repository);
   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
