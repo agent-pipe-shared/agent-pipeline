@@ -1,0 +1,67 @@
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 7baa1ace2..aedecfe49 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -157,6 +157,19 @@ function findingIdsAreAcceptable(ids) {
+   return true;
+ }
+ 
++/**
++ * Toolbox D23: why `findingIdsAreAcceptable` refuses, in words a caller can act on (the library answers with the code alone).
++ * Returns null for an acceptable list; it never decides, the predicate above does.
++ */
++export function describeDesignReviewFindingIdRefusal(ids) {
++  if (!Array.isArray(ids) || findingIdsAreAcceptable([...ids].sort(compareUnits))) return null;
++  const rule = `an id is upper-case letters and digits, starts with a letter, has 2 to 8 parts joined by "-" (for example AC-155 or DESIGN-REVIEW-3), at most ${MAX_FINDING_ID_LENGTH} characters; at most ${MAX_FINDING_IDS} distinct ids`;
++  const bad = ids.filter((id) => typeof id !== "string" || id.length > MAX_FINDING_ID_LENGTH || !FINDING_ID.test(id));
++  if (bad.length > 0) return `${bad.map((id) => JSON.stringify(id)).join(", ")} ${bad.length === 1 ? "is not a valid finding id" : "are not valid finding ids"}: ${rule}`;
++  if (new Set(ids).size !== ids.length) return `a finding id is given twice: ${rule}`;
++  return `${ids.length} finding ids are given: ${rule}`;
++}
++
+ /** First failing code of a decoded receipt value, in the contract order, or null. */
+ function receiptRefusal(receipt) {
+   const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 471320a14..f90ccb45f 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -33,7 +33,7 @@ import { createHash } from "node:crypto";
+ import { lstatSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, join, sep } from "node:path";
+ 
+-import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
+@@ -242,6 +242,11 @@ export function createReceiptFromDisk(input, deps = {}) {
+     if (created.code === "DRR-DECISION-TRACE") {
+       return refuse(created.code, `design review receipt refused: DRR-DECISION-TRACE: foundational Spec decision(s) without an ADR/register reference or a recorded non-significance reason: ${created.unresolved.join(", ")}. Under the "Foundational decisions" heading give each entry "ADR: ADR-NNNN", "Register: <id>" or "Not significant: <reason>".`);
+     }
++    // Toolbox D23: the library answers with the code alone; say which id is wrong and what an id looks like.
++    if (created.code === "DRR-FINDING-IDS") {
++      const why = describeDesignReviewFindingIdRefusal(openFindingIds);
++      if (why !== null) return refuse(created.code, `design review receipt refused: DRR-FINDING-IDS: ${why}`);
++    }
+     return refuse(created.code, `design review receipt refused: ${created.code}`);
+   }
+ 
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index b6aa395ca..35916abd7 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -296,6 +296,13 @@ test("the command line reports role, requested route and observed identity separ
+ test("library refusals pass through under their own code and write nothing", withRepo((repo) => {
+   const badFinding = createReceiptFromDisk(request(repo, { openFindingIds: ["not an id"] }), { env: CLAUDE, now });
+   assert.deepEqual([badFinding.ok, badFinding.code], [false, "DRR-FINDING-IDS"]);
++  // D23: the refusal names the offending id and what an id looks like (F1 has no hyphen and is refused the same way).
++  assert.match(badFinding.message, /"not an id" is not a valid finding id: an id is upper-case letters and digits.*AC-155/u);
++  const f1 = createReceiptFromDisk(request(repo, { openFindingIds: ["F1", "AC-155"] }), { env: CLAUDE, now });
++  assert.match(f1.message, /"F1" is not a valid finding id/u);
++  assert.doesNotMatch(f1.message, /"AC-155"/u, "a valid id is not named as wrong");
++  const twice = createReceiptFromDisk(request(repo, { openFindingIds: ["AC-155", "AC-155"] }), { env: CLAUDE, now });
++  assert.match(twice.message, /a finding id is given twice/u);
+   const sameSources = createReceiptFromDisk(request(repo, { specPath: PRD }), { env: CLAUDE, now });
+   assert.equal(sameSources.code, "DRR-SOURCES");
+   const badFeature = createReceiptFromDisk(request(repo, { featureId: "Not A Feature" }), { env: CLAUDE, now });
