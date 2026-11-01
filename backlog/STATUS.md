@@ -87,6 +87,7 @@
 | pipeline.agent-talks-itself-out-of-the-pipeline | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
+| pipeline.agents-cannot-rerun-or-watch-a-ci-run | open | workflow-improvement | pipeline | alfred | 2026-11-01 | — | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | nightwing | 2026-08-09 | 2026-08-20 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.agy-driver-dispatch-and-design-routes-incomplete | open | defect | pipeline | alfred | 2026-10-03 | — | — |
@@ -254,6 +255,7 @@
 | pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.consumer-push-blocked-by-late-review-unit | open | defect | pipeline | alfred | 2026-10-26 | — | — |
+| pipeline.continuity-close-route-needs-an-owning-context-no-cli-provides | open | defect | pipeline | alfred | 2026-11-01 | — | — |
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | — | 2026-08-10 | — | — |
@@ -384,6 +386,7 @@
 | pipeline.fanout-ledger-spawns-powershell-on-every-stop-on-windows | closed | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | closed | requirement | pipeline | nova | 2026-09-14 | — | — |
 | pipeline.feature-branch-push-admitted-without-signature-approval | open | defect | pipeline | alfred | 2026-10-03 | — | — |
+| pipeline.feature-close-audit-has-no-policy-pack-for-a-consumer | open | defect | pipeline | alfred | 2026-11-01 | — | — |
 | pipeline.feature-close-reconcile-route-is-undocumented | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry. |
 | pipeline.finalized-legacy-packet-receipt-digest-refused-by-export | open | defect | pipeline | alfred | 2026-10-28 | — | — |
@@ -630,6 +633,7 @@
 | pipeline.multi-cli-efficiency-pilots | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
 | pipeline.native-patch-rename-drops-protected-content-markers | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.negated-rg-glob-filter-is-refused-by-the-read-grammar | open | workflow-improvement | pipeline | alfred | 2026-11-01 | — | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.nine-test-suites-run-in-no-verify-invocation | closed | defect | pipeline | — | 2026-08-27 | — | — |
@@ -649,6 +653,7 @@
 | pipeline.no-technical-gate-enforces-critic-review-before-done | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate. |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.no-uninstall-path-for-a-repository-that-once-opted-in | open | requirement | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.no-verb-sets-the-package-candidate-or-registers-the-verify-evidence | open | defect | pipeline | alfred | 2026-11-01 | — | — |
 | pipeline.node-v24-on-windows-creates-a-real-nul-file | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper | open | defect | pipeline | alfred | 2026-09-29 | — | — |
@@ -1072,7 +1077,7 @@
 
 ## Counts
 
-- open: 376
+- open: 381
 - in_progress: 0
 - closed: 674
 - rejected: 3
