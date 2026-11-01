@@ -52,7 +52,8 @@ test("stale map blocks strict push and explicit checkpoint persists typed debt",
     git("add", "."); git("commit", "-q", "-m", "contract change\n\nCheckpoint-Intent: backup before map refresh");
     const strict = runGuard("git push origin feat/map-debt:refs/heads/release/0.7");
     assert.equal(strict.status, 2, `${strict.stderr}\n${strict.stdout}`);
-    assert.match(strict.stderr, /final candidate needs a current architecture map/u);
+    // N25: the refusal names the stale contract and the concept map that declares it, not only its header.
+    assert.match(strict.stderr, /final candidate needs a current architecture map[\s\S]*src\/contract\.mjs[\s\S]*architecture\/map\/core\.md/u);
     const checkpoint = runGuard("git push origin feat/map-debt:refs/heads/feat/map-debt");
     assert.equal(checkpoint.status, 0, checkpoint.stderr);
     const records = readFileSync(join(dir, ".git", "agent-pipeline", "feature-checkpoint-audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
