@@ -37,7 +37,10 @@ was needed; capability evidence is not an Advisor answer.
    receipt, including the receipt chain when a delta is used. Produce each
    receipt with `node <plugin-root>/scripts/design-review-receipt.mjs create`
    (`--repo`, `--feature`, `--report`, `--prd`, `--spec`, `--out`; `--companion`,
-   `--previous` for the delta and `--open-finding` as needed). It reads the
+   `--previous` for the delta and `--open-finding` as needed; an `--open-finding`
+   id is upper-case letters and digits starting with a letter, in 2 to 8
+   hyphen-joined parts such as `AC-155` or `DESIGN-REVIEW-3`, so `F1` is refused
+   as `DRR-FINDING-IDS` and the refusal names the id). It reads the
    sources and the report from disk and stamps the review time, runner and
    reviewer model itself. Never write or edit a receipt by hand: a hand-written
    receipt is not admissible evidence.
