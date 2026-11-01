@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -507,6 +507,73 @@ test("15h an addendum commit carries the Critic when the dispatch record is not 
   assert.equal(courseAdmission.criticAddendumOnlyCommit(root, addendum.commit), false, "changed record bytes do not match recordSha256");
   rmSync(recordFile);
   assert.equal(courseAdmission.criticAddendumOnlyCommit(root, addendum.commit), false, "a missing record ends the classification");
+});
+
+// Candidate 16c (PO decision 2026-11-01): the feature close produces one documentation-and-evidence commit after the last Critic round
+// (Result, backlog, handover, retrospective, audit bundle, lifecycle, Verify evidence). It carries the Critic; anything else stays a correction.
+test("16c the close commit and handover-only commits carry the Critic; any source, configuration, prompt or foreign path does not", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const featureId = "close-commit-feature";
+  git(["init", "--quiet"]);
+  for (const dir of [`specs/${featureId}/evidence`, "docs", "backlog/items", ".claude/agents", "src"]) mkdirSync(join(root, dir), { recursive: true });
+  writeFileSync(join(root, "src/app.js"), "export const reviewed = 1;\n");
+  writeFileSync(join(root, "docs/state.md"), "# State\n");
+  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
+    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const reviewed = commitAll("reviewed source");
+  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
+    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
+  const deps = { readConsumedCandidateReceiptFn: () => read };
+  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
+    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
+  const closeCommitAt = (message, edit, base = reviewed.commit) => { git(["checkout", "--quiet", "--detach", base]); edit(); return commitAll(message); };
+  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
+
+  const close = closeCommitAt("the close commit", () => {
+    writeAt("docs/state.md", "# State\n\nClosed.\n");
+    writeAt("docs/pipeline-feedback-07.md", "# Feedback\n");
+    writeAt("backlog/items/2026-11-01-closed.md", "# Item\n");
+    writeAt(`audit-bundles/${featureId}/${reviewed.commit}/manifest.json`, "{}\n");
+    writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })} \n`);
+    writeAt(`specs/${featureId}/evidence/verify-latest.json`, "{}\n");
+    writeAt("project/pipeline-state.json", "{}\n");
+  });
+  assert.equal(courseAdmission.criticCloseCommit(root, close.commit, featureId), true);
+  assert.deepEqual(carry(close).proof.evidenceOnlyCommits, [close.commit]);
+  assert.deepEqual(courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed.commit,
+    candidateCommit: close.commit }).correctionCommits, [close.commit], "course counters are unchanged without the option");
+
+  const handover = closeCommitAt("handover only", () => writeAt("docs/state.md", "# State\n\nHandover.\n"), close.commit);
+  assert.deepEqual(carry(handover).proof.evidenceOnlyCommits, [close.commit, handover.commit], "close then handover carry together");
+
+  const refused = {
+    "a source change next to the docs": () => { writeAt("docs/state.md", "# State\n\nX\n"); writeAt("src/app.js", "export const reviewed = 2;\n"); },
+    "an agent prompt": () => writeAt(".claude/agents/reviewer.md", "# prompt\n"),
+    "a shell script under docs": () => writeAt("docs/run.sh", "echo hi\n"),
+    "a JSON file under docs": () => writeAt("docs/data.json", "{}\n"),
+    "another feature's specs directory": () => writeAt("specs/other-feature/lifecycle.json", "{}\n"),
+    "another feature's audit bundle": () => writeAt("audit-bundles/other-feature/x/manifest.json", "{}\n"),
+    "a Markdown file at the repository root": () => writeAt("README.md", "# readme\n"),
+    "a package manifest": () => writeAt("package.json", "{}\n"),
+    "a Critic export that bypasses its receipt classifier": () => writeAt(`specs/${featureId}/evidence/critic/${"a".repeat(32)}/report.md`, "# forged\n"),
+    "a removed source file": () => { git(["rm", "--quiet", "src/app.js"]); },
+    "an executable Markdown file": () => { writeAt("docs/exec.md", "# x\n"); chmodSync(join(root, "docs/exec.md"), 0o755); },
+  };
+  for (const [name, edit] of Object.entries(refused)) {
+    const commit = closeCommitAt(name, edit);
+    assert.equal(courseAdmission.criticCloseCommit(root, commit.commit, featureId), false, name);
+    assert.throws(() => carry(commit), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
+  }
+  const link = closeCommitAt("a symlink named like a document", () => symlinkSync("../src/app.js", join(root, "docs/linked.md")));
+  assert.equal(courseAdmission.criticCloseCommit(root, link.commit, featureId), false, "a symlink is not a document");
+  assert.equal(courseAdmission.criticCloseCommit(root, reviewed.commit, featureId), false, "the root commit has no single parent");
 });
 
 // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and

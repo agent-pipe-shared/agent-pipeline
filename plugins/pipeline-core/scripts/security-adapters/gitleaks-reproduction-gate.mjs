@@ -55,6 +55,24 @@ function fields(f) {
     value: f?.Secret ?? f?.secret };
 }
 
+// Candidate 16c (consumer finding): the gate used to bind the digest of the WHOLE scanner report. On a working root the report holds
+// every finding of the tree (build caches, local files, fixtures) in a parallel-scan order that changes between runs, so the gate could
+// never be verified a second time. The report digest now binds the ONE selected finding (path, rule, line, column, value digest), which
+// the reproduction has already proven to be present exactly once; other findings of the tree no longer matter to the gate.
+function selectedFindingDigest({ path, rule, line, column, value }) {
+  return digest(JSON.stringify({ schema: "pipeline.gitleaks-selected-finding.v1", path, rule, line, column, valueSha256: digest(value) }));
+}
+function selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) {
+  try {
+    const report = JSON.parse(rawReport);
+    if (!Array.isArray(report)) return null;
+    const matches = report.map(f => fields(normalizeCandidateFindingPath(f, rootDir)))
+      .filter(f => f.path === gate.path && f.rule === gate.rule && f.line === gate.line && f.column === gate.column);
+    if (matches.length !== 1 || matches[0].value !== reviewedValue) return null;
+    return selectedFindingDigest({ ...gate, value: reviewedValue });
+  } catch { return null; }
+}
+
 export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
   reviewedValue, spawnFn = spawnSync, env = process.env }) {
   if (reviewedValueClass(rootDir, reviewedValue) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
@@ -85,7 +103,7 @@ export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule
       schema: "pipeline.gitleaks-reproduction-gate.v1", historicalIdentity: "unknown",
       scanner: "gitleaks", binarySha256, adapterSha256, gateSourceSha256, configSha256, inputSha256,
       ignoreSha256: scan.ignored?.authoritySha256 ?? null,
-      reportSha256: digest(scan.raw), path, rule, line, column,
+      reportSha256: selectedFindingDigest({ path, rule, line, column, value: reviewedValue }), path, rule, line, column,
       valueSha256: digest(reviewedValue),
     } };
   } catch {
@@ -117,7 +135,7 @@ export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, rev
     const configPath = resolveGitleaksConfigPath();
     return reviewedValueClass(rootDir, reviewedValue) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
       && digest(reviewedValue) === gate.valueSha256
-      && (typeof rawReport === "string" ? digest(rawReport) : observedReportSha256) === gate.reportSha256
+      && (typeof rawReport === "string" ? selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) : observedReportSha256) === gate.reportSha256
       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256
       && (existsSync(join(rootDir, ".gitleaksignore"))
         ? fileDigest(join(rootDir, ".gitleaksignore")) : null) === gate.ignoreSha256

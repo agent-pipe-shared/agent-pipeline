@@ -370,6 +370,42 @@ export function criticAddendumOnlyCommit(root, commit) {
   } catch { return false; }
 }
 
+const CLOSE_STATE_FILES = new Set(["project/pipeline-state.json", ".claude/pipeline-state.json"]);
+const CLOSE_DOC_PATH = /^(?:docs|backlog)\/(?:[^/]+\/)*[^/]+\.md$/u;
+/**
+ * Candidate 16c (PO decision 2026-11-01, consumer finding): the feature close itself produces one commit that can only exist AFTER the last
+ * Critic round (Result, backlog, handover, retrospective, the audit bundle, the lifecycle and the Verify evidence it binds), and a push
+ * needs a Critic-bound Verify on it. Counted as a correction it made the push unreachable for every project that closes a feature and then
+ * pushes. A commit is a close commit when it has one parent, is not empty, and every changed path is documentation or close evidence and
+ * nothing else: a Markdown file under `docs/` or `backlog/`, anything under `specs/<feature>/` or `audit-bundles/<feature>/`, or the State
+ * file. Added and modified files must be regular, non-executable blobs (no symlink, no mode change). Any other path -- source, tests,
+ * configuration, agent or skill prompts, another feature's directory -- ends the classification and the commit stays a correction.
+ */
+export function criticCloseCommit(root, commit, featureId) {
+  try {
+    const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
+    if (parents.length !== 2 || typeof featureId !== "string" || featureId === "") return false;
+    const fields = gitBytes(root, ["diff", "--raw", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
+    if (fields.length === 0 || fields.length % 2 !== 0) return false;
+    const specs = `specs/${featureId}/`;
+    const bundles = `audit-bundles/${featureId}/`;
+    for (let index = 0; index < fields.length; index += 2) {
+      const meta = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([AMD])$/u.exec(fields[index]);
+      const path = fields[index + 1];
+      if (!meta) return false;
+      // The export subtree of a consumed Critic review has its own receipt-bound classifier (`criticExportOnlyCommit`); a close commit
+      // must not become a second, weaker way in for forged or extended exports.
+      if (path.startsWith(`${specs}evidence/critic/`)) return false;
+      const inside = path.startsWith(specs) || path.startsWith(bundles);
+      if (!(inside || CLOSE_DOC_PATH.test(path) || CLOSE_STATE_FILES.has(path))) return false;
+      if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return false;
+      if (meta[3] !== "D" && meta[2] !== "100644") return false;
+      if (meta[3] === "M" && meta[1] !== "100644") return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
 const CRITIC_EXPORT_PATH = /^specs\/([^/]+)\/evidence\/critic\/[a-f0-9]{32}\/[^/]+$/u;
 /**
  * N27b / D206: which commits lie between a verified candidate and HEAD, and are all of them delivery tail? A commit is tail
@@ -479,7 +515,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   for (const commit of source.rangeCommits) {
     (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
-        || criticAddendumOnlyCommit(root, commit)))
+        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)))
       ? evidenceOnly : correction).push(commit);
   }
   return Object.freeze({

@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reviewedValueClass, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
+import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reproductionGateFactsStillMatch, reviewedValueClass, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
 import { parseArgv } from "../gitleaks-repair-ignore.mjs";
 
 const VALUE = "playgame.example-studio.example";
@@ -110,6 +110,34 @@ test("the public-value class is closed: untracked, missing, differing or malform
     assert.match(REVIEWED_VALUE_REFUSAL, /plain domain/u);
     assert.match(REVIEWED_VALUE_REFUSAL, /public\/<key>\.txt/u);
     assert.equal(reviewedValueClass(f.rootDir, "playgame.example-studio.example"), "domain", "the domain class is unchanged");
+  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+});
+
+// Candidate 16c (consumer finding): on a working root the report holds every finding of the tree in a changing order. The gate binds only
+// the selected finding, so a second scan with other, more, differently ordered findings still verifies, and a changed selected finding does not.
+test("the gate binds the selected finding, not the whole report: unrelated and reordered findings do not invalidate it", async () => {
+  const f = keyFixture();
+  try {
+    const selected = { File: join(f.rootDir, KEY_PATH), RuleID: RULE, StartLine: 1, StartColumn: 14, Secret: KEY, Description: "Generic API Key" };
+    const noise = (n) => ({ File: join(f.rootDir, `.next/cache/${n}.json`), RuleID: "generic-api-key", StartLine: n, StartColumn: 3, Secret: `noise${n}`.padEnd(24, "x"), Description: "noise" });
+    const scanWith = (report) => (_command, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const first = await reproduceReviewedFinding({ ...f, spawnFn: scanWith([selected, noise(1)]) });
+    assert.equal(first.ok, true, first.reason);
+    const later = { ...f, spawnFn: scanWith([noise(3), noise(2), selected, noise(1), noise(4)]) };
+    assert.equal((await verifyReproductionGate({ ...later, gate: first.gate })).ok, true, "other findings and another order do not matter");
+    const again = await reproduceReviewedFinding(later);
+    assert.equal(JSON.stringify(again.gate), JSON.stringify(first.gate), "the gate is reproducible byte for byte");
+    assert.equal(reproductionGateFactsStillMatch({ gate: first.gate, rootDir: f.rootDir, binaryPath: f.binaryPath, reviewedValue: KEY,
+      rawReport: JSON.stringify([noise(9), selected]) }), true, "the final readback accepts a raw report with other findings");
+    assert.equal(reproductionGateFactsStillMatch({ gate: first.gate, rootDir: f.rootDir, binaryPath: f.binaryPath, reviewedValue: KEY,
+      rawReport: JSON.stringify([noise(9)]) }), false, "the final readback refuses a report without the selected finding");
+    const moved = { ...selected, StartLine: 2 };
+    assert.equal((await verifyReproductionGate({ ...f, spawnFn: scanWith([moved, noise(1)]), gate: first.gate })).ok, false, "a moved selected finding is refused");
+    const changedValue = { ...selected, Secret: KEY.replace("9f", "9e") };
+    assert.equal((await verifyReproductionGate({ ...f, spawnFn: scanWith([changedValue]), gate: first.gate })).ok, false, "another value at the same place is refused");
   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
 });
 

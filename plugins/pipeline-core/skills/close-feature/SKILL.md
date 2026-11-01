@@ -169,6 +169,13 @@ descriptor, its cleanup status is the evidence to digest. A project WITHOUT a se
 as `evidenceDigest` (PO decision 2026-11-01), provided the close report or handover states explicitly that no
 descriptor existed and the digest is the empty-input digest.
 
+The Critic carry-forward of a Critic-bound Verify (`--mode release --critic-packet-id ...`) admits the close's
+own commit and handover-only commits after the last Critic round: a commit with one parent whose every changed
+path is a Markdown file under `docs/` or `backlog/`, anything under `specs/<feature>/` or
+`audit-bundles/<feature>/` of the feature being carried, or the State file, added or modified as regular
+non-executable files. Any other path (source, tests, configuration, agent or skill prompts, another feature's
+directory, a symlink) keeps the commit a correction and the carry refuses with `CVL-CARRY-CONTENT-CHANGED`.
+
 Without separately authorized publication, confirmed descriptor-bound cleanup
 may end at `closed-local`. Publication, readback, release and promotion are
 separate coordinator transitions and are never implied by this skill.
