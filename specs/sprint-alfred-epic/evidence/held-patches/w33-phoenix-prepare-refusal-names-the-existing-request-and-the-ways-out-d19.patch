@@ -1,0 +1,49 @@
+diff --git a/plugins/pipeline-core/lib/authority-revision-proof.test.mjs b/plugins/pipeline-core/lib/authority-revision-proof.test.mjs
+index 72ee69761..acfa6a478 100644
+--- a/plugins/pipeline-core/lib/authority-revision-proof.test.mjs
++++ b/plugins/pipeline-core/lib/authority-revision-proof.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -27,6 +27,20 @@ test("external proof becomes the authority revision approval shape", () => {
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("D19: a second prepare in the same directory is refused naming the existing request and the ways out, and keeps the first request byte for byte", () => {
++  const root = mkdtempSync(join(tmpdir(), "phoenix-authority-prepare-")); const repo = join(root, "repo"); const directory = join(root, "external");
++  try {
++    mkdirSync(repo); writeFileSync(join(repo, "proposal.json"), JSON.stringify(request));
++    const argv = ["prepare", "--repo-root", repo, "--directory", directory, "--proposal", "proposal.json"];
++    assert.equal(approval(argv).code, "PHOENIX-AUTHORITY-REQUEST-READY");
++    const requestPath = join(directory, "phoenix-authority-revision-request.json");
++    const first = readFileSync(requestPath);
++    assert.throws(() => approval(argv), (error) => error.message.includes(`request already exists at ${requestPath}`) && /refuse overwrite/u.test(error.message)
++      && /move it aside/u.test(error.message) && /fresh --directory/u.test(error.message));
++    assert.deepEqual(readFileSync(requestPath), first);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ // PX0-AC-05 negative clause (closes Critic Finding 1, px0-ac0305-06-critic-review-d827c1b3.md):
+ // decision.id must be constrained the same way its sibling identifiers (featureId,
+ // idempotencyKey) already are -- it must be IMPOSSIBLE to smuggle a private path, a
+diff --git a/plugins/pipeline-core/scripts/phoenix-authority-approval.mjs b/plugins/pipeline-core/scripts/phoenix-authority-approval.mjs
+index 272ca9b74..73e410d73 100644
+--- a/plugins/pipeline-core/scripts/phoenix-authority-approval.mjs
++++ b/plugins/pipeline-core/scripts/phoenix-authority-approval.mjs
+@@ -21,7 +21,9 @@ function run(argv = process.argv.slice(2)) {
+     const intent = createAuthorityRevisionIntent(proposal);
+     const request = { schema: "pipeline.continuity-authority-revision-request.v1", intent };
+     const path = join(dir, "phoenix-authority-revision-request.json");
+-    if (existsSync(path)) throw new Error("request already exists; refuse overwrite");
++    // Toolbox D19: the file names are fixed, so a second ceremony meets the first one's request. Name the file and the two ways out instead of a bare refusal.
++    // Toolbox D19: the file names are fixed, so a second ceremony meets the first one's request. Name the file and the two ways out instead of a bare refusal.
++    if (existsSync(path)) throw new Error(`request already exists at ${path}; refuse overwrite. It belongs to an earlier ceremony and is kept as it is: move it aside together with its phoenix-authority-revision-proof.json (for example rename both with a date suffix), or give a fresh --directory.`);
+     writeFileSync(path, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+     return { ok: true, code: "PHOENIX-AUTHORITY-REQUEST-READY", intentSha256: intent.sha256 };
+   }
