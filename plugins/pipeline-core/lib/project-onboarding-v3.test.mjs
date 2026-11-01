@@ -374,6 +374,9 @@ async function assertEveryChunkRunsContract() {
 }
 async function runShards(recorder) {
   const suitePath = fileURLToPath(import.meta.url);
+  // Shards finish in arrival order, but Verify's completion parser requires the DISPOSED records in the declared
+  // (sorted) case order, so the parent collects every child's dispositions and records them in that order afterwards.
+  const collectedDispositions = new Map();
   const runChunk = async (selectedChunk) => {
     const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
     const expectedCases = ONBOARDING_TEST_CASES.filter((entry) => assignedToChunk(entry.index, index, selectedChunk));
@@ -404,7 +407,7 @@ async function runShards(recorder) {
         try {
           const receipt = receiver.close(code, signal);
           coverage = receipt.classes;
-          for (const result of receipt.results) recorder.dispose(result.id, result.disposition);
+          for (const result of receipt.results) collectedDispositions.set(result.id, result.disposition);
         } catch (failure) { error = failure; }
       }
       const childEndedAtNs = process.hrtime.bigint();
@@ -416,7 +419,11 @@ async function runShards(recorder) {
     }));
     return Promise.all(children);
   };
-  return runAllChunks(CHUNK_COUNT, runChunk);
+  const chunkResults = await runAllChunks(CHUNK_COUNT, runChunk);
+  for (const id of ONBOARDING_CASE_IDS) {
+    if (collectedDispositions.has(id)) recorder.dispose(id, collectedDispositions.get(id));
+  }
+  return chunkResults;
 }
 // `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
 // `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`

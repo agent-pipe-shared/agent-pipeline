@@ -308,6 +308,7 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/project-authority.mjs",
     "../lib/guard-devplan-policy.mjs",
     "../lib/administrative-commit-policy.mjs",
+    "../lib/feature-package-registration.mjs",
   ],
   // closure repair ALF-C-P3-01D: lazily loaded modules of newly reached kernel files.
   "plugins/pipeline-core/scripts/po-human-approval.mjs": [

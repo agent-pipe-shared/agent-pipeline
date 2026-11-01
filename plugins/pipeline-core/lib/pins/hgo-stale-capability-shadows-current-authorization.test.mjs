@@ -124,7 +124,11 @@ function staleStage() {
 }
 function currentStage(state, order) {
   const { root, head, stale, moved } = state;
-  for (let i = 0; i < 16; i++) {
+  // The stale digest is random, so a wanted order is reached per attempt with probability s (or 1-s). Measured: a bound of 16
+  // failed 7 runs in 30 (three pairs, each failing with probability 1/17 on average); 192 still failed 1 in 40. The loop stops
+  // at the first digest that sorts as requested, so a large bound costs nothing in the common case and only bounds the tail:
+  // 1024 attempts leave about one run in three hundred.
+  for (let i = 0; i < 1024; i++) {
     const { req, plan } = requestAndPlan(root, 5000 + i);
     if (!(order === "stale-first" ? stale < plan.planSha256 : plan.planSha256 < stale)) continue;
     const current = armPlanned(root, 5000 + i, input, req, plan);

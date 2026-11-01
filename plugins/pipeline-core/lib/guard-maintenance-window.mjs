@@ -187,6 +187,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // node:child_process's spawnSync), not just static imports -- `project-onboarding-v3.mjs`
   // above reaches these two writer scripts (and everything THEY import) through the
   // process boundary, not an import.
+  "plugins/pipeline-core/lib/feature-package-registration.mjs",
   "plugins/pipeline-core/lib/feature-package-topology.mjs",
   "plugins/pipeline-core/lib/gate-estimate.mjs",
   "plugins/pipeline-core/lib/git-cmd.mjs",

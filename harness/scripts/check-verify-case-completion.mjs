@@ -245,7 +245,12 @@ function hasOnboardingParentRecorder(source, suitePath, bindings) {
   const shardsClose = matchingClose(source, shardsOpen, "{", "}", true);
   if (shardsClose === -1) return false;
   const shardBody = masked.slice(shardsOpen + 1, shardsClose);
-  return /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) recorder\.dispose\(result\.id, result\.disposition\);/u.test(shardBody);
+  // The close-observed producer only collects; the single recorder.dispose runs afterwards in declared case order,
+  // because Verify's parser requires the DISPOSED records ordinal by ordinal while shards finish in arrival order.
+  return /const collectedDispositions = new Map\(\);/u.test(shardBody)
+    && /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) collectedDispositions\.set\(result\.id, result\.disposition\);/u.test(shardBody)
+    && /const chunkResults = await runAllChunks\(CHUNK_COUNT, runChunk\);\s*for \(const id of ONBOARDING_CASE_IDS\) \{\s*if \(collectedDispositions\.has\(id\)\) recorder\.dispose\(id, collectedDispositions\.get\(id\)\);\s*\}\s*return chunkResults;/u.test(shardBody)
+    && [...shardBody.matchAll(/recorder\.dispose\(/gu)].length === 1;
 }
 
 function closedCompletionRegistration(source, start) {

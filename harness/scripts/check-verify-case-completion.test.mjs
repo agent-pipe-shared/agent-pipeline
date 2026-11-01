@@ -723,7 +723,9 @@ registerTestCaseCompletion({ cases() {}, fd: 3, maxBytes: 4096 });
     ["exit before shards", (source) => source.replace("const results = await runShards(recorder);", "process.exit(0);\n  const results = await runShards(recorder);")],
     ["foreign recorder argument", (source) => source.replace("const results = await runShards(recorder);", "const results = await runShards(other);")],
     ["absent close validation", (source) => source.replace("const receipt = receiver.close(code, signal);", "const receipt = receiver.receipt;")],
-    ["fabricated pass disposition", (source) => source.replace("recorder.dispose(result.id, result.disposition)", 'recorder.dispose(result.id, "pass")')],
+    ["fabricated pass disposition", (source) => source.replace("collectedDispositions.set(result.id, result.disposition)", 'collectedDispositions.set(result.id, "pass")')],
+    ["fabricated pass at replay", (source) => source.replace("recorder.dispose(id, collectedDispositions.get(id))", 'recorder.dispose(id, "pass")')],
+    ["arrival-order disposal", (source) => source.replace("collectedDispositions.set(result.id, result.disposition);", "recorder.dispose(result.id, result.disposition);")],
     ["noncanonical declaration", (source) => source.replace("ONBOARDING_TEST_CASES.map((entry) => entry.id).sort()", "unrelatedIds")],
   ];
   for (const [name, mutate, path] of mutations) {

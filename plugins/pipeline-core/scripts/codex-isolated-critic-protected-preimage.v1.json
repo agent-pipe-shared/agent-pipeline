@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "harness/review-protocol.md",
-      "rawSha256": "a51e9f75d2b8bff51638953ff2d73f444746372f4ef9ac8a4e2b858b7fbfaf2c"
+      "rawSha256": "fc0077b34a1db0a3526fdf57ed2b18e812c6eb8d23c1d4b582ad8419c7e23f07"
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
@@ -32,7 +32,7 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "d6619a4718da6b87315ea57867ff7b8ac5f5e0c85f6f395c5ee41490d8c5a0a9"
+      "rawSha256": "2e39049d62cfae91728c72e36439a18715acf94d62487be4d163c975f93deb26"
     },
     {
       "path": "roles/critic.md",
@@ -40,7 +40,7 @@
     },
     {
       "path": "templates/prompts/critic-review.md",
-      "rawSha256": "d96dfba383352d5cd5b232addf6bf3e187a8225b40e246c01186b7471eaa090c"
+      "rawSha256": "0e71395c4e5767b4cf3baa14e522229c3c758821908261f8d2c870c0e4284441"
     }
   ]
 }
