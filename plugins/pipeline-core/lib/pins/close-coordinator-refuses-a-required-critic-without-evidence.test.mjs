@@ -480,6 +480,7 @@ test("rigor one close without a delivery course still needs the independent Crit
   const refused = repo.planPrepared();
   assert.equal(refused.status, 2, JSON.stringify(refused.body));
   assert.equal(refused.body.code, "CLOSE-QUALIFICATION-REQUIRED");
+  assert.match(refused.body.message, /--audit-request <path> --critic-verify-lifecycle <id>/u, "the refusal names the two flags of the audit route");
   assert.deepEqual(repo.snapshot(), before);
 });
 

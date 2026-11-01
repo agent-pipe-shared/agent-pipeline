@@ -673,7 +673,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     // The audit route below reads the consumed Critic packet and exact Verify
     // lifecycle; a self-authored design receipt cannot stand in for either.
     if (requiresPublicationReview(snapshot.state, { rootDir: root }) && values.auditRequest === undefined) {
-      fail("CLOSE-QUALIFICATION-REQUIRED", "rigor >= 1 feature close requires the candidate-bound Critic/Verify audit route");
+      fail("CLOSE-QUALIFICATION-REQUIRED", "rigor >= 1 feature close requires the candidate-bound Critic/Verify audit route: record the candidate's passing Verify and its Critic review as a Critic/Verify lifecycle, then plan this transition again with --audit-request <path> --critic-verify-lifecycle <id> (the request file has schema pipeline.feature-close-audit-request.v1 and names the same lifecycle id)");
     }
     if (values.auditRequest !== undefined) {
       const request = auditRequest(root, values.auditRequest);
