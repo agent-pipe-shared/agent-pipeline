@@ -31,7 +31,8 @@ import * as courseAdmission from "../critic-course-admission.mjs";
 const { resolveRegisteredCriticCourseHistory } = courseAdmission;
 import { produceCriticDiagnostic } from "../critic-diagnostic-producer.mjs";
 import { criticDispositionAddendumPath, CRITIC_DISPOSITION_ADDENDUM_SCHEMA } from "../critic-disposition-addendum.mjs";
-import { residualFindingId } from "../critic-verify-lifecycle.mjs";
+import { readBoundConsumedCriticReceipt, residualFindingId } from "../critic-verify-lifecycle.mjs";
+import { run as pipelineStateRun } from "../../scripts/pipeline-state.mjs";
 import { loadResidualAcceptanceDepsForPacket, writeResidualAcceptanceRecord } from "../critic-verify-readiness.mjs";
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../../scripts/critic-packet-preflight.mjs";
 import { SLICE_QUEUE_SCHEMA } from "../slice-queue.mjs";
@@ -534,6 +535,118 @@ test("PATH B at a repository root commit: the course genesis base is the root co
     assert.equal(fx.observed.genesisIsRoot, true);
     const addenda = writeAddenda(fx, ["TASK-ONE", "TASK-TWO"]);
     for (const [taskId, outcome] of Object.entries(addenda)) assert.equal(outcome.status, 0, `${taskId}: ${outcome.text}${outcome.stderr}`);
+    const closed = closeToPrepared(fx);
+    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+  } finally { cleanup(fx); }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Path C (D227 / N45): a Critic round FAILED with one MAJOR finding that no commit can correct (commit trailers of past commits). The PO
+// accepts it through the REAL verb `pipeline-state approve-residual-acceptance --reason-class uncorrectable-past-authorship`; the close
+// then plans and the receipt names the accepted major and the class. Seams (named): the Critic model call (fixed verdict, as above) and
+// the PO's attended chat confirmation (the verb's isattyFn / readLineFn dependencies return the confirmation code the verb printed,
+// exactly as the pipeline-state suite does; a spawned process has no attended terminal). No record is hand-written.
+// ---------------------------------------------------------------------------------------------------------------------------------
+const MAJOR_PAST_AUTHORSHIP = { findings: [{ gap: "stage-0 trailers on past commits violate the criterion", risk: "authorship cannot be corrected", severity: "major", evidence: `${SPEC_PATH}:1`, spec_ref: "AC-1" }], pass: false };
+const BLOCKER_ONE = { findings: [{ gap: "fatal gap", risk: "consumer breaks", severity: "blocker", evidence: `${SPEC_PATH}:1`, spec_ref: "AC-1" }], pass: false };
+const PAST_AUTHORSHIP_CLASS = "uncorrectable-past-authorship";
+
+/** One real `approve-residual-acceptance` call (the exported function the CLI calls) against the walk repository. */
+function acceptViaVerb(fx, packetId, { reasonClass } = {}) {
+  const controlRoot = join(gitCommonOf(fx.root), "agent-pipeline", "critic-packets");
+  const receiptSha = sha256(packetCanonicalJson(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt));
+  const code = `ACCEPT-${receiptSha.slice(0, 8).toUpperCase()}`;
+  const lines = [];
+  let prompted = 0;
+  const originalError = console.error, originalLog = console.log;
+  console.error = (...args) => { lines.push(args.join(" ")); };
+  console.log = (...args) => { lines.push(args.join(" ")); };
+  let status;
+  try {
+    status = pipelineStateRun(["approve-residual-acceptance", "--by", "PO", "--critic-packet", packetId, ...(reasonClass === undefined ? [] : ["--reason-class", reasonClass])],
+      { dir: fx.root, now: () => new Date().toISOString(), isattyFn: () => true, readLineFn: (prompt) => { prompted += 1; lines.push(prompt); return code; } });
+  } finally { console.error = originalError; console.log = originalLog; }
+  return { status, lines, text: lines.join("\n"), prompted, receiptSha };
+}
+
+/** The bound receipt reader the close addendum and Verify use, with the acceptance the verb recorded. */
+function boundWithAcceptance(fx) {
+  const { root, observed } = fx;
+  const tree = git(root, ["rev-parse", `${observed.lastCandidate}^{tree}`]);
+  const deps = loadResidualAcceptanceDepsForPacket({ gitCommonDir: gitCommonOf(root), projectDir: root, criticPacketId: observed.lastPacketId });
+  return { deps, bound: deps === null ? null : readBoundConsumedCriticReceipt({ gitCommonDir: gitCommonOf(root), criticPacketId: observed.lastPacketId, candidate: { commit: observed.lastCandidate, tree } }, deps) };
+}
+
+test("PATH C (D227 major with the reason class): accept the major through the real verb, then the close plans and the receipt names the major and the class", () => {
+  const fx = walkCourse({ label: "c-major", rounds: [{ kind: "full", verdict: MAJOR_PAST_AUTHORSHIP }], slices: ["TASK-ONE"] });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const packetId = fx.observed.lastPacketId;
+    // negatives on the real verb: the same major without the class, and an unknown class, are refused with typed codes, nothing recorded
+    const withoutClass = acceptViaVerb(fx, packetId);
+    assert.equal(withoutClass.status, 2, withoutClass.text);
+    assert.match(withoutClass.text, /RESIDUAL-PROOF-SEVERITY/u);
+    assert.equal(withoutClass.prompted, 0, "a refused acceptance consumes no confirmation");
+    const unknown = acceptViaVerb(fx, packetId, { reasonClass: "some-other-class" });
+    assert.equal(unknown.status, 2, unknown.text);
+    assert.match(unknown.text, /RESIDUAL-PROOF-CLASS/u);
+    assert.equal(boundWithAcceptance(fx).deps, null, "nothing was recorded by a refused acceptance");
+    assert.throws(() => readBoundConsumedCriticReceipt({ gitCommonDir: gitCommonOf(fx.root), criticPacketId: packetId, candidate: { commit: fx.observed.lastCandidate, tree: git(fx.root, ["rev-parse", `${fx.observed.lastCandidate}^{tree}`]) } }, {}), (error) => error.code === "CVL-CRITIC-FAILED");
+    // the close is still refused while the major is open: no addendum can bind the failed receipt
+    const refusedAddenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.notEqual(refusedAddenda["TASK-ONE"].status, 0, "the failed receipt does not bind without the acceptance");
+    // the acceptance with the class
+    const accepted = acceptViaVerb(fx, packetId, { reasonClass: PAST_AUTHORSHIP_CLASS });
+    assert.equal(accepted.status, 0, accepted.text);
+    assert.equal(accepted.prompted, 1);
+    assert.match(accepted.text, /reason class: uncorrectable-past-authorship/u, "the PO sees the class before confirming");
+    assert.match(accepted.text, /major [a-f0-9]{64}/u, "the PO sees the severity word next to the finding");
+    const { bound } = boundWithAcceptance(fx);
+    assert.notEqual(bound, null, "the failed receipt now binds through the acceptance");
+    assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP_CLASS, "the receipt names the reason class");
+    assert.equal(bound.residual.basis, "po-acceptance-of-residual-findings-with-reason-class");
+    assert.deepEqual(bound.residual.findings.map((entry) => entry.severity), ["major"], "the receipt names the accepted major");
+    const addenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(addenda["TASK-ONE"].status, 0, `${addenda["TASK-ONE"].text}${addenda["TASK-ONE"].stderr}`);
+    const closed = closeToPrepared(fx);
+    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+    assert.equal(closed.planned.body.phase, "feature-close-prepared");
+    assert.equal(closed.apply().status, "applied");
+  } finally { cleanup(fx); }
+});
+
+test("PATH C negative: a blocker is refused with the class (RESIDUAL-PROOF-SEVERITY) and nothing is recorded", () => {
+  const fx = walkCourse({ label: "c-blocker", rounds: [{ kind: "full", verdict: BLOCKER_ONE }], slices: ["TASK-ONE"] });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    for (const reasonClass of [PAST_AUTHORSHIP_CLASS, undefined]) {
+      const refused = acceptViaVerb(fx, fx.observed.lastPacketId, { reasonClass });
+      assert.equal(refused.status, 2, refused.text);
+      assert.match(refused.text, /RESIDUAL-PROOF-SEVERITY/u);
+      assert.equal(refused.prompted, 0);
+    }
+    assert.equal(boundWithAcceptance(fx).deps, null);
+  } finally { cleanup(fx); }
+});
+
+test("PATH C negative and control: a class on a minor-only list is refused RESIDUAL-PROOF-CLASS; the minor-only acceptance without a class works unchanged and its receipt carries no class", () => {
+  const fx = walkCourse({ label: "c-minor", rounds: [{ kind: "full", verdict: minors("c") }], slices: ["TASK-ONE"] });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt));
+    const packetId = fx.observed.lastPacketId;
+    const misplaced = acceptViaVerb(fx, packetId, { reasonClass: PAST_AUTHORSHIP_CLASS });
+    assert.equal(misplaced.status, 2, misplaced.text);
+    assert.match(misplaced.text, /RESIDUAL-PROOF-CLASS/u);
+    assert.equal(misplaced.prompted, 0);
+    assert.equal(boundWithAcceptance(fx).deps, null);
+    const accepted = acceptViaVerb(fx, packetId);
+    assert.equal(accepted.status, 0, accepted.text);
+    assert.doesNotMatch(accepted.text, /reason class/u, "the minor-only confirmation is unchanged");
+    const { bound } = boundWithAcceptance(fx);
+    assert.equal(bound.residual.basis, "po-acceptance-of-residual-minor-findings");
+    assert.equal(Object.hasOwn(bound.residual, "reasonClass"), false);
+    const addenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(addenda["TASK-ONE"].status, 0, `${addenda["TASK-ONE"].text}${addenda["TASK-ONE"].stderr}`);
     const closed = closeToPrepared(fx);
     assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
   } finally { cleanup(fx); }

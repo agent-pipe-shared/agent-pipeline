@@ -201,32 +201,53 @@ const residualInputValid = ({ projectDir, anchorDir, state, candidate, criticRec
   typeof projectDir === "string" && typeof anchorDir === "string" && object(state) && validCandidate(candidate)
   && SHA256.test(criticReceiptSha256 ?? "") && residualFindingList(findings) !== null;
 
-// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list.
-function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings }, prefix) {
+// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list, and (D227) the reason class the caller names.
+function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings, reasonClass }, prefix) {
   if (!object(recorded) || recorded.forCommit !== candidate.commit) return `${prefix}-COMMIT-MISMATCH`;
   const observed = residualFindingList(findings);
   const bound = residualFindingList(recorded.findings);
   if (recorded.forTree !== candidate.tree || recorded.criticReceiptSha256 !== criticReceiptSha256
-    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)) {
+    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)
+    || (reasonClass !== undefined && recorded.reasonClass !== reasonClass)) {
     return `${prefix}-BINDING-MISMATCH`;
   }
   return null;
 }
 
-const residualSeverityRefused = (findings) => residualFindingList(findings).some((finding) => finding.severity !== "minor");
+/**
+ * D227 (N45): the one reason class under which a MAJOR finding can be accepted, and the one rule for it. A blocker is never
+ * accepted; a major only with exactly this class; a list without a major never carries a class. Returns null when the
+ * (findings, class) pair is acceptable, else the typed suffix: SEVERITY (blocker, or a major without a class) or CLASS (an unknown
+ * value, or a class on a list that has no major). `findings` need only carry a `severity` each; `undefined` means "no class named".
+ */
+export const RESIDUAL_REASON_CLASS = "uncorrectable-past-authorship";
+export function residualReasonClassRefusal(findings, reasonClass) {
+  const list = Array.isArray(findings) ? findings : [];
+  if (list.length === 0 || list.some((finding) => finding?.severity === "blocker" || !["minor", "major"].includes(finding?.severity))) return "SEVERITY";
+  if (list.some((finding) => finding.severity === "major")) {
+    if (reasonClass === undefined) return "SEVERITY";
+    return reasonClass === RESIDUAL_REASON_CLASS ? null : "CLASS";
+  }
+  return reasonClass === undefined ? null : "CLASS";
+}
+
+// The class in force for a call: the one the caller names, else the one the recorded acceptance carries.
+const residualEffectiveClass = (reasonClass, state) => reasonClass !== undefined ? reasonClass : state?.residualAcceptance?.lastAccepted?.reasonClass;
 
 /**
- * D190: authorize the acceptance of residual MINOR Critic findings by a detached signature,
- * modelled on `authorizeRecordedPush`. A major or blocker finding is refused here, never accepted.
+ * D190: authorize the acceptance of residual Critic findings by a detached signature, modelled on `authorizeRecordedPush`.
+ * A blocker is refused here, never accepted; D227: a major is accepted only when the signed acceptance names the reason class
+ * `uncorrectable-past-authorship`, which then is part of the signed subject. A minor-only subject carries no class key at all.
  * The record lives at `state.residualAcceptance.lastAccepted`.
  */
 export function authorizeRecordedResidualAcceptance({
-  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, now, machinePlaneDeps = {}, pinTrustAnchor = null,
+  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, reasonClass, now, machinePlaneDeps = {}, pinTrustAnchor = null,
 } = {}) {
   const prefix = "RESIDUAL-PROOF";
-  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
+  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings, reasonClass };
   if (!residualInputValid(input) || !validNow(now)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
-  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  const earlyRefusal = residualReasonClassRefusal(findings, residualEffectiveClass(reasonClass, state));
+  if (earlyRefusal !== null) return { authorized: false, code: `${prefix}-${earlyRefusal}` };
 
   const trust = trustAnchorsFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
@@ -238,11 +259,12 @@ export function authorizeRecordedResidualAcceptance({
   if (!object(approval) || !object(recorded)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
   const binding = residualBindingCode(approval, input, prefix);
   if (binding !== null) return { authorized: false, code: binding };
-  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  const recordRefusal = residualReasonClassRefusal(approval.findings, approval.reasonClass);
+  if (recordRefusal !== null) return { authorized: false, code: `${prefix}-${recordRefusal}` };
 
   const verified = verifySignedAction({
     state, kind: RESIDUAL_KIND, prefix, candidate, recorded, anchors: trust.anchors, now,
-    subject: { criticReceiptSha256, findings: residualFindingList(findings) },
+    subject: { criticReceiptSha256, findings: residualFindingList(findings), ...(approval.reasonClass === undefined ? {} : { reasonClass: approval.reasonClass }) },
   });
   if (!verified.ok) return { authorized: false, code: verified.code };
 
@@ -264,12 +286,13 @@ export function authorizeRecordedResidualAcceptance({
 
 /** Chat route of the same acceptance, modelled on `authorizeRecordedChatPush`; follows `gates.push_approval`. */
 export function authorizeRecordedChatResidualAcceptance({
-  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings,
+  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, reasonClass,
 } = {}) {
   const prefix = "RESIDUAL-PROOF";
-  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
+  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings, reasonClass };
   if (!residualInputValid(input)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
-  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  const earlyRefusal = residualReasonClassRefusal(findings, residualEffectiveClass(reasonClass, state));
+  if (earlyRefusal !== null) return { authorized: false, code: `${prefix}-${earlyRefusal}` };
   let waiver;
   try { waiver = criticalProofWaiverFor(anchorDir, RESIDUAL_KIND); }
   catch { return { authorized: false, code: `${prefix}-CHAT-POLICY-UNREADABLE` }; }
@@ -283,7 +306,8 @@ export function authorizeRecordedChatResidualAcceptance({
   if (!object(approval)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
   const binding = residualBindingCode(approval, input, prefix);
   if (binding !== null) return { authorized: false, code: binding };
-  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  const recordRefusal = residualReasonClassRefusal(approval.findings, approval.reasonClass);
+  if (recordRefusal !== null) return { authorized: false, code: `${prefix}-${recordRefusal}` };
   if (approval.criticalProof !== null) return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
   const recordedWaiver = approval.criticalProofWaiver;
   if (!object(recordedWaiver) || recordedWaiver.kind !== RESIDUAL_KIND

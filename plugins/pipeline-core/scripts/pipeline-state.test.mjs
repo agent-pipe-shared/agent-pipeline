@@ -3371,9 +3371,9 @@ function c11Lifecycle(fx, cand, findings) {
   });
 }
 
-function c11SignatureFiles(fx, findings, { cand = candidate } = {}) {
+function c11SignatureFiles(fx, findings, { cand = candidate, reasonClass } = {}) {
   const external = mktempProjectDir();
-  const subjectSha256 = criticalActionSubjectSha256({ kind: C11_KIND, candidate: cand, subject: { criticReceiptSha256: fx.made.receiptSha256, findings: c11Findings(findings) } });
+  const subjectSha256 = criticalActionSubjectSha256({ kind: C11_KIND, candidate: cand, subject: { criticReceiptSha256: fx.made.receiptSha256, findings: c11Findings(findings), ...(reasonClass === undefined ? {} : { reasonClass }) } });
   const request = createCriticalActionApprovalRequest({ candidate: cand, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: C11_KIND, subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
   const keys = generateKeyPairSync("ed25519");
   const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
@@ -3490,8 +3490,98 @@ c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves t
   } finally { fx.cleanup(); }
 });
 
+// D227 / N45: a MAJOR finding is accepted when the PO's acceptance names the reason class uncorrectable-past-authorship
+// (--reason-class on the same verb); a blocker is never accepted; a minor-only acceptance takes no class and stays unchanged.
+const C11_CLASS = "uncorrectable-past-authorship";
+const c11Major = [c11Finding("gap one", "minor"), c11Finding("trailers of past commits", "major")];
+
+c11Case("C11-f chat mode accepts a major finding with --reason-class, shows the class and the major before the confirmation, and the lifecycle qualifies", () => {
+  const fx = c11Fixture({ chat: true, findings: c11Major });
+  try {
+    let prompted = 0;
+    const prompts = [];
+    // In chat mode the summary the PO reads is the prompt handed to the attended line reader (the seam), not stderr.
+    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: (prompt) => { prompted += 1; prompts.push(prompt); return fx.expectedCode; } };
+    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--reason-class", C11_CLASS], deps));
+    assert.equal(outcome.result, 0, outcome.lines.join(" "));
+    assert.equal(prompted, 1);
+    const text = prompts.join("\n");
+    assert.match(text, /reason class: uncorrectable-past-authorship/u, "the confirmation shows the class");
+    assert.match(text, /major [a-f0-9]{64}/u, "the confirmation shows the severity word next to the finding");
+    const accepted = c11Private(fx).record;
+    assert.equal(accepted.reasonClass, C11_CLASS);
+    assert.deepEqual(accepted.findings, c11Findings(c11Major));
+    const lifecycle = c11Lifecycle(fx, candidate, c11Major);
+    assert.equal(lifecycle.receipt.residualAcceptance.reasonClass, C11_CLASS, "the close names the class");
+    assert.ok(lifecycle.receipt.residualAcceptance.findings.some((f) => f.severity === "major"), "the close names the accepted major");
+  } finally { fx.cleanup(); }
+});
+
+c11Case("C11-g signature mode accepts a major with the signed class; a proof signed without the class, or a flag that differs from the signed class, is refused", () => {
+  const fx = c11Fixture({ chat: false, findings: c11Major });
+  try {
+    const argv = (flags, extra = []) => ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...extra, ...flags];
+    // signed WITHOUT the class, flag given: the rebuilt subject differs, nothing is recorded
+    const unsigned = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major), ["--reason-class", C11_CLASS]), fx.deps));
+    assert.notEqual(unsigned.result, 0, unsigned.lines.join(" "));
+    assert.equal(existsSync(c11PrivatePath(fx)), false);
+    // signed WITH the class, flag omitted: a major without the class
+    const omitted = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major, { reasonClass: C11_CLASS })), fx.deps));
+    assert.equal(omitted.result, 2);
+    assert.ok(omitted.lines.some((line) => line.includes("RESIDUAL-PROOF-SEVERITY")), omitted.lines.join(" "));
+    assert.equal(existsSync(c11PrivatePath(fx)), false);
+    // signed with the class and the flag given
+    const ok = capturedStderr(() => run(argv(c11SignatureFiles(fx, c11Major, { reasonClass: C11_CLASS }), ["--reason-class", C11_CLASS]), fx.deps));
+    assert.equal(ok.result, 0, ok.lines.join(" "));
+    const stored = c11Private(fx);
+    assert.equal(stored.record.reasonClass, C11_CLASS);
+    assert.equal(stored.consumption.kind, C11_KIND);
+    const text = ok.lines.join("\n");
+    assert.match(text, /reason class: uncorrectable-past-authorship/u);
+    assert.match(text, /major [a-f0-9]{64}/u);
+  } finally { fx.cleanup(); }
+});
+
+c11Case("C11-h a blocker with the class, a class on a minor-only list and an unknown class are refused with typed codes, nothing prompted or written", () => {
+  const cases = [
+    { findings: [c11Finding("gap one", "minor"), c11Finding("fatal", "blocker")], flag: C11_CLASS, code: "RESIDUAL-PROOF-SEVERITY" },
+    { findings: [c11Finding("big", "major"), c11Finding("fatal", "blocker")], flag: C11_CLASS, code: "RESIDUAL-PROOF-SEVERITY" },
+    { findings: c11Minor, flag: C11_CLASS, code: "RESIDUAL-PROOF-CLASS" },
+    { findings: c11Major, flag: "some-other-class", code: "RESIDUAL-PROOF-CLASS" },
+  ];
+  for (const { findings, flag, code } of cases) {
+    const fx = c11Fixture({ chat: true, findings });
+    try {
+      const before = readFileSync(fx.statePathFile);
+      let prompted = 0;
+      const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => { prompted += 1; return fx.expectedCode; } };
+      const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--reason-class", flag], deps));
+      assert.equal(outcome.result, 2, outcome.lines.join(" "));
+      assert.ok(outcome.lines.some((line) => line.includes(code)), `${code}: ${outcome.lines.join(" ")}`);
+      assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical");
+      assert.equal(prompted, 0, "no prompt may be consumed for a refused acceptance");
+      assert.equal(existsSync(c11PrivatePath(fx)), false);
+    } finally { fx.cleanup(); }
+  }
+});
+
+c11Case("C11-i a minor-only acceptance records no reasonClass key at all and its confirmation text is unchanged", () => {
+  const fx = c11Fixture({ chat: true, findings: c11Minor });
+  try {
+    const prompts = [];
+    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: (prompt) => { prompts.push(prompt); return fx.expectedCode; } };
+    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId], deps));
+    assert.equal(outcome.result, 0, outcome.lines.join(" "));
+    assert.equal(Object.hasOwn(c11Private(fx).record, "reasonClass"), false);
+    assert.equal(prompts.length, 1);
+    assert.doesNotMatch(prompts.join("\n"), /reason class/u);
+    const lifecycle = c11Lifecycle(fx, candidate, c11Minor);
+    assert.equal(Object.hasOwn(lifecycle.receipt.residualAcceptance, "reasonClass"), false);
+  } finally { fx.cleanup(); }
+});
+
 assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
-console.log("D190 residual acceptance C11-a..e complete.");
+console.log("D190 residual acceptance C11-a..i complete.");
 
 // W7 N26 / D206: a signature approval must not dirty the tracked state file. approve-push and the
 // feature-package reconcile approval write the approval and the proof consumption to a private store

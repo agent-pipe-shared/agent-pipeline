@@ -24,6 +24,17 @@ check("valid exact proof verifies", () => assert.equal(verifyCriticalActionAppro
 check("candidate drift is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: { ...candidate, commit: "c".repeat(40) }, expectedAction: action, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH"));
 check("cross-kind use is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: { ...action, kind: "deploy" }, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH"));
 check("expired proof is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: action, now: "2026-08-02T19:00:00.001Z" }).code, "CRITICAL-ACTION-PROOF-EXPIRED"));
+// D227: a minor-only residual-acceptance subject keeps its digest byte for byte (the literal was measured against the baseline
+// before the reason class existed); a reason class is an extra signed key and changes the digest.
+check("D227 the minor-only residual acceptance subject digest is unchanged and a reason class changes it", () => {
+  const residualSubject = { criticReceiptSha256: "78ca0c8c095a436f51150503222f357a36934217d2c6d6dc4db884cc39070106", findings: [
+    { id: "5f781b4e1e9e7602d42eceaadd25bed03a3fe26c2b17f98aeeb65b50bf140f8b", severity: "minor" },
+    { id: "a250750cdb2e2ccb2dd2628008c663c8b5d5df60880dd412846336921d2950d3", severity: "minor" }] };
+  const kind = "accept-residual-critic-findings";
+  assert.equal(criticalActionSubjectSha256({ kind, candidate, subject: residualSubject }), "ea782ff58b4c44c7d988c0a7611d49802de076f3bf277abe71e69b6b1151e7c1");
+  assert.notEqual(criticalActionSubjectSha256({ kind, candidate, subject: { ...residualSubject, reasonClass: "uncorrectable-past-authorship" } }),
+    criticalActionSubjectSha256({ kind, candidate, subject: residualSubject }));
+});
 check("subject digest changes with target", () => assert.notEqual(subjectSha256, criticalActionSubjectSha256({ kind: "push", candidate, subject: { source: candidate.commit, remote: "origin", destination: "refs/heads/other" } })));
 
 // ADR-0064: release-preflight is a fourth kind, not a reuse of an existing one. The source's

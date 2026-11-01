@@ -20,7 +20,8 @@ import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandid
 import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
 import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
-export { RESIDUAL_ACCEPTANCE_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
+export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
+export { RESIDUAL_REASON_CLASS, residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
 
 
 export const CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v1";
@@ -40,10 +41,12 @@ function recordPath(privateRoot, id) {
 }
 
 /** The subject a PO residual acceptance is bound to; one definition for the signature route and the chat route. */
-export function residualAcceptanceSubject({ receipt, findings }) {
+export function residualAcceptanceSubject({ receipt, findings, reasonClass }) {
+  // D227: the reason class is an extra signed key and exists only when named; a minor-only subject keeps its exact baseline bytes.
   return { criticReceiptSha256: sha256(canonicalJson(receipt)),
     findings: findings.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    ...(reasonClass === undefined ? {} : { reasonClass }) };
 }
 
 const ROUTE_NOT_REGISTERED = Object.freeze({ state: "unavailable", reasonCode: "RRP-ROLE-NOT-REGISTERED", evidence: "" });

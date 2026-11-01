@@ -6264,3 +6264,77 @@ test("prepare-critical --kind accept-residual-critic-findings writes a request b
     cleanup(dirs);
   }
 });
+
+// D227 / N45: --reason-class uncorrectable-past-authorship lets the request carry a MAJOR finding; the class rides in the signed subject.
+const RESIDUAL_ROUTE_CLASS = "uncorrectable-past-authorship";
+const RESIDUAL_ROUTE_MAJOR = Object.freeze([
+  ...RESIDUAL_ROUTE_MINOR,
+  { severity: "major", title: "stage-0 trailers on commits that violate the criterion", location: "history" },
+]);
+const residualRouteClassSubject = (findings, reasonClass) => ({ ...residualRouteExpectedSubject(findings), reasonClass });
+
+test("prepare-critical --kind accept-residual-critic-findings --reason-class binds the class and the major list into the request digest", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteClassSubject(RESIDUAL_ROUTE_MAJOR, RESIDUAL_ROUTE_CLASS) });
+    const result = runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--reason-class", RESIDUAL_ROUTE_CLASS]), residualRouteDependencies(RESIDUAL_ROUTE_MAJOR));
+    assert.equal(result.ok, true);
+    assert.equal(result.action.subjectSha256, expected, "the class is part of the signed subject");
+    const withoutClass = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MAJOR) });
+    assert.notEqual(expected, withoutClass, "a proof signed without the class cannot match this request");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical with --reason-class shows the class and the accepted major before the signature, and not the minor-only sentence", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const prompts = [];
+    const result = runHumanApproval(residualRouteArgv("authorize-critical", dirs, ["--reason-class", RESIDUAL_ROUTE_CLASS]), residualRouteDependencies(RESIDUAL_ROUTE_MAJOR, {
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    }));
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /reason class: uncorrectable-past-authorship/u);
+    assert.match(prompts[0], /accepted finding: major [a-f0-9]{64}/u);
+    assert.match(prompts[0], /includes a MAJOR finding/u);
+    assert.doesNotMatch(prompts[0], /accepts ONLY the minor findings/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("accept-residual-critic-findings refuses a major without the class (SEVERITY), a blocker with it (SEVERITY), a class on minor-only or an unknown class (CLASS), and --reason-class on another kind", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const blocker = [...RESIDUAL_ROUTE_MINOR, { severity: "blocker", title: "fatal", location: "x" }];
+    const attempts = [
+      { findings: RESIDUAL_ROUTE_MAJOR, extra: [], pattern: /RESIDUAL-PROOF-SEVERITY/u },
+      { findings: blocker, extra: ["--reason-class", RESIDUAL_ROUTE_CLASS], pattern: /RESIDUAL-PROOF-SEVERITY/u },
+      { findings: RESIDUAL_ROUTE_MINOR, extra: ["--reason-class", RESIDUAL_ROUTE_CLASS], pattern: /RESIDUAL-PROOF-CLASS/u },
+      { findings: RESIDUAL_ROUTE_MAJOR, extra: ["--reason-class", "some-other-class"], pattern: /RESIDUAL-PROOF-CLASS/u },
+    ];
+    for (const { findings, extra, pattern } of attempts) {
+      let confirmationAsked = false;
+      assert.throws(() => runHumanApproval(residualRouteArgv("authorize-critical", dirs, extra), residualRouteDependencies(findings, {
+        readConfirmation: () => { confirmationAsked = true; return "approve"; },
+      })), pattern);
+      assert.equal(confirmationAsked, false);
+      assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), false);
+    }
+    assert.throws(
+      () => runHumanApproval([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+        "--kind", "push", "--reason-class", RESIDUAL_ROUTE_CLASS, "--subject-sha256", "a".repeat(64), "--expires-at", futureExpiry(),
+      ], residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
+      /--reason-class is only valid for --kind accept-residual-critic-findings/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});

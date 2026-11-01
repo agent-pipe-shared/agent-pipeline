@@ -551,7 +551,7 @@ import {
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
-import { readCriticVerifyLifecycle, residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
+import { RESIDUAL_REASON_CLASS, readCriticVerifyLifecycle, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { writeResidualAcceptanceRecord } from "../lib/critic-verify-readiness.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
@@ -9398,6 +9398,8 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
   }
   const waived = configured.waived === true;
   const names = waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"];
+  // D227: ONE optional flag; the finding list itself is never typed. Present only when the PO names the reason class.
+  if (rest.includes("--reason-class")) names.push("reason-class");
   const parsed = parseExactFlags(rest, new Set(names));
   const flags = parsed.value ?? {};
   if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
@@ -9435,11 +9437,16 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
     return 2;
   }
-  const { criticReceiptSha256, findings } = residualAcceptanceSubject({
-    receipt, findings: rawFindings,
-  });
-  if (findings.length === 0 || findings.some((finding) => finding.severity !== "minor")) {
-    console.error("Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker or major finding never.");
+  const reasonClass = flags["reason-class"];
+  const subject = residualAcceptanceSubject({ receipt, findings: rawFindings, reasonClass });
+  const { criticReceiptSha256, findings } = subject;
+  const classRefusal = residualReasonClassRefusal(findings, reasonClass);
+  if (classRefusal === "SEVERITY") {
+    console.error(`Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker never, and a major finding only when the acceptance names --reason-class ${RESIDUAL_REASON_CLASS} (a defect of past authorship that no commit can correct).`);
+    return 2;
+  }
+  if (classRefusal === "CLASS") {
+    console.error(`Error: approve-residual-acceptance refused (RESIDUAL-PROOF-CLASS); --reason-class takes exactly ${RESIDUAL_REASON_CLASS} and only for a list that contains a major finding.`);
     return 2;
   }
   const summaryLines = [
@@ -9447,6 +9454,10 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     `  candidate: ${candidate.commit}`,
     `  critic receipt: ${criticReceiptSha256}`,
     ...findings.map((finding) => `  ${finding.severity} ${finding.id}`),
+    ...(reasonClass === undefined ? [] : [
+      `  reason class: ${reasonClass}`,
+      "  this acceptance includes a MAJOR finding that no commit can correct; it is not a Critic pass, and a blocker is never accepted.",
+    ]),
   ];
   const approvedAt = now();
   if (waived) {
@@ -9467,7 +9478,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
   }
   const verified = verifyCriticalHumanProof({
     dir, state: base, kind, candidate,
-    subject: { criticReceiptSha256, findings },
+    subject,
     flags, now: approvedAt, required: true,
   });
   if (!verified.ok) {
@@ -9495,6 +9506,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     candidate,
     criticReceiptSha256,
     findings,
+    ...(reasonClass === undefined ? {} : { reasonClass }),
     approvedBy: flags.by,
     approvedAt,
     criticalProof: verified.proof,
@@ -9517,7 +9529,9 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     console.error(`Error: approve-residual-acceptance refused (${stored.code}).`);
     return 2;
   }
-  console.log(`Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`);
+  console.log(reasonClass === undefined
+    ? `Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`
+    : `Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} finding(s) including ${findings.filter((finding) => finding.severity === "major").length} major under reason class ${reasonClass} on critic receipt ${criticReceiptSha256}.`);
   return 0;
 }
 

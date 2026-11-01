@@ -671,10 +671,13 @@ try {
   const RA_KIND = "accept-residual-critic-findings";
   const RA_RECEIPT = "e".repeat(64);
   const RA_FINDINGS = [{ id: "1".repeat(64), severity: "minor" }, { id: "2".repeat(64), severity: "minor" }];
-  const raRecord = ({ key, findings = RA_FINDINGS, receipt = RA_RECEIPT, candidate = { commit: COMMIT, tree: TREE }, signWith = key.privateKey }) => {
+  // D227: `reasonClass` sets both the class the subject was signed with and the class the record carries; `signedClass` /
+  // `recordClass` override one side to prove the binding both ways. Absent (undefined) adds no key, so every older case is unchanged.
+  const raRecord = ({ key, findings = RA_FINDINGS, receipt = RA_RECEIPT, candidate = { commit: COMMIT, tree: TREE }, signWith = key.privateKey,
+    reasonClass, signedClass = reasonClass, recordClass = reasonClass }) => {
     const action = {
       kind: RA_KIND,
-      subjectSha256: criticalActionSubjectSha256({ kind: RA_KIND, candidate, subject: { criticReceiptSha256: receipt, findings } }),
+      subjectSha256: criticalActionSubjectSha256({ kind: RA_KIND, candidate, subject: { criticReceiptSha256: receipt, findings, ...(signedClass === undefined ? {} : { reasonClass: signedClass }) } }),
       expiresAt: EXPIRES,
     };
     const intent = createPoApprovalIntent({
@@ -690,7 +693,8 @@ try {
     const proofSha256 = createHash("sha256").update(canon(proof)).digest("hex");
     return {
       approvedBy: "Human", approvedAt: NOW, forCommit: candidate.commit, forTree: candidate.tree,
-      criticReceiptSha256: receipt, findings, criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+      criticReceiptSha256: receipt, findings, ...(recordClass === undefined ? {} : { reasonClass: recordClass }),
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
     };
   };
   const raState = (record) => ({
@@ -804,6 +808,73 @@ try {
     const chat = raCall(authorizeRecordedChatResidualAcceptance, sigRoot, raState(raChatRecord()));
     assert.equal(chat.authorized, false);
     assert.equal(raCall(authorizeRecordedResidualAcceptanceByMode, sigRoot, raState(raChatRecord())).authorized, false);
+  });
+
+  // D227 / N45: a MAJOR finding is acceptable only when the signed acceptance names the reason class
+  // uncorrectable-past-authorship; a blocker is never acceptable; a minor-only list never carries a class.
+  const RA_CLASS = "uncorrectable-past-authorship";
+  const RA_MAJOR = [RA_FINDINGS[0], { id: "2".repeat(64), severity: "major" }];
+  const RA_BLOCKER = [RA_FINDINGS[0], { id: "2".repeat(64), severity: "blocker" }];
+  const raSigRoot = () => {
+    const key = keypair();
+    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
+    return { key, root };
+  };
+
+  check("RA9 signature mode: a major list accepted with the signed reason class verifies; the minor-only subject carries no class key", () => {
+    const { key, root } = raSigRoot();
+    const ok = raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS })), { findings: RA_MAJOR });
+    assert.equal(ok.authorized, true, JSON.stringify(ok));
+    assert.equal(ok.code, "RESIDUAL-PROOF-VERIFIED");
+    // The same major list with the input class given explicitly verifies as well (both sides agree).
+    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS })),
+      { findings: RA_MAJOR, reasonClass: RA_CLASS }).authorized, true);
+    // A minor-only list signed without any class key still verifies byte for byte as before.
+    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key }))).code, "RESIDUAL-PROOF-VERIFIED");
+  });
+
+  check("RA10 signature mode: the class binds both ways and a blocker or misplaced class is refused with typed codes", () => {
+    const { key, root } = raSigRoot();
+    const run = (record, overrides = {}) => raCall(authorizeRecordedResidualAcceptance, root, raState(record), { findings: RA_MAJOR, ...overrides });
+    // a major without the class: SEVERITY (record has no class, proof signed without it)
+    const noClass = run(raRecord({ key, findings: RA_MAJOR }));
+    assert.equal(noClass.authorized, false);
+    assert.equal(noClass.code, "RESIDUAL-PROOF-SEVERITY");
+    // proof signed WITH the class, but the record lost it: SEVERITY, never a pass
+    assert.equal(run(raRecord({ key, findings: RA_MAJOR, signedClass: RA_CLASS, recordClass: undefined })).code, "RESIDUAL-PROOF-SEVERITY");
+    // record carries the class but the proof was signed WITHOUT it: the subject differs, the proof does not verify
+    const unsigned = run(raRecord({ key, findings: RA_MAJOR, signedClass: undefined, recordClass: RA_CLASS }));
+    assert.equal(unsigned.authorized, false);
+    assert.notEqual(unsigned.code, "RESIDUAL-PROOF-VERIFIED");
+    assert.notEqual(unsigned.code, "RESIDUAL-PROOF-SEVERITY");
+    // proof signed with the class, record or caller names another class: CLASS
+    assert.equal(run(raRecord({ key, findings: RA_MAJOR, signedClass: RA_CLASS, recordClass: "other-class" })).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(run(raRecord({ key, findings: RA_MAJOR, reasonClass: RA_CLASS }), { reasonClass: "other-class" }).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(run(raRecord({ key, findings: RA_MAJOR, reasonClass: "other-class" })).code, "RESIDUAL-PROOF-CLASS");
+    // a blocker is refused with or without the class
+    for (const record of [raRecord({ key, findings: RA_BLOCKER, reasonClass: RA_CLASS }), raRecord({ key, findings: RA_BLOCKER })]) {
+      const blocker = run(record, { findings: RA_BLOCKER });
+      assert.equal(blocker.authorized, false);
+      assert.equal(blocker.code, "RESIDUAL-PROOF-SEVERITY");
+    }
+    // a class on a minor-only list is a misplaced class: CLASS
+    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, reasonClass: RA_CLASS }))).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key })), { reasonClass: RA_CLASS }).code, "RESIDUAL-PROOF-CLASS");
+  });
+
+  check("RA11 chat mode: the same class rules hold on the chat route", () => {
+    const chatRoot = raChatRoot("chat");
+    const chat = (record, overrides = {}) => raCall(authorizeRecordedChatResidualAcceptance, chatRoot, raState(record), overrides);
+    const ok = chat(raChatRecord({ findings: RA_MAJOR, reasonClass: RA_CLASS }), { findings: RA_MAJOR });
+    assert.equal(ok.authorized, true, JSON.stringify(ok));
+    assert.equal(ok.code, "RESIDUAL-PROOF-WAIVED");
+    assert.equal(chat(raChatRecord({ findings: RA_MAJOR }), { findings: RA_MAJOR }).code, "RESIDUAL-PROOF-SEVERITY");
+    assert.equal(chat(raChatRecord({ findings: RA_MAJOR, reasonClass: "other-class" }), { findings: RA_MAJOR }).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(chat(raChatRecord({ findings: RA_MAJOR, reasonClass: RA_CLASS }), { findings: RA_MAJOR, reasonClass: "other-class" }).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(chat(raChatRecord({ findings: RA_BLOCKER, reasonClass: RA_CLASS }), { findings: RA_BLOCKER }).code, "RESIDUAL-PROOF-SEVERITY");
+    assert.equal(chat(raChatRecord({ reasonClass: RA_CLASS })).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(chat(raChatRecord(), { reasonClass: RA_CLASS }).code, "RESIDUAL-PROOF-CLASS");
+    assert.equal(chat(raChatRecord()).code, "RESIDUAL-PROOF-WAIVED");
   });
 
   check("RA8 the existing kinds behave as before (push still authorizes; kind list is a superset)", () => {

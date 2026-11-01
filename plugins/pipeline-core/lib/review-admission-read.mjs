@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { criticDecisionPathFinding, criticDisposition } from "./critic-skip-decision.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
 import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
+import { residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
 import { resolveRetainedCriticCourseRecords } from "./critic-course-admission.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord, isSafeTaskId } from "./dispatch-record.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
@@ -1160,6 +1161,8 @@ export function revalidateHistoricalFreshReviewPacketBinding(binding){
 }
 
 export const RESIDUAL_ACCEPTANCE_BASIS = "po-acceptance-of-residual-minor-findings";
+// D227 (N45): the basis of a receipt whose accepted findings include a MAJOR one; the fragment then also carries `reasonClass`.
+export const RESIDUAL_ACCEPTANCE_CLASS_BASIS = "po-acceptance-of-residual-findings-with-reason-class";
 export const CVL_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 export const PACKET = /^[a-f0-9]{32}$/u;
 export function cvlFail(code, message) { const error = new Error(message); error.code = code; throw error; }
@@ -1181,16 +1184,22 @@ function residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSh
     const readOpen = deps.readOpenFindingsFn ?? (({ controlRoot, packetId }) => readConsumedCandidateResult({ controlRoot, packetId }).result.verdict.findings);
     const open = readOpen({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId });
     if (!Array.isArray(open) || open.length === 0 || open.length !== critic.findingCount
-      || !open.every(finding => finding !== null && typeof finding === "object" && finding.severity === "minor")) return null;
+      || !open.every(finding => finding !== null && typeof finding === "object" && (finding.severity === "minor" || finding.severity === "major"))) return null;
+    // D227: a major is accepted only when the acceptance names the reason class; a minor-only list carries none; a blocker never qualifies.
+    if (residualReasonClassRefusal(open, acceptance.reasonClass) !== null) return null;
+    const withMajor = open.some(finding => finding.severity === "major");
     const expected = open.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     if (acceptance.candidate?.commit !== critic.candidate.commit || acceptance.candidate?.tree !== critic.candidate.tree
       || acceptance.criticReceiptSha256 !== criticReceiptSha256
       || canonicalJson(acceptance.findings) !== canonicalJson(expected)) return null;
-    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected });
+    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected,
+      ...(acceptance.reasonClass === undefined ? {} : { reasonClass: acceptance.reasonClass }) });
     if (verdict?.authorized !== true || typeof verdict.mode !== "string" || verdict.mode.length === 0) return null;
-    return Object.freeze({ basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode,
-      acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
+    // A minor-only fragment keeps its exact four keys (it is part of recorded v3 lifecycle receipts); only an accepted major adds the class.
+    return Object.freeze(withMajor
+      ? { basis: RESIDUAL_ACCEPTANCE_CLASS_BASIS, mode: verdict.mode, acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected, reasonClass: acceptance.reasonClass }
+      : { basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode, acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
   } catch { return null; }
 }
 

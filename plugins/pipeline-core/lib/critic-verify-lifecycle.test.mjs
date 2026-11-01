@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualFindingId } from "./critic-verify-lifecycle.mjs";
+import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualAcceptanceSubject, residualFindingId } from "./critic-verify-lifecycle.mjs";
 import { inspectCriticBoundVerify } from "./critic-verify-readiness.mjs";
 import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "../scripts/check-critic-bound-verify.mjs";
@@ -465,4 +465,76 @@ test("N22 readiness admits a failed all-minor receipt through the private accept
     worktreeState: "clean", evidencePath: "evidence/verify-latest.json", evidence: fullEvidence, readLifecycle, residualAuthorizeFn: authorizeFn });
   assert.equal(admitted.code, "critic-bound-verify-valid");
   assert.equal(admitted.privateLifecycleBound, true);
+});
+// D227 / N45: a MAJOR open finding is accepted only when the acceptance names the reason class uncorrectable-past-authorship; the
+// accepted-major fragment carries the class and a second basis, a minor-only fragment keeps its exact four keys and its basis.
+const PAST_AUTHORSHIP = "uncorrectable-past-authorship";
+test("D227 a failed receipt with a major finding qualifies through an acceptance that names the class; the receipt shows the class and the major", t => {
+  const common = fixture(t);
+  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "major")], a => ({ ...a, reasonClass: PAST_AUTHORSHIP }));
+  let verifyInput = null;
+  const seen = { ...deps, verifyResidualAcceptanceFn: (input) => { verifyInput = input; return { authorized: true, mode: deps.residualAcceptance.mode }; } };
+  const recorded = record(common, failed, seen);
+  assert.equal(verifyInput.reasonClass, PAST_AUTHORSHIP, "the verifier is told the class so it can bind it");
+  const fragment = recorded.receipt.residualAcceptance;
+  assert.equal(fragment.basis, "po-acceptance-of-residual-findings-with-reason-class");
+  assert.equal(fragment.reasonClass, PAST_AUTHORSHIP);
+  assert.deepEqual(fragment.findings.map(f => f.severity).sort(), ["major", "minor"]);
+  assert.equal(recorded.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v3");
+  const read = readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify.json", evidence }, seen);
+  assert.equal(read.receiptSha256, recorded.receiptSha256);
+  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: failed.packetId, candidate }, seen);
+  assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP);
+});
+test("D227 a major without the class, another class, a blocker with the class, or a class on a minor-only list leaves the receipt refused", t => {
+  const cases = [
+    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => a },
+    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => ({ ...a, reasonClass: "other-class" }) },
+    { findings: [finding("a", "minor"), finding("b", "major")], mutate: a => ({ ...a, reasonClass: null }) },
+    { findings: [finding("a", "minor"), finding("b", "blocker")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
+    { findings: [finding("a", "major"), finding("b", "blocker")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
+    { findings: [finding("a", "minor"), finding("b", "minor")], mutate: a => ({ ...a, reasonClass: PAST_AUTHORSHIP }) },
+  ];
+  for (const { findings, mutate } of cases) {
+    const { failed, deps } = residualSetup(findings, mutate);
+    assert.throws(() => record(fixture(t), failed, deps), error => error.code === "CVL-CRITIC-FAILED", JSON.stringify(mutate({})));
+  }
+});
+test("D227 residualAcceptanceSubject: the minor-only subject is byte-identical to the baseline and the class key appears only when given", () => {
+  const cand = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  const receipt = { schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: "c".repeat(32), candidate: cand };
+  const minors = [{ gap: "g1", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" }, { gap: "g2", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" }];
+  assert.equal(JSON.stringify(residualAcceptanceSubject({ receipt, findings: minors })),
+    '{"criticReceiptSha256":"78ca0c8c095a436f51150503222f357a36934217d2c6d6dc4db884cc39070106","findings":[{"id":"5f781b4e1e9e7602d42eceaadd25bed03a3fe26c2b17f98aeeb65b50bf140f8b","severity":"minor"},{"id":"a250750cdb2e2ccb2dd2628008c663c8b5d5df60880dd412846336921d2950d3","severity":"minor"}]}');
+  assert.equal(residualAcceptanceSubject({ receipt, findings: minors, reasonClass: PAST_AUTHORSHIP }).reasonClass, PAST_AUTHORSHIP);
+  assert.equal(Object.hasOwn(residualAcceptanceSubject({ receipt, findings: minors, reasonClass: undefined }), "reasonClass"), false);
+});
+test("D227 a minor-only acceptance keeps its fragment byte for byte: exactly basis, mode, acceptanceSha256 and findings", t => {
+  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "minor")]);
+  const fragment = record(fixture(t), failed, deps).receipt.residualAcceptance;
+  assert.deepEqual(Object.keys(fragment).sort(), ["acceptanceSha256", "basis", "findings", "mode"]);
+  assert.equal(fragment.basis, "po-acceptance-of-residual-minor-findings");
+  assert.equal(fragment.acceptanceSha256, sha256(canonicalJson(deps.residualAcceptance)));
+});
+test("D227 the private record carries the class to the lifecycle deps, and the verifier receives it", t => {
+  const common = fixture(t);
+  const failed = critic({ reviewPass: false, findingCount: 1 });
+  const findings = [finding("a", "major")];
+  const { receiptSha, record: stored } = privateAcceptance(failed, findings, { reasonClass: PAST_AUTHORSHIP });
+  assert.equal(readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record: stored, consumption: null }).ok, true);
+  let seen = null;
+  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha,
+    authorizeFn: (arg) => { seen = arg; return { authorized: true, mode: stored.mode }; } });
+  assert.equal(loaded.residualAcceptance.reasonClass, PAST_AUTHORSHIP);
+  const base = { readConsumedCandidateReceiptFn: () => consumed(failed), readOpenFindingsFn: () => findings };
+  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId: failed.packetId, candidate }, { ...base, ...loaded });
+  assert.equal(seen.reasonClass, PAST_AUTHORSHIP);
+  assert.equal(bound.residual.basis, "po-acceptance-of-residual-findings-with-reason-class");
+  assert.equal(bound.residual.reasonClass, PAST_AUTHORSHIP);
+  // A minor-only private record yields a loader result with no reasonClass key at all.
+  const minorFailed = critic({ reviewPass: false, findingCount: 1, verdictSha256: sha("4") });
+  const minor = privateAcceptance(minorFailed, [finding("a", "minor")]);
+  readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: minor.receiptSha, record: minor.record, consumption: null });
+  const minorLoaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: minor.receiptSha });
+  assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
 });

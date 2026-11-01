@@ -45,10 +45,13 @@ export function loadResidualAcceptanceDeps({ gitCommonDir, projectDir = null, cr
     const state = { ...projectState, residualAcceptance: { lastAccepted: record },
       criticalProofConsumption: stored.consumption === null || stored.consumption === undefined ? [] : [stored.consumption] };
     return {
+      // D227: the reason class travels only when the private record carries it (a minor-only record yields the exact old shape).
       residualAcceptance: { candidate: { commit: record.forCommit, tree: record.forTree },
-        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings },
-      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256: bondSha, findings }) =>
-        authorizeFn({ projectDir, state, candidate: bound, criticReceiptSha256: bondSha, findings, now: now() }),
+        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings,
+        ...(record.reasonClass === undefined ? {} : { reasonClass: record.reasonClass }) },
+      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256: bondSha, findings, reasonClass }) =>
+        authorizeFn({ projectDir, state, candidate: bound, criticReceiptSha256: bondSha, findings, now: now(),
+          ...(reasonClass === undefined ? {} : { reasonClass }) }),
     };
   } catch { return null; }
 }

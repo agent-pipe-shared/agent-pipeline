@@ -31,7 +31,7 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
-import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
+import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
@@ -1032,7 +1032,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "reasonClass", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -1102,6 +1102,8 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
   // D190: the residual acceptance subject is computed from the consumed Critic packet and from nothing else.
   if (values.criticPacket !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--critic-packet is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
+  // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
+  if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
   if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
     if (values.subject !== undefined) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} takes no --subject: the subject is computed from the consumed Critic packet named by --critic-packet.` };
     if (!/^[a-f0-9]{32}$/u.test(values.criticPacket ?? "")) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} requires --critic-packet <32 lowercase hexadecimal characters>.` };
@@ -1817,8 +1819,12 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
     findings = (dependencies.readOpenFindingsFn ?? (({ controlRoot: root, packetId: id }) => readConsumedCandidateResult({ controlRoot: root, packetId: id }).result.verdict.findings))({ controlRoot, packetId });
   } catch (error) { fail(`critical approval request is invalid: the consumed Critic packet could not be read (${typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"})`); }
   if (!receipt || !Array.isArray(findings)) fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
-  if (findings.length === 0 || findings.some((finding) => finding?.severity !== "minor")) {
-    fail("critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker or major finding never");
+  const classRefusal = residualReasonClassRefusal(findings, args.reasonClass);
+  if (classRefusal === "SEVERITY") {
+    fail(`critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker never, and a major finding only with --reason-class ${RESIDUAL_REASON_CLASS} (a defect of past authorship that no commit can correct)`);
+  }
+  if (classRefusal === "CLASS") {
+    fail(`critical approval request is invalid (RESIDUAL-PROOF-CLASS): --reason-class takes exactly ${RESIDUAL_REASON_CLASS} and only for a list that contains a major finding`);
   }
   // N22: the subject (and the request) bind the candidate the Critic reviewed, exactly as the writer does,
   // never the checkout's current HEAD; the clean-tree observation stays the caller's precondition.
@@ -1826,7 +1832,7 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
   if (typeof reviewed.commit !== "string" || typeof reviewed.tree !== "string") {
     fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
   }
-  const subject = residualAcceptanceSubject({ receipt, findings });
+  const subject = residualAcceptanceSubject({ receipt, findings, reasonClass: args.reasonClass });
   const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate: reviewed, subject });
   if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
     fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
@@ -1840,7 +1846,10 @@ function residualAcceptanceConfirmationLines(kind, subject) {
   return [
     `critic receipt sha256: ${subject.criticReceiptSha256}`,
     ...subject.findings.map((finding) => `accepted finding: ${finding.severity} ${finding.id}`),
-    "this approval accepts ONLY the minor findings listed above as residual for the candidate above; it is not a Critic pass, it does not accept any finding that is not listed, and a new finding blocks again.",
+    ...(subject.reasonClass === undefined
+      ? ["this approval accepts ONLY the minor findings listed above as residual for the candidate above; it is not a Critic pass, it does not accept any finding that is not listed, and a new finding blocks again."]
+      : [`reason class: ${subject.reasonClass}`,
+        "this approval accepts ONLY the findings listed above as residual for the candidate above and it includes a MAJOR finding that no commit can correct (past authorship); it is not a Critic pass, it does not accept any finding that is not listed, a blocker is never accepted, and a new finding blocks again."]),
   ];
 }
 
