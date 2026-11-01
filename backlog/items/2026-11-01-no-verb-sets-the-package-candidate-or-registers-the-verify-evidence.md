@@ -39,3 +39,8 @@ not checked. The first step of the fix is to run the real chain in a clone from 
 ## PO tile
 
 None yet; the decision follows the verified chain (a verb that records the candidate and the Verify evidence is the expected fix).
+
+Triage 2026-11-01 (candidate 15d, PO exception: built by the Elephant): the gap is confirmed on the real chain (the apply refuses with `FTP-CANDIDATE`; a consumer reproduced the
+`invalid-transition` and the null candidate). The fix is held as `w38`: `register-feature-package.mjs --add-verify-evidence <path>` registers passing Verify evidence, and the first
+`feature-package-plan`/`-apply` into `verifying` binds the candidate to the current HEAD when such evidence names exactly that HEAD. A chain test ends in the audit preflight planning the package.
+Open: native Windows, a real consumer run, Full Verify, Critic, acceptance.

@@ -1,0 +1,462 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index f13d65277..263df2ea0 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -485,6 +485,70 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+   };
+ }
+ 
++/**
++ * Registers a passing candidate-bound Verify evidence file (`--add-verify-evidence <path>`) as an immutable, non-authority
++ * `candidate-evidence` entry of the feature manifest. The feature-close audit route needs such an entry (and a package candidate
++ * the next `feature-package-plan --next-state verifying` derives from it); no other verb writes it. The file, produced by
++ * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/...`, must already exist under `specs/<feature>/`; it must be a
++ * `pipeline.verify-evidence.v0` with `exitCode` 0 whose candidate commit and tree resolve in this repository. Nothing else of the
++ * manifest changes, and a path registered with other bytes is refused, never replaced.
++ */
++export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, readAcceptedDeliveryContract } = {}) {
++  if (!object(state) || typeof evidenceRel !== "string") return refused("FPR-ARGS", "root, state and the Verify evidence path are required");
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
++  const featureId = state.activeFeature?.id;
++  if (!SAFE_ID.test(featureId ?? "")) return refused("FPR-NO-APPROVED-PLAN", "no active feature; set-feature first");
++  const manifestPath = `specs/${featureId}/lifecycle.json`, packageDir = `specs/${featureId}/`;
++  const manifestRead = inspect(root, manifestPath);
++  if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>)`, { manifestPath });
++  const checked = validateFeaturePackage(root, manifestPath);
++  let manifest;
++  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
++  if (!checked.ok) {
++    const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === evidenceRel && entry.class === "candidate-evidence") : null;
++    const present = registered ? inspect(root, evidenceRel) : null;
++    if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
++    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  }
++  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(packageDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${packageDir}; produce the evidence with verify-evidence-producer.mjs --out under ${packageDir}`, { manifestPath, path: evidenceRel });
++  const seen = inspect(root, evidenceRel);
++  if (seen.kind !== "file") return refused("FPR-VERIFY-PATH", `${evidenceRel} is missing or is not a regular file`, { manifestPath, path: evidenceRel });
++  try { if (realpathSync(join(root, evidenceRel)) !== join(root, evidenceRel)) return refused("FPR-VERIFY-PATH", `${evidenceRel} resolves through a link`, { manifestPath, path: evidenceRel }); } catch { return refused("FPR-VERIFY-PATH", `${evidenceRel} does not resolve`, { manifestPath, path: evidenceRel }); }
++  let value;
++  try { value = JSON.parse(seen.bytes.toString("utf8")); } catch { return refused("FPR-VERIFY-SCHEMA", "the file is not JSON", { manifestPath, path: evidenceRel }); }
++  if (!object(value) || value.schema !== "pipeline.verify-evidence.v0") return refused("FPR-VERIFY-SCHEMA", "the file is not a pipeline.verify-evidence.v0 document", { manifestPath, path: evidenceRel });
++  if (value.exitCode !== 0) return refused("FPR-VERIFY-NOT-PASSING", "the Verify evidence did not pass (exitCode is not 0); only a passing run qualifies a candidate", { manifestPath, path: evidenceRel });
++  const recorded = value.candidate;
++  const commit = object(recorded) && typeof recorded.commit === "string" && /^[a-f0-9]{40,64}$/u.test(recorded.commit) ? gitOut(root, ["rev-parse", "--verify", `${recorded.commit}^{commit}`]) : null;
++  const tree = commit ? gitOut(root, ["rev-parse", `${commit}^{tree}`]) : null;
++  if (!commit || commit !== recorded.commit || !tree || tree !== recorded.tree || value.commit !== commit || value.tree !== tree) return refused("FPR-VERIFY-CANDIDATE", "the recorded candidate commit and tree do not resolve to a commit of this repository, or differ from the evidence's own commit and tree", { manifestPath, path: evidenceRel });
++  const existing = manifest.artifacts.find((entry) => entry.path === evidenceRel);
++  const evidenceSha256 = digest(seen.bytes);
++  if (existing && existing.sha256 !== evidenceSha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
++  if (existing) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, verifyEvidencePath: evidenceRel };
++  const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, { ...DIAGNOSTIC_ARTIFACT, path: evidenceRel, sha256: evidenceSha256 }] }, null, 2)}\n`);
++  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* the readback below reports a manifest it cannot restore */ } };
++  const temp = join(root, `${manifestPath}.verify-${process.pid}.tmp`);
++  try { writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath)); }
++  catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the Verify evidence could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
++  const validated = validateFeaturePackage(root, manifestPath);
++  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
++  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
++  if (envelopes.length === 1) {
++    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
++      restore();
++      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
++    }
++  }
++  return {
++    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "verify-evidence-added", manifestPath, verifyEvidencePath: evidenceRel,
++    registered: [{ path: evidenceRel, sha256: evidenceSha256 }], manifestSha256: digest(bytes),
++    next: "do NOT commit: the package candidate must stay equal to HEAD. Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
++  };
++}
++
+ /**
+  * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
+  * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index 8fa296ddb..7e410639b 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -242,24 +242,62 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
+   if (!admitted.has(`${from}:${nextState}`)) {
+     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
+   }
+-  const operation = from === "draft" && nextState === "awaiting-approval"
+-    ? "submit"
+-    : nextState === "draft"
+-      ? "reopen-design"
+-      : from === "awaiting-approval" && nextState === "approved"
+-        ? "approve"
+-        : "replace-manifest-state";
++  // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
++  // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
++  // that commit and tree is already in the package; the caller resolves HEAD (`options.head`), this library never runs git.
++  let candidate = null;
++  if (from === "implementing" && nextState === "verifying" && checked.receipt.candidate === null) {
++    const bound = verifiedCandidateOfPackage(resolve(rootDir), checked.receipt.manifest, options?.head);
++    if (bound.reason) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: bound.reason, findings: bound.findings };
++    candidate = bound.candidate;
++  }
++  const operation = candidate !== null
++    ? "set-candidate-and-state"
++    : from === "draft" && nextState === "awaiting-approval"
++      ? "submit"
++      : nextState === "draft"
++        ? "reopen-design"
++        : from === "awaiting-approval" && nextState === "approved"
++          ? "approve"
++          : "replace-manifest-state";
+   return {
+     schema: "pipeline.feature-package-transition-plan.v1",
+     status: "preview",
+     manifest: checked.receipt.manifest,
+     from,
+     to: nextState,
++    ...(candidate !== null ? { candidate } : {}),
+     changes: [{ path: checked.receipt.manifest, operation }],
+     requiredAuthority: operation === "approve" ? "po" : "lifecycle",
+   };
+ }
+ 
++/**
++ * The candidate a package may be bound to on its way into `verifying`: `head` ({commit, tree}, resolved by the caller)
++ * when one registered `candidate-evidence` artifact is a passing `pipeline.verify-evidence.v0` for exactly that commit
++ * and tree. The audit preflight (`feature-close-audit-preflight.mjs`) re-checks the evidence boundary; this only refuses
++ * to bind a candidate nothing has qualified.
++ */
++function verifiedCandidateOfPackage(root, manifestRel, head) {
++  const rejected = (reason, message) => ({ reason, findings: [message] });
++  if (!exact(head, ["commit", "tree"]) || !OID.test(head.commit ?? "") || !OID.test(head.tree ?? "")) {
++    return rejected("head-unresolved", "FTP-VERIFY-HEAD: the current HEAD commit and tree could not be resolved, so no candidate can be bound");
++  }
++  let manifest;
++  try { manifest = JSON.parse(readFileSync(join(root, manifestRel), "utf8")); } catch { return rejected("invalid-current-package", "FTP-MANIFEST: the manifest could not be read"); }
++  for (const artifact of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
++    if (artifact?.class !== "candidate-evidence" || typeof artifact.path !== "string") continue;
++    let value;
++    try { value = JSON.parse(readFileSync(join(root, artifact.path), "utf8")); } catch { continue; }
++    if (value?.schema === "pipeline.verify-evidence.v0" && value.exitCode === 0
++      && value.candidate?.commit === head.commit && value.candidate?.tree === head.tree
++      && value.commit === head.commit && value.tree === head.tree) {
++      return { candidate: { commit: head.commit, tree: head.tree } };
++    }
++  }
++  return rejected("verify-evidence-required", "FTP-VERIFY-EVIDENCE: no registered candidate-evidence artifact is a passing pipeline.verify-evidence.v0 for the current HEAD commit and tree; produce it with verify-evidence-producer.mjs --mode candidate and register it, uncommitted, with register-feature-package.mjs --root <root> --add-verify-evidence <path>, then plan again");
++}
++
+ /**
+  * Preview the sole permitted absent-manifest transition.  This deliberately
+  * validates proposed bytes in memory: callers cannot create a temporary
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index b2e8e9bdf..a1e2eec7b 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -212,7 +212,8 @@ function sanctionedRegisterFeaturePackageArgs(args, root) {
+   if (args.length === 5) return args[2] === "--add-review-lineage" && args[3] === "--packet" && /^[a-f0-9]{32}$/u.test(args[4]);
+   // PF-94: the delta request form names one repository-relative input file (same path rules as the diagnostic form).
+   // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
+-  return args.length === 4 && (args[2] === "--add-diagnostic-evidence" || args[2] === "--add-delta-request") && typeof args[3] === "string" && args[3] !== ""
++  // The Verify evidence form (feature-close audit route) takes the same single repository-relative path.
++  return args.length === 4 && (args[2] === "--add-diagnostic-evidence" || args[2] === "--add-delta-request" || args[2] === "--add-verify-evidence") && typeof args[3] === "string" && args[3] !== ""
+     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 9d2f4e5f3..bd81301e0 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -468,7 +468,12 @@ test("D64 feature-package registration: exactly the documented forms are admitte
+     bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
+-    for (const [label, argv] of [["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-verify-evidence", "specs/feature/verify.json"), f, "add verify evidence");
++    for (const [label, argv] of [["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
++      ["verify without path", ["--root", f.root, "--add-verify-evidence"]], ["verify absolute path", ["--root", f.root, "--add-verify-evidence", join(f.root, "v.json")]],
++      ["verify parent path", ["--root", f.root, "--add-verify-evidence", "specs/feature/../../x.json"]], ["verify dash path", ["--root", f.root, "--add-verify-evidence", "--force"]],
++      ["verify extra argument", ["--root", f.root, "--add-verify-evidence", "v.json", "--force"]],
++      ["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
+       ["diagnostic without path", ["--root", f.root, "--add-diagnostic-evidence"]], ["diagnostic absolute path", ["--root", f.root, "--add-diagnostic-evidence", join(f.root, "d.json")]],
+       ["diagnostic parent path", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/../../x.json"]], ["diagnostic dash path", ["--root", f.root, "--add-diagnostic-evidence", "--force"]],
+       ["diagnostic extra argument", ["--root", f.root, "--add-diagnostic-evidence", "d.json", "--force"]],["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+index 952e371df..f79b11d44 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+@@ -17,6 +17,13 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
++import { execFileSync } from "node:child_process";
++import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
++import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
++import { planFeaturePackageTransition } from "../lib/feature-package-topology.mjs";
++import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
++import { planVerifySelection } from "../lib/verify-selection.mjs";
++import { addVerifyEvidence } from "../lib/feature-package-registration.mjs";
+ import { run } from "./pipeline-state.mjs";
+ 
+ function sha256Hex(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+@@ -154,3 +161,127 @@ test("feature-package-apply stays unwired for autoRebindMutable -- a mutable-cla
+     rmSync(fx.root, { recursive: true, force: true });
+   }
+ });
++
++// ---- Feature-close audit route, package side: register the Verify evidence, bind the candidate, complete --------------------
++//
++// No shipped verb set `manifest.candidate` or registered the Verify evidence, so a package could not reach `completed` and the
++// audit route (`planFeatureCloseAudit`) could not be planned for a consumer (Toolbox, 2026-11-01). These cases walk the new
++// route with real git, real registration and the real plan/apply verbs, and end in the audit preflight accepting the package.
++
++const AUDIT_ID = "audit-pkg";
++const gitIn = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" } }).trim();
++
++function auditFixture() {
++  const root = mkdtempSync(join(tmpdir(), "vc-pkg-"));
++  gitIn(root, ["init", "-q"]);
++  const base = `specs/${AUDIT_ID}`;
++  mkdirSync(join(root, base), { recursive: true });
++  const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "mutable"], ["acceptance", "acceptance.md", false, "mutable"], ["result", "result.md", false, "mutable"], ["candidate-evidence", "envelope.json", false, "immutable"]].map(([klass, name, authority, mutability]) => {
++    const bytes = `${klass} of ${AUDIT_ID}\n`;
++    writeFileSync(join(root, base, name), bytes);
++    return { class: klass, path: `${base}/${name}`, sha256: sha256Hex(bytes), authority, mutability, retention: "active" };
++  });
++  const manifestRel = `${base}/lifecycle.json`;
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: AUDIT_ID, rigor: 1 }, state: "implementing", artifacts: entries, candidate: null, supersedes: null };
++  const save = () => writeFileSync(join(root, manifestRel), `${JSON.stringify(manifest, null, 2)}\n`);
++  save();
++  gitIn(root, ["add", "-A"]);
++  gitIn(root, ["commit", "-qm", "work"]);
++  const head = () => ({ commit: gitIn(root, ["rev-parse", "HEAD"]), tree: gitIn(root, ["rev-parse", "HEAD^{tree}"]) });
++  const evidence = (name, overrides = {}) => {
++    const candidate = head();
++    const value = { schema: "pipeline.verify-evidence.v0", ...candidate, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }), ...overrides };
++    writeFileSync(join(root, base, name), JSON.stringify(value));
++    return `${base}/${name}`;
++  };
++  const readManifest = () => readFileSync(join(root, manifestRel), "utf8");
++  return { root, base, manifestRel, manifest, head, evidence, readManifest, state: { activeFeature: { id: AUDIT_ID } } };
++}
++
++test("Verify evidence registration: a passing candidate-bound file becomes immutable non-authority candidate evidence, once", () => {
++  const f = auditFixture();
++  try {
++    const path = f.evidence("verify.json");
++    const added = addVerifyEvidence({ root: f.root, state: f.state, path });
++    assert.equal(added.status, "verify-evidence-added", JSON.stringify(added));
++    const entry = JSON.parse(f.readManifest()).artifacts.find((a) => a.path === path);
++    assert.deepEqual({ class: entry.class, authority: entry.authority, mutability: entry.mutability, retention: entry.retention }, { class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain" });
++    assert.equal(entry.sha256, sha256Hex(readFileSync(join(f.root, path))));
++    assert.match(added.next, /do NOT commit/u);
++    const before = f.readManifest();
++    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "already-registered");
++    assert.equal(f.readManifest(), before, "registering the same bytes twice rewrites nothing");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("Verify evidence registration refuses what cannot qualify a candidate and never touches the manifest", () => {
++  const f = auditFixture();
++  try {
++    const before = f.readManifest();
++    const bad = { commit: "f".repeat(40), tree: "e".repeat(40) };
++    const cases = [
++      ["outside the package directory", () => { writeFileSync(join(f.root, "loose.json"), "{}"); return "loose.json"; }, "FPR-VERIFY-PATH"],
++      ["missing file", () => `${f.base}/absent.json`, "FPR-VERIFY-PATH"],
++      ["not JSON", () => { writeFileSync(join(f.root, f.base, "text.json"), "no"); return `${f.base}/text.json`; }, "FPR-VERIFY-SCHEMA"],
++      ["another schema", () => f.evidence("schema.json", { schema: "pipeline.verify-evidence.v9" }), "FPR-VERIFY-SCHEMA"],
++      ["a failed run", () => f.evidence("failed.json", { exitCode: 1 }), "FPR-VERIFY-NOT-PASSING"],
++      ["a candidate no commit of this repository has", () => f.evidence("ghost.json", { ...bad, candidate: bad }), "FPR-VERIFY-CANDIDATE"],
++      ["a commit field that differs from the candidate", () => f.evidence("split.json", { commit: bad.commit }), "FPR-VERIFY-CANDIDATE"],
++    ];
++    for (const [label, make, code] of cases) {
++      const refused = addVerifyEvidence({ root: f.root, state: f.state, path: make() });
++      assert.equal(refused.status, "refused", label);
++      assert.equal(refused.code, code, `${label}: ${JSON.stringify(refused)}`);
++      assert.equal(f.readManifest(), before, `${label}: the manifest is untouched`);
++    }
++    const path = f.evidence("again.json");
++    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "verify-evidence-added");
++    writeFileSync(join(f.root, path), JSON.stringify({ schema: "pipeline.verify-evidence.v0", changed: true }));
++    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).code, "FPR-VERIFY-IMMUTABLE", "registered evidence is never replaced");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("entering verifying binds the candidate only to the HEAD a registered passing Verify evidence names", () => {
++  const f = auditFixture();
++  const plan = (head) => planFeaturePackageTransition(f.root, f.manifestRel, "verifying", head === undefined ? {} : { head });
++  try {
++    assert.equal(plan().reason, "head-unresolved", "no HEAD, no candidate");
++    const missing = plan(f.head());
++    assert.equal(missing.status, "rejected");
++    assert.equal(missing.reason, "verify-evidence-required");
++    assert.match(missing.findings.join(" "), /--add-verify-evidence/u, "the refusal names the route");
++    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path: f.evidence("verify.json") }).status, "verify-evidence-added");
++    const preview = plan(f.head());
++    assert.equal(preview.status, "preview", JSON.stringify(preview));
++    assert.deepEqual(preview.candidate, f.head());
++    assert.equal(preview.changes[0].operation, "set-candidate-and-state");
++    gitIn(f.root, ["commit", "--allow-empty", "-qm", "later"]);
++    assert.equal(plan(f.head()).reason, "verify-evidence-required", "evidence for an older commit does not qualify the new HEAD");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("a package with no candidate walks implementing -> verifying -> completed and the audit preflight plans it (the Toolbox chain)", async () => {
++  const f = auditFixture();
++  const apply = (nextState) => {
++    const planned = captureLog(() => run(["feature-package-plan", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState]));
++    assert.equal(planned.value, 0, planned.out);
++    const plan = JSON.parse(planned.logs.at(-1));
++    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", sha256CanonicalJson(plan)]));
++    assert.equal(applied.value, 0, applied.out);
++    return JSON.parse(applied.logs.at(-1));
++  };
++  try {
++    const path = f.evidence("verify.json");
++    const head = f.head();
++    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "verify-evidence-added");
++    assert.equal(apply("verifying").status, "applied");
++    const verifying = JSON.parse(f.readManifest());
++    assert.equal(verifying.state, "verifying");
++    assert.deepEqual(verifying.candidate, head, "the candidate is the HEAD the evidence names");
++    assert.equal(apply("completed").status, "applied");
++    assert.equal(JSON.parse(f.readManifest()).state, "completed");
++    assert.deepEqual(f.head(), head, "nothing was committed on the way");
++    const audit = await planFeatureCloseAudit({ repositoryRoot: f.root, featureId: AUDIT_ID, candidate: head, manifestPath: f.manifestRel, coreVersion: "0.7.0", packs: [resolveNamedOrganizationPolicyPack(CORE_BASELINE_PACK_ID)] });
++    assert.equal(audit.status, "build-required", JSON.stringify(audit));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7bb1fdaa6..f25a21407 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -8601,7 +8601,7 @@ function runFeaturePackageReadCommand(sub, argv) {
+     if (flags.proposal !== undefined) {
+       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
+     }
+-    const plan = planFeaturePackageTransition(root, manifest, nextState);
++    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root) });
+     console.log(JSON.stringify(plan, null, 2));
+     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
+   }
+@@ -8817,7 +8817,16 @@ function retireFeaturePackageApplyJournal(paths) {
+  * object and therefore its digest. Returns a refusal message (never printed here) or the
+  * resolved, digest-bound request.
+  */
+-function buildFeaturePackageApplyPreview(flags) {
++/**
++ * The current HEAD commit and tree for the one transition that binds a package candidate (implementing -> verifying).
++ * `null` when git cannot resolve it; the planner then refuses that transition with `head-unresolved`.
++ */
++function featurePackageHead(root, deps = {}) {
++  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(root);
++  return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
++}
++
++function buildFeaturePackageApplyPreview(flags, deps = {}) {
+   if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
+   const root = resolve(flags.root);
+   let rootStat = null;
+@@ -8838,7 +8847,7 @@ function buildFeaturePackageApplyPreview(flags) {
+   if (manifestExists) {
+     if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
+     if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
+-    plan = planFeaturePackageTransition(root, manifest, nextState);
++    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps) });
+     kind = "transition";
+   } else {
+     if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };
+@@ -8889,7 +8898,9 @@ function computeFeaturePackagePostimage(root, manifest, kind, plan, manifestByte
+   }
+   let value;
+   try { value = JSON.parse(preFile.bytes.toString("utf8")); } catch { return { ok: false, code: "FTP-APPLY-TRANSITION-JSON" }; }
+-  const nextValue = { ...value, state: plan.to };
++  // `plan.candidate` exists only for the first move into `verifying` (the planner bound it to the current HEAD and a passing
++  // Verify evidence); every other transition replaces `state` and nothing else.
++  const nextValue = { ...value, state: plan.to, ...(plan.candidate ? { candidate: plan.candidate } : {}) };
+   const postBytes = Buffer.from(`${JSON.stringify(nextValue, null, 2)}\n`, "utf8");
+   const postSha256 = sha256Bytes(postBytes);
+   const mode = Number(preFile.identity.mode) & 0o777;
+@@ -8923,7 +8934,7 @@ function runFeaturePackageApplyCommand(argv, deps) {
+     // tested LIBRARY capability (planFeaturePackageTransition/planFeaturePackageReconcile,
+     // feature-package-topology.mjs) for a deliberate, out-of-band invocation -- never
+     // hardwired into a CLI write path that also consumes an approval-bound preview digest.
+-    const preview = buildFeaturePackageApplyPreview(parsed.value);
++    const preview = buildFeaturePackageApplyPreview(parsed.value, deps);
+     if (!preview.ok) return refuseFeaturePackageRead(sub, preview.error);
+     const { manifest, kind, plan, planSha256, manifestBytes } = preview;
+     const nextState = kind === "transition" ? plan.to : (parsed.value["next-state"] ?? "draft");
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 783c2c8ee..8ba3297c1 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
+ 
+ function git(root, args) {
+@@ -51,7 +51,13 @@ function commitPlan(root, result) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
++  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
++  "",
++  "Feature-close audit route, package side (run in this order, nothing committed in between: the package candidate must equal HEAD):",
++  "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/<name>.json",
++  "  2. Register it: register-feature-package.mjs --root <root> --add-verify-evidence specs/<feature>/<name>.json",
++  "  3. pipeline-state.mjs feature-package-plan, then feature-package-apply, with --next-state verifying (this binds the candidate to HEAD), then the same with --next-state completed.",
++  "  4. Plan the close with close-coordinator.mjs plan-transition --phase feature-close-prepared --audit-request <path> --critic-verify-lifecycle <id>.",
+   "",
+   "Critic diagnostic evidence route (run in this order):",
+   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
+@@ -96,12 +102,14 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
+   // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
+   const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
++  // `--add-verify-evidence <path>` registers a passing candidate-bound Verify evidence file as candidate evidence (feature-close audit route).
++  const addVerify = argv.length === 4 && argv[2] === "--add-verify-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+   // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
+   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
+   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
+   const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
++    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path>]" })}\n`);
+     return 2;
+   }
+   let root;
+@@ -130,6 +138,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(`${JSON.stringify(added)}\n`);
+     return added.status === "refused" ? 2 : 0;
+   }
++  if (addVerify) {
++    const added = addVerifyEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
++    out(`${JSON.stringify(added)}\n`);
++    return added.status === "refused" ? 2 : 0;
++  }
+   if (addReviewUnit) {
+     const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });
+     out(`${JSON.stringify(added)}\n`);
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index cd9f95bf7..424071e4b 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -54,6 +54,13 @@ has no record of either kind. Report it to the PO before applying. The audit
+ request's `packs` entries are full organization policy pack objects or, for a
+ consumer without an organization policy, the shipped name `pipeline-core-baseline`
+ (floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
++The package must be `completed` with a candidate equal to HEAD and a registered
++passing Verify evidence. Package side, nothing committed in between: produce the
++evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`,
++register it with `register-feature-package.mjs --root <root> --add-verify-evidence
++<path>`, then run `pipeline-state.mjs feature-package-plan` and `feature-package-apply`
++with `--next-state verifying` (this binds the candidate to HEAD, refused without a
++passing evidence for exactly HEAD) and again with `--next-state completed`.
+ 
+ The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
+ dispatch record that requires a Critic and carries no bound evidence (an
