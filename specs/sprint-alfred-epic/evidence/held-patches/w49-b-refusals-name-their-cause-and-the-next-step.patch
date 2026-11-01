@@ -1,0 +1,137 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 2da19d59b..0c2d8d248 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -1337,6 +1337,17 @@ test("PF94 DOCS (c) SCF-TAKEOVER-REQUEST names the expected request shape and th
+   assert.ok(help.includes("inspect-course-takeover --root <repository-root> --request"));
+   assert.ok(help.includes("supersede-course-takeover --root <repository-root> --request"));
+ });
++// Candidate 17 (Toolbox): the identity refusal of the takeover verbs named no cause after the feature was closed.
++test("17 SCF-TAKEOVER-IDENTITY names the reader's code, the two situations and the way out", async () => {
++  const { takeoverIdentityDetail } = await import("../scripts/session-critic-finalizer.mjs");
++  const text = takeoverIdentityDetail("modell-update-okt26", "CCA-TRANSPORT-SOURCE-DRIFT");
++  assert.ok(text.includes("modell-update-okt26") && text.includes("CCA-TRANSPORT-SOURCE-DRIFT"), "feature and reader code");
++  assert.match(text, /content commits follow the last registered round/u);
++  assert.match(text, /feature is closed/u);
++  assert.match(text, /new feature of rigor 1/u);
++  assert.match(takeoverIdentityDetail("f", undefined), /\(no code\)/u, "an absent code is said, not hidden");
++  assert.ok(pf94Read("../scripts/session-critic-finalizer.mjs").includes('fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code))'), "the refusal passes the reader's code");
++});
+ test("PF94 DOCS (d) the Critic skill documents continuing a course and the continuation reference points to it", () => {
+   const skill = pf94Read("../skills/critic-review/SKILL.md");
+   const heading = "## Continuing a Critic course after the first round (PF-94)";
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 36afd73a5..56e3713da 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -919,7 +919,9 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+   const stored = readCloseCoordinator(common, values.lifecycle);
+   const coordinator = stored.coordinator;
+   if (!coordinatorNextPhases(coordinator.phase).includes("cleanup-complete")) {
+-    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`);
++    const behind = ["closed-local", "release-eligible", "promoted", "delivered"].includes(coordinator.phase);
++    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`
++      + (behind ? ". Cleanup is already behind this lifecycle and the coordinator has no way back from it: the receipt recorded at cleanup-complete stays the close evidence (nothing was written). Use the producer at the next close, before cleanup-complete." : ""));
+   }
+   if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
+   const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 4d27a3d6c..937abd0ba 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -721,6 +721,13 @@ test("process: write-cleanup-receipt produces the private receipt the coordinato
+   assert.equal(digest(canonical(JSON.parse(readFileSync(written.observationPath, "utf8")))), receipt.evidenceDigest, "the digest is that of the stored observation");
+   fixture.transition("cleanup-complete", ["--evidence", written.receiptPath]);
+   fixture.transition("closed-local");
++  // Candidate 17 (Toolbox): after closed-local the producer refuses and says there is no way back, instead of only naming the phase.
++  const late = invoke(["write-cleanup-receipt", "--root", fixture.root, "--lifecycle", fixture.lifecycle], 2);
++  assert.equal(late.code, "CLOSE-CLEANUP-PHASE");
++  assert.match(late.message, /closed-local/u);
++  assert.match(late.message, /no way back/u);
++  assert.match(late.message, /nothing was written/u);
++  assert.equal(readFileSync(written.receiptPath, "utf8"), `${JSON.stringify(receipt, null, 2)}\n`, "the recorded receipt is untouched");
+   rmSync(fixture.root, { recursive: true, force: true });
+   rmSync(frozen.root, { recursive: true, force: true });
+ });
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 7427da217..1eca94023 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -352,7 +352,11 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   const spec = normalizePath(specPath, "spec path");
+   const guardrails = uniquePaths(guardrailPaths, "guardrail path");
+   const evidence = uniquePaths(evidencePaths, "evidence path");
+-  if (evidence.length === 0) fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.");
++  if (evidence.length === 0) {
++    // Candidate 17 (Toolbox): the refusal carried no reason; name what is admitted, the exact producers and the flag that passes it.
++    const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate and the tree is clean.`;
++    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason });
++  }
+   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
+   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 12af549f1..8269c5a38 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -432,6 +432,13 @@ test("current-artifact preflight keeps evidence small while admitting bounded la
+ test("rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing", () => {
+   const fx = fixture();
+   assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-REQUIRED");
++  // Candidate 17 (Toolbox): the refusal names the producers and the flag instead of a bare sentence.
++  assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => {
++    const reason = error.details?.reason ?? "";
++    return error.code === "CDP-EVIDENCE-REQUIRED" && /--evidence <file>/u.test(reason)
++      && /verify-evidence-producer\.mjs --root <root> --mode critic/u.test(reason)
++      && /critic-diagnostic-evidence\.mjs/u.test(reason) && reason.includes(fx.candidate);
++  });
+   writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: fx.base, tree: fx.tree } })}\n`);
+   assert.throws(() => preflightCriticDispatch(input(fx)), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-BINDING");
+   assert.throws(() => preflightCriticDispatch(input(fx, { priorCriticEvidencePath: "evidence/verify.json" })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-PRIOR-ALIASED");
+@@ -680,8 +687,15 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+   const before = git(fx.root, ["status", "--porcelain", "--untracked-files=all"]);
+   const expected = preflightCriticDispatch(value);
+   assert.deepEqual(directCli(fx, producerArgv(value)), { status: 0, stdout: JSON.stringify(expected) + "\n", stderr: "" });
++  // Candidate 17: this rejection now carries its reason (the producers and the flag), like the evidence-mode rejection does.
++  const evidenceRequired = directCli(fx, producerArgv(input(fx, { evidencePaths: [] })));
++  assert.equal(evidenceRequired.status, 1);
++  assert.equal(evidenceRequired.stdout, "");
++  const evidenceRequiredBody = JSON.parse(evidenceRequired.stderr);
++  assert.deepEqual(Object.keys(evidenceRequiredBody), ["schema", "status", "code", "reason"]);
++  assert.equal(evidenceRequiredBody.code, "CDP-EVIDENCE-REQUIRED");
++  assert.match(evidenceRequiredBody.reason, /--evidence <file>/u);
+   for (const [patch, code] of [
+-    [{ evidencePaths: [] }, "CDP-EVIDENCE-REQUIRED"],
+     [{ evidencePaths: ["evidence/prior-critic.json"], priorCriticEvidencePath: null }, "CDP-EVIDENCE-BINDING"],
+     [{ priorCriticEvidencePath: "evidence/verify.json" }, "CDP-PRIOR-ALIASED"],
+     [{ specPath: "specs/absent.md" }, "CDP-CANDIDATE-PATH"],
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 444ecaf14..7fdb53371 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -48,6 +48,16 @@ export function takeoverVerbHelp(verb) {
+     `example: ${JSON.stringify(example)}`,
+   ].join("\n");
+ }
++/**
++ * Candidate 17: the identity refusal named no cause (a consumer got a bare code after its feature was closed). The reader's own code is shown
++ * and the two situations that make a course unresolvable at HEAD are named with their way out.
++ */
++export function takeoverIdentityDetail(featureId, code) {
++  return `the Critic course of feature ${featureId} cannot be resolved at HEAD (${typeof code === "string" && code !== "" ? code : "no code"}). `
++    + "The takeover verbs only work while the registered course still resolves at HEAD: the retained rounds must be readable and every commit after them must be registered evidence. "
++    + "This is not the case once content commits follow the last registered round or the feature is closed and its course takes no review. "
++    + "Then continue with a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over those commits; do not rewrite history.";
++}
+ function takeoverTarget(root, featureId, supersede = false) {
+   if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
+   const run = (args) => {
+@@ -64,7 +74,7 @@ function takeoverTarget(root, featureId, supersede = false) {
+   const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
+     logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
+   const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
+-  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
++  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code));
+   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
+     courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };
+ }
