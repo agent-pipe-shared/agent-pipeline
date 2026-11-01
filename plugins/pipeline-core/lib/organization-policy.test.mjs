@@ -3,6 +3,8 @@ import assert from "node:assert/strict"; import test from "node:test";
 import { ID } from "./external-reference-adapter.mjs";
 import { FEATURE_STATES } from "./feature-package-topology.mjs";
 import { LIFECYCLE_EVENTS, OrganizationPolicyError, OWNED_SECTION_REF, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
+import * as organizationPolicy from "./organization-policy.mjs";
+import { canonicalSha256 } from "./governance-event.mjs";
 // WP-P-AC11: targetBinding is an OPTIONAL closed field (see
 // organization-policy.mjs); this fixture default declares one so most tests
 // below exercise the scoped path, and dedicated tests cover omission,
@@ -289,4 +291,43 @@ test("P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed 
   const strict = pack({ packId: "security-conflict-strict", revision: "13".repeat(32), documentClasses: [{ ...pack().documentClasses[0], conflictPolicy: "reject" }] });
   const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [lenient, strict] });
   assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").conflictPolicy, "reject");
+});
+// D229 (2026-11-01): the pipeline ships ONE minimal core pack that a feature-close
+// audit request can NAME, so a consumer without an organization closes on the audit
+// route without inventing a policy. These cases are written from that decision, not
+// from the implementation: the revision literal below was computed independently from
+// the pack body, so a silent edit of the shipped pack fails here.
+const BASELINE_REVISION_PIN = "6611e7f34e2b330b096dde3ec9f1662c5226bceb2390c96d856f0cd751bd8ee3";
+test("D229 the shipped core baseline pack is the exact minimal closed pack and validates across its whole version window", () => {
+  const baseline = organizationPolicy.CORE_BASELINE_PACK;
+  assert.equal(organizationPolicy.CORE_BASELINE_PACK_ID, "pipeline-core-baseline");
+  assert.deepEqual(baseline, {
+    schema: "pipeline.organization-policy-pack.v1", packId: "pipeline-core-baseline", revision: BASELINE_REVISION_PIN,
+    compatibility: { minimumCoreVersion: "0.7.0", maximumCoreVersion: "999.999.999" },
+    governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [],
+  });
+  assert.deepEqual(Object.keys(baseline).sort(), ["compatibility", "documentClasses", "governanceFloors", "packId", "revision", "schema"]);
+  for (const coreVersion of ["0.7.0", "0.7.1", "0.8.0", "1.0.0", "12.34.56", "999.999.999"]) assert.equal(validateOrganizationPolicyPack(baseline, { coreVersion }).packId, "pipeline-core-baseline", coreVersion);
+  assert.equal(Object.isFrozen(baseline) && Object.isFrozen(baseline.compatibility) && Object.isFrozen(baseline.governanceFloors) && Object.isFrozen(baseline.documentClasses), true);
+});
+test("D229 the core baseline pack revision is the pinned sha256 of the canonical pack body without the revision key", () => {
+  const { revision, ...body } = organizationPolicy.CORE_BASELINE_PACK;
+  assert.equal(revision, BASELINE_REVISION_PIN);
+  assert.equal(canonicalSha256(body), BASELINE_REVISION_PIN);
+});
+test("D229 the core baseline pack refuses a core version outside its window", () => {
+  for (const coreVersion of ["0.6.9", "0.0.1", "1000.0.0", "0.7", "0.7.0-rc1", "0.7.0+build"]) assert.throws(() => validateOrganizationPolicyPack(organizationPolicy.CORE_BASELINE_PACK, { coreVersion }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-CORE-VERSION", coreVersion);
+});
+test("D229 the named-pack resolver returns the shipped pack and refuses every other name", () => {
+  assert.equal(organizationPolicy.resolveNamedOrganizationPolicyPack("pipeline-core-baseline"), organizationPolicy.CORE_BASELINE_PACK);
+  for (const name of ["pipeline-core-baselin", "Pipeline-Core-Baseline", "pipeline-core-baseline ", "", "security-baseline", undefined, null, 7, {}]) assert.throws(() => organizationPolicy.resolveNamedOrganizationPolicyPack(name), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-PACK-NAME", String(name));
+});
+test("D229 the core baseline pack resolves alone with no document class, and beside another pack without conflict", () => {
+  const alone = resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK] });
+  assert.deepEqual(alone.packs.map((entry) => entry.packId), ["pipeline-core-baseline"]);
+  assert.deepEqual(alone.documentClasses, []);
+  assert.deepEqual({ ...alone.governanceFloors }, { requireHumanDecisionLedger: true, allowExternalAuthority: false });
+  const beside = resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK, pack({ compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" } })] });
+  assert.deepEqual(beside.packs.map((entry) => entry.packId), ["pipeline-core-baseline", "security-baseline"]);
+  assert.equal(beside.documentClasses.length, 1);
 });

@@ -50,7 +50,10 @@ background Goldfish), is accepted only on the audit route: the planner refuses
 `--critic-verify-lifecycle` bind a passing Verify and a Critic review to the
 candidate. The plan's `courseAuthorship` names each slice's record:
 `dispatchRecord`, `orchestratorCommit`, or `unrecorded`. An `unrecorded` slice
-has no record of either kind. Report it to the PO before applying.
+has no record of either kind. Report it to the PO before applying. The audit
+request's `packs` entries are full organization policy pack objects or, for a
+consumer without an organization policy, the shipped name `pipeline-core-baseline`
+(floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
 
 The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
 dispatch record that requires a Critic and carries no bound evidence (an

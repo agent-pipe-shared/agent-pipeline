@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Closed PHX-3 organization policy pack validation and fail-closed compatibility. */
+import { canonicalSha256 } from "./governance-event.mjs";
 const SHA = /^[a-f0-9]{64}$/u; const ID = /^[a-z][a-z0-9-]{2,63}$/u; const VERSION = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
 export const CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]);
 // WP-P-AC01: signaturePolicy's closed algorithm vocabulary. "none" is a real,
@@ -251,3 +252,33 @@ export function resolveEffectiveOrganizationPolicy({ coreVersion, packs } = {}) 
 }
 
 function frozenBinding(pack) { return Object.freeze({ packId: pack.packId, revision: pack.revision, compatibility: Object.freeze({ ...pack.compatibility }) }); }
+
+/**
+ * D229 (2026-11-01): the ONE minimal pack the pipeline itself ships, so a consumer without an
+ * organization policy can close a feature on the audit route without inventing one. It restates the
+ * governance floors this module already hard-pins and declares NO document class, so it can only
+ * ever add the floors and never a publication rule, a mode, or an approval requirement. It is not
+ * a default: nothing applies it implicitly -- an audit request must NAME it (scripts/close-coordinator.mjs).
+ *
+ * Window: 0.7.0 up to 999.999.999. The core VERSION is plain x.y.z (no pre-release or build
+ * metadata, see VERSION above), so the largest bound it accepts is a very large x.y.z; the lower
+ * bound is the first release that ships this pack.
+ *
+ * revision is the sha256 of the canonical bytes of the pack body WITHOUT the revision key, so any edit
+ * of the body changes it; organization-policy.test.mjs pins the literal digest.
+ */
+export const CORE_BASELINE_PACK_ID = "pipeline-core-baseline";
+const CORE_BASELINE_BODY = Object.freeze({
+  schema: "pipeline.organization-policy-pack.v1",
+  packId: CORE_BASELINE_PACK_ID,
+  compatibility: Object.freeze({ minimumCoreVersion: "0.7.0", maximumCoreVersion: "999.999.999" }),
+  governanceFloors: Object.freeze({ requireHumanDecisionLedger: true, allowExternalAuthority: false }),
+  documentClasses: Object.freeze([]),
+});
+export const CORE_BASELINE_PACK = Object.freeze({ ...CORE_BASELINE_BODY, revision: canonicalSha256(CORE_BASELINE_BODY) });
+
+/** Resolve a shipped pack by its id; any other value fails closed with OPP-PACK-NAME. */
+export function resolveNamedOrganizationPolicyPack(id) {
+  if (id !== CORE_BASELINE_PACK_ID) fail("OPP-PACK-NAME");
+  return CORE_BASELINE_PACK;
+}

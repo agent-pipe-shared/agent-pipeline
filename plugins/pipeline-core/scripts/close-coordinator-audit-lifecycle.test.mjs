@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import * as organizationPolicy from "../lib/organization-policy.mjs";
+import { canonicalSha256 } from "../lib/governance-event.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { finishFeature } from "./finish-feature.mjs";
@@ -34,7 +36,10 @@ const invokeAction = (root, action, status = 0) => {
   return action.argv[0] === STATE ? result.stdout : JSON.parse(result.stdout);
 };
 function put(root, path, text) { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); }
-function fixture(t) {
+// The audit request's `packs` default is today's full pack object; a case may substitute its own array
+// (D229: the request may NAME the shipped core baseline pack instead of carrying a pack object).
+const FIXTURE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] };
+function fixture(t, { packs = [FIXTURE_PACK] } = {}) {
   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -108,21 +113,87 @@ function fixture(t) {
   finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
-  const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs: [{ schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] }], criticVerifyLifecycleId: lifecycle.receipt.id };
+  const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs, criticVerifyLifecycleId: lifecycle.receipt.id };
   put(root, "evidence/audit-request.json", JSON.stringify(request));
   const state = { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "audit-feature", planPath: "specs/audit-feature/prd.md", phase: "implementation" }, planApproval: { poGateAuthority: { planSha256: sha(prd), specPath: "specs/audit-feature/spec.md", specSha256: sha(spec) } }, continuity: { schema: "pipeline.continuity.v0", featureId: "audit-feature", runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, revision: 1, authority: { prd: { path: "specs/audit-feature/prd.md", sha256: sha(prd) }, spec: { path: "specs/audit-feature/spec.md", sha256: sha(spec) }, result: { path: "specs/audit-feature/result.md", sha256: sha(result) } }, queueHead: { packageId: "close-package", actionId: "close-action", nextAction: "close", dispatch: null, productRetryCount: 0, environmentRerouteCount: 0 }, blocker: null, decisionTxn: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" }, recovery: null, capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } } };
   put(root, ".claude/pipeline-state.json", JSON.stringify(state));
   put(root, "evidence/close-request.json", JSON.stringify({ schema: "pipeline.continuity-close.v0", featureId: "audit-feature", expectedRevision: 1, result: state.continuity.authority.result, closeEvidence: { path: "evidence/close.txt", sha256: sha(readFileSync(join(root, "evidence/close.txt"))) } }));
   return { root, candidate, lifecycle, statePath: join(root, ".claude/pipeline-state.json") };
 }
-function prepare(t) {
-  const f = fixture(t); const lifecycle = "close-audit";
+function prepare(t, options) {
+  const f = fixture(t, options); const lifecycle = "close-audit";
   const start = invoke(f.root, ["plan-start", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]); invokeAction(f.root, start.nextAction);
   const checkpoint = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "checkpointed"]); invokeAction(f.root, checkpoint.nextAction);
   const plan = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id]);
   const applied = invokeAction(f.root, plan.nextAction);
   return { ...f, plan, applied };
 }
+// Plan the feature-close-prepared transition without applying it, optionally expecting a refusal.
+function planPrepared(f, status = 0) {
+  const lifecycle = "close-audit";
+  const start = invoke(f.root, ["plan-start", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]); invokeAction(f.root, start.nextAction);
+  const checkpoint = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "checkpointed"]); invokeAction(f.root, checkpoint.nextAction);
+  return invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], status);
+}
+const requestPath = (f) => join(f.root, "evidence/audit-request.json");
+const auditReceipt = (f) => JSON.parse(readFileSync(join(f.root, ".git", "agent-pipeline", "publication-close", "close-audit", "evidence", "feature-close-audit.json"), "utf8"));
+// D229 (2026-11-01), written from the decision before the implementation: a consumer without an organization
+// policy names the shipped core baseline pack in its audit request and closes on the audit route.
+test("D229 an audit request that names the shipped core baseline pack plans, builds the README audit bundle with that pack in the effective policy and closes", t => {
+  const f = prepare(t, { packs: ["pipeline-core-baseline"] });
+  // The request bytes keep the NAME; only the plan and its stored options carry the resolved pack object.
+  assert.deepEqual(JSON.parse(readFileSync(requestPath(f), "utf8")).packs, ["pipeline-core-baseline"]);
+  const bundle = join(f.root, "audit-bundles", "audit-feature", f.candidate.commit);
+  assert.equal(existsSync(join(bundle, "README.md")), true);
+  const expected = organizationPolicy.resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK] });
+  assert.equal(JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")).effectivePolicySha256, canonicalSha256(expected));
+  const saved = auditReceipt(f);
+  assert.deepEqual(saved.plan.bundlePlan.effectivePolicy.packs.map((entry) => entry.packId), ["pipeline-core-baseline"]);
+  assert.equal(saved.plan.bundlePlan.effectivePolicy.packs[0].revision, "6611e7f34e2b330b096dde3ec9f1662c5226bceb2390c96d856f0cd751bd8ee3");
+  assert.deepEqual(saved.plan.bundlePlan.effectivePolicy.documentClasses, []);
+  const closed = invokeAction(f.root, f.applied.nextAction);
+  assert.match(closed, /Feature "audit-feature" closed/);
+  assert.equal(JSON.parse(readFileSync(f.statePath)).closedFeatures.at(-1).auditReference.criticVerifyLifecycleId, f.lifecycle.receipt.id);
+});
+test("D229 a request may name the core baseline pack beside a full pack object; both reach the effective policy", t => {
+  const f = prepare(t, { packs: ["pipeline-core-baseline", FIXTURE_PACK] });
+  assert.deepEqual(auditReceipt(f).plan.bundlePlan.effectivePolicy.packs.map((entry) => entry.packId), ["pipeline-core-baseline", "test-policy"]);
+});
+test("D229 a full pack object in the request behaves exactly as before: it reaches the effective policy unchanged", t => {
+  const f = prepare(t);
+  const policy = auditReceipt(f).plan.bundlePlan.effectivePolicy;
+  assert.deepEqual(policy.packs.map((entry) => entry.packId), ["test-policy"]);
+  assert.equal(policy.packs[0].revision, h("5"));
+  assert.deepEqual(policy.documentClasses.map((entry) => entry.class), ["security"]);
+  assert.equal(JSON.parse(readFileSync(requestPath(f), "utf8")).packs[0].packId, "test-policy");
+});
+test("D229 an unknown pack name or a wrong element type is refused CLOSE-AUDIT-REQUEST naming the known id, and nothing is built", t => {
+  const f = fixture(t, { packs: ["pipeline-core-basline"] });
+  const unknown = planPrepared(f, 2);
+  assert.equal(unknown.code, "CLOSE-AUDIT-REQUEST");
+  assert.match(JSON.stringify(unknown), /pipeline-core-baseline/);
+  for (const packs of [[7], [null], [["pipeline-core-baseline"]], [true], ["Pipeline-Core-Baseline"], [""], ["pipeline-core-baseline", "other-pack"]]) {
+    put(f.root, "evidence/audit-request.json", JSON.stringify({ ...JSON.parse(readFileSync(requestPath(f), "utf8")), packs }));
+    const refused = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], 2);
+    assert.equal(refused.code, "CLOSE-AUDIT-REQUEST", JSON.stringify(packs));
+  }
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+});
+test("D229 there is no default pack: an empty packs array is still FCA-POLICY-REQUIRED and a request without packs keeps its exact-shape refusal", t => {
+  const f = fixture(t, { packs: [] });
+  assert.equal(planPrepared(f, 2).code, "FCA-POLICY-REQUIRED");
+  const { packs, ...withoutPacks } = JSON.parse(readFileSync(requestPath(f), "utf8"));
+  assert.deepEqual(packs, []);
+  put(f.root, "evidence/audit-request.json", JSON.stringify(withoutPacks));
+  const refused = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], 2);
+  assert.equal(refused.code, "CLOSE-AUDIT-REQUEST");
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+});
+test("D229 naming the core baseline pack twice is refused as a duplicate pack", t => {
+  const f = fixture(t, { packs: ["pipeline-core-baseline", "pipeline-core-baseline"] });
+  assert.equal(planPrepared(f, 2).code, "OPP-RESOLVE-DUPLICATE");
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+});
 test("coordinator builds the README audit bundle and forwards only a readback-bound Critic/Verify ID", t => {
   const f = prepare(t);
   assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);

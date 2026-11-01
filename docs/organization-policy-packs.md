@@ -18,6 +18,28 @@ uses the separate transaction service and must receive a matching human
 authority readback; a policy file, plan, local record, or Git commit is never
 human proof.
 
+## The shipped core baseline pack
+
+A consumer without an organization policy still needs a pack to close a feature
+on the audit route, because the feature-close audit refuses an empty `packs`
+array (`FCA-POLICY-REQUIRED`) and must not invent a policy. The pipeline
+therefore ships ONE minimal pack, `pipeline-core-baseline`
+(`CORE_BASELINE_PACK` in `organization-policy.mjs`): the two governance floors
+this module already pins (`requireHumanDecisionLedger: true`,
+`allowExternalAuthority: false`), no document class, no provenance,
+dependencies or signature policy, valid for core versions 0.7.0 through
+999.999.999. Its `revision` is the sha256 of the canonical bytes of the pack
+body without the revision key; a test pins the literal digest.
+
+It is never a default and never applied implicitly. A feature-close audit request
+(`pipeline.feature-close-audit-request.v1`, `scripts/close-coordinator.mjs`) uses
+it only when its `packs` array NAMES it: each element is either a full pack
+object (unchanged behaviour) or the string `"pipeline-core-baseline"`, which the
+coordinator resolves to the shipped object before planning. The request file
+keeps the name; any other string or non-object element is refused
+`CLOSE-AUDIT-REQUEST`, and an empty array is still `FCA-POLICY-REQUIRED`.
+`coreVersion` in the request is plain `x.y.z` without build metadata.
+
 ## Threat model
 
 **Assets:** the resolved effective policy (governance floors, document-class

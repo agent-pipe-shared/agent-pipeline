@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
 import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
+import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
@@ -271,7 +272,15 @@ function auditRequest(root, path) {
     || !Array.isArray(request.value.packs) || !SHA256.test(request.value.criticVerifyLifecycleId ?? "")) {
     fail("CLOSE-AUDIT-REQUEST", "feature-close audit request has an invalid exact shape");
   }
-  return request;
+  // D229: an element of `packs` is a full organization policy pack object (passed on unchanged) or the NAME of the
+  // pack the pipeline ships. The name is resolved here, once, so the plan, its stored options and the apply path see
+  // only objects; the request file keeps the name and its digest (request.sha256) is the digest of those bytes.
+  const packs = request.value.packs.map((entry) => {
+    if (typeof entry === "object" && entry !== null && !Array.isArray(entry)) return entry;
+    if (entry === CORE_BASELINE_PACK_ID) return resolveNamedOrganizationPolicyPack(entry);
+    fail("CLOSE-AUDIT-REQUEST", `feature-close audit request packs must each be a full organization policy pack object or the shipped pack name "${CORE_BASELINE_PACK_ID}"`);
+  });
+  return { ...request, value: { ...request.value, packs } };
 }
 
 function auditLifecycleReadback({ root, common, request, auditPlan }) {
