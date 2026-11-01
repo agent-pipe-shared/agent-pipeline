@@ -1,0 +1,320 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-record.mjs b/plugins/pipeline-core/lib/dispatch-record.mjs
+index 68e639989..a4617cda7 100644
+--- a/plugins/pipeline-core/lib/dispatch-record.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record.mjs
+@@ -12,6 +12,8 @@ export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-o
+ // host-observed authored commit. It is never a host-observation substitute (see dispatch-authorship-verify, follow-up slice).
+ export const ORCHESTRATOR_ATTESTATION_SCHEMA = "pipeline.dispatch-orchestrator-attestation.v1";
+ export const ORCHESTRATOR_ATTESTED_ASSURANCE = "orchestrator-attested";
++/** 17: the label of an orchestrator-attested record whose runner has no model authority here; the declared model is the briefing's, unobserved. */
++export const MODEL_ASSURANCE_DECLARED_UNOBSERVED = "declared-unobserved";
+ const RESERVED_NON_AUTHORING_OUTCOMES = Object.freeze({ "read-only-completed": "read-only", "stopped-without-commit": "stopped-without-commit" });
+ export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
+ export const NO_DELIVERY_OUTCOME = "completed-no-delivery";
+@@ -203,7 +205,11 @@ function validateRecord(record, { legacy, v3 = false }) {
+     } else if (Object.hasOwn(record, "observationIdentity")) fail("record-outcome-classification", "observationIdentity is reserved for completed-undelivered");
+     if (kind === "orchestrator-attested") {
+       if (!Object.hasOwn(record, "attestation")) fail("record-outcome-classification", "orchestrator-attested classification requires an attestation");
+-      exactKeys(record.attestation, ["schema", "assurance", "briefingSha256", "handbackSha256"], "attestation");
++      // 17: `modelAssurance` is optional and exists only for a runner whose model nothing here can observe; it is a label, never a
++      // claim: a Claude record (whose model the agent frontmatter attests) must not carry it, and no other value is accepted.
++      const modelAssurance = Object.hasOwn(record.attestation ?? {}, "modelAssurance");
++      exactKeys(record.attestation, modelAssurance ? ["schema", "assurance", "briefingSha256", "handbackSha256", "modelAssurance"] : ["schema", "assurance", "briefingSha256", "handbackSha256"], "attestation");
++      if (modelAssurance && (record.attestation.modelAssurance !== MODEL_ASSURANCE_DECLARED_UNOBSERVED || record.runner === "claude" || typeof record.runner !== "string")) fail("record-attestation", `attestation modelAssurance is only ${MODEL_ASSURANCE_DECLARED_UNOBSERVED} and only for a runner other than claude`);
+       if (record.attestation.schema !== ORCHESTRATOR_ATTESTATION_SCHEMA || record.attestation.assurance !== ORCHESTRATOR_ATTESTED_ASSURANCE) fail("record-attestation", "attestation schema or assurance is invalid");
+       if (![record.attestation.briefingSha256, record.attestation.handbackSha256].every((value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value))) fail("record-attestation", "attestation digests must be lowercase SHA-256");
+       if (!terminal) fail("record-outcome-classification", "orchestrator-attested record must be terminal");
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index b65e0825b..f646b268d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -32,7 +32,7 @@ export const HOST_CRITERION_ID_SOURCE = 'AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}
+ const CRITERION_ID = new RegExp(`^${HOST_CRITERION_ID_SOURCE}$`, 'u');
+ const CRITERION_ID_MAX_LENGTH = 64;
+ const isCriterionId = (value) => typeof value === 'string' && value.length <= CRITERION_ID_MAX_LENGTH && CRITERION_ID.test(value);
+-const ROLE_TO_AGENT = Object.freeze({
++export const ROLE_TO_AGENT = Object.freeze({
+   "pipeline-core:goldfish-implementor": "goldfish-implementor",
+   "pipeline-core:goldfish-mechanic": "goldfish-mechanic",
+   "pipeline-core:goldfish-deep": "goldfish-deep",
+diff --git a/plugins/pipeline-core/lib/review-admission-read.mjs b/plugins/pipeline-core/lib/review-admission-read.mjs
+index 703d5e2e7..1ba5d6039 100644
+--- a/plugins/pipeline-core/lib/review-admission-read.mjs
++++ b/plugins/pipeline-core/lib/review-admission-read.mjs
+@@ -756,7 +756,7 @@ export function evaluateReviewAdmissionCore(options = {}, historicalEntries = []
+   if (admittedCount !== 1) {
+     const descendantTaskIds = admittedCount === 0 ? descendantTaskIdsOfDeliveredRecords(root, pendingDeliveredRecords, candidateCommit, options) : [];
+     const missingRecordHint = admittedCount === 0
+-      ? `; ${DESCENDANT_ROUTE_HINT}${descendantTaskIds.length === 0 ? "" : ` This candidate descends from the delivered record of task id ${descendantTaskIds.join(", ")}: use that task id for this round.`} Otherwise the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
++      ? `; ${DESCENDANT_ROUTE_HINT}${descendantTaskIds.length === 0 ? "" : ` This candidate descends from the delivered record of task id ${descendantTaskIds.join(", ")}: use that task id for this round.`} Otherwise the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record (for a runner other than claude the record also labels its model declared-unobserved: the briefing's declaration, never an observation, and the briefing must be the file dispatch-briefing.mjs wrote, whose allowedPaths are exact files); a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+       : "";
+     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
+   }
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 6521b5a67..ddde279f9 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -198,6 +198,34 @@ function validRepoPath(value) {
+     && value.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part !== ".git");
+ }
+ 
++// The native host admits at most 64 exact paths in a binding (lib/native-goldfish-host-return.mjs parseNativeGoldfishBriefing).
++const MAX_ALLOWED_PATHS = 64;
++/**
++ * The regular files below `path` (repository-relative, posix) when it is an existing directory inside `root`, sorted; null when the path
++ * is not an existing directory (a file, or a file the dispatch will create). Links are never followed and never listed; `.git` is skipped;
++ * a name that would not be a valid exact path is skipped, so the result can always be bound.
++ */
++function listDirectoryFiles(root, path) {
++  const start = resolve(root, path);
++  const within = relative(root, start);
++  if (within.startsWith("..") || within === "") return null;
++  let info;
++  try { info = lstatSync(start); } catch { return null; }
++  if (info.isSymbolicLink() || !info.isDirectory()) return null;
++  const files = [];
++  const walk = (directory, prefix) => {
++    for (const entry of readdirSync(directory, { withFileTypes: true })) {
++      if (entry.name === ".git") continue;
++      const next = `${prefix}/${entry.name}`;
++      if (entry.isSymbolicLink()) continue;
++      if (entry.isDirectory()) { if (files.length <= MAX_ALLOWED_PATHS) walk(resolve(directory, entry.name), next); continue; }
++      if (entry.isFile() && validRepoPath(next)) files.push(next);
++    }
++  };
++  walk(start, path.replace(/\/+$/u, ""));
++  return files.sort();
++}
++
+ /** The Codex task route of a duty (read-only registry projection), or null when the registry yields none. */
+ function defaultCodexRoute(taskRoute) {
+   try {
+@@ -649,10 +677,26 @@ export function generateDispatchBinding(options, deps = {}) {
+   }
+   if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
+   if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
+-  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...options.paths])].sort();
+-
+   let root;
+   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
++  // 17 (PO 2026-11-01): every route reads `allowedPaths` as EXACT files (this generator, the native host's `includes`, the attested
++  // writer), so a directory given as `--path` used to become one useless entry and every file under it was "outside the scope".
++  // A directory that exists is resolved here to the regular files it holds today. The expansion is a snapshot: the briefing says so
++  // (DBG-DIRECTORY-EXPANDED) and a file created later has to be added by a new binding, not by a looser match.
++  const expandedPaths = [];
++  const directoryExpansions = [];
++  for (const path of options.paths) {
++    const listed = listDirectoryFiles(root, path);
++    if (listed === null) { expandedPaths.push(path); continue; }
++    if (listed.length === 0) refuse("DBG-PATH-EMPTY-DIRECTORY", `path ${path} is a directory without regular files; name the files the dispatch will create, one --path each (a write scope is a list of exact files)`);
++    directoryExpansions.push({ path, files: listed });
++    expandedPaths.push(...listed);
++  }
++  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...expandedPaths])].sort();
++  if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
++  for (const entry of directoryExpansions) {
++    warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
++  }
+ 
+   // D195: a command check is bound to the calibration file that registers it; the id must be registered at this commit.
+   let commandCheckPath = null;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index c60d54b7b..049591c31 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -388,6 +388,40 @@ for (const [name, overrides, extra, depOverrides, code, mention] of REFUSALS) {
+   });
+ }
+ 
++// 17 (PO 2026-11-01): every route reads allowedPaths as EXACT files, so a directory given as --path is resolved to the regular files it
++// holds today (visibly: DBG-DIRECTORY-EXPANDED), never kept as one useless entry and never widened into a prefix match.
++test("17 a --path that is an existing directory is resolved to its regular files and says so; a new file stays an exact entry", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const put = (rel, text = "x") => { mkdirSync(dirname(join(fx.root, rel)), { recursive: true }); writeFileSync(join(fx.root, rel), text); };
++  put("shots/a.png"); put("shots/sub/b.png"); put("shots/.git/config"); put("outside/secret.txt");
++  symlinkSync(join(fx.root, "outside", "secret.txt"), join(fx.root, "shots", "link.png"));
++  const result = runDispatchBriefing(argvOf(fx, {}, ["--path", "shots", "--path", "plugins/x/new-file.mjs"]), depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  assert.deepEqual(result.binding.allowedPaths, ["plugins/x/new-file.mjs", PATH_A, CHECK, "shots/a.png", "shots/sub/b.png"].sort());
++  assert.ok(!result.binding.allowedPaths.includes("shots"), "the directory itself is not an entry");
++  assert.ok(!result.binding.allowedPaths.some((path) => path.includes("link.png") || path.includes(".git")), "links and .git are never listed");
++  const note = result.warnings.find((warning) => warning.code === "DBG-DIRECTORY-EXPANDED");
++  assert.deepEqual(note?.files, ["shots/a.png", "shots/sub/b.png"]);
++  assert.match(note.message, /created there later is outside the scope/u);
++  assert.ok(result.binding.itemDelivery.checks[0].dependencies.includes("shots/a.png"), "every expanded file is a dependency of the check");
++});
++
++test("17 an empty directory and a directory that would exceed the host cap are refused with the repair", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  mkdirSync(join(fx.root, "empty-dir"), { recursive: true });
++  const empty = runDispatchBriefing(argvOf(fx, {}, ["--path", "empty-dir"]), depsOf(fx));
++  assert.equal(empty.code, "DBG-PATH-EMPTY-DIRECTORY", empty.message);
++  assert.match(empty.message, /one --path each/u);
++  mkdirSync(join(fx.root, "many"), { recursive: true });
++  for (let index = 0; index < 70; index += 1) writeFileSync(join(fx.root, "many", `f${String(index).padStart(2, "0")}.txt`), "x");
++  const many = runDispatchBriefing(argvOf(fx, {}, ["--path", "many"]), depsOf(fx));
++  assert.equal(many.code, "DBG-SCOPE-TOO-MANY-PATHS", many.message);
++  assert.match(many.message, /at most 64/u);
++  assert.match(many.message, /many -> /u);
++});
++
+ // K12: a transient registry lock must never degrade into a different ruleset identity.
+ const heldLock = (over = {}) => ({ status: "held", owner: "live", pid: 4242, ageSeconds: 3, ...over });
+ const unavailableObserver = () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } }, pluginRoot: "/fixture/plugin-root" });
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index ddc13f820..1bbd3b534 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -7,7 +7,8 @@ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstat
+ import { basename, dirname, relative, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
++import { ROLE_TO_AGENT } from "../lib/native-goldfish-host-return.mjs";
++import { MODEL_ASSURANCE_DECLARED_UNOBSERVED, DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+@@ -261,6 +262,8 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+       record, recordBytes: agyAuthoredRecordBytes(record) });
+     if (!checked.ok) fail("record-host-observation", `Agy host observation is not independently readable: ${checked.code}`);
+   } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted
++    && !(orchestratorAttested && record.attestation.modelAssurance === MODEL_ASSURANCE_DECLARED_UNOBSERVED
++      && modelCheck.classification === "runner-model-authority-required")
+     && modelCheck.classification !== "model-matches"
+     && !(record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+       && modelCheck.classification === "model-override-declared")) {
+@@ -568,8 +571,12 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
+   let block;
+   try { block = JSON.parse(marker[1]); } catch { fail("attested-briefing", "the briefing block is not JSON"); }
+   if (!block || typeof block !== "object" || Array.isArray(block)) fail("attested-briefing", "the briefing block is not an object");
++  // 17: a generated Codex briefing names the agent by `nativeAgentType: "worker"` plus `role` (the host derives the agent type from the
++  // role, lib/native-goldfish-host-return.mjs); every generated Codex briefing used to fail here with "lacks agentType".
++  if ((typeof block.agentType !== "string" || block.agentType === "") && block.runner === "codex" && block.nativeAgentType === "worker"
++    && typeof block.role === "string" && Object.hasOwn(ROLE_TO_AGENT, block.role)) block.agentType = ROLE_TO_AGENT[block.role];
+   for (const key of ["dispatchId", "runner", "agentType", "model", "effort", "rulesetSha", "candidateCommit"]) {
+-    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}`);
++    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}${key === "agentType" ? " (and no Codex role to derive it from); pass the briefing file that dispatch-briefing.mjs wrote for this dispatch: it holds the pipeline-native-goldfish-host-commit block with role, model, allowedPaths and a required-review criticDecision" : ""}`);
+   }
+   if (!Array.isArray(block.allowedPaths) || block.allowedPaths.length === 0 || !block.allowedPaths.every((entry) => typeof entry === "string" && entry !== "")) fail("attested-briefing", "the briefing block lacks allowedPaths");
+   if (!block.criticDecision || block.criticDecision.schema !== CRITIC_REQUIRED_SCHEMA) fail("attested-briefing", "the briefing criticDecision is not a required-review decision");
+@@ -592,17 +599,22 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
+     for (const path of paths) changed.add(path);
+   }
+   const outside = [...changed].filter((path) => !inAllowedScope(path, block.allowedPaths));
+-  if (outside.length !== 0) fail("attested-scope", `commit paths outside the briefed allowedPaths: ${outside.join(", ")}`);
++  if (outside.length !== 0) fail("attested-scope", `commit paths outside the briefed allowedPaths: ${outside.join(", ")}. allowedPaths holds exact files (a directory is resolved to the files it held when the briefing was generated, so a file created later is outside). repair: generate a new briefing whose --path list names every one of these files (node <plugin-root>/scripts/dispatch-briefing.mjs binding ... --path <file>), then pass that briefing in the attested request`);
+   const report = { text, changedFiles: [...changed].sort() };
+   const record = {
+     schema: DISPATCH_RECORD_SCHEMA, runner: block.runner, taskId: block.dispatchId, agentType: block.agentType, model: block.model, effort: block.effort,
+     rulesetSha: block.rulesetSha, dispatcher: "Elephant", candidateCommit: request.commits[request.commits.length - 1], resultSha256: reportSha256(text),
+     outcome: "completed-orchestrator-attested", commits: [...request.commits],
+-    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], report,
++    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: block.runner === "claude"
++      ? "tool-use count and worker model not observed"
++      : "tool-use count and worker model not observed; model and effort are the briefing's declaration, not an observation" }], report,
+     criticRequired: block.criticDecision,
+     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" },
++    // 17 (PO 2026-11-01): for a runner whose model nothing in this repository can observe (only Claude agent frontmatter attests a
++    // model), the record says so in its own attestation instead of being refused; it never claims a host observation.
+     attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested",
+-      briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex") },
++      briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex"),
++      ...(block.runner === "claude" ? {} : { modelAssurance: MODEL_ASSURANCE_DECLARED_UNOBSERVED }) },
+   };
+   const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
+   // D212 (N33 D) early detection, AFTER the write and never instead of it: every attested record is Critic-required, so name the
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index 4b09203be..d19ccd969 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -621,6 +621,60 @@ check("attested CLI: a second call for the same task is refused and the first re
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// 17 (PO 2026-11-01): the attested route for runners whose model nothing here can observe. A generated Codex briefing names the agent by
++// `nativeAgentType` and `role`; the record then carries a visible `declared-unobserved` label instead of being refused, and it never
++// satisfies a host-observed predicate.
++function codexBriefingBody(overrides = {}) {
++  const { agentType: _agentType, ...claudeShape } = JSON.parse(briefingBody().match(/v3\n(.*)\n-->/u)[1]);
++  const block = { ...claudeShape, runner: "codex", nativeAgentType: "worker", model: "gpt-5.5", effort: "high", ...overrides };
++  return `Read the obligations first.\n\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(block)}\n-->\n\n### 1. Goal\nDo it.\n`;
++}
++check("17 attested CLI: a generated Codex briefing is accepted and the record says its model is declared, not observed", () => {
++  const root = cliFixture({ briefing: codexBriefingBody() });
++  try {
++    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, runCli(root).target))));
++    assert.equal(persisted.runner, "codex");
++    assert.equal(persisted.agentType, "goldfish-implementor");
++    assert.equal(persisted.attestation.modelAssurance, "declared-unobserved");
++    assert.equal(persisted.attestation.assurance, "orchestrator-attested");
++    assert.match(persisted.log[0].note, /not an observation/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++  const claude = cliFixture();
++  try {
++    const persisted = JSON.parse(readFileSync(join(claude, runCli(claude).target)));
++    assert.equal(Object.hasOwn(persisted.attestation, "modelAssurance"), false, "a Claude record keeps the four-key attestation");
++  } finally { rmSync(claude, { recursive: true, force: true }); }
++});
++
++check("17 attested CLI: the label is only for a runner other than claude, and no other value is accepted", () => {
++  const root = attestedRoot();
++  try {
++    const label = (modelAssurance) => ({ attestation: { ...attestedRecord().attestation, modelAssurance } });
++    refusedWith("record-attestation", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "claude", ...label("declared-unobserved") }) }, gitReaders()));
++    refusedWith("record-attestation", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex", ...label("host-observed") }) }, gitReaders()));
++    // without the label a Codex record is still refused by the model authority gate: the label is what makes the weaker assurance visible
++    refusedWith("record-model", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex" }) }, gitReaders()));
++    assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-ATT-1.json")), false);
++    // the label never admits an authored Codex record through the generic writers
++    refusedWith("record-attestation-route", () => writeDispatchRecordObject({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex", ...label("declared-unobserved") }) }, gitReaders()));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("17 attested CLI: a Codex briefing without a role to derive the agent from is refused and names the briefing to pass", () => {
++  const root = cliFixture({ briefing: codexBriefingBody({ role: "pipeline-core:not-a-goldfish" }) });
++  try {
++    assert.throws(() => runCli(root), (error) => error?.code === "attested-briefing" && /lacks agentType/u.test(error.message) && /dispatch-briefing\.mjs wrote/u.test(error.message));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("17 attested CLI: a file outside the briefed allowedPaths is refused with the repair recipe", () => {
++  const root = cliFixture({ briefing: codexBriefingBody({ allowedPaths: ["screenshots"] }) });
++  try {
++    assert.throws(() => runCli(root, gitReaders({ paths: ["screenshots/a.png"] })), (error) => error?.code === "attested-scope"
++      && /screenshots\/a\.png/u.test(error.message) && /exact files/u.test(error.message) && /dispatch-briefing\.mjs binding/u.test(error.message));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ // N33 A+B+C (D212): the sanctioned addendum route. `--critic-addendum <request>` is the command the close gate's refusal names;
+ // the request file IS the addendum object. The route refuses an addendum that no consumed, passed Critic receipt binds BEFORE it
+ // publishes, because the publication is exclusive and a wrongly written addendum could never be replaced.
+@@ -815,7 +869,7 @@ check("N35 --critic-addendum publishes an addendum for the last round of a resid
+   } finally { rmSync(refused.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 40, "the complete dispatch-record writer corpus must be registered before execution begins");
++assert.equal(cases.length, 44, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index fe6fb8935..30e1e9158 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -157,7 +157,12 @@ The request is one closed JSON object: `schema` `pipeline.dispatch-attested-requ
+ generated briefing, which must carry a required-review `criticDecision`), `handbackPath` (the hand-back text
+ the Elephant received) and `commits` (full 40-hex shas in chain order). Both paths are repository-relative
+ under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must lie inside the briefing's
+-`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. Use the task id of
++`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. `allowedPaths` holds exact
++files: `dispatch-briefing.mjs binding` resolves a directory given as `--path` to the files it holds at that moment (and
++says so), so a file created there later needs a new briefing, not a looser match. For a runner other than `claude`
++(Codex; the generated Codex briefing names the agent by `role`) the record carries `attestation.modelAssurance:
++declared-unobserved`: its model and effort are the briefing's declaration, never an observation, and it does not satisfy
++any host-observed predicate. Use the task id of
+ that record for every round (next section).
+ 
+ ## Real commits after a consumed PASS (D199)
