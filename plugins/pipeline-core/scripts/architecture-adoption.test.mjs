@@ -475,6 +475,19 @@ describe("ADOPT-SIGN-T: adoption request file for the signing ceremony", () => {
     assert.equal(JSON.parse(bytes).schema, "pipeline.adoption-approval-request.v1");
   });
 
+  it("D10: prepare without --decided-at, or with a non-canonical instant, names the flag and its form instead of a TypeError, and writes nothing", () => {
+    const target = path.join(root, "scratch", "adoption-request-d10.json");
+    const without = prepareArgs().filter((_, index, all) => all[index] !== "--decided-at" && all[index - 1] !== "--decided-at");
+    for (const args of [without, prepareArgs().map((value) => (value === "2026-01-01T00:00:00.000Z" ? "2026-01-01" : value))]) {
+      const refused = spawnSync(process.execPath, [script, "prepare", ...args, "--out", target], { encoding: "utf8" });
+      assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+      assert.match(refused.stderr, /prepare needs --decided-at <UTC instant/u);
+      assert.doesNotMatch(refused.stderr, /TypeError|canonical ISO-8601 at/u);
+      assert.equal(refused.stdout, "", "no request is printed");
+      assert.equal(fs.existsSync(target), false, "no request file is written");
+    }
+  });
+
   it("ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing", () => {
     for (const target of [
       path.join(root, "adoption-request.json"),

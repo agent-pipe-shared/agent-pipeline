@@ -573,6 +573,12 @@ function runCli() {
           process.exit(1);
         }
       }
+      // Toolbox D10: the missing or malformed instant used to end in a TypeError from the authority module. It is part of the signed request,
+      // so name the flag and the exact form here, before anything is built or written.
+      if (typeof decidedAt !== "string" || !Number.isFinite(Date.parse(decidedAt)) || new Date(decidedAt).toISOString() !== decidedAt) {
+        console.error("Error: prepare needs --decided-at <UTC instant in the form new Date().toISOString() prints, for example 2026-11-01T10:00:00.000Z>. It is part of the request the PO signs; apply reads it back from that request file, so it is given once, here.");
+        process.exit(1);
+      }
       const request = prepareAdoptionAuthority({ rootDir, decision, scope, rationale, expiresAt: expires, reviewDate, decidedAt, decisionRef });
       // One byte string feeds both sinks, so the file is byte-identical to the stdout form by construction.
       const bytes = `${JSON.stringify(request, null, 2)}\n`;
