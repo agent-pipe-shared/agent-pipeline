@@ -45,4 +45,5 @@ namespace drifts under that member, which the registry refuses strictly (PF-55).
 - Wanted 2 is held: `w22` (the check skips `*.patch` and `*.diff`; two cases pin both sides).
 - Wanted 1 is held as an interim: `w24` (heal finishes with the retained-aside move-aside when nothing is open or kept) and the `move-aside` kind no longer stops on an incomplete heal (it looped).
   The structural gap remains: no per-member abandon transition for a settled slice, so the registry is discarded wholesale.
-- Wanted 3 and 4 are untouched.
+- Wanted 4 is held: `w27` (the generator no longer warns `DBG-CHECKPOINTED-OWNER` for a started slice whose recorded write scope is disjoint from the new one; an overlapping or unknown scope keeps it; `docs/parallel-work.md` states the D205 rule).
+- Wanted 3 (the integration-dependency hold) is untouched.

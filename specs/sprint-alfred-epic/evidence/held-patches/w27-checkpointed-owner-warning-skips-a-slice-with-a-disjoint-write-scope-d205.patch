@@ -1,0 +1,94 @@
+diff --git a/docs/parallel-work.md b/docs/parallel-work.md
+index d5774e15e..9e321b096 100644
+--- a/docs/parallel-work.md
++++ b/docs/parallel-work.md
+@@ -13,7 +13,11 @@ Consider a native fan-out when there are three or more remaining packages and
+ all of the following are true:
+ 
+ - Each package has an explicit, disjoint write scope. Keep shared tracking,
+-  handover, and other common files with one owner.
++  handover, and other common files with one owner. Two slices of the same item
++  or criterion may run at the same time when their write scopes do not
++  overlap (D205); the briefing generator then raises no
++  `DBG-CHECKPOINTED-OWNER` for the running one. An overlap keeps the scope
++  refusal, and a running slice with no recorded scope keeps the warning.
+ - No package needs a file another package will change. A dependency means
+   sequence the work.
+ - The commit surface is safe: use separate worktrees, allow only one slice to
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 30e4125ac..6521b5a67 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -347,6 +347,7 @@ function defaultQueueRows(root) {
+ export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
+   try {
+     const live = new Set(queueRows.filter((entry) => entry?.state === "ready").map((entry) => entry.id));
++    const scopeOf = new Map(queueRows.filter((entry) => entry?.state === "ready" && Array.isArray(entry.writeScope) && entry.writeScope.length > 0).map((entry) => [entry.id, [...entry.writeScope]]));
+     if (live.size === 0) return [];
+     // A slice with a commit carrying its Dispatch trailer is delivered (one git call; the full integration read takes tens of seconds).
+     const trailers = execFileSync("git", ["-C", root, "log", "--format=%(trailers:key=Dispatch,valueonly,separator=%x0a)"], { encoding: "utf8", maxBuffer: 1 << 26 });
+@@ -362,7 +363,7 @@ export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
+         const bytes = readFileSync(resolve(dir, name));
+         if (names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) continue;
+         const value = JSON.parse(bytes.toString("utf8"));
+-        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId });
++        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId, ...(scopeOf.has(value.binding.dispatchId) ? { writeScope: scopeOf.get(value.binding.dispatchId) } : {}) });
+       } catch { /* an unreadable pending file names no owner */ }
+     }
+     return started;
+@@ -774,8 +775,11 @@ export function generateDispatchBinding(options, deps = {}) {
+   }
+ 
+   // D196 (R1): warn, never refuse, when another slice of this item is started and unfinished (a running or budget-checkpointed owner).
++  // D205: a started slice whose write scope is known and disjoint from this one is a parallel slice, not the owner of this outcome, so it is no warning;
++  // an unknown scope or any overlap keeps the warning (the overlap itself is still refused below).
+   const startedOwners = (() => { try { const found = (deps.startedOwners ?? defaultStartedOwners)(root); return Array.isArray(found) ? found : []; } catch { return []; } })()
+     .filter((entry) => entry && entry.itemId === itemId && entry.dispatchId !== dispatchId && typeof entry.dispatchId === "string")
++    .filter((entry) => !(Array.isArray(entry.writeScope) && entry.writeScope.length > 0 && !scopesOverlap(allowedPaths, entry.writeScope)))
+     .map((entry) => entry.dispatchId).sort();
+   for (const owner of startedOwners) {
+     warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent with SendMessage. A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index ae558211b..c60d54b7b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1749,6 +1749,17 @@ test("D196 R1: an unreadable started-owner reader never refuses the build", asyn
+   assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
+ });
+ 
++test("D205: a started slice of the same item with a known, disjoint write scope gives no DBG-CHECKPOINTED-OWNER; an overlapping or unknown scope keeps it", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const own = [PATH_A];
++  const warns = (owner) => warningCodes(runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => [owner] }))).includes("DBG-CHECKPOINTED-OWNER");
++  assert.equal(warns(startedOwner({ writeScope: ["plugins/other/elsewhere.mjs", "plugins/other/elsewhere.test.mjs"] })), false, "disjoint scope: a parallel slice, no warning");
++  assert.equal(warns(startedOwner({ writeScope: [own[0]] })), true, "an overlapping scope keeps the warning");
++  assert.equal(warns(startedOwner({ writeScope: [] })), true, "an empty scope is unknown, so the warning stays");
++  assert.equal(warns(startedOwner()), true, "no recorded scope keeps the warning");
++});
++
+ test("D196 R4: an estimate above the base cap whose rationale does not say a grant is planned warns DBG-ESTIMATE-ABOVE-BASE; grant wording silences it; D193 still refuses a missing rationale", async () => {
+   const { runDispatchBriefing } = await lib();
+   const base = packageFixture();
+@@ -1809,6 +1820,8 @@ test("D196 R1 default reader: an unsettled pending state of a ready queue slice
+       { id: "ALF-CANCELLED", state: "cancelled" }, { id: "ALF-BADNAME", state: "ready" }, { id: "ALF-DELIVERED", state: "ready" }];
+     assert.deepEqual(defaultStartedOwners(dir, rows), [{ dispatchId: "ALF-OPEN", itemId: "item.a" }]);
+     assert.deepEqual(defaultStartedOwners(dir, []), [], "no live queue row: no owner, whatever the pending states say");
++    const scoped = defaultStartedOwners(dir, [{ id: "ALF-OPEN", state: "ready", writeScope: ["plugins/x/a.mjs", "plugins/x/a.test.mjs"] }]);
++    assert.deepEqual(scoped, [{ dispatchId: "ALF-OPEN", itemId: "item.a", writeScope: ["plugins/x/a.mjs", "plugins/x/a.test.mjs"] }], "D205: the queue row's write scope rides along");
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index 8f4bd781c..ff5024d37 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -186,7 +186,7 @@ state this priority explicitly in the briefing, not just the number.
+ 
+ A returned `outcome: checkpoint` keeps the reservation live and the agent resumable. The cheap move is always the same: read the report and the actual diff, run `dispatch-budget-grant.mjs --agent-id <id> --extra 30 --reason "<why>"`, then `SendMessage` to the SAME agent id with a procedural continuation (make one read-only call first; continue only after the `DISPATCH-BUDGET-GRANT` notice names the digest). Grants are repeatable and each is a recorded decision. A fresh dispatch for the same outcome is the exception, named by a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`) and by the checkpointed outcome it does not continue. When the estimate already exceeds the base cap, plan the grant in the package (`budgetRationale`) instead of discovering it at the checkpoint. The rule text is `roles/elephant.md` EL-25a and EL-13b.
+ 
+-The generator reminds the dispatcher at build time and never refuses (D196): `DBG-CHECKPOINTED-OWNER` names another started, unfinished slice of the same item with the grant-and-resume commands and the release route (`slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`); `DBG-ESTIMATE-ABOVE-BASE` fires when `estimatedToolCalls` exceeds the base cap and `budgetRationale` does not say a grant is planned; `DBG-ESTIMATE-NEEDS-SPLIT` asks for a split along independent criteria when the estimate exceeds twice the base cap plus one grant step of 30.
++The generator reminds the dispatcher at build time and never refuses (D196): `DBG-CHECKPOINTED-OWNER` names another started, unfinished slice of the same item with the grant-and-resume commands and the release route (`slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`) and is not raised for a slice whose recorded write scope is disjoint from this one (D205: a parallel slice); `DBG-ESTIMATE-ABOVE-BASE` fires when `estimatedToolCalls` exceeds the base cap and `budgetRationale` does not say a grant is planned; `DBG-ESTIMATE-NEEDS-SPLIT` asks for a split along independent criteria when the estimate exceeds twice the base cap plus one grant step of 30.
+ 
+ ## The dispatch-record artifact is not automatic — verify the prompt actually carries it
+ 
