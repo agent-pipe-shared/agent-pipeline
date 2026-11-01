@@ -1443,4 +1443,19 @@ test("N20 (c) a registered round whose lane is neither the legacy lane nor the l
   const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
   assert.equal(after.decision.code, "CVL-COURSE-RECORD", `a forged lane must not read back as a genuine round: ${JSON.stringify(after.decision)}`);
 });
+// Appended after the numbered cases on purpose: the completion registry numbers unnumbered cases by position, so a mid-file insert would renumber the rest.
+test("N38 (PO decision 2026-11-01) a manifest-only commit that changes the manifest core, like a feature-package-reconcile commit, is taken as the candidate of the delta verb instead of being skipped as evidence-only", () => {
+  const fx = pf94DeltaFixture();
+  pf94WriteInput(fx);
+  // Before the decision this commit counted as evidence-only for the candidate choice (it changes only the manifest), the candidate stayed the correction commit, and the transport
+  // check then refused FPR-DELTA-TRANSPORT because the commit changes the manifest CORE (here feature.rigor).
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  manifest.feature.rigor = manifest.feature.rigor === 1 ? 2 : 1;
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  const reconcile = pf94CommitPaths(fx.root, [fx.manifestPath], "reconcile the manifest core");
+  const actual = pf94Delta(fx);
+  assert.equal(actual.code, "FPR-DELTA-NO-DIAGNOSTIC", JSON.stringify(actual));
+  assert.ok(actual.reason.includes(reconcile), `the reconcile commit is the chosen candidate and the refusal names it: ${actual.reason}`);
+  assert.ok(!actual.reason.includes(fx.correctionCommit), actual.reason);
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

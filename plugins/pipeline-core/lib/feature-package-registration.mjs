@@ -696,6 +696,20 @@ function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
   } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
   return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool - then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
 }
+/** The manifest core of a commit: the manifest minus its candidate-evidence artifacts (the transport check's own definition), as a canonical digest; null when unreadable. */
+function manifestCoreSha256(root, commit, manifestPath) {
+  const raw = gitOut(root, ["show", `${commit}:${manifestPath}`]);
+  if (raw === null) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!object(parsed) || Array.isArray(parsed)) return null;
+    return sha256Canonical({ ...parsed, artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts.filter((entry) => entry?.class !== "candidate-evidence") : parsed.artifacts });
+  } catch { return null; }
+}
+function manifestCoreUnchanged(root, parent, commit, manifestPath) {
+  const before = manifestCoreSha256(root, parent, manifestPath), after = manifestCoreSha256(root, commit, manifestPath);
+  return before !== null && after !== null && before === after;
+}
 export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
   let root;
@@ -749,7 +763,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     const [oid, ...parents] = line.split(/\s+/u);
     const names = parents.length === 1 ? gitOut(root, ["diff", "--name-only", "-z", parents[0], oid, "--"]) : null;
     const paths = names === null ? null : names.split("\0").filter(Boolean);
-    if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))) continue;
+    // N38 (PO decision 2026-11-01): a commit that changes the manifest CORE (the manifest without its candidate-evidence artifacts, the same core the transport
+    // check compares), for example a feature-package-reconcile commit, is not evidence-only: it becomes the candidate. An unreadable manifest on either side fails toward the candidate.
+    if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))
+      && (!paths.includes(manifestPath) || manifestCoreUnchanged(root, parents[0], oid, manifestPath))) continue;
     candidate = oid; break;
   }
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
@@ -762,7 +779,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), register it WITHOUT committing first with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun this command`, extra2);
     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
-    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command`, extra2);
+    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command. This command chose the candidate ${candidate} (the newest first-parent commit that is not evidence-only by the candidate-choice test: it changes beyond the manifest and specs/${featureId}/evidence/), the base ${tail.commit} and HEAD ${head}. A commit between ${candidate} and HEAD that is neither a registration nor a change outside the manifest core breaks the transport (a commit that changes the manifest core, for example a feature-package-reconcile commit, is itself taken as the candidate)`, { ...extra2, candidateCommit: candidate, baseCommit: tail.commit, headCommit: head });
     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
   }
   const { descriptor, artifact } = compiled.value;
