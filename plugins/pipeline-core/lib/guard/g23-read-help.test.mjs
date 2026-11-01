@@ -28,7 +28,12 @@ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", 
       assert.equal(isBoundedSingleRg(["-l", "safe", "docs", "-g", "*.md", "-g", good], root), true, good);
     }
     assert.equal(isBoundedSingleRg(["safe", "docs", "--glob", "!*.patch"], root), true, "negated filter alone, long spelling");
-    for (const bad of [".*", "../*.md", "**/*.md", "*.tar.gz", "!.*", "!../x", "!/abs", "!a/b", "!*.{md,txt}", "!", "!*", "!-x", "!*.a.b.c.d"]) {
+    // PO tile answer 2026-11-01 (restated, intent kept: a filter stays a bounded basename filter): a positive `**/` basename filter and a multi-dot
+    // extension (up to three literal segments) are admitted; they name the same files a basename glob already names at any depth.
+    for (const good of ["**/*.md", "*.tar.gz", "**/*.d.ts", "**/*.test.mjs", "*.a.b.c"]) {
+      assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", good], root), true, good);
+    }
+    for (const bad of [".*", "../*.md", "scratch/*.md", "**/sub/*.md", "**/**/*.md", "**/*", "**/.*", "**/*.{md,txt}", "*.m*", "*.a.b.c.d", "!.*", "!../x", "!/abs", "!a/b", "!*.{md,txt}", "!", "!*", "!-x", "!*.a.b.c.d"]) {
       assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", bad], root), false, bad);
     }
     assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "--pre", "run"], root), false);

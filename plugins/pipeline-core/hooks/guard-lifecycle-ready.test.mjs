@@ -12754,7 +12754,10 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
       // D232: a negation can only narrow a search that already names an admitted target, so a bounded negated filter is admitted.
       qp4Admit('rg -n -g "!*.md" apply scratch/notes.md', path);
       qp4Admit('rg -n -g "!*.patch" apply scratch/notes.md', path);
-      for (const glob of ['"**/*.md"', '"scratch/*.md"', '"!scratch/*.md"', '"!.git"', '"!../*.md"', '"!*"']) {
+      // PO tile answer 2026-11-01: a positive `**/` basename filter and a multi-dot extension are admitted as well (same files as the bare basename filter).
+      qp4Admit('rg -n -g "**/*.md" apply scratch/notes.md', path);
+      qp4Admit('rg -n -g "*.tar.gz" apply scratch/notes.md', path);
+      for (const glob of ['"scratch/*.md"', '"**/*"', '"**/sub/*.md"', '"*.a.b.c.d"', '"!scratch/*.md"', '"!.git"', '"!../*.md"', '"!*"']) {
         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
       }
     });

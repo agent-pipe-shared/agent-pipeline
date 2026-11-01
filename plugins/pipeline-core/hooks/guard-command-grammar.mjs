@@ -48,6 +48,11 @@ function isBoundedFilenameFilter(value) {
   // dotted/glob/path expressions (including the existing *.tar.gz negative).
   if (typeof value !== "string") return false;
   if (/^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
+  // PO tile answer 2026-11-01: a POSITIVE recursive basename filter (`**/*.md`) and a multi-dot extension (`*.tar.gz`, `**/*.d.ts`) are admitted too.
+  // `**/` before a bare basename pattern names the same files as the pattern alone (a basename glob already matches at any depth), and up to three
+  // literal dot-separated segments stay bounded filename data. Still refused: any other path segment (`scratch/*.md`), a brace group, `[]`, `?`,
+  // a leading dot or a wildcard inside an extension.
+  if (/^(?:\*\*\/)?\*\.(?:[A-Za-z0-9][A-Za-z0-9_-]{0,15}\.){0,2}[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
   // D232 (PO instruction, 2026-11-01): a NEGATED filter only excludes. It can never add a file the unfiltered search would not
   // visit, never lifts an ignore rule (only a positive glob overrides one) and never reaches a hidden name, so it narrows the
   // traversal and is read-only. Admitted exclusions: a bounded extension (`!*.patch`, `!*.min.js`, `!**/*.log`) and a plain

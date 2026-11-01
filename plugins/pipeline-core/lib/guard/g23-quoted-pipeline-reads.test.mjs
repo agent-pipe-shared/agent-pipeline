@@ -52,16 +52,18 @@ test("quoted operators remain inert regex data in the stdin sink", () => fixture
     assert.equal(isBoundedReadOnlyPipeline(parse(command), root), true);
     assert.equal(guard(command).exitCode, 0);
   }
+  for (const glob of ["*.tar.gz", "*.test.tar.gz", "**/*.mjs"]) {
+    assert.equal(guard(`rg --files plugins/pipeline-core -g '${glob}' | rg owner`).exitCode, 0, glob);
+  }
 }));
 
 test("unsupported filters, executable flags and shell effects stay refused", () => fixture(({ guard }) => {
   for (const command of [
-    "rg --files plugins/pipeline-core -g '*.tar.gz' | rg owner",
-    "rg --files plugins/pipeline-core -g '*.test.tar.gz' | rg owner",
+    // PO tile answer 2026-11-01 (restated): `*.tar.gz`, `*.test.tar.gz` and `**/*.mjs` moved to the admitted list of the test above; SEC-11 intent unchanged.
     "rg --files plugins/pipeline-core -g '*.test..mjs' | rg owner",
     "rg --files plugins/pipeline-core -g '.*' | rg owner",
     "rg --files plugins/pipeline-core -g '../*.mjs' | rg owner",
-    "rg --files plugins/pipeline-core -g '**/*.mjs' | rg owner",
+    "rg --files plugins/pipeline-core -g '**/sub/*.mjs' | rg owner",
     "rg --pre inert owner plugins/pipeline-core | rg owner",
     "rg --files plugins/pipeline-core | rg --pre inert owner",
     "rg --files plugins/pipeline-core | rg --output out owner",
