@@ -1,0 +1,772 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index d7c5d31b9..79ec9bfdc 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -101,6 +101,7 @@ import {
+   inspectSessionOwnerRuntime,
+   listActiveSessionDescriptors,
+   loadSessionDescriptor,
++  retireSessionDescriptor,
+   observeOwnedSessionDescriptorOwnerHandle,
+   observeOwnedSessionDescriptorClosureHandle, inspectOwnedSessionDescriptorClosure, inspectSignedDescriptorCustodyRepository,
+ } from "./worktree-lifecycle.mjs";
+@@ -114,7 +115,8 @@ import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrust
+ import { readMachinePlane } from "./machine-plane.mjs";
+ import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
+   inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation, withSourceOwnedRetiredOwnerTerminalContext,
+-  inspectSourceOwnedRetiredOwnerTerminalContext } from "./session-requester-bridge.mjs";
++  inspectSourceOwnedRetiredOwnerTerminalContext, isSourceOwnedContinuityOwnerRouteRequester,
++  inspectSourceOwnedContinuityOwnerRouteInvocation } from "./session-requester-bridge.mjs";
+ import { withSessionAuthorityBoundary, advanceSessionAuthorityMember, reserveSessionAuthorityMember, releaseSessionAuthorityMember,
+   inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord,
+   inspectSourceOwnedSessionAuthorityStateRefresh, inspectSourceOwnedSessionAuthorityCompanionRefresh,
+@@ -10009,6 +10011,91 @@ export function releaseOnboardingSessionCleanup(request={}) {
+   return operation.terminalOwnerResult;
+ }
+ 
++/**
++ * D231 (option a): the State sha256 an onboarding-continuity owner recorded in its immutable execution journal right after the bind,
++ * found by the member's bindingSha256; null when no such journal exists. Read-only; the registry compares it with the release evidence.
++ */
++export function readOnboardingContinuityMemberBoundStateSha256({repository, bindingSha256} = {}) {
++  if (!SHA256_RE.test(bindingSha256 ?? '')) return null;
++  const actual = continuityAuthorityRepository(repository);
++  const directory = privateCleanupPaths(actual.primaryRoot).directory;
++  if (!existsSync(directory)) return null;
++  for (const name of readdirSync(directory).sort()) {
++    if (!/^continuity-authority-execution-[a-f0-9]{32}\.json$/u.test(name)) continue;
++    try {
++      const body = JSON.parse(assertPrivateCleanupFile(join(directory,name),'continuity execution journal').toString('utf8'));
++      if (body?.schema === 'pipeline.continuity-authority-observation.v1' && body.stage === 'execution' && body.bindingSha256 === bindingSha256
++          && SHA256_RE.test(body.source?.stateSha256 ?? '')) return body.source.stateSha256;
++    } catch { /* an unreadable journal proves nothing, so it never exempts */ }
++  }
++  return null;
++}
++
++// D231 (PO decision 2026-11-01, option A): the one closed list of State entries a plain-terminal OWNER ROUTE process may run for
++// the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
++// for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
++const CONTINUITY_OWNER_ROUTE_ENTRIES = new Set([
++  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply',
++]);
++/**
++ * Runs exactly one allowlisted entry through the existing port.executeCompanionOperation for the CURRENT process's direct binding
++ * (the handles are process-local WeakMap capabilities, so this is the only place that can reach them). Every gate of
++ * continuityExecuteCompanionOperation still runs; this adds one more: the active requester must be the owner-route issuer's.
++ */
++export function executeOnboardingContinuityOwnerRouteEntry(request = {}) {
++  if (!exactKeys(request, new Set(['rootDir','sessionCleanup','entry','argv','expectedStateSha256'])))
++    fail('COR-REQUEST','owner-route entry request is invalid');
++  if (!CONTINUITY_OWNER_ROUTE_ENTRIES.has(request.entry))
++    fail('COR-ENTRY-OUTSIDE-ALLOWLIST',`the owner route runs only ${[...CONTINUITY_OWNER_ROUTE_ENTRIES].join(', ')}`);
++  const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
++  if (!isSourceOwnedContinuityOwnerRouteRequester({repository}))
++    fail('COR-REQUESTER-NOT-OWNER-ROUTE','the active requester was not issued by the continuity owner-route issuer');
++  const owned = continuityAuthorityDirectBindings.get(continuityAuthorityDirectKey(repository,request.sessionCleanup));
++  if (!owned || !continuityAuthorityEqual(repository,owned.repository))
++    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owner-route binding unavailable in this process');
++  const operation = continuityAuthorityOperations.get(owned.prepared.operationHandle);
++  return owned.port.executeCompanionOperation({operationHandle:owned.prepared.operationHandle,
++    executionHandle:owned.executed.executionHandle,expectedMemberRef:continuityAuthorityReadMemberRef(repository,operation.expectedMemberRef),
++    expectedStateSha256:request.expectedStateSha256,entry:request.entry,argv:[...request.argv]});
++}
++
++/**
++ * D231 (E): releases the binding an owner-route CLI call left behind when it was killed between bind and release. Not a new
++ * authority: it is the existing lost-binding sequence (descriptor retired, registry member released FIRST, binding second,
++ * registry healed and read back) applied only to a session that (1) the State names as the held binding, (2) carries an
++ * owner-route invocation record of this repository, and (3) whose recorded process is PROVEN dead. A live or unverifiable owner
++ * is reported and left alone; any other binding (a real session, the approved controller) is `none` and stays with its own recovery.
++ */
++export function releaseDeadContinuityOwnerRouteBinding({ rootDir } = {}) {
++  const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(rootDir));
++  let observed;
++  try { observed = observeSessionCleanupState(rootDir); }
++  catch { return {status:'none',reason:'the selected State cannot be observed, so no owner-route binding can be classified'}; }
++  const tuple = observed.sessionCleanup;
++  if (tuple === null || tuple === undefined) return {status:'none',reason:'no session-cleanup binding is held'};
++  const invocation = inspectSourceOwnedContinuityOwnerRouteInvocation({rootDir:repository.primaryRoot,sessionId:tuple.sessionId});
++  if (invocation.status !== 'found') return {status:'none',reason:'the held binding is not an owner-route binding; the existing recovery decides it'};
++  if (invocation.ownerStatus === 'live') return {status:'live',sessionId:tuple.sessionId,reason:'the owner-route process is still running; its own call releases the binding'};
++  if (invocation.ownerStatus !== 'dead') return {status:'unverifiable',sessionId:tuple.sessionId,reason:'the owner-route process cannot be proven dead on this platform'};
++  let loaded = null;
++  try { loaded = loadSessionDescriptor(repository.primaryRoot,tuple.sessionId,{expectedDescriptorSha256:tuple.descriptorSha256}); }
++  catch (error) { if (error?.code !== 'WT-SESSION-MISSING') throw error; }
++  if (loaded !== null) retireSessionDescriptor(repository.primaryRoot,{sessionId:tuple.sessionId,descriptorSha256:tuple.descriptorSha256,ownerNonce:loaded.ownerNonce});
++  const step = runOrphanSessionAuthorityMemberStep({repository,target:{sessionId:tuple.sessionId,descriptorSha256:tuple.descriptorSha256},
++    codePrefix:'COR-ORPHAN-RELEASE',rerun:'routine-repair.mjs run heal',
++    recheck:() => {
++      const current = observeSessionCleanupState(rootDir);
++      if (!continuityAuthorityEqual(current.sessionCleanup,tuple) || current.stateSha256 !== observed.stateSha256 || current.revision !== observed.revision)
++        fail('COR-ORPHAN-RELEASE-CAS','State changed since the owner-route orphan was observed');
++    },
++    releaseBinding:() => {
++      const released = releaseOnboardingSessionCleanupInternal({rootDir,expectedStateSha256:observed.stateSha256,expectedRevision:observed.revision,sessionCleanup:tuple});
++      if (released.status !== 'released' || released.sessionCleanup !== null) fail('COR-ORPHAN-RELEASE-READBACK','the owner-route binding release did not read back as released');
++    }});
++  if (observeSessionCleanupState(rootDir).sessionCleanup !== null) fail('COR-ORPHAN-RELEASE-READBACK','the owner-route binding is still held after the release');
++  return {status:'released',sessionId:tuple.sessionId,descriptorRetired:loaded !== null,member:step.member,registry:step.registry};
++}
++
+ // Source-owned selected-State bookkeeping. No public constructor mints a witness.
+ const continuitySharedStateWitnesses = new WeakMap();
+ const continuityAuthorityPortCache = new Map();
+@@ -10857,6 +10944,19 @@ function continuityRefreshCompanionKnownOwnerAlias(data,snapshot) {
+     fail('SDC-AUTHORITY-UNAVAILABLE','continuity companion lifetime bound');
+   data.legacy.set(key,value.operation.operationHandle);
+ }
++// D231 option (a): the owner-side twin of the registry's exemption. A released member is no historical writer only when its terminal is
++// continuity-released or lost-binding-recovered AND the State sha it was bound at (its immutable execution journal) equals every
++// selected-state fact of the member and of its release evidence. A member that wrote moved its facts to the postimage and never matches.
++function continuityReleasedMemberNeverChangedState(data,item) {
++  try {
++    if (!['continuity-released','lost-binding-recovered'].includes(item.releaseRecord?.terminal)) return false;
++    const bound=readOnboardingContinuityMemberBoundStateSha256({repository:data.repository,bindingSha256:item.record.bindingSha256});
++    if (typeof bound!=='string') return false;
++    const released=item.releaseRecord.sourceFacts.filter(fact=>fact.namespaceId==='selected-state');
++    return released.length>0 && released.every(fact=>fact.sha256===bound)
++      && item.record.sourceFacts.filter(fact=>fact.namespaceId==='selected-state').every(fact=>fact.sha256===bound);
++  } catch { return false; }
++}
+ function continuityObserveCompanionStateWrite(data,port,methods,handle,context) {
+   if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
+       || !isOwnedStateAuthorityCompanionWriteHandle(handle,{repository:data.repository}))
+@@ -10883,7 +10983,8 @@ function continuityObserveCompanionStateWrite(data,port,methods,handle,context)
+       || !continuityAuthorityEqual(members.map(item=>item.record),context.memberRecords)
+       || !continuityAuthorityEqual(members.filter(item=>item.releaseRecord!==null).map(item=>item.releaseRecord),context.releaseRecords)
+       || members.some(item=>item.record.phase==='terminal-observed'
+-        || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage')))))
++        || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage'))
++          &&!continuityReleasedMemberNeverChangedState(data,item))))
+     fail('SDC-AUTHORITY-CAS','continuity companion record authentication failed');
+   const snapshot=continuityAuthoritySnapshot(data.repository);
+   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index 64963664a..039eae97f 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -14,10 +14,11 @@ export const ROUTINE_REPAIR_RECORD_SCHEMA = "pipeline.routine-repair-record.v1";
+ export const ROUTINE_REPAIR_LIST_SCHEMA = "pipeline.routine-repair-list.v1";
+ const SAR = fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url));
+ const SLICE_QUEUE = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
++const OWNER_ROUTE = fileURLToPath(new URL("../scripts/continuity-owner-route.mjs", import.meta.url));
+ 
+ /** The closed list (D194). Frozen; nothing registers into it at runtime. */
+ export const ROUTINE_REPAIRS = Object.freeze([
+-  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
++  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
+   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
+   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
+   Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
+@@ -275,7 +276,8 @@ export function runRoutineRepair(request, deps = {}) {
+   if (!plan.ok) result = plan;
+   else if (commonDir === null) result = refuse("RR-ROOT", "--root is not a git repository");
+   else {
+-    try { result = execute(plan, { root, commonDir, spawn, now, moved, retained }); }
++    // ownerRouteSpawn (tests only): the owner-route orphan release is its own delegate, separate from the session-authority-repair stub.
++    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained }); }
+     catch (error) { result = refuse("RR-FAILED", short(error)); }
+   }
+   const code = result.ok ? (result.code ?? "done") : result.code;
+@@ -337,9 +339,24 @@ function retireSettledPending(ctx, inspect) {
+   return { retiredPending, keptPending: kept, retiredOrphanAuthority: orphans.retire, keptOrphanAuthority: orphans.kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
+ }
+ 
++/** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
++function releaseOwnerRouteOrphan(spawn, root) {
++  try {
++    const json = parseJson(spawn(OWNER_ROUTE, ["release-orphan", "--root", root], root).stdout);
++    if (json === null || typeof json.status !== "string") return { status: "unverifiable", reason: "continuity-owner-route release-orphan did not report, so no owner-route binding was classified" };
++    const { schema, ...rest } = json;
++    return rest;
++  } catch (error) { return { status: "unverifiable", reason: short(error) }; }
++}
++
+ function execute(plan, ctx) {
+   const { root, commonDir, spawn, now } = ctx;
+   if (plan.kind === "heal") {
++    // D231 (E): an owner-route CLI call killed between bind and release leaves a held binding and an armed member that would block the
++    // next call and the close. The release runs FIRST, in its own process, so the delegate below heals a consistent namespace. Only a
++    // binding with an owner-route invocation record whose process is proven dead is released; a live or unverifiable owner is reported.
++    const ownerRoute = releaseOwnerRouteOrphan(ctx.ownerSpawn, root);
++    if (ownerRoute.status === "refused" && /^COR-ORPHAN-RELEASE/u.test(ownerRoute.code ?? "")) return refuse(ownerRoute.code ?? "RR-OWNER-ROUTE-RELEASE", ownerRoute.message ?? "the owner-route orphan release was refused", `node ${OWNER_ROUTE} release-orphan --root ${root}`);
+     // W7: the settled pending states leave BEFORE the delegate runs, so heal re-anchors the registry on the namespace as it stays.
+     let settledPending;
+     try {
+@@ -351,7 +368,7 @@ function execute(plan, ctx) {
+     // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
+     const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
+     const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
+-    return { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
++    return { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+   }
+   if (plan.kind === "settled-pending-aside") {
+     const run = spawn(SAR, ["inspect", "--root", root], root);
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 93c4c7d93..164e8ffcd 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -1129,6 +1129,21 @@ function companionInventory(row,images){
+   return {memberships:baseline.memberships,legacyOperationsSha256:digest(legacy)};
+ }
+ function companionConserveFacts(before,after,preimages,postimages){if(!equal(before.filter(f=>!companionFactMatches(f,preimages)),after.filter(f=>!companionFactMatches(f,postimages))))fail('SDC-AUTHORITY-CAS','companion-unscoped-source-effects');}
++// D231 (PO decision 2026-11-01, option a): a RELEASED onboarding-continuity member is no historical writer when (1) its release terminal is
++// continuity-released or lost-binding-recovered AND (2) the State image it was BOUND at equals the State image in its release evidence (and the
++// image the next write starts from). The bound image is the sha256 the owner recorded in its immutable execution journal at the bind (found by the
++// member's bindingSha256); the release evidence is the selected-state fact of the release record. A member that wrote moved its own facts to the
++// postimage, so its journal sha differs from a later image or from its release evidence: it stays blocking, as does every other terminal.
++function releasedMemberNeverChangedState(repo,row,member,preimages){
++  try{
++    if(row.participant.producerId!=='onboarding-continuity'||!member.release||!['continuity-released','lost-binding-recovered'].includes(member.release.value.terminal))return false;
++    const bound=onboarding.readOnboardingContinuityMemberBoundStateSha256({repository:repo,bindingSha256:member.value.bindingSha256});
++    if(typeof bound!=='string')return false;
++    const released=member.release.value.sourceFacts.filter(f=>f.namespaceId==='selected-state');
++    if(!released.length||released.some(f=>f.sha256!==bound))return false;
++    return member.value.sourceFacts.filter(f=>companionFactMatches(f,preimages)).every(f=>f.sha256===bound);
++  }catch{return false;}
++}
+ export function inspectSourceOwnedSessionAuthorityCompanionRefresh(input){
+   exact(input,['boundary','producerPort','companionWriteHandle','ownerWitness'],'companion-refresh-input');
+   const {boundary:token,producerPort,companionWriteHandle:handle,ownerWitness}=input,repo=boundary(token),ticket=companionRefreshTickets.get(ownerWitness);
+@@ -1161,7 +1176,7 @@ export function executeSourceOwnedSessionAuthorityCompanionWrite(input){
+   const pairs=boundaryPorts(token),before=stateRead(repo,pairs),preimages=plan.effects.map(e=>e.preimage),pre=before.rows.map(r=>companionInventory(r,preimages));
+   const affected=[];for(let i=0;i<before.rows.length;i++){
+     const row=before.rows[i];if(!equal(pre[i].memberships,row.record.value.baseline))fail('SDC-AUTHORITY-CAS','companion-preexisting-drift');
+-    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
++    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))&&!releasedMemberNeverChangedState(repo,row,m,preimages)))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
+     const overlap=[...pre[i].memberships.flatMap(m=>m.sourceFacts),...row.members.filter(m=>m.value.phase!=='released').flatMap(m=>m.value.sourceFacts)].some(f=>companionFactMatches(f,preimages));
+     const declared=plan.affectedProducerIds.includes(row.participant.producerId);
+     if(overlap&&!declared)fail('SDC-AUTHORITY-UNAVAILABLE','companion-unknown-overlapping-owner');
+diff --git a/plugins/pipeline-core/lib/session-requester-bridge.mjs b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+index aebebf9ed..0db632462 100644
+--- a/plugins/pipeline-core/lib/session-requester-bridge.mjs
++++ b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+@@ -24,6 +24,7 @@ import { parseStrictJson } from './governance-event.mjs';
+ import { derivePlanLifecycle as deriveApprovedControllerPlanLifecycle } from './plan-spec-state-v2.mjs';
+ import { readAcceptedDeliveryContract as readApprovedControllerAcceptedContract } from '../scripts/pipeline-state.mjs';
+ import { validateVerifySuiteReceipt } from './verify-resume.mjs';
++import { COORDINATOR_PHASES as ownerRouteCoordinatorPhases, readCloseCoordinator as readOwnerRouteCloseCoordinator } from '../scripts/publication-close-journal.mjs';
+ import { validateVerifyCaseCompletionPolicy, validateVerifyCaseCompletionAttestation, verifyCaseCompletionPolicySha256 } from './verify-case-completion-receipt.mjs';
+ 
+ const SHA = /^[a-f0-9]{64}$/u, ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u;
+@@ -1650,3 +1651,150 @@ export function inspectSourceOwnedApprovedControllerCourse(input){
+     approvalRefs:approved.refs,expectedStateSha256:approved.selectedStateRef.sha256,
+     expectedRevision:approved.observed.revision,sessionCleanup:null});
+ }
++
++// ---- Continuity owner route (PO decision D231, option A, 2026-11-01) --------------------------------------------------
++// A second fixed production issuer, mirroring the approved-controller precedent above. A plain-terminal process may own the
++// State write of exactly four Close-route entries, in exactly one closed script, only AFTER the Close lifecycle has started.
++// Owner identity is a FRESH per-invocation descriptor (controller-<random>): neither the host session nor the hook-observed
++// owner (documented as unauthenticated). The issuer admits nothing else: it reads no caller JSON, takes no session/PID input.
++const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply']);
++const OWNER_ROUTE_SCHEMA='pipeline.continuity-owner-route-invocation.v1';
++const OWNER_ROUTE_PRODUCER='continuity-owner-route';
++const ownerRouteRuntimes=new Map();
++function ownerRouteRefuse(code,reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;throw error;}
++const ownerRouteRefusal=error=>typeof error?.code==='string'&&error.code.startsWith('COR-');
++/** The new bridge-side course predicate: reads the real selected State and the Close coordinator; admits nothing else. */
++function ownerRouteCourse(rootDir,lifecycleId,currentStatePath=null){
++  let observed;
++  try{
++    if(currentStatePath===null)observed=continuityVerificationIssuer.observeSessionCleanupState(rootDir);
++    else{
++      // Between bind and release the State legitimately carries the binding; recheck only real bytes, as the precedent does.
++      const before=osvPhysicalRef(currentStatePath),bytes=readFileSync(currentStatePath);
++      if(hash(bytes)!==before.sha256)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State changed while it was read');
++      observed={path:currentStatePath,state:parseStrictJson(bytes),stateSha256:before.sha256};
++    }
++  }catch(error){if(ownerRouteRefusal(error))throw error;ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State cannot be read ('+(error?.code??'unreadable')+')');}
++  const state=observed.state;
++  if(state?.schema!=='pipeline.state.v0'||!state.activeFeature||typeof state.activeFeature.id!=='string'||!state.continuity
++    ||state.continuity.featureId!==state.activeFeature.id)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the State has no active feature with Continuity');
++  if(currentStatePath===null){
++    if(observed.orphanBinding||observed.sessionCleanup!==null)ownerRouteRefuse('COR-BINDING-HELD','a session-cleanup binding is already held');
++    if(!observed.neutral||observed.mode!=='active')ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State is not the neutral active State');
++  }
++  let coordinator;
++  try{coordinator=readOwnerRouteCloseCoordinator(retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(rootDir).commonDir,lifecycleId).coordinator;}
++  catch{ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','no Close coordinator record exists for lifecycle '+lifecycleId);}
++  if(coordinator.featureId!==state.activeFeature.id||ownerRouteCoordinatorPhases.indexOf(coordinator.phase)<ownerRouteCoordinatorPhases.indexOf('checkpointed'))
++    ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','the Close lifecycle of this feature has not reached checkpointed');
++  // Each of the four entries is legal only before the Close transition exists; the entry's own gates decide everything finer.
++  if(state.continuity.closeTransition!==null&&state.continuity.closeTransition!==undefined)ownerRouteRefuse('COR-STATE-PHASE','the Close transition already exists, so these entries are past their phase');
++  const selectedStateRef=osvPhysicalRef(observed.path);
++  if(currentStatePath===null){const again=continuityVerificationIssuer.observeSessionCleanupState(rootDir);
++    if(digest(again.state)!==digest(state)||again.path!==observed.path||again.revision!==observed.revision)ownerRouteRefuse('COR-STATE-UNAVAILABLE','the selected State changed while it was inspected');}
++  osvPhysical(selectedStateRef);
++  return {observed,selectedStateRef,course:{featureId:state.activeFeature.id,lifecycleId}};
++}
++function ownerRouteProgram(rootDir){
++  const controller=osvObservedProcess(process.pid),program=osvProgram(controller);
++  const module=fileURLToPath(new URL('../scripts/continuity-owner-route.mjs',import.meta.url));
++  const args=process.argv.slice(2);
++  // run --root <root> --lifecycle <id> -- <entry> <entry argv...>: the lifecycle id is part of the authenticated argv, so a
++  // process cannot be admitted for a Close lifecycle it did not name (a directory scan cannot tell several lifecycles apart).
++  if(program.module.path!==module||program.cwd!==rootDir||args.length<7||args.length>262||args[0]!=='run'||args[1]!=='--root'||args[2]!==rootDir
++    ||args[3]!=='--lifecycle'||!ID.test(args[4])||args[5]!=='--'||!OWNER_ROUTE_ENTRIES.includes(args[6])
++    ||args.slice(6).some(value=>typeof value!=='string'||value.length<1||value.length>4096||/[\0\r\n]/u.test(value)))osvFail('OSV-OWNER-UNAVAILABLE');
++  osvSame(program.argv,[process.argv0,...process.execArgv,module,...args]);
++  return {controller,program,lifecycleId:args[4],entry:args[6],entryArgvSha256:digest(args.slice(6))};
++}
++function ownerRouteValidRoot(rootDir){
++  if(typeof rootDir!=='string'||!isAbsolute(rootDir)||resolve(rootDir)!==rootDir)osvFail('OSV-OWNER-UNAVAILABLE');
++}
++/** Read-only course facts with TYPED refusals for the CLI to print; arms nothing and returns no handle. */
++export function inspectSourceOwnedContinuityOwnerRouteCourse(input){
++  osvExact(input,['rootDir','lifecycleId']);ownerRouteValidRoot(input.rootDir);
++  if(typeof input.lifecycleId!=='string'||!ID.test(input.lifecycleId))return Object.freeze({status:'refused',code:'COR-LIFECYCLE-NOT-STARTED',reason:'the lifecycle id is not valid'});
++  const repository=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
++  if(repository.primaryRoot!==input.rootDir)osvFail('OSV-OWNER-UNAVAILABLE');
++  try{
++    const approved=ownerRouteCourse(repository.primaryRoot,input.lifecycleId);
++    return Object.freeze({status:'current',course:Object.freeze({...approved.course}),expectedStateSha256:approved.selectedStateRef.sha256,expectedRevision:approved.observed.revision});
++  }catch(error){if(ownerRouteRefusal(error))return Object.freeze({status:'refused',code:error.code,reason:error.reason??error.message});throw error;}
++}
++/** Fixed production entry only; no session/PID/origin/dependency issuer inputs. */
++export function createSourceOwnedContinuityOwnerRouteRequesterRuntime(input){
++  osvExact(input,['rootDir']);ownerRouteValidRoot(input.rootDir);
++  const r=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
++  if(r.primaryRoot!==input.rootDir||ownerRouteRuntimes.has(repositoryHash(r)))osvFail('OSV-REPLAY');
++  const capture=ownerRouteProgram(r.primaryRoot);
++  const course=(path=null)=>{try{return ownerRouteCourse(r.primaryRoot,capture.lifecycleId,path);}catch(error){if(ownerRouteRefusal(error))osvFail('OSV-COURSE-UNAVAILABLE');throw error;}};
++  const approved=course();
++  if(approved.observed.sessionCleanup!==null)osvFail('OSV-OWNER-UNAVAILABLE');
++  const key=repositoryHash(r),lifetime={live:true};ownerRouteRuntimes.set(key,lifetime);
++  let runtimePort;
++  try{
++    const started=startSessionDescriptor(r.primaryRoot,{sessionId:'controller-'+randomBytes(12).toString('hex')});
++    const descriptorHandle=createSourceOwnedDescriptorHandle({repository:r,sessionId:started.sessionId,expectedDescriptorSha256:started.descriptorSha256,ownerNonceFile:null});
++    const source={schema:OWNER_ROUTE_SCHEMA,repositorySha256:key,sessionId:started.sessionId,process:capture.controller,program:capture.program,
++      lifecycleId:capture.lifecycleId,entry:capture.entry,entryArgvSha256:capture.entryArgvSha256,course:approved.course,initialStateRef:approved.selectedStateRef,
++      assurance:'physical-readback',eventId:randomBytes(16).toString('hex')};
++    const sourceRef=publish(r,join(ensureNamespace(r),'invocations','owner-route-'+randomBytes(12).toString('hex')+'.json'),source);
++    runtimePort=runtimePortFor({repository:r,disposed:false,children:new Set()});
++    const recheck=()=>{
++      if(!lifetime.live)osvFail('OSV-OWNER-UNAVAILABLE');
++      const freshProgram=ownerRouteProgram(r.primaryRoot),freshCourse=course(approved.selectedStateRef.path);
++      if(!osvSameProcess(capture.controller,freshProgram.controller))osvFail('OSV-OWNER-UNAVAILABLE');
++      osvSame(capture.program,freshProgram.program);osvSame(approved.course,freshCourse.course);readPrivate(r,sourceRef);
++    };
++    const currentInvocationHandle=opaque(invocations,{repository:r,process:capture.controller,sourceRef,
++      invocationBindingSha256:digest(source),producerId:OWNER_ROUTE_PRODUCER,assurance:'physical-readback',port:runtimePort,sourceOwnerRecheck:recheck});
++    const bound=bindSourceOwnedRequesterInvocation({repository:r,descriptorHandle,currentInvocationHandle},runtimePort);
++    return Object.freeze({descriptorHandle,currentInvocationHandle,runtimePort,...bound,
++      sessionCleanup:Object.freeze({sessionId:started.sessionId,descriptorSha256:started.descriptorSha256}),
++      entry:capture.entry,entryArgv:Object.freeze(process.argv.slice(8)),
++      expectedStateSha256:approved.selectedStateRef.sha256,expectedRevision:approved.observed.revision,
++      run:callback=>withSourceOwnedAuthorityContext({requesterHandle:bound.requesterHandle,runtimePort},callback),
++      dispose:async()=>{lifetime.live=false;const port=ports.get(runtimePort);port.disposed=true;
++        // Expiry never releases descriptor/history or a still-held Registry member.
++        return {status:[...port.children].some(child=>!child.closed)?'held':'closed',sourceRefs:[sourceRef,bound.bindingRef]};}});
++  }catch(error){lifetime.live=false;if(runtimePort)ports.get(runtimePort).disposed=true;throw error;}
++}
++/** True only while the active requester context was issued by the owner-route issuer above (a fixture requester never is). */
++export function isSourceOwnedContinuityOwnerRouteRequester(input){
++  osvExact(input,['repository']);
++  const r=repository(input.repository),context=active.getStore();
++  if(!context?.lifetime.live||!sameRepository(r,context.repository))return false;
++  const entry=requesters.get(context.requesterHandle),invocation=entry?.currentInvocationHandle?invocations.get(entry.currentInvocationHandle):null;
++  return Boolean(invocation&&invocation.producerId===OWNER_ROUTE_PRODUCER&&invocation.assurance==='physical-readback');
++}
++function ownerRouteProcessStatus(recorded){
++  try{
++    if(process.platform==='win32')return 'unknown';
++    const observed=observePosixProcess(recorded.pid);
++    if(observed===null||['Z','X'].includes(observed.state))return 'dead';
++    if(observed.start!==recorded.start||observed.bootSha256!==recorded.bootSha256)return 'dead';
++    return sameProcess(recorded,observed)?'live':'unknown';
++  }catch{return 'unknown';}
++}
++/** Read-only: the owner-route invocation record of one cleanup session, with the proven liveness of its process (dead only on proof). */
++export function inspectSourceOwnedContinuityOwnerRouteInvocation(input){
++  osvExact(input,['rootDir','sessionId']);ownerRouteValidRoot(input.rootDir);
++  if(typeof input.sessionId!=='string'||!ID.test(input.sessionId))return Object.freeze({status:'absent'});
++  const repository=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
++  const directory=join(repository.commonDir,'agent-pipeline','run','session-requesters','invocations');
++  if(!existsSync(directory))return Object.freeze({status:'absent'});
++  for(const name of readdirSync(directory).sort()){
++    if(!/^owner-route-[a-f0-9]{24}\.json$/u.test(name))continue;
++    const path=join(directory,name);
++    let value;
++    try{
++      const before=lstatSync(path);
++      if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.uid!==process.getuid()||(before.mode&0o077)!==0||before.size>MAX)continue;
++      value=parseStrictJson(readFileSync(path));
++    }catch{continue;}
++    if(value?.schema!==OWNER_ROUTE_SCHEMA||value.sessionId!==input.sessionId||value.repositorySha256!==repositoryHash(repository)
++      ||!Number.isSafeInteger(value.process?.pid))continue;
++    return Object.freeze({status:'found',sessionId:value.sessionId,lifecycleId:value.lifecycleId,entry:value.entry,ownerStatus:ownerRouteProcessStatus(value.process)});
++  }
++  return Object.freeze({status:'absent'});
++}
+diff --git a/plugins/pipeline-core/scripts/continuity-owner-route.mjs b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+new file mode 100644
+index 000000000..4d10e0237
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+@@ -0,0 +1,147 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// D231 owner route (PO decision 2026-11-01, option A). A plain-terminal process may own the State write of EXACTLY FOUR Close-route
++// entries, and only here. For a project WITH a session-authority catalogue those entries refuse on the direct route
++// (SDC-AUTHORITY-UNAVAILABLE) because the State write must be owner-bound to an armed onboarding-continuity member.
++//
++//   node continuity-owner-route.mjs run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>]
++//   node continuity-owner-route.mjs release-orphan --root <root>          (also run by `routine-repair.mjs run heal`)
++//
++// ONE `run` call = bind, exactly one entry through the existing port.executeCompanionOperation (every gate unchanged), release, all in
++// this process (the handles are process-local capabilities). Allowlist: continuity-result-bootstrap-plan, continuity-result-bootstrap-apply,
++// continuity-result-close-plan, continuity-result-close-apply. close-feature is NOT on it (separate slice); the entry itself writes State,
++// this script never does, and it never forces the registry or a member. The entry's own stdout passes through; the one-line result
++// envelope (pipeline.continuity-owner-route-result.v1) goes to stderr. Exit: 0 completed, 2 refused, 3 held (a binding remains: run heal).
++import { existsSync, realpathSync, readFileSync } from 'node:fs';
++import { createHash } from 'node:crypto';
++import { fileURLToPath } from 'node:url';
++import { isAbsolute, join, resolve } from 'node:path';
++import { inspectSignedDescriptorCustodyRepository } from '../lib/worktree-lifecycle.mjs';
++import { createSourceOwnedContinuityOwnerRouteRequesterRuntime, inspectSourceOwnedContinuityOwnerRouteCourse } from '../lib/session-requester-bridge.mjs';
++import { bindOnboardingSessionCleanup, observeSessionCleanupState, releaseOnboardingSessionCleanup,
++  executeOnboardingContinuityOwnerRouteEntry, releaseDeadContinuityOwnerRouteBinding } from '../lib/onboarding-continuity.mjs';
++
++const SELF = fileURLToPath(import.meta.url);
++const ROUTINE_REPAIR = fileURLToPath(new URL('./routine-repair.mjs', import.meta.url));
++const SESSION_AUTHORITY_REPAIR = fileURLToPath(new URL('./session-authority-repair.mjs', import.meta.url));
++const PIPELINE_STATE = fileURLToPath(new URL('./pipeline-state.mjs', import.meta.url));
++const CLOSE_COORDINATOR = fileURLToPath(new URL('./close-coordinator.mjs', import.meta.url));
++export const OWNER_ROUTE_RESULT_SCHEMA = 'pipeline.continuity-owner-route-result.v1';
++export const OWNER_ROUTE_ORPHAN_SCHEMA = 'pipeline.continuity-owner-route-orphan-release.v1';
++const ALLOWLIST = Object.freeze(['continuity-result-bootstrap-plan', 'continuity-result-bootstrap-apply', 'continuity-result-close-plan', 'continuity-result-close-apply']);
++const USAGE = `node ${SELF} run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>] (entries: ${ALLOWLIST.join(', ')})`;
++const healCommand = (root) => `node ${ROUTINE_REPAIR} run heal --root ${root} --reason "<why the owner-route call was interrupted>"`;
++
++class OwnerRouteRefusal extends Error {
++  constructor(code, message, { held = false } = {}) { super(message); this.name = 'OwnerRouteRefusal'; this.code = code; this.held = held; }
++}
++const refuse = (code, message, options) => { throw new OwnerRouteRefusal(code, message, options); };
++
++function parseRun(argv) {
++  const dash = argv.indexOf('--');
++  if (dash < 0) refuse('COR-USAGE', `the entry follows a literal "--": ${USAGE}`);
++  const head = argv.slice(1, dash), tail = argv.slice(dash + 1);
++  for (const token of head) {
++    if (token.startsWith('-') && token !== '--root' && token !== '--lifecycle') refuse('COR-FOREIGN-FLAG', `${token} is not a flag of this command; the owner route accepts only --root and --lifecycle before "--": ${USAGE}`);
++  }
++  if (head.length !== 4 || head[0] !== '--root' || head[2] !== '--lifecycle' || tail.length < 1) refuse('COR-USAGE', USAGE);
++  const [, root, , lifecycleId] = head;
++  if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || process.cwd() !== root) refuse('COR-USAGE', `--root must be the absolute real path of the current directory: ${USAGE}`);
++  return { root, lifecycleId, entry: tail[0], tail };
++}
++
++function courseMessage(refusal, root, entry) {
++  switch (refusal.code) {
++    case 'COR-BINDING-HELD':
++      return `a session-cleanup binding is already held (an owner-route call that was killed between bind and release leaves one). Release it, then repeat this call: ${healCommand(root)}`;
++    case 'COR-LIFECYCLE-NOT-STARTED':
++      return `the owner route is admitted only after the Close lifecycle of the active feature reached checkpointed (${refusal.reason}). Start it with: node ${CLOSE_COORDINATOR} plan-start ... then plan-transition --phase checkpointed`;
++    default:
++      return `${refusal.reason ?? refusal.code}; ${entry} stays refused until the State is admissible`;
++  }
++}
++
++async function run(argv) {
++  const { root, lifecycleId, entry, tail } = parseRun(argv);
++  if (entry === 'close-feature') {
++    refuse('COR-CLOSE-FEATURE-UNAVAILABLE', 'close-feature cannot run on the owner route yet: its State write runs in the retired-owner terminal, which needs (a) the retirement of the per-invocation owner descriptor before the entry runs and (b) a retired terminal for a physical-readback requester (today only the controlled-unit-method fixture assurance has one). That is a separate slice. The route that works today: the direct route for a project without a catalogue, or the attended close (an operator-held session that owns the lifecycle), see skills/close-feature/SKILL.md.');
++  }
++  if (!ALLOWLIST.includes(entry)) refuse('COR-ENTRY-OUTSIDE-ALLOWLIST', `${entry} is not an owner-route entry; the closed list is ${ALLOWLIST.join(', ')}. Everything else keeps its present route.`);
++  let repository;
++  try { repository = inspectSignedDescriptorCustodyRepository(root); } catch { refuse('COR-USAGE', `${root} is not a repository root`); }
++  if (repository.primaryRoot !== root) refuse('COR-USAGE', `${root} is not the repository root`);
++  if (!existsSync(join(repository.commonDir, 'agent-pipeline', 'session-authority', 'catalogue.json'))) {
++    refuse('COR-NO-CATALOGUE', `this project has no session-authority catalogue, so ${entry} needs no owner: run it on the direct route, node ${PIPELINE_STATE} ${entry} ...`);
++  }
++  const course = inspectSourceOwnedContinuityOwnerRouteCourse({ rootDir: root, lifecycleId });
++  if (course.status !== 'current') refuse(course.code, courseMessage(course, root, entry));
++  let runtime;
++  try { runtime = createSourceOwnedContinuityOwnerRouteRequesterRuntime({ rootDir: root }); }
++  catch (error) {
++    refuse('COR-REQUESTER-UNAVAILABLE', `the owner-route requester was refused (${error?.code ?? 'unavailable'}); this script is admitted only when started exactly as ${USAGE}, from the repository root, once per process`);
++  }
++  try {
++    return await runtime.run(async () => {
++      try {
++        bindOnboardingSessionCleanup({ rootDir: root, sessionCleanup: runtime.sessionCleanup,
++          expectedStateSha256: runtime.expectedStateSha256, expectedRevision: runtime.expectedRevision });
++      } catch (error) {
++        refuse('COR-MEMBER-UNAVAILABLE', `the onboarding-continuity member could not be armed (${error?.code ?? 'error'}: ${String(error?.message ?? error).slice(0, 200)}). Inspect with: node ${SESSION_AUTHORITY_REPAIR} inspect --root ${root}; release a leftover with: ${healCommand(root)}`, { held: true });
++      }
++      // Named test seam (S-ABORT): only ever kills this process after the bind, to leave the orphan the heal path must release.
++      if (process.env.PIPELINE_COR_TEST_ABORT_AFTER_BIND === '1') process.kill(process.pid, 'SIGKILL');
++      const bound = observeSessionCleanupState(root);
++      const expectedStateSha256 = createHash('sha256').update(readFileSync(bound.path)).digest('hex');
++      let result;
++      try {
++        result = executeOnboardingContinuityOwnerRouteEntry({ rootDir: root, sessionCleanup: runtime.sessionCleanup, entry, argv: [...tail], expectedStateSha256 });
++      } catch (error) {
++        result = { status: 'unavailable', code: error?.code ?? 'COR-ENTRY-REFUSED', attempted: false, exitCode: null };
++      }
++      if (result.status === 'unavailable' && result.attempted === true) {
++        refuse('COR-ENTRY-HELD', `the entry was attempted and then refused (${result.code}); the binding is kept because a write may have happened. Release it only after reading the State: ${healCommand(root)}`, { held: true });
++      }
++      try {
++        const before = observeSessionCleanupState(root);
++        releaseOnboardingSessionCleanup({ rootDir: root, sessionCleanup: runtime.sessionCleanup, expectedStateSha256: before.stateSha256, expectedRevision: before.revision });
++        const after = observeSessionCleanupState(root);
++        if (after.sessionCleanup !== null || after.orphanBinding) throw new Error('binding still held');
++      } catch (error) {
++        refuse('COR-RELEASE-HELD', `the entry ran but its owner-route binding could not be released (${error?.code ?? 'error'}). Release it with: ${healCommand(root)}`, { held: true });
++      }
++      if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}); the binding is released`);
++      return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, released: true };
++    });
++  } finally { await runtime.dispose(); }
++}
++
++function releaseOrphan(argv) {
++  if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(argv[2]) || resolve(argv[2]) !== argv[2]) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
++  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: argv[2] }) };
++}
++
++const entry = process.argv[1] && resolve(process.argv[1]);
++if (entry === SELF) {
++  const argv = process.argv.slice(2);
++  if (argv[0] === 'release-orphan') {
++    try { process.stdout.write(JSON.stringify(releaseOrphan(argv)) + '\n'); }
++    catch (error) {
++      process.stdout.write(JSON.stringify({ schema: OWNER_ROUTE_ORPHAN_SCHEMA, status: 'refused', code: /^COR-[A-Z0-9-]{1,80}$/u.test(error?.code ?? '') ? error.code : 'COR-ORPHAN-RELEASE-FAILED',
++        message: String(error?.message ?? error).slice(0, 400) }) + '\n');
++      process.exitCode = 2;
++    }
++  } else if (argv[0] === 'run') {
++    run(argv).then((result) => {
++      process.stderr.write(JSON.stringify({ schema: OWNER_ROUTE_RESULT_SCHEMA, ...result }) + '\n');
++      process.exitCode = result.status === 'completed' ? 0 : 2;
++    }).catch((error) => {
++      const known = /^COR-[A-Z0-9-]{1,80}$/u.test(error?.code ?? '');
++      process.stderr.write(JSON.stringify({ schema: OWNER_ROUTE_RESULT_SCHEMA, status: error?.held === true ? 'held' : 'refused', code: known ? error.code : 'COR-UNAVAILABLE',
++        message: known ? String(error.message).slice(0, 1200) : `the owner route failed (${error?.code ?? 'error'}); nothing is released implicitly: ${USAGE}`, released: error?.held === true ? false : null }) + '\n');
++      process.exitCode = error?.held === true ? 3 : 2;
++    });
++  } else {
++    process.stderr.write(JSON.stringify({ schema: OWNER_ROUTE_RESULT_SCHEMA, status: 'refused', code: 'COR-USAGE', message: USAGE }) + '\n');
++    process.exitCode = 2;
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a29941ab9..f55caa193 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -759,6 +759,199 @@ test("N29 negatives: two Result entries, a Result at another path and a PRD with
+   assert.match(draftNoSpec, /condition=entry-missing/); assert.match(draftNoSpec, /class=spec/);
+ });
+ 
++// ---- D231 owner route (PO decision 2026-11-01, option A): four Close-route State entries for a project WITH a session-authority catalogue ----
++// The bridge authenticates the process argv of the requester, so every positive case SPAWNS the real CLI; a function call cannot stand in.
++// Named seams: (S-FIXTURE) the project is a fixture repository under scratch/test-tmp (the registry refuses an unsafe ancestor such as /tmp);
++// (S-ABORT) PIPELINE_COR_TEST_ABORT_AFTER_BIND=1 makes the CLI SIGKILL itself right after the bind, the only way to leave an orphan binding
++// deterministically. The seam can only kill the process: it grants no authority and skips no gate.
++
++import * as continuityApi from "../lib/onboarding-continuity.mjs";
++import { inspectSourceOwnedCurrentAuthorityContext } from "../lib/session-requester-bridge.mjs";
++
++const OWNER_ROUTE_CLI = fileURLToPath(new URL("./continuity-owner-route.mjs", import.meta.url));
++const ROUTINE_REPAIR_CLI = fileURLToPath(new URL("./routine-repair.mjs", import.meta.url));
++const SAR_CLI = fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url));
++
++function ownerRouteProject(name, { lifecycle = true, catalogue = true } = {}) {
++  const parent = join(process.cwd(), "scratch", "test-tmp");
++  mkdirSync(parent, { recursive: true });
++  const f = fixture(name, parent);
++  f.root = realpathSync(f.root);
++  mkdirSync(join(f.root, "project"), { mode: 0o700 });
++  const neutral = join(f.root, "project", "pipeline-state.json");
++  writeFileSync(neutral, readFileSync(f.statePath), { mode: 0o600 });
++  rmSync(f.statePath);
++  f.statePath = neutral;
++  chmodSync(neutral, 0o600);
++  f.resultPath = join(f.root, "specs/feature/result.md");
++  registerPackage(f);
++  const repository = inspectSignedDescriptorCustodyRepository(f.root);
++  if (catalogue) {
++    const ports = createSessionAuthorityParticipantPorts({ repository });
++    assert.equal(initializeSessionAuthorityRegistry({ repository }, ports).status, "initialized");
++  }
++  const lifecycleId = "close-cor";
++  if (lifecycle) {
++    const start = closeCli(["plan-start", "--root", f.root, "--lifecycle", lifecycleId, "--actor", "PO", "--close-intent", "durable-stop"]);
++    assert.equal(closeAction(start.nextAction).status, "applied");
++    const checkpoint = closeCli(["plan-transition", "--root", f.root, "--lifecycle", lifecycleId, "--actor", "PO", "--phase", "checkpointed"]);
++    assert.equal(closeAction(checkpoint.nextAction).phase, "checkpointed");
++  }
++  return { ...f, repository, lifecycleId };
++}
++
++function spawnNode(script, args, { cwd, env = {} }) {
++  const base = { ...process.env }; delete base.NODE_TEST_CONTEXT;
++  return spawnSync(process.execPath, [script, ...args], { cwd, encoding: "utf8", shell: false, env: { ...base, ...env } });
++}
++const ownerCli = (p, argv, options = {}) => spawnNode(OWNER_ROUTE_CLI, argv, { cwd: p.root, ...options });
++const ownerRun = (p, entryArgv, options = {}) => ownerCli(p, ["run", "--root", p.root, "--lifecycle", p.lifecycleId, "--", ...entryArgv], options);
++const envelopeOf = (r) => JSON.parse(r.stderr.trim().split("\n").filter(Boolean).at(-1));
++const onboardingInFlight = (p) => {
++  const r = spawnNode(SAR_CLI, ["inspect", "--root", p.root], { cwd: p.root });
++  assert.equal(r.status, 0, r.stderr);
++  return JSON.parse(r.stdout).registry.producers.find((row) => row.producerId === "onboarding-continuity").inFlight;
++};
++const assertReleased = (p, label) => {
++  const observed = observeSessionCleanupState(p.root);
++  assert.equal(observed.sessionCleanup, null, `${label}: no session-cleanup binding remains`);
++  assert.equal(observed.orphanBinding ?? null, null, label);
++  assert.equal(onboardingInFlight(p), 0, `${label}: no onboarding-continuity member stays in flight`);
++};
++
++test("D231 owner route: the four Close-route entries run through the spawned CLI, reach the direct-route result and leave the binding released", () => {
++  const p = ownerRouteProject("cor-walk");
++  const planned = ownerRun(p, ["continuity-result-bootstrap-plan"]);
++  assert.equal(planned.status, 0, planned.stderr);
++  assert.equal(envelopeOf(planned).status, "completed");
++  assertReleased(p, "bootstrap-plan");
++  const plan = JSON.parse(planned.stdout);
++  assert.equal(plan.applyAction.argv[1], "continuity-result-bootstrap-apply");
++  const applied = ownerRun(p, plan.applyAction.argv.slice(1));
++  assert.equal(applied.status, 0, applied.stderr);
++  const receipt = JSON.parse(applied.stdout);
++  assert.equal(receipt.status, "applied");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(p.resultPath).subarray(0, p.historical.length), p.historical);
++  assertReleased(p, "bootstrap-apply");
++  const bound = JSON.parse(readFileSync(p.statePath));
++  assert.notEqual(bound.continuity.authority.result, null, "the Result is bound exactly as on the direct route");
++  // Registry side "not exempt" (PO decision option a): the member of bootstrap-apply WROTE the State, so its released record is a
++  // historical writer for the image it left. The next owner is refused with the registry's code, writes nothing and still releases.
++  const stateAfterWrite = readFileSync(p.statePath);
++  const blockedAfterWriter = ownerRun(p, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(bound.continuity.revision),
++    "--result-path", bound.continuity.authority.result.path, "--result-sha256", bound.continuity.authority.result.sha256]);
++  assert.notEqual(blockedAfterWriter.status, 0);
++  assert.match(blockedAfterWriter.stderr, /companion-historical-owner-witness-missing/, "a released member that wrote is never exempt");
++  assert.deepEqual(readFileSync(p.statePath), stateAfterWrite);
++  assertReleased(p, "refused after a writer");
++  // The close entries on a project whose Result is still unbound (the direct-route close fixture): plan, then apply under a second member.
++  const c = ownerRouteProject("cor-close");
++  const closePlanned = ownerRun(c, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", "7",
++    "--result-path", "specs/feature/result.md", "--result-sha256", hash(c.historical)]);
++  assert.equal(closePlanned.status, 0, closePlanned.stderr);
++  const closePlan = JSON.parse(closePlanned.stdout);
++  assert.equal(closePlan.schema, "pipeline.continuity-result-close-plan.v1");
++  assertReleased(c, "close-plan");
++  const closeApplied = ownerRun(c, closePlan.applyAction.argv.slice(1));
++  assert.equal(closeApplied.status, 0, closeApplied.stderr);
++  assert.equal(JSON.parse(closeApplied.stdout).status, "applied");
++  const after = JSON.parse(readFileSync(c.statePath));
++  assert.equal(after.continuity.queueHead.nextAction, "close");
++  assert.equal(after.continuity.revision, 8);
++  assertReleased(c, "close-apply");
++});
++
++test("D231 owner route: close-feature, entries outside the allowlist, foreign flags and a State before the Close lifecycle are refused with a typed code and write nothing", () => {
++  const p = ownerRouteProject("cor-negatives");
++  const before = readFileSync(p.statePath), resultBefore = readFileSync(p.resultPath);
++  const refuse = (r, code, label) => {
++    assert.notEqual(r.status, 0, label); assert.equal(envelopeOf(r).code, code, `${label}: ${r.stderr}`);
++    assert.deepEqual(readFileSync(p.statePath), before, `${label}: State bytes unchanged`);
++    assert.deepEqual(readFileSync(p.resultPath), resultBefore, `${label}: Result bytes unchanged`);
++    assertReleased(p, label); return envelopeOf(r);
++  };
++  const closeFeature = refuse(ownerRun(p, ["close-feature"]), "COR-CLOSE-FEATURE-UNAVAILABLE", "close-feature");
++  assert.match(closeFeature.message, /retire/i, "names the missing piece: the owner-descriptor retirement");
++  assert.match(closeFeature.message, /physical-readback/, "names the retired terminal for physical-readback");
++  assert.match(closeFeature.message, /direct route|attended/i, "names the route that works today");
++  refuse(ownerRun(p, ["continuity-init"]), "COR-ENTRY-OUTSIDE-ALLOWLIST", "entry outside the allowlist");
++  refuse(ownerRun(p, ["continuity-result-rebind-plan"]), "COR-ENTRY-OUTSIDE-ALLOWLIST", "rebind is not on the list");
++  refuse(ownerCli(p, ["run", "--root", p.root, "--lifecycle", p.lifecycleId, "--force", "--", "continuity-result-bootstrap-plan"]), "COR-FOREIGN-FLAG", "foreign flag");
++  const directErrors = [], originalError = console.error;
++  console.error = (...parts) => directErrors.push(parts.join(" "));
++  let directStatus;
++  try { directStatus = run(["continuity-result-bootstrap-plan"], { dir: p.root }); } finally { console.error = originalError; }
++  assert.equal(directStatus, 2, "the old direct call still refuses for a catalogue project");
++  assert.match(directErrors.join("\n"), /SDC-AUTHORITY-UNAVAILABLE|companion-owning-lifecycle-context-required/);
++  const early = ownerRouteProject("cor-early", { lifecycle: false });
++  const earlyBefore = readFileSync(early.statePath);
++  const notStarted = ownerRun({ ...early, lifecycleId: "close-never-started" }, ["continuity-result-bootstrap-plan"]);
++  assert.notEqual(notStarted.status, 0); assert.equal(envelopeOf(notStarted).code, "COR-LIFECYCLE-NOT-STARTED");
++  assert.deepEqual(readFileSync(early.statePath), earlyBefore); assertReleased(early, "before the Close lifecycle");
++});
++
++test("D231 owner route: a project without a catalogue takes the direct route unchanged and the CLI names that route", () => {
++  const p = ownerRouteProject("cor-nocatalogue", { catalogue: false });
++  const direct = invoke(p.root, ["continuity-result-bootstrap-plan"]);
++  assert.equal(direct.status, 0, direct.err);
++  assert.equal(JSON.parse(direct.out).schema.startsWith("pipeline.continuity-result-bootstrap"), true);
++  const before = readFileSync(p.statePath);
++  const viaCli = ownerRun(p, ["continuity-result-bootstrap-plan"]);
++  assert.notEqual(viaCli.status, 0); assert.equal(envelopeOf(viaCli).code, "COR-NO-CATALOGUE");
++  assert.match(envelopeOf(viaCli).message, /pipeline-state\.mjs/);
++  assert.deepEqual(readFileSync(p.statePath), before);
++});
++
++test("D231 owner route: a controlled-method fixture requester is refused by the owner-route entry port and nothing is written", async () => {
++  const p = ownerRouteProject("cor-fixture-requester", { lifecycle: false });
++  const runtime = createControlledMethodRuntimeFixture({ repository: p.repository,
++    fixtureRoot: join(p.repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "cor"), sessionId: "cor-fixture" });
++  await runtime.run(async () => {
++    const observed = observeSessionCleanupState(p.root);
++    const current = inspectSourceOwnedCurrentAuthorityContext({ repository: p.repository }).currentRequester;
++    const tuple = { sessionId: current.sessionId, descriptorSha256: current.descriptorSha256 };
++    continuityApi.bindOnboardingSessionCleanup({ rootDir: p.root, sessionCleanup: tuple, expectedStateSha256: observed.stateSha256, expectedRevision: observed.revision });
++    const bytes = readFileSync(p.statePath);
++    assert.equal(typeof continuityApi.executeOnboardingContinuityOwnerRouteEntry, "function", "the owner-route entry port exists");
++    assert.throws(() => continuityApi.executeOnboardingContinuityOwnerRouteEntry({ rootDir: p.root, sessionCleanup: tuple,
++      entry: "continuity-result-bootstrap-plan", argv: ["continuity-result-bootstrap-plan"], expectedStateSha256: hash(bytes) }),
++    (error) => error.code === "COR-REQUESTER-NOT-OWNER-ROUTE");
++    assert.deepEqual(readFileSync(p.statePath), bytes);
++    const bound = observeSessionCleanupState(p.root);
++    continuityApi.releaseOnboardingSessionCleanup({ rootDir: p.root, sessionCleanup: tuple, expectedStateSha256: bound.stateSha256, expectedRevision: bound.revision });
++  });
++  await runtime.dispose();
++});
++
++test("D231 owner route (E): a CLI call killed between bind and release blocks the next call with a typed code naming heal, heal releases it, and heal on a clean project changes nothing", () => {
++  const p = ownerRouteProject("cor-heal");
++  const heal = (extra = []) => spawnNode(ROUTINE_REPAIR_CLI, ["run", "heal", "--root", p.root, "--reason", "test heal", ...extra], { cwd: p.root });
++  const clean = readFileSync(p.statePath);
++  const noop = heal();
++  assert.equal(noop.status, 0, noop.stdout + noop.stderr);
++  assert.equal(JSON.parse(noop.stdout).ownerRoute.status, "none", "heal on a clean project releases nothing");
++  assert.deepEqual(readFileSync(p.statePath), clean, "heal on a clean project leaves the State bytes unchanged");
++  assertReleased(p, "clean project after heal");
++  const killed = ownerRun(p, ["continuity-result-bootstrap-plan"], { env: { PIPELINE_COR_TEST_ABORT_AFTER_BIND: "1" } });
++  assert.equal(killed.signal, "SIGKILL", `the seam killed the owner after the bind: ${killed.stderr}`);
++  assert.notEqual(observeSessionCleanupState(p.root).sessionCleanup, null, "the killed call left its binding");
++  assert.equal(onboardingInFlight(p), 1, "and its armed member");
++  const blocked = ownerRun(p, ["continuity-result-bootstrap-plan"]);
++  assert.notEqual(blocked.status, 0);
++  const refusal = envelopeOf(blocked);
++  assert.equal(refusal.code, "COR-BINDING-HELD");
++  assert.match(refusal.message, /routine-repair\.mjs run heal --root /);
++  assert.match(refusal.message, /--reason/);
++  const healed = heal();
++  assert.equal(healed.status, 0, healed.stdout + healed.stderr);
++  assert.equal(JSON.parse(healed.stdout).ownerRoute.status, "released");
++  assertReleased(p, "after heal");
++  const again = ownerRun(p, ["continuity-result-bootstrap-plan"]);
++  assert.equal(again.status, 0, again.stderr);
++  assertReleased(p, "next call after heal");
++});
++
+ test("N29: the reconcile plan lifts authority only on the Result entry Continuity binds, and the no-drift check admits nothing wider", () => {
+   const before = { schema: "s", state: "implementing", artifacts: [
+     { class: "prd", path: "p", sha256: h("1"), authority: true, mutability: "mutable", retention: "active" },
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index bc5ebf05d..25ef7d304 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -122,6 +122,7 @@ A feature whose State carries `continuity` closes in this order. Every step is f
+ 1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
+ 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+ 3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, `signatureCommand` and `reconcileCommand`.
++   **Project WITH a session-authority catalogue (D231):** the direct `pipeline-state.mjs` call refuses (`SDC-AUTHORITY-UNAVAILABLE`) because the State write must be owner-bound. For exactly the four entries `continuity-result-bootstrap-plan`, `continuity-result-bootstrap-apply`, `continuity-result-close-plan` and `continuity-result-close-apply`, run `node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- <entry> [<entry flags>]` from the repository root, after the lifecycle reached checkpointed (take the entry and flags from the printed `applyAction.argv` from the entry name onward). One call binds a fresh per-invocation owner (a `controller-<random>` descriptor, not the host session and not the hook-observed owner, which is unauthenticated), runs that one entry through the unchanged gates and releases. A call killed in between leaves a binding: the next call prints `COR-BINDING-HELD` naming `routine-repair.mjs run heal --root <root> --reason "<why>"`, which releases it. A State write moves the image, and the next owner is refused (`companion-historical-owner-witness-missing`) until another route changes it; `close-feature` (step 7) is NOT on this route yet and keeps the direct route or the attended close until the follow-up slice.
+ 4. Sign the reconcile (PO only, in the PO's own terminal): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
+ 5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders. `<po-name>` is the PO's own name, supplied by the PO, never by the agent. `<proof-request>`, `<proof-authority>` and `<proof>` are the `requestPath`, `authorityPath` and `proofPath` the signing terminal printed.
+ 6. Write the Continuity close request (below) and plan `close-coordinator.mjs plan-transition ... --phase feature-close-prepared --architecture-impact <impact> --continuity-close-request <request>`; apply the returned action.

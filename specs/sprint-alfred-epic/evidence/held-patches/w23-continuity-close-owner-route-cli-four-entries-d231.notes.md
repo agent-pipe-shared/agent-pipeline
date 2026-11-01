@@ -1,66 +1,62 @@
-# W23 D231 owner route, four entries: budget CHECKPOINT (partial build, one design finding open)
+# W23 D231 owner route, four entries: held patch (targeted delivery green; one registry test side by code reading only)
 
 Slice: W23-CONTINUITY-CLOSE-OWNER-ROUTE-FOUR-ENTRIES-D231-20261101 · Candidate a27687cae7fe601dddf09880f4828cb92d099fae
-Outcome: `checkpoint` at the 80 % budget mark (call 128 of 160). The `.patch` slice file is NOT in the repository tree: the cumulative patch is at
-`scratch/agent-out/w32own/w23-continuity-close-owner-route-cli-four-entries-d231.patch` (52740 bytes, `git apply --check` exit 0 on clone2 at the candidate;
-5 files, 562 insertions, 3 deletions). The edited clone is `scratch/agent-out/w32own/clone` (driver unchanged). The host/Elephant copies the patch into this directory.
+Patch: `w23-continuity-close-owner-route-cli-four-entries-d231.patch` next to these notes (65597 bytes, 7 files, 628 insertions, 6 deletions; `git apply --check` exit 0 on the plain clone at the candidate).
+Critic, Verify, native Windows and PO acceptance stay parent-owned and pending. All production files below are protected kernel paths: the PO applies the patch under a Guard Maintenance Window.
 
-## Open finding (blocks the walk; a design question, not a typo)
+## Design as built (PO answers A to E, option a on the registry)
 
-Re-proving measurement (D) with the real spawned CLI shows that "ONE CLI call = bind, ONE entry, release" does NOT compose across calls.
-`session-authority-registry.mjs` 1164 (`executeSourceOwnedSessionAuthorityCompanionWrite`) refuses a companion write with
-`SDC-AUTHORITY-UNAVAILABLE: companion-historical-owner-witness-missing` whenever ANY RELEASED onboarding-continuity member carries a source fact equal to the
-State image the write starts from. A read-only entry (plan) leaves the State bytes unchanged, so the member of the plan call, once released, poisons the next
-call: measured, bootstrap-plan (call 1, ok) then bootstrap-apply (call 2) is refused; and after heal released the orphan, the next bootstrap-plan write path is
-refused for the same reason (the heal's `lost-binding-recovered` member also carries the unchanged image). The earlier w21 probe did not see it because all four
-entries ran under ONE member. The check has no test and no doc; the code comment-free; `git log -S` finds only the transfer checkpoints.
-Smallest candidate fixes (each is a registry gate decision for the PO, none was built): (a) exempt a released member whose release record is
-terminal `continuity-released`/`lost-binding-recovered` AND whose State image never changed (no write in its lifetime); (b) make the bind itself change the State
-image (a revision-neutral bind marker), so a released member's pre-bind image never equals a later preimage; (c) keep one member across calls (a long-lived
-owner process), which contradicts PO answer (D). Recommend (a) with a test, in `session-authority-registry.mjs` (inside the write scope).
+- (A) One new closed script `plugins/pipeline-core/scripts/continuity-owner-route.mjs`: verbs `run --root R --lifecycle L -- <entry> ...` and `release-orphan --root R`. Allowlist of FOUR:
+  continuity-result-bootstrap-plan, -bootstrap-apply, -close-plan, -close-apply. `close-feature` gets the typed refusal `COR-CLOSE-FEATURE-UNAVAILABLE` (names the missing piece: retirement of the
+  per-invocation owner descriptor, and a retired terminal for a physical-readback requester; names the route that works today: direct route without a catalogue, or the attended close) and never partly runs.
+  Other typed codes: COR-ENTRY-OUTSIDE-ALLOWLIST, COR-FOREIGN-FLAG, COR-USAGE, COR-NO-CATALOGUE (names the direct command), COR-LIFECYCLE-NOT-STARTED, COR-BINDING-HELD (names the heal command),
+  COR-MEMBER-UNAVAILABLE, COR-ENTRY-HELD, COR-RELEASE-HELD. The script never writes State (the entry does) and never forces the registry or a member.
+- (B) Course predicate: new bridge-side `ownerRouteCourse` reads the real selected State through `observeSessionCleanupState` (active feature with Continuity, neutral active State, no binding, no orphan,
+  closeTransition null) AND the Close coordinator record (`readCloseCoordinator`, same featureId, phase at least `checkpointed`). Lifecycle id: a validated argv flag `--lifecycle <id>`, not a directory
+  scan, because several lifecycle directories may exist and the flag is part of the process argv the bridge authenticates through /proc. "Each entry only in its legal phase" is one shared rule
+  (lifecycle started, closeTransition absent); the finer per-entry gates are the entry's own and unchanged.
+- (C) Owner identity: a fresh per-invocation `controller-<random>` descriptor, issuer `createSourceOwnedContinuityOwnerRouteRequesterRuntime` (producer `continuity-owner-route`, assurance
+  `physical-readback`); neither the host session nor the hook-observed owner. Stated in the close-feature skill paragraph.
+- (D) One CLI call = bind, one entry through the unchanged `port.executeCompanionOperation`, release, in one process. New export `executeOnboardingContinuityOwnerRouteEntry` (onboarding-continuity) reaches the
+  process-local direct binding; it refuses any requester not issued by the owner-route issuer (`COR-REQUESTER-NOT-OWNER-ROUTE`) and re-checks the four-entry list.
+- (E) Heal: `routine-repair.mjs run heal` now FIRST runs `continuity-owner-route.mjs release-orphan` (own process), then the unchanged delegates; the result gains `ownerRoute`.
+  `releaseDeadContinuityOwnerRouteBinding` (onboarding-continuity) releases only a binding that has an owner-route invocation record of this repository whose recorded process is PROVEN dead (absent, zombie,
+  or start/boot identity changed); live or unprovable (Windows) is reported and left alone; any other binding is `none`. Sequence = the existing lost-binding sequence: descriptor retired, registry member
+  released first (`runOrphanSessionAuthorityMemberStep`), binding second, registry healed and read back. Why the existing `planOrphanSessionCleanupBindingRelease` is not reused: it needs a discarded feature.
+  Measured on a killed owner: `plan-recovery` says `cleanup-required`, the zero-authority archive tier refuses `WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE`; no existing route releases it without a signature.
+  The next blocked call prints `COR-BINDING-HELD` with the exact `routine-repair.mjs run heal --root <root> --reason "..."` command. A test seam `ownerRouteSpawn` keeps the existing exact-call pins of `routine-repair.test.mjs` unchanged.
 
-## What is built in the clone (all in the patch)
+## Registry change (PO decision 2026-11-01, option a) and how "State image never changed" is verified
 
-- `lib/session-requester-bridge.mjs` (+148): `createSourceOwnedContinuityOwnerRouteRequesterRuntime` (program pin to `scripts/continuity-owner-route.mjs`, argv
-  `run --root R --lifecycle L -- <entry> ...`, cwd equals root, replay map, fresh `controller-<random>` descriptor, producer `continuity-owner-route`, assurance
-  `physical-readback`, dispose never releases a member); `inspectSourceOwnedContinuityOwnerRouteCourse` (read-only, typed `COR-*` refusals); the new bridge
-  predicate `ownerRouteCourse` (real selected State through `observeSessionCleanupState`, coordinator record `readCloseCoordinator` phase >= checkpointed and same
-  featureId, `sessionCleanup` null, no orphan, closeTransition null); `isSourceOwnedContinuityOwnerRouteRequester`; `inspectSourceOwnedContinuityOwnerRouteInvocation`
-  (read-only invocation record + liveness; `dead` only on proof). Lifecycle id choice: validated argv flag `--lifecycle` (a directory scan cannot tell several
-  lifecycles apart, and the flag is authenticated through /proc argv).
-- `lib/onboarding-continuity.mjs` (+67): `executeOnboardingContinuityOwnerRouteEntry` (the one export that runs `executeCompanionOperation` for the process's direct
-  binding; closed four-entry list as defence in depth; refuses a non-owner-route requester with `COR-REQUESTER-NOT-OWNER-ROUTE`); `releaseDeadContinuityOwnerRouteBinding`
-  (descriptor retired, registry member released FIRST via `runOrphanSessionAuthorityMemberStep`, binding second; only for a binding with an owner-route record whose
-  process is proven dead). No gate removed.
-- `scripts/continuity-owner-route.mjs` (new, 147 lines, kernel path; closure-list report pending): verbs `run` and `release-orphan`; typed refusals
-  `COR-CLOSE-FEATURE-UNAVAILABLE` (names the missing piece: owner-descriptor retirement + retired terminal for physical-readback; names the direct/attended route),
-  `COR-ENTRY-OUTSIDE-ALLOWLIST`, `COR-FOREIGN-FLAG`, `COR-USAGE`, `COR-NO-CATALOGUE` (names the direct command), `COR-LIFECYCLE-NOT-STARTED`,
-  `COR-BINDING-HELD` (names `routine-repair.mjs run heal --root ... --reason ...`), `COR-MEMBER-UNAVAILABLE`, `COR-ENTRY-HELD`, `COR-RELEASE-HELD`.
-- `lib/routine-repair.mjs` (+20): `heal` first runs `release-orphan` (own process), then the unchanged settled-pending and `session-authority-repair heal`; result gains
-  `ownerRoute`. Why not `planOrphanSessionCleanupBindingRelease`: it needs a discarded feature. Measured: for a dead `controller-*` owner `plan-recovery` says
-  `cleanup-required` and the zero-authority archive tier refuses `WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE`, so no existing route releases it without a signature.
-- `scripts/pipeline-state-result-bootstrap.test.mjs` (+183, 5 cases, all spawn the real CLI except the fixture-requester case).
+Finding of the first run: with one member per call, a released member whose State image equals the next write's preimage made `session-authority-registry.mjs` (`executeSourceOwnedSessionAuthorityCompanionWrite`) refuse with
+`companion-historical-owner-witness-missing`; the owner-side twin check is in `continuityObserveCompanionStateWrite`. Both now call the same narrow rule (registry: `releasedMemberNeverChangedState`;
+owner: `continuityReleasedMemberNeverChangedState`): a RELEASED onboarding-continuity member no longer blocks only when (1) its release terminal is `continuity-released` or `lost-binding-recovered` AND
+(2) the State sha256 it was BOUND at equals every selected-state fact of its release record and of its own member record. Records the registry holds do not keep the bind image (a member that wrote has its
+facts refreshed to the postimage, and prior member revisions are replaced), so the bound image is read from the owner's immutable execution journal (`continuity-authority-execution-<id>.json`, written at the bind
+with the post-bind State sha, found by the member's `bindingSha256`; new export `readOnboardingContinuityMemberBoundStateSha256`). A member that wrote moved its facts to the postimage, so its journal sha differs and it
+stays blocking; every other terminal, a missing or unreadable journal, or a different image blocks exactly as before (fail closed). Measured consequence: after a State-writing entry the next owner is refused until the State moves by another route
+(the walk asserts this for bootstrap-apply then close-plan), so the close pair is walked on a second project whose Result is unbound.
 
-## Test-first record (clone, `driver.mjs run c1 plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs`)
+## Tests (clone, `driver.mjs run`); baseline = plain clone at the candidate
 
-RED on the original code (5 new cases failed: CLI module missing / export missing / `ownerRoute` missing). After the build: 26 pass, 2 fail.
-GREEN: negatives (close-feature, outside allowlist, rebind, foreign flag, direct call still `SDC-AUTHORITY-UNAVAILABLE`, State before the Close lifecycle), no-catalogue
-project (direct route unchanged, CLI names it), fixture-requester refusal. RED (open finding above): the four-entry walk (fails at bootstrap-apply) and the heal case
-(fails at the first call after heal). The first calls of both (bootstrap-plan, bind, kill, typed `COR-BINDING-HELD`, heal clean-project no-op) are not yet asserted to the end.
+- `pipeline-state-result-bootstrap.test.mjs`: baseline 23 pass; clone 28 pass (5 new cases, all first RED on the original code: CLI module/export/ownerRoute missing). New: four-entry walk through the spawned CLI
+  (bootstrap-plan then bootstrap-apply under a second member = registry "exempt" side; writer-then-close-plan refused with the registry code = "not exempt, member wrote" side; close-plan then close-apply on a second project),
+  negatives (close-feature, outside allowlist, rebind, foreign flag, direct call still SDC-AUTHORITY-UNAVAILABLE, State before the lifecycle), no-catalogue project (direct route unchanged, CLI names it),
+  fixture-requester refusal, heal case (clean-project heal changes nothing; SIGKILL after bind; next call `COR-BINDING-HELD` naming heal; heal releases; next call succeeds = lost-binding exempt side).
+  VCR01: +5 top-level cases in that file (23 to 28); pinned counts not edited; `check-verify-case-completion.test.mjs` 32 pass.
+- Revert proof (`driver.mjs revert`): the 5 new cases are RED with the production files reverted; restored byte-equal true.
+- Also green in the clone: `lib/routine-repair.test.mjs` 33/33 (unchanged), `scripts/session-authority-repair.test.mjs` 40/40, `scripts/design-approval-route.e2e.test.mjs` 18/18 (baseline 18/18),
+  `lib/guard-maintenance-window-kernel-closure.test.mjs` 11/11 (no `NEVER_LIFTABLE_KERNEL_PATHS` violation reported for the new script), `harness/scripts/check-doc-contracts.mjs` valid.
+- Downstream sweep: the new script name and codes have no earlier reference in plugins, docs or harness; changed functions' callers: `executeCompanionOperation` path unchanged, `routine-repair` heal callers pinned by `routine-repair.test.mjs` (green), registry/owner historical check shared by all companion entries (design-approval e2e and result-bootstrap controlled-METHOD walk green).
 
-## Seams
+## Seams (named)
 
-S-FIXTURE: fixture repositories live under `scratch/test-tmp` (the registry refuses `/tmp` ancestors). S-ABORT: `PIPELINE_COR_TEST_ABORT_AFTER_BIND=1` makes the CLI SIGKILL itself
-after the bind; it can only kill the process. Probe `scratch/probe-e.mjs` (git-ignored in the clone): a dead fixture owner leaves `sessionCleanup` bound, onboarding-continuity
-`inFlight 1`, descriptor active with owner `not-live`.
+S-FIXTURE: fixture repositories live under `scratch/test-tmp` (the registry refuses `/tmp` ancestors). S-ABORT: `PIPELINE_COR_TEST_ABORT_AFTER_BIND=1` makes the CLI SIGKILL itself after the bind (it can only kill the process).
+`ownerRouteSpawn`: test-only dependency of `runRoutineRepair`.
 
-## Not done / unverified
+## Not verified / open
 
-Baseline run in clone2, revert proof, routine-repair and session-authority-repair suites, `design-approval-route.e2e.test.mjs`, kernel-closure test
-(`NEVER_LIFTABLE_KERNEL_PATHS` likely names the new script), `check-verify-case-completion` (VCR01: +5 top-level cases in `pipeline-state-result-bootstrap.test.mjs`, pinned count
-untouched), `check-doc-contracts`, the SKILL.md paragraph (step 3), downstream sweep of `routine-repair` heal text/`does` pins, a live-owner heal case, native Windows (liveness is
-`unknown` there, so heal reports `unverifiable`), a real shell session as requester, a real Full Verify, a real consumer repository.
-
-## Next step
-
-Decide the registry fix for the finding (recommend (a)), build it with its own test, rerun the bootstrap test file, then do the listed remaining checks and re-run `driver.mjs patch`.
+- The registry side "a released member with ANOTHER terminal still blocks" has no test: it needs a released onboarding-continuity member with a non-listed terminal, which no admitted route produces here. It is code-read only (terminal set check).
+- No live-owner heal case (a running owner must be reported `live` and left alone): covered by code and the proven-dead rule, not run. Native Windows: liveness is `unknown`, so heal reports `unverifiable` there; a real shell session as requester;
+  a real Full Verify; a real consumer repository; the new script as a new kernel path for the PO's Guard Maintenance Window (kernel-closure test reported no violation).
+- Pre-existing reds: none appeared in the compared suites (failing-name sets empty on both sides).
