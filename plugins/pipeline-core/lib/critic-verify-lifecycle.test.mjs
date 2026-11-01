@@ -466,6 +466,31 @@ test("N22 readiness admits a failed all-minor receipt through the private accept
   assert.equal(admitted.code, "critic-bound-verify-valid");
   assert.equal(admitted.privateLifecycleBound, true);
 });
+// Candidate 16 (Toolbox, feature close): the close-side readers call readCriticVerifyLifecycle with no residual deps. A lifecycle receipt
+// that records a PO residual acceptance must still read there, because the acceptance sits in the private record next to the packet; the
+// reader loads it for that receipt only, so a passing receipt is unchanged and an unauthorized or missing acceptance still refuses.
+test("candidate 16: a residual-accepted lifecycle receipt reads without caller-supplied deps through the private record, and an expired or missing record refuses", t => {
+  const common = fixture(t);
+  const failed = critic({ reviewPass: false, findingCount: 1 });
+  const findings = [finding("a", "minor")];
+  const fullEvidence = { ...evidence, commit: candidate.commit, tree: candidate.tree,
+    verifyRun: { status: "passed", terminalSha256: sha("c") }, steps: [{ name: "configured-verify", exitCode: 0 }] };
+  const { receiptSha, record } = privateAcceptance(failed, findings);
+  readiness.writeResidualAcceptanceRecord({ gitCommonDir: common, criticReceiptSha256: receiptSha, record, consumption: null });
+  const base = { readConsumedCandidateReceiptFn: () => consumed(failed), readOpenFindingsFn: () => findings };
+  const loaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: receiptSha,
+    authorizeFn: () => ({ authorized: true, mode: record.mode }) });
+  const recorded = recordCriticVerifyLifecycle({ gitCommonDir: common, criticPacketId: failed.packetId, candidate,
+    evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, { ...base, ...loaded });
+  const read = (extra = {}) => readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate,
+    evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, { ...base, ...extra });
+  assert.equal(read({ residualAuthorizeFn: () => ({ authorized: true, mode: record.mode }) }).receiptSha256, recorded.receiptSha256, "no deps: the private record is loaded");
+  assert.throws(() => read({ residualAuthorizeFn: () => ({ authorized: false }) }), error => error.code === "CVL-CRITIC-FAILED" && /no longer verifies.*approve-residual-acceptance --by <name> --critic-packet /u.test(error.message),
+    "an acceptance that no longer authorizes (expired) refuses and the text names the route");
+  const lone = fixture(t);
+  assert.throws(() => readCriticVerifyLifecycle({ gitCommonDir: lone, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify-latest.json", evidence: fullEvidence }, base),
+    error => error.code === "CVL-RECEIPT-UNAVAILABLE", "another common dir has neither receipt nor record");
+});
 // D227 / N45: a MAJOR open finding is accepted only when the acceptance names the reason class uncorrectable-past-authorship; the
 // accepted-major fragment carries the class and a second basis, a minor-only fragment keeps its exact four keys and its basis.
 const PAST_AUTHORSHIP = "uncorrectable-past-authorship";

@@ -1239,7 +1239,13 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
   let residual = null;
   if (failedReceipt) {
     residual = residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps);
-    if (residual === null) cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+    if (residual === null) {
+      // N36: with an acceptance on record the usual cause is that it no longer verifies (the signature window is short), not that none exists.
+      if (deps.residualAcceptance !== undefined && deps.residualAcceptance !== null) {
+        cvlFail("CVL-CRITIC-FAILED", `Critic findings remain unresolved and the recorded PO residual acceptance no longer verifies (most often it has expired, the signature window is short, or it does not match the open findings); capture it again with pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet ${criticPacketId} and approve it again, then retry`);
+      }
+      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+    }
   }
   const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
   return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute, residual });

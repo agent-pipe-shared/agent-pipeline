@@ -19,6 +19,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
+import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
 import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
 export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
 export { RESIDUAL_REASON_CLASS, residualReasonClassRefusal } from "./critical-action-authorization-read.mjs";
@@ -187,6 +188,16 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
     verifyEvidenceSha256: receipt.verify.evidenceSha256 }) !== id) {
     fail("CVL-RECEIPT-IDENTITY", "Private lifecycle identity differs from its candidate and Verify binding.");
   }
+  // The close-side readers pass no residual deps. A receipt that records a PO residual acceptance would then always read as an
+  // unresolved failed Critic receipt, although the acceptance sits in the private record next to the packet. Load it for that
+  // receipt only (a passing receipt is untouched); the loader still re-verifies the acceptance now, so an expired or revoked one refuses.
+  let readDeps = deps;
+  if (residualRecord && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
+    const loaded = loadResidualAcceptanceDepsForPacket({ gitCommonDir, projectDir: typeof repoRoot === "string" ? repoRoot : null,
+      criticPacketId: receipt.critic.packetId, readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn,
+      authorizeFn: deps.residualAuthorizeFn });
+    if (loaded !== null) readDeps = { ...loaded, ...deps };
+  }
   let carry = null;
   if (carrying) {
     if (typeof repoRoot !== "string" || !isAbsolute(repoRoot)
@@ -197,7 +208,7 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
     }
     carry = inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonDir,
       featureId: receipt.carryForward.proof.featureId,
-      criticPacketId: receipt.critic.packetId, targetCandidate: sourceCandidate }, deps);
+      criticPacketId: receipt.critic.packetId, targetCandidate: sourceCandidate }, readDeps);
     if (carry.proofSha256 !== receipt.carryForward.proofSha256
       || canonicalJson(carry.proof) !== canonicalJson(receipt.carryForward.proof)
       || receipt.critic.reviewRange.commit !== carry.proof.reviewedCandidate.commit) {
@@ -205,7 +216,7 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
     }
   }
   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId: receipt.critic.packetId,
-    candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, deps);
+    candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, readDeps);
   if ((bound.residual === null) !== !residualRecord
     || (residualRecord && canonicalJson(receipt.residualAcceptance) !== canonicalJson(bound.residual))) {
     fail("CVL-CRITIC-DRIFT", "Private lifecycle residual acceptance differs from the consumed review and acceptance.");

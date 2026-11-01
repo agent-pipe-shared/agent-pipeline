@@ -265,8 +265,9 @@ test("a package with no candidate walks implementing -> verifying -> completed a
   const apply = (nextState) => {
     const planned = captureLog(() => run(["feature-package-plan", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState]));
     assert.equal(planned.value, 0, planned.out);
-    const plan = JSON.parse(planned.logs.at(-1));
-    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", sha256CanonicalJson(plan)]));
+    const { planSha256, ...plan } = JSON.parse(planned.logs.at(-1));
+    assert.equal(planSha256, sha256CanonicalJson(plan), "the plan prints the digest apply expects");
+    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", planSha256]));
     assert.equal(applied.value, 0, applied.out);
     return JSON.parse(applied.logs.at(-1));
   };

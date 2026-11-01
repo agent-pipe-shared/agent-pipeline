@@ -296,7 +296,7 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
       evidence: evidence.value,
     });
   } catch (error) {
-    fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", "feature close requires the exact private Critic/Verify lifecycle receipt");
+    fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", `feature close requires the exact private Critic/Verify lifecycle receipt (${error?.message ?? "unavailable"})`);
   }
   return { evidence, lifecycle };
 }

@@ -8602,7 +8602,9 @@ function runFeaturePackageReadCommand(sub, argv) {
       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
     }
     const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root) });
-    console.log(JSON.stringify(plan, null, 2));
+    // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
+    // computed before this field is added), so a consumer does not have to re-derive it.
+    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
   }
   if (flags.proposal === undefined) {
