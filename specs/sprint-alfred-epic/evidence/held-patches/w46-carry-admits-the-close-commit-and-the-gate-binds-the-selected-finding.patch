@@ -1,0 +1,256 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index abbbd87f7..0613b4095 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -370,6 +370,42 @@ export function criticAddendumOnlyCommit(root, commit) {
+   } catch { return false; }
+ }
+ 
++const CLOSE_STATE_FILES = new Set(["project/pipeline-state.json", ".claude/pipeline-state.json"]);
++const CLOSE_DOC_PATH = /^(?:docs|backlog)\/(?:[^/]+\/)*[^/]+\.md$/u;
++/**
++ * Candidate 16c (PO decision 2026-11-01, consumer finding): the feature close itself produces one commit that can only exist AFTER the last
++ * Critic round (Result, backlog, handover, retrospective, the audit bundle, the lifecycle and the Verify evidence it binds), and a push
++ * needs a Critic-bound Verify on it. Counted as a correction it made the push unreachable for every project that closes a feature and then
++ * pushes. A commit is a close commit when it has one parent, is not empty, and every changed path is documentation or close evidence and
++ * nothing else: a Markdown file under `docs/` or `backlog/`, anything under `specs/<feature>/` or `audit-bundles/<feature>/`, or the State
++ * file. Added and modified files must be regular, non-executable blobs (no symlink, no mode change). Any other path -- source, tests,
++ * configuration, agent or skill prompts, another feature's directory -- ends the classification and the commit stays a correction.
++ */
++export function criticCloseCommit(root, commit, featureId) {
++  try {
++    const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
++    if (parents.length !== 2 || typeof featureId !== "string" || featureId === "") return false;
++    const fields = gitBytes(root, ["diff", "--raw", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
++    if (fields.length === 0 || fields.length % 2 !== 0) return false;
++    const specs = `specs/${featureId}/`;
++    const bundles = `audit-bundles/${featureId}/`;
++    for (let index = 0; index < fields.length; index += 2) {
++      const meta = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([AMD])$/u.exec(fields[index]);
++      const path = fields[index + 1];
++      if (!meta) return false;
++      // The export subtree of a consumed Critic review has its own receipt-bound classifier (`criticExportOnlyCommit`); a close commit
++      // must not become a second, weaker way in for forged or extended exports.
++      if (path.startsWith(`${specs}evidence/critic/`)) return false;
++      const inside = path.startsWith(specs) || path.startsWith(bundles);
++      if (!(inside || CLOSE_DOC_PATH.test(path) || CLOSE_STATE_FILES.has(path))) return false;
++      if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return false;
++      if (meta[3] !== "D" && meta[2] !== "100644") return false;
++      if (meta[3] === "M" && meta[1] !== "100644") return false;
++    }
++    return true;
++  } catch { return false; }
++}
++
+ const CRITIC_EXPORT_PATH = /^specs\/([^/]+)\/evidence\/critic\/[a-f0-9]{32}\/[^/]+$/u;
+ /**
+  * N27b / D206: which commits lie between a verified candidate and HEAD, and are all of them delivery tail? A commit is tail
+@@ -479,7 +515,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
+   for (const commit of source.rangeCommits) {
+     (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
+-        || criticAddendumOnlyCommit(root, commit)))
++        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)))
+       ? evidenceOnly : correction).push(commit);
+   }
+   return Object.freeze({
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index 49745fa94..f878271d6 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -509,6 +509,73 @@ test("15h an addendum commit carries the Critic when the dispatch record is not
+   assert.equal(courseAdmission.criticAddendumOnlyCommit(root, addendum.commit), false, "a missing record ends the classification");
+ });
+ 
++// Candidate 16c (PO decision 2026-11-01): the feature close produces one documentation-and-evidence commit after the last Critic round
++// (Result, backlog, handover, retrospective, audit bundle, lifecycle, Verify evidence). It carries the Critic; anything else stays a correction.
++test("16c the close commit and handover-only commits carry the Critic; any source, configuration, prompt or foreign path does not", t => {
++  const root = fixture(t);
++  const git = (args) => execFileSync("git", ["-C", root, ...args],
++    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  const commitAll = (message) => {
++    git(["add", "-A"]);
++    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
++    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
++  };
++  const featureId = "close-commit-feature";
++  git(["init", "--quiet"]);
++  for (const dir of [`specs/${featureId}/evidence`, "docs", "backlog/items", ".claude/agents", "src"]) mkdirSync(join(root, dir), { recursive: true });
++  writeFileSync(join(root, "src/app.js"), "export const reviewed = 1;\n");
++  writeFileSync(join(root, "docs/state.md"), "# State\n");
++  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
++    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
++  const reviewed = commitAll("reviewed source");
++  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
++    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
++  const deps = { readConsumedCandidateReceiptFn: () => read };
++  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
++    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
++  const closeCommitAt = (message, edit, base = reviewed.commit) => { git(["checkout", "--quiet", "--detach", base]); edit(); return commitAll(message); };
++  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
++
++  const close = closeCommitAt("the close commit", () => {
++    writeAt("docs/state.md", "# State\n\nClosed.\n");
++    writeAt("docs/pipeline-feedback-07.md", "# Feedback\n");
++    writeAt("backlog/items/2026-11-01-closed.md", "# Item\n");
++    writeAt(`audit-bundles/${featureId}/${reviewed.commit}/manifest.json`, "{}\n");
++    writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })} \n`);
++    writeAt(`specs/${featureId}/evidence/verify-latest.json`, "{}\n");
++    writeAt("project/pipeline-state.json", "{}\n");
++  });
++  assert.equal(courseAdmission.criticCloseCommit(root, close.commit, featureId), true);
++  assert.deepEqual(carry(close).proof.evidenceOnlyCommits, [close.commit]);
++  assert.deepEqual(courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed.commit,
++    candidateCommit: close.commit }).correctionCommits, [close.commit], "course counters are unchanged without the option");
++
++  const handover = closeCommitAt("handover only", () => writeAt("docs/state.md", "# State\n\nHandover.\n"), close.commit);
++  assert.deepEqual(carry(handover).proof.evidenceOnlyCommits, [close.commit, handover.commit], "close then handover carry together");
++
++  const refused = {
++    "a source change next to the docs": () => { writeAt("docs/state.md", "# State\n\nX\n"); writeAt("src/app.js", "export const reviewed = 2;\n"); },
++    "an agent prompt": () => writeAt(".claude/agents/reviewer.md", "# prompt\n"),
++    "a shell script under docs": () => writeAt("docs/run.sh", "echo hi\n"),
++    "a JSON file under docs": () => writeAt("docs/data.json", "{}\n"),
++    "another feature's specs directory": () => writeAt("specs/other-feature/lifecycle.json", "{}\n"),
++    "another feature's audit bundle": () => writeAt("audit-bundles/other-feature/x/manifest.json", "{}\n"),
++    "a Markdown file at the repository root": () => writeAt("README.md", "# readme\n"),
++    "a package manifest": () => writeAt("package.json", "{}\n"),
++    "a Critic export that bypasses its receipt classifier": () => writeAt(`specs/${featureId}/evidence/critic/${"a".repeat(32)}/report.md`, "# forged\n"),
++    "a removed source file": () => { git(["rm", "--quiet", "src/app.js"]); },
++    "an executable Markdown file": () => { writeAt("docs/exec.md", "# x\n"); chmodSync(join(root, "docs/exec.md"), 0o755); },
++  };
++  for (const [name, edit] of Object.entries(refused)) {
++    const commit = closeCommitAt(name, edit);
++    assert.equal(courseAdmission.criticCloseCommit(root, commit.commit, featureId), false, name);
++    assert.throws(() => carry(commit), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
++  }
++  const link = closeCommitAt("a symlink named like a document", () => symlinkSync("../src/app.js", join(root, "docs/linked.md")));
++  assert.equal(courseAdmission.criticCloseCommit(root, link.commit, featureId), false, "a symlink is not a document");
++  assert.equal(courseAdmission.criticCloseCommit(root, reviewed.commit, featureId), false, "the root commit has no single parent");
++});
++
+ // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
+ // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
+ import * as readiness from "./critic-verify-readiness.mjs";
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+index 0835160b9..762a1b164 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+@@ -55,6 +55,24 @@ function fields(f) {
+     value: f?.Secret ?? f?.secret };
+ }
+ 
++// Candidate 16c (consumer finding): the gate used to bind the digest of the WHOLE scanner report. On a working root the report holds
++// every finding of the tree (build caches, local files, fixtures) in a parallel-scan order that changes between runs, so the gate could
++// never be verified a second time. The report digest now binds the ONE selected finding (path, rule, line, column, value digest), which
++// the reproduction has already proven to be present exactly once; other findings of the tree no longer matter to the gate.
++function selectedFindingDigest({ path, rule, line, column, value }) {
++  return digest(JSON.stringify({ schema: "pipeline.gitleaks-selected-finding.v1", path, rule, line, column, valueSha256: digest(value) }));
++}
++function selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) {
++  try {
++    const report = JSON.parse(rawReport);
++    if (!Array.isArray(report)) return null;
++    const matches = report.map(f => fields(normalizeCandidateFindingPath(f, rootDir)))
++      .filter(f => f.path === gate.path && f.rule === gate.rule && f.line === gate.line && f.column === gate.column);
++    if (matches.length !== 1 || matches[0].value !== reviewedValue) return null;
++    return selectedFindingDigest({ ...gate, value: reviewedValue });
++  } catch { return null; }
++}
++
+ export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
+   reviewedValue, spawnFn = spawnSync, env = process.env }) {
+   if (reviewedValueClass(rootDir, reviewedValue) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
+@@ -85,7 +103,7 @@ export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule
+       schema: "pipeline.gitleaks-reproduction-gate.v1", historicalIdentity: "unknown",
+       scanner: "gitleaks", binarySha256, adapterSha256, gateSourceSha256, configSha256, inputSha256,
+       ignoreSha256: scan.ignored?.authoritySha256 ?? null,
+-      reportSha256: digest(scan.raw), path, rule, line, column,
++      reportSha256: selectedFindingDigest({ path, rule, line, column, value: reviewedValue }), path, rule, line, column,
+       valueSha256: digest(reviewedValue),
+     } };
+   } catch {
+@@ -117,7 +135,7 @@ export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, rev
+     const configPath = resolveGitleaksConfigPath();
+     return reviewedValueClass(rootDir, reviewedValue) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+       && digest(reviewedValue) === gate.valueSha256
+-      && (typeof rawReport === "string" ? digest(rawReport) : observedReportSha256) === gate.reportSha256
++      && (typeof rawReport === "string" ? selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) : observedReportSha256) === gate.reportSha256
+       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256
+       && (existsSync(join(rootDir, ".gitleaksignore"))
+         ? fileDigest(join(rootDir, ".gitleaksignore")) : null) === gate.ignoreSha256
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+index 1792b7b8f..993bb507a 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { spawnSync } from "node:child_process";
+-import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reviewedValueClass, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
++import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reproductionGateFactsStillMatch, reviewedValueClass, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
+ import { parseArgv } from "../gitleaks-repair-ignore.mjs";
+ 
+ const VALUE = "playgame.example-studio.example";
+@@ -113,6 +113,34 @@ test("the public-value class is closed: untracked, missing, differing or malform
+   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+ });
+ 
++// Candidate 16c (consumer finding): on a working root the report holds every finding of the tree in a changing order. The gate binds only
++// the selected finding, so a second scan with other, more, differently ordered findings still verifies, and a changed selected finding does not.
++test("the gate binds the selected finding, not the whole report: unrelated and reordered findings do not invalidate it", async () => {
++  const f = keyFixture();
++  try {
++    const selected = { File: join(f.rootDir, KEY_PATH), RuleID: RULE, StartLine: 1, StartColumn: 14, Secret: KEY, Description: "Generic API Key" };
++    const noise = (n) => ({ File: join(f.rootDir, `.next/cache/${n}.json`), RuleID: "generic-api-key", StartLine: n, StartColumn: 3, Secret: `noise${n}`.padEnd(24, "x"), Description: "noise" });
++    const scanWith = (report) => (_command, args) => {
++      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
++      return { status: 0, stdout: "", stderr: "", error: null };
++    };
++    const first = await reproduceReviewedFinding({ ...f, spawnFn: scanWith([selected, noise(1)]) });
++    assert.equal(first.ok, true, first.reason);
++    const later = { ...f, spawnFn: scanWith([noise(3), noise(2), selected, noise(1), noise(4)]) };
++    assert.equal((await verifyReproductionGate({ ...later, gate: first.gate })).ok, true, "other findings and another order do not matter");
++    const again = await reproduceReviewedFinding(later);
++    assert.equal(JSON.stringify(again.gate), JSON.stringify(first.gate), "the gate is reproducible byte for byte");
++    assert.equal(reproductionGateFactsStillMatch({ gate: first.gate, rootDir: f.rootDir, binaryPath: f.binaryPath, reviewedValue: KEY,
++      rawReport: JSON.stringify([noise(9), selected]) }), true, "the final readback accepts a raw report with other findings");
++    assert.equal(reproductionGateFactsStillMatch({ gate: first.gate, rootDir: f.rootDir, binaryPath: f.binaryPath, reviewedValue: KEY,
++      rawReport: JSON.stringify([noise(9)]) }), false, "the final readback refuses a report without the selected finding");
++    const moved = { ...selected, StartLine: 2 };
++    assert.equal((await verifyReproductionGate({ ...f, spawnFn: scanWith([moved, noise(1)]), gate: first.gate })).ok, false, "a moved selected finding is refused");
++    const changedValue = { ...selected, Secret: KEY.replace("9f", "9e") };
++    assert.equal((await verifyReproductionGate({ ...f, spawnFn: scanWith([changedValue]), gate: first.gate })).ok, false, "another value at the same place is refused");
++  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
++});
++
+ test("the closed CLI accepts --reason and still refuses unknown or duplicate selectors", () => {
+   const base = ["--prepare-gate", "--path", KEY_PATH, "--rule", RULE, "--line", "1", "--column", "14", "--gate-file", "scratch/g.json", "--reviewed-value-file", "scratch/v.txt"];
+   assert.equal(parseArgv([...base, "--reason", "IndexNow key, public by protocol"]).reason, "IndexNow key, public by protocol");
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index a72aed45f..cbeafb029 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -169,6 +169,13 @@ descriptor, its cleanup status is the evidence to digest. A project WITHOUT a se
+ as `evidenceDigest` (PO decision 2026-11-01), provided the close report or handover states explicitly that no
+ descriptor existed and the digest is the empty-input digest.
+ 
++The Critic carry-forward of a Critic-bound Verify (`--mode release --critic-packet-id ...`) admits the close's
++own commit and handover-only commits after the last Critic round: a commit with one parent whose every changed
++path is a Markdown file under `docs/` or `backlog/`, anything under `specs/<feature>/` or
++`audit-bundles/<feature>/` of the feature being carried, or the State file, added or modified as regular
++non-executable files. Any other path (source, tests, configuration, agent or skill prompts, another feature's
++directory, a symlink) keeps the commit a correction and the carry refuses with `CVL-CARRY-CONTENT-CHANGED`.
++
+ Without separately authorized publication, confirmed descriptor-bound cleanup
+ may end at `closed-local`. Publication, readback, release and promotion are
+ separate coordinator transitions and are never implied by this skill.
