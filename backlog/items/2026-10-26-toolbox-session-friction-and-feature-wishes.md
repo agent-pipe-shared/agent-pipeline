@@ -27,6 +27,7 @@ Not in the 0.7.0 matrix. The P0/P1 findings of the same handover have their own 
 - **D10** `architecture-adoption.mjs prepare` without `--decided-at` ends in a TypeError
   (`decidedAt must be canonical ISO-8601`, `architecture-adoption-authority.mjs:86`) instead of naming the flag; the
   value must be identical in `prepare` and `apply`.
+  Triage 2026-11-01 (candidate 15c): held as `w31` (the CLI names the flag and its form before building anything; `apply` already reads the instant from the request file).
 - **D11** The briefing generator does not fit a Playwright consumer: `check` must be a `*.test.mjs|cjs|js`
   (`DBG-CHECK-NOT-TEST`); an item needs a criterion (`DBG-AC-ROW-MISSING`), its slug may not contain a dot
   (`DBG-ITEM-SLUG`); a delivery binds exactly one AC. An estimate above the implementor tool cap silently routes to
