@@ -52,6 +52,17 @@ request, `close-feature`) cannot be run from a shell session, and the skill does
   the owner-bound State write the companion design closed).
 - C: no change; a consumer with a session-authority catalogue cannot close an epic through the Continuity route.
 
+## Slice result (2026-11-01): option A is blocked on a design decision, not built
+
+The Goldfish slice stopped at its step-(1) condition and wrote no production code
+(`specs/sprint-alfred-epic/evidence/held-patches/w11-continuity-close-owner-route-cli-d231.notes.md`). No shipped issuer gives a shell-started CLI a
+requester identity, so the member cannot be armed from it: the fixture issuer is a test seam, the managed-Codex and session-power issuers need a parent
+that already holds a requester, and the approved-controller issuer is hard-pinned to the verification controller. Option A therefore needs a NEW fixed
+issuer in `lib/session-requester-bridge.mjs`, i.e. a new root of authority for State writes, which also reverses the bind writer's rule that a binding
+is never created from a plain terminal. Four PO decisions are needed before a rebuild: (A) may a plain-terminal process become State-write owner at all,
+(B) the close-route course predicate, (C) owner identity (fresh per-invocation descriptor or host session), (D) release behaviour per entry (not
+measured). Tile B above avoids the new issuer. D231 is NOT part of candidate 15c until the PO decides again.
+
 ## Interim route in 0.7.0
 
 None found by reading. The consumer must not force the registry or the member.
