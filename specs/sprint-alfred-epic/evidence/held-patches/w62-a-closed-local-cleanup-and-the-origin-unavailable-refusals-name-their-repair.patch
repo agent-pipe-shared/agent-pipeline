@@ -1,0 +1,53 @@
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 78acacd41..054be647d 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -617,7 +617,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+   }
+   if (["closed-local", "delivered", "release-eligible", "promoted"].includes(values.phase)
+     && stored.coordinator.cleanup.status !== "complete") {
+-    fail("CLOSE-CLEANUP", "a clean terminal/release transition requires confirmed cleanup");
++    fail("CLOSE-CLEANUP", `a clean terminal/release transition requires confirmed cleanup; the cleanup status is "${stored.coordinator.cleanup.status}". Write the cleanup receipt first (close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>); when other session descriptors remain, end or clear those sessions (session-cleanup.mjs status lists them) and write the receipt again`);
+   }
+   if (values.phase === "delivered"
+     && !SHA256.test(stored.coordinator.publication?.readbackReceiptDigest ?? "")) {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index cde7efa7a..9950d56ef 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -623,6 +623,9 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
+     "--actor", "PO", "--phase", "closed-local",
+   ], 2);
+   assert.equal(uncertainTerminal.code, "CLOSE-CLEANUP");
++  assert.match(uncertainTerminal.message, /cleanup status is "[a-z-]+"/u, "the refusal names the status it saw");
++  assert.match(uncertainTerminal.message, /write-cleanup-receipt --root <repository-root> --lifecycle <id>/u, "and the verb that writes the receipt");
++  assert.match(uncertainTerminal.message, /session-cleanup\.mjs status/u, "and the command that lists the remaining sessions");
+   writePrivateJsonAtomic(cleanupPath, {
+     schema: "pipeline.close-cleanup-receipt.v1",
+     status: "complete",
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 7fdb53371..8c947afb7 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -130,7 +130,7 @@ function originGate(query, options, deps) {
+     if (options.allowCallerAuthoredFallback === true) {
+       return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
+     }
+-    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE");
++    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE", "no runner issues a Source return record for the fresh session yet; to finalize this verdict as caller-authored (a weaker, labelled independence marker) repeat the finalize call with the sixth argument --allow-caller-authored-fallback");
+   }
+   const now = (deps.originNowMsFn ?? Date.now)();
+   if (!exact(record, ORIGINAL_SOURCE_RETURN_KEYS) || record.schema !== ORIGINAL_SOURCE_RETURN_SCHEMA || record.issuer !== "source"
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index dfa0e3229..760ff8634 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1489,6 +1489,8 @@ test("Cut A (1) a caller-authored verdict with no Source origin is refused typed
+   try {
+     const request = preadmitted(fx, { packetId: "7".repeat(32) });
+     assert.throws(() => finalizeRaw(request), codeIs(ORIGIN_UNAVAILABLE));
++    assert.throws(() => finalizeRaw(request), (error) => /--allow-caller-authored-fallback/u.test(error.message) && /caller-authored/u.test(error.message),
++      "the refusal names the opt-in that is admitted");
+     assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => { throw new Error("no producer"); } }), codeIs(ORIGIN_UNAVAILABLE));
+     // Nothing was recorded or consumed, so the same admitted packet still finalizes once an origin exists.
+     const done = finalizeRaw(request, { readOriginalSourceReturnFn: originStub() });
