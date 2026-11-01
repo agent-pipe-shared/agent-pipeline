@@ -1,0 +1,188 @@
+diff --git a/plugins/pipeline-core/lib/critic-disposition-addendum.mjs b/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
+index 05c0c6b7d..3284c7b19 100644
+--- a/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
++++ b/plugins/pipeline-core/lib/critic-disposition-addendum.mjs
+@@ -34,7 +34,7 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
+     || reference.schema !== CRITIC_EVIDENCE_SCHEMA
+     || reference.taskId !== addendum.taskId
+     || reference.candidateCommit !== addendum.candidateCommit
+-    || !SHA256.test(reference.sha256 ?? "")) throw new TypeError("critic addendum evidence binding is invalid");
++    || !SHA256.test(reference.sha256 ?? "")) throw new TypeError(`critic addendum evidence binding is invalid: criticEvidence must be exactly { schema: "${CRITIC_EVIDENCE_SCHEMA}", taskId (equal to the addendum taskId), candidateCommit (equal to the addendum candidateCommit), path (repository-relative, under evidence/), sha256 (64 hex of that file) }`);
+   normalizeDispatchRecordPath(reference.path, "critic addendum evidence path");
+   if (!/^(?:evidence|backlog\/evidence)\//u.test(reference.path)) throw new TypeError("critic addendum evidence must be under evidence");
+   const undelivered = record?.outcomeClassification?.kind === "completed-undelivered"
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index fad34adff..8a8dd319e 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -806,3 +806,15 @@ test("D227 the private record carries the class to the lifecycle deps, and the v
+   const minorLoaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: minor.receiptSha });
+   assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
+ });
++
++import { validateCriticDispositionAddendum as validateAddendumForMessage } from "./critic-disposition-addendum.mjs";
++
++// 17 (AGY greenfield): the Critic addendum's evidence binding is a closed object whose schema string and fields the agent had to read
++// out of the source. The refusal now names them.
++test("17 a malformed Critic evidence binding in the addendum names the closed field set", () => {
++  const addendum = (criticEvidence) => ({ schema: "pipeline.critic-disposition-addendum.v1", recordPath: "evidence/dispatch-record-t1.json", recordSha256: "a".repeat(64),
++    taskId: "t1", candidateCommit: "b".repeat(40), reviewCandidateCommit: "b".repeat(40), criticEvidence, criticPacketId: "c".repeat(32), criticReceiptSha256: "d".repeat(64) });
++  assert.throws(() => validateAddendumForMessage(addendum({ schema: "wrong" }), { recordPath: "evidence/dispatch-record-t1.json" }),
++    (error) => error instanceof TypeError
++      && /^critic addendum evidence binding is invalid: criticEvidence must be exactly \{ schema: "pipeline\.critic-evidence-reference\.v1", taskId \(equal to the addendum taskId\), candidateCommit \(equal to the addendum candidateCommit\), path \(repository-relative, under evidence\/\), sha256 \(64 hex of that file\) \}$/u.test(error.message));
++});
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index 7e410639b..21e916a7c 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -240,7 +240,10 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
+     "verifying:implementing",
+   ]);
+   if (!admitted.has(`${from}:${nextState}`)) {
+-    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
++    // 17 (AGY greenfield): the agent asked for implementing -> completed in one step and had to read this file to learn the chain.
++    const next = [...admitted].filter((key) => key.startsWith(`${from}:`)).map((key) => key.slice(from.length + 1));
++    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", from, to: nextState,
++      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn`, findings: [] };
+   }
+   // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
+   // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.test.mjs b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+index 6194994d2..af027a8df 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.test.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+@@ -21,6 +21,13 @@ try {
+   file(`${base}/lifecycle.json`, `${JSON.stringify(manifest)}\n`);
+   assert.equal(validateFeatureTopology(root).ok, true);
+   assert.equal(planFeaturePackageTransition(root, `${base}/lifecycle.json`, "completed").status, "preview");
++  // 17: a refused step names the admitted next states instead of leaving the chain to be read from the source.
++  const skipped = planFeaturePackageTransition(root, `${base}/lifecycle.json`, "approved");
++  assert.equal(skipped.status, "rejected");
++  assert.equal(skipped.reason, "invalid-transition");
++  assert.equal(skipped.from, "verifying");
++  assert.match(skipped.repair, /from verifying the admitted next states are completed, implementing/u);
++  assert.match(skipped.repair, /draft > awaiting-approval > approved > implementing > verifying > completed/u);
+   const bootstrapId = "bootstrap-feature";
+   const bootstrapBase = `specs/${bootstrapId}`;
+   const bootstrapPrd = file(`${bootstrapBase}/prd.md`, "# Bootstrap PRD\n");
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 1eca94023..e6b451007 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -649,7 +649,7 @@ export function parseCriticDispatchPreflightArgs(argv) {
+       if (Object.hasOwn(selectors, flag)) fail("CDP-ARGUMENT", "Duplicate course selector.");
+       selectors[flag] = value;
+     }
+-    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
++    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}; the preflight takes --root, --base, --candidate, --spec, --guardrail, --evidence, --prior-critic, --sweep-evidence, --task-id, --registration-commit, --accepted-contract, --criterion-locator, --delta-request and --correction-input-bindings, each with a value${flag === "--range" ? "; there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>" : ""}.`);
+     index += 1;
+   }
+   // D223 (slice 3): no --registration-commit given. The registration commit is the ONE commit after the candidate (an evidence-only chain, as
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 8269c5a38..19f9d6872 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -722,8 +722,13 @@ test("shared argument parser preserves defaults scalar overwrites arrays and exa
+   assert.deepEqual(parseCriticDispatchPreflightArgs(["--root", "--base"]), { ...defaults, root: "--base" });
+   for (const flag of ["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence"])
+     assert.throws(() => parseCriticDispatchPreflightArgs([flag]), { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: flag + " requires a value." });
++  // 17: an unknown flag now names the flags the preflight does take, and `--range` (a spelling the AGY greenfield run tried) names the replacement.
+   assert.throws(() => parseCriticDispatchPreflightArgs(["--other", "value"]),
+-    { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: "Unknown argument: --other" });
++    (error) => error.name === "CriticDispatchPreflightError" && error.code === "CDP-ARGUMENT"
++      && error.message.startsWith("Unknown argument: --other; the preflight takes --root, --base, --candidate,")
++      && !/there is no --range/u.test(error.message));
++  assert.throws(() => parseCriticDispatchPreflightArgs(["--range", "a..b"]),
++    (error) => error.code === "CDP-ARGUMENT" && /there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>/u.test(error.message));
+ });
+ 
+ test("request destructuring retains original getter order and exceptions before body entry", () => {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 7fdb53371..6b452ae55 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -97,6 +97,10 @@ export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evi
+ const CLI_HELP = [
+   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
+   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json> [--allow-caller-authored-fallback]",
++  "       admit and finalize request (a closed JSON file; exactly these keys): schema, taskId, projectId, sessionId, packetId, trigger (T0|T1|T2|T3),",
++  "         route {routeId, runner, adapter, provider, modelTier, effortTier}, review {base, candidate, specPath, guardrailPaths[], evidencePaths[],",
++  "         priorCriticEvidencePath|null}, verdictPath, event (null or {eventOutPath, featureId});",
++  "         schema pipeline.session-critic-finalization-request.v1 (v2 adds review.courseContext, v3 adds review.genericBatchRef)",
+   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
+@@ -116,6 +120,9 @@ const ROUTE_KEYS = Object.freeze(["routeId", "runner", "adapter", "provider", "m
+ const REQUEST_KEYS = Object.freeze(["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route", "review", "verdictPath", "event"]);
+ const REVIEW_KEYS = Object.freeze(["base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath"]);
+ const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
++// 17 (AGY greenfield): a bare SCF-REQUEST left the agent to read the validator to learn the closed request shape.
++// The CLI error detail is cut to one line of 200 characters, so the full key list lives in --help and the detail points there.
++const SCF_REQUEST_SHAPE = "the request is a closed JSON file that does not match; session-critic-finalizer.mjs --help lists its exact keys";
+ 
+ // Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
+ // No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
+@@ -275,10 +282,10 @@ function validateCliRequest(value) {
+     || typeof value.verdictPath !== "string"
+     || !(value.event === null || (exact(value.event, EVENT_KEYS)
+       && typeof value.event.eventOutPath === "string"
+-      && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST");
+-  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST");
++      && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
++  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+   if (version3 && (!exact(value.review.genericBatchRef, ["batchId", "registrationSha256", "memberSha256"])
+-    || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST");
++    || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+   if (hasSignedImportAnchor) {
+     const anchor = value.signedQualityImportAnchor;
+     if (!exact(anchor, ["schema", "intentSha256", "integrationCommit"])
+@@ -900,7 +907,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       if (!exact(rawRelease, ["schema", "packetId", "reason"]) || rawRelease.schema !== SESSION_CRITIC_RELEASE_REQUEST_SCHEMA) fail("SCF-RELEASE-REQUEST");
+       return Object.freeze({ exitCode: 0, output: releaseCriticPacket({ controlRoot: controlRootFor(releaseRoot), packetId: rawRelease.packetId, reason: rawRelease.reason }) });
+     }
+-    if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
++    if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE", "usage: session-critic-finalizer.mjs <admit|finalize|register-batch|append-correction> --root <repo> --request <request file under scratch> (the export verb has its own usage)");
+     const root = realpathSync(resolve(argv[2]));
+     const raw = readPhysicalRequest(root, argv[4]);
+     if (argv[0] === "register-batch") {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index dfa0e3229..59a897df7 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1896,7 +1896,8 @@ test("D173 a typed error keeps its code and gains a detail only when its message
+   const usage = runSessionCriticFinalizerCli(["finalize", "--root", "x"]);
+   assert.equal(usage.output.code, "SCF-USAGE");
+   assert.equal(usage.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
+-  assert.equal(usage.output.detail, "SCF-USAGE: Session Critic finalization is invalid.");
++  // 17: the usage refusal names the verbs and the argument shape (the detail is one line of at most 200 characters).
++  assert.equal(usage.output.detail, "SCF-USAGE: usage: session-critic-finalizer.mjs <admit|finalize|register-batch|append-correction> --root <repo> --request <request file under scratch> (the export verb has its own usage)");
+ });
+ 
+ test("D173 an output without a detail is byte-identical to the old shape", () => {
+@@ -2219,10 +2220,26 @@ test("D1 walk (6) v1 and v2 requests accept the optional key and pass it to the
+     for (const bad of ["", 7, null]) {
+       const result = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "d1-bad.json", d1Request(fx, bad))], deps);
+       assert.equal(result.output.code, "SCF-REQUEST", String(bad));
++      // 17: the detail points at --help, which lists the exact keys (the detail itself is cut to one short line).
++      assert.match(result.output.detail, /session-critic-finalizer\.mjs --help lists its exact keys/u, String(bad));
+     }
+   } finally { cleanup(fx); }
+ });
+ 
++test("17 the finalizer --help lists the closed finalization request keys and the usage refusal names the verbs", () => {
++  const help = spawnSync(process.execPath, [FINALIZER_SCRIPT, "--help"], { encoding: "utf8" });
++  assert.equal(help.status, 0);
++  for (const key of ["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route {routeId, runner, adapter, provider, modelTier, effortTier}",
++    "review {base, candidate, specPath, guardrailPaths[], evidencePaths[],", "priorCriticEvidencePath|null", "verdictPath", "event (null or {eventOutPath, featureId})"]) {
++    assert.ok(help.stdout.includes(key), `--help names ${key}`);
++  }
++  assert.match(help.stdout, /pipeline\.session-critic-finalization-request\.v1 \(v2 adds review\.courseContext, v3 adds review\.genericBatchRef\)/u);
++  const usage = runSessionCriticFinalizerCli(["bogus-verb"]);
++  assert.equal(usage.output.code, "SCF-USAGE");
++  assert.match(usage.output.detail, /usage: session-critic-finalizer\.mjs <admit\|finalize\|register-batch\|append-correction> --root/u);
++  assert.ok(usage.output.detail.length <= 200, "the detail is not cut inside the sentence");
++});
++
+ test("W7 round takeover CLI: a consumed round whose lineage cannot be registered any more is retired by the verbs its refusal names, and each refusal text names a verb that admits", async () => {
+   const fx = featureCourseFixture();
+   try {
