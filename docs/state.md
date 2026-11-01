@@ -17,7 +17,7 @@ transfer by midnight and explicitly permits an earlier push. Production is
 frozen. No close-block, feature close, main switch, merge or release is needed.
 Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
-**Candidate 15c** (D229 core pack, D230 CI rerun, D232 negated rg glob, N28/N29 hints, fv10 scan fix; rehearsed, `scratch/po-apply-0.7-candidate15c.sh`; D231 needs PO redesign; installed 15b). Open: apply/stamp/install, Full Verify, Critic, native, acceptance.
+**Candidate 15c** (D229 core pack, D230 CI rerun, D232 negated rg glob, N21/N28/N29 hints, fv10 scan fix; rehearsed, `scratch/po-apply-0.7-candidate15c.sh`; D231 needs PO redesign; installed 15b). Open: apply/stamp/install, Full Verify, Critic, native, acceptance.
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
 contains **281 items:all at75;index75.0%** (candidate 14, 2026-10-31 evening: operator-applied through `88a800089`, stamped `e9454e59e`, installed and read back `0.7.0+claude.20261031181742.88a8000`; carries the consumer Critic-course chain, the green-Verify triage fixes, the Critic preimage re-pin (D221) and the D216 option A read/write split, decisions D219-D222; implementation complete, matrix not re-measured; Full Verify on this tree is red until candidate 15; open: batch Critic, native Windows runs, PO acceptance, drift-test debt for the read halves; no push planned; previous: `a2099ff5f` 10-31, candidate 13 installed, read back
