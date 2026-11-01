@@ -1,0 +1,15 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 0d9ede625..653aabc57 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -43,6 +43,10 @@ The PO's standing call (2026-10-28) is that the Elephant stamps and the PO only
+ 4. The PO installs from the marketplace. Nothing else is the PO's step; the Elephant does not edit the tree while a HEAD- or tree-bound PO command is outstanding.
+ 5. The Elephant reads the installed manifest version back (it must end in the stamped `<7-char HEAD>`), lifts the matrix rows of the applied patches, updates `docs/state.md`, and only then runs Full Verify. Batch Critic, native Windows runs and PO acceptance remain open after that.
+ 
++### Where the Full Verify clone lives
++
++Create the Full Verify clone OUTSIDE the repository it verifies and give it a working `upstream` remote. A clone under the verified repository's own `scratch/` made two steps of the Full Verify of 2026-11-01 red without a product defect: `g23-read-help-tests` (`G23C001`: from inside the verified repository `ls -lh ../` stays inside the project, so the guard admits what the test pins as refused; the same test is green in the verified checkout itself) and `security-scan` (every adapter reported `remote-not-configured`, the clone had no remote). Three more reds of that run (`agy-host-commit-execution-tests`, `critic-course-admission-tests`, `pipeline-state-tests`) passed when re-run alone and are load effects, so re-run a red alone before calling it red.
++
+ ## Isolated Linux single runs
+ 
+ `node scripts/run-parallel.mjs <workers> <label> [--src <dir>] [--allow-dirty] <test-file>...` gives every worker its own clone of the source HEAD, its own private HOME (with the git identity copied) and its own TMPDIR outside every repository. Heavy suites share `~/.apsp`, its lock and repo-local state when they run side by side in one checkout, and then collide on the registry; the private HOME and TMPDIR remove that. Use at most 3 workers; the heavy suites also slow each other down, so a timeout that appears only under load is re-run alone before it is called red.
