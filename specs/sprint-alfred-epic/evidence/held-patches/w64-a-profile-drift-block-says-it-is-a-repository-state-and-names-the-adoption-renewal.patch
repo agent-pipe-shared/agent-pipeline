@@ -1,0 +1,76 @@
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 7181c26a8..343048578 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -44,9 +44,14 @@ export function blockingFitnessOutcomes(outcomes, reportOnly = []) {
+       }),
+     }));
+ }
++/**
++ * Class 9 (profile drift) is a repository state, not a property of the PRD: the accepted adoption snapshot differs from the current
++ * profile and module snapshot, so every feature plan of the repository stays blocked until the adoption authority is renewed.
++ */
++export const PROFILE_DRIFT_REPAIR = "profile drift is a state of this repository, not of the PRD: the accepted architecture adoption snapshot differs from the current profile and module snapshot, so no plan can pass until the adoption authority is renewed. Read it with architecture-adoption.mjs status --root <root>, then renew it with architecture-adoption.mjs prepare and apply (the apply step carries the PO's signature)";
+ export function describeBlockingOutcome(outcome) {
+   const first = outcome.violations[0];
+-  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}`;
++  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}${outcome.classId === 9 ? `; ${PROFILE_DRIFT_REPAIR}` : ""}`;
+ }
+ 
+ export function architectureTouchedContracts(paths) {
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index b26e6284c..9bfde3229 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -374,6 +374,51 @@ test("a blocked planning fitness names the blocking classes and does not ask for
+   assert.equal(result.nextAction.kind === "collect-input", false);
+ });
+ 
++// Candidate 17 (intake 1m): a profile-drift block says in words that it is a repository state and names the renewal route.
++test("a blocking profile-drift outcome (class 9) names the adoption renewal in the refusal", () => {
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/security-deps.md", paths: ["package.json"] },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
++      checkPlanningAdoptionDisposition: readyDisposition,
++      evaluateArchitectureFitness: () => ({
++        overallStatus: "blocked",
++        summary: { passCount: 9, findingCount: 1, exceptedCount: 0, unavailableCount: 0, unsupportedCount: 0, unknownCount: 0, totalClasses: 10 },
++        outcomes: [
++          ...Array.from({ length: 8 }, (_, index) => ({ classId: index + 1, outcome: "pass" })),
++          { classId: 9, propertyId: "profile-drift", outcome: "finding", violations: ["accepted snapshot differs from the current profile"] },
++          { classId: 10, outcome: "pass" },
++        ],
++      }),
++    },
++  });
++  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
++  assert.match(result.message, /class 9 \(profile-drift\) finding: accepted snapshot differs from the current profile; profile drift is a state of this repository, not of the PRD/u);
++  assert.match(result.message, /architecture-adoption\.mjs status --root <root>/u);
++  assert.match(result.message, /architecture-adoption\.mjs prepare and apply/u);
++  assert.equal(result.nextAction.kind, "repair-required");
++});
++
++test("a blocking class other than 9 does not carry the profile-drift repair", () => {
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/security-deps.md", paths: ["package.json"] },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
++      checkPlanningAdoptionDisposition: readyDisposition,
++      evaluateArchitectureFitness: () => ({
++        overallStatus: "blocked",
++        summary: { passCount: 9, findingCount: 1, exceptedCount: 0, unavailableCount: 0, unsupportedCount: 0, unknownCount: 0, totalClasses: 10 },
++        outcomes: [
++          ...Array.from({ length: 6 }, (_, index) => ({ classId: index + 1, outcome: "pass" })),
++          { classId: 7, propertyId: "module-boundaries", outcome: "finding", violations: ["x"] },
++          { classId: 8, outcome: "pass" }, { classId: 9, outcome: "pass" }, { classId: 10, outcome: "pass" },
++        ],
++      }),
++    },
++  });
++  assert.doesNotMatch(result.message, /profile drift/u);
++});
++
+ test("malformed or incomplete fitness outcomes fail closed", () => {
+   const result = inspectArchitectureEntryReadiness({
+     rootDir: repoRoot,
