@@ -1,0 +1,342 @@
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+index 8b754496c..63fc222a5 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+@@ -33,7 +33,14 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+     const root = realpathSync(resolve(repositoryRoot));
+     safePath(root, manifestPath);
+     const check = validateFeaturePackage(root, manifestPath);
+-    if (!check.ok || check.receipt.featureId !== featureId || check.receipt.state !== "completed" || !same(check.receipt.candidate, candidate)) return blocked("FCA-PACKAGE", "Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning.");
++    if (!check.ok || check.receipt.featureId !== featureId || check.receipt.state !== "completed" || !same(check.receipt.candidate, candidate)) {
++      // Candidate 16b: say which condition failed. A commit made after the registration moves HEAD away from the package's candidate.
++      const why = !check.ok ? `the package does not validate (${check.code ?? check.reason ?? "invalid"})`
++        : check.receipt.featureId !== featureId ? `the package belongs to feature ${check.receipt.featureId}, not ${featureId}`
++        : check.receipt.state !== "completed" ? `the package state is ${check.receipt.state}, completed is required`
++        : `the package candidate ${String(check.receipt.candidate?.commit).slice(0, 12)} is not the requested candidate ${candidate.commit.slice(0, 12)} (HEAD moved after the registration: register the package again for the current HEAD)`;
++      return blocked("FCA-PACKAGE", `Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning. Observed: ${why}.`);
++    }
+     const git = args => {
+       const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000 });
+       return result.status === 0 ? result.stdout.trim() : null;
+@@ -43,13 +50,23 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+     const manifest = JSON.parse(manifestBytes);
+     const results = manifest.artifacts.filter(a => a.class === "result");
+     if (results.length !== 1 || readFileSync(safePath(root, results[0].path)).length === 0) return blocked("FCA-RESULT", "Provide one non-empty digest-bound Result in the validated feature package.");
+-    const qualification = manifest.artifacts.filter(a => a.class === "candidate-evidence").find(a => {
++    // Candidate 16b: a refusal names the evidence it examined and why each file was rejected (the boundary rule was invisible before).
++    const rejection = a => {
+       try {
+         const value = JSON.parse(readFileSync(safePath(root, a.path), "utf8"));
+-        return value.schema === "pipeline.verify-evidence.v0" && value.exitCode === 0 && same(value.candidate, candidate) && value.commit === candidate.commit && value.tree === candidate.tree && verifyEvidenceSatisfiesBoundary(value, "candidate");
+-      } catch { return false; }
+-    });
+-    if (!qualification) return blocked("FCA-QUALIFICATION", "Produce passing candidate-bound Verify evidence and bind it into the package. Diagnostic or stale evidence is not qualification.");
++        if (value.schema !== "pipeline.verify-evidence.v0") return "not Verify evidence (schema)";
++        if (value.exitCode !== 0) return `the run did not pass (exit code ${value.exitCode})`;
++        if (!same(value.candidate, candidate) || value.commit !== candidate.commit || value.tree !== candidate.tree) return `it is bound to another candidate (${String(value.commit).slice(0, 12)}), not ${candidate.commit.slice(0, 12)}`;
++        if (!verifyEvidenceSatisfiesBoundary(value, "candidate")) return "it does not satisfy the candidate boundary: the run must use --mode candidate, be full and omit nothing (a release-mode run satisfies only release/push)";
++        return null;
++      } catch { return "unreadable or not JSON"; }
++    };
++    const evidenceFiles = manifest.artifacts.filter(a => a.class === "candidate-evidence");
++    const qualification = evidenceFiles.find(a => rejection(a) === null);
++    if (!qualification) {
++      const seen = evidenceFiles.map(a => `${a.path}: ${rejection(a)}`).join("; ") || "the package holds no candidate-evidence file";
++      return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
++    }
+     let bundlePlan;
+     try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs }); }
+     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs b/plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs
+index f1b3d7fd9..8eb6f823f 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs
+@@ -58,11 +58,19 @@ test("missing policy is actionable, no fabricated defaults or extra signature",
+ 
+ test("candidate changes, incomplete Result, stale or diagnostic Verify do not qualify", async t => {
+   const f = fixture(t);
+-  for (const state of ["draft", "verifying"]) { f.manifest.state = state; f.save(); assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-PACKAGE"); }
++  for (const state of ["draft", "verifying"]) {
++    f.manifest.state = state; f.save();
++    const refused = await planFeatureCloseAudit(f.options);
++    assert.equal(refused.code, "FCA-PACKAGE");
++    assert.match(refused.remedy, new RegExp(`the package state is ${state}, completed is required`, "u"), "16b: the refusal names the failing condition");
++  }
+   f.manifest.state = "completed"; f.save();
+   const evidence = f.manifest.artifacts.find(a => a.class === "candidate-evidence");
+   writeFileSync(join(f.root, evidence.path), "{}"); evidence.sha256 = digest("{}"); f.save();
+-  assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-QUALIFICATION");
++  const unqualified = await planFeatureCloseAudit(f.options);
++  assert.equal(unqualified.code, "FCA-QUALIFICATION");
++  assert.match(unqualified.remedy, /--mode candidate/u, "16b: the refusal names the mode the evidence needs");
++  assert.ok(unqualified.remedy.includes(`${evidence.path}: not Verify evidence (schema)`), "16b: the refusal names the rejected evidence file and why");
+   f.git(["commit", "--allow-empty", "-qm", "later candidate"]);
+   assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-CANDIDATE-CHANGED");
+ });
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 263df2ea0..d3d7592f3 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -545,7 +545,7 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
+   return {
+     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "verify-evidence-added", manifestPath, verifyEvidencePath: evidenceRel,
+     registered: [{ path: evidenceRel, sha256: evidenceSha256 }], manifestSha256: digest(bytes),
+-    next: "do NOT commit: the package candidate must stay equal to HEAD. Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
++    next: "do NOT commit until the close-feature audit plan has used this package: the package candidate must stay equal to HEAD (a commit in between makes that plan refuse with FCA-PACKAGE, and the package must then be registered again for the new HEAD; the close's own commits come after the plan). Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs b/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
+index a03334990..97404c27b 100644
+--- a/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
++++ b/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
+@@ -21,7 +21,8 @@
+  * PATH/PIPELINE_GITLEAKS_PATH-resolved gitleaks binary via gitleaks.mjs's own isInstalled().
+  *
+  * Public use first calls --prepare-gate with the exact current --line and a manually reviewed
+- * plain-domain value in a regular file under root/scratch. It writes only digest metadata under
++ * plain-domain value (or, with --reason, a hex key of 32..64 characters that the project publishes as the
++ * tracked file public/<key>.txt containing exactly that key; candidate 16b) in a regular file under root/scratch. It writes only digest metadata under
+  * scratch. A later --approve-new or stale --old-line repair re-runs the scanner and checks that
+  * same gate, value, source file, config and binary before touching `.gitleaksignore`. The low-level
+  * exported repair primitive retains its injected-spawn test seam; ordinary production calls to
+@@ -38,7 +39,7 @@ import {
+   isInstalled,
+ } from "./security-adapters/gitleaks.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { reproduceReviewedFinding, reproductionGateFactsStillMatch, verifyReproductionGate } from "./security-adapters/gitleaks-reproduction-gate.mjs";
++import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reproductionGateFactsStillMatch, reviewedValueClass, verifyReproductionGate } from "./security-adapters/gitleaks-reproduction-gate.mjs";
+ import { assessTrustedExecutablePath } from "./tool-identity.mjs";
+ 
+ const IGNORE_FILE = ".gitleaksignore";
+@@ -265,7 +266,7 @@ export async function recomputeStaleIgnoreEntry(options) {
+ /** Closed CLI: no raw secret, arbitrary flag, duplicate selector or positional operand. */
+ export function parseArgv(argv) {
+   const args = {};
+-  const values = new Set(["root", "path", "rule", "column", "old-line", "line", "gate-file", "reviewed-value-file"]);
++  const values = new Set(["root", "path", "rule", "column", "old-line", "line", "gate-file", "reviewed-value-file", "reason"]);
+   for (let i = 0; i < argv.length; i++) {
+     const token = argv[i];
+     if (token === "--recompute") {
+@@ -328,7 +329,7 @@ async function main() {
+   const missing = required.filter((k) => args[k] === undefined);
+   if (missing.length > 0) {
+     console.error(`gitleaks-repair-ignore: missing required flag(s): ${missing.map((k) => `--${k}`).join(", ")}`);
+-    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
++    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>] [--reason \"<why>\", required when the value is a public key published as tracked public/<key>.txt]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
+     process.exitCode = 1;
+     return;
+   }
+@@ -347,13 +348,25 @@ async function main() {
+     process.exitCode = 1;
+     return;
+   }
++  // Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is admitted besides a plain
++  // domain, but only with a written reason, which is printed so the chat confirmation and the close report can quote it.
++  const valueClass = reviewedValueClass(rootDir, reviewedValue);
++  if (valueClass === null) { console.error(`gitleaks-repair-ignore: ${REVIEWED_VALUE_REFUSAL}`); process.exitCode = 1; return; }
++  if (valueClass === "public-key-file") {
++    if (typeof args.reason !== "string" || args.reason.trim().length < 10) {
++      console.error("gitleaks-repair-ignore: a public value needs --reason \"<why this value is public by design>\" (at least 10 characters)");
++      process.exitCode = 1;
++      return;
++    }
++    console.log(`gitleaks-repair-ignore: public-by-design value (tracked public/<key>.txt matches); reason: ${args.reason.trim()}`);
++  }
+   if (args["prepare-gate"]) {
+     const produced = await reproduceReviewedFinding({ rootDir, binaryPath, path: args.path,
+       rule: args.rule, line: Number(args.line), column: Number(args.column), reviewedValue });
+     if (!produced.ok) { console.error(`gitleaks-repair-ignore: ${produced.reason}`); process.exitCode = 1; return; }
+     try { writeFileSync(gatePath, `${JSON.stringify(produced.gate, null, 2)}\n`, { flag: "wx", mode: 0o600 }); }
+     catch { console.error("gitleaks-repair-ignore: gate file could not be created exclusively"); process.exitCode = 1; return; }
+-    console.log("gitleaks-repair-ignore: reproduced exact reviewed domain; sanitized gate prepared");
++    console.log(`gitleaks-repair-ignore: reproduced exact reviewed ${valueClass === "domain" ? "domain" : "public value"}; sanitized gate prepared`);
+     return;
+   }
+   let gate;
+@@ -394,7 +407,7 @@ async function main() {
+       gate, rootDir, binaryPath, reviewedValue, observedReportSha256: verified.observedReportSha256,
+     }));
+     if (!published.ok) { console.error(`gitleaks-repair-ignore: ${published.reason}`); process.exitCode = 1; return; }
+-    console.log("gitleaks-repair-ignore: approved one reproduced exact domain finding");
++    console.log(`gitleaks-repair-ignore: approved one reproduced exact ${valueClass === "domain" ? "domain" : "public value"} finding`);
+     return;
+   }
+   const action = args.recompute ? recomputeStaleIgnoreEntry : repairStaleIgnoreEntry;
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+index 505ea53a1..0835160b9 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+@@ -14,6 +14,26 @@ const domain = value => typeof value === "string" && value.length <= 253
+ const safePath = value => typeof value === "string" && value.length > 0 && !isAbsolute(value)
+   && !value.includes("\\") && value.split("/").every(part => part && part !== "." && part !== "..");
+ 
++// Candidate 16b (PO decision 2026-11-01): a deliberately public value may be reviewed besides a plain domain. The shape is closed:
++// a hex key of 32..64 characters that the project itself publishes as the tracked file `public/<key>.txt` whose whole content is that
++// key (the IndexNow protocol). The proof is checked here, not claimed: a regular non-linked file, tracked by Git, identical content.
++// Any other credential-shaped value stays refused, and the refusal text names what is accepted.
++export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, or a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key";
++const PUBLIC_KEY = /^[a-f0-9]{32,64}$/u;
++export function reviewedValueClass(rootDir, value, gitFn = spawnSync) {
++  if (domain(value)) return "domain";
++  if (typeof value !== "string" || !PUBLIC_KEY.test(value) || typeof rootDir !== "string") return null;
++  try {
++    const rel = `public/${value}.txt`;
++    const file = join(rootDir, rel);
++    const info = lstatSync(file);
++    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size > 4096) return null;
++    if (readFileSync(file, "utf8").replace(/\r?\n$/u, "") !== value) return null;
++    const tracked = gitFn("git", ["ls-files", "--error-unmatch", "--", rel], { cwd: rootDir, encoding: "utf8", shell: false });
++    return tracked.status === 0 ? "public-key-file" : null;
++  } catch { return null; }
++}
++
+ function fileDigest(path) {
+   const stat = lstatSync(path);
+   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("source must be a regular file");
+@@ -37,7 +57,7 @@ function fields(f) {
+ 
+ export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
+   reviewedValue, spawnFn = spawnSync, env = process.env }) {
+-  if (!domain(reviewedValue)) return { ok: false, reason: "reviewed value is not a plain domain" };
++  if (reviewedValueClass(rootDir, reviewedValue) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
+   if (!safePath(path) || typeof rule !== "string" || !/^[a-z0-9][a-z0-9._-]*$/iu.test(rule)
+     || !Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
+     return { ok: false, reason: "invalid finding selector" };
+@@ -95,7 +115,7 @@ export async function verifyReproductionGate({ gate, ...options }) {
+ export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, reviewedValue, rawReport, observedReportSha256 }) {
+   try {
+     const configPath = resolveGitleaksConfigPath();
+-    return domain(reviewedValue) && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
++    return reviewedValueClass(rootDir, reviewedValue) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+       && digest(reviewedValue) === gate.valueSha256
+       && (typeof rawReport === "string" ? digest(rawReport) : observedReportSha256) === gate.reportSha256
+       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+index 47603e577..1792b7b8f 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+@@ -4,7 +4,9 @@ import test from "node:test";
+ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { reproduceReviewedFinding, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
++import { spawnSync } from "node:child_process";
++import { REVIEWED_VALUE_REFUSAL, reproduceReviewedFinding, reviewedValueClass, verifyReproductionGate } from "./gitleaks-reproduction-gate.mjs";
++import { parseArgv } from "../gitleaks-repair-ignore.mjs";
+ 
+ const VALUE = "playgame.example-studio.example";
+ const PATH = "src/game.js";
+@@ -51,3 +53,69 @@ test("review must match one reproduced plain domain; credential-shaped value can
+     assert.equal((await reproduceReviewedFinding({ ...f, path: "../elsewhere" })).ok, false);
+   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+ });
++
++// Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is reviewable besides a plain
++// domain; every other credential-shaped value stays refused, and the refusal text names what is accepted.
++const KEY = "9f86d081884c7d659a2feaa0c55ad015";
++const KEY_PATH = "app/api/indexnow/route.ts";
++const gitIn = (cwd, ...args) => {
++  const r = spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
++  assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
++};
++const keyFixture = ({ publicFile = "tracked", content = KEY } = {}) => {
++  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-public-value-"));
++  gitIn(rootDir, "init", "-q");
++  mkdirSync(join(rootDir, "app/api/indexnow"), { recursive: true });
++  mkdirSync(join(rootDir, "public"));
++  writeFileSync(join(rootDir, KEY_PATH), `const key = "${KEY}";\n`);
++  if (publicFile !== "none") writeFileSync(join(rootDir, "public", `${KEY}.txt`), `${content}\n`);
++  gitIn(rootDir, "add", KEY_PATH);
++  if (publicFile === "tracked") gitIn(rootDir, "add", `public/${KEY}.txt`);
++  const binaryPath = join(rootDir, "scanner-binary");
++  writeFileSync(binaryPath, "synthetic binary identity");
++  const spawnFn = (_command, args) => {
++    const report = [{ File: join(rootDir, KEY_PATH), RuleID: RULE, StartLine: 1, StartColumn: 14, Secret: KEY, Description: "Generic API Key" }];
++    writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
++    return { status: 0, stdout: "", stderr: "", error: null };
++  };
++  return { rootDir, binaryPath, spawnFn, path: KEY_PATH, rule: RULE, line: 1, column: 14, reviewedValue: KEY };
++};
++
++test("a hex key published as a tracked public/<key>.txt with exactly that content is reviewable and the gate verifies", async () => {
++  const f = keyFixture();
++  try {
++    assert.equal(reviewedValueClass(f.rootDir, KEY), "public-key-file");
++    const result = await reproduceReviewedFinding(f);
++    assert.equal(result.ok, true, result.reason);
++    assert.doesNotMatch(JSON.stringify(result.gate), new RegExp(KEY, "u"), "the value itself never enters the gate");
++    assert.equal((await verifyReproductionGate({ ...f, gate: result.gate })).ok, true);
++  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
++});
++
++test("the public-value class is closed: untracked, missing, differing or malformed keys stay refused with a text that names what is accepted", async () => {
++  for (const [label, options] of [["untracked public file", { publicFile: "untracked" }], ["no public file", { publicFile: "none" }], ["public file with other content", { content: "something else" }]]) {
++    const f = keyFixture(options);
++    try {
++      const refused = await reproduceReviewedFinding(f);
++      assert.equal(refused.ok, false, label);
++      assert.equal(refused.reason, REVIEWED_VALUE_REFUSAL, label);
++    } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
++  }
++  const f = keyFixture();
++  try {
++    for (const value of [KEY.slice(1), KEY.toUpperCase(), `${KEY}${"0".repeat(40)}`, "AKIAIOSFODNN7EXAMPLE", `../${KEY}`]) {
++      assert.equal(reviewedValueClass(f.rootDir, value), null, `refused: ${value}`);
++      assert.equal((await reproduceReviewedFinding({ ...f, reviewedValue: value })).ok, false, `refused: ${value}`);
++    }
++    assert.match(REVIEWED_VALUE_REFUSAL, /plain domain/u);
++    assert.match(REVIEWED_VALUE_REFUSAL, /public\/<key>\.txt/u);
++    assert.equal(reviewedValueClass(f.rootDir, "playgame.example-studio.example"), "domain", "the domain class is unchanged");
++  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
++});
++
++test("the closed CLI accepts --reason and still refuses unknown or duplicate selectors", () => {
++  const base = ["--prepare-gate", "--path", KEY_PATH, "--rule", RULE, "--line", "1", "--column", "14", "--gate-file", "scratch/g.json", "--reviewed-value-file", "scratch/v.txt"];
++  assert.equal(parseArgv([...base, "--reason", "IndexNow key, public by protocol"]).reason, "IndexNow key, public by protocol");
++  assert.throws(() => parseArgv([...base, "--reason", "a", "--reason", "b"]), /unknown or duplicate/u);
++  assert.throws(() => parseArgv([...base, "--why", "x"]), /unknown or duplicate/u);
++});
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index b82e3be80..a72aed45f 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -132,6 +132,10 @@ input, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, for t
+ (`<git-common-dir>/agent-pipeline/publication-close/<lifecycle>/evidence/<name>.json`, absolute path,
+ `pipeline.close-final-verification.v1`) with `candidateOid` and `candidateTree` equal to the frozen
+ candidate, `verifyStatus` and `securityStatus` exactly `green`, and `verifySha256` / `securitySha256`.
++Every private evidence file of the coordinator (this one, the publication receipts and the cleanup receipt) must be a
++regular file with mode 0600 and a single link, with a name of `[A-Za-z0-9._-]{1,160}.json` and a size of 2 bytes to
++1 MiB, in that evidence directory, which itself carries no group or world bits; otherwise the plan refuses with
++`PB-FILE` ("must be a mode-0600 single-link regular file") or `CLOSE-EVIDENCE-PATH`.
+ Write `green` only when the Verify run (`--mode candidate`, full) passed and `security-scan.mjs --root
+ <root>` did not report `BLOCKING` for the frozen candidate; the coordinator does not read either result.
+ 
+@@ -144,7 +148,26 @@ must then name the new candidate. Findings you judge not relevant are put on the
+ route BEFORE the freeze, with a reason: gitleaks through `.gitleaksignore` (`gitleaks-repair-ignore.mjs`),
+ dependency findings through the project's `osv-scanner.toml` (`[[IgnoredVulns]]` with `id`, `ignoreUntil`
+ and `reason`). The shipped gitleaks configuration already exempts the bare hex digests the close itself
+-writes into `audit-bundles/<feature>/<commit>/` and the State file; a real key in those files is still found.
++writes into `audit-bundles/<feature>/<commit>/` and the State file (bare hex values of 32 to 64 characters);
++a real key in those files is still found.
++
++A value that is public by design (for example an IndexNow key) is reviewed through the same route
++(`gitleaks-repair-ignore.mjs --prepare-gate`, then `--approve-new`) when the project publishes it as the
++tracked file `public/<key>.txt` containing exactly that key (hex, 32 to 64 characters): put the key alone in
++the reviewed-value file under `scratch/` and add `--reason "<why this value is public by design>"` (at least
++10 characters; the command prints it, quote it in the chat confirmation and the close report). Any other
++value is refused with a text that names what is accepted. The suppression is an entry in `.gitleaksignore`,
++so commit it BEFORE the freeze, or renew the freeze as above.
++
++`cleanup-complete` takes one private evidence file, `pipeline.close-cleanup-receipt.v1`, with exactly the keys
++`schema`, `status` (`complete` or `uncertain`), `evidenceDigest` (64 hex characters; only its format is checked),
++`candidateOid` and `candidateTree` (the frozen candidate, after a re-freeze the renewed one). No command
++produces this file: write it yourself. `uncertain` is accepted by `cleanup-complete`, but `closed-local` is then
++refused with `CLOSE-CLEANUP`; a later `cleanup-complete` with `complete` replaces it. With a session
++descriptor, its cleanup status is the evidence to digest. A project WITHOUT a session descriptor
++(`sessionCleanup` null) may write `complete` with the SHA-256 of the empty input (`e3b0c442…b855`, as above)
++as `evidenceDigest` (PO decision 2026-11-01), provided the close report or handover states explicitly that no
++descriptor existed and the digest is the empty-input digest.
+ 
+ Without separately authorized publication, confirmed descriptor-bound cleanup
+ may end at `closed-local`. Publication, readback, release and promotion are
