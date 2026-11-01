@@ -822,6 +822,9 @@ test("critic-bound-verify remedy for private-critic-binding-unavailable names th
   assert.match(check.remedy, /\$\{PIPELINE_PLUGIN_ROOT\}/u);
   assert.match(check.remedy, /merge base/u);
   assert.match(check.remedy, /publication target/u);
+  // N29 (D232 batch): a FAIL with only minor findings is bound by the PO's signed residual acceptance; the hint names that route and the reason class.
+  assert.match(check.remedy, /approve-residual-acceptance --by <name> --critic-packet <packet-id>/u);
+  assert.match(check.remedy, /--reason-class uncorrectable-past-authorship/u);
   assert.doesNotMatch(check.remedy, /[\r\n]/u);
 });
 

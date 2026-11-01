@@ -68,6 +68,9 @@ function blocked({ currentBytes, maxBytes, proposedBytes, handoverPath, rotateSc
       + `${DENIAL_CODE}: the handover file \`${handoverPath}\` is at or over its hard size cap and this write is not a net decrease.\n`
       + `Current size: ${currentBytes} bytes (utf8-byte-upper-bound, schema ${HANDOVER_MEASUREMENT_SCHEMA}). Cap: ${maxBytes} bytes. Proposed size: ${proposedBytes} bytes.\n`
       + `Rotate closed content out first: node "${rotateScriptPath}" --root <repository-root> --section-heading "<block heading>" --summary "<one-line summary>".\n`
+      + "The rotation script refuses a section that is not yet acknowledged (HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED, ADR-0066 Decision 7). "
+      + "Read that section for durable rules that have no home yet, then run the same script with --acknowledge-extraction-done --section-heading \"<block heading>\" "
+      + "(deliberate review work, not a formality), and only then rotate it.\n"
       + "A write that is itself a net size decrease -- including the rotation script's own live-file rewrite -- is always admitted, never blocked by this cap.\n",
   );
 }

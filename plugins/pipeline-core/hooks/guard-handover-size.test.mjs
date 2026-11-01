@@ -70,6 +70,9 @@ withFixture("over-cap-growing", { maxBytes: 10 }, (root) => {
   assert.ok(result.stderr.includes("Current size: 10 bytes"));
   assert.ok(result.stderr.includes("Cap: 10 bytes"));
   assert.ok(result.stderr.includes("/fixture/handover-rotate.mjs"));
+  // N28 (D232 batch): the denial also names the acknowledgment step the rotation script will demand next.
+  assert.ok(result.stderr.includes("HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED"));
+  assert.ok(result.stderr.includes("--acknowledge-extraction-done"));
 });
 
 // == DoD 3: at/over-cap AND the edit is a net decrease -- admits (never blocks a rotation) ==
