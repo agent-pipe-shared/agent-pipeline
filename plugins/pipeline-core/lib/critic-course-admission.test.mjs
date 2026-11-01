@@ -1109,6 +1109,37 @@ test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request 
   assert.ok(readFileSync(join(fx.root, fx.manifestPath)).equals(before), "step manifest is byte-identical");
   assert.deepEqual(readdirSync(join(fx.root, "specs", fx.featureId, "evidence")).filter((n) => n.startsWith("critic-lineage-")).sort(), lineageFilesBefore, "step no round 2 lineage file was written");
 });
+test("PF94 ROUND2 (c) two registered delta requests for one candidate: the lineage of round 2 compiles against the newest one (N44)", () => {
+  const fx = pf94DeltaFixture();
+  pf94WriteInput(fx);
+  const delta = pf94Delta(fx);
+  assert.equal(delta.status, "delta-request-added", `step delta request: ${JSON.stringify(delta)}`);
+  const registration = pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request");
+  const specPath = `specs/${fx.featureId}/spec.md`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
+  const taskId = "feature-held-task-round2c", packetId = "9d".repeat(16);
+  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
+  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, fx.candidate, fx.correctionCommit) };
+  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review-2c", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
+  admitSessionCriticReview(request, {});
+  const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
+  assert.equal(finalized.status, "completed", `step round 2 finalize completes: ${JSON.stringify(finalized)}`);
+  assert.equal(finalized.lineage.status, "written", JSON.stringify(finalized.lineage));
+  pf94UnwrittenOf(fx.root, fx.manifestPath, finalized.lineage);
+  // An OLDER request for the same candidate and base (built when fewer diagnostics existed) sits before the genuine one in the manifest and no longer binds the evidence set.
+  const genuine = JSON.parse(readFileSync(join(fx.root, delta.deltaRequestPath), "utf8"));
+  const stalePath = `specs/${fx.featureId}/evidence/critic-delta-request-${"d".repeat(64)}.json`;
+  const staleBytes = Buffer.from(JSON.stringify({ ...genuine, deterministicEvidence: [] }));
+  writeFileSync(join(fx.root, stalePath), staleBytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  const at = manifest.artifacts.findIndex((entry) => entry.path === delta.deltaRequestPath);
+  assert.ok(at >= 0, "the genuine request is in the manifest");
+  manifest.artifacts.splice(at, 0, { class: "candidate-evidence", path: stalePath, sha256: hash(staleBytes), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  const added = addCriticReviewLineage({ root: fx.root, packetId });
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  assert.equal(added.reviewId, "review-2", "the lineage is the one of round 2");
+});
 // D204 anchor: a follow-up round whose registered delta request moves a trust boundary (or is impact-ambiguous) is an effective FULL
 // round of the same course, end to end, from the consumer's state: TWO consumed registered rounds, then the fallback full round 3,
 // then an ordinary diff round 4 whose corrections are counted from the previous candidate.

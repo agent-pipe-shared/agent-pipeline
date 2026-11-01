@@ -544,7 +544,8 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   // D204: the course base is the previous round's candidate; an effective full round (RE-DELTA-FALLBACK-FULL) has a packet base that is the course genesis base.
   const courseBase = history.length > 0 ? history.at(-1).record.candidate.commit : packet.candidate.base;
   if (history.length > 0) {
-    for (const entry of manifest.artifacts) {
+    // N44: a candidate can hold several registered requests (one per time the diagnostic set changed); the newest one binds the full set, so walk the manifest from its end.
+    for (const entry of [...manifest.artifacts].reverse()) {
       if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
       const present = inspect(root, entry.path);
       let record = null;
