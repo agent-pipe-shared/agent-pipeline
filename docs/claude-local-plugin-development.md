@@ -195,6 +195,16 @@ are re-read on every invocation, so a refreshed copy takes effect for them
 immediately; `hooks.json` is read once at session start, so a change to the
 wiring itself needs a new session.
 
+A project that already uses the Pipeline needs one more step after an install or
+update that changes a mandatory hook: its own hook wiring must be refreshed.
+`pipeline-start` reports this as the preflight status `hook-refresh-required`
+and carries the exact action, `refresh-mandatory-hooks.mjs --root <project
+root>` from the installed plugin's `scripts/` folder (a project without the
+hooks yet gets `hook-provisioning-required` and its own action instead). Run
+the returned action once from the Elephant session, then rerun the same
+preflight; a guard that still refuses after an update, for example a newly
+admitted command or directory, usually means this step is missing.
+
 This refresh is deliberately an operator action taken outside an agent session:
 an agent session may not write into the plugin root that is enforcing its own
 guards, and `guard-lifecycle-ready.mjs` refuses cross-repository mutation
