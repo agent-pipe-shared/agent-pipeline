@@ -1,0 +1,380 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index f0096ff5d..30382b5b3 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -303,7 +303,15 @@ replace it). Compute the hash by **importing the real function** in a
+ throwaway script (`scratch/`, gitignored) — never hand-roll the hash. A wrong
+ hash fails closed at verification, it does not silently accept.
+ 
+-### A fourth kind: `release-preflight` (ADR-0064)
++### Pushing after the feature close (candidate 16d)
++
++`close-feature` clears the active feature and its plan authority from State. A push after the close is then bound to the **most
++recently closed feature** (`closedFeatures`, the unique latest `closedAt`), and only a push: `push-prepare.mjs` and `push-init.mjs`
++use its id, PRD path and the sibling `spec.md` to print the same `authorize-critical` command, and the proof is verified by
++`approve-push` and by the push guard against that feature. The PRD and spec digests are taken from the files **in the push
++candidate's own tree** (`git show <candidate>:<path>`), so the signature binds the exact bytes being pushed, and the closed
++feature's `forCommit` must be an ancestor of the candidate. Anything missing, ambiguous or not an ancestor is refused exactly as
++before. With an active feature nothing changes.
+ 
+ `authorize-critical` also accepts `--kind release-preflight` — the release
+ gate's consent, produced by the identical three-act ceremony above (copy the
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index f0096ff5d..30382b5b3 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -303,7 +303,15 @@ replace it). Compute the hash by **importing the real function** in a
+ throwaway script (`scratch/`, gitignored) — never hand-roll the hash. A wrong
+ hash fails closed at verification, it does not silently accept.
+ 
+-### A fourth kind: `release-preflight` (ADR-0064)
++### Pushing after the feature close (candidate 16d)
++
++`close-feature` clears the active feature and its plan authority from State. A push after the close is then bound to the **most
++recently closed feature** (`closedFeatures`, the unique latest `closedAt`), and only a push: `push-prepare.mjs` and `push-init.mjs`
++use its id, PRD path and the sibling `spec.md` to print the same `authorize-critical` command, and the proof is verified by
++`approve-push` and by the push guard against that feature. The PRD and spec digests are taken from the files **in the push
++candidate's own tree** (`git show <candidate>:<path>`), so the signature binds the exact bytes being pushed, and the closed
++feature's `forCommit` must be an ancestor of the candidate. Anything missing, ambiguous or not an ancestor is refused exactly as
++before. With an active feature nothing changes.
+ 
+ `authorize-critical` also accepts `--kind release-preflight` — the release
+ gate's consent, produced by the identical three-act ceremony above (copy the
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+index 0eb55d8f7..97349351b 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+@@ -6,6 +6,7 @@
+  * verdict); the write-capable module passes its own pin. The old module imports and re-exports these symbols.
+  */
+ import { createHash } from "node:crypto";
++import { spawnSync } from "node:child_process";
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
+ import { criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
+ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+@@ -96,13 +97,56 @@ export function localOperatorAnchorFor(trust, machinePlaneDeps) {
+   return trust.pinOnSuccess ? resolveLocalOperatorKeyAnchor(machinePlaneDeps) : null;
+ }
+ 
++const CLOSED_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const CLOSED_PLAN_PATH = /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.md$/u;
++const COMMIT_OID = /^[0-9a-f]{40,64}$/u;
++const NO_AUTHORITY = Object.freeze({ source: "none", featureId: undefined, planSha256: undefined, specSha256: undefined });
++
++/**
++ * Candidate 16d (PO decision 2026-11-01): which feature identity, plan digest and spec digest a signed critical action is bound to.
++ * With an ACTIVE feature this is exactly what it always was (the feature id and the digests of its approved plan authority in State).
++ * A push after the feature close has no active feature and no plan authority in State, because the close clears both; for a PUSH
++ * only, and only when there is no active feature, the most recently closed feature (`closedFeatures`, unique latest `closedAt`) carries
++ * the push: its PRD and sibling `spec.md` are read from the PUSH CANDIDATE's own tree (`git show <candidate>:<path>`), so the signature
++ * binds the exact bytes being pushed, and its `forCommit` must be an ancestor of the candidate (the push delivers that feature's
++ * work). Anything missing, ambiguous, unsafe or not an ancestor yields no authority and the caller refuses exactly as before.
++ */
++export function criticalActionAuthority({ state, kind, candidate, projectDir, gitFn = spawnSync }) {
++  if (object(state?.activeFeature)) {
++    const gate = state?.planApproval?.poGateAuthority;
++    return { source: "active", featureId: state.activeFeature.id, planSha256: gate?.planSha256, specSha256: gate?.specSha256 };
++  }
++  if (kind !== "push" || typeof projectDir !== "string" || !validCandidate(candidate) || !Array.isArray(state?.closedFeatures)) return NO_AUTHORITY;
++  try {
++    const rows = state.closedFeatures
++      .filter((entry) => object(entry) && CLOSED_FEATURE_ID.test(entry.id ?? "") && CLOSED_PLAN_PATH.test(entry.planPath ?? "")
++        && !entry.planPath.split("/").some((part) => part === "." || part === "..") && COMMIT_OID.test(entry.forCommit ?? "")
++        && Number.isFinite(Date.parse(entry.closedAt)))
++      .map((entry) => ({ entry, at: Date.parse(entry.closedAt) }));
++    const latest = Math.max(...rows.map((row) => row.at));
++    const chosen = rows.filter((row) => row.at === latest);
++    if (rows.length === 0 || chosen.length !== 1) return NO_AUTHORITY;
++    const { id, planPath, forCommit } = chosen[0].entry;
++    const git = (args) => gitFn("git", ["-C", projectDir, ...args], { encoding: "buffer", maxBuffer: 64 * 1024 * 1024, shell: false });
++    if (git(["merge-base", "--is-ancestor", forCommit, candidate.commit]).status !== 0) return NO_AUTHORITY;
++    const sha = (path) => {
++      const shown = git(["show", `${candidate.commit}:${path}`]);
++      return shown.status === 0 && Buffer.isBuffer(shown.stdout) ? createHash("sha256").update(shown.stdout).digest("hex") : undefined;
++    };
++    const specPath = `${planPath.includes("/") ? planPath.slice(0, planPath.lastIndexOf("/") + 1) : ""}spec.md`;
++    const planSha256 = sha(planPath);
++    const specSha256 = sha(specPath);
++    return planSha256 && specSha256 ? { source: "closed", featureId: id, planPath, specPath, planSha256, specSha256 } : NO_AUTHORITY;
++  } catch { return NO_AUTHORITY; }
++}
++
+ /**
+  * The half both routes share: a recorded proof is accepted only if the signature
+  * verifies against the committed anchor SET (or against any well-formed key, in the
+  * absent-set posture) over an intent rebuilt from the OBSERVED subject. `subject` is the
+  * caller's route-specific object; everything else is uniform.
+  */
+-export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now }) {
++export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now, projectDir }) {
+   if (!object(recorded) || !object(recorded.proof) || !object(recorded.action)
+     || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) {
+     return { ok: false, code: `${prefix}-RECORD-INCOMPLETE` };
+@@ -134,14 +178,14 @@ export function verifySignedAction({ state, kind, prefix, candidate, subject, re
+   // The intent, rebuilt around that action. This is where the plan/spec authority and the
+   // candidate tree enter: an approval signed under a different plan, or for a different
+   // tree at the same commit, cannot be replayed here.
+-  const gate = state?.planApproval?.poGateAuthority;
++  const authority = criticalActionAuthority({ state, kind, candidate, projectDir });
+   let intent;
+   try {
+     intent = createPoApprovalIntent({
+       kind: "critical-action",
+-      featureId: state?.activeFeature?.id,
+-      planSha256: gate?.planSha256,
+-      specSha256: gate?.specSha256,
++      featureId: authority.featureId,
++      planSha256: authority.planSha256,
++      specSha256: authority.specSha256,
+       candidate: { commit: candidate.commit, tree: candidate.tree },
+       policyRevision: "critical-human-proof-v1",
+       subjectSha256: criticalActionSha256(recorded.action),
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index eca7542c4..e416096c1 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -410,7 +410,7 @@ export function authorizeRecordedPush({
+   }
+ 
+   const verified = verifySignedAction({
+-    state, kind: "push", prefix, candidate, recorded, anchors: trust.anchors, now,
++    state, kind: "push", prefix, candidate, recorded, anchors: trust.anchors, now, projectDir,
+     subject: {
+       sourceCommit: candidate.commit,
+       remote,
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+index 923e0fe1b..43a5ee429 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+@@ -14,6 +14,7 @@ import { join } from "node:path";
+ 
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
+ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
++import { criticalActionAuthority } from "./critical-action-authorization-read.mjs";
+ import { execFileSync } from "node:child_process";
+ import {
+   authorizeRecordedChatResidualAcceptance, authorizeRecordedDeploy, authorizeRecordedPush,
+@@ -883,6 +884,66 @@ try {
+     assert.equal(call(root, stateFor(approvalRecord({ key, threatModel }))).code, "PUSH-PROOF-VERIFIED");
+   });
+ 
++  // Candidate 16d (PO decision 2026-11-01): a push after the feature close has no active feature and no plan authority in State. The push
++  // is then bound to the most recently closed feature, with the plan and spec digests taken from the PUSH CANDIDATE's own tree.
++  const sha256Of = (text) => createHash("sha256").update(text).digest("hex");
++  const closedFixture = ({ key }) => {
++    const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++    git("init", "--quiet");
++    const prd = "# PRD of the closed feature\n";
++    const spec = "# Spec of the closed feature\n";
++    writeFileSync(join(root, "specs", "demo", "prd.md"), prd);
++    writeFileSync(join(root, "specs", "demo", "spec.md"), spec);
++    git("add", "-A");
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "close commit");
++    const forCommit = git("rev-parse", "HEAD");
++    mkdirSync(join(root, "docs"), { recursive: true });
++    writeFileSync(join(root, "docs", "state.md"), "# handover after the close\n");
++    git("add", "-A");
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "handover");
++    const candidate = { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") };
++    return { root, git, threatModel, forCommit, candidate, planSha256: sha256Of(prd), specSha256: sha256Of(spec) };
++  };
++  const closedState = (record, closedFeatures) => ({
++    closedFeatures,
++    pushApproval: { lastApproved: record },
++    criticalProofConsumption: [{ proofSha256: record.criticalProof.proofSha256, kind: "push", consumedAt: NOW }],
++  });
++  const closedEntry = (f, over = {}) => ({ id: "demo-feature", planPath: "specs/demo/prd.md", phaseAtClose: null,
++    architectureImpact: "no-architecture-impact", closedAt: "2026-11-01T10:00:00.000Z", closedBy: "PO", forCommit: f.forCommit, ...over });
++
++  check("CF1 a push after the close is authorized against the closed feature, with plan and spec digests from the candidate's tree", () => {
++    const key = keypair();
++    const f = closedFixture({ key });
++    const record = approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, planSha256: f.planSha256, specSha256: f.specSha256 });
++    const result = call(f.root, closedState(record, [closedEntry(f)]), { candidate: f.candidate });
++    assert.equal(result.code, "PUSH-PROOF-VERIFIED", JSON.stringify(result));
++    assert.equal(result.authorized, true);
++  });
++
++  check("CF2 the closed path is closed: other digests, another feature id, a foreign ancestor, an active feature, an ambiguous latest, a missing spec and any other kind are refused", () => {
++    const key = keypair();
++    const f = closedFixture({ key });
++    const good = () => approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, planSha256: f.planSha256, specSha256: f.specSha256 });
++    const run = (record, closedFeatures, extra = {}, state = {}) => call(f.root, { ...closedState(record, closedFeatures), ...state }, { candidate: f.candidate, ...extra });
++    assert.equal(run(good(), [closedEntry(f)]).authorized, true, "control: the same inputs authorize");
++    assert.notEqual(run(approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate }), [closedEntry(f)]).authorized, true, "a proof over other plan/spec digests (State-style constants)");
++    assert.notEqual(run(approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, featureId: "another-feature", planSha256: f.planSha256, specSha256: f.specSha256 }), [closedEntry(f)]).authorized, true, "a proof for another feature id");
++    assert.notEqual(run(good(), [closedEntry(f, { forCommit: f.candidate.commit.replace(/.$/u, f.candidate.commit.endsWith("0") ? "1" : "0") })]).authorized, true, "a forCommit that is not in the history");
++    assert.notEqual(run(good(), [closedEntry(f, { planPath: "specs/demo/../demo/prd.md" })]).authorized, true, "an unsafe plan path");
++    assert.notEqual(run(good(), [closedEntry(f, { planPath: "specs/demo/missing.md" })]).authorized, true, "a plan that is not in the candidate tree");
++    assert.notEqual(run(good(), [closedEntry(f), closedEntry(f, { id: "other-feature" })]).authorized, true, "two entries with the same latest closedAt are ambiguous");
++    assert.equal(run(good(), [closedEntry(f, { id: "older-feature", closedAt: "2026-10-01T10:00:00.000Z", planPath: "specs/older/prd.md" }), closedEntry(f)]).authorized, true, "the latest closedAt wins");
++    assert.notEqual(run(good(), [closedEntry(f)], {}, { activeFeature: { id: "active-feature" } }).authorized, true, "an active feature takes precedence; the closed path is not used");
++    f.git("rm", "--quiet", "specs/demo/spec.md");
++    f.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "spec removed");
++    const later = { commit: f.git("rev-parse", "HEAD"), tree: f.git("rev-parse", "HEAD^{tree}") };
++    const laterRecord = approvalRecord({ key, threatModel: f.threatModel, candidate: later, planSha256: f.planSha256, specSha256: f.specSha256 });
++    assert.notEqual(call(f.root, closedState(laterRecord, [closedEntry(f)]), { candidate: later }).authorized, true, "a spec that is not in the candidate tree");
++    assert.equal(criticalActionAuthority({ state: { closedFeatures: [closedEntry(f)] }, kind: "deploy", candidate: f.candidate, projectDir: f.root }).source, "none", "only a push uses a closed feature");
++  });
++
+   process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
+ } finally {
+   for (const root of roots) rmSync(root, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+index 93d8ae246..c6a7b36d0 100644
+--- a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+@@ -131,4 +131,51 @@ assert.equal(run(["publication-approve", "--request-file", "publication-request.
+ assert.equal(run(["publication-approve", "--request-file", "publication-request.json", "--proof-request", publicationProofRequestPath, "--proof-authority", authorityPath, "--proof", publicationProofPath], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 0);
+ const published = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+ assert.equal(typeof published.publicationCriticalProofs[transactionId]?.proofSha256, "string");
++// Candidate 16d (PO decision 2026-11-01): after the feature close there is no active feature and no plan authority in State. approve-push
++// then binds the push to the most recently closed feature, with the PRD and spec digests taken from the push candidate's own tree.
++{
++  const closedRoot = mkdtempSync(join(tmpdir(), "critical-proof-closed-"));
++  const closedExternal = mkdtempSync(join(tmpdir(), "critical-proof-closed-external-"));
++  const g = (...args) => execFileSync("git", ["-C", closedRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
++  g("init", "-q"); g("config", "user.name", "Fixture"); g("config", "user.email", "fixture@example.invalid");
++  mkdirSync(join(closedRoot, "project"), { recursive: true });
++  mkdirSync(join(closedRoot, "specs", "closed-demo"), { recursive: true });
++  writeFileSync(join(closedRoot, "project", "push-threat-model.md"), "fixture threat model\n");
++  writeFileSync(join(closedRoot, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
++  writeFileSync(join(closedRoot, "specs", "closed-demo", "prd.md"), "closed prd\n");
++  writeFileSync(join(closedRoot, "specs", "closed-demo", "spec.md"), "closed spec\n");
++  g("add", "-A"); g("commit", "-q", "-m", "close commit");
++  const forCommit = g("rev-parse", "HEAD");
++  writeFileSync(join(closedRoot, "docs-after-close.md"), "handover\n");
++  g("add", "-A"); g("commit", "-q", "-m", "handover");
++  const closedCandidate = { commit: g("rev-parse", "HEAD"), tree: g("rev-parse", "HEAD^{tree}") };
++  const stateFor = (closedFeatures) => JSON.stringify({ schema: "pipeline.state.v0", closedFeatures }, null, 2);
++  const entry = (over = {}) => ({ id: "closed-demo", planPath: "specs/closed-demo/prd.md", phaseAtClose: null, architectureImpact: "no-architecture-impact", closedAt: "2026-08-02T10:00:00.000Z", closedBy: "PO", forCommit, ...over });
++  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry()]));
++  const closedSubject = criticalActionSubjectSha256({ kind: "push", candidate: closedCandidate, subject: { sourceCommit: closedCandidate.commit, ...pushTarget, threatModel } });
++  const closedRequest = (featureId, planBytes = Buffer.from("closed prd\n"), specBytes = Buffer.from("closed spec\n")) => createCriticalActionApprovalRequest({
++    candidate: closedCandidate, featureId, planBytes, specBytes, action: { kind: "push", subjectSha256: closedSubject, expiresAt: "2026-08-02T18:50:00.000Z" },
++  });
++  const files = (name, req) => {
++    const prf = { schema: "pipeline.po-approval-proof.v1", intentSha256: req.approvalIntent.sha256, keyReference: "test-key", publicKey,
++      signatureBase64: sign(null, Buffer.from(req.approvalIntent.sha256), keys.privateKey).toString("base64") };
++    const r = join(closedExternal, `${name}-request.json`), p = join(closedExternal, `${name}-proof.json`), a = join(closedExternal, "authority.json");
++    writeFileSync(r, JSON.stringify(req)); writeFileSync(p, JSON.stringify(prf)); writeFileSync(a, JSON.stringify(authority));
++    return ["--proof-request", r, "--proof-authority", a, "--proof", p];
++  };
++  const closedDeps = { dir: closedRoot, now: () => now, gitHead: () => ({ ok: true, commit: closedCandidate.commit }), gitCandidate: () => ({ ok: true, ...closedCandidate }) };
++  const approve = (proofArgs, depsOverride = closedDeps) => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, ...proofArgs], depsOverride);
++  assert.equal(approve(files("wrong-plan", closedRequest("closed-demo", Buffer.from("other prd\n")))), 2, "a proof over other plan bytes is refused");
++  assert.equal(approve(files("wrong-feature", closedRequest("another-feature"))), 2, "a proof for another feature id is refused");
++  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry({ forCommit: "0".repeat(40) })]));
++  assert.equal(approve(files("foreign-ancestor", closedRequest("closed-demo"))), 2, "a close commit that is not in the candidate's history is refused");
++  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([]));
++  assert.equal(approve(files("no-closed-feature", closedRequest("closed-demo"))), 2, "no closed feature and no active feature is refused");
++  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry()]));
++  assert.equal(approve(files("closed-ok", closedRequest("closed-demo"))), 0, "the closed feature carries the push with digests from the candidate tree");
++  const closedAfter = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(closedRoot, "project", "pipeline-state.json"), "utf8")), closedRoot);
++  assert.equal(closedAfter.pushApproval.lastApproved.forCommit, closedCandidate.commit);
++  assert.equal(closedAfter.criticalProofConsumption?.length, 1);
++}
++
+ console.log("critical-human-proof-gate: 20 assertions passed");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index ab7e68219..b8b97539b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -441,6 +441,7 @@ import {
+   withPrivateCriticalApprovals,
+   writeCriticalApproval,
+ } from "../lib/critical-action-authorization.mjs";
++import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+@@ -4814,9 +4815,10 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
+       || authority.value?.publicKeySha256 !== policy.trustAnchor.publicKeySha256)) {
+     return { ok: false, code: "CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH" };
+   }
+-  const active = state.activeFeature;
+-  const gate = state.planApproval?.poGateAuthority;
+-  if (!active?.id || !gate?.planSha256 || !gate?.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
++  // Candidate 16d: after the feature close there is no active feature; a PUSH is then bound to the closed feature through the shared
++  // authority reader (the same one the push guard uses), with the plan and spec digests taken from the push candidate's own tree.
++  const authority16d = criticalActionAuthority({ state, kind, candidate, projectDir: dir });
++  if (!authority16d.featureId || !authority16d.planSha256 || !authority16d.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
+   const candidateIdentity = { commit: candidate.commit, tree: candidate.tree };
+   const action = request.value?.action;
+   const expectedSubject = criticalActionSubjectSha256({ kind, candidate: candidateIdentity, subject });
+@@ -4841,7 +4843,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
+   });
+   if (!result.verified) return { ok: false, code: result.code };
+   const intent = request.value.approvalIntent?.value;
+-  if (intent?.featureId !== active.id || intent?.planSha256 !== gate.planSha256 || intent?.specSha256 !== gate.specSha256) {
++  if (intent?.featureId !== authority16d.featureId || intent?.planSha256 !== authority16d.planSha256 || intent?.specSha256 !== authority16d.specSha256) {
+     return { ok: false, code: "CRITICAL-PROOF-AUTHORITY" };
+   }
+   // The proof object itself travels into State alongside its digest. It is public data --
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index a94c84a65..448501d34 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -58,6 +58,7 @@ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
++import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+ 
+ export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
+@@ -528,7 +529,15 @@ export function resolveFeatureContext(dir, deps = {}) {
+   const result = (deps.readState ?? readState)(dir);
+   const active = result?.status === "ok" ? result.state.activeFeature : null;
+   if (!active || typeof active.id !== "string" || active.id === "" || typeof active.planPath !== "string" || active.planPath === "") {
+-    return { ok: false, message: "no active feature with an id and planPath in pipeline state." };
++    // Candidate 16d: after the feature close there is no active feature. A push is then bound to the most recently closed feature
++    // when its close commit is an ancestor of HEAD and its PRD and spec are in HEAD's tree (the shared authority reader decides).
++    if (result?.status === "ok" && !result.state.activeFeature) {
++      const commit = gitOutput(dir, ["rev-parse", "--verify", "HEAD^{commit}"], deps);
++      const tree = gitOutput(dir, ["rev-parse", "--verify", "HEAD^{tree}"], deps);
++      const closed = commit && tree ? criticalActionAuthority({ state: result.state, kind: "push", candidate: { commit: commit.trim(), tree: tree.trim() }, projectDir: dir }) : null;
++      if (closed?.source === "closed") return { ok: true, featureId: closed.featureId, planPath: closed.planPath, specPath: closed.specPath, closedFeature: true };
++    }
++    return { ok: false, message: "no active feature with an id and planPath in pipeline state, and no closed feature whose close commit this push delivers (its close commit must be an ancestor of HEAD and its PRD and spec must be in HEAD's tree)." };
+   }
+   const specPath = `${dirname(active.planPath).split(sep).join("/")}/spec.md`;
+   return { ok: true, featureId: active.id, planPath: active.planPath, specPath };
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 70eb4f193..7844bf374 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -693,6 +693,32 @@ test("resolveFeatureContext: no active feature -> ok:false", () => {
+   assert.equal(result.ok, false);
+ });
+ 
++// Candidate 16d (PO decision 2026-11-01): after the feature close there is no active feature; the push is then bound to the most recently
++// closed feature whose close commit is an ancestor of HEAD and whose PRD and spec are in HEAD's tree.
++test("resolveFeatureContext: after the close the most recently closed feature carries the push, only with its close commit in history and its PRD and spec in HEAD", () => {
++  const root = mkdtempSync(join(tmpdir(), "push-prepare-closed-"));
++  try {
++    const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
++    git("init", "--quiet");
++    mkdirSync(join(root, "specs", "demo"), { recursive: true });
++    writeFileSync(join(root, "specs", "demo", "prd.md"), "# prd\n");
++    writeFileSync(join(root, "specs", "demo", "spec.md"), "# spec\n");
++    git("add", "-A");
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "close commit");
++    const forCommit = git("rev-parse", "HEAD").stdout.trim();
++    const entry = (over = {}) => ({ id: "demo", planPath: "specs/demo/prd.md", phaseAtClose: null, architectureImpact: "no-architecture-impact", closedAt: "2026-11-01T10:00:00.000Z", closedBy: "PO", forCommit, ...over });
++    const ctx = (state) => resolveFeatureContext(root, { readState: () => ({ status: "ok", state }) });
++    const ok = ctx({ closedFeatures: [entry()] });
++    assert.deepEqual({ ok: ok.ok, featureId: ok.featureId, planPath: ok.planPath, specPath: ok.specPath, closedFeature: ok.closedFeature },
++      { ok: true, featureId: "demo", planPath: "specs/demo/prd.md", specPath: "specs/demo/spec.md", closedFeature: true });
++    assert.equal(ctx({ closedFeatures: [entry({ forCommit: "0".repeat(40) })] }).ok, false, "a close commit that is not in history");
++    assert.equal(ctx({ closedFeatures: [entry({ planPath: "specs/demo/missing.md" })] }).ok, false, "a PRD that is not in HEAD");
++    assert.equal(ctx({ closedFeatures: [] }).ok, false, "no closed feature");
++    assert.equal(ctx({ closedFeatures: [entry()], activeFeature: { id: "" } }).ok, false, "an active feature slot, even a broken one, never falls back");
++    assert.match(ctx({}).message, /no closed feature whose close commit this push delivers/u, "the refusal names the closed-feature condition");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("criticalArtifactPaths: agent-side push artifacts stay in repository scratch", () => {
+   const paths = criticalArtifactPaths(FIXTURE_DIR, {
+     gitCommonDir: () => "/external/po-dir/.fake-common",
