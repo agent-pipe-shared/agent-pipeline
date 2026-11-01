@@ -23,6 +23,8 @@ done_when: manual
    pure relocation. The action-local chat ceremony still writes the tracked record and keeps the fold.
 4. N29 coordinator: the bootstrap verb takes no `--root` (D1); the composed close stops at
    `CLOSE-QUALIFICATION-REQUIRED` (D2).
+   Triage 2026-11-01 (candidate 15c): D2's refusal now names the audit route flags, held as `w36`; D1 is already stated in the
+   `CLOSE-RESULT` text ("that verb takes no --root flag"). The composed close itself is unchanged.
 5. N27: `plugins/pipeline-core/lib/published-tag-push.test.mjs` is not a Verify phase yet (needs `harness/scripts/verify.mjs`,
    TP-3, and an inventory rebaseline of `reader-inputs/product-capability-inventory.json`); the predicate is covered
    through the registered guard-push, pre-push-hook-install and push-init suites meanwhile. The guard-push
