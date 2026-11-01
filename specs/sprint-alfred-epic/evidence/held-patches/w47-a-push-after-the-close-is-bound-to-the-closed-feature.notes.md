@@ -26,6 +26,29 @@ path; install only on the PO's word).
   kind, and lets the latest `closedAt` win), one test in `push-prepare.test.mjs`, and a real-signature `approve-push` section in
   `critical-human-proof-gate.test.mjs`. A mutation removing the ancestor check fails CF2.
 
+## Added to 16d at the PO's request: the cleanup receipt is produced, and the closing session does not count
+
+Found by both consumer closes: `pipeline.close-cleanup-receipt.v1` had no producing command, and the digest consumers chose (the hash of a stored
+`session-cleanup.mjs status` output) listed the closing session's OWN descriptor as `unavailable`. A session that is still running cannot answer for
+itself, so that hash proved nothing about cleanup (PO: "the own one must not count, only the others").
+
+- `lib/close-cleanup-receipt.mjs` (new): `buildCleanupReceipt({descriptors, ownSessionId, candidateOid, candidateTree})` is a pure function. The own
+  descriptor is excluded and named in the observation; every other active descriptor counts. `complete` only with no other descriptor, otherwise
+  `uncertain` (which `closed-local` still refuses with `CLOSE-CLEANUP`). `evidenceDigest` is the SHA-256 of the canonical observation, which binds the
+  candidate, the named exclusion and the other descriptors with their owner status; order of listing does not matter.
+- `scripts/close-coordinator.mjs`: new command `write-cleanup-receipt --root --lifecycle`. It reads the stored coordinator (refuses unless the phase can
+  move to `cleanup-complete`, `CLOSE-CLEANUP-PHASE`), lists the descriptors and their owner status (same calls as `session-cleanup.mjs status`), derives
+  the own descriptor id from `CLAUDE_CODE_SESSION_ID` (`claude-<id>`, never typed), and writes `cleanup-observation.json` and `cleanup-receipt.json`
+  (mode 0600) into the lifecycle's private evidence directory. The coordinator's own acceptance rules are unchanged.
+- `skills/close-feature/SKILL.md`: the receipt paragraph now names the command; the hand-written empty-input route stays accepted.
+- Tests (existing suite `close-coordinator.test.mjs`): pure-function coverage (own only, none at all, other live, order independence, own not derivable,
+  changed status changes the digest, invalid input) and a CLI chain to `closed-local` with the produced receipt. A mutation that stops excluding the own
+  descriptor fails the first test.
+
+Limits, disclosed: the own session is derived for the Claude runner only; for another runner nothing is excluded, so a receipt cannot be `complete`
+while any descriptor exists (conservative). Stale `claude-*` identity descriptors of ended sessions count as other sessions and make the receipt
+`uncertain` until cleared. The producer is not independently Critic-reviewed (Critic paused). Not run on a native Windows consumer.
+
 ## Deviation from the design draft
 
 The draft proposed a distinct policy revision (`critical-human-proof-v1-closed-feature`) for the closed case. Not built: the signing side

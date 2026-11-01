@@ -40,6 +40,90 @@ index f0096ff5d..30382b5b3 100644
  
  `authorize-critical` also accepts `--kind release-preflight` — the release
  gate's consent, produced by the identical three-act ceremony above (copy the
+diff --git a/plugins/pipeline-core/lib/close-cleanup-receipt.mjs b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+new file mode 100644
+index 000000000..486dfb412
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// Producer logic for `pipeline.close-cleanup-receipt.v1` (candidate 16d).
++//
++// The close coordinator accepts a private cleanup receipt (5 keys) but nothing produced it, so `evidenceDigest` was whatever a
++// consumer chose (the hash of a stored `session-cleanup.mjs status` output). That output lists the CLOSING session's own descriptor
++// as `unavailable`: a still-running session cannot answer for itself, so the hash proved nothing about cleanup.
++//
++// Rule built here: the closing session's own descriptor (`claude-<session id>`, derived from the runtime environment, never typed)
++// is excluded and named explicitly in the observation; every OTHER active descriptor counts. `complete` only when no other active
++// descriptor remains, otherwise `uncertain` (which passes `cleanup-complete` but is refused by `closed-local`, CLOSE-CLEANUP).
++
++import { createHash } from "node:crypto";
++
++export const CLEANUP_OBSERVATION_SCHEMA = "pipeline.close-cleanup-observation.v1";
++export const CLEANUP_RECEIPT_SCHEMA = "pipeline.close-cleanup-receipt.v1";
++
++const SHA256 = /^[0-9a-f]{64}$/u;
++const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
++const OWNER_STATUSES = new Set(["live", "not-live", "reused", "unavailable", "unobserved"]);
++
++const canonical = (value) => {
++  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
++  if (value && typeof value === "object") {
++    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
++  }
++  return JSON.stringify(value);
++};
++
++function refuse(message) {
++  const error = new Error(message);
++  error.code = "CLOSE-CLEANUP-RECEIPT";
++  throw error;
++}
++
++/**
++ * @param {{descriptors: Array<{sessionId: string, descriptorSha256: string, status: string}>,
++ *          ownSessionId: string|null, candidateOid: string, candidateTree: string}} input
++ * @returns {{observation: object, observationSha256: string, receipt: object}}
++ */
++export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, candidateTree }) {
++  if (!Array.isArray(descriptors)) refuse("descriptor listing is invalid");
++  if (!OID.test(candidateOid ?? "") || !OID.test(candidateTree ?? "")) refuse("candidate identity is invalid");
++  if (ownSessionId !== null && (typeof ownSessionId !== "string" || ownSessionId === "")) refuse("own session id is invalid");
++  const seen = new Set();
++  for (const descriptor of descriptors) {
++    if (!descriptor || typeof descriptor.sessionId !== "string" || descriptor.sessionId === ""
++      || !SHA256.test(descriptor.descriptorSha256 ?? "") || !OWNER_STATUSES.has(descriptor.status)
++      || seen.has(descriptor.sessionId)) refuse("descriptor entry is invalid");
++    seen.add(descriptor.sessionId);
++  }
++  const own = ownSessionId === null ? null : descriptors.find((descriptor) => descriptor.sessionId === ownSessionId) ?? null;
++  const others = descriptors
++    .filter((descriptor) => descriptor.sessionId !== ownSessionId)
++    .map(({ sessionId, descriptorSha256, status }) => ({ sessionId, descriptorSha256, status }))
++    .sort((left, right) => (left.sessionId < right.sessionId ? -1 : 1));
++  const observation = {
++    schema: CLEANUP_OBSERVATION_SCHEMA,
++    candidateOid,
++    candidateTree,
++    // Named, never silent: the exclusion is part of what the digest binds.
++    excludedOwnSession: own === null ? null : { sessionId: own.sessionId, descriptorSha256: own.descriptorSha256, status: own.status },
++    ownSessionDerived: ownSessionId !== null,
++    otherActiveDescriptors: others,
++  };
++  const observationSha256 = createHash("sha256").update(canonical(observation)).digest("hex");
++  return {
++    observation,
++    observationSha256,
++    receipt: {
++      schema: CLEANUP_RECEIPT_SCHEMA,
++      status: others.length === 0 ? "complete" : "uncertain",
++      evidenceDigest: observationSha256,
++      candidateOid,
++      candidateTree,
++    },
++  };
++}
 diff --git a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
 index 0eb55d8f7..97349351b 100644
 --- a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
@@ -221,6 +305,172 @@ index 923e0fe1b..43a5ee429 100644
    process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
  } finally {
    for (const root of roots) rmSync(root, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 209b087ba..36afd73a5 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -31,8 +31,13 @@ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+   assertPrivateRegularFile,
+   ensurePrivateDirectory,
++  writePrivateJsonAtomic,
+ } from "../lib/private-boundary.mjs";
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
++import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
++import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
++import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
++import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+ import {
+   LEGACY_STATE,
+@@ -76,6 +81,7 @@ const CLI_HELP = [
+   "       close-coordinator.mjs apply-start <plan-start arguments> --plan-sha256 <sha256> --activate",
+   "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
+   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
++  "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
+   "       close-coordinator.mjs --help",
+   "",
+   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
+@@ -904,6 +910,49 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+     nextAction: action("apply-transition", { ...values, root }, digest) };
+ }
+ 
++// Candidate 16d: the producer for `pipeline.close-cleanup-receipt.v1`. Read-only toward the repository and the descriptors; it writes
++// exactly two private files into the lifecycle's own evidence directory. The closing session's own descriptor (derived from the runtime
++// environment, never typed) is excluded and named; every other active descriptor counts (lib/close-cleanup-receipt.mjs).
++function writeCleanupReceipt(values, { env = process.env, listDescriptors = listActiveSessionDescriptors, inspectOwner = inspectSessionOwnerRuntime } = {}) {
++  const root = physicalRoot(values.root);
++  const common = gitCommonDir(root);
++  const stored = readCloseCoordinator(common, values.lifecycle);
++  const coordinator = stored.coordinator;
++  if (!coordinatorNextPhases(coordinator.phase).includes("cleanup-complete")) {
++    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`);
++  }
++  if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
++  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
++  const ownSessionId = identity.ok ? claudeHookDescriptorSessionId(identity.sessionId) : null;
++  const descriptors = listDescriptors(root).map((descriptor) => {
++    const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
++    if (!observed || observed.schema !== "pipeline.session-owner-status.v1" || observed.sessionId !== descriptor.sessionId
++      || observed.descriptorSha256 !== descriptor.descriptorSha256) fail("CLOSE-CLEANUP-RECEIPT", "session owner status readback is invalid");
++    return { sessionId: observed.sessionId, descriptorSha256: observed.descriptorSha256, status: observed.status };
++  });
++  const built = buildCleanupReceipt({
++    descriptors, ownSessionId, candidateOid: coordinator.candidateOid, candidateTree: coordinator.candidateTree,
++  });
++  const directory = ensurePrivateDirectory(join(publicationClosePaths(common, values.lifecycle).directory, "evidence"));
++  const receiptPath = join(directory, "cleanup-receipt.json");
++  const observationPath = join(directory, "cleanup-observation.json");
++  writePrivateJsonAtomic(observationPath, built.observation);
++  writePrivateJsonAtomic(receiptPath, built.receipt);
++  return {
++    schema: "pipeline.close-coordinator.cleanup-receipt.v1",
++    status: built.receipt.status,
++    receiptPath,
++    observationPath,
++    evidenceDigest: built.receipt.evidenceDigest,
++    excludedOwnSession: built.observation.excludedOwnSession,
++    ownSessionDerived: built.observation.ownSessionDerived,
++    otherActiveDescriptors: built.observation.otherActiveDescriptors,
++    next: built.receipt.status === "complete"
++      ? `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${values.lifecycle} --actor <name> --phase cleanup-complete --evidence ${receiptPath}`
++      : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
++  };
++}
++
+ function applyStart(values, suppliedDigest) {
+   const plan = startPlan(values);
+   if (plan.planSha256 !== suppliedDigest) fail("CLOSE-PLAN", "start plan digest drifted");
+@@ -1115,6 +1164,10 @@ try {
+       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
+       next: coordinatorNextPhases(stored.coordinator.phase),
+     });
++  } else if (command === "write-cleanup-receipt") {
++    const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
++    if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");
++    emit(writeCleanupReceipt(parsed.values));
+   } else if (command === "plan-start" || command === "apply-start") {
+     const parsed = exactArgs(argv, new Set(["root", "lifecycle", "actor", "close-intent", "plan-sha256"]), new Set(["activate"]));
+     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor || !CLOSE_INTENTS.has(parsed.values["close-intent"])) fail("CLOSE-INTENT", `${command} requires --close-intent durable-stop or runtime-transfer`);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index df7dc6278..4d27a3d6c 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -26,6 +26,7 @@ import {
+   syncPublicationCloseDirectory,
+ } from "./publication-close-journal.mjs";
+ import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
++import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+ import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ 
+ const h = (c, n = 64) => c.repeat(n);
+@@ -664,6 +665,66 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
+   rmSync(fixture.root, { recursive: true, force: true });
+ });
+ 
++// Candidate 16d: the producer for the cleanup receipt. The closing session's own descriptor cannot answer for itself (it is still running, so its
++// owner status is `unavailable`); it is excluded and named, and only OTHER active descriptors decide complete versus uncertain.
++test("cleanup receipt: the closing session's own descriptor is excluded and named, other sessions decide", () => {
++  const oid = h("c", 40); const tree = h("d", 40);
++  const own = { sessionId: "claude-11111111-aaaa", descriptorSha256: h("1"), status: "unavailable" };
++  const other = { sessionId: "codex-22222222", descriptorSha256: h("2"), status: "live" };
++  const alone = buildCleanupReceipt({ descriptors: [own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
++  assert.equal(alone.receipt.status, "complete");
++  assert.deepEqual(Object.keys(alone.receipt).sort(), ["candidateOid", "candidateTree", "evidenceDigest", "schema", "status"]);
++  assert.equal(alone.receipt.evidenceDigest, alone.observationSha256);
++  assert.deepEqual(alone.observation.excludedOwnSession, own);
++  assert.deepEqual(alone.observation.otherActiveDescriptors, []);
++  const none = buildCleanupReceipt({ descriptors: [], ownSessionId: null, candidateOid: oid, candidateTree: tree });
++  assert.equal(none.receipt.status, "complete", "a project without any descriptor is complete, and says so in its observation");
++  assert.equal(none.observation.excludedOwnSession, null);
++  assert.equal(none.observation.ownSessionDerived, false);
++  const crowded = buildCleanupReceipt({ descriptors: [other, own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
++  assert.equal(crowded.receipt.status, "uncertain");
++  assert.deepEqual(crowded.observation.otherActiveDescriptors, [other]);
++  assert.deepEqual(crowded.observation.excludedOwnSession, own);
++  const reordered = buildCleanupReceipt({ descriptors: [own, other], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
++  assert.equal(reordered.receipt.evidenceDigest, crowded.receipt.evidenceDigest, "the digest does not depend on listing order");
++  // Without a derivable own session nothing is excluded: the descriptor counts, and the receipt cannot claim complete.
++  const unknownOwn = buildCleanupReceipt({ descriptors: [own], ownSessionId: null, candidateOid: oid, candidateTree: tree });
++  assert.equal(unknownOwn.receipt.status, "uncertain");
++  // A different status of the same other session is a different observation.
++  const changed = buildCleanupReceipt({ descriptors: [{ ...other, status: "not-live" }, own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
++  assert.notEqual(changed.receipt.evidenceDigest, crowded.receipt.evidenceDigest);
++  for (const bad of [
++    { descriptors: "x" },
++    { descriptors: [{ ...own, status: "dead" }] },
++    { descriptors: [{ ...own, descriptorSha256: "zz" }] },
++    { descriptors: [own, own] },
++    { candidateOid: "abc" },
++    { ownSessionId: "" },
++  ]) {
++    assert.throws(() => buildCleanupReceipt({ descriptors: [], ownSessionId: null, candidateOid: oid, candidateTree: tree, ...bad }), /invalid/u);
++  }
++});
++
++test("process: write-cleanup-receipt produces the private receipt the coordinator accepts, and only from a phase that can use it", () => {
++  const frozen = processFixture("receipt-phase", { stopAfterFreeze: true });
++  const early = frozen.invoke(["write-cleanup-receipt", "--root", frozen.root, "--lifecycle", frozen.lifecycle], 2);
++  assert.equal(early.code, "CLOSE-CLEANUP-PHASE");
++  const fixture = processFixture("receipt");
++  const written = invoke(["write-cleanup-receipt", "--root", fixture.root, "--lifecycle", fixture.lifecycle]);
++  assert.equal(written.schema, "pipeline.close-coordinator.cleanup-receipt.v1");
++  assert.equal(written.status, "complete");
++  assert.equal(written.receiptPath, join(fixture.evidenceDirectory, "cleanup-receipt.json"));
++  assert.deepEqual(written.otherActiveDescriptors, []);
++  const receipt = JSON.parse(readFileSync(written.receiptPath, "utf8"));
++  assert.equal(receipt.candidateOid, fixture.candidateOid);
++  assert.equal(receipt.evidenceDigest, written.evidenceDigest);
++  assert.equal(digest(canonical(JSON.parse(readFileSync(written.observationPath, "utf8")))), receipt.evidenceDigest, "the digest is that of the stored observation");
++  fixture.transition("cleanup-complete", ["--evidence", written.receiptPath]);
++  fixture.transition("closed-local");
++  rmSync(fixture.root, { recursive: true, force: true });
++  rmSync(frozen.root, { recursive: true, force: true });
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
 diff --git a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
 index 93d8ae246..c6a7b36d0 100644
 --- a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
@@ -378,3 +628,35 @@ index 70eb4f193..7844bf374 100644
  test("criticalArtifactPaths: agent-side push artifacts stay in repository scratch", () => {
    const paths = criticalArtifactPaths(FIXTURE_DIR, {
      gitCommonDir: () => "/external/po-dir/.fake-common",
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index cbeafb029..6a134ebef 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -161,13 +161,20 @@ so commit it BEFORE the freeze, or renew the freeze as above.
+ 
+ `cleanup-complete` takes one private evidence file, `pipeline.close-cleanup-receipt.v1`, with exactly the keys
+ `schema`, `status` (`complete` or `uncertain`), `evidenceDigest` (64 hex characters; only its format is checked),
+-`candidateOid` and `candidateTree` (the frozen candidate, after a re-freeze the renewed one). No command
+-produces this file: write it yourself. `uncertain` is accepted by `cleanup-complete`, but `closed-local` is then
+-refused with `CLOSE-CLEANUP`; a later `cleanup-complete` with `complete` replaces it. With a session
+-descriptor, its cleanup status is the evidence to digest. A project WITHOUT a session descriptor
+-(`sessionCleanup` null) may write `complete` with the SHA-256 of the empty input (`e3b0c442…b855`, as above)
+-as `evidenceDigest` (PO decision 2026-11-01), provided the close report or handover states explicitly that no
+-descriptor existed and the digest is the empty-input digest.
++`candidateOid` and `candidateTree` (the frozen candidate, after a re-freeze the renewed one). Produce it with
++`close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (from `final-verify-green`,
++or `readback-confirmed` after a publication; candidate 16d). The command lists the active session descriptors and
++EXCLUDES the closing session's own: that session is still running, so its descriptor can only ever report
++`unavailable`, and it is derived from the runtime environment (`claude-<session id>`), never typed. The exclusion is
++named in the stored observation (`cleanup-observation.json`, beside the receipt) and the receipt's `evidenceDigest` is
++the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
++`uncertain`, and the output lists them. When the own session cannot be derived (a runner other than Claude), nothing
++is excluded and the receipt cannot be `complete` while any descriptor exists. A project with no descriptor at all
++gets `complete` with an observation that says so (no hand-chosen digest is needed any more). `uncertain` is accepted
++by `cleanup-complete`, but `closed-local` is then refused with `CLOSE-CLEANUP`; end or clear the other sessions,
++write the receipt again, and run `cleanup-complete` again with the new file (a later `cleanup-complete` with
++`complete` replaces it). Hand-written receipts with the empty-input digest (PO decision 2026-11-01) stay accepted,
++because only the format of `evidenceDigest` is checked, but the producer is the route.
+ 
+ The Critic carry-forward of a Critic-bound Verify (`--mode release --critic-packet-id ...`) admits the close's
+ own commit and handover-only commits after the last Critic round: a commit with one parent whose every changed
