@@ -33,6 +33,11 @@ Byte-exact reads of working-tree files, where the bound digests are over the com
 Delete the affected files and rewrite them with `git -c core.autocrlf=false checkout HEAD -- <paths>`. A plain checkout without the deletion
 is a no-op.
 
+## Triage 2026-11-01 (candidate 15c)
+
+Cause 1 (the Verify adapter check) is held as `w30`: `assertConsumerVerifyAdapter` folds CRLF to LF before comparing, every other difference stays a conflict. Cause 2 (the registrar and other readers of tracked
+evidence bytes after a `core.autocrlf` checkout) is not touched: it needs the measurement named below and a native Windows run, so the item stays open.
+
 ## Proposed direction
 
 Read the committed blob (`git show <commit>:<path>`) for every digest comparison of tracked evidence and for the adapter check, or hash

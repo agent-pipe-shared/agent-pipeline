@@ -1,0 +1,49 @@
+diff --git a/plugins/pipeline-core/lib/consumer-verify.mjs b/plugins/pipeline-core/lib/consumer-verify.mjs
+index df10a4672..2dd510343 100644
+--- a/plugins/pipeline-core/lib/consumer-verify.mjs
++++ b/plugins/pipeline-core/lib/consumer-verify.mjs
+@@ -54,7 +54,8 @@ export function readConsumerVerifyConfiguration(rootDir) {
+ export function assertConsumerVerifyAdapter(rootDir) {
+   const path = resolve(rootDir, CONSUMER_VERIFY_ADAPTER_PATH);
+   if (!existsSync(path)) throw new Error("VEP-PREPARATION-REQUIRED: run verify-evidence-producer.mjs --prepare --root <repo>, then commit the adapter.");
+-  if (!lstatSync(path).isFile() || realpathSync(path) !== path || readFileSync(path, "utf8") !== CONSUMER_VERIFY_ADAPTER) {
++  // N39: a checkout with core.autocrlf=true writes this committed LF file with CRLF; the line ending is not a user edit. Only CRLF is folded, every other byte must match.
++  if (!lstatSync(path).isFile() || realpathSync(path) !== path || readFileSync(path, "utf8").replaceAll("\r\n", "\n") !== CONSUMER_VERIFY_ADAPTER) {
+     throw new Error(`VEP-ADAPTER-CONFLICT: preserve and resolve ${CONSUMER_VERIFY_ADAPTER_PATH}.`);
+   }
+   return path;
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 06913eb40..32b0e5d0b 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -12,7 +12,7 @@ import test from "node:test";
+ import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
+ import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+-import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
++import { assertConsumerVerifyAdapter, prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+ import { verifySuiteArtifactName } from "./verify-journal.mjs";
+ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+@@ -635,6 +635,21 @@ test("explicit preparation is idempotent, preserves conflicts and the configured
+   });
+ });
+ 
++test("N39: the adapter written with CRLF line endings by a core.autocrlf checkout is the adapter; any other difference is still a conflict", async () => {
++  await withFixture('node -e "process.exit(0)"', (root) => {
++    const adapterPath = join(root, CONSUMER_VERIFY_ADAPTER_PATH);
++    const lf = readFileSync(adapterPath, "utf8");
++    writeFileSync(adapterPath, lf.replaceAll("\n", "\r\n"));
++    assert.equal(prepareConsumerVerify({ rootDir: root }).status, "unchanged", "CRLF of the identical text is accepted");
++    assert.equal(assertConsumerVerifyAdapter(root), adapterPath);
++    writeFileSync(adapterPath, `${lf.replaceAll("\n", "\r\n")}// edit\r\n`);
++    assert.throws(() => assertConsumerVerifyAdapter(root), /VEP-ADAPTER-CONFLICT/u);
++    writeFileSync(adapterPath, lf.replace("\n", "\r\r\n"));
++    assert.throws(() => assertConsumerVerifyAdapter(root), /VEP-ADAPTER-CONFLICT/u, "a stray CR is not folded");
++    assert.equal(readFileSync(adapterPath, "utf8"), lf.replace("\n", "\r\r\n"), "a conflict leaves the file untouched");
++  });
++});
++
+ test("output aliases cannot delete outside bytes even when configuration is invalid", async () => {
+   const outside = mkdtempSync(join(tmpdir(), "consumer-outside-"));
+   const victim = join(outside, "verify.json");
