@@ -34,3 +34,15 @@ done_when: manual
    committed in a form the check accepts).
 3. The integration-dependency hold honours D205: a running slice with a disjoint write scope does not hold a new one.
 4. `DBG-CHECKPOINTED-OWNER` is not raised for a D205-admissible slice; `docs/parallel-work.md` states the D205 rule.
+
+## Triage 2026-11-01 (candidate 15c)
+
+Root cause measured (read-only, retained diagnostics): of 290 retired pending states only 2 carry a terminal record; 193 dispatches left a stop-failure. From 2026-10-30 the dominant
+code is `NATIVE-HOST-COMMIT-DIFF-CHECK` (`git diff --cached --check` in `lib/agy-host-commit-execution.mjs` reads every blank context line of a held `.patch` as trailing whitespace). No host
+commit means no terminal record, so the registry member stays `armed`; the Elephant's hand commit does not release it; `heal` then moves the settled pending files and the native-goldfish
+namespace drifts under that member, which the registry refuses strictly (PF-55). Other endings leave a member armed too (plain-text stop, `checkpoint` hand-back, cancel).
+
+- Wanted 2 is held: `w22` (the check skips `*.patch` and `*.diff`; two cases pin both sides).
+- Wanted 1 is held as an interim: `w24` (heal finishes with the retained-aside move-aside when nothing is open or kept) and the `move-aside` kind no longer stops on an incomplete heal (it looped).
+  The structural gap remains: no per-member abandon transition for a settled slice, so the registry is discarded wholesale.
+- Wanted 3 and 4 are untouched.
