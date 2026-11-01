@@ -1,0 +1,61 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index a019c0b15..0dc0496ef 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -153,6 +153,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // Restated 2026-10-31 (candidate 15, own hunk): two sites counts moved with the D223 slices and the Toolbox fixes, measured on the stacked candidate with
+   // the unchanged classifier: critic-course-admission 329->334, critic-dispatch-preflight 352->382 (the
+   // stack was already at 373 before slice 3, which adds 5, and the N43 follow-up text assertions add 4). Only these two numbers change.
++  // Restated 2026-11-01 (candidate 15c, N38): critic-course-admission 334->340 (the delta transport refusal case adds 6 assertions).
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
+@@ -174,7 +175,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",334],
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",340],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",382],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",115],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 3db573da5..c561eed41 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -1443,4 +1443,22 @@ test("N20 (c) a registered round whose lane is neither the legacy lane nor the l
+   const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
+   assert.equal(after.decision.code, "CVL-COURSE-RECORD", `a forged lane must not read back as a genuine round: ${JSON.stringify(after.decision)}`);
+ });
++// Appended after the numbered cases on purpose: the completion registry numbers unnumbered cases by position, so a mid-file insert would renumber the rest.
++test("N38 a manifest-only commit that changes the manifest core after the diagnostic registration is refused FPR-DELTA-TRANSPORT, and the refusal names the candidate, base and HEAD the verb chose", () => {
++  const fx = pf94DeltaFixture();
++  pf94WriteInput(fx);
++  // A reconcile-like commit: it changes only the manifest, so the candidate choice (manifest + evidence directory only) skips it as evidence-only,
++  // but it changes the manifest CORE (here feature.rigor), which the transport check refuses.
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  manifest.feature.rigor = manifest.feature.rigor === 1 ? 2 : 1;
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  const head = pf94CommitPaths(fx.root, [fx.manifestPath], "reconcile the manifest core");
++  const actual = pf94Delta(fx);
++  assert.equal(actual.code, "FPR-DELTA-TRANSPORT", JSON.stringify(actual));
++  assert.equal(actual.candidateCommit, fx.correctionCommit, JSON.stringify(actual));
++  assert.equal(actual.baseCommit, fx.candidate, JSON.stringify(actual));
++  assert.equal(actual.headCommit, head, JSON.stringify(actual));
++  for (const sha of [fx.correctionCommit, fx.candidate, head]) assert.ok(actual.reason.includes(sha), `the refusal text names ${sha}: ${actual.reason}`);
++  assert.ok(actual.reason.includes("feature-package-reconcile"), actual.reason);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index ba1c50521..0029d087f 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -762,7 +762,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), register it WITHOUT committing first with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun this command`, extra2);
+     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
+     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
+-    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command`, extra2);
++    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command. This command chose the candidate ${candidate} (the newest first-parent commit that is not evidence-only by the candidate-choice test: it changes beyond the manifest and specs/${featureId}/evidence/), the base ${tail.commit} and HEAD ${head}. A commit between ${candidate} and HEAD that changes the manifest beyond registering evidence (for example a feature-package-reconcile commit) passes the candidate-choice test but not the transport check; a real non-evidence commit after it becomes the candidate, and the diagnostic evidence is then produced for that commit`, { ...extra2, candidateCommit: candidate, baseCommit: tail.commit, headCommit: head });
+     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
+   }
+   const { descriptor, artifact } = compiled.value;
