@@ -556,6 +556,45 @@ test(
 );
 
 test(
+  "run() wires the repo's .gitleaks.toml: bare hex digests written by the close (audit bundle, State file) are exempt, a real key there and the same digest elsewhere keep their findings (candidate 16a, real gitleaks binary)",
+  { skip: gitleaksOnlySkip },
+  async () => {
+    const digest = "385cb38d0123456789abcdef0123456789abcdef0123456789abcdef01238c64";
+    const oid = "83640cec22d494d227eebc82929370277ce926b9";
+    const digestLine = `${JSON.stringify({ courseKey: digest, previousEntrySha256: digest })}\n`;
+    const realKeyLine = `${JSON.stringify({ apiKey: "Zx9Qm4Lp7Rt2Vb6Nc8Hd3Jf5Ks1Wg0Ya" })}\n`;
+    const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-close-digests-"));
+    try {
+      const bundle = join(rootDir, "audit-bundles", "feat-x", oid, "artifacts");
+      mkdirSync(bundle, { recursive: true });
+      mkdirSync(join(rootDir, "audit-bundles", "feat-x", "not-a-commit"), { recursive: true });
+      mkdirSync(join(rootDir, "project"), { recursive: true });
+      mkdirSync(join(rootDir, "other"), { recursive: true });
+      writeFileSync(join(bundle, "006-candidate-evidence.json"), digestLine);
+      writeFileSync(join(bundle, "007-notes.json"), realKeyLine);
+      // A 32-hex packet id (a consumer's Critic packet ids) is as much a close-written digest as a SHA-256.
+      writeFileSync(join(bundle, "008-packet.json"), `${JSON.stringify({ packetKey: "9f86d081884c7d659a2feaa0c55ad015", packetToken: "9f86d081884c7d659a2feaa0c55ad015" })}\n`);
+      writeFileSync(join(rootDir, "other", "packet.json"), `${JSON.stringify({ packetKey: "9f86d081884c7d659a2feaa0c55ad015", packetToken: "9f86d081884c7d659a2feaa0c55ad015" })}\n`);
+      writeFileSync(join(rootDir, "project", "pipeline-state.json"), digestLine);
+      writeFileSync(join(rootDir, "other", "pipeline-state.json"), digestLine);
+      writeFileSync(join(rootDir, "audit-bundles", "feat-x", "not-a-commit", "006.json"), digestLine);
+
+      const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
+      const seen = result.findings.map((f) => f.path);
+      assert.equal(seen.includes(`audit-bundles/feat-x/${oid}/artifacts/006-candidate-evidence.json`), false, "the digest inside a commit-addressed bundle is exempt");
+      assert.equal(seen.includes("project/pipeline-state.json"), false, "the digest in the State file is exempt");
+      assert.equal(seen.includes(`audit-bundles/feat-x/${oid}/artifacts/007-notes.json`), true, "a real key inside the bundle keeps its finding");
+      assert.equal(seen.includes(`audit-bundles/feat-x/${oid}/artifacts/008-packet.json`), false, "a 32-hex packet id inside a commit-addressed bundle is exempt");
+      assert.equal(seen.includes("other/packet.json"), true, "the same 32-hex id at another path keeps its finding (proves the control is detectable at all)");
+      assert.equal(seen.includes("other/pipeline-state.json"), true, "the same digest at another path keeps its finding");
+      assert.equal(seen.includes("audit-bundles/feat-x/not-a-commit/006.json"), true, "a bundle-looking path that is not commit-addressed keeps its finding");
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
   "reproduction: bare `detect` leaks a sibling branch's secret from a detached worktree; --no-git closes it (real gitleaks + git, env-gated)",
   { skip: reproSkip },
   async () => {

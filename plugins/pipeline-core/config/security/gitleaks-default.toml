@@ -43,8 +43,36 @@ paths = [
   '''.*/backlog/transitions-alfred-history\.pre-rebase\.ndjson$'''
 ]
 
+# Candidate 16a (consumer blocker, PO decision 2026-11-01): the close itself writes bare hex digests (SHA-256 / OID) that these two rules
+# read as keys: the byte copies of evidence in the audit bundle and the State file's digests. Exempted ONLY when the path is one of those
+# shapes AND the matched secret is a bare hex digest of 32..64 characters (SHA-256, OID, 32-hex packet id) (condition = "AND", regexTarget = "secret"): a real key in the
+# same file, a hex digest anywhere else and every other rule stay fully armed.
+[[rules.allowlists]]
+description = "bare hex digests in the audit bundle and the State file written by the close"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''.*/audit-bundles/[^/]+/[0-9a-f]{40,64}/.*''',
+  '''.*/(?:project|\.claude)/pipeline-state\.json$'''
+]
+regexes = [
+  '''^[0-9a-f]{32,64}$'''
+]
+
 [[rules]]
 id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "bare hex digests in the audit bundle and the State file written by the close"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''.*/audit-bundles/[^/]+/[0-9a-f]{40,64}/.*''',
+  '''.*/(?:project|\.claude)/pipeline-state\.json$'''
+]
+regexes = [
+  '''^[0-9a-f]{32,64}$'''
+]
 
 [[rules.allowlists]]
 paths = [

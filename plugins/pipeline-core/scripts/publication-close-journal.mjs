@@ -202,7 +202,9 @@ export function validateCloseCoordinator(state) {
   let previous = "active";
   for (const effect of state.effects) {
     assertKeys(effect, ["phase", "inputDigest", "observedDigest", "operationSha256"], "coordinator effect");
-    if (!(COORDINATOR_NEXT[previous]?.includes(effect.phase) || (previous === "cleanup-complete" && effect.phase === "cleanup-complete"))) throw new Error("coordinator effect order invalid");
+    if (!(COORDINATOR_NEXT[previous]?.includes(effect.phase)
+      || (previous === "cleanup-complete" && effect.phase === "cleanup-complete")
+      || (previous === "candidate-frozen" && effect.phase === "candidate-frozen"))) throw new Error("coordinator effect order invalid");
     assertHex(effect.inputDigest, "coordinator inputDigest", true);
     assertHex(effect.observedDigest, "coordinator observedDigest", true);
     assertHex(effect.operationSha256, "coordinator operationSha256", true);
@@ -255,6 +257,26 @@ export function advanceCloseCoordinator(state, args) {
       validateCloseCoordinator(recovered); return recovered;
     }
     const prior = state.effects.at(-1); if (prior && prior.inputDigest === args.inputDigest && prior.observedDigest === args.observedDigest) return state;
+    // Candidate 16a: a frozen candidate may be renewed to a successor commit (the coordinator checks ancestry and the protected close
+    // artefacts before it plans this); the renewal is one more `candidate-frozen` effect, so the history keeps every freeze.
+    if (state.phase === "candidate-frozen" && args.candidateOid !== undefined && args.candidateTree !== undefined
+      && (args.candidateOid !== state.candidateOid || args.candidateTree !== state.candidateTree)) {
+      assertHex(args.candidateOid, "candidateOid"); assertHex(args.candidateTree, "candidateTree");
+      const renewed = {
+        ...state,
+        candidateOid: args.candidateOid,
+        candidateTree: args.candidateTree,
+        revision: state.revision + 1,
+        priorStateSha256: args.expectedStateSha256,
+        effects: [...state.effects, {
+          phase: "candidate-frozen",
+          inputDigest: args.inputDigest,
+          observedDigest: args.observedDigest,
+          operationSha256: args.operationSha256,
+        }],
+      };
+      validateCloseCoordinator(renewed); return renewed;
+    }
     throw new Error("conflicting coordinator replay");
   }
   if (!COORDINATOR_NEXT[state.phase]?.includes(args.phase)) throw new Error("coordinator transition invalid");

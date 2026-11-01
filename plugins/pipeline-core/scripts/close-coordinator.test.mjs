@@ -436,6 +436,9 @@ function processFixture(name, options = {}) {
   transition("candidate-frozen");
   const candidateOid = git(root, ["rev-parse", "HEAD"]);
   const candidateTree = git(root, ["rev-parse", "HEAD^{tree}"]);
+  if (options.stopAfterFreeze) {
+    return { root, lifecycle, transition, invoke, candidateOid, candidateTree, evidenceDirectory: started.evidenceDirectory, featureId: activeFeature.id };
+  }
   const verifyPath = join(started.evidenceDirectory, "final-verification.json");
   writePrivateJsonAtomic(verifyPath, {
     schema: "pipeline.close-final-verification.v1",
@@ -458,6 +461,53 @@ function processFixture(name, options = {}) {
     trackedPath: join(root, paths.tracked),
   };
 }
+
+// Candidate 16a (consumer blocker): fixes found after the freeze (security remediation) need a new candidate. A freeze can be renewed to a
+// successor commit; the close artefacts earlier phases bound must stay unchanged, and the renewal is one more recorded effect.
+test("process: a frozen candidate can be renewed to a successor commit, and only then", () => {
+  const f = processFixture("refreeze", { stopAfterFreeze: true });
+  const commit = (message) => {
+    git(f.root, ["add", "."]);
+    git(f.root, ["-c", "user.name=H5 Test", "-c", "user.email=h5@example.invalid", "commit", "-m", message]);
+    return git(f.root, ["rev-parse", "HEAD"]);
+  };
+  const planFreeze = (code = undefined) => f.invoke(["plan-transition", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", "--phase", "candidate-frozen"], code);
+  assert.equal(planFreeze(2).code, "CLOSE-REFREEZE", "nothing changed since the freeze: nothing to renew");
+  writeFileSync(join(f.root, "security-fix.txt"), "dependency bumped\n");
+  const fix = commit("fix: bump a dependency");
+  const renewed = f.transition("candidate-frozen");
+  assert.equal(renewed.applied.status, "applied");
+  const inspected = f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]);
+  assert.equal(inspected.coordinator.phase, "candidate-frozen");
+  assert.equal(inspected.coordinator.candidateOid, fix);
+  assert.notEqual(fix, f.candidateOid);
+  assert.deepEqual(inspected.coordinator.effects.slice(-2).map((effect) => effect.phase), ["candidate-frozen", "candidate-frozen"], "both freezes stay in the history");
+  assert.equal(f.invoke(["plan-transition", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", "--phase", "candidate-frozen"], 2).code, "CLOSE-REFREEZE");
+  mkdirSync(join(f.root, "specs", f.featureId), { recursive: true });
+  writeFileSync(join(f.root, "specs", f.featureId, "late-edit.md"), "a bound artefact changed\n");
+  commit("late edit of a bound artefact");
+  const refused = planFreeze(2);
+  assert.equal(refused.code, "CLOSE-REFREEZE");
+  assert.match(refused.message, /close artefacts/u);
+  assert.equal(f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]).coordinator.candidateOid, fix, "a refused renewal changes nothing");
+});
+
+test("process: after a renewed freeze the final Verify binds the new candidate, not the old one", () => {
+  const f = processFixture("refreeze-verify", { stopAfterFreeze: true });
+  writeFileSync(join(f.root, "security-fix.txt"), "dependency bumped\n");
+  git(f.root, ["add", "."]);
+  git(f.root, ["-c", "user.name=H5 Test", "-c", "user.email=h5@example.invalid", "commit", "-m", "fix: bump a dependency"]);
+  f.transition("candidate-frozen");
+  const oid = git(f.root, ["rev-parse", "HEAD"]), tree = git(f.root, ["rev-parse", "HEAD^{tree}"]);
+  const evidence = (candidateOid, candidateTree, name) => {
+    const path = join(f.evidenceDirectory, name);
+    writePrivateJsonAtomic(path, { schema: "pipeline.close-final-verification.v1", candidateOid, candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
+    return path;
+  };
+  const stale = f.invoke(["plan-transition", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", "--phase", "final-verify-green", "--evidence", evidence(f.candidateOid, f.candidateTree, "stale.json")], 2);
+  assert.equal(stale.code, "CLOSE-VERIFY", "evidence for the earlier candidate is refused");
+  assert.equal(f.transition("final-verify-green", ["--evidence", evidence(oid, tree, "renewed.json")]).applied.phase, "final-verify-green");
+});
 
 // AC-175 part A (D209/D210): the close course writes the generated audit index next to the close evidence on the
 // feature-close-prepared transition, names it in the close result, and lists a missing source instead of refusing.

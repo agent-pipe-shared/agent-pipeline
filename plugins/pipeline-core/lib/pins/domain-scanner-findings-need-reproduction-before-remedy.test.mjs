@@ -152,9 +152,37 @@ test("C: shipped scanner config has no secret-prefix whitelist, stopwords, globa
       "]",
       "",
     ].join("\n");
+    // Candidate 16a (PO decision 2026-11-01): the close writes bare hex digests (audit bundle copies, State file) that two rules read as keys.
+    // The sanctioned exemption is path AND bare-hex secret (condition = "AND", regexTarget = "secret"), once per rule (sentry-access-token
+    // with its comment, generic-api-key without), byte-for-byte in both shipped files; removed before the checks, so any other or any
+    // widened allowlist still fails exactly as before.
+    const CLOSE_DIGEST_STANZA = [
+      "[[rules.allowlists]]",
+      "description = \"bare hex digests in the audit bundle and the State file written by the close\"",
+      "condition = \"AND\"",
+      "regexTarget = \"secret\"",
+      "paths = [",
+      "  '''.*/audit-bundles/[^/]+/[0-9a-f]{40,64}/.*''',",
+      "  '''.*/(?:project|\\.claude)/pipeline-state\\.json$'''",
+      "]",
+      "regexes = [",
+      "  '''^[0-9a-f]{32,64}$'''",
+      "]",
+      "",
+    ].join("\n");
+    const CLOSE_DIGEST_COMMENT = [
+      "# Candidate 16a (consumer blocker, PO decision 2026-11-01): the close itself writes bare hex digests (SHA-256 / OID) that these two rules",
+      "# read as keys: the byte copies of evidence in the audit bundle and the State file's digests. Exempted ONLY when the path is one of those",
+      "# shapes AND the matched secret is a bare hex digest of 32..64 characters (SHA-256, OID, 32-hex packet id) (condition = \"AND\", regexTarget = \"secret\"): a real key in the",
+      "# same file, a hex digest anywhere else and every other rule stay fully armed.",
+      "",
+    ].join("\n");
     const raw = readFileSync(p, "utf8");
     assert.equal(raw.split(PF99_ALLOWLIST).length, 2, `the course-key exemption is present exactly once, byte-for-byte: ${p}`);
-    const text = raw.replace(K98_ALLOWLIST, "").replace(PF99_ALLOWLIST, "");
+    assert.equal(raw.split(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA).length, 2, `the commented close-digest exemption is present exactly once: ${p}`);
+    const withoutFirst = raw.replace(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA, "");
+    assert.equal(withoutFirst.split(CLOSE_DIGEST_STANZA).length, 2, `the second close-digest exemption is present exactly once: ${p}`);
+    const text = withoutFirst.replace(CLOSE_DIGEST_STANZA, "").replace(K98_ALLOWLIST, "").replace(PF99_ALLOWLIST, "");
     assert.doesNotMatch(text, /^\s*(regexes|stopwords|entropy|tags|commits)\s*=/mu);
     assert.doesNotMatch(text, /^\s*\[(\[?)allowlists?\]/mu);
     assert.deepEqual([...text.matchAll(/^id = "([^"]+)"/gmu)].map((m) => m[1]), ["sentry-access-token", "generic-api-key"]);

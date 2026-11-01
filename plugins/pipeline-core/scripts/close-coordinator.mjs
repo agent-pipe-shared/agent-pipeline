@@ -605,7 +605,8 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
   if (!coordinatorNextPhases(stored.coordinator.phase).includes(values.phase)
-    && !(stored.coordinator.phase === "cleanup-complete" && values.phase === "cleanup-complete")) {
+    && !(stored.coordinator.phase === "cleanup-complete" && values.phase === "cleanup-complete")
+    && !(stored.coordinator.phase === "candidate-frozen" && values.phase === "candidate-frozen")) {
     fail("CLOSE-ORDER", "transition is not reachable");
   }
   if (["closed-local", "delivered", "release-eligible", "promoted"].includes(values.phase)
@@ -756,6 +757,21 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     advance.candidateTree = candidate.tree;
     advance.inputDigest = snapshot.sha256;
     advance.observedDigest = sha256(canonical(candidate));
+    if (stored.coordinator.phase === "candidate-frozen") {
+      // Candidate 16a: renew the freeze to a successor commit (security fixes found after the freeze). The close artefacts the earlier
+      // phases bound must be unchanged, and the new candidate must descend from the frozen one; the changed paths enter the digest.
+      const frozen = stored.coordinator.candidateOid;
+      if (candidate.oid === frozen) fail("CLOSE-REFREEZE", "HEAD is already the frozen candidate; commit the change first, then plan the re-freeze again");
+      let descends = true;
+      try { git(root, ["merge-base", "--is-ancestor", frozen, candidate.oid]); } catch { descends = false; }
+      if (!descends) fail("CLOSE-REFREEZE", "the new candidate does not descend from the frozen candidate; a re-freeze moves forward only");
+      const changed = git(root, ["diff", "--name-only", frozen, candidate.oid, "--"]).split("\n").filter(Boolean);
+      const featureId = stored.coordinator.featureId;
+      const protectedPaths = changed.filter((path) => path === snapshot.path || path.startsWith(`audit-bundles/${featureId}/`)
+        || path.startsWith(`specs/${featureId}/`));
+      if (protectedPaths.length > 0) fail("CLOSE-REFREEZE", `the successor commit changes close artefacts that earlier phases bound (${protectedPaths.slice(0, 5).join(", ")}); a re-freeze only admits changes elsewhere`);
+      advance.observedDigest = sha256(canonical({ ...candidate, renewedFrom: frozen, changedPaths: changed }));
+    }
   } else if (values.phase === "final-verify-green") {
     const verified = evidence(root, common, values.lifecycle, values.evidence, "pipeline.close-final-verification.v1", [
       "schema", "candidateOid", "candidateTree", "verifyStatus", "verifySha256",
@@ -1021,7 +1037,8 @@ async function applyTransition(values, suppliedDigest) {
       return result;
     }
     if (!(values.phase === "cleanup-complete"
-      && prior.coordinator.cleanup.status === "uncertain")) {
+      && prior.coordinator.cleanup.status === "uncertain")
+      && values.phase !== "candidate-frozen") {
       fail("CLOSE-REPLAY", "transition conflicts with the durable phase");
     }
   }

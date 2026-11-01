@@ -120,6 +120,32 @@ Note in the project's handover file which feature closed, by whom, `forCommit`
 (or "—" if Git resolution failed), and the close timestamp from the State
 writer output.
 
+`tracked-close-finalized` takes one repo-relative evidence file
+(`--evidence <path>`, `pipeline.close-tracked-effects.v1`) with exactly the keys `schema`,
+`resultSha256`, `backlogSha256`, `handoverSha256`, `historySha256`, `telemetrySha256`,
+`retrospectiveSha256`, `pipelineStateSha256`; each value is the SHA-256 of that file's bytes.
+Only `resultSha256` (the bound Result) and `pipelineStateSha256` (the State file on disk) are
+compared. A project that has no telemetry or retrospective artefact uses the SHA-256 of the empty
+input, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, for that key (PO rule).
+
+`final-verify-green` takes one PRIVATE evidence file in the coordinator's evidence directory
+(`<git-common-dir>/agent-pipeline/publication-close/<lifecycle>/evidence/<name>.json`, absolute path,
+`pipeline.close-final-verification.v1`) with `candidateOid` and `candidateTree` equal to the frozen
+candidate, `verifyStatus` and `securityStatus` exactly `green`, and `verifySha256` / `securitySha256`.
+Write `green` only when the Verify run (`--mode candidate`, full) passed and `security-scan.mjs --root
+<root>` did not report `BLOCKING` for the frozen candidate; the coordinator does not read either result.
+
+If the Security scan blocks the frozen candidate and the fix needs a commit, renew the freeze instead
+of restarting: commit the fix on top of the frozen candidate, then plan `--phase candidate-frozen` again
+(`CLOSE-REFREEZE` explains a refusal). The new candidate must descend from the frozen one and must not
+change the State file, `specs/<feature>/` or `audit-bundles/<feature>/` that earlier phases bound.
+The renewal is recorded as one more `candidate-frozen` effect; the final Verify and Security evidence
+must then name the new candidate. Findings you judge not relevant are put on the scanner's own ignore
+route BEFORE the freeze, with a reason: gitleaks through `.gitleaksignore` (`gitleaks-repair-ignore.mjs`),
+dependency findings through the project's `osv-scanner.toml` (`[[IgnoredVulns]]` with `id`, `ignoreUntil`
+and `reason`). The shipped gitleaks configuration already exempts the bare hex digests the close itself
+writes into `audit-bundles/<feature>/<commit>/` and the State file; a real key in those files is still found.
+
 Without separately authorized publication, confirmed descriptor-bound cleanup
 may end at `closed-local`. Publication, readback, release and promotion are
 separate coordinator transitions and are never implied by this skill.
