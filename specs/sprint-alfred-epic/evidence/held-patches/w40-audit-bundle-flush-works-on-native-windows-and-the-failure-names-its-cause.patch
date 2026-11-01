@@ -1,0 +1,111 @@
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+index d8d4f81a5..a331e2e42 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+@@ -51,8 +51,7 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
+     if (current.status !== "reuse-verified" || current.planSha256 !== expectedPlanSha256) return blocked("FCA-POSTBUILD-DRIFT", "Bundle remains local; source or candidate drifted and the feature remains unclosed.");
+     // A durable receipt must not precede persistence of the bytes it references.
+     for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath)]) {
+-      const fd = openSync(physicalAuditPath(root, `${plan.outputPath}/${file}`), "r");
+-      try { fsyncSync(fd); } finally { closeSync(fd); }
++      syncAuditBundleFile(physicalAuditPath(root, `${plan.outputPath}/${file}`));
+     }
+     const bundleRoot = physicalAuditPath(root, plan.outputPath);
+     syncPublicationCloseDirectory(join(bundleRoot, "artifacts"));
+@@ -69,6 +68,36 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
+     fault("after-receipt");
+     return { status: "verified-pending-close", featureClosed: false, receiptPath, receipt, receiptSha256: verified.receiptSha256 };
+   } catch (error) {
+-    return blocked(error.message?.startsWith("FCA-") ? error.message : "FCA-BUILD-OR-RECEIPT-FAILED", "No feature-close mutation occurred. Preserve any existing partial output; retry verifies complete output and refuses incomplete or conflicting output without overwriting it.");
++    const known = error.message?.startsWith("FCA-");
++    const cause = known ? "" : ` Cause: ${error?.code ? `${error.code} ` : ""}${String(error?.message ?? error).slice(0, 300)}`;
++    return blocked(known ? error.message : "FCA-BUILD-OR-RECEIPT-FAILED", `No feature-close mutation occurred. Preserve any existing partial output; retry verifies complete output and refuses incomplete or conflicting output without overwriting it.${cause}`);
++  }
++}
++
++const UNSUPPORTED_FILE_DURABILITY = new Set(["EPERM", "EACCES", "EBUSY", "EINVAL", "ENOTSUP"]);
++
++/**
++ * Flush one already-written bundle file. POSIX flushes through a read-only descriptor.
++ * Native Windows needs a write-capable handle for FlushFileBuffers: try one, and when the file
++ * is read-only (a copied source artifact) or the host refuses the flush, report the file as
++ * unsupported instead of failing the whole close. The bytes are verified by the bundle verifier
++ * and the receipt check right after, so a skipped flush never skips verification.
++ */
++export function syncAuditBundleFile(path, { platform = process.platform, open = openSync, fsync = fsyncSync, close = closeSync } = {}) {
++  let fd;
++  try {
++    fd = open(path, platform === "win32" ? "r+" : "r");
++  } catch (error) {
++    if (platform === "win32" && UNSUPPORTED_FILE_DURABILITY.has(error?.code)) return { status: "unsupported", stage: "open", code: error.code };
++    throw error;
++  }
++  try {
++    fsync(fd);
++    return { status: "synced" };
++  } catch (error) {
++    if (platform === "win32" && UNSUPPORTED_FILE_DURABILITY.has(error?.code)) return { status: "unsupported", stage: "fsync", code: error.code };
++    throw error;
++  } finally {
++    close(fd);
+   }
+ }
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs b/plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs
+index 43847418f..481a8e45f 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs
+@@ -5,7 +5,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { auditFixture } from "./feature-close-audit-test-fixture.mjs";
+ import { planFeatureCloseAudit } from "./feature-close-audit-preflight.mjs";
+-import { executeFeatureCloseAudit } from "./feature-close-audit-executor.mjs";
++import { executeFeatureCloseAudit, syncAuditBundleFile } from "./feature-close-audit-executor.mjs";
+ 
+ test("executor creates real local bundle and durable receipt; identical retry is a no-write replay", async t => {
+   const f = auditFixture(t), plan = await planFeatureCloseAudit(f.options);
+@@ -52,3 +52,32 @@ test("partial output remains untouched; candidate drift after build creates no r
+   assert.equal(failed.code, "FCA-POSTBUILD-DRIFT");
+   assert.equal(existsSync(join(other.root, ".git/agent-pipeline")), false);
+ });
++
++test("windows file flush: write-capable handle first, a read-only or refused flush is tolerated, other errors still fail", () => {
++  const eperm = Object.assign(new Error("operation not permitted"), { code: "EPERM" });
++  const eio = Object.assign(new Error("input/output error"), { code: "EIO" });
++  const calls = [];
++  const spy = (open = () => 7, fsync = () => {}) => ({ open: (p, m) => { calls.push(["open", m]); return open(p, m); }, fsync: fd => { calls.push(["fsync", fd]); return fsync(fd); }, close: fd => { calls.push(["close", fd]); } });
++  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy() }), { status: "synced" });
++  assert.deepEqual(calls.slice(0, 3), [["open", "r+"], ["fsync", 7], ["close", 7]]);
++  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy(() => { throw eperm; }) }), { status: "unsupported", stage: "open", code: "EPERM" });
++  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy(undefined, () => { throw eperm; }) }), { status: "unsupported", stage: "fsync", code: "EPERM" });
++  assert.throws(() => syncAuditBundleFile("x", { platform: "win32", ...spy(undefined, () => { throw eio; }) }), /input\/output/);
++  calls.length = 0;
++  assert.deepEqual(syncAuditBundleFile("x", { platform: "linux", ...spy() }), { status: "synced" });
++  assert.equal(calls[0][1], "r");
++  assert.throws(() => syncAuditBundleFile("x", { platform: "linux", ...spy(undefined, () => { throw eperm; }) }), /not permitted/);
++});
++
++test("a failure inside the build names its cause instead of hiding it", async t => {
++  const f = auditFixture(t), plan = await planFeatureCloseAudit(f.options);
++  const failed = await executeFeatureCloseAudit({ options: f.options, lifecycleId: "close-fixture", expectedPlanSha256: plan.planSha256, activate: true,
++    fault: at => { if (at === "after-build") throw Object.assign(new Error("operation not permitted, fsync"), { code: "EPERM" }); } });
++  assert.equal(failed.code, "FCA-BUILD-OR-RECEIPT-FAILED");
++  assert.match(failed.detail, /Cause: EPERM operation not permitted, fsync/);
++  // The consumer's retry: the verified bundle is left behind, a fresh plan reuses it, no rebuild, the receipt is written.
++  const retryPlan = await planFeatureCloseAudit(f.options);
++  assert.equal(retryPlan.status, "reuse-verified", JSON.stringify(retryPlan));
++  const retried = await executeFeatureCloseAudit({ options: f.options, lifecycleId: "close-fixture", expectedPlanSha256: retryPlan.planSha256, activate: true });
++  assert.equal(retried.status, "verified-pending-close", JSON.stringify(retried));
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index a7dff3b8a..43a89880e 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -1033,7 +1033,7 @@ async function applyTransition(values, suppliedDigest) {
+   if (plan.audit !== null) {
+     const executed = await executeFeatureCloseAudit({ options: plan.audit.options, lifecycleId: plan.lifecycleId,
+       expectedPlanSha256: plan.audit.planSha256, activate: true });
+-    if (!new Set(["verified-pending-close", "replayed"]).has(executed.status)) fail(executed.code ?? "CLOSE-AUDIT-FAILED", "audit bundle did not verify; feature remains open");
++    if (!new Set(["verified-pending-close", "replayed"]).has(executed.status)) fail(executed.code ?? "CLOSE-AUDIT-FAILED", `audit bundle did not verify; feature remains open${typeof executed.detail === "string" ? ` (${executed.detail})` : ""}`);
+     const lifecycle = auditLifecycleReadback({ root, common, request: { value: { criticVerifyLifecycleId: plan.audit.criticVerifyLifecycleId } }, auditPlan: executed.receipt ? { ...((JSON.parse(readFileSync(executed.receiptPath, "utf8"))).plan) } : null });
+     if (lifecycle.lifecycle.receiptSha256 !== plan.audit.criticVerifyLifecycleReceiptSha256) fail("CLOSE-CRITIC-VERIFY-DRIFT", "Critic/Verify lifecycle changed while audit bundle was built");
+     if (readCloseCoordinator(common, plan.lifecycleId).rawDigest !== stored.rawDigest || stateSnapshot(root).sha256 !== plan.advance.authority.pipelineStateSha256) fail("CLOSE-CAS", "State changed while audit bundle was built; bundle is preserved for reconciliation");
