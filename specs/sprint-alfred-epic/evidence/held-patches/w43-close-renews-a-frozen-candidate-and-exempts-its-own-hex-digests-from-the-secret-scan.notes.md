@@ -20,8 +20,9 @@ frozen candidate):
   every other phase. The final Verify/Security evidence must then name the new candidate (a test pins that the earlier candidate is refused).
 - gitleaks (`.gitleaks.toml` and its byte mirror `config/security/gitleaks-default.toml`): one rule-scoped allowlist per rule
   (`sentry-access-token`, `generic-api-key`) with `condition = "AND"` and `regexTarget = "secret"`: path is
-  `audit-bundles/<feature>/<40..64 hex>/...` or the State file AND the matched secret is a bare hex digest of 40..64 characters. A real key in
-  the same files, the same digest anywhere else and every other rule stay armed (test with the real binary, with controls). The scanner-config
+  `audit-bundles/<feature>/<40..64 hex>/...` (the commit directory) or the State file AND the matched secret is a bare hex digest of 32..64
+  characters (SHA-256, Git OID, and the 32-hex Critic packet ids a consumer reported). A real key in the same files, the same digest anywhere
+  else and every other rule stay armed (test with the real binary, with controls; a mutation back to 40..64 fails the 32-hex test). The scanner-config
   pin test is restated: the two stanzas are sanctioned byte-for-byte, once per rule, and removed before the existing checks.
 - `skills/close-feature/SKILL.md`: the two evidence shapes (`tracked-close-finalized`, `final-verify-green`), the empty-input convention for
   missing telemetry/retrospective artefacts, the re-freeze route, and the per-finding ignore routes (gitleaks `.gitleaksignore`, dependency
