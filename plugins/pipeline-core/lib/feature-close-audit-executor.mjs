@@ -51,8 +51,7 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
     if (current.status !== "reuse-verified" || current.planSha256 !== expectedPlanSha256) return blocked("FCA-POSTBUILD-DRIFT", "Bundle remains local; source or candidate drifted and the feature remains unclosed.");
     // A durable receipt must not precede persistence of the bytes it references.
     for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath)]) {
-      const fd = openSync(physicalAuditPath(root, `${plan.outputPath}/${file}`), "r");
-      try { fsyncSync(fd); } finally { closeSync(fd); }
+      syncAuditBundleFile(physicalAuditPath(root, `${plan.outputPath}/${file}`));
     }
     const bundleRoot = physicalAuditPath(root, plan.outputPath);
     syncPublicationCloseDirectory(join(bundleRoot, "artifacts"));
@@ -69,6 +68,36 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
     fault("after-receipt");
     return { status: "verified-pending-close", featureClosed: false, receiptPath, receipt, receiptSha256: verified.receiptSha256 };
   } catch (error) {
-    return blocked(error.message?.startsWith("FCA-") ? error.message : "FCA-BUILD-OR-RECEIPT-FAILED", "No feature-close mutation occurred. Preserve any existing partial output; retry verifies complete output and refuses incomplete or conflicting output without overwriting it.");
+    const known = error.message?.startsWith("FCA-");
+    const cause = known ? "" : ` Cause: ${error?.code ? `${error.code} ` : ""}${String(error?.message ?? error).slice(0, 300)}`;
+    return blocked(known ? error.message : "FCA-BUILD-OR-RECEIPT-FAILED", `No feature-close mutation occurred. Preserve any existing partial output; retry verifies complete output and refuses incomplete or conflicting output without overwriting it.${cause}`);
+  }
+}
+
+const UNSUPPORTED_FILE_DURABILITY = new Set(["EPERM", "EACCES", "EBUSY", "EINVAL", "ENOTSUP"]);
+
+/**
+ * Flush one already-written bundle file. POSIX flushes through a read-only descriptor.
+ * Native Windows needs a write-capable handle for FlushFileBuffers: try one, and when the file
+ * is read-only (a copied source artifact) or the host refuses the flush, report the file as
+ * unsupported instead of failing the whole close. The bytes are verified by the bundle verifier
+ * and the receipt check right after, so a skipped flush never skips verification.
+ */
+export function syncAuditBundleFile(path, { platform = process.platform, open = openSync, fsync = fsyncSync, close = closeSync } = {}) {
+  let fd;
+  try {
+    fd = open(path, platform === "win32" ? "r+" : "r");
+  } catch (error) {
+    if (platform === "win32" && UNSUPPORTED_FILE_DURABILITY.has(error?.code)) return { status: "unsupported", stage: "open", code: error.code };
+    throw error;
+  }
+  try {
+    fsync(fd);
+    return { status: "synced" };
+  } catch (error) {
+    if (platform === "win32" && UNSUPPORTED_FILE_DURABILITY.has(error?.code)) return { status: "unsupported", stage: "fsync", code: error.code };
+    throw error;
+  } finally {
+    close(fd);
   }
 }

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { auditFixture } from "./feature-close-audit-test-fixture.mjs";
 import { planFeatureCloseAudit } from "./feature-close-audit-preflight.mjs";
-import { executeFeatureCloseAudit } from "./feature-close-audit-executor.mjs";
+import { executeFeatureCloseAudit, syncAuditBundleFile } from "./feature-close-audit-executor.mjs";
 
 test("executor creates real local bundle and durable receipt; identical retry is a no-write replay", async t => {
   const f = auditFixture(t), plan = await planFeatureCloseAudit(f.options);
@@ -51,4 +51,33 @@ test("partial output remains untouched; candidate drift after build creates no r
   const failed = await executeFeatureCloseAudit({ options: other.options, lifecycleId: "close-fixture", expectedPlanSha256: otherPlan.planSha256, activate: true, fault: at => { if (at === "after-build") other.git(["commit", "--allow-empty", "-qm", "changed candidate"]); } });
   assert.equal(failed.code, "FCA-POSTBUILD-DRIFT");
   assert.equal(existsSync(join(other.root, ".git/agent-pipeline")), false);
+});
+
+test("windows file flush: write-capable handle first, a read-only or refused flush is tolerated, other errors still fail", () => {
+  const eperm = Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+  const eio = Object.assign(new Error("input/output error"), { code: "EIO" });
+  const calls = [];
+  const spy = (open = () => 7, fsync = () => {}) => ({ open: (p, m) => { calls.push(["open", m]); return open(p, m); }, fsync: fd => { calls.push(["fsync", fd]); return fsync(fd); }, close: fd => { calls.push(["close", fd]); } });
+  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy() }), { status: "synced" });
+  assert.deepEqual(calls.slice(0, 3), [["open", "r+"], ["fsync", 7], ["close", 7]]);
+  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy(() => { throw eperm; }) }), { status: "unsupported", stage: "open", code: "EPERM" });
+  assert.deepEqual(syncAuditBundleFile("x", { platform: "win32", ...spy(undefined, () => { throw eperm; }) }), { status: "unsupported", stage: "fsync", code: "EPERM" });
+  assert.throws(() => syncAuditBundleFile("x", { platform: "win32", ...spy(undefined, () => { throw eio; }) }), /input\/output/);
+  calls.length = 0;
+  assert.deepEqual(syncAuditBundleFile("x", { platform: "linux", ...spy() }), { status: "synced" });
+  assert.equal(calls[0][1], "r");
+  assert.throws(() => syncAuditBundleFile("x", { platform: "linux", ...spy(undefined, () => { throw eperm; }) }), /not permitted/);
+});
+
+test("a failure inside the build names its cause instead of hiding it", async t => {
+  const f = auditFixture(t), plan = await planFeatureCloseAudit(f.options);
+  const failed = await executeFeatureCloseAudit({ options: f.options, lifecycleId: "close-fixture", expectedPlanSha256: plan.planSha256, activate: true,
+    fault: at => { if (at === "after-build") throw Object.assign(new Error("operation not permitted, fsync"), { code: "EPERM" }); } });
+  assert.equal(failed.code, "FCA-BUILD-OR-RECEIPT-FAILED");
+  assert.match(failed.detail, /Cause: EPERM operation not permitted, fsync/);
+  // The consumer's retry: the verified bundle is left behind, a fresh plan reuses it, no rebuild, the receipt is written.
+  const retryPlan = await planFeatureCloseAudit(f.options);
+  assert.equal(retryPlan.status, "reuse-verified", JSON.stringify(retryPlan));
+  const retried = await executeFeatureCloseAudit({ options: f.options, lifecycleId: "close-fixture", expectedPlanSha256: retryPlan.planSha256, activate: true });
+  assert.equal(retried.status, "verified-pending-close", JSON.stringify(retried));
 });

@@ -1033,7 +1033,7 @@ async function applyTransition(values, suppliedDigest) {
   if (plan.audit !== null) {
     const executed = await executeFeatureCloseAudit({ options: plan.audit.options, lifecycleId: plan.lifecycleId,
       expectedPlanSha256: plan.audit.planSha256, activate: true });
-    if (!new Set(["verified-pending-close", "replayed"]).has(executed.status)) fail(executed.code ?? "CLOSE-AUDIT-FAILED", "audit bundle did not verify; feature remains open");
+    if (!new Set(["verified-pending-close", "replayed"]).has(executed.status)) fail(executed.code ?? "CLOSE-AUDIT-FAILED", `audit bundle did not verify; feature remains open${typeof executed.detail === "string" ? ` (${executed.detail})` : ""}`);
     const lifecycle = auditLifecycleReadback({ root, common, request: { value: { criticVerifyLifecycleId: plan.audit.criticVerifyLifecycleId } }, auditPlan: executed.receipt ? { ...((JSON.parse(readFileSync(executed.receiptPath, "utf8"))).plan) } : null });
     if (lifecycle.lifecycle.receiptSha256 !== plan.audit.criticVerifyLifecycleReceiptSha256) fail("CLOSE-CRITIC-VERIFY-DRIFT", "Critic/Verify lifecycle changed while audit bundle was built");
     if (readCloseCoordinator(common, plan.lifecycleId).rawDigest !== stored.rawDigest || stateSnapshot(root).sha256 !== plan.advance.authority.pipelineStateSha256) fail("CLOSE-CAS", "State changed while audit bundle was built; bundle is preserved for reconciliation");
