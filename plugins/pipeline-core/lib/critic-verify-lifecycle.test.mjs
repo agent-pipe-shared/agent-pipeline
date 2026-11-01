@@ -462,6 +462,53 @@ test("15g the addendum-only commit carries the Critic; an extra, changed, unrefe
   }
 });
 
+// Candidate 15h (second consumer): the dispatch records live in an ignored directory, outside Git. The addendum binds them by their
+// own recordSha256, so the classification reads the working-tree record when Git holds none, and a changed or missing file ends it.
+test("15h an addendum commit carries the Critic when the dispatch record is not tracked by Git, and only for the exact record bytes", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const featureId = "ignored-record-feature", taskId = "task-ignored";
+  git(["init", "--quiet"]);
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, ".gitignore"), "/evidence/dispatch-record-*.json\n");
+  writeFileSync(join(root, "source.txt"), "authored source\n");
+  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
+    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const authored = commitAll("authored source");
+  const recordText = `${JSON.stringify({ schema: "pipeline.dispatch-record.v4", taskId, candidateCommit: authored.commit, criticRequired: true,
+    outcomeClassification: { kind: "authored-commit" }, commits: [authored.commit] })}\n`;
+  const recordFile = join(root, `evidence/dispatch-record-${taskId}.json`);
+  writeFileSync(recordFile, recordText);
+  writeFileSync(join(root, "notes.txt"), "reviewed together with the source\n");
+  const reviewed = commitAll("reviewed");
+  assert.equal(git(["ls-files", "evidence"]), "", "the record is not tracked");
+  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed },
+    reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
+  const deps = { readConsumedCandidateReceiptFn: () => read };
+  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
+    featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
+  const evidenceText = "# Critic disposition\n\nPass with minors.\n", evidencePath = `evidence/critic-disposition-evidence-${taskId}.md`;
+  writeFileSync(join(root, evidencePath), evidenceText);
+  writeFileSync(join(root, `evidence/dispatch-critic-addendum-${taskId}.json`), `${JSON.stringify({
+    schema: "pipeline.critic-disposition-addendum.v1", recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha256(recordText),
+    taskId, candidateCommit: authored.commit, reviewCandidateCommit: reviewed.commit,
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: authored.commit, path: evidencePath, sha256: sha256(evidenceText) },
+    criticPacketId: read.receipt.packetId, criticReceiptSha256: sha("2") })}\n`);
+  const addendum = commitAll("commit the addendum");
+  assert.deepEqual(carry(addendum).proof.evidenceOnlyCommits, [addendum.commit]);
+  writeFileSync(recordFile, `${recordText.trim()} \n`);
+  assert.equal(courseAdmission.criticAddendumOnlyCommit(root, addendum.commit), false, "changed record bytes do not match recordSha256");
+  rmSync(recordFile);
+  assert.equal(courseAdmission.criticAddendumOnlyCommit(root, addendum.commit), false, "a missing record ends the classification");
+});
+
 // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
 // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
 import * as readiness from "./critic-verify-readiness.mjs";

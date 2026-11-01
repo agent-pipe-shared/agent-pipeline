@@ -6,7 +6,7 @@ import { validateCriticReviewHistory, validateCriticReviewLineage } from "./crit
 import { admitReviewAttempt, admitAuthenticatedReviewAttempt, CRITIC_DISPATCH_LIMITS, canonicalJson, sha256Canonical } from "./review-economy.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
 import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
@@ -294,6 +294,24 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
   } catch { return false; }
 }
 
+/**
+ * Candidate 15h: the immutable dispatch record an addendum binds is read from the commit when Git tracks it, and otherwise from the
+ * working tree. A consumer may keep `evidence/dispatch-record-*.json` out of Git (the close planner and the record writer read them from
+ * the working tree); the binding is the addendum's own `recordSha256`, which the validator compares with exactly these bytes, so a changed
+ * or foreign file still ends the classification. A symbolic link, a non-regular file or a path outside the root is never read.
+ */
+function dispatchRecordBytes(root, at, recordPath) {
+  try {
+    regularBlobAt(root, at, recordPath);
+    return gitBytes(root, ["show", `${at}:${recordPath}`], "CCA-EVIDENCE-READ");
+  } catch {
+    const file = join(root, recordPath);
+    const info = lstatSync(file);
+    if (!info.isFile() || info.isSymbolicLink() || realpathSync(file) !== file) throw new Error("CCA-RECORD-UNSAFE");
+    return readFileSync(file);
+  }
+}
+
 const ADDENDUM_PATH = /^evidence\/dispatch-critic-addendum-([^/]+)\.json$/u;
 const ADDENDUM_EVIDENCE_PATH = /^(?:backlog\/)?evidence\/[^/]+\.md$/u;
 /**
@@ -335,8 +353,7 @@ export function criticAddendumOnlyCommit(root, commit) {
         const taskId = ADDENDUM_PATH.exec(path)[1];
         if (!object(addendum) || addendum.taskId !== taskId) return null;
         const recordPath = `evidence/dispatch-record-${taskId}.json`;
-        regularBlobAt(root, at, recordPath);
-        const recordBytes = gitBytes(root, ["show", `${at}:${recordPath}`], "CCA-EVIDENCE-READ");
+        const recordBytes = dispatchRecordBytes(root, at, recordPath);
         validateCriticDispositionAddendum(addendum, { recordPath, recordBytes, record: JSON.parse(recordBytes.toString("utf8")) });
         const reference = addendum.criticEvidence;
         regularBlobAt(root, at, reference.path);
