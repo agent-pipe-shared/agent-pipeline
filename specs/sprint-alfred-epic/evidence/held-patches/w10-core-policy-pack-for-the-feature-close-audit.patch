@@ -1,0 +1,295 @@
+diff --git a/docs/organization-policy-packs.md b/docs/organization-policy-packs.md
+index e00dcd606..79180d16b 100644
+--- a/docs/organization-policy-packs.md
++++ b/docs/organization-policy-packs.md
+@@ -18,6 +18,28 @@ uses the separate transaction service and must receive a matching human
+ authority readback; a policy file, plan, local record, or Git commit is never
+ human proof.
+ 
++## The shipped core baseline pack
++
++A consumer without an organization policy still needs a pack to close a feature
++on the audit route, because the feature-close audit refuses an empty `packs`
++array (`FCA-POLICY-REQUIRED`) and must not invent a policy. The pipeline
++therefore ships ONE minimal pack, `pipeline-core-baseline`
++(`CORE_BASELINE_PACK` in `organization-policy.mjs`): the two governance floors
++this module already pins (`requireHumanDecisionLedger: true`,
++`allowExternalAuthority: false`), no document class, no provenance,
++dependencies or signature policy, valid for core versions 0.7.0 through
++999.999.999. Its `revision` is the sha256 of the canonical bytes of the pack
++body without the revision key; a test pins the literal digest.
++
++It is never a default and never applied implicitly. A feature-close audit request
++(`pipeline.feature-close-audit-request.v1`, `scripts/close-coordinator.mjs`) uses
++it only when its `packs` array NAMES it: each element is either a full pack
++object (unchanged behaviour) or the string `"pipeline-core-baseline"`, which the
++coordinator resolves to the shipped object before planning. The request file
++keeps the name; any other string or non-object element is refused
++`CLOSE-AUDIT-REQUEST`, and an empty array is still `FCA-POLICY-REQUIRED`.
++`coreVersion` in the request is plain `x.y.z` without build metadata.
++
+ ## Threat model
+ 
+ **Assets:** the resolved effective policy (governance floors, document-class
+diff --git a/plugins/pipeline-core/lib/organization-policy.mjs b/plugins/pipeline-core/lib/organization-policy.mjs
+index 36b58c815..9d1ebb8a8 100644
+--- a/plugins/pipeline-core/lib/organization-policy.mjs
++++ b/plugins/pipeline-core/lib/organization-policy.mjs
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Closed PHX-3 organization policy pack validation and fail-closed compatibility. */
++import { canonicalSha256 } from "./governance-event.mjs";
+ const SHA = /^[a-f0-9]{64}$/u; const ID = /^[a-z][a-z0-9-]{2,63}$/u; const VERSION = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
+ export const CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]);
+ // WP-P-AC01: signaturePolicy's closed algorithm vocabulary. "none" is a real,
+@@ -251,3 +252,33 @@ export function resolveEffectiveOrganizationPolicy({ coreVersion, packs } = {})
+ }
+ 
+ function frozenBinding(pack) { return Object.freeze({ packId: pack.packId, revision: pack.revision, compatibility: Object.freeze({ ...pack.compatibility }) }); }
++
++/**
++ * D229 (2026-11-01): the ONE minimal pack the pipeline itself ships, so a consumer without an
++ * organization policy can close a feature on the audit route without inventing one. It restates the
++ * governance floors this module already hard-pins and declares NO document class, so it can only
++ * ever add the floors and never a publication rule, a mode, or an approval requirement. It is not
++ * a default: nothing applies it implicitly -- an audit request must NAME it (scripts/close-coordinator.mjs).
++ *
++ * Window: 0.7.0 up to 999.999.999. The core VERSION is plain x.y.z (no pre-release or build
++ * metadata, see VERSION above), so the largest bound it accepts is a very large x.y.z; the lower
++ * bound is the first release that ships this pack.
++ *
++ * revision is the sha256 of the canonical bytes of the pack body WITHOUT the revision key, so any edit
++ * of the body changes it; organization-policy.test.mjs pins the literal digest.
++ */
++export const CORE_BASELINE_PACK_ID = "pipeline-core-baseline";
++const CORE_BASELINE_BODY = Object.freeze({
++  schema: "pipeline.organization-policy-pack.v1",
++  packId: CORE_BASELINE_PACK_ID,
++  compatibility: Object.freeze({ minimumCoreVersion: "0.7.0", maximumCoreVersion: "999.999.999" }),
++  governanceFloors: Object.freeze({ requireHumanDecisionLedger: true, allowExternalAuthority: false }),
++  documentClasses: Object.freeze([]),
++});
++export const CORE_BASELINE_PACK = Object.freeze({ ...CORE_BASELINE_BODY, revision: canonicalSha256(CORE_BASELINE_BODY) });
++
++/** Resolve a shipped pack by its id; any other value fails closed with OPP-PACK-NAME. */
++export function resolveNamedOrganizationPolicyPack(id) {
++  if (id !== CORE_BASELINE_PACK_ID) fail("OPP-PACK-NAME");
++  return CORE_BASELINE_PACK;
++}
+diff --git a/plugins/pipeline-core/lib/organization-policy.test.mjs b/plugins/pipeline-core/lib/organization-policy.test.mjs
+index 49976005a..50c6d48be 100644
+--- a/plugins/pipeline-core/lib/organization-policy.test.mjs
++++ b/plugins/pipeline-core/lib/organization-policy.test.mjs
+@@ -3,6 +3,8 @@ import assert from "node:assert/strict"; import test from "node:test";
+ import { ID } from "./external-reference-adapter.mjs";
+ import { FEATURE_STATES } from "./feature-package-topology.mjs";
+ import { LIFECYCLE_EVENTS, OrganizationPolicyError, OWNED_SECTION_REF, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
++import * as organizationPolicy from "./organization-policy.mjs";
++import { canonicalSha256 } from "./governance-event.mjs";
+ // WP-P-AC11: targetBinding is an OPTIONAL closed field (see
+ // organization-policy.mjs); this fixture default declares one so most tests
+ // below exercise the scoped path, and dedicated tests cover omission,
+@@ -290,3 +292,42 @@ test("P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed
+   const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [lenient, strict] });
+   assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").conflictPolicy, "reject");
+ });
++// D229 (2026-11-01): the pipeline ships ONE minimal core pack that a feature-close
++// audit request can NAME, so a consumer without an organization closes on the audit
++// route without inventing a policy. These cases are written from that decision, not
++// from the implementation: the revision literal below was computed independently from
++// the pack body, so a silent edit of the shipped pack fails here.
++const BASELINE_REVISION_PIN = "6611e7f34e2b330b096dde3ec9f1662c5226bceb2390c96d856f0cd751bd8ee3";
++test("D229 the shipped core baseline pack is the exact minimal closed pack and validates across its whole version window", () => {
++  const baseline = organizationPolicy.CORE_BASELINE_PACK;
++  assert.equal(organizationPolicy.CORE_BASELINE_PACK_ID, "pipeline-core-baseline");
++  assert.deepEqual(baseline, {
++    schema: "pipeline.organization-policy-pack.v1", packId: "pipeline-core-baseline", revision: BASELINE_REVISION_PIN,
++    compatibility: { minimumCoreVersion: "0.7.0", maximumCoreVersion: "999.999.999" },
++    governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [],
++  });
++  assert.deepEqual(Object.keys(baseline).sort(), ["compatibility", "documentClasses", "governanceFloors", "packId", "revision", "schema"]);
++  for (const coreVersion of ["0.7.0", "0.7.1", "0.8.0", "1.0.0", "12.34.56", "999.999.999"]) assert.equal(validateOrganizationPolicyPack(baseline, { coreVersion }).packId, "pipeline-core-baseline", coreVersion);
++  assert.equal(Object.isFrozen(baseline) && Object.isFrozen(baseline.compatibility) && Object.isFrozen(baseline.governanceFloors) && Object.isFrozen(baseline.documentClasses), true);
++});
++test("D229 the core baseline pack revision is the pinned sha256 of the canonical pack body without the revision key", () => {
++  const { revision, ...body } = organizationPolicy.CORE_BASELINE_PACK;
++  assert.equal(revision, BASELINE_REVISION_PIN);
++  assert.equal(canonicalSha256(body), BASELINE_REVISION_PIN);
++});
++test("D229 the core baseline pack refuses a core version outside its window", () => {
++  for (const coreVersion of ["0.6.9", "0.0.1", "1000.0.0", "0.7", "0.7.0-rc1", "0.7.0+build"]) assert.throws(() => validateOrganizationPolicyPack(organizationPolicy.CORE_BASELINE_PACK, { coreVersion }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-CORE-VERSION", coreVersion);
++});
++test("D229 the named-pack resolver returns the shipped pack and refuses every other name", () => {
++  assert.equal(organizationPolicy.resolveNamedOrganizationPolicyPack("pipeline-core-baseline"), organizationPolicy.CORE_BASELINE_PACK);
++  for (const name of ["pipeline-core-baselin", "Pipeline-Core-Baseline", "pipeline-core-baseline ", "", "security-baseline", undefined, null, 7, {}]) assert.throws(() => organizationPolicy.resolveNamedOrganizationPolicyPack(name), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-PACK-NAME", String(name));
++});
++test("D229 the core baseline pack resolves alone with no document class, and beside another pack without conflict", () => {
++  const alone = resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK] });
++  assert.deepEqual(alone.packs.map((entry) => entry.packId), ["pipeline-core-baseline"]);
++  assert.deepEqual(alone.documentClasses, []);
++  assert.deepEqual({ ...alone.governanceFloors }, { requireHumanDecisionLedger: true, allowExternalAuthority: false });
++  const beside = resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK, pack({ compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" } })] });
++  assert.deepEqual(beside.packs.map((entry) => entry.packId), ["pipeline-core-baseline", "security-baseline"]);
++  assert.equal(beside.documentClasses.length, 1);
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+index 11e2a1176..054ebc3bf 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
+ import test from "node:test";
+ 
+ import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
++import * as organizationPolicy from "../lib/organization-policy.mjs";
++import { canonicalSha256 } from "../lib/governance-event.mjs";
+ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
+ import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+ import { finishFeature } from "./finish-feature.mjs";
+@@ -34,7 +36,10 @@ const invokeAction = (root, action, status = 0) => {
+   return action.argv[0] === STATE ? result.stdout : JSON.parse(result.stdout);
+ };
+ function put(root, path, text) { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); }
+-function fixture(t) {
++// The audit request's `packs` default is today's full pack object; a case may substitute its own array
++// (D229: the request may NAME the shipped core baseline pack instead of carrying a pack object).
++const FIXTURE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] };
++function fixture(t, { packs = [FIXTURE_PACK] } = {}) {
+   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
+   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
+   t.after(() => rmSync(root, { recursive: true, force: true }));
+@@ -108,21 +113,87 @@ function fixture(t) {
+   finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
+     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
+-  const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs: [{ schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] }], criticVerifyLifecycleId: lifecycle.receipt.id };
++  const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs, criticVerifyLifecycleId: lifecycle.receipt.id };
+   put(root, "evidence/audit-request.json", JSON.stringify(request));
+   const state = { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "audit-feature", planPath: "specs/audit-feature/prd.md", phase: "implementation" }, planApproval: { poGateAuthority: { planSha256: sha(prd), specPath: "specs/audit-feature/spec.md", specSha256: sha(spec) } }, continuity: { schema: "pipeline.continuity.v0", featureId: "audit-feature", runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, revision: 1, authority: { prd: { path: "specs/audit-feature/prd.md", sha256: sha(prd) }, spec: { path: "specs/audit-feature/spec.md", sha256: sha(spec) }, result: { path: "specs/audit-feature/result.md", sha256: sha(result) } }, queueHead: { packageId: "close-package", actionId: "close-action", nextAction: "close", dispatch: null, productRetryCount: 0, environmentRerouteCount: 0 }, blocker: null, decisionTxn: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" }, recovery: null, capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } } };
+   put(root, ".claude/pipeline-state.json", JSON.stringify(state));
+   put(root, "evidence/close-request.json", JSON.stringify({ schema: "pipeline.continuity-close.v0", featureId: "audit-feature", expectedRevision: 1, result: state.continuity.authority.result, closeEvidence: { path: "evidence/close.txt", sha256: sha(readFileSync(join(root, "evidence/close.txt"))) } }));
+   return { root, candidate, lifecycle, statePath: join(root, ".claude/pipeline-state.json") };
+ }
+-function prepare(t) {
+-  const f = fixture(t); const lifecycle = "close-audit";
++function prepare(t, options) {
++  const f = fixture(t, options); const lifecycle = "close-audit";
+   const start = invoke(f.root, ["plan-start", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]); invokeAction(f.root, start.nextAction);
+   const checkpoint = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "checkpointed"]); invokeAction(f.root, checkpoint.nextAction);
+   const plan = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id]);
+   const applied = invokeAction(f.root, plan.nextAction);
+   return { ...f, plan, applied };
+ }
++// Plan the feature-close-prepared transition without applying it, optionally expecting a refusal.
++function planPrepared(f, status = 0) {
++  const lifecycle = "close-audit";
++  const start = invoke(f.root, ["plan-start", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]); invokeAction(f.root, start.nextAction);
++  const checkpoint = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "checkpointed"]); invokeAction(f.root, checkpoint.nextAction);
++  return invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], status);
++}
++const requestPath = (f) => join(f.root, "evidence/audit-request.json");
++const auditReceipt = (f) => JSON.parse(readFileSync(join(f.root, ".git", "agent-pipeline", "publication-close", "close-audit", "evidence", "feature-close-audit.json"), "utf8"));
++// D229 (2026-11-01), written from the decision before the implementation: a consumer without an organization
++// policy names the shipped core baseline pack in its audit request and closes on the audit route.
++test("D229 an audit request that names the shipped core baseline pack plans, builds the README audit bundle with that pack in the effective policy and closes", t => {
++  const f = prepare(t, { packs: ["pipeline-core-baseline"] });
++  // The request bytes keep the NAME; only the plan and its stored options carry the resolved pack object.
++  assert.deepEqual(JSON.parse(readFileSync(requestPath(f), "utf8")).packs, ["pipeline-core-baseline"]);
++  const bundle = join(f.root, "audit-bundles", "audit-feature", f.candidate.commit);
++  assert.equal(existsSync(join(bundle, "README.md")), true);
++  const expected = organizationPolicy.resolveEffectiveOrganizationPolicy({ coreVersion: "0.7.0", packs: [organizationPolicy.CORE_BASELINE_PACK] });
++  assert.equal(JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")).effectivePolicySha256, canonicalSha256(expected));
++  const saved = auditReceipt(f);
++  assert.deepEqual(saved.plan.bundlePlan.effectivePolicy.packs.map((entry) => entry.packId), ["pipeline-core-baseline"]);
++  assert.equal(saved.plan.bundlePlan.effectivePolicy.packs[0].revision, "6611e7f34e2b330b096dde3ec9f1662c5226bceb2390c96d856f0cd751bd8ee3");
++  assert.deepEqual(saved.plan.bundlePlan.effectivePolicy.documentClasses, []);
++  const closed = invokeAction(f.root, f.applied.nextAction);
++  assert.match(closed, /Feature "audit-feature" closed/);
++  assert.equal(JSON.parse(readFileSync(f.statePath)).closedFeatures.at(-1).auditReference.criticVerifyLifecycleId, f.lifecycle.receipt.id);
++});
++test("D229 a request may name the core baseline pack beside a full pack object; both reach the effective policy", t => {
++  const f = prepare(t, { packs: ["pipeline-core-baseline", FIXTURE_PACK] });
++  assert.deepEqual(auditReceipt(f).plan.bundlePlan.effectivePolicy.packs.map((entry) => entry.packId), ["pipeline-core-baseline", "test-policy"]);
++});
++test("D229 a full pack object in the request behaves exactly as before: it reaches the effective policy unchanged", t => {
++  const f = prepare(t);
++  const policy = auditReceipt(f).plan.bundlePlan.effectivePolicy;
++  assert.deepEqual(policy.packs.map((entry) => entry.packId), ["test-policy"]);
++  assert.equal(policy.packs[0].revision, h("5"));
++  assert.deepEqual(policy.documentClasses.map((entry) => entry.class), ["security"]);
++  assert.equal(JSON.parse(readFileSync(requestPath(f), "utf8")).packs[0].packId, "test-policy");
++});
++test("D229 an unknown pack name or a wrong element type is refused CLOSE-AUDIT-REQUEST naming the known id, and nothing is built", t => {
++  const f = fixture(t, { packs: ["pipeline-core-basline"] });
++  const unknown = planPrepared(f, 2);
++  assert.equal(unknown.code, "CLOSE-AUDIT-REQUEST");
++  assert.match(JSON.stringify(unknown), /pipeline-core-baseline/);
++  for (const packs of [[7], [null], [["pipeline-core-baseline"]], [true], ["Pipeline-Core-Baseline"], [""], ["pipeline-core-baseline", "other-pack"]]) {
++    put(f.root, "evidence/audit-request.json", JSON.stringify({ ...JSON.parse(readFileSync(requestPath(f), "utf8")), packs }));
++    const refused = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], 2);
++    assert.equal(refused.code, "CLOSE-AUDIT-REQUEST", JSON.stringify(packs));
++  }
++  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
++});
++test("D229 there is no default pack: an empty packs array is still FCA-POLICY-REQUIRED and a request without packs keeps its exact-shape refusal", t => {
++  const f = fixture(t, { packs: [] });
++  assert.equal(planPrepared(f, 2).code, "FCA-POLICY-REQUIRED");
++  const { packs, ...withoutPacks } = JSON.parse(readFileSync(requestPath(f), "utf8"));
++  assert.deepEqual(packs, []);
++  put(f.root, "evidence/audit-request.json", JSON.stringify(withoutPacks));
++  const refused = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id], 2);
++  assert.equal(refused.code, "CLOSE-AUDIT-REQUEST");
++  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
++});
++test("D229 naming the core baseline pack twice is refused as a duplicate pack", t => {
++  const f = fixture(t, { packs: ["pipeline-core-baseline", "pipeline-core-baseline"] });
++  assert.equal(planPrepared(f, 2).code, "OPP-RESOLVE-DUPLICATE");
++  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
++});
+ test("coordinator builds the README audit bundle and forwards only a readback-bound Critic/Verify ID", t => {
+   const f = prepare(t);
+   assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index d972c433c..703fb2fba 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
+ import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
+ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
+ import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
++import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+@@ -271,7 +272,15 @@ function auditRequest(root, path) {
+     || !Array.isArray(request.value.packs) || !SHA256.test(request.value.criticVerifyLifecycleId ?? "")) {
+     fail("CLOSE-AUDIT-REQUEST", "feature-close audit request has an invalid exact shape");
+   }
+-  return request;
++  // D229: an element of `packs` is a full organization policy pack object (passed on unchanged) or the NAME of the
++  // pack the pipeline ships. The name is resolved here, once, so the plan, its stored options and the apply path see
++  // only objects; the request file keeps the name and its digest (request.sha256) is the digest of those bytes.
++  const packs = request.value.packs.map((entry) => {
++    if (typeof entry === "object" && entry !== null && !Array.isArray(entry)) return entry;
++    if (entry === CORE_BASELINE_PACK_ID) return resolveNamedOrganizationPolicyPack(entry);
++    fail("CLOSE-AUDIT-REQUEST", `feature-close audit request packs must each be a full organization policy pack object or the shipped pack name "${CORE_BASELINE_PACK_ID}"`);
++  });
++  return { ...request, value: { ...request.value, packs } };
+ }
+ 
+ function auditLifecycleReadback({ root, common, request, auditPlan }) {
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index bc5ebf05d..0c190dd29 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -50,7 +50,10 @@ background Goldfish), is accepted only on the audit route: the planner refuses
+ `--critic-verify-lifecycle` bind a passing Verify and a Critic review to the
+ candidate. The plan's `courseAuthorship` names each slice's record:
+ `dispatchRecord`, `orchestratorCommit`, or `unrecorded`. An `unrecorded` slice
+-has no record of either kind. Report it to the PO before applying.
++has no record of either kind. Report it to the PO before applying. The audit
++request's `packs` entries are full organization policy pack objects or, for a
++consumer without an organization policy, the shipped name `pipeline-core-baseline`
++(floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
+ 
+ The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
+ dispatch record that requires a Critic and carries no bound evidence (an
