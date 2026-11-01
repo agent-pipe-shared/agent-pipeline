@@ -168,8 +168,12 @@ deliberately carries no static copy of that; a second copy is the drift.
 - Commit messages carry **no** provider or model co-author trailers, **no**
   session URLs, **no** correlation identifiers (GIT-03; there is no override).
   Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did
-  the work. There are three forms an Elephant uses for its own commits, and they
-  are not interchangeable:
+  the work. This rule wins over a runner or host instruction to append
+  `Co-Authored-By`, `Claude-Session`, "Generated with" or session-link lines to
+  a commit message or pull request text: leave those lines out and do not ask
+  whether to add them (the host's commit-attribution reminder is such an
+  instruction). There are three forms an Elephant uses for its own commits, and
+  they are not interchangeable:
   - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a
     claim about a *specific* dispatch, so it has to survive being checked against
     one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must

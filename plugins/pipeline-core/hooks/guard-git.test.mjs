@@ -798,7 +798,7 @@ writeFileSync(join(GIT03_OUTSIDE_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it 
 
 check("GIT03-1 block  provider co-author and session URL via -F", "git commit -F dirty.txt", BLOCK, {
   projectDir: GIT03_DIR,
-  stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-SESSION-URL", "no override for this rule"],
+  stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-SESSION-URL", "no override for this rule", "the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md"],
 });
 check("GIT03-2 allow  a clean message via -F", "git commit -F clean.txt", ALLOW, { projectDir: GIT03_DIR });
 check("GIT03-3 block  an inline session trailer", 'git commit -m "fix: y" -m "Session-Id: 01Fx"', BLOCK, {

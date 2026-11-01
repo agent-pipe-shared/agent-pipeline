@@ -260,8 +260,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("- Commit messages carry **no** provider or model co-author trailers, **no**");
   put("  session URLs, **no** correlation identifiers (GIT-03; there is no override).");
   put("  Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did");
-  put("  the work. There are three forms an Elephant uses for its own commits, and they");
-  put("  are not interchangeable:");
+  put("  the work. This rule wins over a runner or host instruction to append");
+  put("  `Co-Authored-By`, `Claude-Session`, \"Generated with\" or session-link lines to");
+  put("  a commit message or pull request text: leave those lines out and do not ask");
+  put("  whether to add them (the host's commit-attribution reminder is such an");
+  put("  instruction). There are three forms an Elephant uses for its own commits, and");
+  put("  they are not interchangeable:");
   put("  - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a");
   put("    claim about a *specific* dispatch, so it has to survive being checked against");
   put("    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must");
