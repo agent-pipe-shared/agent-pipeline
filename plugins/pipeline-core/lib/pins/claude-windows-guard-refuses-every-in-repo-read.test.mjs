@@ -116,7 +116,16 @@ test("AP3 the rg flags the item names (--no-heading, -m N) on an in-repo target 
   ]) {
     assert.equal(verdict(bash(command), path).exitCode, 0, command);
   }
-  for (const bad of [".*", "../*.md", "**/*.md", "!*.md"]) {
+  // QG-04 restatement (2026-11-01, D232, PO instruction "glob ... nur reads"): `!*.md` moved from the refused list to the admitted list below.
+  // SEC-11 intent unchanged: no glob can reach a hidden, credential or parent path. A NEGATED filter only excludes files the search
+  // would otherwise visit, so it cannot reach anything; every positive filter outside the closed extension grammar stays refused.
+  for (const good of ["!*.md", "!*.min.js", "!node_modules"]) {
+    const command = `rg -l -S lifecycle plugins -g "*.mjs" -g "${good}"`;
+    assert.equal(verdict(bash(command), path).exitCode, 0, command);
+    assert.equal(verdict(bash(`${command} | head -n 180`), path).exitCode, 0, `${command} | head -n 180`);
+    assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", good], path), true, `single-command predicate: ${good}`);
+  }
+  for (const bad of [".*", "../*.md", "**/*.md", "!.*", "!../x", "!*.{md,txt}"]) {
     const command = `rg -l -S lifecycle plugins -g "*.mjs" -g "${bad}"`;
     assert.equal(verdict(bash(command), path).exitCode, 2, command);
     assert.equal(verdict(bash(`${command} | head -n 180`), path).exitCode, 2, `${command} | head -n 180`);

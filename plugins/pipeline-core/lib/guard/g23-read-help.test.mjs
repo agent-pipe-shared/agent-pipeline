@@ -8,6 +8,7 @@ import { registerTestCaseCompletion } from "../test-case-completion.mjs";
 import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
 const fixtureBase = resolve("scratch");
@@ -21,10 +22,28 @@ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", 
     mkdirSync(join(root, "docs"));
     writeFileSync(join(root, "docs", "a.md"), "safe\n");
     assert.equal(isBoundedSingleRg(["-n", "safe", "docs", "-g", "*.md", "-g", "*.txt"], root), true);
-    for (const bad of [".*", "../*.md", "**/*.md", "!*.md", "*.tar.gz"]) {
+    // D232 restates this case (intent kept: a filter may only narrow): a NEGATED filter excludes and so only narrows, it is admitted;
+    // every positive filter outside the closed extension grammar, a hidden name, a traversal and a path pattern stay refused.
+    for (const good of ["!*.patch", "!*.min.js", "!**/*.log", "!node_modules", "!scratch/"]) {
+      assert.equal(isBoundedSingleRg(["-l", "safe", "docs", "-g", "*.md", "-g", good], root), true, good);
+    }
+    assert.equal(isBoundedSingleRg(["safe", "docs", "--glob", "!*.patch"], root), true, "negated filter alone, long spelling");
+    for (const bad of [".*", "../*.md", "**/*.md", "*.tar.gz", "!.*", "!../x", "!/abs", "!a/b", "!*.{md,txt}", "!", "!*", "!-x", "!*.a.b.c.d"]) {
       assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", bad], root), false, bad);
     }
     assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "--pre", "run"], root), false);
+    // D232 measured, not changed: the source grammar already admits `ls -l`, `-h` and their clusters on an admitted directory (the generic
+    // read lane takes any flag); only a path outside the project root or a missing operand ends in a refusal. Pinned so it stays.
+    for (const good of ["ls -lh docs", "ls -l docs", "ls -h docs", "ls -lah docs", "ls -1 docs", "ls -a docs"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(good, root), true, good);
+    }
+    for (const bad of ["ls -lh ../", "ls -lh /etc"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(bad, root), false, bad);
+    }
+    // The full command line through the shell grammar: a negated filter in either spelling, and a positive one as before.
+    for (const good of ["rg -l safe docs --glob '!*.patch'", "rg -l safe docs -g '!node_modules'", "rg -l safe docs -g '*.md'"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(good, root), true, good);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

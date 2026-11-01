@@ -46,7 +46,16 @@ function isBoundedFilenameFilter(value) {
   // read has the same traversal boundary as `*.mjs`. Keep the extension
   // bound and optional literal test marker, rather than admitting arbitrary
   // dotted/glob/path expressions (including the existing *.tar.gz negative).
-  return typeof value === "string" && /^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+  if (typeof value !== "string") return false;
+  if (/^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
+  // D232 (PO instruction, 2026-11-01): a NEGATED filter only excludes. It can never add a file the unfiltered search would not
+  // visit, never lifts an ignore rule (only a positive glob overrides one) and never reaches a hidden name, so it narrows the
+  // traversal and is read-only. Admitted exclusions: a bounded extension (`!*.patch`, `!*.min.js`, `!**/*.log`) and a plain
+  // directory or file name (`!node_modules`, `!scratch/`). The positive forms above stay exactly as they were.
+  if (!value.startsWith("!")) return false;
+  const excluded = value.slice(1);
+  return /^(?:\*\*\/)?\*\.(?:[A-Za-z0-9][A-Za-z0-9_-]{0,15}\.){0,2}[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(excluded)
+    || /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\/?$/u.test(excluded);
 }
 
 function denied(code = "GUARD-PARSE-UNSUPPORTED") {
