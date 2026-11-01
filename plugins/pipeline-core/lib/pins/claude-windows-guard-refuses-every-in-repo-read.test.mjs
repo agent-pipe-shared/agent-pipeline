@@ -228,6 +228,24 @@ test("AP9 Glob wildcard listing of an in-repo directory is admitted; hidden/esca
   assert.match(dirGrep.text, /GUARD-READ-TARGET/u);
 }));
 
+test("AP9b a native Glob may end in any literal extension that is not credential-shaped, or in one trailing brace group of such extensions (PO 2026-11-01); credential extensions, braces anywhere else, extension wildcards, hidden parts and escapes stay refused", () => withFixture((path) => {
+  const glob = (pattern, base = join(path, "docs")) => verdict({ tool_name: "Glob", tool_input: { pattern, path: base } }, path).exitCode;
+  for (const pattern of ["**/*.json", "*.patch", "*.log", "*.sh", "*.toml", "*.csv", "*.py", "*.xml", "*.tar.gz", "*.docx", "*.{md,mjs}", "**/*.{md,json,yaml}", "sub/**/*.{yml,yaml}", "**/*.{py,rs,go}"]) {
+    assert.equal(glob(pattern), 0, pattern);
+  }
+  // Credential-shaped extensions: the shared credential basename regex (p12 pfx key pem kdbx opvault ppk pgp gpg asc cer p7b jks keystore) plus env token secret secrets crt der p8 pk8 output.
+  for (const extension of ["p12", "pfx", "key", "pem", "kdbx", "ppk", "pgp", "gpg", "asc", "cer", "p7b", "jks", "keystore", "env", "token", "secret", "secrets", "crt", "der", "p8", "pk8", "output", "PEM"]) {
+    assert.equal(glob(`*.${extension}`), 2, extension);
+    assert.equal(glob(`**/*.${extension}`), 2, `**/ ${extension}`);
+    assert.equal(glob(`*.{md,${extension}}`), 2, `brace ${extension}`);
+  }
+  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.m*", "*.*", "*.js?", "id_rsa*", "**/*", "*.thirteenchars", "*.{a,b,c,d,e,f,g,h,i}"]) {
+    assert.equal(glob(pattern), 2, pattern);
+  }
+  assert.equal(glob("*.{md,mjs}", join(path, ".git")), 2);
+  assert.equal(glob("../*.{md,mjs}", join(path, "docs")), 2);
+}));
+
 // ---------------------------------------------------------------------------------------------------------------------
 // K3 (PO decision 2026-10-14, Critic finding F1 of batch C5): the patch for this item carries two admission lanes beyond the
 // three rg flags. Both are declared in the grammar sources and pinned here.

@@ -406,15 +406,43 @@ export function containedLiteralReadPath(value, root, dependencies = {}, extraRo
     });
 }
 
+// A wildcard Glob lists names, never contents, and the base directory is still contained separately (containedGlobBase, hidden-directory
+// walk). PO decision 2026-11-01: a wildcard selector may end in ANY literal extension except a credential-shaped one. "Credential-shaped" is
+// the shared credential basename regex of the passive read policy (p12, pfx, key, pem, kdbx, ppk, pgp, gpg, asc, cer, p7b, jks, keystore, ...)
+// applied to a synthetic basename `x.<ext>`, plus the extensions below that the shared regex does not name by extension. `output` stays refused
+// because the task-output scope pins it (guard-lifecycle-ready: the selector allowlist still refuses an *.output pattern).
+const GLOB_EXTRA_DENIED_EXTENSIONS = new Set(["env", "token", "secret", "secrets", "crt", "der", "p8", "pk8", "output"]);
+const GLOB_LITERAL_EXTENSION = "[A-Za-z0-9]{1,12}";
+const GLOB_LISTING_EXTENSION_RE = new RegExp(`\\.(${GLOB_LITERAL_EXTENSION})$`, "u");
+const GLOB_LISTING_BRACE_RE = new RegExp(`^([^{}]*)\\.\\{(${GLOB_LITERAL_EXTENSION}(?:,${GLOB_LITERAL_EXTENSION}){1,7})\\}$`, "u");
+
+function globExtensionAdmitted(extension) {
+  if (GLOB_EXTRA_DENIED_EXTENSIONS.has(extension.toLowerCase())) return false;
+  const roots = PASSIVE_READ_CREDENTIAL_ROOTS;
+  return !new RegExp(roots.secretBasenameRegex.source, roots.secretBasenameRegex.flags).test(`x.${extension}`);
+}
+
 function containedRelativeGlob(value) {
-  // Wildcards are useful inside the project, but broad patterns and hidden
-  // selectors could enumerate private key files. Keep wildcard forms to
-  // ordinary source/document extensions; exact entries use the read policy.
-  if (typeof value !== "string" || value === "" || /[\0$`\[\]{}\\]/u.test(value)
-    || value.startsWith("~") || isAbsolute(value) || win32.isAbsolute(value)
-    || !value.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
-  if (!/[?*]/u.test(value)) return true;
-  return /\.(?:md|mjs|js|cjs|ts|tsx|css|html|svg|txt|yaml|yml)$/iu.test(value);
+  // Wildcards are useful inside the project, but broad patterns and hidden selectors could enumerate private key files. A wildcard form
+  // must end in one literal extension that is not credential-shaped; exact entries use the read policy.
+  // One trailing brace group of such literal extensions (`*.{md,mjs}`) is the only brace form admitted; every alternative must pass the same
+  // extension test, and the group is reduced to its first alternative before the checks below, so it can neither widen the extension set nor
+  // reach a hidden or escaping part.
+  let plain = value;
+  if (typeof value === "string") {
+    const braced = GLOB_LISTING_BRACE_RE.exec(value);
+    if (braced !== null) {
+      const alternatives = braced[2].split(",");
+      if (!alternatives.every(globExtensionAdmitted)) return false;
+      plain = `${braced[1]}.${alternatives[0]}`;
+    }
+  }
+  if (typeof plain !== "string" || plain === "" || /[\0$`\[\]{}\\]/u.test(plain)
+    || plain.startsWith("~") || isAbsolute(plain) || win32.isAbsolute(plain)
+    || !plain.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
+  if (!/[?*]/u.test(plain)) return plain === value;
+  const extension = GLOB_LISTING_EXTENSION_RE.exec(plain);
+  return extension !== null && globExtensionAdmitted(extension[1]);
 }
 
 function containedGlobBase(path, root, extraRoots = []) {
