@@ -14,20 +14,25 @@ with no way out.
 under the same `admitCriticExports` option the Critic carry-forward already passes (course counters keep the default and still count
 such a commit). A commit qualifies only when it:
 
-- has one parent and ADDS (status `A`) nothing but `evidence/dispatch-critic-addendum-<task>.json` files and markdown files under
-  `evidence/` or `backlog/evidence/`;
-- each addendum validates through the existing `validateCriticDispositionAddendum` against the immutable dispatch record it names
-  (`evidence/dispatch-record-<task>.json`, regular blob at that commit, digest equal to `recordSha256`) and its file name task id
-  equals its `taskId`;
-- the evidence file each addendum references exists at the commit and its bytes hash to the digest in the addendum;
-- every added markdown file is referenced by an added addendum.
+- has one parent and adds, replaces or removes (status `A`, `M`, `D`) nothing but `evidence/dispatch-critic-addendum-<task>.json`
+  files and markdown files under `evidence/` or `backlog/evidence/`;
+- each addendum (the new version in the commit, or the removed one as it stood in the parent) validates through the existing
+  `validateCriticDispositionAddendum` against the immutable dispatch record it names (`evidence/dispatch-record-<task>.json`, regular
+  blob, digest equal to `recordSha256`) and its file name task id equals its `taskId`;
+- the evidence file each addendum references exists in the same tree and its bytes hash to the digest in the addendum;
+- every added or replaced markdown file is referenced by an added or replaced addendum, every removed one by a removed addendum.
 
-A deleted, modified, extra or unreferenced file, a source change in the same commit, a record digest mismatch or a foreign task
-name ends the classification, and the range stays unreviewed content. Whether the addendum binds the right Critic round is still
+Removal and replacement exist because a later Critic round retires the addenda of the earlier one (they name its packet): the second
+real consumer repository removed four files in one commit and added three new addenda in the next. Any other path (the dispatch
+record, source, a manifest), an extra or unreferenced file, a source change in the same commit, a record digest mismatch or a foreign
+task name ends the classification, and the range stays unreviewed content. Whether an addendum binds the right Critic round is still
 checked where it always was (the close planner), not here.
 
 Test: `critic-verify-lifecycle.test.mjs` (already registered, unpinned): the good commit carries; six forged variants are refused;
-counters unchanged without the option. Confirmed red before the change with exactly the consumer's error.
+counters unchanged without the option; removal and in-place replacement are evidence-only; remove-then-add carries through the
+carry-forward; removing only the evidence, the dispatch record or a source file with the addendum is refused. Confirmed red before
+the change with exactly the consumer's error. A range whose net change is empty (an addendum added and removed again) is refused by
+the existing `CCA-RANGE-PATHS` rule and is not affected by this patch.
 
 ## Not in this patch (candidate 16)
 
