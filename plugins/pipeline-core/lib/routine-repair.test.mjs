@@ -356,3 +356,96 @@ test("CLI: list prints the closed list, an unknown kind is refused outside the l
   assert.deepEqual(lines.map((line) => line.result), ["RR-OUTSIDE-LIST", "RR-REASON-REQUIRED", "RR-REASON-REQUIRED", "moved-aside"]);
   assert.equal(run("list", "extra").status, 2);
 }));
+
+// Interim (PO 2026-11-01): heal's own retirement of settled pending states drifts the namespace under a registry member that a dispatch
+// ended without releasing. When that is all that is left and nothing can be running, heal finishes with the retained-aside move-aside.
+const healIncompleteSpawn = (base, { moveAside } = {}) => (script, args) => {
+  if (args[0] === "heal") return { status: 2, stdout: `${JSON.stringify({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: "the registry still does not read after heal: native-goldfish:namespace-drift" })}\n`, stderr: "" };
+  if (args[0] === "move-aside" && moveAside) return moveAside;
+  return base(script, args);
+};
+
+test("interim: a heal that ends SAR-HEAL-INCOMPLETE with nothing open or kept moves the registry aside itself, verifies it, and records one ledger line", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-AUTO", { terminal: false });
+  const withSettled = { ...driftedLive, reservations: [rowOf(settled, "integrated-by-commit")] };
+  const { calls, spawn: base } = stub([withSettled, driftedLive, emptyInspect]);
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "retire settled pending states before dispatch" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.equal(result.code, "healed-by-move-aside");
+  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "inspect", "move-aside", "inspect"]);
+  const argv = calls.find((call) => call.args[0] === "move-aside").args;
+  assert.ok(argv.includes("--no-goldfish-running"));
+  assert.match(argv[argv.indexOf("--reason") + 1], /retire settled pending states before dispatch/u);
+  assert.equal(result.next, undefined);
+  assert.equal(result.stillReconcileRefused, undefined);
+  assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+  assert.equal(ledger(ap).length, 1);
+  assert.equal(ledger(ap)[0].result, "healed-by-move-aside");
+  assert.ok(!existsSync(join(commitDir(ap), settled.name)), "the settled pending state left");
+}));
+
+test("interim: an unsettled pending state keeps heal from moving the registry aside; it still names the routine for the human", () => withRepo((root, ap) => {
+  const open = writeNamedPending(ap, "D-OPEN");
+  const withOpen = { ...driftedLive, reservations: [rowOf(open, null)] };
+  const { calls, spawn: base } = stub(withOpen);
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
+  assert.equal(exit, 2);
+  assert.equal(result.code, "SAR-HEAL-INCOMPLETE");
+  assert.ok(!calls.some((call) => call.args[0] === "move-aside"), "no move-aside ran");
+  assert.equal(result.autoMoveAside.attempted, false);
+  assert.match(result.autoMoveAside.why, /pending state was kept|findings|reconcile-refused/u);
+  assert.match(result.next, /run move-aside --no-goldfish-running/u);
+  assert.ok(existsSync(join(commitDir(ap), open.name)), "the open pending state stays");
+}));
+
+test("interim: another finding (a held lock) keeps heal from moving the registry aside", () => withRepo((root) => {
+  const held = { ...driftedLive, lock: { status: "held", owner: "live" } };
+  const { calls, spawn: base } = stub(held);
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
+  assert.equal(exit, 2);
+  assert.ok(!calls.some((call) => call.args[0] === "move-aside"));
+  assert.match(result.autoMoveAside.why, /other than a reconcile-refused/u);
+}));
+
+test("interim: a heal that fails for another reason, or one that succeeded, never moves the registry aside", () => withRepo((root) => {
+  const other = (script, args) => (args[0] === "heal"
+    ? { status: 2, stdout: `${JSON.stringify({ status: "refused", code: "SAR-LOCK-HELD", reason: "held" })}\n`, stderr: "" }
+    : stub(driftedLive).spawn(script, args));
+  const failed = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: other, ...SETTLED_DEPS });
+  assert.equal(failed.result.code, "SAR-LOCK-HELD");
+  assert.equal(failed.result.autoMoveAside, undefined);
+  const ok = stub(driftedLive);
+  const succeeded = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: ok.spawn, ...SETTLED_DEPS });
+  assert.equal(succeeded.exit, 0);
+  assert.equal(succeeded.result.code, "healed");
+  assert.ok(!ok.calls.some((call) => call.args[0] === "move-aside"));
+}));
+
+test("interim: when the move-aside itself fails, or the registry still refuses after it, heal reports that and stays refused", () => withRepo((root) => {
+  const refusedMove = { status: 2, stdout: `${JSON.stringify({ status: "refused", code: "SAR-GOLDFISH-ASSERTION", reason: "no" })}\n`, stderr: "" };
+  const failed = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedLive).spawn, { moveAside: refusedMove }), ...SETTLED_DEPS });
+  assert.equal(failed.exit, 2);
+  assert.equal(failed.result.autoMoveAside.attempted, true);
+  assert.equal(failed.result.autoMoveAside.code, "SAR-GOLDFISH-ASSERTION");
+  const still = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedLive).spawn), ...SETTLED_DEPS });
+  assert.equal(still.exit, 2);
+  assert.equal(still.result.autoMoveAside.code, "RR-STILL-REFUSED");
+}));
+
+test("interim: the move-aside kind carries on to the move-aside after a heal that ends SAR-HEAL-INCOMPLETE (it used to stop there)", () => withRepo((root) => {
+  const { calls, spawn: base } = stub(driftedLive);
+  const { exit, result } = runRoutineRepair({ kind: "move-aside", root, reason: "namespace drift after a returned goldfish" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.equal(result.code, "moved-aside");
+  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "inspect", "move-aside"]);
+  assert.ok(calls.at(-1).args.includes("--no-goldfish-running"));
+}));
+
+test("interim: heal on a clean project does exactly what it did before and records no automatic move-aside", () => withRepo((root) => {
+  const { calls, spawn } = stub(emptyInspect);
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0);
+  assert.equal(result.code, "healed");
+  assert.equal(result.autoMoveAside, undefined);
+  assert.deepEqual(calls.map((call) => call.args[0]), ["inspect", "heal", "inspect"]);
+}));

@@ -18,7 +18,7 @@ const OWNER_ROUTE = fileURLToPath(new URL("../scripts/continuity-owner-route.mjs
 
 /** The closed list (D194). Frozen; nothing registers into it at runtime. */
 export const ROUTINE_REPAIRS = Object.freeze([
-  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
+  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside; when its own retirement of settled pending states leaves the registry refusing with nothing open, unsettled or kept, it finishes with the retained-aside move-aside itself (code healed-by-move-aside)" }),
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
   Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
@@ -240,6 +240,21 @@ export function classifyInspectFindings(inspect) {
 
 // D203: the only findings move-aside admits after an unsuccessful heal are reconcile-refused producers.
 const onlyReconcileRefused = (rows) => rows.length > 0 && rows.every((row) => row.allowed || row.reconcileRefused === true);
+const healIncomplete = (healed) => healed?.ok === false && healed?.code === "SAR-HEAL-INCOMPLETE";
+/**
+ * Interim (PO 2026-11-01): null when heal may finish with move-aside itself, otherwise the reason it may not. "No Goldfish runs" is
+ * decided from state, not asserted: heal kept no pending state (an unsettled or unreadable pending file would be kept), kept no authority
+ * record, the retirement step actually ran, and the only findings left are reconcile-refused or drifted producers (an open item
+ * reservation, a held lock or any other finding is a finding of its own and keeps the human in the loop).
+ */
+function autoMoveAsideAdmitted({ settledPending, findings }) {
+  if (settledPending?.skipped !== undefined) return "the settled pending states were not classified, so an in-flight dispatch cannot be ruled out";
+  if ((settledPending?.keptPending?.length ?? 0) > 0) return "a pending state was kept (unsettled or unreadable), so its Goldfish may still run";
+  if ((settledPending?.keptOrphanAuthority?.length ?? 0) > 0) return "an authority record was kept, so heal cannot rule out a live dispatch";
+  if (!onlyReconcileRefused(findings)) return "inspect reports a finding other than a reconcile-refused or drifted producer";
+  return null;
+}
+const autoMoveAsideReason = (reason) => `heal retired settled pending states and the registry still refuses (namespace drift under an unreleased member); nothing is open or unsettled: ${reason}`.slice(0, 500);
 const moveAsideNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run move-aside --no-goldfish-running --root <root> --reason "<why>" (D203: only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
 
 const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
@@ -368,7 +383,20 @@ function execute(plan, ctx) {
     // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
     const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
     const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
-    return { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+    const base = { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+    // Interim (PO 2026-11-01): heal's own retirement of the settled pending states drifts the namespace under a registry member that a
+    // dispatch ended without releasing (no host commit), and the registry then refuses strictly. When that is ALL that is left and nothing
+    // can be running, heal finishes the job itself with the same retained-aside move-aside, instead of handing the human a second command.
+    if (!healIncomplete(healed) || after === null || !stillRefused.length) return base;
+    const clear = autoMoveAsideAdmitted({ settledPending, findings: classifyInspectFindings(after) });
+    if (clear !== null) return { ...base, autoMoveAside: { attempted: false, why: clear } };
+    const moved = delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", autoMoveAsideReason(plan.reason)], root), ctx);
+    if (!moved.ok) return { ...base, autoMoveAside: { attempted: true, code: moved.code, ...(moved.reason ? { reason: moved.reason } : {}) } };
+    const verified = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
+    const left = verified === null ? null : classifyInspectFindings(verified);
+    if (left === null || left.length) return { ...base, autoMoveAside: { attempted: true, code: "RR-STILL-REFUSED", reason: "the registry still reports findings after the move-aside; inspect names the repair" } };
+    const { ok: ignoredOk, code: ignoredCode, next: ignoredNext, stillReconcileRefused: ignoredRefused, ...kept } = base;
+    return { ok: true, code: "healed-by-move-aside", ...kept, delegate: "session-authority-repair heal + move-aside", autoMoveAside: { attempted: true, code: "moved-aside" } };
   }
   if (plan.kind === "settled-pending-aside") {
     const run = spawn(SAR, ["inspect", "--root", root], root);
@@ -399,7 +427,8 @@ function execute(plan, ctx) {
   if (findings.some((row) => !row.allowed) && onlyReconcileRefused(findings)) {
     // D203: heal first; only a producer that heal did not resolve is moved aside.
     const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
-    if (!healed.ok) return { ...healed, healedFirst: true };
+    // An incomplete heal (the registry still does not read) is exactly the state this branch exists for; any other failed heal still stops here.
+    if (!healed.ok && !healIncomplete(healed)) return { ...healed, healedFirst: true };
     const again = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
     if (again === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report after heal, so no finding can be classified", `node ${SAR} inspect --root <root>`);
     findings = classifyInspectFindings(again);
