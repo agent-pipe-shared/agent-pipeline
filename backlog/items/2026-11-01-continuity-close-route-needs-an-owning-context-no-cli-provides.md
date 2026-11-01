@@ -44,7 +44,7 @@ request, `close-feature`) cannot be run from a shell session, and the skill does
   command, since they are in the same set.
 - Why the catalogue exists in one consumer and not the other.
 
-## PO tile (decision pending)
+## PO tile (decided 2026-11-01: option A, D231; PO word: into candidate 15c)
 
 - A (recommended): ship the owning route as a CLI (arms the `onboarding-continuity` member for the session and runs one named companion entry through
   `executeCompanionOperation`, with the same gates), and document it in the close-feature skill. Protected kernel files.

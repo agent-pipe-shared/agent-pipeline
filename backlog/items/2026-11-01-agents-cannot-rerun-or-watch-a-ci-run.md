@@ -36,7 +36,7 @@ that block (`watch`) nor the one that changes nothing in the repository (`rerun`
 `gh run rerun <id> [--failed]` changes no code, no ref and no push state: it executes the workflow again for a commit that is already pushed. It still has an
 effect outside the machine (it spends runner minutes and can re-trigger deployment jobs that a workflow attaches to a run), so it is not read-only.
 
-## PO tile (decision pending)
+## PO tile (decided 2026-11-01: option A, D230; PO word: into candidate 15c)
 
 - A (recommended): a new closed class for `gh run rerun <numeric id> [--failed]` (exactly that shape, one run id, no other flag, no `--debug`), classified as
   its own action `ci-rerun` that the guard admits without a push approval, plus `gh run watch <numeric id> [--exit-status]` and `gh run view <id>` as
