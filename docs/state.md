@@ -17,7 +17,7 @@ transfer by midnight and explicitly permits an earlier push. Production is
 frozen. No close-block, feature close, main switch, merge or release is needed.
 Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
-**Candidate 15** (applied, stamped, installed; D224-D226); `fv9`: 4 red, fixes after 15b. **15b** (D227, NOT applied): `held-patches/w9-residual-acceptance-*`, `scratch/po-apply-0.7-candidate15b.sh`. Open: green Verify, batch Critic, native runs, acceptance.
+**Candidate 15b** (D227 + the 4 `fv9` reds fixed; applied, stamped `fa1dcc033`, installed). Open: Full Verify of the stamped tree, batch Critic, native runs, acceptance; PO tile on the staging push lane.
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
 contains **281 items:all at75;index75.0%** (candidate 14, 2026-10-31 evening: operator-applied through `88a800089`, stamped `e9454e59e`, installed and read back `0.7.0+claude.20261031181742.88a8000`; carries the consumer Critic-course chain, the green-Verify triage fixes, the Critic preimage re-pin (D221) and the D216 option A read/write split, decisions D219-D222; implementation complete, matrix not re-measured; Full Verify on this tree is red until candidate 15; open: batch Critic, native Windows runs, PO acceptance, drift-test debt for the read halves; no push planned; previous: `a2099ff5f` 10-31, candidate 13 installed, read back
