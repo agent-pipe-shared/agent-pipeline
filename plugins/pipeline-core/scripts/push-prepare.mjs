@@ -58,6 +58,7 @@ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
@@ -528,7 +529,15 @@ export function resolveFeatureContext(dir, deps = {}) {
   const result = (deps.readState ?? readState)(dir);
   const active = result?.status === "ok" ? result.state.activeFeature : null;
   if (!active || typeof active.id !== "string" || active.id === "" || typeof active.planPath !== "string" || active.planPath === "") {
-    return { ok: false, message: "no active feature with an id and planPath in pipeline state." };
+    // Candidate 16d: after the feature close there is no active feature. A push is then bound to the most recently closed feature
+    // when its close commit is an ancestor of HEAD and its PRD and spec are in HEAD's tree (the shared authority reader decides).
+    if (result?.status === "ok" && !result.state.activeFeature) {
+      const commit = gitOutput(dir, ["rev-parse", "--verify", "HEAD^{commit}"], deps);
+      const tree = gitOutput(dir, ["rev-parse", "--verify", "HEAD^{tree}"], deps);
+      const closed = commit && tree ? criticalActionAuthority({ state: result.state, kind: "push", candidate: { commit: commit.trim(), tree: tree.trim() }, projectDir: dir }) : null;
+      if (closed?.source === "closed") return { ok: true, featureId: closed.featureId, planPath: closed.planPath, specPath: closed.specPath, closedFeature: true };
+    }
+    return { ok: false, message: "no active feature with an id and planPath in pipeline state, and no closed feature whose close commit this push delivers (its close commit must be an ancestor of HEAD and its PRD and spec must be in HEAD's tree)." };
   }
   const specPath = `${dirname(active.planPath).split(sep).join("/")}/spec.md`;
   return { ok: true, featureId: active.id, planPath: active.planPath, specPath };

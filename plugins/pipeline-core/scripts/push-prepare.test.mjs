@@ -693,6 +693,32 @@ test("resolveFeatureContext: no active feature -> ok:false", () => {
   assert.equal(result.ok, false);
 });
 
+// Candidate 16d (PO decision 2026-11-01): after the feature close there is no active feature; the push is then bound to the most recently
+// closed feature whose close commit is an ancestor of HEAD and whose PRD and spec are in HEAD's tree.
+test("resolveFeatureContext: after the close the most recently closed feature carries the push, only with its close commit in history and its PRD and spec in HEAD", () => {
+  const root = mkdtempSync(join(tmpdir(), "push-prepare-closed-"));
+  try {
+    const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    git("init", "--quiet");
+    mkdirSync(join(root, "specs", "demo"), { recursive: true });
+    writeFileSync(join(root, "specs", "demo", "prd.md"), "# prd\n");
+    writeFileSync(join(root, "specs", "demo", "spec.md"), "# spec\n");
+    git("add", "-A");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "close commit");
+    const forCommit = git("rev-parse", "HEAD").stdout.trim();
+    const entry = (over = {}) => ({ id: "demo", planPath: "specs/demo/prd.md", phaseAtClose: null, architectureImpact: "no-architecture-impact", closedAt: "2026-11-01T10:00:00.000Z", closedBy: "PO", forCommit, ...over });
+    const ctx = (state) => resolveFeatureContext(root, { readState: () => ({ status: "ok", state }) });
+    const ok = ctx({ closedFeatures: [entry()] });
+    assert.deepEqual({ ok: ok.ok, featureId: ok.featureId, planPath: ok.planPath, specPath: ok.specPath, closedFeature: ok.closedFeature },
+      { ok: true, featureId: "demo", planPath: "specs/demo/prd.md", specPath: "specs/demo/spec.md", closedFeature: true });
+    assert.equal(ctx({ closedFeatures: [entry({ forCommit: "0".repeat(40) })] }).ok, false, "a close commit that is not in history");
+    assert.equal(ctx({ closedFeatures: [entry({ planPath: "specs/demo/missing.md" })] }).ok, false, "a PRD that is not in HEAD");
+    assert.equal(ctx({ closedFeatures: [] }).ok, false, "no closed feature");
+    assert.equal(ctx({ closedFeatures: [entry()], activeFeature: { id: "" } }).ok, false, "an active feature slot, even a broken one, never falls back");
+    assert.match(ctx({}).message, /no closed feature whose close commit this push delivers/u, "the refusal names the closed-feature condition");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("criticalArtifactPaths: agent-side push artifacts stay in repository scratch", () => {
   const paths = criticalArtifactPaths(FIXTURE_DIR, {
     gitCommonDir: () => "/external/po-dir/.fake-common",

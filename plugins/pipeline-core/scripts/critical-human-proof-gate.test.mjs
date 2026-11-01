@@ -131,4 +131,51 @@ assert.equal(run(["publication-approve", "--request-file", "publication-request.
 assert.equal(run(["publication-approve", "--request-file", "publication-request.json", "--proof-request", publicationProofRequestPath, "--proof-authority", authorityPath, "--proof", publicationProofPath], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 0);
 const published = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
 assert.equal(typeof published.publicationCriticalProofs[transactionId]?.proofSha256, "string");
+// Candidate 16d (PO decision 2026-11-01): after the feature close there is no active feature and no plan authority in State. approve-push
+// then binds the push to the most recently closed feature, with the PRD and spec digests taken from the push candidate's own tree.
+{
+  const closedRoot = mkdtempSync(join(tmpdir(), "critical-proof-closed-"));
+  const closedExternal = mkdtempSync(join(tmpdir(), "critical-proof-closed-external-"));
+  const g = (...args) => execFileSync("git", ["-C", closedRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  g("init", "-q"); g("config", "user.name", "Fixture"); g("config", "user.email", "fixture@example.invalid");
+  mkdirSync(join(closedRoot, "project"), { recursive: true });
+  mkdirSync(join(closedRoot, "specs", "closed-demo"), { recursive: true });
+  writeFileSync(join(closedRoot, "project", "push-threat-model.md"), "fixture threat model\n");
+  writeFileSync(join(closedRoot, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
+  writeFileSync(join(closedRoot, "specs", "closed-demo", "prd.md"), "closed prd\n");
+  writeFileSync(join(closedRoot, "specs", "closed-demo", "spec.md"), "closed spec\n");
+  g("add", "-A"); g("commit", "-q", "-m", "close commit");
+  const forCommit = g("rev-parse", "HEAD");
+  writeFileSync(join(closedRoot, "docs-after-close.md"), "handover\n");
+  g("add", "-A"); g("commit", "-q", "-m", "handover");
+  const closedCandidate = { commit: g("rev-parse", "HEAD"), tree: g("rev-parse", "HEAD^{tree}") };
+  const stateFor = (closedFeatures) => JSON.stringify({ schema: "pipeline.state.v0", closedFeatures }, null, 2);
+  const entry = (over = {}) => ({ id: "closed-demo", planPath: "specs/closed-demo/prd.md", phaseAtClose: null, architectureImpact: "no-architecture-impact", closedAt: "2026-08-02T10:00:00.000Z", closedBy: "PO", forCommit, ...over });
+  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry()]));
+  const closedSubject = criticalActionSubjectSha256({ kind: "push", candidate: closedCandidate, subject: { sourceCommit: closedCandidate.commit, ...pushTarget, threatModel } });
+  const closedRequest = (featureId, planBytes = Buffer.from("closed prd\n"), specBytes = Buffer.from("closed spec\n")) => createCriticalActionApprovalRequest({
+    candidate: closedCandidate, featureId, planBytes, specBytes, action: { kind: "push", subjectSha256: closedSubject, expiresAt: "2026-08-02T18:50:00.000Z" },
+  });
+  const files = (name, req) => {
+    const prf = { schema: "pipeline.po-approval-proof.v1", intentSha256: req.approvalIntent.sha256, keyReference: "test-key", publicKey,
+      signatureBase64: sign(null, Buffer.from(req.approvalIntent.sha256), keys.privateKey).toString("base64") };
+    const r = join(closedExternal, `${name}-request.json`), p = join(closedExternal, `${name}-proof.json`), a = join(closedExternal, "authority.json");
+    writeFileSync(r, JSON.stringify(req)); writeFileSync(p, JSON.stringify(prf)); writeFileSync(a, JSON.stringify(authority));
+    return ["--proof-request", r, "--proof-authority", a, "--proof", p];
+  };
+  const closedDeps = { dir: closedRoot, now: () => now, gitHead: () => ({ ok: true, commit: closedCandidate.commit }), gitCandidate: () => ({ ok: true, ...closedCandidate }) };
+  const approve = (proofArgs, depsOverride = closedDeps) => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, ...proofArgs], depsOverride);
+  assert.equal(approve(files("wrong-plan", closedRequest("closed-demo", Buffer.from("other prd\n")))), 2, "a proof over other plan bytes is refused");
+  assert.equal(approve(files("wrong-feature", closedRequest("another-feature"))), 2, "a proof for another feature id is refused");
+  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry({ forCommit: "0".repeat(40) })]));
+  assert.equal(approve(files("foreign-ancestor", closedRequest("closed-demo"))), 2, "a close commit that is not in the candidate's history is refused");
+  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([]));
+  assert.equal(approve(files("no-closed-feature", closedRequest("closed-demo"))), 2, "no closed feature and no active feature is refused");
+  writeFileSync(join(closedRoot, "project", "pipeline-state.json"), stateFor([entry()]));
+  assert.equal(approve(files("closed-ok", closedRequest("closed-demo"))), 0, "the closed feature carries the push with digests from the candidate tree");
+  const closedAfter = withPrivateCriticalApprovals(JSON.parse(readFileSync(join(closedRoot, "project", "pipeline-state.json"), "utf8")), closedRoot);
+  assert.equal(closedAfter.pushApproval.lastApproved.forCommit, closedCandidate.commit);
+  assert.equal(closedAfter.criticalProofConsumption?.length, 1);
+}
+
 console.log("critical-human-proof-gate: 20 assertions passed");

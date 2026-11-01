@@ -410,7 +410,7 @@ export function authorizeRecordedPush({
   }
 
   const verified = verifySignedAction({
-    state, kind: "push", prefix, candidate, recorded, anchors: trust.anchors, now,
+    state, kind: "push", prefix, candidate, recorded, anchors: trust.anchors, now, projectDir,
     subject: {
       sourceCommit: candidate.commit,
       remote,

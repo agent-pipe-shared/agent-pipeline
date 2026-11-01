@@ -31,8 +31,13 @@ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
+  writePrivateJsonAtomic,
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
+import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import {
   LEGACY_STATE,
@@ -76,6 +81,7 @@ const CLI_HELP = [
   "       close-coordinator.mjs apply-start <plan-start arguments> --plan-sha256 <sha256> --activate",
   "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
+  "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
   "       close-coordinator.mjs --help",
   "",
   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
@@ -904,6 +910,49 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     nextAction: action("apply-transition", { ...values, root }, digest) };
 }
 
+// Candidate 16d: the producer for `pipeline.close-cleanup-receipt.v1`. Read-only toward the repository and the descriptors; it writes
+// exactly two private files into the lifecycle's own evidence directory. The closing session's own descriptor (derived from the runtime
+// environment, never typed) is excluded and named; every other active descriptor counts (lib/close-cleanup-receipt.mjs).
+function writeCleanupReceipt(values, { env = process.env, listDescriptors = listActiveSessionDescriptors, inspectOwner = inspectSessionOwnerRuntime } = {}) {
+  const root = physicalRoot(values.root);
+  const common = gitCommonDir(root);
+  const stored = readCloseCoordinator(common, values.lifecycle);
+  const coordinator = stored.coordinator;
+  if (!coordinatorNextPhases(coordinator.phase).includes("cleanup-complete")) {
+    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`);
+  }
+  if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
+  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
+  const ownSessionId = identity.ok ? claudeHookDescriptorSessionId(identity.sessionId) : null;
+  const descriptors = listDescriptors(root).map((descriptor) => {
+    const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
+    if (!observed || observed.schema !== "pipeline.session-owner-status.v1" || observed.sessionId !== descriptor.sessionId
+      || observed.descriptorSha256 !== descriptor.descriptorSha256) fail("CLOSE-CLEANUP-RECEIPT", "session owner status readback is invalid");
+    return { sessionId: observed.sessionId, descriptorSha256: observed.descriptorSha256, status: observed.status };
+  });
+  const built = buildCleanupReceipt({
+    descriptors, ownSessionId, candidateOid: coordinator.candidateOid, candidateTree: coordinator.candidateTree,
+  });
+  const directory = ensurePrivateDirectory(join(publicationClosePaths(common, values.lifecycle).directory, "evidence"));
+  const receiptPath = join(directory, "cleanup-receipt.json");
+  const observationPath = join(directory, "cleanup-observation.json");
+  writePrivateJsonAtomic(observationPath, built.observation);
+  writePrivateJsonAtomic(receiptPath, built.receipt);
+  return {
+    schema: "pipeline.close-coordinator.cleanup-receipt.v1",
+    status: built.receipt.status,
+    receiptPath,
+    observationPath,
+    evidenceDigest: built.receipt.evidenceDigest,
+    excludedOwnSession: built.observation.excludedOwnSession,
+    ownSessionDerived: built.observation.ownSessionDerived,
+    otherActiveDescriptors: built.observation.otherActiveDescriptors,
+    next: built.receipt.status === "complete"
+      ? `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${values.lifecycle} --actor <name> --phase cleanup-complete --evidence ${receiptPath}`
+      : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
+  };
+}
+
 function applyStart(values, suppliedDigest) {
   const plan = startPlan(values);
   if (plan.planSha256 !== suppliedDigest) fail("CLOSE-PLAN", "start plan digest drifted");
@@ -1115,6 +1164,10 @@ try {
       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
       next: coordinatorNextPhases(stored.coordinator.phase),
     });
+  } else if (command === "write-cleanup-receipt") {
+    const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
+    if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");
+    emit(writeCleanupReceipt(parsed.values));
   } else if (command === "plan-start" || command === "apply-start") {
     const parsed = exactArgs(argv, new Set(["root", "lifecycle", "actor", "close-intent", "plan-sha256"]), new Set(["activate"]));
     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor || !CLOSE_INTENTS.has(parsed.values["close-intent"])) fail("CLOSE-INTENT", `${command} requires --close-intent durable-stop or runtime-transfer`);

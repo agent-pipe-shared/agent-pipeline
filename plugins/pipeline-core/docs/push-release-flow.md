@@ -303,7 +303,15 @@ replace it). Compute the hash by **importing the real function** in a
 throwaway script (`scratch/`, gitignored) — never hand-roll the hash. A wrong
 hash fails closed at verification, it does not silently accept.
 
-### A fourth kind: `release-preflight` (ADR-0064)
+### Pushing after the feature close (candidate 16d)
+
+`close-feature` clears the active feature and its plan authority from State. A push after the close is then bound to the **most
+recently closed feature** (`closedFeatures`, the unique latest `closedAt`), and only a push: `push-prepare.mjs` and `push-init.mjs`
+use its id, PRD path and the sibling `spec.md` to print the same `authorize-critical` command, and the proof is verified by
+`approve-push` and by the push guard against that feature. The PRD and spec digests are taken from the files **in the push
+candidate's own tree** (`git show <candidate>:<path>`), so the signature binds the exact bytes being pushed, and the closed
+feature's `forCommit` must be an ancestor of the candidate. Anything missing, ambiguous or not an ancestor is refused exactly as
+before. With an active feature nothing changes.
 
 `authorize-critical` also accepts `--kind release-preflight` — the release
 gate's consent, produced by the identical three-act ceremony above (copy the

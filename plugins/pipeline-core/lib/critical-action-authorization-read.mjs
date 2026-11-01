@@ -6,6 +6,7 @@
  * verdict); the write-capable module passes its own pin. The old module imports and re-exports these symbols.
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -96,13 +97,56 @@ export function localOperatorAnchorFor(trust, machinePlaneDeps) {
   return trust.pinOnSuccess ? resolveLocalOperatorKeyAnchor(machinePlaneDeps) : null;
 }
 
+const CLOSED_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const CLOSED_PLAN_PATH = /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.md$/u;
+const COMMIT_OID = /^[0-9a-f]{40,64}$/u;
+const NO_AUTHORITY = Object.freeze({ source: "none", featureId: undefined, planSha256: undefined, specSha256: undefined });
+
+/**
+ * Candidate 16d (PO decision 2026-11-01): which feature identity, plan digest and spec digest a signed critical action is bound to.
+ * With an ACTIVE feature this is exactly what it always was (the feature id and the digests of its approved plan authority in State).
+ * A push after the feature close has no active feature and no plan authority in State, because the close clears both; for a PUSH
+ * only, and only when there is no active feature, the most recently closed feature (`closedFeatures`, unique latest `closedAt`) carries
+ * the push: its PRD and sibling `spec.md` are read from the PUSH CANDIDATE's own tree (`git show <candidate>:<path>`), so the signature
+ * binds the exact bytes being pushed, and its `forCommit` must be an ancestor of the candidate (the push delivers that feature's
+ * work). Anything missing, ambiguous, unsafe or not an ancestor yields no authority and the caller refuses exactly as before.
+ */
+export function criticalActionAuthority({ state, kind, candidate, projectDir, gitFn = spawnSync }) {
+  if (object(state?.activeFeature)) {
+    const gate = state?.planApproval?.poGateAuthority;
+    return { source: "active", featureId: state.activeFeature.id, planSha256: gate?.planSha256, specSha256: gate?.specSha256 };
+  }
+  if (kind !== "push" || typeof projectDir !== "string" || !validCandidate(candidate) || !Array.isArray(state?.closedFeatures)) return NO_AUTHORITY;
+  try {
+    const rows = state.closedFeatures
+      .filter((entry) => object(entry) && CLOSED_FEATURE_ID.test(entry.id ?? "") && CLOSED_PLAN_PATH.test(entry.planPath ?? "")
+        && !entry.planPath.split("/").some((part) => part === "." || part === "..") && COMMIT_OID.test(entry.forCommit ?? "")
+        && Number.isFinite(Date.parse(entry.closedAt)))
+      .map((entry) => ({ entry, at: Date.parse(entry.closedAt) }));
+    const latest = Math.max(...rows.map((row) => row.at));
+    const chosen = rows.filter((row) => row.at === latest);
+    if (rows.length === 0 || chosen.length !== 1) return NO_AUTHORITY;
+    const { id, planPath, forCommit } = chosen[0].entry;
+    const git = (args) => gitFn("git", ["-C", projectDir, ...args], { encoding: "buffer", maxBuffer: 64 * 1024 * 1024, shell: false });
+    if (git(["merge-base", "--is-ancestor", forCommit, candidate.commit]).status !== 0) return NO_AUTHORITY;
+    const sha = (path) => {
+      const shown = git(["show", `${candidate.commit}:${path}`]);
+      return shown.status === 0 && Buffer.isBuffer(shown.stdout) ? createHash("sha256").update(shown.stdout).digest("hex") : undefined;
+    };
+    const specPath = `${planPath.includes("/") ? planPath.slice(0, planPath.lastIndexOf("/") + 1) : ""}spec.md`;
+    const planSha256 = sha(planPath);
+    const specSha256 = sha(specPath);
+    return planSha256 && specSha256 ? { source: "closed", featureId: id, planPath, specPath, planSha256, specSha256 } : NO_AUTHORITY;
+  } catch { return NO_AUTHORITY; }
+}
+
 /**
  * The half both routes share: a recorded proof is accepted only if the signature
  * verifies against the committed anchor SET (or against any well-formed key, in the
  * absent-set posture) over an intent rebuilt from the OBSERVED subject. `subject` is the
  * caller's route-specific object; everything else is uniform.
  */
-export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now }) {
+export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now, projectDir }) {
   if (!object(recorded) || !object(recorded.proof) || !object(recorded.action)
     || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) {
     return { ok: false, code: `${prefix}-RECORD-INCOMPLETE` };
@@ -134,14 +178,14 @@ export function verifySignedAction({ state, kind, prefix, candidate, subject, re
   // The intent, rebuilt around that action. This is where the plan/spec authority and the
   // candidate tree enter: an approval signed under a different plan, or for a different
   // tree at the same commit, cannot be replayed here.
-  const gate = state?.planApproval?.poGateAuthority;
+  const authority = criticalActionAuthority({ state, kind, candidate, projectDir });
   let intent;
   try {
     intent = createPoApprovalIntent({
       kind: "critical-action",
-      featureId: state?.activeFeature?.id,
-      planSha256: gate?.planSha256,
-      specSha256: gate?.specSha256,
+      featureId: authority.featureId,
+      planSha256: authority.planSha256,
+      specSha256: authority.specSha256,
       candidate: { commit: candidate.commit, tree: candidate.tree },
       policyRevision: "critical-human-proof-v1",
       subjectSha256: criticalActionSha256(recorded.action),

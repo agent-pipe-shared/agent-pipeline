@@ -441,6 +441,7 @@ import {
   withPrivateCriticalApprovals,
   writeCriticalApproval,
 } from "../lib/critical-action-authorization.mjs";
+import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {parse} from 'node:path';
@@ -4814,9 +4815,10 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
       || authority.value?.publicKeySha256 !== policy.trustAnchor.publicKeySha256)) {
     return { ok: false, code: "CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH" };
   }
-  const active = state.activeFeature;
-  const gate = state.planApproval?.poGateAuthority;
-  if (!active?.id || !gate?.planSha256 || !gate?.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
+  // Candidate 16d: after the feature close there is no active feature; a PUSH is then bound to the closed feature through the shared
+  // authority reader (the same one the push guard uses), with the plan and spec digests taken from the push candidate's own tree.
+  const authority16d = criticalActionAuthority({ state, kind, candidate, projectDir: dir });
+  if (!authority16d.featureId || !authority16d.planSha256 || !authority16d.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
   const candidateIdentity = { commit: candidate.commit, tree: candidate.tree };
   const action = request.value?.action;
   const expectedSubject = criticalActionSubjectSha256({ kind, candidate: candidateIdentity, subject });
@@ -4841,7 +4843,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   });
   if (!result.verified) return { ok: false, code: result.code };
   const intent = request.value.approvalIntent?.value;
-  if (intent?.featureId !== active.id || intent?.planSha256 !== gate.planSha256 || intent?.specSha256 !== gate.specSha256) {
+  if (intent?.featureId !== authority16d.featureId || intent?.planSha256 !== authority16d.planSha256 || intent?.specSha256 !== authority16d.specSha256) {
     return { ok: false, code: "CRITICAL-PROOF-AUTHORITY" };
   }
   // The proof object itself travels into State alongside its digest. It is public data --

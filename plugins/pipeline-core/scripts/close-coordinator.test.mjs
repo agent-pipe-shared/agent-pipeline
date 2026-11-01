@@ -26,6 +26,7 @@ import {
   syncPublicationCloseDirectory,
 } from "./publication-close-journal.mjs";
 import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const h = (c, n = 64) => c.repeat(n);
@@ -662,6 +663,66 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
   assert.equal(inspected.coordinator.phase, "promoted");
   assert.equal(git(fixture.root, ["status", "--porcelain=v1"]), "");
   rmSync(fixture.root, { recursive: true, force: true });
+});
+
+// Candidate 16d: the producer for the cleanup receipt. The closing session's own descriptor cannot answer for itself (it is still running, so its
+// owner status is `unavailable`); it is excluded and named, and only OTHER active descriptors decide complete versus uncertain.
+test("cleanup receipt: the closing session's own descriptor is excluded and named, other sessions decide", () => {
+  const oid = h("c", 40); const tree = h("d", 40);
+  const own = { sessionId: "claude-11111111-aaaa", descriptorSha256: h("1"), status: "unavailable" };
+  const other = { sessionId: "codex-22222222", descriptorSha256: h("2"), status: "live" };
+  const alone = buildCleanupReceipt({ descriptors: [own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
+  assert.equal(alone.receipt.status, "complete");
+  assert.deepEqual(Object.keys(alone.receipt).sort(), ["candidateOid", "candidateTree", "evidenceDigest", "schema", "status"]);
+  assert.equal(alone.receipt.evidenceDigest, alone.observationSha256);
+  assert.deepEqual(alone.observation.excludedOwnSession, own);
+  assert.deepEqual(alone.observation.otherActiveDescriptors, []);
+  const none = buildCleanupReceipt({ descriptors: [], ownSessionId: null, candidateOid: oid, candidateTree: tree });
+  assert.equal(none.receipt.status, "complete", "a project without any descriptor is complete, and says so in its observation");
+  assert.equal(none.observation.excludedOwnSession, null);
+  assert.equal(none.observation.ownSessionDerived, false);
+  const crowded = buildCleanupReceipt({ descriptors: [other, own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
+  assert.equal(crowded.receipt.status, "uncertain");
+  assert.deepEqual(crowded.observation.otherActiveDescriptors, [other]);
+  assert.deepEqual(crowded.observation.excludedOwnSession, own);
+  const reordered = buildCleanupReceipt({ descriptors: [own, other], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
+  assert.equal(reordered.receipt.evidenceDigest, crowded.receipt.evidenceDigest, "the digest does not depend on listing order");
+  // Without a derivable own session nothing is excluded: the descriptor counts, and the receipt cannot claim complete.
+  const unknownOwn = buildCleanupReceipt({ descriptors: [own], ownSessionId: null, candidateOid: oid, candidateTree: tree });
+  assert.equal(unknownOwn.receipt.status, "uncertain");
+  // A different status of the same other session is a different observation.
+  const changed = buildCleanupReceipt({ descriptors: [{ ...other, status: "not-live" }, own], ownSessionId: own.sessionId, candidateOid: oid, candidateTree: tree });
+  assert.notEqual(changed.receipt.evidenceDigest, crowded.receipt.evidenceDigest);
+  for (const bad of [
+    { descriptors: "x" },
+    { descriptors: [{ ...own, status: "dead" }] },
+    { descriptors: [{ ...own, descriptorSha256: "zz" }] },
+    { descriptors: [own, own] },
+    { candidateOid: "abc" },
+    { ownSessionId: "" },
+  ]) {
+    assert.throws(() => buildCleanupReceipt({ descriptors: [], ownSessionId: null, candidateOid: oid, candidateTree: tree, ...bad }), /invalid/u);
+  }
+});
+
+test("process: write-cleanup-receipt produces the private receipt the coordinator accepts, and only from a phase that can use it", () => {
+  const frozen = processFixture("receipt-phase", { stopAfterFreeze: true });
+  const early = frozen.invoke(["write-cleanup-receipt", "--root", frozen.root, "--lifecycle", frozen.lifecycle], 2);
+  assert.equal(early.code, "CLOSE-CLEANUP-PHASE");
+  const fixture = processFixture("receipt");
+  const written = invoke(["write-cleanup-receipt", "--root", fixture.root, "--lifecycle", fixture.lifecycle]);
+  assert.equal(written.schema, "pipeline.close-coordinator.cleanup-receipt.v1");
+  assert.equal(written.status, "complete");
+  assert.equal(written.receiptPath, join(fixture.evidenceDirectory, "cleanup-receipt.json"));
+  assert.deepEqual(written.otherActiveDescriptors, []);
+  const receipt = JSON.parse(readFileSync(written.receiptPath, "utf8"));
+  assert.equal(receipt.candidateOid, fixture.candidateOid);
+  assert.equal(receipt.evidenceDigest, written.evidenceDigest);
+  assert.equal(digest(canonical(JSON.parse(readFileSync(written.observationPath, "utf8")))), receipt.evidenceDigest, "the digest is that of the stored observation");
+  fixture.transition("cleanup-complete", ["--evidence", written.receiptPath]);
+  fixture.transition("closed-local");
+  rmSync(fixture.root, { recursive: true, force: true });
+  rmSync(frozen.root, { recursive: true, force: true });
 });
 
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {

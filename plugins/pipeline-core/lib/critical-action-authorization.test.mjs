@@ -14,6 +14,7 @@ import { join } from "node:path";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { criticalActionAuthority } from "./critical-action-authorization-read.mjs";
 import { execFileSync } from "node:child_process";
 import {
   authorizeRecordedChatResidualAcceptance, authorizeRecordedDeploy, authorizeRecordedPush,
@@ -881,6 +882,66 @@ try {
     const key = keypair();
     const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
     assert.equal(call(root, stateFor(approvalRecord({ key, threatModel }))).code, "PUSH-PROOF-VERIFIED");
+  });
+
+  // Candidate 16d (PO decision 2026-11-01): a push after the feature close has no active feature and no plan authority in State. The push
+  // is then bound to the most recently closed feature, with the plan and spec digests taken from the PUSH CANDIDATE's own tree.
+  const sha256Of = (text) => createHash("sha256").update(text).digest("hex");
+  const closedFixture = ({ key }) => {
+    const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
+    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    git("init", "--quiet");
+    const prd = "# PRD of the closed feature\n";
+    const spec = "# Spec of the closed feature\n";
+    writeFileSync(join(root, "specs", "demo", "prd.md"), prd);
+    writeFileSync(join(root, "specs", "demo", "spec.md"), spec);
+    git("add", "-A");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "close commit");
+    const forCommit = git("rev-parse", "HEAD");
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), "# handover after the close\n");
+    git("add", "-A");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "handover");
+    const candidate = { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") };
+    return { root, git, threatModel, forCommit, candidate, planSha256: sha256Of(prd), specSha256: sha256Of(spec) };
+  };
+  const closedState = (record, closedFeatures) => ({
+    closedFeatures,
+    pushApproval: { lastApproved: record },
+    criticalProofConsumption: [{ proofSha256: record.criticalProof.proofSha256, kind: "push", consumedAt: NOW }],
+  });
+  const closedEntry = (f, over = {}) => ({ id: "demo-feature", planPath: "specs/demo/prd.md", phaseAtClose: null,
+    architectureImpact: "no-architecture-impact", closedAt: "2026-11-01T10:00:00.000Z", closedBy: "PO", forCommit: f.forCommit, ...over });
+
+  check("CF1 a push after the close is authorized against the closed feature, with plan and spec digests from the candidate's tree", () => {
+    const key = keypair();
+    const f = closedFixture({ key });
+    const record = approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, planSha256: f.planSha256, specSha256: f.specSha256 });
+    const result = call(f.root, closedState(record, [closedEntry(f)]), { candidate: f.candidate });
+    assert.equal(result.code, "PUSH-PROOF-VERIFIED", JSON.stringify(result));
+    assert.equal(result.authorized, true);
+  });
+
+  check("CF2 the closed path is closed: other digests, another feature id, a foreign ancestor, an active feature, an ambiguous latest, a missing spec and any other kind are refused", () => {
+    const key = keypair();
+    const f = closedFixture({ key });
+    const good = () => approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, planSha256: f.planSha256, specSha256: f.specSha256 });
+    const run = (record, closedFeatures, extra = {}, state = {}) => call(f.root, { ...closedState(record, closedFeatures), ...state }, { candidate: f.candidate, ...extra });
+    assert.equal(run(good(), [closedEntry(f)]).authorized, true, "control: the same inputs authorize");
+    assert.notEqual(run(approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate }), [closedEntry(f)]).authorized, true, "a proof over other plan/spec digests (State-style constants)");
+    assert.notEqual(run(approvalRecord({ key, threatModel: f.threatModel, candidate: f.candidate, featureId: "another-feature", planSha256: f.planSha256, specSha256: f.specSha256 }), [closedEntry(f)]).authorized, true, "a proof for another feature id");
+    assert.notEqual(run(good(), [closedEntry(f, { forCommit: f.candidate.commit.replace(/.$/u, f.candidate.commit.endsWith("0") ? "1" : "0") })]).authorized, true, "a forCommit that is not in the history");
+    assert.notEqual(run(good(), [closedEntry(f, { planPath: "specs/demo/../demo/prd.md" })]).authorized, true, "an unsafe plan path");
+    assert.notEqual(run(good(), [closedEntry(f, { planPath: "specs/demo/missing.md" })]).authorized, true, "a plan that is not in the candidate tree");
+    assert.notEqual(run(good(), [closedEntry(f), closedEntry(f, { id: "other-feature" })]).authorized, true, "two entries with the same latest closedAt are ambiguous");
+    assert.equal(run(good(), [closedEntry(f, { id: "older-feature", closedAt: "2026-10-01T10:00:00.000Z", planPath: "specs/older/prd.md" }), closedEntry(f)]).authorized, true, "the latest closedAt wins");
+    assert.notEqual(run(good(), [closedEntry(f)], {}, { activeFeature: { id: "active-feature" } }).authorized, true, "an active feature takes precedence; the closed path is not used");
+    f.git("rm", "--quiet", "specs/demo/spec.md");
+    f.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "spec removed");
+    const later = { commit: f.git("rev-parse", "HEAD"), tree: f.git("rev-parse", "HEAD^{tree}") };
+    const laterRecord = approvalRecord({ key, threatModel: f.threatModel, candidate: later, planSha256: f.planSha256, specSha256: f.specSha256 });
+    assert.notEqual(call(f.root, closedState(laterRecord, [closedEntry(f)]), { candidate: later }).authorized, true, "a spec that is not in the candidate tree");
+    assert.equal(criticalActionAuthority({ state: { closedFeatures: [closedEntry(f)] }, kind: "deploy", candidate: f.candidate, projectDir: f.root }).source, "none", "only a push uses a closed feature");
   });
 
   process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
