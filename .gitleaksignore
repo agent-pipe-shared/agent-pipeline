@@ -354,3 +354,7 @@ content-v1:ff6ba7bee4b2361645149717cfe254aa4e5128f857f4fcf1c224619b91b50f2e:spec
 # to a new line, so its line-bound entry above went stale. Same reviewed value (a PEM header literal in a detection constant, not a key), new line; generated with
 # gitleaksContentAuthorityLine() from the normalized finding of the applied tree. The stale entry stays as a harmless record.
 content-v1:2bb243f703e651052ed783debf08353b789416d602ecfe4a877a78b9cc58e26d:plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1678:22
+# C15B-GITLEAKS-FP (2026-11-01): the D227 patch added two lines before the string constant that detects an unencrypted key file in plugins/pipeline-core/scripts/po-human-approval.mjs,
+# so its line-bound entry went stale (the fv10 security-scan was the only red of 1144 steps). Same reviewed value (a PEM header literal in a detection check, not a key), new line;
+# the entry is the one the adapter recomputed from the normalized finding of the applied tree. The stale entry stays as a harmless record.
+content-v1:60280fcc421d07eff69732a896c13a4ae964153b8e45e8bac399e5cc2f316859:plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1680:22
