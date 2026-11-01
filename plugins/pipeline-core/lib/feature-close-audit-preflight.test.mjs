@@ -52,6 +52,7 @@ test("read-only plan binds candidate, Result and policy; identical bundle retry 
 test("missing policy is actionable, no fabricated defaults or extra signature", async t => {
   const f = fixture(t), result = await planFeatureCloseAudit({ ...f.options, packs: [] });
   assert.equal(result.code, "FCA-POLICY-REQUIRED"); assert.match(result.remedy, /do not invent/u);
+  assert.match(result.remedy, /"packs":\["pipeline-core-baseline"\]/u, "the refusal names the shipped baseline pack as the route (D229)");
   assert.equal(result.requiresAdditionalApproval, false);
 });
 

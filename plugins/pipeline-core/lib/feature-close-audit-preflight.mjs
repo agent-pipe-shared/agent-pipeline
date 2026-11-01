@@ -28,7 +28,7 @@ function blocked(code, remedy) { return { schema: "pipeline.feature-close-audit-
 export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath } = {}) {
   if (!ID.test(featureId ?? "")) return blocked("FCA-FEATURE-ID", "Supply the exact active feature ID as one safe path component.");
   if (!candidate || Object.keys(candidate).sort().join() !== "commit,tree" || !OID.test(candidate.commit ?? "") || !OID.test(candidate.tree ?? "") || candidate.commit === candidate.tree || /^0+$/u.test(candidate.commit) || /^0+$/u.test(candidate.tree)) return blocked("FCA-CANDIDATE", "Resolve the qualified source candidate commit and tree before planning its snapshot.");
-  if (!Array.isArray(packs) || packs.length === 0) return blocked("FCA-POLICY-REQUIRED", "Resolve the applicable organization policy packs and core version through the existing policy workflow; do not invent a policy to complete closure.");
+  if (!Array.isArray(packs) || packs.length === 0) return blocked("FCA-POLICY-REQUIRED", "Resolve the applicable organization policy packs and core version through the existing policy workflow; do not invent a policy to complete closure. The shipped core baseline pack can be named by id in the audit request: \"packs\":[\"pipeline-core-baseline\"] (docs/organization-policy-packs.md).");
   try {
     const root = realpathSync(resolve(repositoryRoot));
     safePath(root, manifestPath);

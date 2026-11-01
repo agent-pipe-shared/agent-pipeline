@@ -17,8 +17,10 @@ First complete the planned delivery flow and prepare the Feature Package in
 `specs/<feature-id>/` (the feature's folder name under `specs/`). The bundle
 `plan` command takes the package's lifecycle manifest
 (`specs/<feature-id>/lifecycle.json`) and refuses an invalid package or a
-missing candidate binding; it also needs an approved organization policy pack
-(see [Audit bundles](audit-bundles.md)). The full layout is defined in the
+missing candidate binding; it also needs a policy pack: an approved organization
+policy pack, or the shipped core baseline pack named by id
+(see [Audit bundles](audit-bundles.md) and
+[Organization policy packs](organization-policy-packs.md)). The full layout is defined in the
 [canonical artifact topology](artifact-topology.md) (maintainer reference).
 Then start with that
 package and its candidate-bound Verify receipt. Validate the package before
