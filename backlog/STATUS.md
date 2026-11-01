@@ -786,6 +786,7 @@
 | pipeline.push-classifier-misreads-backslash-escaped-quotes | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push | closed | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.push-flow-needs-one-remote-readback-transaction | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
+| pipeline.push-gate-has-no-lighter-lane-for-a-staging-destination | open | workflow-improvement | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | — | 2026-08-09 | 2026-08-10 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.push-gate-unsatisfiable-in-consumer-deployment | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire. |
@@ -1071,7 +1072,7 @@
 
 ## Counts
 
-- open: 375
+- open: 376
 - in_progress: 0
 - closed: 674
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ceb2749c46138fffdd99b6e50af4b9d3b7d444c6af29e1c89df2a95527410177"
+    "transitionHead": "855a2284d9d9b3ae519f373de1b87ba62b67d440a15c6284bb49ae40beb864c1"
   },
   "counts": {
-    "open": 375,
+    "open": 376,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -9746,6 +9746,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
+    },
+    {
+      "id": "pipeline.push-gate-has-no-lighter-lane-for-a-staging-destination",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-31",
+      "source": "Consumer request (2026-10-31, PO decision relayed by the consumer session): a staging deployment branch needs a lighter push lane than main; today it costs a full release Verify and a Critic round before every push.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
