@@ -673,6 +673,8 @@ test("W7 round takeover (1) inspect decides by the tail above the registered lin
     assert.equal(noTail.scope,"batch");assert.deepEqual(noTail.tailOrdinals,[]);
     const open=CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:0});
     assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");assert.equal(open.scope,"batch");assert.deepEqual(open.tailOrdinals,[]);
+    // N21 (D232 batch): the text names the release verb and its request schema, not only "release it".
+    assert.ok(open.repair.includes("session-critic-finalizer.mjs release")&&open.repair.includes("pipeline.session-critic-release-request.v1"),open.repair);
     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:true,registeredRounds:0}))?.code,"CGB-SHAPE");
     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:1}))?.code,"CGB-SHAPE");
     assert.equal(thrown(()=>CGB.inspectFeatureCourseTakeover({...key,courseHistoryRegistered:false,registeredRounds:-1}))?.code,"CGB-SHAPE");
