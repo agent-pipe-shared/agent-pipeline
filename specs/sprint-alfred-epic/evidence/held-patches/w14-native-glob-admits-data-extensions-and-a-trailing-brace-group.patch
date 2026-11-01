@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 9fb9590fd..0a6049660 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -406,15 +406,28 @@ export function containedLiteralReadPath(value, root, dependencies = {}, extraRo
+     });
+ }
+ 
++// Ordinary source, document, data and log extensions a wildcard Glob may end in. A Glob lists names, never contents, and the base
++// directory is still contained separately; credential-shaped extensions (pem, key, p12, env, output) stay out.
++const GLOB_LISTING_EXTENSIONS = ["md", "mjs", "js", "cjs", "ts", "tsx", "css", "html", "svg", "txt", "yaml", "yml", "json", "jsonl", "patch", "log", "sh", "toml", "csv"];
++const GLOB_LISTING_EXTENSION_RE = new RegExp(`\\.(?:${GLOB_LISTING_EXTENSIONS.join("|")})$`, "iu");
++const GLOB_LISTING_BRACE_RE = new RegExp(`^([^{}]*)\\.\\{((?:${GLOB_LISTING_EXTENSIONS.join("|")})(?:,(?:${GLOB_LISTING_EXTENSIONS.join("|")})){1,7})\\}$`, "iu");
++
+ function containedRelativeGlob(value) {
+   // Wildcards are useful inside the project, but broad patterns and hidden
+   // selectors could enumerate private key files. Keep wildcard forms to
+   // ordinary source/document extensions; exact entries use the read policy.
+-  if (typeof value !== "string" || value === "" || /[\0$`\[\]{}\\]/u.test(value)
+-    || value.startsWith("~") || isAbsolute(value) || win32.isAbsolute(value)
+-    || !value.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
+-  if (!/[?*]/u.test(value)) return true;
+-  return /\.(?:md|mjs|js|cjs|ts|tsx|css|html|svg|txt|yaml|yml)$/iu.test(value);
++  // One trailing brace group of those same extensions (`*.{md,mjs}`) is the only brace form admitted; it expands to the
++  // plain extension forms checked below, so it can neither widen the extension set nor reach a hidden or escaping part.
++  let plain = value;
++  if (typeof value === "string") {
++    const braced = GLOB_LISTING_BRACE_RE.exec(value);
++    if (braced !== null) plain = `${braced[1]}.${braced[2].split(",")[0]}`;
++  }
++  if (typeof plain !== "string" || plain === "" || /[\0$`\[\]{}\\]/u.test(plain)
++    || plain.startsWith("~") || isAbsolute(plain) || win32.isAbsolute(plain)
++    || !plain.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
++  if (!/[?*]/u.test(plain)) return plain === value;
++  return GLOB_LISTING_EXTENSION_RE.test(plain);
+ }
+ 
+ function containedGlobBase(path, root, extraRoots = []) {
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index 3679d643c..238ce5596 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -217,6 +217,18 @@ test("AP9 Glob wildcard listing of an in-repo directory is admitted; hidden/esca
+   assert.match(dirGrep.text, /GUARD-READ-TARGET/u);
+ }));
+ 
++test("AP9b a native Glob may end in a data/log extension or in one trailing brace group of the allowed extensions; braces anywhere else, a credential extension, hidden parts and escapes stay refused", () => withFixture((path) => {
++  const glob = (pattern, base = join(path, "docs")) => verdict({ tool_name: "Glob", tool_input: { pattern, path: base } }, path).exitCode;
++  for (const pattern of ["**/*.json", "*.patch", "*.log", "*.sh", "*.toml", "*.csv", "*.{md,mjs}", "**/*.{md,json,yaml}", "sub/**/*.{yml,yaml}"]) {
++    assert.equal(glob(pattern), 0, pattern);
++  }
++  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.pem", "*.key", "*.output"]) {
++    assert.equal(glob(pattern), 2, pattern);
++  }
++  assert.equal(glob("*.{md,mjs}", join(path, ".git")), 2);
++  assert.equal(glob("../*.{md,mjs}", join(path, "docs")), 2);
++}));
++
+ // ---------------------------------------------------------------------------------------------------------------------
+ // K3 (PO decision 2026-10-14, Critic finding F1 of batch C5): the patch for this item carries two admission lanes beyond the
+ // three rg flags. Both are declared in the grammar sources and pinned here.
