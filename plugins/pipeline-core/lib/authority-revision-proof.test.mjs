@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -24,6 +24,20 @@ test("external proof becomes the authority revision approval shape", () => {
     assert.equal(result.code, "PHOENIX-AUTHORITY-PROOF-VERIFIED"); assert.equal(result.approval.phase, "design"); assert.deepEqual(result.approval.oldAuthority, request.oldAuthority);
     writeFileSync(join(repo, "proposal.json"), JSON.stringify({ ...request, preStateSha256: "b".repeat(64) }));
     assert.throws(() => approval(["verify", "--repo-root", repo, "--directory", directory, "--proposal", "proposal.json"]), /does not bind/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("D19: a second prepare in the same directory is refused naming the existing request and the ways out, and keeps the first request byte for byte", () => {
+  const root = mkdtempSync(join(tmpdir(), "phoenix-authority-prepare-")); const repo = join(root, "repo"); const directory = join(root, "external");
+  try {
+    mkdirSync(repo); writeFileSync(join(repo, "proposal.json"), JSON.stringify(request));
+    const argv = ["prepare", "--repo-root", repo, "--directory", directory, "--proposal", "proposal.json"];
+    assert.equal(approval(argv).code, "PHOENIX-AUTHORITY-REQUEST-READY");
+    const requestPath = join(directory, "phoenix-authority-revision-request.json");
+    const first = readFileSync(requestPath);
+    assert.throws(() => approval(argv), (error) => error.message.includes(`request already exists at ${requestPath}`) && /refuse overwrite/u.test(error.message)
+      && /move it aside/u.test(error.message) && /fresh --directory/u.test(error.message));
+    assert.deepEqual(readFileSync(requestPath), first);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

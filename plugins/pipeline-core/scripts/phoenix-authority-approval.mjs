@@ -21,7 +21,9 @@ function run(argv = process.argv.slice(2)) {
     const intent = createAuthorityRevisionIntent(proposal);
     const request = { schema: "pipeline.continuity-authority-revision-request.v1", intent };
     const path = join(dir, "phoenix-authority-revision-request.json");
-    if (existsSync(path)) throw new Error("request already exists; refuse overwrite");
+    // Toolbox D19: the file names are fixed, so a second ceremony meets the first one's request. Name the file and the two ways out instead of a bare refusal.
+    // Toolbox D19: the file names are fixed, so a second ceremony meets the first one's request. Name the file and the two ways out instead of a bare refusal.
+    if (existsSync(path)) throw new Error(`request already exists at ${path}; refuse overwrite. It belongs to an earlier ceremony and is kept as it is: move it aside together with its phoenix-authority-revision-proof.json (for example rename both with a date suffix), or give a fresh --directory.`);
     writeFileSync(path, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PHOENIX-AUTHORITY-REQUEST-READY", intentSha256: intent.sha256 };
   }
