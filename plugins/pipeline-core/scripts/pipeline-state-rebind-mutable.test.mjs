@@ -17,6 +17,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { execFileSync } from "node:child_process";
+import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
+import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
+import { planFeaturePackageTransition } from "../lib/feature-package-topology.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { addVerifyEvidence } from "../lib/feature-package-registration.mjs";
 import { run } from "./pipeline-state.mjs";
 
 function sha256Hex(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
@@ -153,4 +160,128 @@ test("feature-package-apply stays unwired for autoRebindMutable -- a mutable-cla
   } finally {
     rmSync(fx.root, { recursive: true, force: true });
   }
+});
+
+// ---- Feature-close audit route, package side: register the Verify evidence, bind the candidate, complete --------------------
+//
+// No shipped verb set `manifest.candidate` or registered the Verify evidence, so a package could not reach `completed` and the
+// audit route (`planFeatureCloseAudit`) could not be planned for a consumer (Toolbox, 2026-11-01). These cases walk the new
+// route with real git, real registration and the real plan/apply verbs, and end in the audit preflight accepting the package.
+
+const AUDIT_ID = "audit-pkg";
+const gitIn = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" } }).trim();
+
+function auditFixture() {
+  const root = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+  gitIn(root, ["init", "-q"]);
+  const base = `specs/${AUDIT_ID}`;
+  mkdirSync(join(root, base), { recursive: true });
+  const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "mutable"], ["acceptance", "acceptance.md", false, "mutable"], ["result", "result.md", false, "mutable"], ["candidate-evidence", "envelope.json", false, "immutable"]].map(([klass, name, authority, mutability]) => {
+    const bytes = `${klass} of ${AUDIT_ID}\n`;
+    writeFileSync(join(root, base, name), bytes);
+    return { class: klass, path: `${base}/${name}`, sha256: sha256Hex(bytes), authority, mutability, retention: "active" };
+  });
+  const manifestRel = `${base}/lifecycle.json`;
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: AUDIT_ID, rigor: 1 }, state: "implementing", artifacts: entries, candidate: null, supersedes: null };
+  const save = () => writeFileSync(join(root, manifestRel), `${JSON.stringify(manifest, null, 2)}\n`);
+  save();
+  gitIn(root, ["add", "-A"]);
+  gitIn(root, ["commit", "-qm", "work"]);
+  const head = () => ({ commit: gitIn(root, ["rev-parse", "HEAD"]), tree: gitIn(root, ["rev-parse", "HEAD^{tree}"]) });
+  const evidence = (name, overrides = {}) => {
+    const candidate = head();
+    const value = { schema: "pipeline.verify-evidence.v0", ...candidate, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }), ...overrides };
+    writeFileSync(join(root, base, name), JSON.stringify(value));
+    return `${base}/${name}`;
+  };
+  const readManifest = () => readFileSync(join(root, manifestRel), "utf8");
+  return { root, base, manifestRel, manifest, head, evidence, readManifest, state: { activeFeature: { id: AUDIT_ID } } };
+}
+
+test("Verify evidence registration: a passing candidate-bound file becomes immutable non-authority candidate evidence, once", () => {
+  const f = auditFixture();
+  try {
+    const path = f.evidence("verify.json");
+    const added = addVerifyEvidence({ root: f.root, state: f.state, path });
+    assert.equal(added.status, "verify-evidence-added", JSON.stringify(added));
+    const entry = JSON.parse(f.readManifest()).artifacts.find((a) => a.path === path);
+    assert.deepEqual({ class: entry.class, authority: entry.authority, mutability: entry.mutability, retention: entry.retention }, { class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain" });
+    assert.equal(entry.sha256, sha256Hex(readFileSync(join(f.root, path))));
+    assert.match(added.next, /do NOT commit/u);
+    const before = f.readManifest();
+    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "already-registered");
+    assert.equal(f.readManifest(), before, "registering the same bytes twice rewrites nothing");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("Verify evidence registration refuses what cannot qualify a candidate and never touches the manifest", () => {
+  const f = auditFixture();
+  try {
+    const before = f.readManifest();
+    const bad = { commit: "f".repeat(40), tree: "e".repeat(40) };
+    const cases = [
+      ["outside the package directory", () => { writeFileSync(join(f.root, "loose.json"), "{}"); return "loose.json"; }, "FPR-VERIFY-PATH"],
+      ["missing file", () => `${f.base}/absent.json`, "FPR-VERIFY-PATH"],
+      ["not JSON", () => { writeFileSync(join(f.root, f.base, "text.json"), "no"); return `${f.base}/text.json`; }, "FPR-VERIFY-SCHEMA"],
+      ["another schema", () => f.evidence("schema.json", { schema: "pipeline.verify-evidence.v9" }), "FPR-VERIFY-SCHEMA"],
+      ["a failed run", () => f.evidence("failed.json", { exitCode: 1 }), "FPR-VERIFY-NOT-PASSING"],
+      ["a candidate no commit of this repository has", () => f.evidence("ghost.json", { ...bad, candidate: bad }), "FPR-VERIFY-CANDIDATE"],
+      ["a commit field that differs from the candidate", () => f.evidence("split.json", { commit: bad.commit }), "FPR-VERIFY-CANDIDATE"],
+    ];
+    for (const [label, make, code] of cases) {
+      const refused = addVerifyEvidence({ root: f.root, state: f.state, path: make() });
+      assert.equal(refused.status, "refused", label);
+      assert.equal(refused.code, code, `${label}: ${JSON.stringify(refused)}`);
+      assert.equal(f.readManifest(), before, `${label}: the manifest is untouched`);
+    }
+    const path = f.evidence("again.json");
+    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "verify-evidence-added");
+    writeFileSync(join(f.root, path), JSON.stringify({ schema: "pipeline.verify-evidence.v0", changed: true }));
+    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).code, "FPR-VERIFY-IMMUTABLE", "registered evidence is never replaced");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("entering verifying binds the candidate only to the HEAD a registered passing Verify evidence names", () => {
+  const f = auditFixture();
+  const plan = (head) => planFeaturePackageTransition(f.root, f.manifestRel, "verifying", head === undefined ? {} : { head });
+  try {
+    assert.equal(plan().reason, "head-unresolved", "no HEAD, no candidate");
+    const missing = plan(f.head());
+    assert.equal(missing.status, "rejected");
+    assert.equal(missing.reason, "verify-evidence-required");
+    assert.match(missing.findings.join(" "), /--add-verify-evidence/u, "the refusal names the route");
+    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path: f.evidence("verify.json") }).status, "verify-evidence-added");
+    const preview = plan(f.head());
+    assert.equal(preview.status, "preview", JSON.stringify(preview));
+    assert.deepEqual(preview.candidate, f.head());
+    assert.equal(preview.changes[0].operation, "set-candidate-and-state");
+    gitIn(f.root, ["commit", "--allow-empty", "-qm", "later"]);
+    assert.equal(plan(f.head()).reason, "verify-evidence-required", "evidence for an older commit does not qualify the new HEAD");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a package with no candidate walks implementing -> verifying -> completed and the audit preflight plans it (the Toolbox chain)", async () => {
+  const f = auditFixture();
+  const apply = (nextState) => {
+    const planned = captureLog(() => run(["feature-package-plan", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState]));
+    assert.equal(planned.value, 0, planned.out);
+    const plan = JSON.parse(planned.logs.at(-1));
+    const applied = captureLog(() => run(["feature-package-apply", "--root", f.root, "--manifest", f.manifestRel, "--next-state", nextState, "--plan-sha256", sha256CanonicalJson(plan)]));
+    assert.equal(applied.value, 0, applied.out);
+    return JSON.parse(applied.logs.at(-1));
+  };
+  try {
+    const path = f.evidence("verify.json");
+    const head = f.head();
+    assert.equal(addVerifyEvidence({ root: f.root, state: f.state, path }).status, "verify-evidence-added");
+    assert.equal(apply("verifying").status, "applied");
+    const verifying = JSON.parse(f.readManifest());
+    assert.equal(verifying.state, "verifying");
+    assert.deepEqual(verifying.candidate, head, "the candidate is the HEAD the evidence names");
+    assert.equal(apply("completed").status, "applied");
+    assert.equal(JSON.parse(f.readManifest()).state, "completed");
+    assert.deepEqual(f.head(), head, "nothing was committed on the way");
+    const audit = await planFeatureCloseAudit({ repositoryRoot: f.root, featureId: AUDIT_ID, candidate: head, manifestPath: f.manifestRel, coreVersion: "0.7.0", packs: [resolveNamedOrganizationPolicyPack(CORE_BASELINE_PACK_ID)] });
+    assert.equal(audit.status, "build-required", JSON.stringify(audit));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
 });

@@ -242,22 +242,60 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
   if (!admitted.has(`${from}:${nextState}`)) {
     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
   }
-  const operation = from === "draft" && nextState === "awaiting-approval"
-    ? "submit"
-    : nextState === "draft"
-      ? "reopen-design"
-      : from === "awaiting-approval" && nextState === "approved"
-        ? "approve"
-        : "replace-manifest-state";
+  // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
+  // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
+  // that commit and tree is already in the package; the caller resolves HEAD (`options.head`), this library never runs git.
+  let candidate = null;
+  if (from === "implementing" && nextState === "verifying" && checked.receipt.candidate === null) {
+    const bound = verifiedCandidateOfPackage(resolve(rootDir), checked.receipt.manifest, options?.head);
+    if (bound.reason) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: bound.reason, findings: bound.findings };
+    candidate = bound.candidate;
+  }
+  const operation = candidate !== null
+    ? "set-candidate-and-state"
+    : from === "draft" && nextState === "awaiting-approval"
+      ? "submit"
+      : nextState === "draft"
+        ? "reopen-design"
+        : from === "awaiting-approval" && nextState === "approved"
+          ? "approve"
+          : "replace-manifest-state";
   return {
     schema: "pipeline.feature-package-transition-plan.v1",
     status: "preview",
     manifest: checked.receipt.manifest,
     from,
     to: nextState,
+    ...(candidate !== null ? { candidate } : {}),
     changes: [{ path: checked.receipt.manifest, operation }],
     requiredAuthority: operation === "approve" ? "po" : "lifecycle",
   };
+}
+
+/**
+ * The candidate a package may be bound to on its way into `verifying`: `head` ({commit, tree}, resolved by the caller)
+ * when one registered `candidate-evidence` artifact is a passing `pipeline.verify-evidence.v0` for exactly that commit
+ * and tree. The audit preflight (`feature-close-audit-preflight.mjs`) re-checks the evidence boundary; this only refuses
+ * to bind a candidate nothing has qualified.
+ */
+function verifiedCandidateOfPackage(root, manifestRel, head) {
+  const rejected = (reason, message) => ({ reason, findings: [message] });
+  if (!exact(head, ["commit", "tree"]) || !OID.test(head.commit ?? "") || !OID.test(head.tree ?? "")) {
+    return rejected("head-unresolved", "FTP-VERIFY-HEAD: the current HEAD commit and tree could not be resolved, so no candidate can be bound");
+  }
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(join(root, manifestRel), "utf8")); } catch { return rejected("invalid-current-package", "FTP-MANIFEST: the manifest could not be read"); }
+  for (const artifact of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
+    if (artifact?.class !== "candidate-evidence" || typeof artifact.path !== "string") continue;
+    let value;
+    try { value = JSON.parse(readFileSync(join(root, artifact.path), "utf8")); } catch { continue; }
+    if (value?.schema === "pipeline.verify-evidence.v0" && value.exitCode === 0
+      && value.candidate?.commit === head.commit && value.candidate?.tree === head.tree
+      && value.commit === head.commit && value.tree === head.tree) {
+      return { candidate: { commit: head.commit, tree: head.tree } };
+    }
+  }
+  return rejected("verify-evidence-required", "FTP-VERIFY-EVIDENCE: no registered candidate-evidence artifact is a passing pipeline.verify-evidence.v0 for the current HEAD commit and tree; produce it with verify-evidence-producer.mjs --mode candidate and register it, uncommitted, with register-feature-package.mjs --root <root> --add-verify-evidence <path>, then plan again");
 }
 
 /**

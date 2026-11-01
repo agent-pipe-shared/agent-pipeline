@@ -54,6 +54,13 @@ has no record of either kind. Report it to the PO before applying. The audit
 request's `packs` entries are full organization policy pack objects or, for a
 consumer without an organization policy, the shipped name `pipeline-core-baseline`
 (floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
+The package must be `completed` with a candidate equal to HEAD and a registered
+passing Verify evidence. Package side, nothing committed in between: produce the
+evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`,
+register it with `register-feature-package.mjs --root <root> --add-verify-evidence
+<path>`, then run `pipeline-state.mjs feature-package-plan` and `feature-package-apply`
+with `--next-state verifying` (this binds the candidate to HEAD, refused without a
+passing evidence for exactly HEAD) and again with `--next-state completed`.
 
 The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
 dispatch record that requires a Critic and carries no bound evidence (an

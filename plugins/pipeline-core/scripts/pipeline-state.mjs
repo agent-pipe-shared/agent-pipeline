@@ -8601,7 +8601,7 @@ function runFeaturePackageReadCommand(sub, argv) {
     if (flags.proposal !== undefined) {
       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
     }
-    const plan = planFeaturePackageTransition(root, manifest, nextState);
+    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root) });
     console.log(JSON.stringify(plan, null, 2));
     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
   }
@@ -8817,7 +8817,16 @@ function retireFeaturePackageApplyJournal(paths) {
  * object and therefore its digest. Returns a refusal message (never printed here) or the
  * resolved, digest-bound request.
  */
-function buildFeaturePackageApplyPreview(flags) {
+/**
+ * The current HEAD commit and tree for the one transition that binds a package candidate (implementing -> verifying).
+ * `null` when git cannot resolve it; the planner then refuses that transition with `head-unresolved`.
+ */
+function featurePackageHead(root, deps = {}) {
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(root);
+  return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
+}
+
+function buildFeaturePackageApplyPreview(flags, deps = {}) {
   if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
   const root = resolve(flags.root);
   let rootStat = null;
@@ -8838,7 +8847,7 @@ function buildFeaturePackageApplyPreview(flags) {
   if (manifestExists) {
     if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
     if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
-    plan = planFeaturePackageTransition(root, manifest, nextState);
+    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps) });
     kind = "transition";
   } else {
     if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };
@@ -8889,7 +8898,9 @@ function computeFeaturePackagePostimage(root, manifest, kind, plan, manifestByte
   }
   let value;
   try { value = JSON.parse(preFile.bytes.toString("utf8")); } catch { return { ok: false, code: "FTP-APPLY-TRANSITION-JSON" }; }
-  const nextValue = { ...value, state: plan.to };
+  // `plan.candidate` exists only for the first move into `verifying` (the planner bound it to the current HEAD and a passing
+  // Verify evidence); every other transition replaces `state` and nothing else.
+  const nextValue = { ...value, state: plan.to, ...(plan.candidate ? { candidate: plan.candidate } : {}) };
   const postBytes = Buffer.from(`${JSON.stringify(nextValue, null, 2)}\n`, "utf8");
   const postSha256 = sha256Bytes(postBytes);
   const mode = Number(preFile.identity.mode) & 0o777;
@@ -8923,7 +8934,7 @@ function runFeaturePackageApplyCommand(argv, deps) {
     // tested LIBRARY capability (planFeaturePackageTransition/planFeaturePackageReconcile,
     // feature-package-topology.mjs) for a deliberate, out-of-band invocation -- never
     // hardwired into a CLI write path that also consumes an approval-bound preview digest.
-    const preview = buildFeaturePackageApplyPreview(parsed.value);
+    const preview = buildFeaturePackageApplyPreview(parsed.value, deps);
     if (!preview.ok) return refuseFeaturePackageRead(sub, preview.error);
     const { manifest, kind, plan, planSha256, manifestBytes } = preview;
     const nextState = kind === "transition" ? plan.to : (parsed.value["next-state"] ?? "draft");

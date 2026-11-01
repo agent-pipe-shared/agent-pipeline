@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
 function git(root, args) {
@@ -51,7 +51,13 @@ function commitPlan(root, result) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
+  "",
+  "Feature-close audit route, package side (run in this order, nothing committed in between: the package candidate must equal HEAD):",
+  "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/<name>.json",
+  "  2. Register it: register-feature-package.mjs --root <root> --add-verify-evidence specs/<feature>/<name>.json",
+  "  3. pipeline-state.mjs feature-package-plan, then feature-package-apply, with --next-state verifying (this binds the candidate to HEAD), then the same with --next-state completed.",
+  "  4. Plan the close with close-coordinator.mjs plan-transition --phase feature-close-prepared --audit-request <path> --critic-verify-lifecycle <id>.",
   "",
   "Critic diagnostic evidence route (run in this order):",
   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
@@ -96,12 +102,14 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
   // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
   const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  // `--add-verify-evidence <path>` registers a passing candidate-bound Verify evidence file as candidate evidence (feature-close audit route).
+  const addVerify = argv.length === 4 && argv[2] === "--add-verify-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
   // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
   const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
+  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path>]" })}\n`);
     return 2;
   }
   let root;
@@ -127,6 +135,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   }
   if (addDiagnostic) {
     const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
+    out(`${JSON.stringify(added)}\n`);
+    return added.status === "refused" ? 2 : 0;
+  }
+  if (addVerify) {
+    const added = addVerifyEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
     out(`${JSON.stringify(added)}\n`);
     return added.status === "refused" ? 2 : 0;
   }

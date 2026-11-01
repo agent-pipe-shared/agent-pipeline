@@ -486,6 +486,70 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
 }
 
 /**
+ * Registers a passing candidate-bound Verify evidence file (`--add-verify-evidence <path>`) as an immutable, non-authority
+ * `candidate-evidence` entry of the feature manifest. The feature-close audit route needs such an entry (and a package candidate
+ * the next `feature-package-plan --next-state verifying` derives from it); no other verb writes it. The file, produced by
+ * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/...`, must already exist under `specs/<feature>/`; it must be a
+ * `pipeline.verify-evidence.v0` with `exitCode` 0 whose candidate commit and tree resolve in this repository. Nothing else of the
+ * manifest changes, and a path registered with other bytes is refused, never replaced.
+ */
+export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, readAcceptedDeliveryContract } = {}) {
+  if (!object(state) || typeof evidenceRel !== "string") return refused("FPR-ARGS", "root, state and the Verify evidence path are required");
+  let root;
+  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+  const featureId = state.activeFeature?.id;
+  if (!SAFE_ID.test(featureId ?? "")) return refused("FPR-NO-APPROVED-PLAN", "no active feature; set-feature first");
+  const manifestPath = `specs/${featureId}/lifecycle.json`, packageDir = `specs/${featureId}/`;
+  const manifestRead = inspect(root, manifestPath);
+  if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>)`, { manifestPath });
+  const checked = validateFeaturePackage(root, manifestPath);
+  let manifest;
+  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+  if (!checked.ok) {
+    const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === evidenceRel && entry.class === "candidate-evidence") : null;
+    const present = registered ? inspect(root, evidenceRel) : null;
+    if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
+    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  }
+  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(packageDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${packageDir}; produce the evidence with verify-evidence-producer.mjs --out under ${packageDir}`, { manifestPath, path: evidenceRel });
+  const seen = inspect(root, evidenceRel);
+  if (seen.kind !== "file") return refused("FPR-VERIFY-PATH", `${evidenceRel} is missing or is not a regular file`, { manifestPath, path: evidenceRel });
+  try { if (realpathSync(join(root, evidenceRel)) !== join(root, evidenceRel)) return refused("FPR-VERIFY-PATH", `${evidenceRel} resolves through a link`, { manifestPath, path: evidenceRel }); } catch { return refused("FPR-VERIFY-PATH", `${evidenceRel} does not resolve`, { manifestPath, path: evidenceRel }); }
+  let value;
+  try { value = JSON.parse(seen.bytes.toString("utf8")); } catch { return refused("FPR-VERIFY-SCHEMA", "the file is not JSON", { manifestPath, path: evidenceRel }); }
+  if (!object(value) || value.schema !== "pipeline.verify-evidence.v0") return refused("FPR-VERIFY-SCHEMA", "the file is not a pipeline.verify-evidence.v0 document", { manifestPath, path: evidenceRel });
+  if (value.exitCode !== 0) return refused("FPR-VERIFY-NOT-PASSING", "the Verify evidence did not pass (exitCode is not 0); only a passing run qualifies a candidate", { manifestPath, path: evidenceRel });
+  const recorded = value.candidate;
+  const commit = object(recorded) && typeof recorded.commit === "string" && /^[a-f0-9]{40,64}$/u.test(recorded.commit) ? gitOut(root, ["rev-parse", "--verify", `${recorded.commit}^{commit}`]) : null;
+  const tree = commit ? gitOut(root, ["rev-parse", `${commit}^{tree}`]) : null;
+  if (!commit || commit !== recorded.commit || !tree || tree !== recorded.tree || value.commit !== commit || value.tree !== tree) return refused("FPR-VERIFY-CANDIDATE", "the recorded candidate commit and tree do not resolve to a commit of this repository, or differ from the evidence's own commit and tree", { manifestPath, path: evidenceRel });
+  const existing = manifest.artifacts.find((entry) => entry.path === evidenceRel);
+  const evidenceSha256 = digest(seen.bytes);
+  if (existing && existing.sha256 !== evidenceSha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
+  if (existing) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, verifyEvidencePath: evidenceRel };
+  const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, { ...DIAGNOSTIC_ARTIFACT, path: evidenceRel, sha256: evidenceSha256 }] }, null, 2)}\n`);
+  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* the readback below reports a manifest it cannot restore */ } };
+  const temp = join(root, `${manifestPath}.verify-${process.pid}.tmp`);
+  try { writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath)); }
+  catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the Verify evidence could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
+  const validated = validateFeaturePackage(root, manifestPath);
+  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
+  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
+  if (envelopes.length === 1) {
+    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+      restore();
+      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
+    }
+  }
+  return {
+    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "verify-evidence-added", manifestPath, verifyEvidencePath: evidenceRel,
+    registered: [{ path: evidenceRel, sha256: evidenceSha256 }], manifestSha256: digest(bytes),
+    next: "do NOT commit: the package candidate must stay equal to HEAD. Run pipeline-state.mjs feature-package-plan --root <root> --manifest " + manifestPath + " --next-state verifying, then feature-package-apply with its digest, then the same for --next-state completed",
+  };
+}
+
+/**
  * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
  * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
  * the round candidate/base from the consumed packet, the parent from the registered history tail. The record is compiled by

@@ -468,7 +468,12 @@ test("D64 feature-package registration: exactly the documented forms are admitte
     bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
-    for (const [label, argv] of [["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-verify-evidence", "specs/feature/verify.json"), f, "add verify evidence");
+    for (const [label, argv] of [["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
+      ["verify without path", ["--root", f.root, "--add-verify-evidence"]], ["verify absolute path", ["--root", f.root, "--add-verify-evidence", join(f.root, "v.json")]],
+      ["verify parent path", ["--root", f.root, "--add-verify-evidence", "specs/feature/../../x.json"]], ["verify dash path", ["--root", f.root, "--add-verify-evidence", "--force"]],
+      ["verify extra argument", ["--root", f.root, "--add-verify-evidence", "v.json", "--force"]],
+      ["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
       ["diagnostic without path", ["--root", f.root, "--add-diagnostic-evidence"]], ["diagnostic absolute path", ["--root", f.root, "--add-diagnostic-evidence", join(f.root, "d.json")]],
       ["diagnostic parent path", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/../../x.json"]], ["diagnostic dash path", ["--root", f.root, "--add-diagnostic-evidence", "--force"]],
       ["diagnostic extra argument", ["--root", f.root, "--add-diagnostic-evidence", "d.json", "--force"]],["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
