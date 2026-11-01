@@ -54,7 +54,8 @@ export function readConsumerVerifyConfiguration(rootDir) {
 export function assertConsumerVerifyAdapter(rootDir) {
   const path = resolve(rootDir, CONSUMER_VERIFY_ADAPTER_PATH);
   if (!existsSync(path)) throw new Error("VEP-PREPARATION-REQUIRED: run verify-evidence-producer.mjs --prepare --root <repo>, then commit the adapter.");
-  if (!lstatSync(path).isFile() || realpathSync(path) !== path || readFileSync(path, "utf8") !== CONSUMER_VERIFY_ADAPTER) {
+  // N39: a checkout with core.autocrlf=true writes this committed LF file with CRLF; the line ending is not a user edit. Only CRLF is folded, every other byte must match.
+  if (!lstatSync(path).isFile() || realpathSync(path) !== path || readFileSync(path, "utf8").replaceAll("\r\n", "\n") !== CONSUMER_VERIFY_ADAPTER) {
     throw new Error(`VEP-ADAPTER-CONFLICT: preserve and resolve ${CONSUMER_VERIFY_ADAPTER_PATH}.`);
   }
   return path;

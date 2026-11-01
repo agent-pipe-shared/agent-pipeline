@@ -12,7 +12,7 @@ import test from "node:test";
 import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
 import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
-import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+import { assertConsumerVerifyAdapter, prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
 import { verifySuiteArtifactName } from "./verify-journal.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
@@ -632,6 +632,21 @@ test("explicit preparation is idempotent, preserves conflicts and the configured
     writeFileSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH), "// user owned\n");
     assert.throws(() => prepareConsumerVerify({ rootDir: root }), /VEP-ADAPTER-CONFLICT/u);
     assert.equal(readFileSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH), "utf8"), "// user owned\n");
+  });
+});
+
+test("N39: the adapter written with CRLF line endings by a core.autocrlf checkout is the adapter; any other difference is still a conflict", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const adapterPath = join(root, CONSUMER_VERIFY_ADAPTER_PATH);
+    const lf = readFileSync(adapterPath, "utf8");
+    writeFileSync(adapterPath, lf.replaceAll("\n", "\r\n"));
+    assert.equal(prepareConsumerVerify({ rootDir: root }).status, "unchanged", "CRLF of the identical text is accepted");
+    assert.equal(assertConsumerVerifyAdapter(root), adapterPath);
+    writeFileSync(adapterPath, `${lf.replaceAll("\n", "\r\n")}// edit\r\n`);
+    assert.throws(() => assertConsumerVerifyAdapter(root), /VEP-ADAPTER-CONFLICT/u);
+    writeFileSync(adapterPath, lf.replace("\n", "\r\r\n"));
+    assert.throws(() => assertConsumerVerifyAdapter(root), /VEP-ADAPTER-CONFLICT/u, "a stray CR is not folded");
+    assert.equal(readFileSync(adapterPath, "utf8"), lf.replace("\n", "\r\r\n"), "a conflict leaves the file untouched");
   });
 });
 
