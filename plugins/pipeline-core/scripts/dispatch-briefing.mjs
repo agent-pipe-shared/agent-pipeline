@@ -347,6 +347,7 @@ function defaultQueueRows(root) {
 export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
   try {
     const live = new Set(queueRows.filter((entry) => entry?.state === "ready").map((entry) => entry.id));
+    const scopeOf = new Map(queueRows.filter((entry) => entry?.state === "ready" && Array.isArray(entry.writeScope) && entry.writeScope.length > 0).map((entry) => [entry.id, [...entry.writeScope]]));
     if (live.size === 0) return [];
     // A slice with a commit carrying its Dispatch trailer is delivered (one git call; the full integration read takes tens of seconds).
     const trailers = execFileSync("git", ["-C", root, "log", "--format=%(trailers:key=Dispatch,valueonly,separator=%x0a)"], { encoding: "utf8", maxBuffer: 1 << 26 });
@@ -362,7 +363,7 @@ export function defaultStartedOwners(root, queueRows = defaultQueueRows(root)) {
         const bytes = readFileSync(resolve(dir, name));
         if (names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) continue;
         const value = JSON.parse(bytes.toString("utf8"));
-        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId });
+        if (typeof value?.delivery?.itemId === "string" && live.has(value?.binding?.dispatchId)) started.push({ dispatchId: value.binding.dispatchId, itemId: value.delivery.itemId, ...(scopeOf.has(value.binding.dispatchId) ? { writeScope: scopeOf.get(value.binding.dispatchId) } : {}) });
       } catch { /* an unreadable pending file names no owner */ }
     }
     return started;
@@ -774,8 +775,11 @@ export function generateDispatchBinding(options, deps = {}) {
   }
 
   // D196 (R1): warn, never refuse, when another slice of this item is started and unfinished (a running or budget-checkpointed owner).
+  // D205: a started slice whose write scope is known and disjoint from this one is a parallel slice, not the owner of this outcome, so it is no warning;
+  // an unknown scope or any overlap keeps the warning (the overlap itself is still refused below).
   const startedOwners = (() => { try { const found = (deps.startedOwners ?? defaultStartedOwners)(root); return Array.isArray(found) ? found : []; } catch { return []; } })()
     .filter((entry) => entry && entry.itemId === itemId && entry.dispatchId !== dispatchId && typeof entry.dispatchId === "string")
+    .filter((entry) => !(Array.isArray(entry.writeScope) && entry.writeScope.length > 0 && !scopesOverlap(allowedPaths, entry.writeScope)))
     .map((entry) => entry.dispatchId).sort();
   for (const owner of startedOwners) {
     warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent with SendMessage. A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });

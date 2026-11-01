@@ -13,7 +13,11 @@ Consider a native fan-out when there are three or more remaining packages and
 all of the following are true:
 
 - Each package has an explicit, disjoint write scope. Keep shared tracking,
-  handover, and other common files with one owner.
+  handover, and other common files with one owner. Two slices of the same item
+  or criterion may run at the same time when their write scopes do not
+  overlap (D205); the briefing generator then raises no
+  `DBG-CHECKPOINTED-OWNER` for the running one. An overlap keeps the scope
+  refusal, and a running slice with no recorded scope keeps the warning.
 - No package needs a file another package will change. A dependency means
   sequence the work.
 - The commit surface is safe: use separate worktrees, allow only one slice to

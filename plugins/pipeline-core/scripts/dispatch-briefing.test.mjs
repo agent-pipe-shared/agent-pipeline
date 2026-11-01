@@ -1749,6 +1749,17 @@ test("D196 R1: an unreadable started-owner reader never refuses the build", asyn
   assert.ok(!warningCodes(result).includes("DBG-CHECKPOINTED-OWNER"));
 });
 
+test("D205: a started slice of the same item with a known, disjoint write scope gives no DBG-CHECKPOINTED-OWNER; an overlapping or unknown scope keeps it", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const own = [PATH_A];
+  const warns = (owner) => warningCodes(runDispatchBriefing(argv, depsOf(fx, { startedOwners: () => [owner] }))).includes("DBG-CHECKPOINTED-OWNER");
+  assert.equal(warns(startedOwner({ writeScope: ["plugins/other/elsewhere.mjs", "plugins/other/elsewhere.test.mjs"] })), false, "disjoint scope: a parallel slice, no warning");
+  assert.equal(warns(startedOwner({ writeScope: [own[0]] })), true, "an overlapping scope keeps the warning");
+  assert.equal(warns(startedOwner({ writeScope: [] })), true, "an empty scope is unknown, so the warning stays");
+  assert.equal(warns(startedOwner()), true, "no recorded scope keeps the warning");
+});
+
 test("D196 R4: an estimate above the base cap whose rationale does not say a grant is planned warns DBG-ESTIMATE-ABOVE-BASE; grant wording silences it; D193 still refuses a missing rationale", async () => {
   const { runDispatchBriefing } = await lib();
   const base = packageFixture();
@@ -1809,6 +1820,8 @@ test("D196 R1 default reader: an unsettled pending state of a ready queue slice 
       { id: "ALF-CANCELLED", state: "cancelled" }, { id: "ALF-BADNAME", state: "ready" }, { id: "ALF-DELIVERED", state: "ready" }];
     assert.deepEqual(defaultStartedOwners(dir, rows), [{ dispatchId: "ALF-OPEN", itemId: "item.a" }]);
     assert.deepEqual(defaultStartedOwners(dir, []), [], "no live queue row: no owner, whatever the pending states say");
+    const scoped = defaultStartedOwners(dir, [{ id: "ALF-OPEN", state: "ready", writeScope: ["plugins/x/a.mjs", "plugins/x/a.test.mjs"] }]);
+    assert.deepEqual(scoped, [{ dispatchId: "ALF-OPEN", itemId: "item.a", writeScope: ["plugins/x/a.mjs", "plugins/x/a.test.mjs"] }], "D205: the queue row's write scope rides along");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
