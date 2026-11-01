@@ -25,6 +25,11 @@ demands `Co-Authored-By` and `Claude-Session` in addition. The consumer did not 
 plugin should name the conflict (obligations text and refusal message), or the harness note should respect the
 Pipeline rule. Classified P2 by the consumer.
 
+## Triage 2026-11-01 (candidate 15c)
+
+Held as `w34`: the obligations text (through its generator) states that the Pipeline rule wins over a runner or host attribution instruction, and the GIT-03 refusal ends with a line pointing to it.
+Both acceptance points are met by the patch; the item stays open until it is applied. The host note itself cannot be changed from this repository.
+
 ## Triggering situation
 
 First commit in a real greenfield project. Sources: `guardrails/git.md`,
