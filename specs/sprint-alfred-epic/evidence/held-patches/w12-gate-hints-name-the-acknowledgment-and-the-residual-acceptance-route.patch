@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/hooks/guard-handover-size.mjs b/plugins/pipeline-core/hooks/guard-handover-size.mjs
+index 5ddb6a8c2..7aaa42bfa 100644
+--- a/plugins/pipeline-core/hooks/guard-handover-size.mjs
++++ b/plugins/pipeline-core/hooks/guard-handover-size.mjs
+@@ -68,6 +68,9 @@ function blocked({ currentBytes, maxBytes, proposedBytes, handoverPath, rotateSc
+       + `${DENIAL_CODE}: the handover file \`${handoverPath}\` is at or over its hard size cap and this write is not a net decrease.\n`
+       + `Current size: ${currentBytes} bytes (utf8-byte-upper-bound, schema ${HANDOVER_MEASUREMENT_SCHEMA}). Cap: ${maxBytes} bytes. Proposed size: ${proposedBytes} bytes.\n`
+       + `Rotate closed content out first: node "${rotateScriptPath}" --root <repository-root> --section-heading "<block heading>" --summary "<one-line summary>".\n`
++      + "The rotation script refuses a section that is not yet acknowledged (HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED, ADR-0066 Decision 7). "
++      + "Read that section for durable rules that have no home yet, then run the same script with --acknowledge-extraction-done --section-heading \"<block heading>\" "
++      + "(deliberate review work, not a formality), and only then rotate it.\n"
+       + "A write that is itself a net size decrease -- including the rotation script's own live-file rewrite -- is always admitted, never blocked by this cap.\n",
+   );
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-handover-size.test.mjs b/plugins/pipeline-core/hooks/guard-handover-size.test.mjs
+index 49f1ec2ed..7b05c443d 100644
+--- a/plugins/pipeline-core/hooks/guard-handover-size.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-handover-size.test.mjs
+@@ -70,6 +70,9 @@ withFixture("over-cap-growing", { maxBytes: 10 }, (root) => {
+   assert.ok(result.stderr.includes("Current size: 10 bytes"));
+   assert.ok(result.stderr.includes("Cap: 10 bytes"));
+   assert.ok(result.stderr.includes("/fixture/handover-rotate.mjs"));
++  // N28 (D232 batch): the denial also names the acknowledgment step the rotation script will demand next.
++  assert.ok(result.stderr.includes("HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED"));
++  assert.ok(result.stderr.includes("--acknowledge-extraction-done"));
+ });
+ 
+ // == DoD 3: at/over-cap AND the edit is a net decrease -- admits (never blocks a rotation) ==
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index af7bf63f6..d78633f32 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -714,7 +714,7 @@ export function criticBoundVerifyRemedy(dir, headCommit) {
+   const publicationBase = "<merge base of HEAD with the publication target>";
+   const first = bases.length > 0 ? bases[0].lastRegisteredCandidate : publicationBase;
+   const registered = bases.map((row) => ` Feature ${row.featureId} has a registered Critic course through round ${row.lastRegisteredRound}: its preflight base is ${row.lastRegisteredCandidate} (the last registered round's candidate), not the merge base (CCA-PARENT); add --spec specs/${row.featureId}/spec.md and the course selectors of the CCA-PARENT repair.`).join("");
+-  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.`;
++  return `run node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base ${first} --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate.${registered} The --evidence file must be a Verify evidence of mode critic: the Verify evidence must be of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --out <file>); push-mode or security evidence is refused (CDP-EVIDENCE-SCHEMA, CDP-EVIDENCE-MODE). If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE. If the bound Critic verdict is FAIL with only minor findings, the route that lets Verify bind it is the PO's signed residual acceptance, not another Critic round: node \${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id> (a major finding of past authorship that no commit can correct needs --reason-class uncorrectable-past-authorship, a blocker is never accepted; see the close-feature skill).`;
+ }
+ 
+ export function pushPrepareReport(argv, deps = {}, options = {}) {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 2876202bc..0eba5ed78 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -822,6 +822,9 @@ test("critic-bound-verify remedy for private-critic-binding-unavailable names th
+   assert.match(check.remedy, /\$\{PIPELINE_PLUGIN_ROOT\}/u);
+   assert.match(check.remedy, /merge base/u);
+   assert.match(check.remedy, /publication target/u);
++  // N29 (D232 batch): a FAIL with only minor findings is bound by the PO's signed residual acceptance; the hint names that route and the reason class.
++  assert.match(check.remedy, /approve-residual-acceptance --by <name> --critic-packet <packet-id>/u);
++  assert.match(check.remedy, /--reason-class uncorrectable-past-authorship/u);
+   assert.doesNotMatch(check.remedy, /[\r\n]/u);
+ });
+ 
