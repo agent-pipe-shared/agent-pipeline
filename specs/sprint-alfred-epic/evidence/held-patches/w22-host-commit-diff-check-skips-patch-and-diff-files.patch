@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+index 31a836fb1..7af1c54ca 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+@@ -127,7 +127,10 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
+   if (admitted.admittedBlobs.some(({ path, oid }) => stagedBlob(root, path, spawn) !== oid)) {
+     return fail(code("HOST-COMMIT-CONTENT-DRIFT"));
+   }
+-  if (git(root, ["diff", "--cached", "--check"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
++  // A patch or diff file stores its context lines as " " + the line, so every blank context line is a trailing-whitespace "error" in
++  // the file that carries it: the check must not read those files as source, or every Goldfish that delivers a held patch fails here
++  // (measured 2026-11-01: 16 stop failures, 12 of them in the last two days, and a member left armed for the repair to clear).
++  if (git(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
+   const stagedTree = git(root, ["write-tree"], spawn)?.trim();
+   if (!stagedTree) return fail(code("HOST-COMMIT-TREE"));
+   // Neither --no-verify nor a temporary hooksPath is permitted here. A hook
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+index cd8187463..f53ad92c2 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+@@ -251,7 +251,34 @@ test("AHE13 a concurrent HEAD advance during readback cannot produce authored su
+   assert.notEqual(git(root, "rev-parse", "HEAD"), result.commit);
+ }));
+ 
+-assert.equal(cases.length, 13, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
++const BLANK_CONTEXT_PATCH = "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1,3 +1,3 @@\n one\n \n-two\n+three\n";
++
++test("AHE14 a held patch file whose blank context lines end in a space is committed, not refused as trailing whitespace", () => fixture(({ root, parent, baseline }) => {
++  writeFileSync(join(root, "held.patch"), BLANK_CONTEXT_PATCH);
++  writeFileSync(join(root, "held.diff"), BLANK_CONTEXT_PATCH);
++  const result = commitFromObservedAdmission({
++    baseline, final: { outcome: "succeeded", changedPaths: ["held.diff", "held.patch"] },
++    allowedPaths: ["held.diff", "held.patch"], taskId: "AGY-EXAMPLE-14",
++  });
++  assert.equal(result.ok, true, result.code);
++  assert.deepEqual(result.paths, ["held.diff", "held.patch"]);
++  assert.equal(git(root, "show", "HEAD:held.patch"), BLANK_CONTEXT_PATCH.trimEnd());
++  assert.equal(git(root, "status", "--porcelain"), "");
++}));
++
++test("AHE15 trailing whitespace in any other file is still refused by the diff check, and a patch file beside it does not excuse it", () => fixture(({ root, parent, baseline }) => {
++  writeFileSync(join(root, "held.patch"), BLANK_CONTEXT_PATCH);
++  writeFileSync(join(root, "file.txt"), "after \n");
++  const result = commitFromObservedAdmission({
++    baseline, final: { outcome: "succeeded", changedPaths: ["file.txt", "held.patch"] },
++    allowedPaths: ["file.txt", "held.patch"], taskId: "AGY-EXAMPLE-15",
++  });
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "AGY-HOST-COMMIT-DIFF-CHECK");
++  assert.equal(git(root, "rev-parse", "HEAD"), parent);
++}));
++
++assert.equal(cases.length, 15, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
