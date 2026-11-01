@@ -1,0 +1,123 @@
+diff --git a/plugins/pipeline-core/lib/root-argument.mjs b/plugins/pipeline-core/lib/root-argument.mjs
+new file mode 100644
+index 000000000..541c320ec
+--- /dev/null
++++ b/plugins/pipeline-core/lib/root-argument.mjs
+@@ -0,0 +1,23 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Shared normalisation of a `--root` / `--repo` command-line value (candidate 17, runner-neutral paths).
++ *
++ * Several script entries compare the raw argument with `resolve(root)` and `realpathSync(root)` and refuse any
++ * difference ("must be the exact physical path"). On win32 both functions return backslash paths, so a root typed
++ * with forward slashes (`C:/work/repo`, which every runner host and most shells accept) was refused although it names
++ * the same directory. The strictness is meant to reject `..`, symlinks and relative paths, not the separator.
++ *
++ * `normalizeRootArgument` changes ONLY the separator spelling and ONLY on win32; on every other platform the value is
++ * returned byte for byte, so the strict checks that follow keep their meaning. It never touches `..`, case, links
++ * or trailing separators: those stay refusals.
++ */
++
++/**
++ * @param {unknown} value the raw argument
++ * @param {string} [platform] injectable for tests; defaults to the running platform
++ * @returns {unknown} the same value, or the win32 spelling with backslashes
++ */
++export function normalizeRootArgument(value, platform = process.platform) {
++  if (typeof value !== "string" || platform !== "win32") return value;
++  return value.replaceAll("/", "\\");
++}
+diff --git a/plugins/pipeline-core/lib/root-argument.test.mjs b/plugins/pipeline-core/lib/root-argument.test.mjs
+new file mode 100644
+index 000000000..699101dc0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/root-argument.test.mjs
+@@ -0,0 +1,34 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++import { normalizeRootArgument } from "./root-argument.mjs";
++
++const PLUGIN = join(dirname(fileURLToPath(import.meta.url)), "..");
++
++test("win32 spelling: forward slashes become backslashes, nothing else changes", () => {
++  assert.equal(normalizeRootArgument("C:/work/repo", "win32"), "C:\\work\\repo");
++  assert.equal(normalizeRootArgument("C:\\work\\repo", "win32"), "C:\\work\\repo");
++  assert.equal(normalizeRootArgument("C:/work/../repo", "win32"), "C:\\work\\..\\repo", ".. stays a refusal for the strict check");
++  assert.equal(normalizeRootArgument("C:/work/repo/", "win32"), "C:\\work\\repo\\", "a trailing separator stays a refusal");
++});
++
++test("every other platform and every non-string value is returned unchanged", () => {
++  for (const platform of ["linux", "darwin"]) assert.equal(normalizeRootArgument("/a/b/../c", platform), "/a/b/../c");
++  assert.equal(normalizeRootArgument("C:/work/repo", "linux"), "C:/work/repo");
++  assert.equal(normalizeRootArgument(undefined, "win32"), undefined);
++  assert.equal(normalizeRootArgument(7, "win32"), 7);
++});
++
++test("the strict root entries normalise the argument before comparing it", () => {
++  for (const [file, needle] of [
++    ["scripts/dispatch-recovery.mjs", 'parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);'],
++    ["scripts/continuity-owner-route.mjs", "const root = normalizeRootArgument(rawRoot);"],
++    ["scripts/continuity-owner-route.mjs", "const orphanRoot = normalizeRootArgument(argv[2]);"],
++  ]) {
++    assert.ok(readFileSync(join(PLUGIN, file), "utf8").includes(needle), `${file} must contain ${needle}`);
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/continuity-owner-route.mjs b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+index 4d10e0237..659c44672 100644
+--- a/plugins/pipeline-core/scripts/continuity-owner-route.mjs
++++ b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+@@ -16,6 +16,7 @@ import { existsSync, realpathSync, readFileSync } from 'node:fs';
+ import { createHash } from 'node:crypto';
+ import { fileURLToPath } from 'node:url';
+ import { isAbsolute, join, resolve } from 'node:path';
++import { normalizeRootArgument } from '../lib/root-argument.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from '../lib/worktree-lifecycle.mjs';
+ import { createSourceOwnedContinuityOwnerRouteRequesterRuntime, inspectSourceOwnedContinuityOwnerRouteCourse } from '../lib/session-requester-bridge.mjs';
+ import { bindOnboardingSessionCleanup, observeSessionCleanupState, releaseOnboardingSessionCleanup,
+@@ -45,7 +46,8 @@ function parseRun(argv) {
+     if (token.startsWith('-') && token !== '--root' && token !== '--lifecycle') refuse('COR-FOREIGN-FLAG', `${token} is not a flag of this command; the owner route accepts only --root and --lifecycle before "--": ${USAGE}`);
+   }
+   if (head.length !== 4 || head[0] !== '--root' || head[2] !== '--lifecycle' || tail.length < 1) refuse('COR-USAGE', USAGE);
+-  const [, root, , lifecycleId] = head;
++  const [, rawRoot, , lifecycleId] = head;
++  const root = normalizeRootArgument(rawRoot);
+   if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || process.cwd() !== root) refuse('COR-USAGE', `--root must be the absolute real path of the current directory: ${USAGE}`);
+   return { root, lifecycleId, entry: tail[0], tail };
+ }
+@@ -116,8 +118,9 @@ async function run(argv) {
+ }
+ 
+ function releaseOrphan(argv) {
+-  if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(argv[2]) || resolve(argv[2]) !== argv[2]) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
+-  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: argv[2] }) };
++  const orphanRoot = normalizeRootArgument(argv[2]);
++  if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(orphanRoot) || resolve(orphanRoot) !== orphanRoot) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
++  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: orphanRoot }) };
+ }
+ 
+ const entry = process.argv[1] && resolve(process.argv[1]);
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery.mjs b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+index 5e1b4792b..0f9c69efe 100644
+--- a/plugins/pipeline-core/scripts/dispatch-recovery.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+@@ -19,6 +19,7 @@ import { lstatSync, readFileSync, realpathSync, rmSync } from "node:fs";
+ import { isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
++import { normalizeRootArgument } from "../lib/root-argument.mjs";
+ import {
+   openDispatchRecovery,
+   readDispatchRecovery,
+@@ -187,6 +188,7 @@ function clear(options) {
+ export async function runDispatchRecovery(argv) {
+   const parsed = parseArgv(argv);
+   if (!parsed.ok) return parsed;
++  parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);
+   const rootRefusal = checkRoot(parsed.options["--root"]);
+   if (rootRefusal !== null) return rootRefusal;
+   const dispatchId = parsed.options["--dispatch-id"];
