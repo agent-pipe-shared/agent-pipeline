@@ -44,7 +44,7 @@ Not in the 0.7.0 matrix. The P0/P1 findings of the same handover have their own 
   Triage 2026-11-01 (candidate 15c): the refusal now names the existing file and the two ways out, held as `w33`; hash-named ceremony files stay a design decision and are not built.
 - **D23** The finding-id format of design review receipts is undocumented: `F1` is refused with `DRR-FINDING-IDS`;
   allowed is `^[A-Z][A-Z0-9]*(-[A-Z0-9]+){1,7}$` (`lib/design-review-receipt.mjs:38`).
-  Triage 2026-11-01 (candidate 15c): held as `w32` (the command line refusal names the bad id and the form; user documentation of the format is still open).
+  Triage 2026-11-01 (candidate 15c): held as `w32` (the command line refusal names the bad id and the form) and `w35` (the design course reference states the form).
 - **D26** Commit trailers: the Pipeline (GIT-03) allows only `Dispatch:` and `AI-Assisted: true`, the Claude Code
   harness additionally demands `Co-Authored-By` and `Claude-Session`. The Pipeline rule wins; the plugin should name the
   conflict. Recorded on the existing item `pipeline.git-03-forbids-provider-trailers-the-runner-environment-demands`.
