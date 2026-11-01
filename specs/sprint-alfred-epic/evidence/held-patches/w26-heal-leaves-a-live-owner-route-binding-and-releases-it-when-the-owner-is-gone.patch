@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index f55caa193..c0a36d219 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -2,11 +2,12 @@
+ // SPDX-License-Identifier: SUL-1.0
+ 
+ import assert from "node:assert/strict";
+-import { execFileSync, spawnSync } from "node:child_process";
++import { execFileSync, spawn, spawnSync } from "node:child_process";
+ import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { afterEach, test } from "node:test";
+-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { observeNativePlatformProcess } from "../lib/native-platform-process-observer.mjs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -952,6 +953,39 @@ test("D231 owner route (E): a CLI call killed between bind and release blocks th
+   assertReleased(p, "next call after heal");
+ });
+ 
++test("D231 owner route (E): heal leaves the binding of an owner whose recorded process is still alive and releases it once that process is gone", { skip: process.platform === "win32" }, async () => {
++  const p = ownerRouteProject("cor-heal-live");
++  const heal = () => spawnNode(ROUTINE_REPAIR_CLI, ["run", "heal", "--root", p.root, "--reason", "test heal"], { cwd: p.root });
++  const killed = ownerRun(p, ["continuity-result-bootstrap-plan"], { env: { PIPELINE_COR_TEST_ABORT_AFTER_BIND: "1" } });
++  assert.equal(killed.signal, "SIGKILL", `the seam killed the owner after the bind: ${killed.stderr}`);
++  const directory = join(p.repository.commonDir, "agent-pipeline", "run", "session-requesters", "invocations");
++  const records = readdirSync(directory).filter((name) => /^owner-route-[a-f0-9]{24}\.json$/u.test(name));
++  assert.equal(records.length, 1, "the killed call left exactly one owner-route invocation record");
++  const recordPath = join(directory, records[0]);
++  const record = JSON.parse(readFileSync(recordPath, "utf8"));
++  // Stand-in for a running owner: a real live process, recorded with the identity the liveness check observes for it.
++  const stand = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
++  try {
++    await new Promise((resolve) => setTimeout(resolve, 200));
++    writeFileSync(recordPath, JSON.stringify({ ...record, process: observeNativePlatformProcess(stand.pid) }));
++    const held = heal();
++    assert.equal(held.status, 0, held.stdout + held.stderr);
++    const report = JSON.parse(held.stdout).ownerRoute;
++    assert.equal(report.status, "live", "a running owner is reported and left alone");
++    assert.notEqual(observeSessionCleanupState(p.root).sessionCleanup, null, "its binding is still held");
++    assert.equal(onboardingInFlight(p), 1, "and its member is still in flight");
++    assert.equal(envelopeOf(ownerRun(p, ["continuity-result-bootstrap-plan"])).code, "COR-BINDING-HELD", "the next call is still told to wait or heal");
++  } finally {
++    const gone = new Promise((resolve) => stand.once("exit", resolve));
++    stand.kill("SIGKILL");
++    await gone;
++  }
++  const released = heal();
++  assert.equal(released.status, 0, released.stdout + released.stderr);
++  assert.equal(JSON.parse(released.stdout).ownerRoute.status, "released", "once the recorded process is gone the same heal releases the binding");
++  assertReleased(p, "after the stand-in is gone");
++});
++
+ test("N29: the reconcile plan lifts authority only on the Result entry Continuity binds, and the no-drift check admits nothing wider", () => {
+   const before = { schema: "s", state: "implementing", artifacts: [
+     { class: "prd", path: "p", sha256: h("1"), authority: true, mutability: "mutable", retention: "active" },
