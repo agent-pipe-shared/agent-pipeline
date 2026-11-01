@@ -1,6 +1,6 @@
 # Held patch notes — heal finishes with the retained-aside move-aside when its own retirement is all that is left (candidate 15c, interim)
 
-Patch: `w24-heal-finishes-with-move-aside-when-nothing-can-be-running.patch`. Interim for the cases the host-commit fix (`w22`) does not cover: a Goldfish ending without a host commit
+Patch: `w24-heal-finishes-with-move-aside-when-nothing-can-be-running.patch`. Apply AFTER `w23` (the D231 owner route): both change `lib/routine-repair.mjs` (w23 releases a dead owner-route binding first and adds `ownerRoute` to the heal result), so this patch was regenerated on the stacked tree and does not apply on the bare tree. Interim for the cases the host-commit fix (`w22`) does not cover: a Goldfish ending without a host commit
 (plain-text stop, `checkpoint` hand-back, Elephant hand commit, cancel) leaves its registry member `armed`.
 
 ## Cause (see the w22 notes for the measurement)

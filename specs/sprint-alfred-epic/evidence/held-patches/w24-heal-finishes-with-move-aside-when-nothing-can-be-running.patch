@@ -1,17 +1,17 @@
 diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
-index 64963664a..b4fac901a 100644
+index 039eae97f..ee57691de 100644
 --- a/plugins/pipeline-core/lib/routine-repair.mjs
 +++ b/plugins/pipeline-core/lib/routine-repair.mjs
-@@ -17,7 +17,7 @@ const SLICE_QUEUE = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.m
+@@ -18,7 +18,7 @@ const OWNER_ROUTE = fileURLToPath(new URL("../scripts/continuity-owner-route.mjs
  
  /** The closed list (D194). Frozen; nothing registers into it at runtime. */
  export const ROUTINE_REPAIRS = Object.freeze([
--  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
-+  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside; when its own retirement of settled pending states leaves the registry refusing with nothing open, unsettled or kept, it finishes with the retained-aside move-aside itself (code healed-by-move-aside)" }),
+-  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside" }),
++  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside; when its own retirement of settled pending states leaves the registry refusing with nothing open, unsettled or kept, it finishes with the retained-aside move-aside itself (code healed-by-move-aside)" }),
    Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
    Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
    Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
-@@ -239,6 +239,21 @@ export function classifyInspectFindings(inspect) {
+@@ -240,6 +240,21 @@ export function classifyInspectFindings(inspect) {
  
  // D203: the only findings move-aside admits after an unsuccessful heal are reconcile-refused producers.
  const onlyReconcileRefused = (rows) => rows.length > 0 && rows.every((row) => row.allowed || row.reconcileRefused === true);
@@ -33,12 +33,12 @@ index 64963664a..b4fac901a 100644
  const moveAsideNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run move-aside --no-goldfish-running --root <root> --reason "<why>" (D203: only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
  
  const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
-@@ -351,7 +366,20 @@ function execute(plan, ctx) {
+@@ -368,7 +383,20 @@ function execute(plan, ctx) {
      // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.
      const after = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
      const stillRefused = after === null ? [] : classifyInspectFindings(after).filter((row) => row.reconcileRefused === true);
--    return { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
-+    const base = { ...healed, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
+-    return { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
++    const base = { ...healed, ownerRoute, settledPending, ...(stillRefused.length ? { stillReconcileRefused: stillRefused.map((row) => row.source), next: moveAsideNext() } : {}) };
 +    // Interim (PO 2026-11-01): heal's own retirement of the settled pending states drifts the namespace under a registry member that a
 +    // dispatch ended without releasing (no host commit), and the registry then refuses strictly. When that is ALL that is left and nothing
 +    // can be running, heal finishes the job itself with the same retained-aside move-aside, instead of handing the human a second command.
@@ -55,7 +55,7 @@ index 64963664a..b4fac901a 100644
    }
    if (plan.kind === "settled-pending-aside") {
      const run = spawn(SAR, ["inspect", "--root", root], root);
-@@ -382,7 +410,8 @@ function execute(plan, ctx) {
+@@ -399,7 +427,8 @@ function execute(plan, ctx) {
    if (findings.some((row) => !row.allowed) && onlyReconcileRefused(findings)) {
      // D203: heal first; only a producer that heal did not resolve is moved aside.
      const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
