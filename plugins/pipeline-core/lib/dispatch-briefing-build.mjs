@@ -33,7 +33,29 @@ const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec",
 export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
 const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
 const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops", "facts"]);
-const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls"]);
+const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls", "visualCheck"]);
+// C18-15 (AC-239): an optional visual check; a closed { question, evidencePath } object, rendered as a fixed block in field 3.
+const VISUAL_CHECK_KEYS = Object.freeze(["evidencePath", "question"]);
+const VISUAL_QUESTION_MAX = 300;
+const VISUAL_PATH_MAX = 240;
+
+/** A visual-check evidence path: a repository-relative file under specs/<feature>/evidence/ (no .., ., .git, backslash or absolute form). */
+export function isVisualEvidencePath(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > VISUAL_PATH_MAX) return false;
+  if (/[\\\0\r\n]/u.test(value) || value.startsWith("/") || /^[A-Za-z]:/u.test(value)) return false;
+  const parts = value.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === ".." || part === ".git")) return false;
+  return parts.length >= 4 && parts[0] === "specs" && parts[2] === "evidence";
+}
+
+/** A visual check is exactly { question, evidencePath }: a one-line question and an evidence path under specs/<feature>/evidence/. */
+export function isVisualCheck(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  if (keys.length !== VISUAL_CHECK_KEYS.length || keys.some((key, index) => key !== VISUAL_CHECK_KEYS[index])) return false;
+  const { question, evidencePath } = value;
+  return nonEmpty(question) && question.length <= VISUAL_QUESTION_MAX && !/[\r\n\0]/u.test(question) && isVisualEvidencePath(evidencePath);
+}
 const TOOL_BUDGET_LINE = /Tool budget[^\n]*≤(\d+) tool uses/u;
 // A repository-relative file named inside a targeted command (`node <path> ...`, a backticked path).
 const NAMED_PATH = /(?<![\w./-])((?:[\w-]+\/)+[\w.-]+\.(?:mjs|cjs|js|ts|md|json|ya?ml))(?![\w/-])/gu;
@@ -81,6 +103,9 @@ export function validateBriefingPackage(pkg) {
   }
   if (pkg.reconNote !== undefined && !isReconNotePath(pkg.reconNote)) {
     note("DBG-PACKAGE-FIELD-TYPE", `package field "reconNote" must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")}; repair: write the recon note there and name its path, or remove the field`);
+  }
+  if (pkg.visualCheck !== undefined && !isVisualCheck(pkg.visualCheck)) {
+    note("DBG-PACKAGE-FIELD-TYPE", `package field "visualCheck" must be exactly { "question": <one line, at most ${VISUAL_QUESTION_MAX} characters>, "evidencePath": <repository-relative file under specs/<feature>/evidence/> } when present; repair: fix both members or remove the field`);
   }
   for (const key of [...REQUIRED_LISTS, ...OPTIONAL_LISTS]) {
     const value = pkg[key];
@@ -242,7 +267,12 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
 
 const factsBlock = (pkg) => (pkg.facts === undefined ? "" : `\n\nFacts established by the coordinator (do not re-derive):\n\n${pkg.facts.map((fact) => `- ${fact}`).join("\n")}`);
 
-/** Renders the full briefing; `generated` is the binding builder's result for this package. */
+/** C18-15: the fixed Visual check block of field 3; nothing at all unless the package carries a visualCheck. */
+function visualCheckBlock(pkg) {
+  if (pkg.visualCheck === undefined) return "";
+  return `\n\n**Visual check**\n\n- Produce a screenshot of the result, store it at \`${pkg.visualCheck.evidencePath}\`, and answer this question in your report (yes or no plus one sentence): ${pkg.visualCheck.question}\n- Never claim the visual check passed without that file: if you cannot produce the screenshot, report the visual check as not verifiable.`;
+}
+
 // C18-19 (AC-239): one fixed paragraph, only for a package that carries a criterion and names a test among its paths or its check.
 const TEST_PATH = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:tests?|__tests__)\/)/u;
 export function testFirstEvidenceParagraph(pkg) {
@@ -250,6 +280,7 @@ export function testFirstEvidenceParagraph(pkg) {
   return `\n\nTest-first evidence in the return (optional, self-attested): add one more key to the JSON object, \`testFirst\`: \`{"red":[{"command":"<the RED command>","exitCode":<its non-zero exit code>,"evidencePath":"<repo-relative evidence file>"}],"greenCommand":"<the GREEN command>"}\`. Write the evidence file with the redacting evidence writer the template names, from the RED run you made before your first production edit. The host only checks that each evidence file exists, is a regular non-empty file inside the repository, and shows the result as \`testFirstEvidence\` (attested, unverifiable or absent) in the dispatch record; the flag is for the Critic and the close readback, never a gate, and the host never refuses a commit because of it. It is your own statement plus file existence: nobody observes the order of events.`;
 }
 
+/** Renders the full briefing; `generated` is the binding builder's result for this package. */
 export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
@@ -302,7 +333,7 @@ ${verify}
   3. Run exactly those cases GREEN, correct the implementation until they pass, then run the targeted checks below.
   A case written in step 1 is changed after step 2 only with a written justification in the report that ties it to the criterion; never weaken it to make the implementation pass. Update only the cases the owned outcome needs.
 - Test fixtures mirror the real input, absolute paths included where a hook receives them.
-- A new test FILE is not run by Verify until it is registered in the project's Verify suite list; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+- A new test FILE is not run by Verify until it is registered in the project's Verify suite list; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.${visualCheckBlock(pkg)}
 
 ### 4. Forbidden
 

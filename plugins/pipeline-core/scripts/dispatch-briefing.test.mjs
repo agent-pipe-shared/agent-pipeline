@@ -2123,3 +2123,57 @@ test("C18-19: a criterion package with no test among its paths and check renders
   assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs", "plugins/x/y.test.mjs"], check: "scripts/check.mjs" }), /testFirst/u);
   assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "plugins/x/y.test.mjs" }), /testFirst/u);
 });
+
+// --- C18-15 (AC-239): an optional visual check in the generated briefing ---
+
+const VISUAL = { question: "Does the camera show the stair block fully lit from the front?", evidencePath: "specs/sample-feature/evidence/stair-block.png" };
+const withoutMarker = (text) => text.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
+
+test("C18-15 a package with visualCheck is accepted and renders a fixed Visual check block in field 3 that verifies and names the file duty", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const { fx, argv } = packageFixture({ visualCheck: VISUAL });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  assert.equal(built.text.split("**Visual check**").length, 2);
+  const at = built.text.indexOf("**Visual check**");
+  assert.ok(built.text.indexOf("### 3. DoD checks") < at && at < built.text.indexOf("### 4. Forbidden"), "the block sits inside field 3");
+  assert.ok(built.text.includes(VISUAL.question));
+  assert.ok(built.text.includes(`\`${VISUAL.evidencePath}\``));
+  assert.match(built.text, /Never claim the visual check passed without that file/u);
+  assert.match(built.text, /yes or no plus one sentence/u);
+  assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  assert.equal(parseNativeGoldfishBriefing(built.text).ok, true);
+});
+
+test("C18-15 without visualCheck the briefing is unchanged: the block is the only difference a present key makes", async () => {
+  const { runDispatchBriefing } = await lib();
+  const plain = packageFixture();
+  const built = runDispatchBriefing(plain.argv, depsOf(plain.fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  assert.equal(built.text.includes("Visual check"), false);
+  assert.ok(built.text.includes("name it in the report as needing registration.\n\n### 4. Forbidden"));
+  const withVisual = packageFixture({ visualCheck: VISUAL });
+  const other = runDispatchBriefing(withVisual.argv, depsOf(withVisual.fx));
+  assert.equal(other.ok, true, JSON.stringify(other));
+  assert.notEqual(other.text, built.text);
+  const stripped = withoutMarker(other.text).replace(/\n\n\*\*Visual check\*\*[\s\S]*?(?=\n\n### 4\. Forbidden)/u, "");
+  assert.equal(stripped, withoutMarker(built.text));
+});
+
+test("C18-15 an unknown or malformed visualCheck is refused DBG-PACKAGE-FIELD-TYPE naming the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const bad = [
+    "a string", [], null, {}, { question: VISUAL.question }, { evidencePath: VISUAL.evidencePath },
+    { ...VISUAL, extra: 1 }, { ...VISUAL, question: "" }, { ...VISUAL, question: "x".repeat(301) }, { ...VISUAL, question: "line one\nline two" },
+    { ...VISUAL, evidencePath: "scratch/shot.png" }, { ...VISUAL, evidencePath: "specs/f/evidence/../../x.png" }, { ...VISUAL, evidencePath: "/abs/specs/f/evidence/x.png" },
+    { ...VISUAL, evidencePath: "specs/f/evidence/" }, { ...VISUAL, evidencePath: "specs/f/evidence/a\\b.png" }, { ...VISUAL, evidencePath: 5 },
+  ];
+  for (const visualCheck of bad) {
+    const { fx, argv } = packageFixture({ visualCheck });
+    const refused = runDispatchBriefing(argv, depsOf(fx));
+    assert.equal(refused.ok, false, JSON.stringify(visualCheck));
+    assert.equal(refused.code, "DBG-PACKAGE-FIELD-TYPE", JSON.stringify(visualCheck));
+    assert.match(refused.message, /"visualCheck".*repair: /u);
+  }
+});
