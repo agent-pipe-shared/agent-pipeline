@@ -432,7 +432,11 @@ implementation-time approval prompts.
 human agrees to use the Pipeline in a repository, that authorises its disclosed
 local happy path through the first usable kickoff: plans/readbacks, portable
 seed, any plan-disclosed local Git initialization, runtime initialization,
-restart preparation and kickoff artifacts. The agent reports the bounded effect
+restart preparation and kickoff artifacts, and after the kickoff promotion the
+provisioning and activation of the mandatory git hooks (plus the runner's own
+host-boundary refresh step where it has one, at its declared boundary). The
+initial question itself states in a short list what agreeing installs and
+activates, so that this step needs no second question. The agent reports the bounded effect
 once and then executes the digest-bound steps autonomously; it does not ask the
 same human to approve every internal plan digest. A restart resumes this local
 onboarding from its sanctioned state. This consent never covers remote/adoption

@@ -27,7 +27,8 @@ returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 For `pipeline-governance-inactive`, ask the human once whether this project
-should use the Pipeline. Only after an affirmative answer, execute the exact
+should use the Pipeline. That question lists in short what agreeing
+installs and activates, git hooks included. Only after an affirmative answer, execute the exact
 read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
 subsequent consent and mutations. A decline leaves the project inactive.
 
@@ -56,8 +57,6 @@ recovery. Never reconstruct the argv or add a source path from conversation.
 For a Claude or Antigravity `plugin-attestation-required` result with no
 `nextAction`, stop and load `references/local-plugin-attestation.md`; recover
 from a verified source checkout, never a guessed source path or gitless copy.
-Rerun preflight after the documented recovery.
-
 Print only after a ready result:
 
 `Agent Pipeline start: version {{MANIFEST_VERSION}} · plugin root {{ABSOLUTE_PLUGIN_ROOT}}`
@@ -71,9 +70,9 @@ A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
 ## Scratch space
 
 Use only the repository's `scratch/` for temporary files in every lifecycle
-phase, including intake. Do not use host temp or `.git/` as agent scratch; a
-scratch refusal needs typed recovery. For cleanup-bound files, ignored evidence,
-or any new durable directory, load `references/scratch-and-directory.md`.
+phase. Do not use host temp or `.git/` as agent scratch; a scratch refusal
+needs typed recovery. For cleanup-bound files, ignored evidence, or any new
+durable directory, load `references/scratch-and-directory.md`.
 
 ## Normal bootstrap command sequence
 
@@ -86,7 +85,8 @@ preparing it; never infer host approval from a saved consent or model label.
 When the user has directly agreed to use Agent Pipeline for this repository,
 consent authorizes the bounded local onboarding happy path: read-only plans
 and readbacks, portable authority seed, any plan-disclosed local Git init,
-runtime init, restart-barrier prep, and the first kickoff artifacts. State
+runtime init, restart-barrier prep, the first kickoff artifacts, and after the
+promotion mandatory-hook activation (plus the runner's own refresh step). State
 the bounded effects once, then execute each returned digest-bound action and
 readback without re-asking per digest. `requiresConfirmation` describes the
 action's safety shape, not a second PO chat gate.
@@ -160,7 +160,7 @@ recommendation.
    same tool result. Never hand-reconstruct the command from memory of a
    prior turn, even for an identical earlier restart action: re-read it.
 4. **Confirmation:** after all checks print exactly this line, five concrete
-   fields, no placeholder (additions, role variants → typed references):
+   fields, no placeholder:
 
    > Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
 
@@ -216,7 +216,6 @@ recommendation.
    failed or skipped read must be surfaced honestly, never silently skipped
    or claimed as done when it was not; this is a MUST-DO consumption step, not
    a new readiness precondition, so it never blocks or gates the session.
-   Capture failure must be surfaced honestly, never claimed as persisted context.
    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
    their shapes differ: `intent` is one string; the other three are **arrays** of
    short strings, at most 4, 4 and 3 entries. Every entry is a distilled

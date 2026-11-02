@@ -20,7 +20,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { main as onboardingCli } from "./project-onboarding-v3.mjs";
+import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor } from "./project-onboarding-v3.mjs";
 import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
 import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
@@ -901,4 +901,43 @@ test("project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --langua
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- C18-20 (AC-145): the first consent discloses hook activation and the promotion hands over the hook provisioning ---
+
+test("C18-20 the post-promotion action is the existing hook provisioning command, covered by the initial consent", () => {
+  assert.equal(typeof buildPostPromotionHookProvisioningAction, "function");
+  const root = "/work/project";
+  const action = buildPostPromotionHookProvisioningAction({ rootDir: root });
+  assert.equal(action.kind, "command");
+  assert.equal(action.mutation, true);
+  assert.deepEqual(action.argv.slice(-3), ["--root", root, "--apply"]);
+  assert.match(action.argv[0], /clone-hook-readiness\.mjs$/u);
+  assert.equal(action.requiresConfirmation, false);
+  assert.equal(action.coveredByConsent, "initial-pipeline-use-consent");
+  assert.deepEqual(action.expected, { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" });
+});
+
+test("C18-20b both promotion routes carry the hook provisioning action on success only", () => {
+  const root = "/work/project";
+  const expected = buildPostPromotionHookProvisioningAction({ rootDir: root });
+  // the bootstrap-bind-apply route: its own result schema
+  assert.deepEqual(postPromotionActionFor({ command: "bootstrap-bind-apply", rootDir: root }, { schema: "pipeline.codex-onboarding-kickoff-promotion-apply.v1", status: "applied" }), expected);
+  // the kickoff-promote-apply route: the shared v4 inspection shape, ready with a valid continuity
+  assert.deepEqual(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "valid" } }), expected);
+  // not on a not-ready observation (the early return of a promotion that did not run), not on another continuity, not on another command
+  assert.equal(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "kickoff-required", continuity: { status: "valid" } }), null);
+  assert.equal(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "stale" } }), null);
+  assert.equal(postPromotionActionFor({ command: "inspect", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "valid" } }), null);
+});
+
+test("C18-20 the initial question and both consent paragraphs disclose hook provisioning and activation", () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), "utf8").replace(/\s+/gu, " ");
+  const skill = read("plugins/pipeline-core/skills/pipeline-start/SKILL.md");
+  const model = read("docs/operating-model.md");
+  const question = skill.slice(skill.indexOf("ask the human once whether this project should use the Pipeline"));
+  assert.match(question.slice(0, 900), /lists in short what agreeing installs and activates/iu);
+  assert.match(question.slice(0, 900), /git hooks/iu);
+  assert.match(skill.slice(skill.indexOf("One onboarding consent")).slice(0, 2500), /hook/iu);
+  assert.match(model.slice(model.indexOf("Pipeline-use consent is likewise one bounded bootstrap consent")).slice(0, 2500), /hook/iu);
 });

@@ -723,6 +723,35 @@ function buildPrePushHookOfferAction({ rootDir }) {
 
 export { buildPrePushHookOfferAction };
 
+// C18-20: the kickoff promotion apply ends by handing back the EXISTING mandatory-hook
+// provisioning action (the one pipeline-start-preflight builds for status
+// `hook-provisioning-required`; same executable, argv, digest-bound apply and refusals).
+// The consent for it is the initial "should this project use the Pipeline?" answer, which
+// discloses hook provisioning, so `requiresConfirmation` is false and `coveredByConsent`
+// names that source -- no new question is asked. Read-only here: it builds, never runs it.
+function buildPostPromotionHookProvisioningAction({ rootDir }) {
+  return {
+    kind: "command",
+    executable: process.execPath,
+    argv: [fileURLToPath(new URL("./clone-hook-readiness.mjs", import.meta.url)), "--root", rootDir, "--apply"],
+    mutation: true,
+    requiresConfirmation: false,
+    coveredByConsent: "initial-pipeline-use-consent",
+    expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
+  };
+}
+
+// C18-20b: when does an apply output carry that action. Two promotion routes exist: the bootstrap-bind-apply result has its own schema; the
+// `kickoff-promote-apply` result is the shared v4 inspection shape, where success is the ready status with a valid continuity (an early return
+// of a not-ready observation never has it, and every failing apply throws before an output exists). Anything else carries nothing.
+function postPromotionActionFor({ command, rootDir }, output) {
+  const promoted = output?.schema === KICKOFF_PROMOTION_APPLY_SCHEMA
+    || (command === "kickoff-promote-apply" && output?.status === "ready" && output?.continuity?.status === "valid");
+  return promoted ? buildPostPromotionHookProvisioningAction({ rootDir }) : null;
+}
+
+export { buildPostPromotionHookProvisioningAction, postPromotionActionFor };
+
 function runGitObservation(spawn, root, args) {
   try {
     const result = spawn("git", args, {
@@ -1072,6 +1101,9 @@ export function main(args = process.argv.slice(2), {
         rootDir: options.root, runner: options.runner, intent: options.intent, deps,
       }).nextAction };
     }
+    // C18-20: a promotion that applied hands over the hook provisioning as its typed next action.
+    const postPromotionAction = postPromotionActionFor({ command: options.command, rootDir: options.root }, output);
+    if (postPromotionAction !== null) output = { ...output, postPromotionAction };
   } catch (error) {
     const code = typeof error?.code === "string" ? error.code : "ONBOARDING-ERROR";
     const message = String(error?.message ?? "onboarding command failed").replace(/[\r\n]+/gu, " ");
