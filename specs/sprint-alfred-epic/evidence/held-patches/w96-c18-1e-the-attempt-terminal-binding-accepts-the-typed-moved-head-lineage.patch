@@ -1,0 +1,86 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index 1bbd3b534..c9b361f83 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -397,6 +397,20 @@ function nativeDispatchAttempt({ repoRoot, runner, input, expectedPendingSha256
+   return { target: associationPath, sha256: digest, openingPath: target, openingSha256: association.openingSha256 };
+ }
+ 
++/**
++ * The receipt parent must be the original briefing candidate (v3 receipts are bound elsewhere) or, only with the typed
++ * `movedHead` evidence the observation validator accepts, the admitted descendant HEAD of that candidate (C18-1E).
++ */
++export function nativeAttemptTerminalParentBound({ receipt, binding, root }) {
++  if (receipt.schema === "pipeline.native-goldfish-host-observation.v3" || receipt.parent === binding.candidateCommit) return true;
++  const mh = receipt.movedHead;
++  if (mh === null || typeof mh !== "object" || Array.isArray(mh)
++    || JSON.stringify(Object.keys(mh).sort()) !== JSON.stringify(["admittedHead", "baselineCommit"])
++    || mh.baselineCommit !== binding.candidateCommit || mh.admittedHead !== receipt.parent
++    || typeof receipt.parent !== "string" || !/^[0-9a-f]{40}$/u.test(receipt.parent)) return false;
++  try { gitText(root, ["merge-base", "--is-ancestor", binding.candidateCommit, receipt.parent]); return true; } catch { return false; }
++}
++
+ /** Only a freshly reopened genuine terminal proof can create this separate association. */
+ export function writeNativeGoldfishAttemptTerminalAssociation({ repoRoot, record, attempt }) {
+   const root = physicalRoot(repoRoot);
+@@ -440,7 +454,7 @@ export function writeNativeGoldfishAttemptTerminalAssociation({ repoRoot, record
+     || binding.dispatchId !== checked.taskId || binding.role !== receipt.role
+     || binding.model !== receipt.model || binding.effort !== receipt.effort
+     || binding.rulesetSha !== receipt.rulesetSha || binding.candidateCommit !== receipt.candidateCommit
+-    || binding.candidateTree !== receipt.candidateTree || (receipt.schema!=="pipeline.native-goldfish-host-observation.v3"&&receipt.parent !== binding.candidateCommit)
++    || binding.candidateTree !== receipt.candidateTree || !nativeAttemptTerminalParentBound({ receipt, binding, root })
+     || receipt.commit !== checked.candidateCommit || receipt.commit === binding.candidateCommit
+     || pending.sha256 !== admission.pendingSha256 || invocationSha256 !== admission.invocationSha256
+     || admission.candidateCommit !== binding.candidateCommit || admission.candidateTree !== binding.candidateTree
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index d19ccd969..52657ccbf 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
++import { execFileSync } from "node:child_process";
+ import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir, devNull } from "node:os";
+ import { join } from "node:path";
+@@ -869,7 +870,38 @@ check("N35 --critic-addendum publishes an addendum for the last round of a resid
+   } finally { rmSync(refused.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 44, "the complete dispatch-record writer corpus must be registered before execution begins");
++// C18-1E (AC-108): the attempt-terminal binding accepts the original parent and, only with the typed movedHead evidence, a descendant parent.
++check("the attempt-terminal parent binding accepts the original parent and a typed moved-HEAD descendant, and refuses every other lineage", () => {
++  const root = mkdtempSync(join(tmpdir(), "dispatch-record-moved-"));
++  try {
++    const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", root, ...args], { encoding: "utf8" }).trim();
++    git("init", "-q");
++    writeFileSync(join(root, "a.txt"), "a\n"); git("add", "a.txt"); git("commit", "-qm", "base");
++    const candidate = git("rev-parse", "HEAD");
++    writeFileSync(join(root, "b.txt"), "b\n"); git("add", "b.txt"); git("commit", "-qm", "sibling");
++    const sibling = git("rev-parse", "HEAD");
++    git("checkout", "-q", "--detach", candidate);
++    writeFileSync(join(root, "c.txt"), "c\n"); git("add", "c.txt"); git("commit", "-qm", "unrelated branch");
++    const other = git("rev-parse", "HEAD");
++    const bound = writerModule.nativeAttemptTerminalParentBound;
++    assert.equal(typeof bound, "function");
++    const binding = { candidateCommit: candidate };
++    const v1 = { schema: "pipeline.native-goldfish-host-observation.v1" };
++    assert.equal(bound({ receipt: { ...v1, parent: candidate }, binding, root }), true, "original lineage");
++    assert.equal(bound({ receipt: { ...v1, parent: sibling }, binding, root }), false, "descendant parent without evidence");
++    const mh = { admittedHead: sibling, baselineCommit: candidate };
++    assert.equal(bound({ receipt: { ...v1, parent: sibling, movedHead: mh }, binding, root }), true, "typed descendant");
++    assert.equal(bound({ receipt: { ...v1, parent: sibling, movedHead: { ...mh, admittedHead: candidate } }, binding, root }), false, "admitted head differs from parent");
++    assert.equal(bound({ receipt: { ...v1, parent: sibling, movedHead: { ...mh, baselineCommit: sibling } }, binding, root }), false, "baseline is not the briefing candidate");
++    assert.equal(bound({ receipt: { ...v1, parent: sibling, movedHead: { admittedHead: sibling } }, binding, root }), false, "incomplete evidence");
++    assert.equal(bound({ receipt: { ...v1, parent: sibling, movedHead: { ...mh, extra: 1 } }, binding, root }), false, "extra evidence key");
++    assert.equal(bound({ receipt: { ...v1, parent: other, movedHead: { admittedHead: other, baselineCommit: candidate } }, binding, root }), true, "a sibling-branch commit on the candidate is a descendant");
++    const orphan = git("commit-tree", "-m", "orphan", `${candidate}^{tree}`);
++    assert.equal(bound({ receipt: { ...v1, parent: orphan, movedHead: { admittedHead: orphan, baselineCommit: candidate } }, binding, root }), false, "not a descendant of the candidate");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 45, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
