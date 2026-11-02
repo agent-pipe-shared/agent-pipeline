@@ -1,0 +1,503 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 9d090c02b..cad9d0039 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -7,7 +7,7 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+-import { finalizeNativeGoldfishHostReturn } from "../lib/native-goldfish-host-finalizer.mjs";
++import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail } from "../lib/native-goldfish-host-finalizer.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -63,18 +63,36 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
+       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
+       if (!newest || observedAt > newest.observedAt) {
+         newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+-          stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null };
++          stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
++          detail: sanitizeStopFailureDetail(entry.detail) };
+       }
+     }
+     return newest;
+   } catch { return null; }
+ }
+ 
++/** AC-164: one short human sentence derived from a bounded failure detail, or "" when there is none. */
++function describeFailureDetail(detail) {
++  const clean = sanitizeStopFailureDetail(detail);
++  if (!clean) return "";
++  const parts = [];
++  if (clean.condition) parts.push(`condition ${clean.condition}`);
++  if (clean.conditions) parts.push(`conditions ${clean.conditions.join(", ")}`);
++  if (clean.stagedPaths) parts.push(`staged ${clean.stagedPaths.join(", ")}`);
++  if (clean.paths) parts.push(`paths ${clean.paths.join(", ")}`);
++  if (clean.outsideAllowed) parts.push(`outside the allowed paths ${clean.outsideAllowed.join(", ")}`);
++  if (clean.extraPaths) parts.push(`changed but not claimed ${clean.extraPaths.join(", ")}${clean.extraCount > clean.extraPaths.length ? ` (+${clean.extraCount - clean.extraPaths.length} more)` : ""}`);
++  if (clean.missingPaths) parts.push(`claimed but not changed ${clean.missingPaths.join(", ")}${clean.missingCount > clean.missingPaths.length ? ` (+${clean.missingCount - clean.missingPaths.length} more)` : ""}`);
++  if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
++  if (clean.reason) parts.push(`reason ${clean.reason}`);
++  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
++}
++
+ function stopFailureNotice(failure) {
+   if (!failure || typeof failure.code !== "string") return null;
+   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
+   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
+-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
++  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${describeFailureDetail(failure.detail)}`;
+ }
+ 
+ export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
+@@ -103,7 +121,7 @@ function nativeGoldfishHookBaseMessage(result) {
+   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
+     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
+   }
+-  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.`;
++  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${describeFailureDetail(result.detail)}`;
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+index 54051d875..e23aba4d5 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+@@ -12,6 +12,8 @@ const MAX_BASELINE_UNTRACKED = 64;
+ const MAX_BASELINE_FILE_BYTES = 4 * 1024 * 1024;
+ 
+ function fail(code) { return { ok: false, code }; }
++/** AC-164: repository-relative paths only, at most 5, so a failure detail stays bounded and never carries a host path. */
++function boundedPaths(list) { return list.filter(normalizedPath).slice(0, 5); }
+ // The Pipeline's own working files: the dispatch guard's route record and the signed quality package's isolated checkout.
+ // They only ever EXPLAIN a mismatch (they are never excluded from it), so the comparison below stays exact.
+ const PIPELINE_WORKING_PATH = /^(?:evidence\/dispatch-route-[A-Za-z0-9._-]+\.json|scratch\/.+)$/u;
+@@ -141,7 +143,12 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
+   const tracked = paths(git(baseline.root, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
+   const untracked = paths(git(baseline.root, ["ls-files", "--others", "--exclude-standard", "-z"]));
+   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-COMMIT-GIT");
+-  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) return fail("AGY-HOST-COMMIT-DRIFT");
++  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) {
++    // AC-164: name which sub-condition fired (the admission decision itself is unchanged).
++    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, head.trim() !== baseline.candidateCommit ? "head-moved" : null,
++      conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
++    return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
++  }
+   const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
+   if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
+   const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
+@@ -153,9 +160,14 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
+     if (unignored.length > 0 && same(actual.filter((path) => !unignored.includes(path)), final.changedPaths)) {
+       return { ...fail("AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED"), pipelinePaths: unignored.slice(0, 20) };
+     }
+-    return fail("AGY-HOST-COMMIT-PATH-MISMATCH");
++    const extra = actual.filter((path) => !final.changedPaths.includes(path));
++    const missing = final.changedPaths.filter((path) => !actual.includes(path)).sort();
++    return { ...fail("AGY-HOST-COMMIT-PATH-MISMATCH"), detail: { extraPaths: boundedPaths(extra), missingPaths: boundedPaths(missing),
++      extraCount: extra.length, missingCount: missing.length } };
++  }
++  if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) {
++    return { ...fail("AGY-HOST-COMMIT-CONSENT-PATH"), detail: { outsideAllowed: boundedPaths(actual.filter((path) => !allowedPaths.includes(path))) } };
+   }
+-  if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) return fail("AGY-HOST-COMMIT-CONSENT-PATH");
+   const admittedBlobs = [];
+   for (const path of actual) {
+     try {
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+index c35ae42fe..4cbc0efcd 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+@@ -125,7 +125,54 @@ test("AHC08 the host hook prints a runnable repair for the unignored Pipeline pa
+   assert.match(message, /No commit or authorship record is claimed/u);
+ });
+ 
+-assert.equal(cases.length, 8, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
++test("AHC09 AC-164: a drift names which sub-condition fired and the staged paths, code unchanged", () => fixture((context) => {
++  const baseline = capture(context);
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  context.git("add", "src/one.mjs");
++  const staged = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
++  assert.equal(staged.code, "AGY-HOST-COMMIT-DRIFT");
++  assert.deepEqual(staged.detail, { conditions: ["index-staged"], stagedPaths: ["src/one.mjs"] });
++  context.git("commit", "-qm", "other actor");
++  const moved = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
++  assert.equal(moved.code, "AGY-HOST-COMMIT-DRIFT");
++  assert.deepEqual(moved.detail, { conditions: ["head-moved"] });
++}));
++
++test("AHC10 AC-164: a path mismatch names the extra and the missing paths, at most five each, repository-relative", () => fixture((context) => {
++  const baseline = capture(context);
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  mkdirSync(join(context.root, "docs"));
++  for (let i = 0; i < 7; i += 1) writeFileSync(join(context.root, "docs", `n${i}.md`), "x\n");
++  const result = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs", "src/never.mjs"] }, allowedPaths: ["src/one.mjs", "src/never.mjs"] });
++  assert.equal(result.code, "AGY-HOST-COMMIT-PATH-MISMATCH");
++  assert.deepEqual(result.detail.extraPaths, [0, 1, 2, 3, 4].map((i) => `docs/n${i}.md`));
++  assert.deepEqual(result.detail.missingPaths, ["src/never.mjs"]);
++  assert.equal(result.detail.extraCount, 7);
++  assert.equal(JSON.stringify(result).includes(context.root), false);
++}));
++
++test("AHC11 AC-164: a consent-path refusal names the paths outside the consent", () => fixture((context) => {
++  const baseline = capture(context);
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  const consent = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/other.mjs"] });
++  assert.equal(consent.code, "AGY-HOST-COMMIT-CONSENT-PATH");
++  assert.deepEqual(consent.detail, { outsideAllowed: ["src/one.mjs"] });
++}));
++
++test("AHC12 AC-164: the hook notice prints a short sentence derived from the code and the detail", () => {
++  const result = { status: "recovery-required", code: "AGY-HOST-COMMIT-PATH-MISMATCH", commit: null, record: null,
++    detail: { extraPaths: ["docs/n0.md"], missingPaths: ["src/never.mjs"], extraCount: 1 } };
++  const message = nativeGoldfishHookMessage(result);
++  assert.match(message, /AGY-HOST-COMMIT-PATH-MISMATCH/u);
++  assert.match(message, /docs\/n0\.md/u);
++  assert.match(message, /src\/never\.mjs/u);
++  const stop = nativeGoldfishHookMessage(null, { stopFailure: { code: "AGY-HOST-COMMIT-DRIFT", dispatchId: "X-1", observedAt: "2026-11-02T00:00:00.000Z",
++    stage: null, reason: null, detail: { conditions: ["head-moved"] } } });
++  assert.match(stop, /AGY-HOST-COMMIT-DRIFT/u);
++  assert.match(stop, /head-moved/u);
++});
++
++assert.equal(cases.length, 12, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index f70e1386f..13dc626e4 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
+-import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
++import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal } from './native-goldfish-host-state.mjs';
+@@ -159,12 +159,21 @@ function observeClaudeSubagentStop(input, pending, mark) {
+ // recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
+ // any fault here is swallowed, the hook stays non-blocking.
+ const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+-function recordSubagentStopOutcome({ stop, dispatch }, result) {
+-  if (!stop && !dispatch) return;
++function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
++  if (!stop && !dispatch && !unresolved) return;
+   try {
+     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
+-    const commonDir = stop ? stop.commonDir : dispatch.commonDir;
++    const commonDir = stop ? stop.commonDir : dispatch ? dispatch.commonDir : unresolved.commonDir;
+     const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    if (!stop && !dispatch) {
++      // AC-164: a marked Goldfish stop whose pending state could not be resolved still leaves its code, keyed by session and agent.
++      const key = stopHash("sha256").update(`${unresolved.sessionId}\0${unresolved.agentId}`).digest("hex").slice(0, 32);
++      stopMkdir(directory, { recursive: true, mode: 0o700 });
++      stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
++        dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
++        reason: null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++      return;
++    }
+     if (result?.status === "authored-commit-recorded") {
+       const dispatchId = stop ? stop.state.binding.dispatchId : dispatch.dispatchId;
+       let entries = [];
+@@ -182,23 +191,72 @@ function recordSubagentStopOutcome({ stop, dispatch }, result) {
+     // D31: a checkpoint is not a failure; it writes no diagnostic.
+     if (result?.status === "checkpoint-recorded") return;
+     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
+-    // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
+-    if (!stop.viaHandback) return;
++    // AC-164: a failed completion of a marked Goldfish ALWAYS leaves a record (also when the contract arrived as
++    // last_assistant_message and no handback was read). It is written only in the diagnostics directory, so a stop refusal
++    // still consumes and changes nothing in the host-commit private state (NGHF08 pins that directory).
++    const detail = sanitizeStopFailureDetail(result?.detail);
+     stopMkdir(directory, { recursive: true, mode: 0o700 });
+     stopWrite(join(directory, name), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
+       dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
+       code: result?.code ?? null, stage: typeof result?.stage === "string" ? result.stage : null,
+-      reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++      reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null,
++      ...(detail ? { detail } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+   } catch { /* diagnostic only */ }
+ }
+ 
++// AC-164: the closed, bounded `detail` of a stop-failure result and record. Strings are short slugs (<= 200), path lists hold at
++// most 5 repository-relative paths, counts are small integers; anything else is dropped, so no host path and no raw exception
++// text can travel. Exported for the hook reader, which sanitizes again on read.
++const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
++const DETAIL_LIST_KEYS = ["conditions"];
++const DETAIL_PATH_KEYS = ["paths", "stagedPaths", "extraPaths", "missingPaths", "outsideAllowed"];
++const DETAIL_COUNT_KEYS = ["extraCount", "missingCount"];
++const detailSlug = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(value);
++const detailPath = (value) => typeof value === "string" && value.length > 0 && value.length <= 200 && !/[\\\0\r\n]/u.test(value)
++  && !value.startsWith("/") && !/^[A-Za-z]:/u.test(value) && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
++export function sanitizeStopFailureDetail(detail) {
++  if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return null;
++  const out = {};
++  for (const key of DETAIL_SLUG_KEYS) if (detailSlug(detail[key])) out[key] = detail[key];
++  for (const key of DETAIL_LIST_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailSlug).slice(0, 5); if (list.length > 0) out[key] = list; }
++  for (const key of DETAIL_PATH_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailPath).slice(0, 5); if (list.length > 0) out[key] = list; }
++  for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
++  return Object.keys(out).length > 0 ? out : null;
++}
++const withDetail = (result, detail) => { const clean = sanitizeStopFailureDetail(detail); return clean ? { ...result, detail: clean } : result; };
++
++// AC-164: a SubagentStop whose pending state cannot be resolved is a MARKED Goldfish's only when the child itself carries the
++// host-return contract (in its last message or in its own SubagentHandback); an unmarked child never leaves a record.
++function markedStopContract(input) {
++  const texts = [];
++  if (typeof input.last_assistant_message === "string") texts.push(input.last_assistant_message);
++  try { const handback = readSubagentHandbackMessage(input); if (handback.ok) texts.push(handback.message); } catch { /* none */ }
++  for (const text of texts) {
++    if (!text.includes(NATIVE_GOLDFISH_RETURN_SCHEMA)) continue;
++    let dispatchId = null;
++    try { const value = parseStrictJson(text); if (typeof value?.dispatchId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value.dispatchId)) dispatchId = value.dispatchId; } catch { /* id unknown */ }
++    return { dispatchId };
++  }
++  return null;
++}
++
+ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
+   const diagnostic = {};
+-  const result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic);
++  let result;
++  try { result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic); }
++  catch (error) {
++    recordSubagentStopOutcome(diagnostic, { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: null, detail: exceptionDetail(error) });
++    throw error;
++  }
+   recordSubagentStopOutcome(diagnostic, result);
+   return result;
+ }
+ 
++// AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.
++function exceptionDetail(error) {
++  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined };
++}
++
+ // Only the host launch call and its correlated successful return are observed.
+ // This is diagnostic history; it cannot attest worker phases or tool counts.
+ function observedNativeHostProgress({ state, observation }) {
+@@ -286,7 +344,14 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+     observation = observeClaudeGoldfishReturn(input, pending.state);
+   } else if (runner === "claude" && input.hook_event_name === "SubagentStop") {
+     const stop = readSubagentStopPending({ commonDir, input });
+-    if (!stop.ok) return fail(stop.code, "not-applicable");
++    if (!stop.ok) {
++      // AC-164: an unresolvable marked Goldfish stop leaves a code-only record; a foreground state (NOT-SUBAGENT-STOP-ROUTE) is normal and silent.
++      if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
++        const marked = markedStopContract(input);
++        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId };
++      }
++      return fail(stop.code, "not-applicable");
++    }
+     pending = stop.pending;
+     if (pending.state.root !== physical || pending.state.commonDir !== commonDir) return fail("NGHF-STATE-ROOT-MISMATCH");
+     // Consume once: any observation receipt for this dispatch and candidate means the host already committed (a
+@@ -303,7 +368,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   const state = pending.state;
+   diagnostic.dispatch = { commonDir, dispatchId: state.binding.dispatchId };
+   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
+-  if (!observation?.ok) return fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized");
++  if (!observation?.ok) return withDetail(fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized"), observation?.detail);
+   // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
+   // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
+   if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
+@@ -314,7 +379,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;
+   let admission = concurrent ? null : (dependencies.assess ?? assessAgyHostCommit)({ baseline: state.baseline,
+     final: observation.final, allowedPaths: state.binding.allowedPaths });
+-  if (!concurrent && !admission?.ok) return fail(admission?.code ?? "NGHF-COMMIT-ADMISSION");
++  if (!concurrent && !admission?.ok) return withDetail(fail(admission?.code ?? "NGHF-COMMIT-ADMISSION"), admission?.detail);
+ 
+   // Read before committing; new public evidence is published afterwards so it
+   // cannot alter the exact diff admitted for this host commit.
+@@ -340,8 +405,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+         taskId: state.binding.dispatchId, priorAdmission: admission,...(nativeAuthority?{nativeAuthority}:{}) });
+     };
+     committed=concurrent?withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256},commit):commit(null);
+-  } catch { return { ...fail("NGHF-COMMIT-EXCEPTION"), commit: "unknown" }; }
+-  if (!committed?.ok) return { ...fail(committed?.code ?? "NGHF-COMMIT-FAILED"), commit: committed?.commit ?? null };
++  } catch (error) { return { ...withDetail(fail("NGHF-COMMIT-EXCEPTION"), exceptionDetail(error)), commit: "unknown" }; }
++  if (!committed?.ok) return { ...withDetail(fail(committed?.code ?? "NGHF-COMMIT-FAILED"), committed?.detail), commit: committed?.commit ?? null };
+ 
+   let postCommitStage = "attempt-admission";
+   let attempt;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 78c38e628..858ba17c0 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
+-import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
++import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
+ import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
+ import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
+ 
+@@ -610,6 +610,73 @@ const cases = [
+       assert.equal(unsafe.causeReason, null, "a reason that is not a bounded slug never travels");
+       assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).reason, null);
+     }, "claude", 1, "goldfish-implementor", { background: true }) })),
++  // NGHF28-NGHF32 -- AC-164: a failed SubagentStop completion of a marked Goldfish always leaves a bounded stop-failure diagnostic.
++  { id: "NGHF28", name: "A valid last_assistant_message (no handback) whose admission fails writes a stop-failure record naming the extra path", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    writeFileSync(join(root, "src/extra.mjs"), "export const extra=1;\n");
++    const before = snapshot(commonDir);
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
++    assert.equal(failed.code, "AGY-HOST-COMMIT-PATH-MISMATCH", JSON.stringify(failed));
++    assert.equal(facts.commits, 0);
++    assert.equal(snapshot(commonDir), before, "only the diagnostics directory is written");
++    const [entry] = diagEntries(commonDir);
++    assert.ok(entry, "a record exists");
++    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8"));
++    assert.equal(recorded.code, "AGY-HOST-COMMIT-PATH-MISMATCH");
++    assert.deepEqual(recorded.detail.extraPaths, ["src/extra.mjs"]);
++    assert.equal(JSON.stringify(recorded).includes(root), false);
++    const read = readNativeGoldfishStopFailure({ commonDir });
++    assert.deepEqual(read.detail.extraPaths, ["src/extra.mjs"]);
++    assert.match(nativeGoldfishHookMessage(null, { stopFailure: read }), /src\/extra\.mjs/u);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, stopInput }) => {
++    const before = snapshot(commonDir);
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
++    assert.equal(result.status, "not-applicable");
++    assert.equal(result.code, "NGHF-STOP-UNRESOLVED");
++    assert.equal(snapshot(commonDir), before);
++    assert.equal(facts.commits, 0);
++    const [entry] = diagEntries(commonDir);
++    assert.ok(entry, "a record exists");
++    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8"));
++    assert.equal(recorded.schema, "pipeline.native-goldfish-host-stop-failure.v1");
++    assert.equal(recorded.code, "NGHF-STOP-UNRESOLVED");
++    assert.equal(recorded.dispatchId, binding.dispatchId);
++    assert.equal(readNativeGoldfishStopFailure({ commonDir }).code, "NGHF-STOP-UNRESOLVED");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF30", name: "A stop of an unmarked or non-Goldfish child writes no diagnostic at all", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
++    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    const before = snapshot(commonDir);
++    assert.equal(finalize(stopInput(binding, "Done, nothing to hand back.")).status, "not-applicable");
++    assert.equal(finalize(stopInput(binding, finalText(binding), { agent_type: "general-purpose" })).status, "not-applicable");
++    assert.equal(finalize(stopInput(binding, finalText(binding), { agent_id: "agent-other", session_id: "session-other" })).status, "not-applicable");
++    writeMeta("agent-nometa-text", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
++    assert.equal(finalize(stopInput(binding, "A plain closing text.", { agent_id: "agent-nometa-text" })).status, "not-applicable");
++    // Only the contract-bearing Goldfish stop (foreign session, unresolvable) may leave a record; the three others leave none.
++    assert.equal(diagEntries(commonDir).length, 1, "the contract-bearing Goldfish stop left one record, the others none");
++    assert.equal(snapshot(commonDir), before);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF31", name: "A commit exception keeps its code and records only the error name, its short code and its slug reason", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const boom = { ...dependencies, commit: () => { throw Object.assign(new Error(`boom at ${root}/secret stack`), { code: "SDC-ROOT", reason: "repository-binding-changed" }); } };
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
++    assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(failed));
++    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed" });
++    const [entry] = diagEntries(commonDir);
++    const text = readFileSync(join(diagDir(commonDir), entry), "utf8");
++    assert.equal(text.includes("boom"), false);
++    assert.equal(text.includes(root), false);
++    assert.deepEqual(JSON.parse(text).detail, failed.detail);
++    assert.equal(facts.commits, 0);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF32", name: "A refused contract shape reaches the stop-failure record with the sub-condition", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding, { candidateCommit: "f".repeat(40) })) }, dependencies);
++    assert.equal(failed.code, "NGHR-FINAL-SHAPE");
++    const [entry] = diagEntries(commonDir);
++    assert.deepEqual(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).detail, { condition: "candidate-commit" });
++    assert.match(nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) }), /candidate-commit/u);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index f646b268d..a84db0fb3 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -95,6 +95,31 @@ export function parseNativeGoldfishBriefing(prompt) {
+     allowedPaths: [...binding.allowedPaths] } };
+ }
+ 
++/** AC-164: the first sub-condition of NGHR-FINAL-SHAPE that fires, as a bounded detail, or null when the shape is valid.
++ * The slugs are closed; a path is echoed only after it passed `normalizedPath` (repository-relative), at most 5, so a
++ * host path or arbitrary text from the contract never travels. The checks and their order are those of the former
++ * single conjunction, so admission is unchanged. */
++function finalShapeCondition(value, binding, allowCheckpoint) {
++  const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
++  if (!exact(value, FINAL_FIELDS)) return named("fields");
++  if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
++  if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
++  if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
++  if (!(value.outcome === "succeeded" || (allowCheckpoint === true && value.outcome === "checkpoint"))) return named("outcome");
++  if (typeof value.report !== "string") return named("report-type");
++  if (value.report.trim() === "") return named("report-empty");
++  if (Buffer.byteLength(value.report, "utf8") > 1024 * 1024) return named("report-oversize");
++  if (!Array.isArray(value.changedPaths)) return named("changed-paths-type");
++  if (value.changedPaths.length === 0) return named("changed-paths-empty");
++  if (value.changedPaths.length > 64) return named("changed-paths-too-many");
++  if (!value.changedPaths.every(normalizedPath)) return named("path-not-normalized");
++  if (new Set(value.changedPaths).size !== value.changedPaths.length) return named("paths-duplicate");
++  if ([...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")) return named("paths-unsorted");
++  const outside = value.changedPaths.filter((path) => !binding.allowedPaths.includes(path));
++  if (outside.length > 0) return named("path-outside-allowed", outside);
++  return null;
++}
++
+ /** Validate one plain-JSON final result; prose, fences and duplicate keys fail closed. */
+ // D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
+ // a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
+@@ -103,14 +128,8 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
+     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
+   let value;
+   try { value = parseStrictJson(text); } catch { return fail("NGHR-FINAL-JSON"); }
+-  if (!exact(value, FINAL_FIELDS) || value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA
+-    || value.dispatchId !== binding.dispatchId || value.candidateCommit !== binding.candidateCommit
+-    || !(value.outcome === "succeeded" || (allowCheckpoint === true && value.outcome === "checkpoint")) || typeof value.report !== "string"
+-    || value.report.trim() === "" || Buffer.byteLength(value.report, "utf8") > 1024 * 1024
+-    || !Array.isArray(value.changedPaths) || value.changedPaths.length === 0 || value.changedPaths.length > 64
+-    || !value.changedPaths.every(normalizedPath) || new Set(value.changedPaths).size !== value.changedPaths.length
+-    || [...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")
+-    || !value.changedPaths.every((path) => binding.allowedPaths.includes(path))) return fail("NGHR-FINAL-SHAPE");
++  const shapeCondition = finalShapeCondition(value, binding, allowCheckpoint);
++  if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
+   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
+   let resultSha256;
+   try { resultSha256 = createHashSha256(canonicalizeJson(value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+index 0fc3f1285..567b5c9c5 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+@@ -125,6 +125,34 @@ const cases = [
+     assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "project/pipeline.json", dependencies: ["project/pipeline.json"] })).code, "NGHR-ITEM-DELIVERY-SHAPE");
+     assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "src/change.test.mjs", dependencies: ["src/change.test.mjs"] })).ok, true);
+   }],
++  ["NGHR10 AC-164: NGHR-FINAL-SHAPE names which sub-condition fired in a bounded detail, keeping the code unchanged", () => {
++    const two = { ...binding, allowedPaths: ["src/a.mjs", "src/b.mjs"] };
++    const run = (change, options = { binding }) => validateNativeGoldfishFinal(JSON.stringify({ ...final, ...change }), options);
++    const cases10 = [
++      [{ schema: "x" }, "schema"], [{ dispatchId: "OTHER" }, "dispatch-id"], [{ candidateCommit: "d".repeat(40) }, "candidate-commit"],
++      [{ outcome: "blocked" }, "outcome"], [{ outcome: "checkpoint" }, "outcome"], [{ report: "  " }, "report-empty"],
++      [{ report: 5 }, "report-type"], [{ report: "x".repeat(1024 * 1024 + 1) }, "report-oversize"],
++      [{ changedPaths: "src/change.mjs" }, "changed-paths-type"], [{ changedPaths: [] }, "changed-paths-empty"],
++      [{ changedPaths: Array.from({ length: 65 }, (_, i) => `src/f${i}.mjs`) }, "changed-paths-too-many"],
++      [{ changedPaths: ["../outside"] }, "path-not-normalized"], [{ changedPaths: ["src/change.mjs", "src/change.mjs"] }, "paths-duplicate"],
++      [{ changedPaths: ["outside.txt"] }, "path-outside-allowed"], [{ extra: true }, "fields"],
++    ];
++    for (const [change, condition] of cases10) {
++      const result = run(change);
++      assert.equal(result.code, "NGHR-FINAL-SHAPE", condition);
++      assert.equal(result.detail?.condition, condition, JSON.stringify(result));
++    }
++    assert.equal(run({ changedPaths: ["src/b.mjs", "src/a.mjs"] }, { binding: two }).detail?.condition, "paths-unsorted");
++    // Which paths: only repository-relative ones, at most 5, and a path that is not normalized is never echoed.
++    const outside = Array.from({ length: 7 }, (_, i) => `out/f${i}.txt`).sort();
++    const named = run({ changedPaths: outside });
++    assert.deepEqual(named.detail.paths, outside.slice(0, 5));
++    const absolute = run({ changedPaths: ["/home/someone/secret.txt"] });
++    assert.equal(absolute.detail.condition, "path-not-normalized");
++    assert.equal(JSON.stringify(absolute).includes("/home/someone"), false);
++    // The checkpoint outcome is an outcome failure only where it is not allowed.
++    assert.equal(run({ outcome: "checkpoint" }, { binding, allowCheckpoint: true }).ok, true);
++  }],
+ 
+ ];
+ 
