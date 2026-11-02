@@ -397,6 +397,20 @@ function nativeDispatchAttempt({ repoRoot, runner, input, expectedPendingSha256 
   return { target: associationPath, sha256: digest, openingPath: target, openingSha256: association.openingSha256 };
 }
 
+/**
+ * The receipt parent must be the original briefing candidate (v3 receipts are bound elsewhere) or, only with the typed
+ * `movedHead` evidence the observation validator accepts, the admitted descendant HEAD of that candidate (C18-1E).
+ */
+export function nativeAttemptTerminalParentBound({ receipt, binding, root }) {
+  if (receipt.schema === "pipeline.native-goldfish-host-observation.v3" || receipt.parent === binding.candidateCommit) return true;
+  const mh = receipt.movedHead;
+  if (mh === null || typeof mh !== "object" || Array.isArray(mh)
+    || JSON.stringify(Object.keys(mh).sort()) !== JSON.stringify(["admittedHead", "baselineCommit"])
+    || mh.baselineCommit !== binding.candidateCommit || mh.admittedHead !== receipt.parent
+    || typeof receipt.parent !== "string" || !/^[0-9a-f]{40}$/u.test(receipt.parent)) return false;
+  try { gitText(root, ["merge-base", "--is-ancestor", binding.candidateCommit, receipt.parent]); return true; } catch { return false; }
+}
+
 /** Only a freshly reopened genuine terminal proof can create this separate association. */
 export function writeNativeGoldfishAttemptTerminalAssociation({ repoRoot, record, attempt }) {
   const root = physicalRoot(repoRoot);
@@ -440,7 +454,7 @@ export function writeNativeGoldfishAttemptTerminalAssociation({ repoRoot, record
     || binding.dispatchId !== checked.taskId || binding.role !== receipt.role
     || binding.model !== receipt.model || binding.effort !== receipt.effort
     || binding.rulesetSha !== receipt.rulesetSha || binding.candidateCommit !== receipt.candidateCommit
-    || binding.candidateTree !== receipt.candidateTree || (receipt.schema!=="pipeline.native-goldfish-host-observation.v3"&&receipt.parent !== binding.candidateCommit)
+    || binding.candidateTree !== receipt.candidateTree || !nativeAttemptTerminalParentBound({ receipt, binding, root })
     || receipt.commit !== checked.candidateCommit || receipt.commit === binding.candidateCommit
     || pending.sha256 !== admission.pendingSha256 || invocationSha256 !== admission.invocationSha256
     || admission.candidateCommit !== binding.candidateCommit || admission.candidateTree !== binding.candidateTree
