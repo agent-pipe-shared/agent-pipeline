@@ -13,14 +13,18 @@ Method: the held-patch route of candidate 18 (clone slices under `scratch/`, `wN
 | A3 | Make `g23-read-help-tests` (case G23C001, `ls -lh ../`) and `agy-item-delivery-tests` independent of the clone location (green below the home directory), or skip with a stated reason | open-by-design reds of 18 | held as w115 (causes measured: agy fixtures five levels up = home / unwritable `/home`; g23 relied on credential-named files in the repository's scratch folder). Green in two clone locations; Full Verify run open |
 | A4 | Full Verify keeps bounded logs of red suites in the run record | seed | not started |
 | A5 | Full Verify resume from the progress journal | seed | not started |
-| A6 | Deferred items of 18: G1, G8 / A18-M5 (check first), C18-5 allowlist rule, C18-12 `--plan`, C18-6 rest (heal defers while a member is armed; needs a decision, tests encode the opposite) | state.md deferred list | not started |
+| A6a | G8 / A18-M5: remedy text on the `prepare-push-subject` path | state.md deferred list | no patch needed: checked 2026-11-02, `pipeline-state.mjs` `prepare-push-subject` already prints the `materialize-push-threat-model` remedy for `CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE` (as `approve-push` does), and w93 lists the action before the Close commit, which answers the PO question |
+| A6b | G1 authorize-critical builder for deploy, publication and release-preflight kinds | state.md deferred list | large (catalog migration): pipeline Goldfish |
+| A6c | C18-5 pre-granted allowlist rule for the second approval gate | state.md deferred list | small to medium: Elephant, after A6b design is known |
+| A6d | C18-12 `--plan` dry run for the readiness reviewer's scope advice | state.md deferred list | small: Elephant |
+| A6e | C18-6 rest: `heal` defers the retirement while a member is armed (tests encode the opposite, restate under QG-04) | state.md deferred list | medium: Elephant or Goldfish by size |
 
 ## B. Needs a PO decision before it starts
 
 | ID | Item | Decision needed |
 |---|---|---|
-| B1 | Ponytail best practices for the Goldfish (seed section 1) | (1) paragraph in the generated briefing generator vs only in the agent definitions; (2) a bloat finding class for the Critic |
-| B2 | Elephant builds small items directly in 19 | re-confirm the candidate 18 exception or dispatch pipeline Goldfish agents |
+| B1 | Ponytail best practices for the Goldfish (seed section 1) | PO 2026-11-02: logic yes, wording never; own definition. Still open: (1) where the rendered paragraph lives (Elephant recommendation: canonical rule in `roles/goldfish.md`, short paragraph rendered by the briefing generator, conditional on the task kind); (2) a bloat finding class for the Critic (recommendation: yes, narrow and evidence-gated; bundle with the PO's pending Critic pin re-pin) |
+| B2 | Work split | DECIDED (PO 2026-11-02): small items the Elephant builds itself, large ones via the pipeline Goldfish agents |
 
 ## C. From the greenfield tests of candidate 18
 
