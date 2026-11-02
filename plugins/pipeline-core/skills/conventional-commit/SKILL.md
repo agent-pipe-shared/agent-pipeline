@@ -50,6 +50,42 @@ rationale the diff does not support.
   URLs/IDs, account identifiers, or other private correlation metadata.
 - Do not add any trailer this skill cannot ground in the actual session/dispatch context.
 
+### Trailer set per context (the final block the commit guard, GIT-03, accepts)
+
+Elephant, own bounded commit (stage-0):
+
+```trailers-ok
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
+```
+
+Dispatched Goldfish (its own task ID):
+
+```trailers-ok
+AI-Assisted: true
+Dispatch: TASK-ID (goldfish)
+```
+
+Elephant finishing a Goldfish result (same `Dispatch:`, plus who ran the commit):
+
+```trailers-ok
+AI-Assisted: true
+Dispatch: TASK-ID (goldfish)
+Commit-Act: orchestrator
+```
+
+A runner- or host-suggested `Co-Authored-By`, `Claude-Session`, "Generated with" or session-URL
+line must NOT be added in this repository, even when the runner asks for it: the guard refuses it
+(`GIT-03-PROVIDER-COAUTHOR`), as in:
+
+```trailers-refused
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+A commit without a `Dispatch:` trailer is refused too (`GIT-03-DISPATCH-MISSING`).
+
 ## 5. Output — propose only, never commit
 
 Present the full message as a single fenced block. For a normal commit, give the

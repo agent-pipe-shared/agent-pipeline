@@ -347,6 +347,31 @@ check("CMP18 any other Checkpoint-Act combination stays refused as before", () =
   assert.ok(codes(finishedCommitMessageFindings(refused[0], opts)).includes("GIT-03-DISPATCH-MISSING"));
 });
 
+// AC-136 -- the conventional-commit skill prints the guard-conformant trailer set per context.
+// The examples are read FROM the skill text and judged by the same validator the guard uses.
+check("CMP19 every trailer example in the conventional-commit skill is accepted by the GIT-03 validator and the runner-attribution example is refused", async () => {
+  const { readFileSync } = await import("node:fs");
+  const skill = readFileSync(new URL("../skills/conventional-commit/SKILL.md", import.meta.url), "utf8").replace(/\r\n/gu, "\n");
+  const blocks = (info) => [...skill.matchAll(new RegExp(`\`\`\`${info}\\n([\\s\\S]*?)\\n\`\`\``, "gu"))].map((m) => m[1]);
+  const opts = { requireMarker: true, requireDispatch: true, requireProvenanceWhenSignaled: true };
+  const wrap = (block) => `feat(x): do a thing\n\nWhy it matters.\n\n${block}\n`;
+  const accepted = blocks("trailers-ok");
+  assert.equal(accepted.length, 3, "one accepted example per context: stage-0, dispatched Goldfish, orchestrator finishing a Goldfish result");
+  assert.ok(accepted.some((b) => /^Dispatch: stage-0 \(elephant\)$/mu.test(b)));
+  assert.ok(accepted.some((b) => /^Dispatch: \S+ \(goldfish\)$/mu.test(b) && !/Commit-Act/u.test(b)));
+  assert.ok(accepted.some((b) => /^Dispatch: \S+ \(goldfish\)$/mu.test(b) && /^Commit-Act: orchestrator$/mu.test(b)));
+  for (const block of accepted) {
+    assert.deepEqual(finishedCommitMessageFindings(wrap(block), opts).findings, [], block);
+    assert.match(block, /^AI-Assisted: true$/mu);
+  }
+  const refused = blocks("trailers-refused");
+  assert.equal(refused.length, 1);
+  assert.ok(codes(finishedCommitMessageFindings(wrap(refused[0]), opts)).includes("GIT-03-PROVIDER-COAUTHOR"));
+  assert.ok(codes(finishedCommitMessageFindings(wrap("AI-Assisted: true"), opts)).includes("GIT-03-DISPATCH-MISSING"));
+  for (const code of ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-DISPATCH-MISSING"]) assert.ok(skill.includes(code), code);
+  assert.match(skill, /must NOT be added/u);
+});
+
 afterTests(() => {
 process.stdout.write(`\n${checks}/${checks} commit-message policy checks passed\n`);
 });
