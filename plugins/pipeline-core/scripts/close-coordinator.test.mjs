@@ -665,6 +665,10 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
     "inspect", "--root", fixture.root, "--lifecycle", fixture.lifecycle,
   ]);
   assert.equal(inspected.coordinator.phase, "promoted");
+  const terminalDrive = invoke(["drive", "--root", fixture.root, "--lifecycle", fixture.lifecycle, "--actor", "PO"]);
+  assert.equal(terminalDrive.status, "terminal");
+  assert.match(terminalDrive.message, /already closed \(phase promoted\)/u, "a closed lifecycle says so instead of returning a bare status");
+  assert.match(terminalDrive.message, /nothing further to drive/u);
   assert.equal(git(fixture.root, ["status", "--porcelain=v1"]), "");
   rmSync(fixture.root, { recursive: true, force: true });
 });

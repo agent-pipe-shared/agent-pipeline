@@ -1215,7 +1215,10 @@ async function driveClose(values, { apply, dryRun = false }) {
   const qualityReadback = readQualityRows(root, stored.coordinator);
   const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root), qualityReadback });
   const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions, qualityReadback };
-  if (options.length === 0) return { ...base, status: "terminal" };
+  if (options.length === 0) {
+    return { ...base, status: "terminal",
+      message: `lifecycle ${values.lifecycle} is already closed (phase ${phase}); there is nothing further to drive, and re-running drive changes nothing. Answer the human's next request as a new turn instead of repeating the close` };
+  }
   const target = values.phase ?? options[0];
   const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
   if (!options.includes(target) && !renewal) {
