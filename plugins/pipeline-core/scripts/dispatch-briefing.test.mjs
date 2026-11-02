@@ -2016,3 +2016,39 @@ test("probe: refuses a missing --package and names probe in the usage text", asy
   const help = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
   assert.match(help.stdout, /dispatch-briefing\.mjs probe --package/u);
 });
+
+// C18-19 (AC-239): the testFirst paragraph is rendered only for a package that carries a criterion and at least one test path.
+const TEST_FIRST_MARK = /testFirst/u;
+test("C18-19: a criterion package with a test path states the testFirst return paragraph, self-attested and flag-only", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ criterion: "AC-1" });
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.text.split("`testFirst`").length >= 2, true);
+  assert.match(result.text, /testFirst/u);
+  assert.match(result.text, /RED command/u);
+  assert.match(result.text, /non-zero exit code/u);
+  assert.match(result.text, /evidence file/u);
+  assert.match(result.text, /self-attested/u);
+  assert.match(result.text, /never a gate/u);
+  assert.doesNotMatch(result.text, /order of events (?:was|is) verified/u);
+  assert.equal(result.text.split("testFirstEvidence").length, 2);
+});
+
+test("C18-19: a package without a criterion renders no testFirst paragraph at all", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { renderGoldfishBriefing, testFirstEvidenceParagraph } = await buildLib();
+  const { fx, argv } = packageFixture();
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.doesNotMatch(result.text, TEST_FIRST_MARK);
+  assert.equal(typeof renderGoldfishBriefing, "function");
+  assert.equal(testFirstEvidenceParagraph({ paths: ["plugins/x/y.test.mjs"], check: CHECK }), "");
+});
+
+test("C18-19: a criterion package with no test among its paths and check renders no paragraph", async () => {
+  const { testFirstEvidenceParagraph } = await buildLib();
+  assert.equal(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "scripts/check.mjs" }), "");
+  assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs", "plugins/x/y.test.mjs"], check: "scripts/check.mjs" }), /testFirst/u);
+  assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "plugins/x/y.test.mjs" }), /testFirst/u);
+});

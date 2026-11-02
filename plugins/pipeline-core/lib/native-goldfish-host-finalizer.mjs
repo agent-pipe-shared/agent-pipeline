@@ -284,7 +284,27 @@ function observedNativeHostProgress({ state, observation }) {
   ];
 }
 
-function draftRecord({ state, observation, commitReadback }) {
+// C18-19 (AC-239): a visible flag, never a gate. `attested` = every red evidencePath is a regular, non-empty, non-symlink file whose
+// real location is inside the repository; `unverifiable` = a testFirst block was returned but a file is missing, empty or outside;
+// `absent` = no block. It proves file existence only: neither the order of events nor the content is observed.
+export function testFirstEvidenceStatus(root, testFirst) {
+  if (testFirst === undefined || testFirst === null) return "absent";
+  try {
+    const realRoot = realpathSync(root);
+    for (const entry of testFirst.red) {
+      const path = resolve(realRoot, entry.evidencePath);
+      const info = lstatSync(path);
+      if (!info.isFile() || info.isSymbolicLink() || info.size === 0) return "unverifiable";
+      const real = realpathSync(path);
+      if (real !== join(realRoot, entry.evidencePath)) return "unverifiable";
+    }
+    return "attested";
+  } catch { return "unverifiable"; }
+}
+const testFirstNote = (status) => (status === "absent" ? "testFirstEvidence: absent (the return carried no testFirst block)."
+  : `testFirstEvidence: ${status} (self-attested; evidence file existence only, the order of events was not observed).`);
+
+function draftRecord({ state, observation, commitReadback, testFirstEvidence = "absent" }) {
   const binding = state.binding;
   const decision = validateCriticDecision(binding.criticDecision,
     { required: binding.criticDecision.schema === CRITIC_REQUIRED_SCHEMA });
@@ -297,7 +317,8 @@ function draftRecord({ state, observation, commitReadback }) {
     model: binding.model, effort: binding.effort, rulesetSha: binding.rulesetSha,
     dispatcher: "Elephant", candidateCommit: commitReadback.commit,
     resultSha256: observation.final.reportSha256, outcome: "completed", commits: [commitReadback.commit],
-    log: observedNativeHostProgress({ state, observation }), report,
+    log: observedNativeHostProgress({ state, observation }).map((entry) => entry.phase === "host-return-observed"
+      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}` } : entry), report,
     outcomeClassification: { schema: OUTCOME_CLASSIFICATION_SCHEMA, kind: "authored-commit" },
     ...(decision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: decision } : { criticSkip: decision }),
   };
@@ -426,7 +447,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     attempt = bindNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input: attemptInput,
       expectedPendingSha256: observedAttempt.pendingSha256 });
     postCommitStage = "record-draft";
-    const drafted = draftRecord({ state, observation, commitReadback: committed });
+    const testFirstEvidence = testFirstEvidenceStatus(physical, observation.final.testFirst);
+    const drafted = draftRecord({ state, observation, commitReadback: committed, testFirstEvidence });
     if (!drafted.ok) return { ...fail(drafted.code), commit: committed.commit };
     const recordBytes = nativeAuthoredRecordBytes(drafted.record);
     postCommitStage = "observation-draft";
@@ -452,7 +474,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
       postCommitStage = "checks-publication";
       checks = publishNativeDispatchChecks({ physical, dispatchId: state.binding.dispatchId, commit: committed.commit, published, delivery: deliveryResult });
     }
-    return { attempt, terminalAssociation, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
+    return { attempt, terminalAssociation, testFirstEvidence, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
       commit: committed.commit, record: { target: published.target, sha256: published.sha256,
         authorship: "host-observed-local" } };
   } catch(error) { return { ...fail(`NGHF-${postCommitStage.toUpperCase()}-EXCEPTION`), causeCode:error?.code??null, causeMessage:error?.message??null, stage:postCommitStage, causeReason:causeReason(error), commit: committed.commit }; }

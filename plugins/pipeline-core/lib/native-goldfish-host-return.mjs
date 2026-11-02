@@ -101,7 +101,8 @@ export function parseNativeGoldfishBriefing(prompt) {
  * single conjunction, so admission is unchanged. */
 function finalShapeCondition(value, binding, allowCheckpoint) {
   const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
-  if (!exact(value, FINAL_FIELDS)) return named("fields");
+  const hasTestFirst = value !== null && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "testFirst");
+  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return named("fields");
   if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
   if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
   if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
@@ -117,6 +118,26 @@ function finalShapeCondition(value, binding, allowCheckpoint) {
   if ([...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")) return named("paths-unsorted");
   const outside = value.changedPaths.filter((path) => !binding.allowedPaths.includes(path));
   if (outside.length > 0) return named("path-outside-allowed", outside);
+  if (hasTestFirst) return testFirstCondition(value.testFirst);
+  return null;
+}
+
+const TEST_FIRST_COMMAND_MAX = 500;
+const boundedCommand = (value) => typeof value === "string" && value.trim() !== "" && value.length <= TEST_FIRST_COMMAND_MAX && !/[\0\r\n]/u.test(value);
+/** C18-19 (AC-239): the optional `testFirst` block of a return. Self-attested evidence; its first failing sub-condition as a closed slug, or null. */
+function testFirstCondition(block) {
+  if (block === null || typeof block !== "object" || Array.isArray(block)) return { condition: "test-first-type" };
+  if (!exact(block, ["red", "greenCommand"])) return { condition: "test-first-fields" };
+  if (!Array.isArray(block.red)) return { condition: "test-first-red-type" };
+  if (block.red.length === 0) return { condition: "test-first-red-empty" };
+  if (block.red.length > 16) return { condition: "test-first-red-too-many" };
+  for (const entry of block.red) {
+    if (!exact(entry, ["command", "exitCode", "evidencePath"])) return { condition: "test-first-red-fields" };
+    if (!boundedCommand(entry.command)) return { condition: "test-first-red-command" };
+    if (!Number.isSafeInteger(entry.exitCode) || entry.exitCode === 0) return { condition: "test-first-red-exit-code" };
+    if (!normalizedPath(entry.evidencePath)) return { condition: "test-first-red-evidence-path" };
+  }
+  if (!boundedCommand(block.greenCommand)) return { condition: "test-first-green-command" };
   return null;
 }
 
@@ -132,11 +153,14 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
   if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
   let resultSha256;
-  try { resultSha256 = createHashSha256(canonicalizeJson(value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }
+  // C18-19: the result digest binds the return WITHOUT its optional testFirst block, because the observation receipt re-derives
+  // this digest from the record alone (native-goldfish-host-observation.mjs) and the record carries no testFirst block.
+  try { resultSha256 = createHashSha256(canonicalizeJson(Object.hasOwn(value, "testFirst") ? (({ testFirst: _t, ...rest }) => rest)(value) : value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }
   return { ok: true, code: "NGHR-FINAL-VALIDATED", final: {
     schema: value.schema, dispatchId: value.dispatchId, candidateCommit: value.candidateCommit,
     outcome: value.outcome, report: value.report,
     resultSha256, reportSha256: createHashSha256(value.report), changedPaths: [...value.changedPaths].sort(),
+    ...(Object.hasOwn(value, "testFirst") ? { testFirst: structuredClone(value.testFirst) } : {}),
   } };
 }
 

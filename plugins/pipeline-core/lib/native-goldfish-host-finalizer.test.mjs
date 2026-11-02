@@ -161,7 +161,28 @@ function itemFixture(check, options = {}) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// C18-19 (AC-239): the testFirst block of a return is self-attested; the host only checks that each evidence file exists
+// (regular, non-empty, inside the repository) and shows a flag. The flag never refuses or delays the commit.
+const testFirstCase = (id, name, { testFirst, plant, expected }) => ({ id, name, run: () => fixture(({ root, binding, dependencies, facts }) => {
+  if (plant !== null) writeFileSync(join(root, "evidence/red-run.txt"), plant);
+  const text = finalText(binding, testFirst === undefined ? {} : { testFirst });
+  const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+    tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+    tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text }] } };
+  const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+  assert.equal(result.status, "authored-commit-recorded", result.code);
+  assert.equal(facts.commits, 1);
+  assert.equal(result.testFirstEvidence, expected);
+  assert.equal(facts.publishedRecord.log.length, 2);
+  assert.match(facts.publishedRecord.log[1].note, new RegExp(`testFirstEvidence: ${expected}`, "u"));
+  if (expected !== "absent") assert.match(facts.publishedRecord.log[1].note, /self-attested/u);
+}) });
+const TF_BLOCK = { red: [{ command: "node --test src/change.test.mjs", exitCode: 1, evidencePath: "evidence/red-run.txt" }], greenCommand: "node --test src/change.test.mjs" };
 const cases = [
+  testFirstCase("NGHF-TF1", "AC-239: testFirst with an existing non-empty evidence file is recorded as attested", { testFirst: TF_BLOCK, plant: "FAIL 1 case\n", expected: "attested" }),
+  testFirstCase("NGHF-TF2", "AC-239: testFirst naming a missing evidence file is unverifiable and the commit still lands", { testFirst: TF_BLOCK, plant: null, expected: "unverifiable" }),
+  testFirstCase("NGHF-TF3", "AC-239: testFirst naming an empty evidence file is unverifiable and the commit still lands", { testFirst: TF_BLOCK, plant: "", expected: "unverifiable" }),
+  testFirstCase("NGHF-TF4", "AC-239: a return without testFirst is recorded as absent", { testFirst: undefined, plant: null, expected: "absent" }),
   { id: "NGHF01", name: "Claude valid PostToolUse return commits and publishes a host-observed v4 record last", run: () => fixture(({ root, binding, dependencies, facts }) => {
     const text = JSON.stringify({ schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId,
       candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Implemented and verified; independent review pending.",

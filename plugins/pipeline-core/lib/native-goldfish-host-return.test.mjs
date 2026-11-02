@@ -153,7 +153,40 @@ const cases = [
     // The checkpoint outcome is an outcome failure only where it is not allowed.
     assert.equal(run({ outcome: "checkpoint" }, { binding, allowCheckpoint: true }).ok, true);
   }],
-
+  ["NGHR11 AC-239: the return admits one optional closed testFirst block; every other shape is refused as NGHR-FINAL-SHAPE naming the field", () => {
+    const red = { command: "node --test src/change.test.mjs", exitCode: 1, evidencePath: "evidence/red-run.txt" };
+    const good = { red: [red], greenCommand: "node --test src/change.test.mjs" };
+    const run = (testFirst) => validateNativeGoldfishFinal(JSON.stringify({ ...final, testFirst }), { binding });
+    const admitted = run(good);
+    assert.equal(admitted.ok, true, admitted.code);
+    assert.deepEqual(admitted.final.testFirst, good);
+    // The result digest stays the digest of the return without the block (the observation receipt re-derives it from the record).
+    assert.equal(admitted.final.resultSha256, validateNativeGoldfishFinal(finalText, { binding }).final.resultSha256);
+    // A return without the key is unchanged: no testFirst on the validated final.
+    assert.equal(Object.hasOwn(validateNativeGoldfishFinal(finalText, { binding }).final, "testFirst"), false);
+    assert.equal(run({ ...good, red: [red, { ...red, exitCode: -1 }] }).ok, true);
+    const refused = [
+      [{ ...good, red: [{ ...red, exitCode: 0 }] }, "test-first-red-exit-code"],
+      [{ ...good, red: [{ ...red, exitCode: "1" }] }, "test-first-red-exit-code"],
+      [{ ...good, red: [] }, "test-first-red-empty"],
+      [{ ...good, red: "x" }, "test-first-red-type"],
+      [{ ...good, extra: true }, "test-first-fields"],
+      [{ red: good.red }, "test-first-fields"],
+      [{ ...good, red: [{ ...red, extra: 1 }] }, "test-first-red-fields"],
+      [{ ...good, red: [{ ...red, command: "" }] }, "test-first-red-command"],
+      [{ ...good, red: [{ ...red, command: "x".repeat(501) }] }, "test-first-red-command"],
+      [{ ...good, red: [{ ...red, evidencePath: "/abs/out.txt" }] }, "test-first-red-evidence-path"],
+      [{ ...good, red: [{ ...red, evidencePath: "../out.txt" }] }, "test-first-red-evidence-path"],
+      [{ ...good, greenCommand: "" }, "test-first-green-command"],
+      [{ ...good, greenCommand: 5 }, "test-first-green-command"],
+      [null, "test-first-type"], [[], "test-first-type"],
+    ];
+    for (const [testFirst, condition] of refused) {
+      const result = run(testFirst);
+      assert.equal(result.code, "NGHR-FINAL-SHAPE", condition);
+      assert.equal(result.detail?.condition, condition, JSON.stringify(result));
+    }
+  }],
 ];
 
 const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));
