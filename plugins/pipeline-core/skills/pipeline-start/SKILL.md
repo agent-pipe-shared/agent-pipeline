@@ -320,6 +320,7 @@ step; later implementation or Critic work loads its reference when reached:
 - `references/resume-hint.md` before material-input capture or consumption;
 - `references/architecture-orientation.md` for the ready preflight's typed
   architecture readback;
+- `references/happy-path.md` for the ordered command chain, design to push;
 - `references/implementation-continuation.md` before implementation dispatch
   or Critic preparation;
 - `references/design-course.md` before first `submit-plan` for an `epic` or
@@ -339,17 +340,16 @@ step; later implementation or Critic work loads its reference when reached:
 - `references/push-approval.md` for the point a session constructs,
   explains, or discusses the push-approval gate (`gates.push_approval`),
   before a human clears it;
-- `references/transcript-forensics.md` for preparing a forensic-analysis
-  dispatch of a runner's own session transcript after a live test run.
+- `references/transcript-forensics.md` for a forensic-analysis dispatch of a
+  session transcript after a live test run.
 - `references/workflow-dispatch.md` for using the Workflow tool or
   `isolation: "worktree"` to fan out Goldfish/Critic work: the
-  Elephant-only orchestration rule, the mandatory worktree self-heal
-  briefing text, the ~50-tool-call termination cliff and required budget
-  language, and how to recover a truncated dispatch's real work.
+  Elephant-only orchestration rule, the worktree self-heal briefing, the
+  ~50-tool-call termination cliff with its budget language, and recovery of
+  a truncated dispatch's real work.
 - `references/antigravity-native-dispatch.md` before an Elephant or other
   authorized dispatcher constructs an Antigravity `invoke_subagent` call that
-  includes a Pipeline role. This applies whether or not the dispatcher uses
-  Workflow or worktrees.
+  includes a Pipeline role, with or without Workflow or worktrees.
 - `references/antigravity-feature-close.md` when an Antigravity session is
   actually closing an approved feature, not for a normal restart.
 
