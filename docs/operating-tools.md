@@ -25,6 +25,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
 | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
 | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
 | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+| Build, test, package and rehearse a held-patch candidate through scratch clones (the clone-slice route of candidate 18); re-run only the red suites of a Full Verify record | `scripts/clone-slice/*.mjs` (copy to `scratch/agent-out/` to use; see "Clone-slice route" below) | clones and patch files only |
 | Collect growing runtime state of a checkout; first collector: old git-hook `runtime-<sha256>` snapshots that no hook names (`plan` prints a digest, `apply --plan-sha256 <digest> --aside <dir outside the repository>` moves them aside, never deletes) | `scripts/housekeeping.mjs plan\|apply` (`node --test scripts/housekeeping.test.mjs`) | `plan` none; `apply` renames snapshots into the aside directory |
 
 ## Candidate stamp
@@ -84,6 +85,26 @@ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied 
 ## Held-commit rehearsal
 
 `node scripts/rehearse-held.mjs <scratch/clones/<rehearsal> | .> [--only k1,k5]` fetches the head of each build clone named in its `ORDER` table and replays the unprotected, post-sitting commits into the target in that fixed order. `scripts/import-held.mjs` 3-way merges a file where main moved and stops at the first conflict. The `ORDER` table and its skip SHAs are per-run data of the 0.7.0 sprint; edit them when the held set changes. Rehearse in a clone first: with target `.` the commits land in the main checkout.
+
+## Clone-slice route
+
+Candidate 18 was built as held patches from scratch clones (`git clone --shared`, never links, see below). The tools are one plain `node` command each, because the shell grammar refuses `git apply`, cross-directory git and pipelines. Tracked sources: `scripts/clone-slice/`. The route runs them from `scratch/agent-out/` (the Goldfish shell guard admits that path), so on a fresh machine copy `scripts/clone-slice/*.mjs` there first (`rehearse.mjs` to `scratch/agent-out/w24reh/`, its repository-root arithmetic counts three levels).
+
+| Tool | Purpose |
+|---|---|
+| `mkclone.mjs <dir> [base-sha]`, `clone-of.mjs <src> <dst>` | a shared clone of the repository (detached at a base) or of another scratch clone |
+| `applyin.mjs <clone> <patch> [flags]` | `git apply` inside a clone, with `--check`, `--3way` or `--reject` |
+| `commit-in.mjs <clone> "<message>"` | commit everything in a clone with a throwaway identity (optional `--rebaseline`) |
+| `test-in.mjs <clone> <test file>... [--name <pattern>]` | `node --test` in a clone with a private TMPDIR, failing lines and summary only; one suite at a time |
+| `run-in.mjs <clone> <script> [args]` | run a node script with the clone as working directory |
+| `save-patch.mjs <clone> <base> <rev> <out> [<check-clone>]` | write `git diff --binary` and prove `git apply --check` on the repository or on a chain clone |
+| `mkpkg.mjs <slice.json> <package.json>` | compact slice description to a full `pipeline.dispatch-briefing-package.v1` (feed `dispatch-briefing.mjs build`) |
+| `chain-apply.mjs <clone> <order file> [--from n]`, `chain-commit.mjs <clone> <name>` | apply the held patches of an order file one commit each (a `.rebased.patch` beside a patch wins); commit a manually resolved step |
+| `toplevels.mjs <order file>` | the top-level paths the patches of an order file touch (feeds the `STAGE` list of an apply script) |
+| `rehearse.mjs <apply script> [<clone-name>]` | run a PO apply script in a fresh clone of the current HEAD (the script and patches must be committed) |
+| `rerun-reds.mjs <clone> <verify-latest.json> <label>`, `red-summary.mjs <verify-latest.json>` | re-run only the red suites of a Full Verify record one at a time with the private HOME/TMPDIR of `full-verify.mjs`; group red steps. A red step is first an environment question: clone location (below the verified repository, under `/tmp` and below the home directory each change results), missing `upstream` remote, load |
+
+Known effect found 2026-11-02: a Full Verify clone under `/tmp` ended with 73 red steps of 1152; `session-authority-lock-wait-tests` failed 0/5 there and passed 5/5 in a clone below the home directory. Keep the Full Verify clone outside the verified repository but inside the home directory (as the section above says), and re-run a red suite alone before calling it red.
 
 ## Scratch work trees: real copies, never links
 
