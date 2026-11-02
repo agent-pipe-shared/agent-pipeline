@@ -456,7 +456,10 @@
           "CCA079",
           "CCA080",
           "CCA081",
-          "CCA082"
+          "CCA082",
+          "CCA083",
+          "CCA084",
+          "CCA085"
         ],
         "maxBytes": 65536
       }
@@ -555,7 +558,9 @@
           "CDPF086",
           "CDPF087",
           "CDPF088",
-          "CDPF089"
+          "CDPF089",
+          "CDPF090",
+          "CDPF091"
         ],
         "maxBytes": 65536
       }
@@ -578,6 +583,10 @@
       "caseCompletion": {
         "schema": "pipeline.verify-case-completion-policy.v1",
         "caseIds": [
+          "NGHF-TF1",
+          "NGHF-TF2",
+          "NGHF-TF3",
+          "NGHF-TF4",
           "NGHF01",
           "NGHF01-DEEP",
           "NGHF01-P3",
@@ -608,7 +617,20 @@
           "NGHF24",
           "NGHF25",
           "NGHF26",
-          "NGHF27"
+          "NGHF27",
+          "NGHF28",
+          "NGHF29",
+          "NGHF30",
+          "NGHF31",
+          "NGHF32",
+          "NGHF33",
+          "NGHF34",
+          "NGHF35",
+          "NGHF36",
+          "NGHF37",
+          "NGHF38",
+          "NGHF39",
+          "NGHF40"
         ],
         "maxBytes": 65536
       }
@@ -1817,7 +1839,15 @@
           "AHC05",
           "AHC06",
           "AHC07",
-          "AHC08"
+          "AHC08",
+          "AHC09",
+          "AHC10",
+          "AHC11",
+          "AHC12",
+          "AHC13",
+          "AHC14",
+          "AHC15",
+          "AHC16"
         ],
         "maxBytes": 65536
       },
@@ -2085,7 +2115,8 @@
           "CMP039",
           "CMP040",
           "CMP041",
-          "CMP042"
+          "CMP042",
+          "CMP043"
         ],
         "maxBytes": 65536
       },
@@ -2263,7 +2294,8 @@
           "GD78",
           "GD79",
           "GD80",
-          "GD81"
+          "GD81",
+          "GD82"
         ],
         "maxBytes": 65536
       },
@@ -2427,7 +2459,13 @@
           "DRW37",
           "DRW38",
           "DRW39",
-          "DRW40"
+          "DRW40",
+          "DRW41",
+          "DRW42",
+          "DRW43",
+          "DRW44",
+          "DRW45",
+          "DRW46"
         ],
         "maxBytes": 65536
       },
@@ -2493,7 +2531,9 @@
           "NGHR06",
           "NGHR07",
           "NGHR08",
-          "NGHR09"
+          "NGHR09",
+          "NGHR10",
+          "NGHR11"
         ],
         "maxBytes": 65536
       },
@@ -2643,7 +2683,8 @@
           "PHS002",
           "PHS003",
           "PHS004",
-          "PHS005"
+          "PHS005",
+          "PHS006"
         ],
         "maxBytes": 65536
       },
@@ -2764,6 +2805,49 @@
         "maxBytes": 65536
       },
       "previousPolicySha256": "2d3dcca820d8757f48b8cb01e5bbbb2d7e868d50c2e519580a1b62cf186dd745"
+    },
+    {
+      "name": "agy-host-commit-execution-tests",
+      "file": "plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AHE01",
+          "AHE02",
+          "AHE03",
+          "AHE04",
+          "AHE05",
+          "AHE06",
+          "AHE07",
+          "AHE08",
+          "AHE09",
+          "AHE10",
+          "AHE11",
+          "AHE12",
+          "AHE13",
+          "AHE14",
+          "AHE15"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "ac2b6eb3f48c7919fb43cab86040ce4ce0868cbb588b38a09b24c52a078750ae"
+    },
+    {
+      "name": "claude-intake-prompt-capture-tests",
+      "file": "plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CIP001",
+          "CIP002",
+          "CIP003",
+          "CIP004",
+          "CIP005",
+          "CIP006"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "a64de0159ca8d5fc2448cbd7b963378396262cc82e6b7d3f74db9a0aef141142"
     }
   ]
 }
