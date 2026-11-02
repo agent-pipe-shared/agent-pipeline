@@ -432,6 +432,13 @@ test("current-artifact preflight keeps evidence small while admitting bounded la
 test("rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing", () => {
   const fx = fixture();
   assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-REQUIRED");
+  // Candidate 17 (Toolbox): the refusal names the producers and the flag instead of a bare sentence.
+  assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => {
+    const reason = error.details?.reason ?? "";
+    return error.code === "CDP-EVIDENCE-REQUIRED" && /--evidence <file>/u.test(reason)
+      && /verify-evidence-producer\.mjs --root <root> --mode critic/u.test(reason)
+      && /critic-diagnostic-evidence\.mjs/u.test(reason) && reason.includes(fx.candidate);
+  });
   writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: fx.base, tree: fx.tree } })}\n`);
   assert.throws(() => preflightCriticDispatch(input(fx)), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-BINDING");
   assert.throws(() => preflightCriticDispatch(input(fx, { priorCriticEvidencePath: "evidence/verify.json" })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-PRIOR-ALIASED");
@@ -680,8 +687,15 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   const before = git(fx.root, ["status", "--porcelain", "--untracked-files=all"]);
   const expected = preflightCriticDispatch(value);
   assert.deepEqual(directCli(fx, producerArgv(value)), { status: 0, stdout: JSON.stringify(expected) + "\n", stderr: "" });
+  // Candidate 17: this rejection now carries its reason (the producers and the flag), like the evidence-mode rejection does.
+  const evidenceRequired = directCli(fx, producerArgv(input(fx, { evidencePaths: [] })));
+  assert.equal(evidenceRequired.status, 1);
+  assert.equal(evidenceRequired.stdout, "");
+  const evidenceRequiredBody = JSON.parse(evidenceRequired.stderr);
+  assert.deepEqual(Object.keys(evidenceRequiredBody), ["schema", "status", "code", "reason"]);
+  assert.equal(evidenceRequiredBody.code, "CDP-EVIDENCE-REQUIRED");
+  assert.match(evidenceRequiredBody.reason, /--evidence <file>/u);
   for (const [patch, code] of [
-    [{ evidencePaths: [] }, "CDP-EVIDENCE-REQUIRED"],
     [{ evidencePaths: ["evidence/prior-critic.json"], priorCriticEvidencePath: null }, "CDP-EVIDENCE-BINDING"],
     [{ priorCriticEvidencePath: "evidence/verify.json" }, "CDP-PRIOR-ALIASED"],
     [{ specPath: "specs/absent.md" }, "CDP-CANDIDATE-PATH"],

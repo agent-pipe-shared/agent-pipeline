@@ -721,6 +721,13 @@ test("process: write-cleanup-receipt produces the private receipt the coordinato
   assert.equal(digest(canonical(JSON.parse(readFileSync(written.observationPath, "utf8")))), receipt.evidenceDigest, "the digest is that of the stored observation");
   fixture.transition("cleanup-complete", ["--evidence", written.receiptPath]);
   fixture.transition("closed-local");
+  // Candidate 17 (Toolbox): after closed-local the producer refuses and says there is no way back, instead of only naming the phase.
+  const late = invoke(["write-cleanup-receipt", "--root", fixture.root, "--lifecycle", fixture.lifecycle], 2);
+  assert.equal(late.code, "CLOSE-CLEANUP-PHASE");
+  assert.match(late.message, /closed-local/u);
+  assert.match(late.message, /no way back/u);
+  assert.match(late.message, /nothing was written/u);
+  assert.equal(readFileSync(written.receiptPath, "utf8"), `${JSON.stringify(receipt, null, 2)}\n`, "the recorded receipt is untouched");
   rmSync(fixture.root, { recursive: true, force: true });
   rmSync(frozen.root, { recursive: true, force: true });
 });

@@ -48,6 +48,16 @@ export function takeoverVerbHelp(verb) {
     `example: ${JSON.stringify(example)}`,
   ].join("\n");
 }
+/**
+ * Candidate 17: the identity refusal named no cause (a consumer got a bare code after its feature was closed). The reader's own code is shown
+ * and the two situations that make a course unresolvable at HEAD are named with their way out.
+ */
+export function takeoverIdentityDetail(featureId, code) {
+  return `the Critic course of feature ${featureId} cannot be resolved at HEAD (${typeof code === "string" && code !== "" ? code : "no code"}). `
+    + "The takeover verbs only work while the registered course still resolves at HEAD: the retained rounds must be readable and every commit after them must be registered evidence. "
+    + "This is not the case once content commits follow the last registered round or the feature is closed and its course takes no review. "
+    + "Then continue with a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over those commits; do not rewrite history.";
+}
 function takeoverTarget(root, featureId, supersede = false) {
   if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
   const run = (args) => {
@@ -64,7 +74,7 @@ function takeoverTarget(root, featureId, supersede = false) {
   const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
     logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
   const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
-  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
+  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code));
   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
     courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };
 }

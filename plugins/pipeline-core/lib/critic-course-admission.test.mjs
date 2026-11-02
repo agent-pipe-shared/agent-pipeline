@@ -1337,6 +1337,17 @@ test("PF94 DOCS (c) SCF-TAKEOVER-REQUEST names the expected request shape and th
   assert.ok(help.includes("inspect-course-takeover --root <repository-root> --request"));
   assert.ok(help.includes("supersede-course-takeover --root <repository-root> --request"));
 });
+// Candidate 17 (Toolbox): the identity refusal of the takeover verbs named no cause after the feature was closed.
+test("17 SCF-TAKEOVER-IDENTITY names the reader's code, the two situations and the way out", async () => {
+  const { takeoverIdentityDetail } = await import("../scripts/session-critic-finalizer.mjs");
+  const text = takeoverIdentityDetail("modell-update-okt26", "CCA-TRANSPORT-SOURCE-DRIFT");
+  assert.ok(text.includes("modell-update-okt26") && text.includes("CCA-TRANSPORT-SOURCE-DRIFT"), "feature and reader code");
+  assert.match(text, /content commits follow the last registered round/u);
+  assert.match(text, /feature is closed/u);
+  assert.match(text, /new feature of rigor 1/u);
+  assert.match(takeoverIdentityDetail("f", undefined), /\(no code\)/u, "an absent code is said, not hidden");
+  assert.ok(pf94Read("../scripts/session-critic-finalizer.mjs").includes('fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code))'), "the refusal passes the reader's code");
+});
 test("PF94 DOCS (d) the Critic skill documents continuing a course and the continuation reference points to it", () => {
   const skill = pf94Read("../skills/critic-review/SKILL.md");
   const heading = "## Continuing a Critic course after the first round (PF-94)";

@@ -352,7 +352,11 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const spec = normalizePath(specPath, "spec path");
   const guardrails = uniquePaths(guardrailPaths, "guardrail path");
   const evidence = uniquePaths(evidencePaths, "evidence path");
-  if (evidence.length === 0) fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.");
+  if (evidence.length === 0) {
+    // Candidate 17 (Toolbox): the refusal carried no reason; name what is admitted, the exact producers and the flag that passes it.
+    const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate and the tree is clean.`;
+    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason });
+  }
   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
 

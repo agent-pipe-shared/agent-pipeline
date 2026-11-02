@@ -924,7 +924,9 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
   const stored = readCloseCoordinator(common, values.lifecycle);
   const coordinator = stored.coordinator;
   if (!coordinatorNextPhases(coordinator.phase).includes("cleanup-complete")) {
-    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`);
+    const behind = ["closed-local", "release-eligible", "promoted", "delivered"].includes(coordinator.phase);
+    fail("CLOSE-CLEANUP-PHASE", `the cleanup receipt is written from a phase that can move to cleanup-complete (final-verify-green, or readback-confirmed after a publication); this lifecycle is at ${coordinator.phase}`
+      + (behind ? ". Cleanup is already behind this lifecycle and the coordinator has no way back from it: the receipt recorded at cleanup-complete stays the close evidence (nothing was written). Use the producer at the next close, before cleanup-complete." : ""));
   }
   if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
   const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
