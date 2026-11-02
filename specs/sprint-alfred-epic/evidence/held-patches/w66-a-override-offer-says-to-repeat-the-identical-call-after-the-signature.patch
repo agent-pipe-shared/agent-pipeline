@@ -1,0 +1,25 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index f0d93383d..a2f03da1b 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -5817,6 +5817,7 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
+     assert.match(sigResult.stderr, /mode-specific nextAction/u);
+     assert.match(sigResult.stderr, /human-held Ed25519 key in an attended external terminal/u);
+     assert.match(sigResult.stderr, /this session only prepares digests and verifies the proof/u);
++    assert.match(sigResult.stderr, /repeat the IDENTICAL denied tool call; a commit or edit between this denial and the signature changes the bound state and voids the request/u);
+     assert.doesNotMatch(sigResult.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
+     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
+   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index 93e03379f..3f32944d5 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -199,7 +199,7 @@ export function humanOverrideRoute(code, reason, subject, root, toolName, toolIn
+           planCommand.text,
+           approvalMode === "chat"
+             ? "The plan JSON gives the mode-specific nextAction; follow each returned action. The human confirms in-session; chat is attribution, not proof."
+-            : "The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof.",
++            : "The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof. Once the PO has signed, repeat the IDENTICAL denied tool call; a commit or edit between this denial and the signature changes the bound state and voids the request.",
+           "",
+         ].join("\n");
+         // A repeated parser denial must stay directly actionable without dumping
