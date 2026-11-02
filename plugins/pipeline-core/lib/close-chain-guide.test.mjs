@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { COORDINATOR_PHASES, coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
 import { PUBLICATION_EXECUTOR_RESULT_SCHEMA } from "../scripts/publication-executor.mjs";
-import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
+import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs, missingQualityRows } from "./close-chain-guide.mjs";
 
 const COORDINATOR_SOURCE = readFileSync(fileURLToPath(new URL("../scripts/close-coordinator.mjs", import.meta.url)), "utf8");
 
@@ -97,6 +97,26 @@ test("AC-264: the threat-model action is absent when the file exists, when the g
   assert.equal(ids("checkpointed", undefined).includes("materialize-push-threat-model"), false);
   assert.equal(ids("candidate-frozen", { required: true, present: false }).includes("materialize-push-threat-model"), false);
   assert.equal(ids("final-verify-green", { required: true, present: false }).includes("materialize-push-threat-model"), false);
+});
+
+test("AC-239: every missing quality row is an agent action before the freeze with its remedy; other statuses list nothing", () => {
+  const quality = [
+    { id: "security-scan", status: "missing", evidence: null, remedy: "node <plugin-root>/scripts/security-scan.mjs" },
+    { id: "adr-decision", status: "unknown", evidence: null, remedy: null },
+    { id: "architecture-fitness", status: "not-applicable", evidence: null, remedy: null },
+    { id: "handover-freshness", status: "missing", evidence: "docs/state.md", remedy: null },
+    { id: "critic-report-file", status: "present", evidence: "x", remedy: null },
+  ];
+  const list = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x", qualityReadback: quality }).actions;
+  const ids = list.map((a) => a.id);
+  assert.deepEqual(ids.filter((id) => id.startsWith("quality-")), ["quality-security-scan", "quality-handover-freshness"]);
+  assert.ok(ids.indexOf("quality-handover-freshness") < ids.indexOf("candidate-frozen"));
+  const scan = list.find((a) => a.id === "quality-security-scan");
+  assert.equal(scan.who, "agent");
+  assert.match(scan.command, /security-scan\.mjs/u);
+  assert.match(list.find((a) => a.id === "quality-handover-freshness").command, /^no sanctioned command/u);
+  assert.equal(missingQualityRows(null).length, 0);
+  assert.equal(describeCloseActions("candidate-frozen", { qualityReadback: quality }).actions.some((a) => a.id.startsWith("quality-")), false, "after the freeze nothing is listed");
 });
 
 test("the missing inputs of a step are named from the supplied values", () => {

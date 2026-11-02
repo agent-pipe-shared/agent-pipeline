@@ -37,6 +37,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
@@ -85,11 +86,13 @@ const CLI_HELP = [
   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
   "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
   "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply | --dry-run]",
+  "       close-coordinator.mjs audit-index --root <repository-root> --lifecycle <id>",
   "       close-coordinator.mjs --help",
   "",
   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
   "drive is the helper over the plan/apply pairs: it names the phase, the missing inputs and the remaining chain, plans one step (read-only), and with --apply",
   "applies exactly that step. It writes the cleanup receipt itself and stops before every human-gate phase; it replaces none of the commands above.",
+  "drive prints a read-only qualityReadback (security scan, ADR decision, fitness run, Critic report file, handover freshness); audit-index prints one read-only JSON index of the change with sha256 per existing file.",
 ].join("\n");
 
 const canonical = (value) => {
@@ -1159,6 +1162,46 @@ function readPushThreatModelState(root) {
   return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
 }
 
+// The real readers behind closeQualityReadback and buildAuditIndex: filesystem and git reads only, nothing is written or run.
+function qualityReaders(root) {
+  const abs = (rel) => join(root, rel);
+  const handoverPath = (() => {
+    try {
+      const configured = JSON.parse(readFileSync(abs("project/pipeline.json"), "utf8")).handover;
+      return typeof configured === "string" && SAFE_RELATIVE.test(configured) ? configured : "docs/state.md";
+    } catch { return "docs/state.md"; }
+  })();
+  const readers = {
+    exists: (rel) => existsSync(abs(rel)),
+    listDir: (rel) => {
+      try { return readdirSync(abs(rel)); } catch (error) { if (error?.code === "ENOENT") return []; throw error; }
+    },
+    readBytes: (rel) => readFileSync(abs(rel)),
+    rigorHistory: () => { const history = stateSnapshot(root).state.rigorHistory; return history === undefined ? [] : history; },
+    handoverUpdatedMs: () => {
+      if (!existsSync(abs(handoverPath))) return null;
+      if (git(root, ["status", "--porcelain", "--", handoverPath]) !== "") return lstatSync(abs(handoverPath)).mtimeMs;
+      const seconds = Number(git(root, ["log", "-1", "--format=%ct", "--", handoverPath]));
+      return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+    },
+    headCommitMs: () => { const seconds = Number(git(root, ["log", "-1", "--format=%ct", "HEAD"])); return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null; },
+  };
+  return { readers, handoverPath };
+}
+function readQualityRows(root, coordinator) {
+  const { readers, handoverPath } = qualityReaders(root);
+  const impact = coordinator.architectureImpact ?? null;
+  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact } });
+}
+function auditPackageIndex(root, coordinator) {
+  const { readers } = qualityReaders(root);
+  let state = null;
+  try { state = stateSnapshot(root).state; } catch { /* paths fall back to the conventional spec directory */ }
+  const prdPath = state?.planSubmission?.planPath ?? state?.activeFeature?.planPath ?? `specs/${coordinator.featureId}/prd.md`;
+  const specPath = state?.planSubmission?.specPath ?? `specs/${coordinator.featureId}/spec.md`;
+  return buildAuditIndex({ featureId: coordinator.featureId, prdPath, specPath, rows: readQualityRows(root, coordinator), readers });
+}
+
 // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
 // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
 async function driveClose(values, { apply, dryRun = false }) {
@@ -1169,8 +1212,9 @@ async function driveClose(values, { apply, dryRun = false }) {
   const phase = stored.coordinator.phase;
   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
   const options = coordinatorNextPhases(phase);
-  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root) });
-  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions };
+  const qualityReadback = readQualityRows(root, stored.coordinator);
+  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root), qualityReadback });
+  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions, qualityReadback };
   if (options.length === 0) return { ...base, status: "terminal" };
   const target = values.phase ?? options[0];
   const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
@@ -1269,6 +1313,12 @@ try {
       auditRequest: parsed.values["audit-request"],
       criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
     }, { apply: parsed.booleans.apply === true, dryRun: parsed.booleans["dry-run"] === true }));
+  } else if (command === "audit-index") {
+    const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
+    if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "audit-index arguments invalid");
+    const root = physicalRoot(parsed.values.root);
+    const stored = readCloseCoordinator(gitCommonDir(root), parsed.values.lifecycle);
+    emit({ lifecycleId: parsed.values.lifecycle, ...auditPackageIndex(root, stored.coordinator) });
   } else if (command === "write-cleanup-receipt") {
     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");

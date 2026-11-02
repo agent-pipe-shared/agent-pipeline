@@ -155,7 +155,13 @@ export function pushThreatModelDue(pushThreatModel) {
   return pushThreatModel !== null && typeof pushThreatModel === "object" && pushThreatModel.required === true && pushThreatModel.present !== true;
 }
 
-export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null } = {}) {
+// `qualityReadback` is the row list of closeQualityReadback() as read by the caller (this module stays pure). Every row that is "missing" becomes an agent
+// action standing before the freeze with its remedy; "unknown" and "not-applicable" rows list nothing. It is advice, never a gate.
+export function missingQualityRows(qualityReadback) {
+  return Array.isArray(qualityReadback) ? qualityReadback.filter((r) => r !== null && typeof r === "object" && r.status === "missing") : [];
+}
+
+export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null, qualityReadback = null } = {}) {
   const actions = [];
   const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
   if (phase === "active") {
@@ -165,6 +171,15 @@ export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>
   const chain = describeCloseChain(phase, { root, lifecycle });
   for (const step of chain.remaining) {
     if (step.phase === "checkpointed") continue;
+    if (step.phase === "candidate-frozen") {
+      for (const quality of missingQualityRows(qualityReadback)) {
+        push({
+          id: `quality-${quality.id}`, who: "agent",
+          command: quality.remedy ?? `no sanctioned command: produce the ${quality.id} artefact for this change`,
+          source: "close-quality-readback (advice, not a gate)",
+        });
+      }
+    }
     if (step.phase === "candidate-frozen" && pushThreatModelDue(pushThreatModel)) {
       push({
         id: "materialize-push-threat-model", who: "agent",

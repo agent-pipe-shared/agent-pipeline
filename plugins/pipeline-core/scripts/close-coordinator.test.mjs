@@ -941,6 +941,47 @@ test("process: AC-264 drive and --dry-run list materialize-push-threat-model bef
   assert.equal(seen.materialized, false, "drive materializes nothing");
 });
 
+test("process: AC-239 drive and --dry-run print qualityReadback, a missing row is an agent action before the freeze, and audit-index prints the index and writes nothing", () => {
+  const seen = {};
+  const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;
+  processFixture("quality", {
+    afterPrepared({ root }) {
+      const lifecycle = "close-quality";
+      const run = (args) => invoke([...args, "--root", root, "--lifecycle", lifecycle, ...(args[0] === "drive" ? ["--actor", "PO"] : [])]);
+      const before = status(root);
+      seen.drive = run(["drive"]);
+      seen.dry = run(["drive", "--dry-run"]);
+      mkdirSync(join(root, "evidence"), { recursive: true });
+      writeFileSync(join(root, "evidence", "security-latest.v2.json"), "{}\n");
+      writeFileSync(join(root, "evidence", "security-latest.v2.verdict.json"), "{}\n");
+      seen.afterScan = run(["drive"]);
+      rmSync(join(root, "evidence", "security-latest.v2.json"), { force: true });
+      rmSync(join(root, "evidence", "security-latest.v2.verdict.json"), { force: true });
+      seen.dirtyBefore = status(root);
+      seen.index = run(["audit-index"]);
+      seen.dirtyAfter = status(root);
+      seen.cleanBefore = before;
+    },
+  });
+  for (const out of [seen.drive, seen.dry]) {
+    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
+    const scan = out.qualityReadback.find((r) => r.id === "security-scan");
+    assert.equal(scan.status, "missing");
+    const ids = out.actions.actions.map((a) => a.id);
+    assert.ok(ids.includes("quality-security-scan"));
+    assert.ok(ids.indexOf("quality-security-scan") < ids.indexOf("candidate-frozen"), "the quality action stands before the freeze");
+    assert.match(out.actions.actions.find((a) => a.id === "quality-security-scan").command, /security-scan\.mjs/u);
+  }
+  assert.equal(seen.afterScan.qualityReadback.find((r) => r.id === "security-scan").status, "present");
+  assert.equal(seen.afterScan.actions.actions.some((a) => a.id === "quality-security-scan"), false);
+  assert.equal(seen.index.schema, "pipeline.close-audit-package-index.v1");
+  assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
+  const prd = seen.index.entries.find((e) => e.id === "prd");
+  assert.equal(prd.sha256, digest("# PRD\n"));
+  assert.equal(seen.index.qualityRows.length, 5);
+  assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
+});
+
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
   const fixture = processFixture("delivery");
   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
