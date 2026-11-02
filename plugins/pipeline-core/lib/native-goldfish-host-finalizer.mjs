@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
-import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
+import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal } from './native-goldfish-host-state.mjs';
@@ -159,12 +159,21 @@ function observeClaudeSubagentStop(input, pending, mark) {
 // recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
 // any fault here is swallowed, the hook stays non-blocking.
 const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
-function recordSubagentStopOutcome({ stop, dispatch }, result) {
-  if (!stop && !dispatch) return;
+function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+  if (!stop && !dispatch && !unresolved) return;
   try {
     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
-    const commonDir = stop ? stop.commonDir : dispatch.commonDir;
+    const commonDir = stop ? stop.commonDir : dispatch ? dispatch.commonDir : unresolved.commonDir;
     const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+    if (!stop && !dispatch) {
+      // AC-164: a marked Goldfish stop whose pending state could not be resolved still leaves its code, keyed by session and agent.
+      const key = stopHash("sha256").update(`${unresolved.sessionId}\0${unresolved.agentId}`).digest("hex").slice(0, 32);
+      stopMkdir(directory, { recursive: true, mode: 0o700 });
+      stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
+        dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
+        reason: null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+      return;
+    }
     if (result?.status === "authored-commit-recorded") {
       const dispatchId = stop ? stop.state.binding.dispatchId : dispatch.dispatchId;
       let entries = [];
@@ -182,21 +191,70 @@ function recordSubagentStopOutcome({ stop, dispatch }, result) {
     // D31: a checkpoint is not a failure; it writes no diagnostic.
     if (result?.status === "checkpoint-recorded") return;
     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
-    // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
-    if (!stop.viaHandback) return;
+    // AC-164: a failed completion of a marked Goldfish ALWAYS leaves a record (also when the contract arrived as
+    // last_assistant_message and no handback was read). It is written only in the diagnostics directory, so a stop refusal
+    // still consumes and changes nothing in the host-commit private state (NGHF08 pins that directory).
+    const detail = sanitizeStopFailureDetail(result?.detail);
     stopMkdir(directory, { recursive: true, mode: 0o700 });
     stopWrite(join(directory, name), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
       dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
       code: result?.code ?? null, stage: typeof result?.stage === "string" ? result.stage : null,
-      reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+      reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null,
+      ...(detail ? { detail } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
   } catch { /* diagnostic only */ }
+}
+
+// AC-164: the closed, bounded `detail` of a stop-failure result and record. Strings are short slugs (<= 200), path lists hold at
+// most 5 repository-relative paths, counts are small integers; anything else is dropped, so no host path and no raw exception
+// text can travel. Exported for the hook reader, which sanitizes again on read.
+const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
+const DETAIL_LIST_KEYS = ["conditions"];
+const DETAIL_PATH_KEYS = ["paths", "stagedPaths", "extraPaths", "missingPaths", "outsideAllowed"];
+const DETAIL_COUNT_KEYS = ["extraCount", "missingCount"];
+const detailSlug = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(value);
+const detailPath = (value) => typeof value === "string" && value.length > 0 && value.length <= 200 && !/[\\\0\r\n]/u.test(value)
+  && !value.startsWith("/") && !/^[A-Za-z]:/u.test(value) && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+export function sanitizeStopFailureDetail(detail) {
+  if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return null;
+  const out = {};
+  for (const key of DETAIL_SLUG_KEYS) if (detailSlug(detail[key])) out[key] = detail[key];
+  for (const key of DETAIL_LIST_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailSlug).slice(0, 5); if (list.length > 0) out[key] = list; }
+  for (const key of DETAIL_PATH_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailPath).slice(0, 5); if (list.length > 0) out[key] = list; }
+  for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
+  return Object.keys(out).length > 0 ? out : null;
+}
+const withDetail = (result, detail) => { const clean = sanitizeStopFailureDetail(detail); return clean ? { ...result, detail: clean } : result; };
+
+// AC-164: a SubagentStop whose pending state cannot be resolved is a MARKED Goldfish's only when the child itself carries the
+// host-return contract (in its last message or in its own SubagentHandback); an unmarked child never leaves a record.
+function markedStopContract(input) {
+  const texts = [];
+  if (typeof input.last_assistant_message === "string") texts.push(input.last_assistant_message);
+  try { const handback = readSubagentHandbackMessage(input); if (handback.ok) texts.push(handback.message); } catch { /* none */ }
+  for (const text of texts) {
+    if (!text.includes(NATIVE_GOLDFISH_RETURN_SCHEMA)) continue;
+    let dispatchId = null;
+    try { const value = parseStrictJson(text); if (typeof value?.dispatchId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value.dispatchId)) dispatchId = value.dispatchId; } catch { /* id unknown */ }
+    return { dispatchId };
+  }
+  return null;
 }
 
 export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
   const diagnostic = {};
-  const result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic);
+  let result;
+  try { result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic); }
+  catch (error) {
+    recordSubagentStopOutcome(diagnostic, { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: null, detail: exceptionDetail(error) });
+    throw error;
+  }
   recordSubagentStopOutcome(diagnostic, result);
   return result;
+}
+
+// AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.
+function exceptionDetail(error) {
+  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined };
 }
 
 // Only the host launch call and its correlated successful return are observed.
@@ -286,7 +344,14 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     observation = observeClaudeGoldfishReturn(input, pending.state);
   } else if (runner === "claude" && input.hook_event_name === "SubagentStop") {
     const stop = readSubagentStopPending({ commonDir, input });
-    if (!stop.ok) return fail(stop.code, "not-applicable");
+    if (!stop.ok) {
+      // AC-164: an unresolvable marked Goldfish stop leaves a code-only record; a foreground state (NOT-SUBAGENT-STOP-ROUTE) is normal and silent.
+      if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
+        const marked = markedStopContract(input);
+        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId };
+      }
+      return fail(stop.code, "not-applicable");
+    }
     pending = stop.pending;
     if (pending.state.root !== physical || pending.state.commonDir !== commonDir) return fail("NGHF-STATE-ROOT-MISMATCH");
     // Consume once: any observation receipt for this dispatch and candidate means the host already committed (a
@@ -303,7 +368,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   const state = pending.state;
   diagnostic.dispatch = { commonDir, dispatchId: state.binding.dispatchId };
   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
-  if (!observation?.ok) return fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized");
+  if (!observation?.ok) return withDetail(fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized"), observation?.detail);
   // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
   // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
   if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
@@ -314,7 +379,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;
   let admission = concurrent ? null : (dependencies.assess ?? assessAgyHostCommit)({ baseline: state.baseline,
     final: observation.final, allowedPaths: state.binding.allowedPaths });
-  if (!concurrent && !admission?.ok) return fail(admission?.code ?? "NGHF-COMMIT-ADMISSION");
+  if (!concurrent && !admission?.ok) return withDetail(fail(admission?.code ?? "NGHF-COMMIT-ADMISSION"), admission?.detail);
 
   // Read before committing; new public evidence is published afterwards so it
   // cannot alter the exact diff admitted for this host commit.
@@ -340,8 +405,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
         taskId: state.binding.dispatchId, priorAdmission: admission,...(nativeAuthority?{nativeAuthority}:{}) });
     };
     committed=concurrent?withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256},commit):commit(null);
-  } catch { return { ...fail("NGHF-COMMIT-EXCEPTION"), commit: "unknown" }; }
-  if (!committed?.ok) return { ...fail(committed?.code ?? "NGHF-COMMIT-FAILED"), commit: committed?.commit ?? null };
+  } catch (error) { return { ...withDetail(fail("NGHF-COMMIT-EXCEPTION"), exceptionDetail(error)), commit: "unknown" }; }
+  if (!committed?.ok) return { ...withDetail(fail(committed?.code ?? "NGHF-COMMIT-FAILED"), committed?.detail), commit: committed?.commit ?? null };
 
   let postCommitStage = "attempt-admission";
   let attempt;

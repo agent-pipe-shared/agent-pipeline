@@ -7,7 +7,7 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
-import { finalizeNativeGoldfishHostReturn } from "../lib/native-goldfish-host-finalizer.mjs";
+import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail } from "../lib/native-goldfish-host-finalizer.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -63,18 +63,36 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
       if (!newest || observedAt > newest.observedAt) {
         newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
-          stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null };
+          stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
+          detail: sanitizeStopFailureDetail(entry.detail) };
       }
     }
     return newest;
   } catch { return null; }
 }
 
+/** AC-164: one short human sentence derived from a bounded failure detail, or "" when there is none. */
+function describeFailureDetail(detail) {
+  const clean = sanitizeStopFailureDetail(detail);
+  if (!clean) return "";
+  const parts = [];
+  if (clean.condition) parts.push(`condition ${clean.condition}`);
+  if (clean.conditions) parts.push(`conditions ${clean.conditions.join(", ")}`);
+  if (clean.stagedPaths) parts.push(`staged ${clean.stagedPaths.join(", ")}`);
+  if (clean.paths) parts.push(`paths ${clean.paths.join(", ")}`);
+  if (clean.outsideAllowed) parts.push(`outside the allowed paths ${clean.outsideAllowed.join(", ")}`);
+  if (clean.extraPaths) parts.push(`changed but not claimed ${clean.extraPaths.join(", ")}${clean.extraCount > clean.extraPaths.length ? ` (+${clean.extraCount - clean.extraPaths.length} more)` : ""}`);
+  if (clean.missingPaths) parts.push(`claimed but not changed ${clean.missingPaths.join(", ")}${clean.missingCount > clean.missingPaths.length ? ` (+${clean.missingCount - clean.missingPaths.length} more)` : ""}`);
+  if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
+  if (clean.reason) parts.push(`reason ${clean.reason}`);
+  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+}
+
 function stopFailureNotice(failure) {
   if (!failure || typeof failure.code !== "string") return null;
   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
+  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${describeFailureDetail(failure.detail)}`;
 }
 
 export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
@@ -103,7 +121,7 @@ function nativeGoldfishHookBaseMessage(result) {
   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
   }
-  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.`;
+  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${describeFailureDetail(result.detail)}`;
 }
 
 if (isDirectInvocation(import.meta.url)) {

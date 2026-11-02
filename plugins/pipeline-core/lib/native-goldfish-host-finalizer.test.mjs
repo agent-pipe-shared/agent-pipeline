@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
-import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
+import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
 import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
 import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
@@ -610,6 +610,73 @@ const cases = [
       assert.equal(unsafe.causeReason, null, "a reason that is not a bounded slug never travels");
       assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).reason, null);
     }, "claude", 1, "goldfish-implementor", { background: true }) })),
+  // NGHF28-NGHF32 -- AC-164: a failed SubagentStop completion of a marked Goldfish always leaves a bounded stop-failure diagnostic.
+  { id: "NGHF28", name: "A valid last_assistant_message (no handback) whose admission fails writes a stop-failure record naming the extra path", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    writeFileSync(join(root, "src/extra.mjs"), "export const extra=1;\n");
+    const before = snapshot(commonDir);
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+    assert.equal(failed.code, "AGY-HOST-COMMIT-PATH-MISMATCH", JSON.stringify(failed));
+    assert.equal(facts.commits, 0);
+    assert.equal(snapshot(commonDir), before, "only the diagnostics directory is written");
+    const [entry] = diagEntries(commonDir);
+    assert.ok(entry, "a record exists");
+    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8"));
+    assert.equal(recorded.code, "AGY-HOST-COMMIT-PATH-MISMATCH");
+    assert.deepEqual(recorded.detail.extraPaths, ["src/extra.mjs"]);
+    assert.equal(JSON.stringify(recorded).includes(root), false);
+    const read = readNativeGoldfishStopFailure({ commonDir });
+    assert.deepEqual(read.detail.extraPaths, ["src/extra.mjs"]);
+    assert.match(nativeGoldfishHookMessage(null, { stopFailure: read }), /src\/extra\.mjs/u);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, stopInput }) => {
+    const before = snapshot(commonDir);
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+    assert.equal(result.status, "not-applicable");
+    assert.equal(result.code, "NGHF-STOP-UNRESOLVED");
+    assert.equal(snapshot(commonDir), before);
+    assert.equal(facts.commits, 0);
+    const [entry] = diagEntries(commonDir);
+    assert.ok(entry, "a record exists");
+    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8"));
+    assert.equal(recorded.schema, "pipeline.native-goldfish-host-stop-failure.v1");
+    assert.equal(recorded.code, "NGHF-STOP-UNRESOLVED");
+    assert.equal(recorded.dispatchId, binding.dispatchId);
+    assert.equal(readNativeGoldfishStopFailure({ commonDir }).code, "NGHF-STOP-UNRESOLVED");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF30", name: "A stop of an unmarked or non-Goldfish child writes no diagnostic at all", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const before = snapshot(commonDir);
+    assert.equal(finalize(stopInput(binding, "Done, nothing to hand back.")).status, "not-applicable");
+    assert.equal(finalize(stopInput(binding, finalText(binding), { agent_type: "general-purpose" })).status, "not-applicable");
+    assert.equal(finalize(stopInput(binding, finalText(binding), { agent_id: "agent-other", session_id: "session-other" })).status, "not-applicable");
+    writeMeta("agent-nometa-text", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
+    assert.equal(finalize(stopInput(binding, "A plain closing text.", { agent_id: "agent-nometa-text" })).status, "not-applicable");
+    // Only the contract-bearing Goldfish stop (foreign session, unresolvable) may leave a record; the three others leave none.
+    assert.equal(diagEntries(commonDir).length, 1, "the contract-bearing Goldfish stop left one record, the others none");
+    assert.equal(snapshot(commonDir), before);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF31", name: "A commit exception keeps its code and records only the error name, its short code and its slug reason", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const boom = { ...dependencies, commit: () => { throw Object.assign(new Error(`boom at ${root}/secret stack`), { code: "SDC-ROOT", reason: "repository-binding-changed" }); } };
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
+    assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(failed));
+    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed" });
+    const [entry] = diagEntries(commonDir);
+    const text = readFileSync(join(diagDir(commonDir), entry), "utf8");
+    assert.equal(text.includes("boom"), false);
+    assert.equal(text.includes(root), false);
+    assert.deepEqual(JSON.parse(text).detail, failed.detail);
+    assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF32", name: "A refused contract shape reaches the stop-failure record with the sub-condition", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding, { candidateCommit: "f".repeat(40) })) }, dependencies);
+    assert.equal(failed.code, "NGHR-FINAL-SHAPE");
+    const [entry] = diagEntries(commonDir);
+    assert.deepEqual(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).detail, { condition: "candidate-commit" });
+    assert.match(nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) }), /candidate-commit/u);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

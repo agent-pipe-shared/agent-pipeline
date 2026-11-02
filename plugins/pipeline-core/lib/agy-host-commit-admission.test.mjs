@@ -125,7 +125,54 @@ test("AHC08 the host hook prints a runnable repair for the unignored Pipeline pa
   assert.match(message, /No commit or authorship record is claimed/u);
 });
 
-assert.equal(cases.length, 8, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
+test("AHC09 AC-164: a drift names which sub-condition fired and the staged paths, code unchanged", () => fixture((context) => {
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  context.git("add", "src/one.mjs");
+  const staged = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
+  assert.equal(staged.code, "AGY-HOST-COMMIT-DRIFT");
+  assert.deepEqual(staged.detail, { conditions: ["index-staged"], stagedPaths: ["src/one.mjs"] });
+  context.git("commit", "-qm", "other actor");
+  const moved = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
+  assert.equal(moved.code, "AGY-HOST-COMMIT-DRIFT");
+  assert.deepEqual(moved.detail, { conditions: ["head-moved"] });
+}));
+
+test("AHC10 AC-164: a path mismatch names the extra and the missing paths, at most five each, repository-relative", () => fixture((context) => {
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  mkdirSync(join(context.root, "docs"));
+  for (let i = 0; i < 7; i += 1) writeFileSync(join(context.root, "docs", `n${i}.md`), "x\n");
+  const result = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs", "src/never.mjs"] }, allowedPaths: ["src/one.mjs", "src/never.mjs"] });
+  assert.equal(result.code, "AGY-HOST-COMMIT-PATH-MISMATCH");
+  assert.deepEqual(result.detail.extraPaths, [0, 1, 2, 3, 4].map((i) => `docs/n${i}.md`));
+  assert.deepEqual(result.detail.missingPaths, ["src/never.mjs"]);
+  assert.equal(result.detail.extraCount, 7);
+  assert.equal(JSON.stringify(result).includes(context.root), false);
+}));
+
+test("AHC11 AC-164: a consent-path refusal names the paths outside the consent", () => fixture((context) => {
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  const consent = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/other.mjs"] });
+  assert.equal(consent.code, "AGY-HOST-COMMIT-CONSENT-PATH");
+  assert.deepEqual(consent.detail, { outsideAllowed: ["src/one.mjs"] });
+}));
+
+test("AHC12 AC-164: the hook notice prints a short sentence derived from the code and the detail", () => {
+  const result = { status: "recovery-required", code: "AGY-HOST-COMMIT-PATH-MISMATCH", commit: null, record: null,
+    detail: { extraPaths: ["docs/n0.md"], missingPaths: ["src/never.mjs"], extraCount: 1 } };
+  const message = nativeGoldfishHookMessage(result);
+  assert.match(message, /AGY-HOST-COMMIT-PATH-MISMATCH/u);
+  assert.match(message, /docs\/n0\.md/u);
+  assert.match(message, /src\/never\.mjs/u);
+  const stop = nativeGoldfishHookMessage(null, { stopFailure: { code: "AGY-HOST-COMMIT-DRIFT", dispatchId: "X-1", observedAt: "2026-11-02T00:00:00.000Z",
+    stage: null, reason: null, detail: { conditions: ["head-moved"] } } });
+  assert.match(stop, /AGY-HOST-COMMIT-DRIFT/u);
+  assert.match(stop, /head-moved/u);
+});
+
+assert.equal(cases.length, 12, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -12,6 +12,8 @@ const MAX_BASELINE_UNTRACKED = 64;
 const MAX_BASELINE_FILE_BYTES = 4 * 1024 * 1024;
 
 function fail(code) { return { ok: false, code }; }
+/** AC-164: repository-relative paths only, at most 5, so a failure detail stays bounded and never carries a host path. */
+function boundedPaths(list) { return list.filter(normalizedPath).slice(0, 5); }
 // The Pipeline's own working files: the dispatch guard's route record and the signed quality package's isolated checkout.
 // They only ever EXPLAIN a mismatch (they are never excluded from it), so the comparison below stays exact.
 const PIPELINE_WORKING_PATH = /^(?:evidence\/dispatch-route-[A-Za-z0-9._-]+\.json|scratch\/.+)$/u;
@@ -141,7 +143,12 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
   const tracked = paths(git(baseline.root, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(baseline.root, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-COMMIT-GIT");
-  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) return fail("AGY-HOST-COMMIT-DRIFT");
+  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) {
+    // AC-164: name which sub-condition fired (the admission decision itself is unchanged).
+    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, head.trim() !== baseline.candidateCommit ? "head-moved" : null,
+      conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
+    return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
+  }
   const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
   if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
   const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
@@ -153,9 +160,14 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
     if (unignored.length > 0 && same(actual.filter((path) => !unignored.includes(path)), final.changedPaths)) {
       return { ...fail("AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED"), pipelinePaths: unignored.slice(0, 20) };
     }
-    return fail("AGY-HOST-COMMIT-PATH-MISMATCH");
+    const extra = actual.filter((path) => !final.changedPaths.includes(path));
+    const missing = final.changedPaths.filter((path) => !actual.includes(path)).sort();
+    return { ...fail("AGY-HOST-COMMIT-PATH-MISMATCH"), detail: { extraPaths: boundedPaths(extra), missingPaths: boundedPaths(missing),
+      extraCount: extra.length, missingCount: missing.length } };
   }
-  if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) return fail("AGY-HOST-COMMIT-CONSENT-PATH");
+  if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) {
+    return { ...fail("AGY-HOST-COMMIT-CONSENT-PATH"), detail: { outsideAllowed: boundedPaths(actual.filter((path) => !allowedPaths.includes(path))) } };
+  }
   const admittedBlobs = [];
   for (const path of actual) {
     try {

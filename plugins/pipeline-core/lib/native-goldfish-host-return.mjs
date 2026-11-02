@@ -95,6 +95,31 @@ export function parseNativeGoldfishBriefing(prompt) {
     allowedPaths: [...binding.allowedPaths] } };
 }
 
+/** AC-164: the first sub-condition of NGHR-FINAL-SHAPE that fires, as a bounded detail, or null when the shape is valid.
+ * The slugs are closed; a path is echoed only after it passed `normalizedPath` (repository-relative), at most 5, so a
+ * host path or arbitrary text from the contract never travels. The checks and their order are those of the former
+ * single conjunction, so admission is unchanged. */
+function finalShapeCondition(value, binding, allowCheckpoint) {
+  const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
+  if (!exact(value, FINAL_FIELDS)) return named("fields");
+  if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
+  if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
+  if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
+  if (!(value.outcome === "succeeded" || (allowCheckpoint === true && value.outcome === "checkpoint"))) return named("outcome");
+  if (typeof value.report !== "string") return named("report-type");
+  if (value.report.trim() === "") return named("report-empty");
+  if (Buffer.byteLength(value.report, "utf8") > 1024 * 1024) return named("report-oversize");
+  if (!Array.isArray(value.changedPaths)) return named("changed-paths-type");
+  if (value.changedPaths.length === 0) return named("changed-paths-empty");
+  if (value.changedPaths.length > 64) return named("changed-paths-too-many");
+  if (!value.changedPaths.every(normalizedPath)) return named("path-not-normalized");
+  if (new Set(value.changedPaths).size !== value.changedPaths.length) return named("paths-duplicate");
+  if ([...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")) return named("paths-unsorted");
+  const outside = value.changedPaths.filter((path) => !binding.allowedPaths.includes(path));
+  if (outside.length > 0) return named("path-outside-allowed", outside);
+  return null;
+}
+
 /** Validate one plain-JSON final result; prose, fences and duplicate keys fail closed. */
 // D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
 // a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
@@ -103,14 +128,8 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
   let value;
   try { value = parseStrictJson(text); } catch { return fail("NGHR-FINAL-JSON"); }
-  if (!exact(value, FINAL_FIELDS) || value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA
-    || value.dispatchId !== binding.dispatchId || value.candidateCommit !== binding.candidateCommit
-    || !(value.outcome === "succeeded" || (allowCheckpoint === true && value.outcome === "checkpoint")) || typeof value.report !== "string"
-    || value.report.trim() === "" || Buffer.byteLength(value.report, "utf8") > 1024 * 1024
-    || !Array.isArray(value.changedPaths) || value.changedPaths.length === 0 || value.changedPaths.length > 64
-    || !value.changedPaths.every(normalizedPath) || new Set(value.changedPaths).size !== value.changedPaths.length
-    || [...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")
-    || !value.changedPaths.every((path) => binding.allowedPaths.includes(path))) return fail("NGHR-FINAL-SHAPE");
+  const shapeCondition = finalShapeCondition(value, binding, allowCheckpoint);
+  if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
   let resultSha256;
   try { resultSha256 = createHashSha256(canonicalizeJson(value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }

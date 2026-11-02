@@ -125,6 +125,34 @@ const cases = [
     assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "project/pipeline.json", dependencies: ["project/pipeline.json"] })).code, "NGHR-ITEM-DELIVERY-SHAPE");
     assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "src/change.test.mjs", dependencies: ["src/change.test.mjs"] })).ok, true);
   }],
+  ["NGHR10 AC-164: NGHR-FINAL-SHAPE names which sub-condition fired in a bounded detail, keeping the code unchanged", () => {
+    const two = { ...binding, allowedPaths: ["src/a.mjs", "src/b.mjs"] };
+    const run = (change, options = { binding }) => validateNativeGoldfishFinal(JSON.stringify({ ...final, ...change }), options);
+    const cases10 = [
+      [{ schema: "x" }, "schema"], [{ dispatchId: "OTHER" }, "dispatch-id"], [{ candidateCommit: "d".repeat(40) }, "candidate-commit"],
+      [{ outcome: "blocked" }, "outcome"], [{ outcome: "checkpoint" }, "outcome"], [{ report: "  " }, "report-empty"],
+      [{ report: 5 }, "report-type"], [{ report: "x".repeat(1024 * 1024 + 1) }, "report-oversize"],
+      [{ changedPaths: "src/change.mjs" }, "changed-paths-type"], [{ changedPaths: [] }, "changed-paths-empty"],
+      [{ changedPaths: Array.from({ length: 65 }, (_, i) => `src/f${i}.mjs`) }, "changed-paths-too-many"],
+      [{ changedPaths: ["../outside"] }, "path-not-normalized"], [{ changedPaths: ["src/change.mjs", "src/change.mjs"] }, "paths-duplicate"],
+      [{ changedPaths: ["outside.txt"] }, "path-outside-allowed"], [{ extra: true }, "fields"],
+    ];
+    for (const [change, condition] of cases10) {
+      const result = run(change);
+      assert.equal(result.code, "NGHR-FINAL-SHAPE", condition);
+      assert.equal(result.detail?.condition, condition, JSON.stringify(result));
+    }
+    assert.equal(run({ changedPaths: ["src/b.mjs", "src/a.mjs"] }, { binding: two }).detail?.condition, "paths-unsorted");
+    // Which paths: only repository-relative ones, at most 5, and a path that is not normalized is never echoed.
+    const outside = Array.from({ length: 7 }, (_, i) => `out/f${i}.txt`).sort();
+    const named = run({ changedPaths: outside });
+    assert.deepEqual(named.detail.paths, outside.slice(0, 5));
+    const absolute = run({ changedPaths: ["/home/someone/secret.txt"] });
+    assert.equal(absolute.detail.condition, "path-not-normalized");
+    assert.equal(JSON.stringify(absolute).includes("/home/someone"), false);
+    // The checkpoint outcome is an outcome failure only where it is not allowed.
+    assert.equal(run({ outcome: "checkpoint" }, { binding, allowCheckpoint: true }).ok, true);
+  }],
 
 ];
 
