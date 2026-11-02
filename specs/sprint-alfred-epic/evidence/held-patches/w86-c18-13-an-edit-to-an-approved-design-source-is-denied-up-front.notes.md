@@ -13,7 +13,16 @@ Edits `plugins/pipeline-core/lib/guard/denial-route.mjs` and `plugins/pipeline-c
 
 In `guard-lifecycle-ready.test.mjs` (written first, RED against the original code, then GREEN): the fixture helper `withContinuityAuthority` takes an optional `companions` list and writes the approval binding shape; one case asserts each companion edit is denied with `GUARD-LIFECYCLE-AUTHORITY-BOUND` and `reopen-design --by <name>`, an unrelated file and a prefix-sharing path stay allowed; one case asserts a would-be companion path stays editable with no approved design binding. No existing case was changed or weakened.
 
+## Checks
+
+- `guard-lifecycle-ready.test.mjs` in the slice clone, before the production edit: 430 tests, 426 pass, 1 fail (the companion-denial case), 3 skipped; after: 430 tests, 427 pass, 0 fail, 3 skipped.
+- `guard-devplan-design-approval.test.mjs`: 12 of 12 pass.
+- `harness/scripts/check-consumer-safe-paths.test.mjs`: 9 of 9 pass.
+- The patch applies to the real HEAD (`git apply --check` exit 0); `w86-...check.test.mjs` (3 of 3 pass) pins that and the touched-file list.
+
 ## Not changed / not proven
+
+- The helper reads the recorded approval binding without consulting `planApproved` separately: the binding is written by `approve-plan` itself, so an absent binding is treated as an unapproved design (covered by the second new case); the earlier design-phase release rule still runs first.
 
 - `DAA-DESIGN-SOURCE-DRIFT` in `guard-devplan-policy.mjs` and every other denial code are untouched.
 - The binding is not validated here (`validateDesignApprovalBinding` is not called): the denial only needs the recorded paths.
