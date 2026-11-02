@@ -43,4 +43,4 @@ Exit 1 after 3543 s, 1152 steps, 15 red. Re-run alone, 11 green and 4 red (the f
 
 ## Open
 
-The Full Verify 4 on a clone with w110 to w114 applied (proof that the 11 case-completion reds are gone) and the main-tree run after the PO has applied the second script; the batch Critic (paused by the PO); native Windows runs; real Codex and Antigravity runs; the security scan (`--remote upstream`); the end-to-end hook activation on a real promotion; parallel host commits in a real parallel run; PO acceptance.
+A Full Verify with w110 to w114 applied (proof that the 11 case-completion reds are gone; started twice and stopped on the PO's word as too long, w114 is check-tested and the second apply script rehearsed with exit 0, but not proven in a full run) and the main-tree run after the PO has applied the second script; the batch Critic (paused by the PO); native Windows runs; real Codex and Antigravity runs; the security scan (`--remote upstream`); the end-to-end hook activation on a real promotion; parallel host commits in a real parallel run; PO acceptance.
