@@ -6368,3 +6368,40 @@ test("17 a design signature is refused before the prompt while pipeline.user.yam
     assert.match(source, /error\?\.code === DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED\) throw error;/u, "the typed refusal is not collapsed into the generic invalid-request refusal");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// A18-M2 (AC-264): the refusal above covered the design signature only. Every other sign-intent kind (a bare digest and each
+// --request schema) must refuse BEFORE the confirmation, the passphrase prompt or any spawn while pipeline.user.yaml is not part of HEAD.
+const M2_SIGN_KINDS = [
+  ["a bare digest", null],
+  ["a quality-package request", "pipeline.signed-quality-package-request.v1"],
+  ["an adoption request", "pipeline.architecture-adoption-approval-request.v1"],
+  ["a bootstrap acknowledgement request", "pipeline.bootstrap-acknowledgement-request.v1"],
+  ["a guard-override signature digest request", "pipeline.human-guard-override-signature-digest.v1"],
+  ["a portable Critic export request", "pipeline.portable-critic-export-request.v1"],
+  ["an unknown-schema request", "pipeline.some-future-request.v1"],
+];
+for (const [label, schema] of M2_SIGN_KINDS) {
+  test(`A18-M2 sign-intent for ${label} refuses before any prompt while pipeline.user.yaml is not committed`, async () => {
+    const dirs = fixtureDirs();
+    try {
+      keyFixture(dirs.directory);
+      anchorFixtureKey(dirs.repoRoot, dirs.directory);
+      writeFileSync(join(dirs.repoRoot, "pipeline.user.yaml"), "gates:\n  human_approval: signature\n");
+      const intentSha256 = "b".repeat(64);
+      const argv = ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory];
+      if (schema === null) argv.push("--intent-sha256", intentSha256);
+      else {
+        mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+        writeFileSync(join(dirs.repoRoot, "scratch", "m2-request.json"), JSON.stringify({ schema, intentSha256, approvalIntent: { sha256: intentSha256 }, intent: { sha256: intentSha256 } }));
+        argv.push("--request", "scratch/m2-request.json");
+      }
+      let asked = 0, spawned = 0;
+      await assert.rejects(
+        async () => runHumanApproval(argv, disclosureChannel({ readConfirmation: () => { asked++; return "approve"; }, spawn: () => { spawned++; throw Error("unexpected signing"); } })),
+        error => error.code === "PO-SIGN-APPROVAL-MODE-UNCOMMITTED" && /commit pipeline\.user\.yaml/u.test(error.message) && /Repair:/u.test(error.message),
+      );
+      assert.equal(asked, 0);
+      assert.equal(spawned, 0);
+    } finally { cleanup(dirs); }
+  });
+}

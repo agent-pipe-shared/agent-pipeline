@@ -300,6 +300,7 @@ export function checkCheckpointDestination(dir, { remote, destination, sourceRef
   };
 }
 
+const PUSH_THREAT_MODEL_REMEDY = "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it";
 export function checkPushThreatModel(dir, deps = {}) {
   const exists = (deps.exists ?? existsSync)(join(dir, PUSH_THREAT_MODEL_PATH));
   if (!exists) {
@@ -307,7 +308,7 @@ export function checkPushThreatModel(dir, deps = {}) {
       id: "push-threat-model",
       ok: false,
       message: `${PUSH_THREAT_MODEL_PATH} does not exist.`,
-      remedy: "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it",
+      remedy: PUSH_THREAT_MODEL_REMEDY,
     };
   }
   return { id: "push-threat-model", ok: true, message: `${PUSH_THREAT_MODEL_PATH} is present.` };
@@ -509,15 +510,19 @@ export function checkCriticalProofModeConflict(dir, deps = {}) {
 export function preparePushSubject({ dir, by, remote, destination }, deps = {}) {
   const runFn = deps.pipelineStateRun ?? pipelineStateRun;
   let captured = "";
+  let capturedErr = "";
   const originalLog = console.log;
+  const originalError = console.error;
   console.log = (message) => { captured += `${message}\n`; };
+  console.error = (message) => { capturedErr += `${message}\n`; };
   let exitCode;
   try {
     exitCode = runFn(["prepare-push-subject", "--by", by, "--remote", remote, "--destination", destination], { dir });
   } finally {
     console.log = originalLog;
+    console.error = originalError;
   }
-  if (exitCode !== 0) return { ok: false, raw: captured };
+  if (exitCode !== 0) return { ok: false, raw: captured, stderr: capturedErr };
   try {
     return { ok: true, value: JSON.parse(captured) };
   } catch {
@@ -854,9 +859,16 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const subject = preparePushSubject({ dir, by, remote, destination }, deps);
   if (!subject.ok) {
     report.ready = false;
+    // A18-M2: the refusal for a missing push threat model carries a typed code; name the same remedy checkPushThreatModel names.
+    const missingThreatModel = typeof subject.stderr === "string" && subject.stderr.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE");
     report.checks.push({
-      id: "subject-hash", ok: false, message: "prepare-push-subject did not produce a usable subject hash.",
-      remedy: `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
+      id: "subject-hash", ok: false,
+      message: missingThreatModel
+        ? `prepare-push-subject refused (CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE): ${PUSH_THREAT_MODEL_PATH} does not exist yet.`
+        : "prepare-push-subject did not produce a usable subject hash.",
+      remedy: missingThreatModel
+        ? PUSH_THREAT_MODEL_REMEDY
+        : `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
     });
     return { ok: true, report, lines: null };
   }

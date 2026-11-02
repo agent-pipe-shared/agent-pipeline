@@ -785,6 +785,23 @@ function readyDeps(overrides = {}) {
   };
 }
 
+// A18-M2: a prepare-push-subject refusal for the missing push threat model names the same remedy checkPushThreatModel names.
+test("A18-M2 pushPrepareReport names materialize-push-threat-model when prepare-push-subject refuses CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE", () => {
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
+    pipelineStateRun: () => {
+      console.error("Error: prepare-push-subject refused (CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE); no push threat-model artifact exists yet.");
+      return 2;
+    },
+  }));
+  assert.equal(result.report.ready, false);
+  const check = result.report.checks.find(entry => entry.id === "subject-hash");
+  assert.equal(check.ok, false);
+  assert.match(check.message, /CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE/u);
+  assert.match(check.remedy, /pipeline-state\.mjs materialize-push-threat-model/u);
+  const other = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ pipelineStateRun: () => 2 }));
+  assert.doesNotMatch(other.report.checks.find(entry => entry.id === "subject-hash").remedy, /materialize-push-threat-model/u, "an unrelated refusal keeps its own remedy");
+});
+
 test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
   assert.equal(result.ok, true);

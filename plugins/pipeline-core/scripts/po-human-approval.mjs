@@ -370,6 +370,13 @@ export function designSigningApprovalModeRefusal(mode) {
   if (mode?.source !== "uncommitted") return null;
   return Object.assign(new Error(`${DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED}: pipeline.user.yaml differs from HEAD (untracked, edited or deleted), so the approval mode this signature is read under is not yet part of the candidate it binds; committing it after signing would move the candidate and make approve-plan refuse the proof. Repair: commit pipeline.user.yaml (or restore it to HEAD), rebuild the design approval request with present-plan so it binds the new HEAD, then sign once.`), { code: DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED });
 }
+// A18-M2 (AC-264): the same refusal for every other sign-intent kind (bare digest and each --request schema), before any
+// confirmation, passphrase prompt or key-using spawn. Design requests keep their own DAB-coded refusal above.
+export const SIGNING_APPROVAL_MODE_UNCOMMITTED = "PO-SIGN-APPROVAL-MODE-UNCOMMITTED";
+export function signingApprovalModeRefusal(mode) {
+  if (mode?.source !== "uncommitted") return null;
+  return Object.assign(new Error(`${SIGNING_APPROVAL_MODE_UNCOMMITTED}: pipeline.user.yaml differs from HEAD (untracked, edited or deleted), so the approval mode this signature is read under is not yet part of the candidate it binds; committing it after signing would move the candidate and the consumer would refuse the proof, so you would have to sign twice. Repair: commit pipeline.user.yaml (or restore it to HEAD), rebuild the request so it binds the new HEAD, then sign once.`), { code: SIGNING_APPROVAL_MODE_UNCOMMITTED });
+}
 function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
   try {
     if (!own(record, ["schema", "binding", "bindingSha256", "approvalIntent"]) || record.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA
@@ -2607,6 +2614,10 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // ALF-C-SIGN-ORDER2 (AC-258): request checks come first; with --request, readiness is deferred but still
     // precedes publication, disclosure, confirmation, passphrase and key-using spawns.
     const assertReady = () => assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
+    if (!(text(args.request) && /(?:^|[\\/])design-approval-request-[a-f0-9]{64}\.json$/u.test(args.request))) {
+      const modeRefusal = signingApprovalModeRefusal(readHumanApprovalMode(repository));
+      if (modeRefusal !== null) throw modeRefusal;
+    }
     if (!text(args.request)) assertReady();
     let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null; let scratchRequestSha256 = null;
     let portableRequestPath = null; let designSigningObservation = null;
