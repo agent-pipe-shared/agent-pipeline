@@ -44,9 +44,14 @@ export function blockingFitnessOutcomes(outcomes, reportOnly = []) {
       }),
     }));
 }
+/**
+ * Class 9 (profile drift) is a repository state, not a property of the PRD: the accepted adoption snapshot differs from the current
+ * profile and module snapshot, so every feature plan of the repository stays blocked until the adoption authority is renewed.
+ */
+export const PROFILE_DRIFT_REPAIR = "profile drift is a state of this repository, not of the PRD: the accepted architecture adoption snapshot differs from the current profile and module snapshot, so no plan can pass until the adoption authority is renewed. Read it with architecture-adoption.mjs status --root <root>, then renew it with architecture-adoption.mjs prepare and apply (the apply step carries the PO's signature)";
 export function describeBlockingOutcome(outcome) {
   const first = outcome.violations[0];
-  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}`;
+  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}${outcome.classId === 9 ? `; ${PROFILE_DRIFT_REPAIR}` : ""}`;
 }
 
 export function architectureTouchedContracts(paths) {
