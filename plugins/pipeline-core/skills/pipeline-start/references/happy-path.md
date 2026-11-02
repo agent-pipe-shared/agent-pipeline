@@ -84,6 +84,7 @@ Owner: `docs/push-release-flow.md`.
 | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
 | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
 | Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |
+| Observation boundary | tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured |
 
 A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
 (one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.

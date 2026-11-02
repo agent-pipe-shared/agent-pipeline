@@ -35,6 +35,18 @@ test("the happy-path guide table is the projection of the JSON source, row for r
   });
 });
 
+test("AC-239: the observation-boundary row exists per runner and claims no containment", () => {
+  const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Observation boundary");
+  assert.ok(row, "the Observation boundary row exists");
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    assert.ok(row[runner].length > 0, `${runner} has a sentence`);
+    assert.doesNotMatch(row[runner], /hermetic|sandbox|isolated/iu, `${runner} sentence claims no containment`);
+    assert.match(row[runner], /tool-level|not measured/u, `${runner} sentence states its level or that it is not measured`);
+  }
+  const guide = readFileSync(GUIDE, "utf8");
+  assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
+});
+
 test("an owner that names a file in this plugin names one that ships", () => {
   for (const row of readRunnerCapabilities().rows) {
     for (const owner of row.owner.split(";").map((part) => part.trim())) {

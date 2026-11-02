@@ -65,6 +65,13 @@
       "codex": "the agent runs every preparation step; only the sign-off is the PO's",
       "antigravity": "the agent runs every preparation step; only the sign-off is the PO's",
       "owner": "docs/push-release-flow.md; skills/pipeline-start/references/push-approval.md"
+    },
+    {
+      "topic": "Observation boundary",
+      "claude": "tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary",
+      "codex": "tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured",
+      "antigravity": "tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured",
+      "owner": "hooks/guard-dispatch.mjs"
     }
   ]
 }

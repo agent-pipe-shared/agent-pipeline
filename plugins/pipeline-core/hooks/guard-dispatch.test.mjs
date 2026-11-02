@@ -243,6 +243,11 @@ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
     tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
   }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", `"${builtIn}" is not a shipped Pipeline role`, "pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor"] });
 }
+check("GD2i-prepare block a Plan dispatch and print the Antigravity prepare command in the repair", {
+  tool_use_id: "gd2i-prepare",
+  tool_name: "Agent",
+  tool_input: { subagent_type: "Plan", model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", "antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>"] });
 // QG-04 justification: a Workflow agent() Explore has transport `workflow`, and the carrier policy admits Explore only over a
 // direct call (guard-dispatch.mjs writeCapableCarrierAdmission); the direct-call Explore stays ALLOW in GD2i above.
 check("GD2j block a batch of two Explore dispatches through a Workflow script (carrier policy: direct transport only)", {
@@ -1249,7 +1254,7 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
   }
 });
 
-assert.equal(cases.length, 81, "the complete dispatch guard corpus must register before execution");
+assert.equal(cases.length, 82, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
