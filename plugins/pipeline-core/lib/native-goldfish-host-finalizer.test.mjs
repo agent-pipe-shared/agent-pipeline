@@ -12,7 +12,9 @@ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finaliz
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
 import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
-import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
+import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes, validateNativeGoldfishHostObservation } from "./native-goldfish-host-observation.mjs";
+import { createHash } from "node:crypto";
+import { canonicalizeJson } from "./governance-event.mjs";
 import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
 import { nativeManagedDigest } from "./native-managed-authority-support.mjs";
@@ -724,13 +726,49 @@ const cases = [
     git("add", "--", "src/sibling.mjs"); git("commit", "-qm", "sibling host commit");
     const siblingHead = git("rev-parse", "HEAD");
     assert.notEqual(siblingHead, binding.candidateCommit);
-    // Measured: the commit succeeds on the moved HEAD but the observation validators (out of this slice's scope) refuse the record with
-    // NGHO-DRAFT-BINDING, so the finalizer refuses BEFORE committing until they accept a descendant parent. Needed change is in the report.
+    // C18-1D: the observation validators accept a parent that is the admitted descendant HEAD, so the commit is recorded.
     const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
-    assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT", JSON.stringify(result));
-    assert.equal(facts.commits, 0, "nothing is committed that could not be recorded");
-    assert.equal(git("rev-parse", "HEAD"), siblingHead);
+    assert.equal(result.code, "NGHF-AUTHORED-RECORD-VERIFIED", JSON.stringify(result));
+    assert.equal(facts.commits, 1);
+    assert.equal(git("rev-parse", "HEAD^"), siblingHead, "the sibling HEAD is the parent of the host commit");
+    assert.equal(git("rev-parse", "HEAD"), result.commit);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
+  // NGHF37-NGHF40 -- C18-1D (AC-108): observation-level binding of a parent that is a descendant of the briefing candidate.
+  ...[
+    ["NGHF37", "A descendant parent equal to the admitted HEAD is accepted by the observation validator, in the finalizer route and on readback", (ctx) => {
+      const { receipt, root, validate } = ctx;
+      assert.equal(typeof receipt.movedHead?.admittedHead, "string");
+      assert.equal(validate(receipt, { root }), true);
+      assert.equal(inspectNativeGoldfishHostObservation({ root, taskId: ctx.binding.dispatchId, record: ctx.facts.publishedRecord,
+        recordBytes: nativeAuthoredRecordBytes(ctx.facts.publishedRecord) }).code, "NGHO-LOCAL-READBACK-VERIFIED");
+    }],
+    ["NGHF38", "A parent that is not the admitted HEAD is refused", (ctx) => {
+      const { receipt, root, validate, reseal } = ctx;
+      assert.equal(validate(reseal({ ...receipt, movedHead: { ...receipt.movedHead, admittedHead: receipt.candidateCommit } }), { root }), false);
+      assert.equal(validate(reseal({ ...receipt, parent: "a".repeat(40) }), { root }), false);
+    }],
+    ["NGHF39", "A parent that is not a descendant of the candidate is refused even when it equals the admitted HEAD", (ctx) => {
+      const { receipt, root, validate, reseal, git } = ctx;
+      const orphan = git("commit-tree", `${receipt.candidateTree}`, "-m", "unrelated root");
+      assert.equal(validate(reseal({ ...receipt, parent: orphan, movedHead: { ...receipt.movedHead, admittedHead: orphan } }), { root }), false);
+    }],
+    ["NGHF40", "A moved parent without headMoved evidence is refused", (ctx) => {
+      const { receipt, root, validate, reseal } = ctx;
+      const { movedHead, ...without } = receipt;
+      assert.equal(validate(reseal(without), { root }), false);
+      assert.equal(validate(reseal({ ...receipt, movedHead: { admittedHead: receipt.parent } }), { root }), false);
+      assert.equal(validate(reseal({ ...receipt, movedHead: { ...receipt.movedHead, baselineCommit: receipt.parent } }), { root }), false);
+    }],
+  ].map(([id, name, check]) => ({ id, name, run: () => fixture(({ root, commonDir, binding, dependencies, facts, git, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    writeFileSync(join(root, "src/sibling.mjs"), "export const sibling=1;\n");
+    git("add", "--", "src/sibling.mjs"); git("commit", "-qm", "sibling host commit");
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+    assert.equal(result.code, "NGHF-AUTHORED-RECORD-VERIFIED", JSON.stringify(result));
+    const receipt = readReceipt(commonDir);
+    const reseal = (r) => { const { receiptSha256, ...subject } = r; return { ...subject, receiptSha256: createHash("sha256").update(canonicalizeJson(subject)).digest("hex") }; };
+    check({ receipt, root, binding, facts, git, reseal, validate: validateNativeGoldfishHostObservation });
+  }, "claude", 1, "goldfish-implementor", { background: true }) })),
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

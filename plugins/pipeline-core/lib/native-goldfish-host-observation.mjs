@@ -56,13 +56,26 @@ function recordMatches(receipt, record, bytes) {
     && [...(declaredPaths(record) ?? [])].sort().join("\0") === receipt.changedPaths.join("\0");
 }
 
-export function validateNativeGoldfishHostObservation(receipt, { record = null, recordBytes = null } = {}) {
+// C18-1D: a commit made on a HEAD a sibling moved has the admitted (descendant) HEAD as parent. The receipt carries that as typed
+// evidence `movedHead`; the parent is accepted only when it equals the admitted HEAD, the baseline is the briefing candidate and, when a
+// repository root is supplied, the candidate is an ancestor of that parent.
+function movedHeadBound(subject, root) {
+  const mh = subject.movedHead;
+  if (!exact(mh, ["admittedHead", "baselineCommit"]) || !OID.test(mh.admittedHead ?? "") || !OID.test(mh.baselineCommit ?? "")
+    || mh.baselineCommit !== subject.candidateCommit || mh.admittedHead !== subject.parent
+    || subject.parent === subject.candidateCommit) return false;
+  return root === null || git(root, ["merge-base", "--is-ancestor", subject.candidateCommit, subject.parent]) !== null;
+}
+
+export function validateNativeGoldfishHostObservation(receipt, { record = null, recordBytes = null, root = null } = {}) {
   const shared=receipt?.schema===NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA;
   const version = shared?receipt.adapterVersion:receipt?.schema === NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA ? 2 : 1;
   const baseKeys = version === 2 ? [...KEYS.slice(0, 8), "nativeAgentType", ...KEYS.slice(8)] : KEYS;
-  const keys=shared?[...baseKeys,"adapterVersion","foreignCommits"]:baseKeys;
+  const moved = !shared && receipt !== null && typeof receipt === "object" && Object.hasOwn(receipt, "movedHead");
+  const keys=shared?[...baseKeys,"adapterVersion","foreignCommits"]:moved?[...baseKeys,"movedHead"]:baseKeys;
   if (!exact(receipt, [...keys, "receiptSha256"])) return false;
   const { receiptSha256, ...subject } = receipt;
+  if (moved && !movedHeadBound(subject, root)) return false;
   if (subject.schema !== (shared?NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA:version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA)
     || !["claude", "codex"].includes(subject.runner)
     || (version === 2 && (subject.runner !== "codex" || subject.nativeAgentType !== "worker"))
@@ -71,7 +84,7 @@ export function validateNativeGoldfishHostObservation(receipt, { record = null, 
     || (subject.runner === "codex" ? !ID.test(subject.agentId ?? "") : subject.agentId !== null)
     || !OID.test(subject.candidateCommit ?? "") || !OID.test(subject.candidateTree ?? "")
     || !OID.test(subject.commit ?? "") || subject.commit === subject.candidateCommit
-    || (!shared&&subject.parent !== subject.candidateCommit) || !OID.test(subject.parent??"") || !OID.test(subject.tree ?? "")
+    || (!shared&&!moved&&subject.parent !== subject.candidateCommit) || !OID.test(subject.parent??"") || !OID.test(subject.tree ?? "")
     || typeof subject.role !== "string" || !["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic", "pipeline-core:goldfish-deep"].includes(subject.role) /* role set owned by ROLE_TO_AGENT in native-goldfish-host-return.mjs; keep identical */
     || typeof subject.model !== "string" || subject.model.length === 0
     || typeof subject.effort !== "string" || subject.effort.length === 0
@@ -95,7 +108,7 @@ export function validateNativeGoldfishHostObservation(receipt, { record = null, 
   return record === null && recordBytes === null || !!record && recordMatches(subject, record, recordBytes);
 }
 
-export function draftNativeGoldfishHostObservation({ state, observation, commitReadback, record, nativeAdmission=null } = {}) {
+export function draftNativeGoldfishHostObservation({ state, observation, commitReadback, record, nativeAdmission=null, movedHead=null, root=null } = {}) {
   if (!state || !["claude", "codex"].includes(state.runner)
     || observation?.ok !== true || observation.runner !== state.runner
     || observation.code !== "NGHR-FINAL-VALIDATED"
@@ -105,7 +118,7 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
   }
   const version = state.binding.adapterVersion === 2 ? 2 : 1;
   let shared=null;try{if(nativeAdmission){const plan=inspectSourceOwnedNativeConcurrentAdmission(nativeAdmission);if(plan.baseCommit!==state.binding.candidateCommit||plan.parentCommit!==commitReadback.parent)return fail("NGHO-SHARED-PARENT");if(plan.foreignCommits.length)shared=plan;}}catch{return fail("NGHO-SHARED-AUTHORITY");}
-  const subject = { ...(shared?{adapterVersion:version,foreignCommits:shared.foreignCommits}:{}),schema: shared?NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA:version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
+  const subject = { ...(shared?{adapterVersion:version,foreignCommits:shared.foreignCommits}:movedHead?{movedHead:{admittedHead:movedHead.admittedHead,baselineCommit:movedHead.baselineCommit}}:{}),schema: shared?NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA:version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
     runner: state.runner, dispatchId: state.binding.dispatchId, sessionId: state.sessionId,
     toolUseId: state.toolUseId, agentId: state.agentId,
     ...(version === 2 ? { nativeAgentType: state.binding.nativeAgentType } : {}),
@@ -122,7 +135,7 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
         : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested",
     recordSha256: hash(nativeAuthoredRecordBytes(record)) };
   const receipt = { ...subject, receiptSha256: hash(canonicalizeJson(subject)) };
-  return validateNativeGoldfishHostObservation(receipt, { record, recordBytes: nativeAuthoredRecordBytes(record) })
+  return validateNativeGoldfishHostObservation(receipt, { record, recordBytes: nativeAuthoredRecordBytes(record), root: typeof root === "string" ? root : null })
     ? { ok: true, code: "NGHO-DRAFT-READY", receipt, authority: "unverified-until-private-readback" }
     : fail("NGHO-DRAFT-BINDING");
 }
@@ -153,7 +166,7 @@ export function inspectNativeGoldfishHostObservation({ root, taskId, record, rec
   catch { return fail("NGHO-OBSERVATION-MISSING"); }
   const receipt = stored.value;
   if(receipt.runner==="codex"){try{inspectSourceOwnedNativeConfiguredObservation({root:physical,sessionId:receipt.sessionId,toolUseId:receipt.toolUseId,model:receipt.model,effort:receipt.effort,candidateCommit:receipt.candidateCommit,candidateTree:receipt.candidateTree,role:receipt.role});}catch{return fail("NGHO-CODEX-CONFIGURED-ROUTE");}}
-  if (receipt.dispatchId !== taskId || !validateNativeGoldfishHostObservation(receipt, { record, recordBytes })) return fail("NGHO-OBSERVATION-BINDING");
+  if (receipt.dispatchId !== taskId || !validateNativeGoldfishHostObservation(receipt, { record, recordBytes, root: physical })) return fail("NGHO-OBSERVATION-BINDING");
   const commit = git(physical, ["rev-parse", "--verify", `${receipt.commit}^{commit}`])?.trim();
   const candidateTree = git(physical, ["rev-parse", "--verify", `${receipt.candidateCommit}^{tree}`])?.trim();
   const parent = git(physical, ["rev-parse", "--verify", `${receipt.commit}^`])?.trim();

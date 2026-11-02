@@ -388,10 +388,6 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   let admission = concurrent ? null : (dependencies.assess ?? assessAgyHostCommit)({ baseline: state.baseline,
     final: observation.final, allowedPaths: state.binding.allowedPaths });
   if (!concurrent && !admission?.ok) return withDetail(fail(admission?.code ?? "NGHF-COMMIT-ADMISSION"), admission?.detail);
-  // C18-1C GUARD (remove when native-goldfish-host-observation.mjs accepts a commit parent that is a descendant of the briefing's
-  // candidate): the observation receipt and record validators bind parent === candidateCommit (NGHO-DRAFT-BINDING), so a commit made
-  // on a moved HEAD could not be recorded. Until then a tolerated moved HEAD is refused BEFORE any commit, exactly as before.
-  if (!concurrent && admission?.headMoved) return withDetail(fail("AGY-HOST-COMMIT-DRIFT"), { conditions: ["head-moved"] });
 
   // Read before committing; new public evidence is published afterwards so it
   // cannot alter the exact diff admitted for this host commit.
@@ -435,7 +431,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     const recordBytes = nativeAuthoredRecordBytes(drafted.record);
     postCommitStage = "observation-draft";
     const receipt = draftNativeGoldfishHostObservation({ state, observation,
-      commitReadback: committed, record: drafted.record, nativeAdmission:concurrent?admission:null });
+      commitReadback: committed, record: drafted.record, nativeAdmission:concurrent?admission:null, root: physical,
+      ...(!concurrent && admission?.headMoved ? { movedHead: { admittedHead: admission.candidateCommit, baselineCommit: admission.baselineCommit } } : {}) });
     if (!receipt.ok) return { ...fail(receipt.code), commit: committed.commit };
     postCommitStage = "private-observation";
     const stored = persistNativeGoldfishHostObservation({ commonDir, receipt: receipt.receipt,
