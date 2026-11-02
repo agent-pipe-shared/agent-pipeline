@@ -1,0 +1,340 @@
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index bdf79c1fb..fdf12cfae 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -316,6 +316,23 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("spends a tool use from the budget that is also the stop condition. When the route is");
+   put("`default`, run the checks as briefed.");
+   put();
++
++  put("## 8. Human-signed gates: prepare yourself, hand over only the sign-off");
++  put();
++  put("<!-- hand-maintained: this is a role rule (PO decision 2026-11-02, signing parity on");
++  put("     every runner), not a value any guard exports. The per-kind commands live in");
++  put("     plugins/pipeline-core/skills/pipeline-start/references/push-approval.md. -->");
++  put();
++  put("On Claude, Codex and Antigravity alike, the agent runs every preparation step of a");
++  put("human-signed gate itself: the read-only plan, the prepare and digest commands, and the");
++  put("readback after the signature. Only the signature step in the PO's own terminal (the");
++  put("passphrase entry) is the PO's. Never hand the PO a list of preparation commands, never");
++  put("ask the PO to run a command the agent is admitted to run, and never describe a");
++  put("preparation step as \"PO only\". When a guard names an external operator for the");
++  put("signature, hand over exactly that one line, then continue after the PO reports back.");
++  put("Do not change the tracked or untracked tree between handing over a tree-bound");
++  put("signature command and its return.");
++  put();
+   return `${lines.join("\n")}\n`;
+ }
+ 
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index 006073a76..0a018d7da 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -58,6 +58,13 @@
+       "codex": "runner prompt, not measured",
+       "antigravity": "runner prompt, not measured",
+       "owner": "docs/push-release-flow.md"
++    },
++    {
++      "topic": "Signing preparation",
++      "claude": "the agent runs every preparation step; only the sign-off is the PO's",
++      "codex": "the agent runs every preparation step; only the sign-off is the PO's",
++      "antigravity": "the agent runs every preparation step; only the sign-off is the PO's",
++      "owner": "docs/push-release-flow.md; skills/pipeline-start/references/push-approval.md"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 135320b58..89b990168 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -36,6 +36,7 @@ import {
+   rememberedNativeHookFailure,
+   rememberNativeHookFailure,
+ } from "../lib/native-hook-failure-memory.mjs";
++import { WHO_ACTS_NEXT_AUTHOR_REPAIR, WHO_ACTS_NEXT_EXTERNAL_OPERATOR } from "../lib/guard/po-commands.mjs";
+ import { parseGuardCommand } from "./guard-command-grammar.mjs";
+ import { commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+@@ -1072,10 +1073,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
+             "",
+             "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
+             authorRepairCommand,
++            WHO_ACTS_NEXT_AUTHOR_REPAIR,
+           ].join("\n");
+         } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
+           overrideGuidance = [
+             "",
++            ...(planned.status === "external-operator-required" ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
+             "Guard recovery route:",
+             JSON.stringify(planned),
+           ].join("\n");
+@@ -1116,6 +1119,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+         }
+         overrideGuidance = [
+           "",
++          ...(hostBoundary ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
+           "Guard recovery route:",
+           JSON.stringify(hostBoundary
+             ? {
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index b50885b2d..bd649134f 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -1190,6 +1190,39 @@ check("17 Antigravity containment ignores node -e text inside a quoted argument
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// AC-262 (signing parity): the same "who acts next" sentences Codex prints, from the one shared source.
++check("AC-262: Antigravity author-repair denial names who acts next next to the unchanged route", () => {
++  const root = readyLifecycleFixture("chat");
++  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
++  const sourceRoot = join(root, "plugins", "pipeline-core");
++  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
++  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
++  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
++  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
++  git("add", "plugins/pipeline-core");
++  git("commit", "-q", "-m", "author repair fixture");
++  try {
++    const res = decision(run({
++      toolCall: {
++        name: "replace_file_content",
++        args: { TargetFile: join(sourceRoot, "lib", "repair.mjs"), TargetContent: "false", ReplacementContent: "true" },
++      },
++    }, root));
++    assert.equal(res.decision, "deny");
++    assert.match(res.reason, /Pipeline Author Repair is available/u);
++    assert.match(res.reason, /Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs\./u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++// The planner-driven external-operator-required status cannot be produced by a real hook run in a
++// fixture, so this pins the adapter source: the sentence precedes the unchanged JSON route in both branches.
++check("AC-262: Antigravity external-operator-required routes print who acts next before the unchanged JSON", () => {
++  const source = readFileSync(adapter, "utf8");
++  assert.match(source, /import \{[^}]*WHO_ACTS_NEXT_EXTERNAL_OPERATOR[^}]*\} from "\.\.\/lib\/guard\/po-commands\.mjs"/u);
++  const printed = source.match(/\.\.\.\((?:planned\.status === "external-operator-required"|hostBoundary) \? \[WHO_ACTS_NEXT_EXTERNAL_OPERATOR\] : \[\]\),\n\s*"Guard recovery route:",/gu) ?? [];
++  assert.equal(printed.length, 2, "both external-operator-required branches must print the sentence immediately before the route");
++});
++
+ check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
+   const root = readyLifecycleFixture("chat");
+   try {
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+index 1e34fce06..7c1aad06b 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+@@ -33,6 +33,7 @@ import {
+   rememberedNativeHookFailure,
+   rememberNativeHookFailure,
+ } from "../lib/native-hook-failure-memory.mjs";
++import { WHO_ACTS_NEXT_AUTHOR_REPAIR, WHO_ACTS_NEXT_EXTERNAL_OPERATOR } from "../lib/guard/po-commands.mjs";
+ import { parseGuardCommand } from "./guard-command-grammar.mjs";
+ import { commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+@@ -624,10 +625,12 @@ if (denials.length > 0) {
+             "plan", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+             "--author-source-root", forcedQuote(planned.candidateSourceRoot),
+           ]),
++          WHO_ACTS_NEXT_AUTHOR_REPAIR,
+         ].join("\n");
+       } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
+         overrideGuidance = [
+           "",
++          ...(planned.status === "external-operator-required" ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
+           "Guard recovery route:",
+           JSON.stringify(planned),
+         ].join("\n");
+@@ -686,6 +689,7 @@ if (denials.length > 0) {
+       }
+       overrideGuidance = [
+         "",
++        ...(hostBoundary ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
+         "Guard recovery route:",
+         JSON.stringify(hostBoundary
+           ? {
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index 1429b00ef..b3afe22f8 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
+ import { fork, spawnSync } from "node:child_process";
+ import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
+ import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
++import { externalPoSigningOnly } from "../lib/guard/po-commands.mjs";
+ import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
+ 
+ const hookDir = dirname(fileURLToPath(import.meta.url));
+@@ -44,7 +45,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
+ const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
+ const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
+ const shardCount = 3;
+-const totalChecks = 39;
++const totalChecks = 42;
+ const shardResults = [];
+ const readyLifecycleEnvByRoot = new Map();
+ const readyLifecycleExternalParents = new Set();
+@@ -1044,6 +1045,51 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
+   assert.equal(decision(run(input, root)).permissionDecision, "deny");
+ });
+ 
++// AC-262 (signing parity, PO decision 2026-11-02): on every runner the agent prepares and only the
++// sign-off is the person's. The refusal for a human-terminal signing command carries that sentence.
++check("AC-262: the human-terminal signing refusal tells the agent to hand over the command and prepare itself", () => {
++  const refusal = externalPoSigningOnly();
++  assert.equal(refusal.exitCode, 2);
++  assert.match(refusal.stderr, /EXTERNAL ACTION REQUIRED/u);
++  assert.match(refusal.stderr, /hand the exact command to the PO and run its preparation steps yourself/u);
++});
++
++check("AC-262: an Author Repair denial names who acts next next to the unchanged route", () => {
++  const root = readyLifecycleFixture("chat");
++  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
++  const sourceRoot = join(root, "plugins", "pipeline-core");
++  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
++  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
++  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
++  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
++  git("add", "plugins/pipeline-core");
++  git("commit", "-q", "-m", "author repair fixture");
++  try {
++    const first = decision(run({
++      tool_name: "apply_patch",
++      tool_input: {
++        command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/lib/repair.mjs\n@@\n-export const repaired = false;\n+export const repaired = true;\n*** End Patch",
++      },
++    }, root));
++    assert.equal(first.permissionDecision, "deny");
++    assert.match(first.permissionDecisionReason, /Pipeline Author Repair is available/u);
++    assert.match(first.permissionDecisionReason, /Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs\./u);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++// The planner-driven external-operator-required status cannot be produced by a real hook run in a
++// fixture (the sensitive-input and plugin-cache cases are refused by the inner guard before the
++// planner branch), so this pins the adapter source: the sentence is printed before the JSON route in
++// every branch that prints status external-operator-required, never inside it.
++check("AC-262: every external-operator-required route prints who acts next before the unchanged JSON", () => {
++  const source = readFileSync(adapter, "utf8");
++  assert.match(source, /import \{[^}]*WHO_ACTS_NEXT_EXTERNAL_OPERATOR[^}]*\} from "\.\.\/lib\/guard\/po-commands\.mjs"/u);
++  const printed = source.match(/\.\.\.\((?:planned\.status === "external-operator-required"|hostBoundary) \? \[WHO_ACTS_NEXT_EXTERNAL_OPERATOR\] : \[\]\),\n\s*"Guard recovery route:",/gu) ?? [];
++  assert.equal(printed.length, 2, "both external-operator-required branches must print the sentence immediately before the route");
++});
++
+ // ADR-0059 Decision 6 makes GUARD-CROSS-REPO-MUTATION liftable through HGO. The exact local
+ // plugin-install shape is eligible as `global-plugin-install`, so this adapter must delegate
+ // to the shared consume/plan path instead of replacing the HGO ceremony with an external
+diff --git a/plugins/pipeline-core/lib/guard/po-commands.mjs b/plugins/pipeline-core/lib/guard/po-commands.mjs
+index 3bb838a80..a0c9b5b40 100644
+--- a/plugins/pipeline-core/lib/guard/po-commands.mjs
++++ b/plugins/pipeline-core/lib/guard/po-commands.mjs
+@@ -13,11 +13,17 @@ import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBo
+ import { verdict } from "./verdict.mjs";
+ import { hasExternalOutputRedirect, isNullDeviceStderrRedirect } from "./read-scope.mjs";
+ 
++// Signing parity (AC-262): one shared source for the "who acts next" sentences, so the Codex and
++// Antigravity adapters print the same words the refusal below does. Text only; no decision uses them.
++export const WHO_ACTS_NEXT_EXTERNAL_OPERATOR = "Who acts next: an attended person outside this session carries out the exact action named in this route; the agent prepares everything else itself and hands over only that sign-off.";
++export const WHO_ACTS_NEXT_AUTHOR_REPAIR = "Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs.";
++
+ export function externalPoSigningOnly() {
+   return verdict(
+     2,
+     "EXTERNAL ACTION REQUIRED (guard-lifecycle-ready, plugin pipeline-core): "
+-      + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts.\n",
++      + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts; "
++      + "hand the exact command to the PO and run its preparation steps yourself.\n",
+   );
+ }
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 4c95e24b8..72da6f1c0 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -83,6 +83,7 @@ Owner: `docs/push-release-flow.md`.
+ | Close entry | coordinator route | coordinator route | `finish-feature.mjs` single entry |
+ | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
+ | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
++| Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |
+ 
+ A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
+ (one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 497cbdd57..7988c54b7 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -42,6 +42,23 @@ prints the exact `authorize-critical` command below, already filled in, for
+ the human to run — the driver itself cannot sign it, approve it, or clear
+ any gate.
+ 
++## Who prepares, who signs (every runner)
++
++On Claude, Codex and Antigravity alike the agent runs every preparation step itself
++and hands the PO only the sign-off command, already filled in. The PO never
++prepares, seeds or digests anything for the agent.
++
++| Kind | The agent prepares | Only the PO runs |
++|---|---|---|
++| push | `push-init.mjs` (or `push-prepare.mjs`), the threat-model artifact, the filled `authorize-critical` line | `po-human-approval.mjs authorize-critical` |
++| deploy, publication, release-preflight | `po-human-approval.mjs prepare-critical` / `verify-critical`, the subject digest | `authorize-critical` with that digest |
++| Critic-bound (residual acceptance, Critic export, Critic consent) | the request file under `scratch/` | `sign-intent --request <that file>` |
++| design approval | `pipeline-state.mjs inspect`, the design-approval request file under `scratch/` | `sign-intent --request <that file>`, then the agent runs `approve-plan --design-approval-request` |
++| a denied guarded edit | `guard-human-override.mjs plan`, `prepare-for-signature`, then `authorize-by-signature --proof` after the PO signed | `sign-intent` on the prepared request |
++
++Request files always live under `scratch/`, never elsewhere. A refusal that names
++a signing command means: hand that exact command to the PO and keep preparing.
++
+ ## The one setting
+ 
+ `gates.push_approval` in `pipeline.user.yaml` decides how a human clears a push.
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 8b921f22a..d30f26872 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -223,3 +223,19 @@ sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge
+ spends a tool use from the budget that is also the stop condition. When the route is
+ `default`, run the checks as briefed.
+ 
++## 8. Human-signed gates: prepare yourself, hand over only the sign-off
++
++<!-- hand-maintained: this is a role rule (PO decision 2026-11-02, signing parity on
++     every runner), not a value any guard exports. The per-kind commands live in
++     plugins/pipeline-core/skills/pipeline-start/references/push-approval.md. -->
++
++On Claude, Codex and Antigravity alike, the agent runs every preparation step of a
++human-signed gate itself: the read-only plan, the prepare and digest commands, and the
++readback after the signature. Only the signature step in the PO's own terminal (the
++passphrase entry) is the PO's. Never hand the PO a list of preparation commands, never
++ask the PO to run a command the agent is admitted to run, and never describe a
++preparation step as "PO only". When a guard names an external operator for the
++signature, hand over exactly that one line, then continue after the PO reports back.
++Do not change the tracked or untracked tree between handing over a tree-bound
++signature command and its return.
++
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 8b921f22a..d30f26872 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -223,3 +223,19 @@ sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge
+ spends a tool use from the budget that is also the stop condition. When the route is
+ `default`, run the checks as briefed.
+ 
++## 8. Human-signed gates: prepare yourself, hand over only the sign-off
++
++<!-- hand-maintained: this is a role rule (PO decision 2026-11-02, signing parity on
++     every runner), not a value any guard exports. The per-kind commands live in
++     plugins/pipeline-core/skills/pipeline-start/references/push-approval.md. -->
++
++On Claude, Codex and Antigravity alike, the agent runs every preparation step of a
++human-signed gate itself: the read-only plan, the prepare and digest commands, and the
++readback after the signature. Only the signature step in the PO's own terminal (the
++passphrase entry) is the PO's. Never hand the PO a list of preparation commands, never
++ask the PO to run a command the agent is admitted to run, and never describe a
++preparation step as "PO only". When a guard names an external operator for the
++signature, hand over exactly that one line, then continue after the PO reports back.
++Do not change the tracked or untracked tree between handing over a tree-bound
++signature command and its return.
++
