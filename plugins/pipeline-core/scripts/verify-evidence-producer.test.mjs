@@ -494,7 +494,9 @@ test("a calibration naming no verify command cannot produce success at any bound
     for (const mode of ["work", "critic", "push", "candidate", "release"]) {
       await assert.rejects(
         () => produceVerifyEvidence({ rootDir: root, outPath: `evidence/${mode}.json`, mode }),
-        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND"
+          // C18-2: the refusal names the sanctioned route; a direct edit of the calibration file is refused by GS-10.
+          && /pipeline-state\.mjs configure-verify --verify-command <project verify command>/u.test(error.message),
       );
       assert.equal(existsSync(join(root, "evidence", `${mode}.json`)), false);
     }

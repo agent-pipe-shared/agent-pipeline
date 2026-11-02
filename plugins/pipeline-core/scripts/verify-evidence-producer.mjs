@@ -111,6 +111,8 @@ export class VerifyEvidenceError extends Error {
   }
 }
 const fail = (code, message) => { throw new VerifyEvidenceError(code, message); };
+// C18-2: the refusal names the one sanctioned route; a direct edit of the calibration file is refused (GS-10).
+export const noVerifyCommandMessage = (mode) => `${mode} Verify requires configured product verification. Set it with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (do not edit project/pipeline.json directly; GS-10 refuses it).`;
 const LIFECYCLE_ID = /^[a-f0-9]{64}$/u;
 
 export function summarizeVerifyFailures(run) {
@@ -423,7 +425,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     // replacement run invalidates prior public evidence.
     try { configuration = readConsumerVerifyConfiguration(root); }
     catch (error) { fail("VEP-CALIBRATION", error.message); }
-    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
     started = candidateIdentity(root, [target, canonicalTarget]);
     startedAt = new Date().toISOString();
     if (started.status !== "clean") fail("VEP-EVENT-SOURCE", "Action event output requires a clean exact candidate before source execution.");
@@ -437,7 +439,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   if (configuration === undefined) {
     try { configuration = readConsumerVerifyConfiguration(root); }
     catch (error) { fail("VEP-CALIBRATION", error.message); }
-    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
   }
   const governedCritic = (mode === "release" || (mode === "candidate"
     && (criticPacketId !== null || criticReverifyReceiptId !== null))) && started.status === "clean"
@@ -451,7 +453,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     catch (error) { fail("VEP-CALIBRATION", error.message); }
   }
   const { fullCommand: command, project, projectIdentity } = configuration;
-  if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+  if (command === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
   started ??= candidateIdentity(root, [target, canonicalTarget]);
   startedAt ??= new Date().toISOString();
   const rigorObservations = readRigorVerifyObservation(root);

@@ -1015,6 +1015,8 @@ try {
       // Toolbox follow-up: every signature binds to the exact HEAD, so the second ceremony can only run after the first commit.
       assert.match(refused.stderr, /binds to the exact HEAD/u, path);
       assert.match(refused.stderr, /commit this file first/u, path);
+      // C18-2: the refusal also names the one sanctioned way to set the verify command, so no one edits the calibration by hand.
+      assert.match(refused.stderr, /pipeline-state\.mjs configure-verify --verify-command <project verify command>/u, path);
     }
     // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
     const rootManifest = ask(root, "pipeline.json");

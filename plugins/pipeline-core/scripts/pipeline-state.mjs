@@ -11623,6 +11623,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
         return 2;
       }
+      // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
+      const submitVerifyStatus = readCalibrationVerifyStatus(dir);
+      if (submitVerifyStatus.status !== "configured") {
+        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it before implementation with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (never edit project/pipeline.json directly; GS-10 refuses it). The submission continues.`);
+      }
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;

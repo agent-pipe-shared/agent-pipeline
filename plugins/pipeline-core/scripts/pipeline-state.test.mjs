@@ -1455,6 +1455,18 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
   }
 }
 
+// C18-2: a null verify command is found late (VEP-NO-COMMAND at the first Verify); submit-plan warns, names configure-verify, and still submits.
+{
+  const featureId = "c18-2-verify-warning";
+  const { root, deps } = planAuthorityFixture({ featureId, planPath: `specs/${featureId}/prd_${featureId}.md`, specPath: `specs/${featureId}/spec.md` });
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: featureId, verify: null }, null, 2)}\n`);
+  const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(submitted.result, 0, `a null verify command must warn, not refuse submit-plan: ${submitted.lines.join(" ")}`);
+  assert.ok(submitted.lines.some((line) => line.includes("configure-verify --verify-command <project verify command>")),
+    `submit-plan must name the sanctioned configure-verify route: ${submitted.lines.join(" ")}`);
+}
+
 // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
 // the PO signs, instead of letting set-phase implementation refuse it later.
 {
