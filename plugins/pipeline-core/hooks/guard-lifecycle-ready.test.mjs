@@ -5817,6 +5817,7 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     assert.match(sigResult.stderr, /mode-specific nextAction/u);
     assert.match(sigResult.stderr, /human-held Ed25519 key in an attended external terminal/u);
     assert.match(sigResult.stderr, /this session only prepares digests and verifies the proof/u);
+    assert.match(sigResult.stderr, /repeat the IDENTICAL denied tool call; a commit or edit between this denial and the signature changes the bound state and voids the request/u);
     assert.doesNotMatch(sigResult.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }

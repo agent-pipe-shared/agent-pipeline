@@ -199,7 +199,7 @@ export function humanOverrideRoute(code, reason, subject, root, toolName, toolIn
           planCommand.text,
           approvalMode === "chat"
             ? "The plan JSON gives the mode-specific nextAction; follow each returned action. The human confirms in-session; chat is attribution, not proof."
-            : "The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof.",
+            : "The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof. Once the PO has signed, repeat the IDENTICAL denied tool call; a commit or edit between this denial and the signature changes the bound state and voids the request.",
           "",
         ].join("\n");
         // A repeated parser denial must stay directly actionable without dumping
