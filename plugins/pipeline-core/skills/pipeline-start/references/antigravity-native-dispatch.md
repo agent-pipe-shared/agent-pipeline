@@ -23,6 +23,8 @@ scope from its own V3 route and the stored session consent.
 
 ### Implementation from an Antigravity-hosted Elephant
 
+`dispatch-briefing.mjs build|probe` supports `--runner antigravity` (model id = a native alias `flash_lite`, `flash` or `pro` of the registry route). Deliver the generated briefing as the packet Prompt of the prepare request; the guard does not yet require it.
+
 ```text
 node <loaded-plugin-root>/scripts/elephant-implementation-dispatch.mjs dispatch --root <repository-root> --request <role-dispatch-request.json under the root> --result-path <new relative output file> --session-id <session id> --descriptor-sha256 <descriptor sha256>
 ```

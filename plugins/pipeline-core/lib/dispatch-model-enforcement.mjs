@@ -13,7 +13,16 @@ import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
 
 /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
 const ENFORCED_RUNNERS = Object.freeze(["claude"]);
-const ANTIGRAVITY_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
+/** The Antigravity native Model aliases (the one list: the briefing generator imports it instead of copying it). */
+export const ANTIGRAVITY_NATIVE_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
+const ANTIGRAVITY_MODELS = ANTIGRAVITY_NATIVE_MODELS;
+
+/** The approved Antigravity native alias the registry projects for a duty task route (e.g. `duty.implement`), or null when none is registered. */
+export function antigravityNativeTierForTaskRoute(taskRoute, routeSource = registeredFunctionalTaskRoutes()) {
+  if (!routeSource?.ok || !Array.isArray(routeSource.taskRoutes)) return null;
+  const route = routeSource.taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === taskRoute && ANTIGRAVITY_MODELS.includes(entry.nativeTier));
+  return route ? route.nativeTier : null;
+}
 
 /** Plugin agent types that exist to serve exactly one configured duty. */
 const AGENT_TYPE_DUTIES = Object.freeze({

@@ -124,3 +124,12 @@ test("parseAgentFrontmatter: no frontmatter block -> empty object, never throws"
   assert.deepEqual(parseAgentFrontmatter("no frontmatter here"), {});
   assert.deepEqual(parseAgentFrontmatter(""), {});
 });
+
+test("A18-M1B acceptedFamilyForms lists the prefixes of a family and one example id that the family check really accepts", async () => {
+  const { acceptedFamilyForms } = await import("./agent-model-registry.mjs");
+  const sonnet = acceptedFamilyForms("sonnet");
+  assert.deepEqual(sonnet.prefixes, [...MODEL_FAMILY_ALIASES.sonnet]);
+  assert.equal(modelBelongsToFamily(sonnet.example, "sonnet"), true);
+  assert.match(sonnet.example, /^claude-sonnet-/u);
+  assert.equal(acceptedFamilyForms("not-a-family"), null);
+});

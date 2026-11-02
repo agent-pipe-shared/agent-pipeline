@@ -1311,8 +1311,10 @@ test("17 a Gemini model id is told that an Antigravity dispatch does not use thi
   const fx = makeFixture();
   const gemini = runDispatchBriefing(argvOf(fx, { "--model-id": "gemini-3.8-flash-medium" }), depsOf(fx));
   assert.equal(gemini.code, "DBG-MODEL-FAMILY");
-  assert.match(gemini.message, /an Antigravity dispatch does not use this generator/u);
-  assert.match(gemini.message, /pipeline\.role-dispatch-request\.v1/u);
+  // A18-M1B (QG-04, intent kept: a Gemini id is told where it belongs): the generator now supports --runner antigravity, so the
+  // "does not use this generator" and role-dispatch-request assertions moved to the --runner antigravity pointer.
+  assert.match(gemini.message, /a Gemini id belongs to an Antigravity dispatch/u);
+  assert.match(gemini.message, /--runner antigravity/u);
   const claude = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
   assert.equal(claude.code, "DBG-MODEL-FAMILY");
   assert.doesNotMatch(claude.message, /Antigravity/u, "the Claude-family refusal is unchanged");
@@ -2176,4 +2178,72 @@ test("C18-15 an unknown or malformed visualCheck is refused DBG-PACKAGE-FIELD-TY
     assert.equal(refused.code, "DBG-PACKAGE-FIELD-TYPE", JSON.stringify(visualCheck));
     assert.match(refused.message, /"visualCheck".*repair: /u);
   }
+});
+
+// --- A18-M1B (AC-108): the generator knows the Antigravity runner and the refusal prints the accepted aliases ---
+
+const AGY = ["--runner", "antigravity"];
+const agyRouteOf = async (taskRoute) => {
+  const { registeredFunctionalTaskRoutes } = await import("../lib/model-role-route-source.mjs");
+  return registeredFunctionalTaskRoutes().taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === taskRoute);
+};
+
+test("A18-M1B --runner antigravity is admitted for a model alias of the Antigravity route and records it", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { ANTIGRAVITY_NATIVE_MODELS } = await import("../lib/dispatch-model-enforcement.mjs");
+  const fx = makeFixture();
+  const route = await agyRouteOf("duty.implement");
+  assert.ok(ANTIGRAVITY_NATIVE_MODELS.includes(route.nativeTier), "the route alias comes from the one shared list");
+  const result = runDispatchBriefing(argvOf(fx, { "--model-id": route.nativeTier }, AGY), depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  assert.equal(result.binding.runner, "antigravity");
+  assert.equal(result.binding.model, route.nativeTier);
+  assert.equal(result.binding.agentType, "goldfish-implementor");
+  assert.equal(result.budgetEnforcement, "unenforced:antigravity");
+});
+
+test("A18-M1B --runner antigravity refuses a Claude or Codex model id with the accepted aliases and the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const route = await agyRouteOf("duty.implement");
+  for (const id of ["claude-sonnet-5-5", "gpt-5.5", "opus"]) {
+    const refused = runDispatchBriefing(argvOf(fx, { "--model-id": id }, AGY), depsOf(fx));
+    assert.equal(refused.ok, false, id);
+    assert.equal(refused.code, "DBG-MODEL-FAMILY", id);
+    for (const alias of ["flash_lite", "flash", "pro"]) assert.ok(refused.message.includes(alias), `${id}: ${alias}`);
+    assert.ok(refused.message.includes(`--model-id ${route.nativeTier}`), "the repair names the route alias");
+    assert.match(refused.message, /repair:/u);
+  }
+});
+
+test("A18-M1B a Gemini id on the Claude path is pointed to --runner antigravity and its alias, not told the generator is unavailable", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const gemini = runDispatchBriefing(argvOf(fx, { "--model-id": "gemini-3.8-flash-medium" }), depsOf(fx));
+  assert.equal(gemini.code, "DBG-MODEL-FAMILY");
+  assert.match(gemini.message, /--runner antigravity/u);
+  assert.doesNotMatch(gemini.message, /does not use this generator/u);
+});
+
+test("A18-M1B the Claude-family refusal prints the accepted prefixes, an example id, the other-family note and MP-29", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { MODEL_FAMILY_ALIASES } = await import("../lib/agent-model-registry.mjs");
+  const fx = makeFixture();
+  const refused = runDispatchBriefing(argvOf(fx, { "--model-id": "opus" }), depsOf(fx));
+  assert.equal(refused.code, "DBG-MODEL-FAMILY");
+  for (const prefix of MODEL_FAMILY_ALIASES.sonnet) assert.ok(refused.message.includes(`\`${prefix}\``), prefix);
+  assert.match(refused.message, /for example `claude-sonnet-/u);
+  assert.match(refused.message, /bare alias of another family/u);
+  assert.match(refused.message, /MP-29/u);
+  assert.match(refused.message, /tool-layer `model` parameter/u);
+});
+
+test("A18-M1B claude and codex generation does not change: the runner field is the only runner-specific difference", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const claude = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  assert.equal(claude.ok, true, JSON.stringify(claude).slice(0, 300));
+  assert.equal(claude.binding.runner, "claude");
+  assert.equal(claude.skeleton.includes("antigravity"), false);
+  assert.match(claude.skeleton, /Tool budget \(TB-09, hard cap\)/u);
 });

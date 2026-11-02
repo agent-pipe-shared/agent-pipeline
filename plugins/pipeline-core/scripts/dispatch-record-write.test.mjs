@@ -661,6 +661,19 @@ check("17 attested CLI: the label is only for a runner other than claude, and no
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// A18-M1B (AC-108): the declared Antigravity route (a native model alias) is recorded in the same shape as the Codex one.
+check("A18-M1B attested CLI: a generated Antigravity briefing is accepted and the record says its model alias is declared, not observed", () => {
+  const root = cliFixture({ briefing: briefingBody({ runner: "antigravity", model: "flash", effort: "medium" }) });
+  try {
+    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, runCli(root).target))));
+    assert.equal(persisted.runner, "antigravity");
+    assert.equal(persisted.model, "flash");
+    assert.equal(persisted.attestation.modelAssurance, "declared-unobserved");
+    assert.equal(persisted.outcomeClassification.kind, "orchestrator-attested");
+    assert.match(persisted.log[0].note, /not an observation/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 check("17 attested CLI: a Codex briefing without a role to derive the agent from is refused and names the briefing to pass", () => {
   const root = cliFixture({ briefing: codexBriefingBody({ role: "pipeline-core:not-a-goldfish" }) });
   try {
@@ -901,7 +914,7 @@ check("the attempt-terminal parent binding accepts the original parent and a typ
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 45, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 46, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

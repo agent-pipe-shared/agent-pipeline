@@ -84,6 +84,17 @@ export function resolveAgentModel(agentType, { agentsDir = DEFAULT_AGENTS_DIR } 
   return { model: frontmatter.model, effort: frontmatter.effort ?? null };
 }
 
+/**
+ * What a family accepts, for a refusal that has to say it: the prefixes of MODEL_FAMILY_ALIASES and one example id the family check
+ * really accepts; null for a name that is not an approved family.
+ */
+export function acceptedFamilyForms(tierAlias) {
+  const tier = String(tierAlias ?? "").trim().toLowerCase();
+  if (!Object.hasOwn(MODEL_FAMILY_ALIASES, tier)) return null;
+  const prefixes = [...MODEL_FAMILY_ALIASES[tier]];
+  return { prefixes, example: `${prefixes.find((prefix) => prefix.includes("-")) ?? prefixes[0]}-5-5` };
+}
+
 /** True if `concreteModel` (e.g. "claude-sonnet-5") belongs to the `tierAlias` family (e.g. "sonnet"). */
 export function modelBelongsToFamily(concreteModel, tierAlias) {
   const normalizedModel = String(concreteModel ?? "").trim().toLowerCase();

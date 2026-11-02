@@ -65,7 +65,7 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
   Required: --dispatch-id, --item, --agent-type, --model-id, --check.
   Types: goldfish-implementor, goldfish-mechanic, goldfish-deep.
   Optional: --root, repeated --path, --spec, --criterion, --recon-note.
-  --runner claude|codex defaults to claude; the selected model must match its role route.
+  --runner claude|codex|antigravity defaults to claude; the selected model must match its role route (antigravity: a native alias flash_lite|flash|pro).
   --effort-escalation MP-05|MP-07 admits an agent definition effort ABOVE its Claude route effort (otherwise a contradiction is refused).
   --check is included in the write scope. Paths are repository-relative.
   --check command:<id> (D195) names a command the project calibration registers under verifyImpact (baseline or an area) instead of a
@@ -102,7 +102,8 @@ const {
   parseNativeGoldfishBriefing,
   validateItemDeliveryBriefing,
 } = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
-const { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
+const { acceptedFamilyForms, modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
+const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
 const { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
 const {
   BRIEFING_BUILD_SCHEMA,
@@ -152,8 +153,10 @@ const SINGLE_FLAGS = Object.freeze({
 // behaviour is unchanged; `codex` checks the model id against the model the Codex route yields for the role, read from
 // the V3 runner-profile registry that `model-role-dispatch-select.mjs --runner codex` also reads (this generator never
 // calls that selector itself: with the model family active it prepares an invocation, and the generator is read-only).
-// Antigravity is deliberately not admitted here (its behaviour is unchanged: an unknown runner is refused with a repair).
-const RUNNERS = Object.freeze(["claude", "codex"]);
+// A18-M1B: `antigravity` checks the model id against the native alias the V3 registry projects for the role (flash_lite, flash, pro;
+// the one list is ANTIGRAVITY_NATIVE_MODELS of lib/dispatch-model-enforcement.mjs). The generated briefing is delivered as the packet
+// Prompt of the prepare request; the Prepare guard does not yet require it.
+const RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
 const DUTY_ROUTE_OF_AGENT = Object.freeze({
   "goldfish-implementor": "duty.implement", "goldfish-mechanic": "duty.mechanic", "goldfish-deep": "duty.deep",
 });
@@ -232,6 +235,11 @@ function defaultCodexRoute(taskRoute) {
     const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
   } catch { return null; }
+}
+
+/** The Antigravity native model alias of a duty (read-only registry projection), or null when the registry yields none. */
+function defaultAntigravityRoute(taskRoute) {
+  try { return antigravityNativeTierForTaskRoute(taskRoute); } catch { return null; }
 }
 
 /** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
@@ -897,8 +905,19 @@ export function generateDispatchBinding(options, deps = {}) {
     if (!matches) {
       refuse("DBG-MODEL-FAMILY", `model id ${modelId} is not the model the Codex route ${taskRoute} selects for ${agentType} (${expected}); repair: pass --model-id ${expected} together with --runner codex, or omit --runner for a Claude dispatch`);
     }
+  } else if (runner === "antigravity") {
+    const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+    const expected = (deps.antigravityRoute ?? defaultAntigravityRoute)(taskRoute);
+    if (typeof expected !== "string" || !ANTIGRAVITY_NATIVE_MODELS.includes(expected)) {
+      refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Antigravity route ${taskRoute} for ${agentType} is not registered in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Antigravity route is registered (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}), or dispatch with --runner claude`);
+    }
+    if (modelId !== expected) {
+      refuse("DBG-MODEL-FAMILY", `model id ${modelId} is not the Antigravity native model alias the route ${taskRoute} selects for ${agentType} (${expected}); the accepted Antigravity aliases are ${ANTIGRAVITY_NATIVE_MODELS.join(", ")} (a Claude or Codex model id belongs to --runner claude or --runner codex); repair: pass --model-id ${expected} together with --runner antigravity, or omit --runner for a Claude dispatch`);
+    }
   } else if (!modelBelongsToFamily(modelId, resolved.model)) {
-    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? "; a Gemini id belongs to an Antigravity dispatch, and an Antigravity dispatch does not use this generator: its implementation route reads a pipeline.role-dispatch-request.v1 packet and its own V3 route, not a native-goldfish-host-commit briefing (references/antigravity-native-dispatch.md)" : ""}`);
+    const forms = acceptedFamilyForms(resolved.model);
+    const accepted = forms === null ? "" : ` (accepted prefixes ${forms.prefixes.map((prefix) => `\`${prefix}\``).join(", ")}; for example \`${forms.example}\`)`;
+    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family${accepted} (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}); a bare alias of another family (for example \`opus\` for a Goldfish agent definition that declares ${resolved.model}) belongs to a different agent type, not to this one; or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? `; a Gemini id belongs to an Antigravity dispatch: pass --runner antigravity with an alias of its route (${ANTIGRAVITY_NATIVE_MODELS.join(", ")}; the generated briefing is then the packet Prompt of the prepare request, references/antigravity-native-dispatch.md)` : ""}`);
   }
   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
   // Claude (W2-R2): the Claude Agent tool cannot pass an effort (MP-29), so the agent definition's frontmatter effort is what the run
@@ -909,7 +928,8 @@ export function generateDispatchBinding(options, deps = {}) {
   if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
     refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort; in a briefing package the key "effortEscalation"), or omit it`);
   }
-  if (runner !== "codex") {
+  // Antigravity: the agent definition's effort is the briefed effort (no Antigravity effort is selectable; the Claude route is not read).
+  if (runner === "claude") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
     const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute);
     const routeEffort = route && route.state !== "unavailable" && typeof route.effort === "string" && route.effort !== "" ? route.effort : null;
@@ -1065,7 +1085,9 @@ export function generateDispatchBinding(options, deps = {}) {
     `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
     runner === "codex"
       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
-      : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
+      : runner === "antigravity"
+        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+        : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
     `- Slice: ${dispatchId}`,
@@ -1088,12 +1110,14 @@ export function generateDispatchBinding(options, deps = {}) {
 
   // Self-check: the host's own parser must accept exactly what is about to be handed out.
   if (skeleton.split(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2)).length !== 2) refuse("DBG-SELFCHECK-MARKER", "the skeleton must contain the binding opening marker exactly once");
-  const parsed = parseNativeGoldfishBriefing(skeleton);
+  // The host parser admits only claude and codex runners; an antigravity skeleton is read back with the runner field as claude (every other
+  // field is checked as for Claude) and compared to its own runner below.
+  const parsed = parseNativeGoldfishBriefing(runner === "antigravity" ? skeleton.replace('"runner":"antigravity"', '"runner":"claude"') : skeleton);
   if (!parsed.ok) refuse("DBG-SELFCHECK-PARSE", `the host parser rejects the generated skeleton: ${parsed.code}`);
   const { criticDecision: _decision, ...parsedAll } = parsed.binding;
   // The host adds `agentType` and `adapterVersion` to a Codex-native binding it reads back; neither is in the block.
   const { agentType: _derived, adapterVersion: _adapter, ...parsedCodex } = parsedAll;
-  const parsedRest = runner === "codex" ? parsedCodex : parsedAll;
+  const parsedRest = runner === "codex" ? parsedCodex : runner === "antigravity" ? { ...parsedAll, runner } : parsedAll;
   const { criticDecision: _own, ...ownRest } = serialised;
   if (JSON.stringify(parsedRest) !== JSON.stringify(ownRest)) refuse("DBG-SELFCHECK-PARSE", "the host parser read back a different binding than was generated");
   const named = parseDispatchSlice(skeleton);
@@ -1140,7 +1164,7 @@ function packageBindingOptions(root, pkg, agentType) {
 /** The tool-layer parameters of the Claude Agent call (tool, subagent_type, model family), or null for a Codex dispatch or an unbound tier. */
 function dispatchCallBase(pkg, boundTier) {
   const family = ["opus", "sonnet", "haiku", "fable"].find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
-  return pkg.runner === "codex" || typeof boundTier !== "string" ? null : { tool: "Agent", subagent_type: `pipeline-core:${boundTier}`, model: family };
+  return pkg.runner === "codex" || pkg.runner === "antigravity" || typeof boundTier !== "string" ? null : { tool: "Agent", subagent_type: `pipeline-core:${boundTier}`, model: family };
 }
 
 /** The D196 (R4) estimate warnings of build, as a pure function of the package and the binding's tool budget. */
