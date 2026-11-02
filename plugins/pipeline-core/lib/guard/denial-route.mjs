@@ -327,6 +327,12 @@ function planInvalidationReleasesBinding(state) {
     .some((at) => Number.isFinite(at) && at > invalidatedAt);
 }
 
+function approvedDesignCompanionPaths(state) {
+  const companions = state.planApproval?.designApprovalBinding?.sources?.companions;
+  if (!Array.isArray(companions)) return [];
+  return companions.map((source) => source?.path).filter((p) => typeof p === "string" && p !== "");
+}
+
 export function boundAuthorityDocumentPath(root, requested) {
   for (const relativeStatePath of [join(".claude", "pipeline-state.json"), join("project", "pipeline-state.json")]) {
     let raw;
@@ -355,6 +361,10 @@ export function boundAuthorityDocumentPath(root, requested) {
       join(dirname(specPath), "design-input.md"),
       state.planApproval?.poGateAuthority?.planPath,
       state.planApproval?.poGateAuthority?.specPath,
+      // C18-13 / AC-155: every companion source the approved design binds is protected
+      // up front too, not only caught afterwards by DAA-DESIGN-SOURCE-DRIFT. Absent or
+      // malformed binding contributes nothing (fail open, as above).
+      ...approvedDesignCompanionPaths(state),
     ].filter((p) => typeof p === "string" && p !== "");
     for (const candidate of candidates) {
       let candidateAbsolute;

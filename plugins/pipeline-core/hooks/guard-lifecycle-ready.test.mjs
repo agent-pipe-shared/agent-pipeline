@@ -521,6 +521,7 @@ function withContinuityAuthority(path, {
   prdPath = "specs/2026-08-18-demo/prd_demo.md",
   specPath = "specs/2026-08-18-demo/spec.md",
   planInvalidation,
+  companions,
 } = {}) {
   const state = {
     schema: "pipeline.state.v0",
@@ -532,6 +533,9 @@ function withContinuityAuthority(path, {
     },
   };
   if (planInvalidation !== undefined) state.planInvalidation = planInvalidation;
+  if (companions !== undefined) {
+    state.planApproval = { designApprovalBinding: { sources: { prd: { path: prdPath }, spec: { path: specPath }, companions: companions.map((p) => ({ path: p })) } } };
+  }
   writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(state));
   return { prdPath, specPath, designInputPath: join(dirname(specPath), "design-input.md") };
 }
@@ -661,6 +665,38 @@ test("writes to the currently bound PRD, Spec, or design input are blocked even 
       assert.match(result.stderr, /submit-plan --by <name>/u, filePath);
       assert.match(result.stderr, /approve-plan --by <name>/u, filePath);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("C18-13 / AC-155: an edit to a companion source of the approved design is denied up front and names reopen-design", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const companions = ["specs/2026-08-18-demo/design-notes.md", "specs/2026-08-18-demo/evidence/model.json"];
+    withContinuityAuthority(path, { companions });
+    for (const filePath of companions) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u, filePath);
+      assert.match(result.stderr, /reopen-design --by <name>/u, filePath);
+    }
+    const unrelated = evaluateLifecycleReadyGuard(edit("specs/2026-08-18-demo/other.md"), { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+    assert.equal(unrelated.exitCode, 0);
+    // a prefix-sharing, non-identical path is not a companion
+    const near = evaluateLifecycleReadyGuard(edit("specs/2026-08-18-demo/design-notes.md.bak"), { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+    assert.equal(near.exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("C18-13 / AC-155: without an approved design binding a would-be companion path stays editable", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    withContinuityAuthority(path);
+    const result = evaluateLifecycleReadyGuard(edit("specs/2026-08-18-demo/design-notes.md"), { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+    assert.equal(result.exitCode, 0);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
