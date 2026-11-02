@@ -1,0 +1,172 @@
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index 58f6838cc..8750989e4 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -146,7 +146,16 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
+ 
+ // Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
+ // the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
+-export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>" } = {}) {
++export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
++
++// The Close commit carries the push threat model when the push gate needs one: prepare-push-subject binds the approval to that file, so a file
++// materialized after the close would leave the tree dirty. `pushThreatModel` is { required, present } as read by the caller (this module stays
++// pure); the action stands after the close artefacts are finalized and before the freeze, i.e. before the commit it belongs in. Currency is not checked.
++export function pushThreatModelDue(pushThreatModel) {
++  return pushThreatModel !== null && typeof pushThreatModel === "object" && pushThreatModel.required === true && pushThreatModel.present !== true;
++}
++
++export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null } = {}) {
+   const actions = [];
+   const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
+   if (phase === "active") {
+@@ -156,6 +165,14 @@ export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>
+   const chain = describeCloseChain(phase, { root, lifecycle });
+   for (const step of chain.remaining) {
+     if (step.phase === "checkpointed") continue;
++    if (step.phase === "candidate-frozen" && pushThreatModelDue(pushThreatModel)) {
++      push({
++        id: "materialize-push-threat-model", who: "agent",
++        command: "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model",
++        commitWith: PUSH_THREAT_MODEL_FILE,
++        source: "close-feature SKILL, Close commit",
++      });
++    }
+     const known = CLOSE_STEP_REQUIREMENTS[step.phase];
+     push({
+       id: step.phase,
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.test.mjs b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+index f4637280d..cf412cb24 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.test.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+@@ -70,6 +70,35 @@ test("AC-264: the action list names the Result bootstrap and the reconcile signa
+   assert.equal(describeCloseActions("promoted").nextHumanGate, null);
+ });
+ 
++test("AC-264: a required, missing push threat model is an agent action before the step that freezes the Close commit, with a commitWith marker", () => {
++  const MATERIALIZE = "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model";
++  for (const phase of ["active", "checkpointed", "feature-close-prepared", "tracked-close-finalized"]) {
++    const list = describeCloseActions(phase, { root: "/r", lifecycle: "close-x", pushThreatModel: { required: true, present: false } });
++    const ids = list.actions.map((a) => a.id);
++    const at = ids.indexOf("materialize-push-threat-model");
++    assert.ok(at >= 0, `${phase}: the action is listed`);
++    assert.ok(at < ids.indexOf("candidate-frozen"), `${phase}: it stands before the freeze that follows the Close commit`);
++    if (ids.includes("tracked-close-finalized")) assert.ok(at > ids.indexOf("tracked-close-finalized"), `${phase}: after the close artefacts are finalized, in the same commit as them`);
++    assert.equal(list.actions[at].who, "agent");
++    assert.equal(list.actions[at].command, MATERIALIZE);
++    assert.equal(list.actions[at].commitWith, "project/push-threat-model.md");
++    assert.ok(list.actions.every((a, i) => a.order === i + 1), `${phase}: order stays contiguous`);
++  }
++  const base = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x" }).actions.map((a) => a.id);
++  const withIt = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x", pushThreatModel: { required: true, present: false } });
++  assert.deepEqual(withIt.actions.map((a) => a.id).filter((id) => id !== "materialize-push-threat-model"), base, "no other action moves or is added");
++  assert.equal(withIt.nextHumanGate, "publication-authorized", "no new PO action is introduced");
++});
++
++test("AC-264: the threat-model action is absent when the file exists, when the gate does not require approval, or when the Close commit is already made", () => {
++  const ids = (phase, pushThreatModel) => describeCloseActions(phase, { root: "/r", lifecycle: "close-x", pushThreatModel }).actions.map((a) => a.id);
++  assert.equal(ids("checkpointed", { required: true, present: true }).includes("materialize-push-threat-model"), false);
++  assert.equal(ids("checkpointed", { required: false, present: false }).includes("materialize-push-threat-model"), false);
++  assert.equal(ids("checkpointed", undefined).includes("materialize-push-threat-model"), false);
++  assert.equal(ids("candidate-frozen", { required: true, present: false }).includes("materialize-push-threat-model"), false);
++  assert.equal(ids("final-verify-green", { required: true, present: false }).includes("materialize-push-threat-model"), false);
++});
++
+ test("the missing inputs of a step are named from the supplied values", () => {
+   assert.deepEqual(missingCloseInputs("checkpointed", {}), []);
+   assert.deepEqual(missingCloseInputs("feature-close-prepared", {}), ["architectureImpact"]);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 22466091f..e98a4a1ea 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -36,7 +36,8 @@ import {
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+-import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
++import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
++import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+@@ -1152,6 +1153,12 @@ async function applyTransition(values, suppliedDigest) {
+   return result;
+ }
+ 
++// Read-only: does the push gate require approval (the same manifest reader push-prepare uses) and is the threat model file there? Currency is not checked.
++function readPushThreatModelState(root) {
++  const required = gateConfig(loadManifestSafe(root), "push")?.approval === "required";
++  return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
++}
++
+ // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
+ // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
+ async function driveClose(values, { apply, dryRun = false }) {
+@@ -1162,7 +1169,7 @@ async function driveClose(values, { apply, dryRun = false }) {
+   const phase = stored.coordinator.phase;
+   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
+   const options = coordinatorNextPhases(phase);
+-  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle });
++  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root) });
+   const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions };
+   if (options.length === 0) return { ...base, status: "terminal" };
+   const target = values.phase ?? options[0];
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 179adced8..8b11c8680 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -906,6 +906,41 @@ test("process: AC-264 drive lists every action with who, ends at the next human
+   rmSync(f.root, { recursive: true, force: true });
+ });
+ 
++test("process: AC-264 drive and --dry-run list materialize-push-threat-model before the Close commit only when the push gate requires approval and the file is missing", () => {
++  const seen = {};
++  const MANIFEST = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
++  processFixture("tmodel", {
++    afterPrepared({ root }) {
++      const lifecycle = "close-tmodel";
++      const listing = (extra = []) => invoke(["drive", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", ...extra]).actions.actions;
++      const find = (list) => list.find((a) => a.id === "materialize-push-threat-model");
++      seen.noGate = [find(listing()), find(listing(["--dry-run"]))];
++      mkdirSync(join(root, ".claude"), { recursive: true });
++      writeFileSync(join(root, ".claude", "pipeline.yaml"), MANIFEST);
++      seen.missing = listing();
++      seen.missingDry = listing(["--dry-run"]);
++      seen.materialized = existsSync(join(root, "project", "push-threat-model.md"));
++      mkdirSync(join(root, "project"), { recursive: true });
++      writeFileSync(join(root, "project", "push-threat-model.md"), "# threat model\n");
++      seen.present = [find(listing()), find(listing(["--dry-run"]))];
++      rmSync(join(root, "project"), { recursive: true, force: true });
++      rmSync(join(root, ".claude", "pipeline.yaml"), { force: true });
++    },
++  });
++  assert.deepEqual(seen.noGate, [undefined, undefined], "no push gate configured: nothing is listed");
++  for (const list of [seen.missing, seen.missingDry]) {
++    const ids = list.map((a) => a.id);
++    const entry = list.find((a) => a.id === "materialize-push-threat-model");
++    assert.ok(entry, "the action is listed");
++    assert.equal(entry.who, "agent");
++    assert.equal(entry.commitWith, "project/push-threat-model.md");
++    assert.match(entry.command, /pipeline-state\.mjs materialize-push-threat-model$/u);
++    assert.ok(ids.indexOf("materialize-push-threat-model") < ids.indexOf("candidate-frozen"));
++  }
++  assert.deepEqual(seen.present, [undefined, undefined], "the file exists: nothing is listed");
++  assert.equal(seen.materialized, false, "drive materializes nothing");
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 32a6283fb..ef5b949c3 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -119,6 +119,8 @@ The State sub-effect is not the terminal close. Complete Result, backlog,
+ handover, HISTORY, telemetry and retrospective bytes, then bind their exact
+ postimage with `tracked-close-finalized`. Only after the one final commit may
+ the coordinator freeze `candidate-frozen` and accept Verify/Security evidence.
++When the push gate requires approval, `project/push-threat-model.md` is committed together with the close artefacts in that one
++commit: `close-coordinator.mjs drive` lists `materialize-push-threat-model` (with `commitWith`) before it, so the tree stays clean afterwards.
+ Note in the project's handover file which feature closed, by whom, `forCommit`
+ (or "—" if Git resolution failed), and the close timestamp from the State
+ writer output.
