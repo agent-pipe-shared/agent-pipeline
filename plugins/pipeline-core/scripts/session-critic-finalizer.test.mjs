@@ -1896,7 +1896,8 @@ test("D173 a typed error keeps its code and gains a detail only when its message
   const usage = runSessionCriticFinalizerCli(["finalize", "--root", "x"]);
   assert.equal(usage.output.code, "SCF-USAGE");
   assert.equal(usage.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
-  assert.equal(usage.output.detail, "SCF-USAGE: Session Critic finalization is invalid.");
+  // 17: the usage refusal names the verbs and the argument shape (the detail is one line of at most 200 characters).
+  assert.equal(usage.output.detail, "SCF-USAGE: usage: session-critic-finalizer.mjs <admit|finalize|register-batch|append-correction> --root <repo> --request <request file under scratch> (the export verb has its own usage)");
 });
 
 test("D173 an output without a detail is byte-identical to the old shape", () => {
@@ -2219,8 +2220,24 @@ test("D1 walk (6) v1 and v2 requests accept the optional key and pass it to the 
     for (const bad of ["", 7, null]) {
       const result = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "d1-bad.json", d1Request(fx, bad))], deps);
       assert.equal(result.output.code, "SCF-REQUEST", String(bad));
+      // 17: the detail points at --help, which lists the exact keys (the detail itself is cut to one short line).
+      assert.match(result.output.detail, /session-critic-finalizer\.mjs --help lists its exact keys/u, String(bad));
     }
   } finally { cleanup(fx); }
+});
+
+test("17 the finalizer --help lists the closed finalization request keys and the usage refusal names the verbs", () => {
+  const help = spawnSync(process.execPath, [FINALIZER_SCRIPT, "--help"], { encoding: "utf8" });
+  assert.equal(help.status, 0);
+  for (const key of ["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route {routeId, runner, adapter, provider, modelTier, effortTier}",
+    "review {base, candidate, specPath, guardrailPaths[], evidencePaths[],", "priorCriticEvidencePath|null", "verdictPath", "event (null or {eventOutPath, featureId})"]) {
+    assert.ok(help.stdout.includes(key), `--help names ${key}`);
+  }
+  assert.match(help.stdout, /pipeline\.session-critic-finalization-request\.v1 \(v2 adds review\.courseContext, v3 adds review\.genericBatchRef\)/u);
+  const usage = runSessionCriticFinalizerCli(["bogus-verb"]);
+  assert.equal(usage.output.code, "SCF-USAGE");
+  assert.match(usage.output.detail, /usage: session-critic-finalizer\.mjs <admit\|finalize\|register-batch\|append-correction> --root/u);
+  assert.ok(usage.output.detail.length <= 200, "the detail is not cut inside the sentence");
 });
 
 test("W7 round takeover CLI: a consumed round whose lineage cannot be registered any more is retired by the verbs its refusal names, and each refusal text names a verb that admits", async () => {

@@ -34,7 +34,7 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
     || reference.schema !== CRITIC_EVIDENCE_SCHEMA
     || reference.taskId !== addendum.taskId
     || reference.candidateCommit !== addendum.candidateCommit
-    || !SHA256.test(reference.sha256 ?? "")) throw new TypeError("critic addendum evidence binding is invalid");
+    || !SHA256.test(reference.sha256 ?? "")) throw new TypeError(`critic addendum evidence binding is invalid: criticEvidence must be exactly { schema: "${CRITIC_EVIDENCE_SCHEMA}", taskId (equal to the addendum taskId), candidateCommit (equal to the addendum candidateCommit), path (repository-relative, under evidence/), sha256 (64 hex of that file) }`);
   normalizeDispatchRecordPath(reference.path, "critic addendum evidence path");
   if (!/^(?:evidence|backlog\/evidence)\//u.test(reference.path)) throw new TypeError("critic addendum evidence must be under evidence");
   const undelivered = record?.outcomeClassification?.kind === "completed-undelivered"

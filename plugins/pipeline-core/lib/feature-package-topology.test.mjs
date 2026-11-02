@@ -21,6 +21,13 @@ try {
   file(`${base}/lifecycle.json`, `${JSON.stringify(manifest)}\n`);
   assert.equal(validateFeatureTopology(root).ok, true);
   assert.equal(planFeaturePackageTransition(root, `${base}/lifecycle.json`, "completed").status, "preview");
+  // 17: a refused step names the admitted next states instead of leaving the chain to be read from the source.
+  const skipped = planFeaturePackageTransition(root, `${base}/lifecycle.json`, "approved");
+  assert.equal(skipped.status, "rejected");
+  assert.equal(skipped.reason, "invalid-transition");
+  assert.equal(skipped.from, "verifying");
+  assert.match(skipped.repair, /from verifying the admitted next states are completed, implementing/u);
+  assert.match(skipped.repair, /draft > awaiting-approval > approved > implementing > verifying > completed/u);
   const bootstrapId = "bootstrap-feature";
   const bootstrapBase = `specs/${bootstrapId}`;
   const bootstrapPrd = file(`${bootstrapBase}/prd.md`, "# Bootstrap PRD\n");

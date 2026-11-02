@@ -97,6 +97,10 @@ export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evi
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json> [--allow-caller-authored-fallback]",
+  "       admit and finalize request (a closed JSON file; exactly these keys): schema, taskId, projectId, sessionId, packetId, trigger (T0|T1|T2|T3),",
+  "         route {routeId, runner, adapter, provider, modelTier, effortTier}, review {base, candidate, specPath, guardrailPaths[], evidencePaths[],",
+  "         priorCriticEvidencePath|null}, verdictPath, event (null or {eventOutPath, featureId});",
+  "         schema pipeline.session-critic-finalization-request.v1 (v2 adds review.courseContext, v3 adds review.genericBatchRef)",
   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
@@ -116,6 +120,9 @@ const ROUTE_KEYS = Object.freeze(["routeId", "runner", "adapter", "provider", "m
 const REQUEST_KEYS = Object.freeze(["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route", "review", "verdictPath", "event"]);
 const REVIEW_KEYS = Object.freeze(["base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath"]);
 const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
+// 17 (AGY greenfield): a bare SCF-REQUEST left the agent to read the validator to learn the closed request shape.
+// The CLI error detail is cut to one line of 200 characters, so the full key list lives in --help and the detail points there.
+const SCF_REQUEST_SHAPE = "the request is a closed JSON file that does not match; session-critic-finalizer.mjs --help lists its exact keys";
 
 // Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
 // No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
@@ -275,10 +282,10 @@ function validateCliRequest(value) {
     || typeof value.verdictPath !== "string"
     || !(value.event === null || (exact(value.event, EVENT_KEYS)
       && typeof value.event.eventOutPath === "string"
-      && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST");
-  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST");
+      && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
   if (version3 && (!exact(value.review.genericBatchRef, ["batchId", "registrationSha256", "memberSha256"])
-    || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST");
+    || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
   if (hasSignedImportAnchor) {
     const anchor = value.signedQualityImportAnchor;
     if (!exact(anchor, ["schema", "intentSha256", "integrationCommit"])
@@ -900,7 +907,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       if (!exact(rawRelease, ["schema", "packetId", "reason"]) || rawRelease.schema !== SESSION_CRITIC_RELEASE_REQUEST_SCHEMA) fail("SCF-RELEASE-REQUEST");
       return Object.freeze({ exitCode: 0, output: releaseCriticPacket({ controlRoot: controlRootFor(releaseRoot), packetId: rawRelease.packetId, reason: rawRelease.reason }) });
     }
-    if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+    if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE", "usage: session-critic-finalizer.mjs <admit|finalize|register-batch|append-correction> --root <repo> --request <request file under scratch> (the export verb has its own usage)");
     const root = realpathSync(resolve(argv[2]));
     const raw = readPhysicalRequest(root, argv[4]);
     if (argv[0] === "register-batch") {

@@ -240,7 +240,10 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
     "verifying:implementing",
   ]);
   if (!admitted.has(`${from}:${nextState}`)) {
-    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
+    // 17 (AGY greenfield): the agent asked for implementing -> completed in one step and had to read this file to learn the chain.
+    const next = [...admitted].filter((key) => key.startsWith(`${from}:`)).map((key) => key.slice(from.length + 1));
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", from, to: nextState,
+      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn`, findings: [] };
   }
   // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
   // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly

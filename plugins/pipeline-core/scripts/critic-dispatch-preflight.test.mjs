@@ -722,8 +722,13 @@ test("shared argument parser preserves defaults scalar overwrites arrays and exa
   assert.deepEqual(parseCriticDispatchPreflightArgs(["--root", "--base"]), { ...defaults, root: "--base" });
   for (const flag of ["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence"])
     assert.throws(() => parseCriticDispatchPreflightArgs([flag]), { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: flag + " requires a value." });
+  // 17: an unknown flag now names the flags the preflight does take, and `--range` (a spelling the AGY greenfield run tried) names the replacement.
   assert.throws(() => parseCriticDispatchPreflightArgs(["--other", "value"]),
-    { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: "Unknown argument: --other" });
+    (error) => error.name === "CriticDispatchPreflightError" && error.code === "CDP-ARGUMENT"
+      && error.message.startsWith("Unknown argument: --other; the preflight takes --root, --base, --candidate,")
+      && !/there is no --range/u.test(error.message));
+  assert.throws(() => parseCriticDispatchPreflightArgs(["--range", "a..b"]),
+    (error) => error.code === "CDP-ARGUMENT" && /there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>/u.test(error.message));
 });
 
 test("request destructuring retains original getter order and exceptions before body entry", () => {

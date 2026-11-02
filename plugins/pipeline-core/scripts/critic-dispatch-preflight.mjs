@@ -649,7 +649,7 @@ export function parseCriticDispatchPreflightArgs(argv) {
       if (Object.hasOwn(selectors, flag)) fail("CDP-ARGUMENT", "Duplicate course selector.");
       selectors[flag] = value;
     }
-    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
+    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}; the preflight takes --root, --base, --candidate, --spec, --guardrail, --evidence, --prior-critic, --sweep-evidence, --task-id, --registration-commit, --accepted-contract, --criterion-locator, --delta-request and --correction-input-bindings, each with a value${flag === "--range" ? "; there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>" : ""}.`);
     index += 1;
   }
   // D223 (slice 3): no --registration-commit given. The registration commit is the ONE commit after the candidate (an evidence-only chain, as

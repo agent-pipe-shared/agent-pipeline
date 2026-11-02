@@ -806,3 +806,15 @@ test("D227 the private record carries the class to the lifecycle deps, and the v
   const minorLoaded = readiness.loadResidualAcceptanceDeps({ gitCommonDir: common, projectDir: common, criticReceiptSha256: minor.receiptSha });
   assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
 });
+
+import { validateCriticDispositionAddendum as validateAddendumForMessage } from "./critic-disposition-addendum.mjs";
+
+// 17 (AGY greenfield): the Critic addendum's evidence binding is a closed object whose schema string and fields the agent had to read
+// out of the source. The refusal now names them.
+test("17 a malformed Critic evidence binding in the addendum names the closed field set", () => {
+  const addendum = (criticEvidence) => ({ schema: "pipeline.critic-disposition-addendum.v1", recordPath: "evidence/dispatch-record-t1.json", recordSha256: "a".repeat(64),
+    taskId: "t1", candidateCommit: "b".repeat(40), reviewCandidateCommit: "b".repeat(40), criticEvidence, criticPacketId: "c".repeat(32), criticReceiptSha256: "d".repeat(64) });
+  assert.throws(() => validateAddendumForMessage(addendum({ schema: "wrong" }), { recordPath: "evidence/dispatch-record-t1.json" }),
+    (error) => error instanceof TypeError
+      && /^critic addendum evidence binding is invalid: criticEvidence must be exactly \{ schema: "pipeline\.critic-evidence-reference\.v1", taskId \(equal to the addendum taskId\), candidateCommit \(equal to the addendum candidateCommit\), path \(repository-relative, under evidence\/\), sha256 \(64 hex of that file\) \}$/u.test(error.message));
+});
