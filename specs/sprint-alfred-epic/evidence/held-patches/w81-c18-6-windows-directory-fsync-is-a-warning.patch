@@ -1,0 +1,67 @@
+diff --git a/plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs b/plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs
+new file mode 100644
+index 000000000..1b476e13d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs
+@@ -0,0 +1,39 @@
++// AC-127 (C18-6): a directory fsync that Windows refuses must not abort the registry write path.
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { syncRegistryDirectory } from './session-authority-registry.mjs';
++
++function port(code) {
++  const calls = [];
++  return {
++    calls,
++    openSync: () => { calls.push('open'); return 7; },
++    fsyncSync: () => { calls.push('fsync'); if (code) { const e = new Error(code); e.code = code; throw e; } },
++    closeSync: () => { calls.push('close'); },
++  };
++}
++
++for (const code of ['EPERM', 'EINVAL', 'EISDIR', 'EACCES', 'ENOTSUP']) {
++  test(`win32 tolerates directory fsync ${code} and reports a bounded warning`, () => {
++    const fs = port(code);
++    const result = syncRegistryDirectory('/x', { platform: 'win32', fs });
++    assert.deepEqual(result, { durability: 'unsupported', syncErrorCode: code });
++    assert.deepEqual(fs.calls, ['open', 'fsync', 'close']);
++  });
++  test(`linux still throws directory fsync ${code}`, () => {
++    const fs = port(code);
++    assert.throws(() => syncRegistryDirectory('/x', { platform: 'linux', fs }), { code });
++    assert.deepEqual(fs.calls, ['open', 'fsync', 'close']);
++  });
++}
++
++test('win32 still throws any other error code', () => {
++  const fs = port('EIO');
++  assert.throws(() => syncRegistryDirectory('/x', { platform: 'win32', fs }), { code: 'EIO' });
++});
++
++test('a successful fsync reports synced on every platform', () => {
++  for (const platform of ['win32', 'linux']) {
++    assert.deepEqual(syncRegistryDirectory('/x', { platform, fs: port(null) }), { durability: 'synced' });
++  }
++});
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 164e8ffcd..d1e6eb61d 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -141,7 +141,16 @@ function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(re
+ function readRecord(repo,path){const read=readRaw(repo,path);try{const value=JSON.parse(read.bytes.toString('utf8'));if(canonical(value)!==read.bytes.toString('utf8'))fail('SDC-AUTHORITY-UNAVAILABLE','noncanonical-record-json');return {...read,value};}catch{fail('SDC-AUTHORITY-UNAVAILABLE','invalid-record-json');}}
+ function readRef(repo,value){ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
+ function privateDirectories(repo,path){if(process.platform==='win32'){let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))windowsAuthority.createWindowsOwnedAuthorityDirectory({path:cursor});windowsAuthority.inspectWindowsOwnedAuthorityPath({path:cursor,directory:true});}return;}let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))mkdirSync(cursor,{mode:0o700});owned(lstatSync(cursor),true);}}
+-function syncDirectory(path){const fd=openSync(path,constants.O_RDONLY);try{fsyncSync(fd);}finally{closeSync(fd);}}
++// Directory fsync. On win32 the platform may refuse it (EPERM and siblings); that counts as a succeeded write and is
++// reported as a bounded warning field instead of being thrown. Platform and fs port are injectable for tests.
++const WIN32_DIRECTORY_FSYNC_TOLERATED=Object.freeze(['EPERM','EINVAL','EISDIR','EACCES','ENOTSUP']);
++export function syncRegistryDirectory(path,{platform=process.platform,fs:port={openSync,fsyncSync,closeSync}}={}){
++  let fd;
++  try{fd=port.openSync(path,constants.O_RDONLY);port.fsyncSync(fd);return {durability:'synced'};}
++  catch(error){if(platform!=='win32'||!WIN32_DIRECTORY_FSYNC_TOLERATED.includes(error?.code))throw error;return {durability:'unsupported',syncErrorCode:error.code};}
++  finally{if(fd!==undefined)port.closeSync(fd);}
++}
++function syncDirectory(path){return syncRegistryDirectory(path);}
+ function publishOriginal(repo,path,value,expected=null,record=null){
+   safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path),bytes=Buffer.from(canonical(value));
+   if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');
