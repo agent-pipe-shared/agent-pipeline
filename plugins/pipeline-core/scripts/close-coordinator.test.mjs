@@ -906,6 +906,41 @@ test("process: AC-264 drive lists every action with who, ends at the next human 
   rmSync(f.root, { recursive: true, force: true });
 });
 
+test("process: AC-264 drive and --dry-run list materialize-push-threat-model before the Close commit only when the push gate requires approval and the file is missing", () => {
+  const seen = {};
+  const MANIFEST = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
+  processFixture("tmodel", {
+    afterPrepared({ root }) {
+      const lifecycle = "close-tmodel";
+      const listing = (extra = []) => invoke(["drive", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", ...extra]).actions.actions;
+      const find = (list) => list.find((a) => a.id === "materialize-push-threat-model");
+      seen.noGate = [find(listing()), find(listing(["--dry-run"]))];
+      mkdirSync(join(root, ".claude"), { recursive: true });
+      writeFileSync(join(root, ".claude", "pipeline.yaml"), MANIFEST);
+      seen.missing = listing();
+      seen.missingDry = listing(["--dry-run"]);
+      seen.materialized = existsSync(join(root, "project", "push-threat-model.md"));
+      mkdirSync(join(root, "project"), { recursive: true });
+      writeFileSync(join(root, "project", "push-threat-model.md"), "# threat model\n");
+      seen.present = [find(listing()), find(listing(["--dry-run"]))];
+      rmSync(join(root, "project"), { recursive: true, force: true });
+      rmSync(join(root, ".claude", "pipeline.yaml"), { force: true });
+    },
+  });
+  assert.deepEqual(seen.noGate, [undefined, undefined], "no push gate configured: nothing is listed");
+  for (const list of [seen.missing, seen.missingDry]) {
+    const ids = list.map((a) => a.id);
+    const entry = list.find((a) => a.id === "materialize-push-threat-model");
+    assert.ok(entry, "the action is listed");
+    assert.equal(entry.who, "agent");
+    assert.equal(entry.commitWith, "project/push-threat-model.md");
+    assert.match(entry.command, /pipeline-state\.mjs materialize-push-threat-model$/u);
+    assert.ok(ids.indexOf("materialize-push-threat-model") < ids.indexOf("candidate-frozen"));
+  }
+  assert.deepEqual(seen.present, [undefined, undefined], "the file exists: nothing is listed");
+  assert.equal(seen.materialized, false, "drive materializes nothing");
+});
+
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
   const fixture = processFixture("delivery");
   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");

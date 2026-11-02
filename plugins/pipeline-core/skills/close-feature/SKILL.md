@@ -119,6 +119,8 @@ The State sub-effect is not the terminal close. Complete Result, backlog,
 handover, HISTORY, telemetry and retrospective bytes, then bind their exact
 postimage with `tracked-close-finalized`. Only after the one final commit may
 the coordinator freeze `candidate-frozen` and accept Verify/Security evidence.
+When the push gate requires approval, `project/push-threat-model.md` is committed together with the close artefacts in that one
+commit: `close-coordinator.mjs drive` lists `materialize-push-threat-model` (with `commitWith`) before it, so the tree stays clean afterwards.
 Note in the project's handover file which feature closed, by whom, `forCommit`
 (or "—" if Git resolution failed), and the close timestamp from the State
 writer output.

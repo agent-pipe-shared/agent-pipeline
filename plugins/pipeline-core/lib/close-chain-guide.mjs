@@ -146,7 +146,16 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
 
 // Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
 // the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
-export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>" } = {}) {
+export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
+
+// The Close commit carries the push threat model when the push gate needs one: prepare-push-subject binds the approval to that file, so a file
+// materialized after the close would leave the tree dirty. `pushThreatModel` is { required, present } as read by the caller (this module stays
+// pure); the action stands after the close artefacts are finalized and before the freeze, i.e. before the commit it belongs in. Currency is not checked.
+export function pushThreatModelDue(pushThreatModel) {
+  return pushThreatModel !== null && typeof pushThreatModel === "object" && pushThreatModel.required === true && pushThreatModel.present !== true;
+}
+
+export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null } = {}) {
   const actions = [];
   const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
   if (phase === "active") {
@@ -156,6 +165,14 @@ export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>
   const chain = describeCloseChain(phase, { root, lifecycle });
   for (const step of chain.remaining) {
     if (step.phase === "checkpointed") continue;
+    if (step.phase === "candidate-frozen" && pushThreatModelDue(pushThreatModel)) {
+      push({
+        id: "materialize-push-threat-model", who: "agent",
+        command: "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model",
+        commitWith: PUSH_THREAT_MODEL_FILE,
+        source: "close-feature SKILL, Close commit",
+      });
+    }
     const known = CLOSE_STEP_REQUIREMENTS[step.phase];
     push({
       id: step.phase,

@@ -36,7 +36,8 @@ import {
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
-import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
+import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
@@ -1152,6 +1153,12 @@ async function applyTransition(values, suppliedDigest) {
   return result;
 }
 
+// Read-only: does the push gate require approval (the same manifest reader push-prepare uses) and is the threat model file there? Currency is not checked.
+function readPushThreatModelState(root) {
+  const required = gateConfig(loadManifestSafe(root), "push")?.approval === "required";
+  return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
+}
+
 // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
 // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
 async function driveClose(values, { apply, dryRun = false }) {
@@ -1162,7 +1169,7 @@ async function driveClose(values, { apply, dryRun = false }) {
   const phase = stored.coordinator.phase;
   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
   const options = coordinatorNextPhases(phase);
-  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle });
+  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root) });
   const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions };
   if (options.length === 0) return { ...base, status: "terminal" };
   const target = values.phase ?? options[0];

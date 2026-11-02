@@ -70,6 +70,35 @@ test("AC-264: the action list names the Result bootstrap and the reconcile signa
   assert.equal(describeCloseActions("promoted").nextHumanGate, null);
 });
 
+test("AC-264: a required, missing push threat model is an agent action before the step that freezes the Close commit, with a commitWith marker", () => {
+  const MATERIALIZE = "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model";
+  for (const phase of ["active", "checkpointed", "feature-close-prepared", "tracked-close-finalized"]) {
+    const list = describeCloseActions(phase, { root: "/r", lifecycle: "close-x", pushThreatModel: { required: true, present: false } });
+    const ids = list.actions.map((a) => a.id);
+    const at = ids.indexOf("materialize-push-threat-model");
+    assert.ok(at >= 0, `${phase}: the action is listed`);
+    assert.ok(at < ids.indexOf("candidate-frozen"), `${phase}: it stands before the freeze that follows the Close commit`);
+    if (ids.includes("tracked-close-finalized")) assert.ok(at > ids.indexOf("tracked-close-finalized"), `${phase}: after the close artefacts are finalized, in the same commit as them`);
+    assert.equal(list.actions[at].who, "agent");
+    assert.equal(list.actions[at].command, MATERIALIZE);
+    assert.equal(list.actions[at].commitWith, "project/push-threat-model.md");
+    assert.ok(list.actions.every((a, i) => a.order === i + 1), `${phase}: order stays contiguous`);
+  }
+  const base = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x" }).actions.map((a) => a.id);
+  const withIt = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x", pushThreatModel: { required: true, present: false } });
+  assert.deepEqual(withIt.actions.map((a) => a.id).filter((id) => id !== "materialize-push-threat-model"), base, "no other action moves or is added");
+  assert.equal(withIt.nextHumanGate, "publication-authorized", "no new PO action is introduced");
+});
+
+test("AC-264: the threat-model action is absent when the file exists, when the gate does not require approval, or when the Close commit is already made", () => {
+  const ids = (phase, pushThreatModel) => describeCloseActions(phase, { root: "/r", lifecycle: "close-x", pushThreatModel }).actions.map((a) => a.id);
+  assert.equal(ids("checkpointed", { required: true, present: true }).includes("materialize-push-threat-model"), false);
+  assert.equal(ids("checkpointed", { required: false, present: false }).includes("materialize-push-threat-model"), false);
+  assert.equal(ids("checkpointed", undefined).includes("materialize-push-threat-model"), false);
+  assert.equal(ids("candidate-frozen", { required: true, present: false }).includes("materialize-push-threat-model"), false);
+  assert.equal(ids("final-verify-green", { required: true, present: false }).includes("materialize-push-threat-model"), false);
+});
+
 test("the missing inputs of a step are named from the supplied values", () => {
   assert.deepEqual(missingCloseInputs("checkpointed", {}), []);
   assert.deepEqual(missingCloseInputs("feature-close-prepared", {}), ["architectureImpact"]);
