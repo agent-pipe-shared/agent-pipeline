@@ -28,7 +28,26 @@ Method: the held-patch route of candidate 18 (clone slices under `scratch/`, `wN
 
 ## C. From the greenfield tests of candidate 18
 
-Not known yet. Read, map and triage when the PO's report arrives; each finding gets an ID here.
+The written report is not there yet; first oral observations (PO 2026-11-03), same on all three runners (Claude, Codex, Antigravity):
+
+| ID | Severity | Observation | Elephant reading (measured in the source 2026-11-03) |
+|---|---|---|---|
+| C19-G1 | major | The runners do not use a design driver that leads them step by step through the design phase; all three maneuver themselves into locks and then search for commands | The close has `close-coordinator.mjs drive` (lists the next admitted action); the phase between the bind and the PRD release has no equivalent. Candidate: a design-phase driver that reads the state and prints exactly the next admitted command with its operands |
+| C19-G2 | major (core issue) | The early binding of PRD/Spec produces the sequences: after `bootstrap-bind-apply` / `kickoff promote apply` the PRD, Spec and `design-input.md` are the bound authority documents (`continuity.authority.prd/.spec`), a direct edit is refused with `GUARD-LIFECYCLE-AUTHORITY-BOUND`, and the sanctioned route is `reopen-design --by <name>`, edit, `submit-plan --by <name> --profile ...`, `approve-plan --by <name>`; every `--by` must be a name the PO supplied (EL-36), so the agent cannot walk it alone | PO question: bind hard only in the step where the signature for the real release comes, not earlier. Analysis below |
+
+### C19-G2 analysis: bind late (draft, then seal)
+
+Today two things are tied together that need not be: the bind at the end of onboarding (digests of PRD, Spec and design-input written into `continuity.authority`) and the approval (PRD release, EL-19). The approval signature already covers the exact bytes it releases. The early bind therefore protects nothing nobody relies on yet; between bind and approval it only costs: a lock on files that are still being worked on.
+
+Proposal: two states of the design package. `draft`: the paths are registered in State, no digest bound, normal edits admitted (the credential and provenance rules stay; `design-input.md` stays immutable once captured). `sealed`: one agent-prepared, digest-bound step binds the digests in the same transaction as the approval, so the PO signs one thing. After the seal everything stays as today (lock, `reopen-design`, rebind).
+
+Consequences:
+- Gain: no lock trap before the approval, one ceremony instead of two, the runner needs no knowledge of the rebind sequence.
+- Cost: the bound digests are read in about 70 files (continuity observation, readiness review, design advisory, Critic preflight, close, guard tripwire). Each reader needs a defined behaviour for a package without digests ("not yet sealed"), the drift detectors must tolerate a draft, and readiness reviews and advisories must bind the digest of the version they read (so a later edit makes them stale, which is the same invariant as today). Projects already bound need a migration (sealed stays sealed).
+- Risk: between bind and approval the guard no longer protects the files; the protection moves to the review and approval digests. This is a trust-model statement and needs an ADR (EL-04) and the PO's decision.
+- Not a small patch: do not squeeze it into the end of candidate 19 without a design review.
+
+Recommendation: (1) now, in 19, the cheap relief that also answers C19-G1: a design-phase driver plus, while no approval exists yet, a single agent-executable `design-amend` step that hides reopen, edit window and resubmit from the runner (needs a decision on the `--by` label for unapproved drafts, since no human act is being replaced before the first approval); (2) the late binding as a drafted ADR with an independent review, built in 19 only if the review is positive, else 0.7.1. Greenfield transcripts of the three runners are needed to see which exact refusals they hit; the PO's report is the source.
 
 ## Order of work
 
