@@ -450,7 +450,28 @@ function sanctionedRoutineRepairArgs(args, root) {
   return positional.length === 0 && values.size === 2 && booleans.size === 0;
 }
 
+// AC-164 (C18-1B): scripts/goldfish-host-commit-recover.mjs lands an uncommitted Goldfish result as one orchestrator commit.
+// Admitted as exact argv shapes bound to this root: `plan --root <root>` or `apply --root <root> ... --expect-sha256 <64 hex>`, with
+// optional --dispatch-id (once) and repeated --allowed-path / --path (repository-relative or absolute, no dot segment).
+// The script validates its own inputs and refuses with a typed code; `--expect-sha256` is required for apply and refused for plan.
+const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+const HOST_COMMIT_RECOVER_DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // briefed ids are upper case (e.g. C18-1B-...)
+function sanctionedHostCommitRecoverArgs(args, root) {
+  if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+  const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-")
+    && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "." || part === "..");
+  let dispatchId = false, expect = false;
+  for (let index = 3; index < args.length; index += 2) {
+    const flag = args[index], value = args[index + 1];
+    if (flag === "--dispatch-id" && !dispatchId && HOST_COMMIT_RECOVER_DISPATCH_ID.test(value ?? "")) dispatchId = true;
+    else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
+    else if (!((flag === "--allowed-path" || flag === "--path") && pathValue(value))) return false;
+  }
+  return args[0] === "plan" ? !expect : expect;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
   if (script === ROUTINE_REPAIR_SCRIPT) return sanctionedRoutineRepairArgs(args, root);
   if (script === PHOENIX_AUTHORITY_REVISION_SCRIPT) return sanctionedPhoenixRevisionArgs(args, root);
   if (script === ARCHITECTURE_ADOPTION_SCRIPT || script === ARCHITECTURE_MEASURE_SCRIPT || script === ARCHITECTURE_FITNESS_SCRIPT) {
