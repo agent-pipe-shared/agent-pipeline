@@ -16,7 +16,7 @@ Method: the held-patch route of candidate 18 (clone slices under `scratch/`, `wN
 | A6a | G8 / A18-M5: remedy text on the `prepare-push-subject` path | state.md deferred list | no patch needed: checked 2026-11-02, `pipeline-state.mjs` `prepare-push-subject` already prints the `materialize-push-threat-model` remedy for `CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE` (as `approve-push` does), and w93 lists the action before the Close commit, which answers the PO question |
 | A6b | G1 authorize-critical builder for deploy, publication and release-preflight kinds | state.md deferred list | large (catalog migration): pipeline Goldfish |
 | A6c | C18-5 pre-granted allowlist rule for the second approval gate | state.md deferred list | small to medium: Elephant, after A6b design is known |
-| A6d | C18-12 `--plan` dry run for the readiness reviewer's scope advice | state.md deferred list | small: Elephant |
+| A6d | C18-12 `--plan` dry run for the readiness reviewer's scope advice | state.md deferred list | held as w116, in another form: no new CLI mode; the existing draft inspection (run at present-plan/submit-plan) now applies the same scope rule, so the refusal comes before the first signature. RED/GREEN case; related pins green; `project-onboarding-e2e` and `pipeline-state` not yet run |
 | A6e | C18-6 rest: `heal` defers the retirement while a member is armed (tests encode the opposite, restate under QG-04) | state.md deferred list | medium: Elephant or Goldfish by size |
 
 ## B. Needs a PO decision before it starts

@@ -1,0 +1,89 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index edf46131b..8c7482ffc 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -51,6 +51,18 @@ function physical(root, name) {
+ }
+ function bytes(root, name) { return readFileSync(physical(root, name), "utf8"); }
+ function covers(scope, name) { return scope.some(prefix => name === prefix || (prefix.endsWith("/") && name.startsWith(prefix))); }
++/** Throws ARCHITECTURE-DESIGN-SCOPE-MISMATCH naming (bounded) the required paths `disposition.scope` does not cover. One rule for the draft check
++ * (before the PO signs) and for the approved inspection (before materialization), so the refusal can no longer appear only after a signature. */
++function requireScopeCoverage(input, planPath, taskScope) {
++  const requiredCoverage = [planPath, "architecture/map/index.md", "architecture/fitness-model.json",
++    "architecture/baseline.json", ...input.implementationSurface, ...(taskScope ? [taskScope] : [])];
++  const uncovered = requiredCoverage.filter(p => !covers(input.disposition.scope, p));
++  if (uncovered.length) {
++    const shown = [...new Set(uncovered)].slice(0, 6).map(p => String(p).slice(0, 96));
++    rejectField("ARCHITECTURE-DESIGN-SCOPE-MISMATCH", "disposition.scope",
++      `disposition.scope must cover every required path; not covered: ${shown.join(", ")}`, shown[0]);
++  }
++}
+ 
+ /** The entire closed package is visible within the PRD and bound by its existing approval. */
+ export function parseArchitectureDesign(prd) {
+@@ -187,9 +199,14 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
+     if (scaffold.every(target => !existsSync(join(root, target.path)))) return { ok: true, required: false };
+     if (!scaffold.every(target => bytes(root, target.path) === target.bytes)) return { ok: true, required: false };
+     try {
+-      return { ok: true, required: true, design: parseArchitectureDesign(prdBytes.toString("utf8")), prdPath: planPath };
++      const design = parseArchitectureDesign(prdBytes.toString("utf8"));
++      // C18-12 / candidate 19: the scope-coverage rule runs here too, before the PO is asked to sign, not only at materialization after the signature.
++      requireScopeCoverage(design, planPath, null);
++      return { ok: true, required: true, design, prdPath: planPath };
+     } catch (error) {
+-      return { ok: false, required: true, code: architectureDesignFailureCode(error), prdPath: planPath };
++      const code = architectureDesignFailureCode(error);
++      return { ok: false, required: true, code, prdPath: planPath,
++        ...(error?.field && code === error.message ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
+     }
+   } catch (error) {
+     // Same closed code contract as inspectArchitectureDesign (AC-174): no exception text in `code`.
+@@ -256,15 +273,8 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+       }
+     }
+     const input = parseArchitectureDesign(prd);
+-    // Same coverage condition as before; the refusal now also names which required paths the scope misses (bounded).
+-    const requiredCoverage = [authority.planPath, "architecture/map/index.md", "architecture/fitness-model.json",
+-      "architecture/baseline.json", ...input.implementationSurface, ...(taskScope ? [taskScope] : [])];
+-    const uncovered = requiredCoverage.filter(p => !covers(input.disposition.scope, p));
+-    if (uncovered.length) {
+-      const shown = [...new Set(uncovered)].slice(0, 6).map(p => String(p).slice(0, 96));
+-      rejectField("ARCHITECTURE-DESIGN-SCOPE-MISMATCH", "disposition.scope",
+-        `disposition.scope must cover every required path; not covered: ${shown.join(", ")}`, shown[0]);
+-    }
++    // Same coverage condition as before; the refusal also names which required paths the scope misses (bounded).
++    requireScopeCoverage(input, authority.planPath, taskScope);
+     // Architecture materialization establishes design authority. Physical
+     // contracts and tests are authored by their implementation owners later.
+     // A materialized design is never proof that those files exist or pass.
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index 68dbe5298..eb5d08250 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -363,6 +363,26 @@ test("C18-12: ARCHITECTURE-DESIGN-SCOPE-MISMATCH names each uncovered required p
+   assert.equal(ok.status, "materialization-required", "a fully covering scope still passes");
+ });
+ 
++// --- C18-12 follow-up (candidate 19): the same rule runs on the draft, before the PO is asked to sign ---
++test("C18-12 follow-up: the draft inspection refuses a scope that misses required paths, with the same detail, before any signature", async () => {
++  const { stage, mod } = await hf9Load();
++  const narrow = hf9Design();
++  narrow.disposition.scope = ["src/", "tests/", "docs/contract.md", "specs/"];
++  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: narrow });
++  const draft = mod.inspectArchitectureDesignDraft({ rootDir: fixture.root, planPath: fixture.planPath, expectedPlanSha256: fixture.prdSha });
++  assert.equal(draft.ok, false);
++  assert.equal(draft.required, true);
++  assert.equal(draft.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
++  assert.equal(draft.field, "disposition.scope");
++  for (const path of ["architecture/map/index.md", "architecture/fitness-model.json", "architecture/baseline.json"]) assert.match(draft.expected, new RegExp(path.replace(/\./gu, "\\.")), path);
++  assert.doesNotMatch(draft.expected, /src\/application\.mjs/u, "a covered implementation-surface path is not named");
++
++  const good = hf9Fixture(stage, { block: true, scaffold: "exact" });
++  const accepted = mod.inspectArchitectureDesignDraft({ rootDir: good.root, planPath: good.planPath, expectedPlanSha256: good.prdSha });
++  assert.equal(accepted.ok, true, "a fully covering scope still passes the draft");
++  assert.equal(accepted.required, true);
++});
++
+ // --- W7: a module declared kind "documentation" with only non-executable owned paths needs no verification entry point (D9) ---
+ import { loadMapBundle } from "../scripts/module-inventory.mjs";
+ function docDesign(ownedPaths = ["docs/guide/**", "README.md"]) {
