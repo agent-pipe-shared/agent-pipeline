@@ -1,0 +1,296 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index cad9d0039..3bff55b21 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -84,6 +84,7 @@ function describeFailureDetail(detail) {
+   if (clean.extraPaths) parts.push(`changed but not claimed ${clean.extraPaths.join(", ")}${clean.extraCount > clean.extraPaths.length ? ` (+${clean.extraCount - clean.extraPaths.length} more)` : ""}`);
+   if (clean.missingPaths) parts.push(`claimed but not changed ${clean.missingPaths.join(", ")}${clean.missingCount > clean.missingPaths.length ? ` (+${clean.missingCount - clean.missingPaths.length} more)` : ""}`);
+   if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
++  if (clean.errorMessage) parts.push(`message "${clean.errorMessage}"`);
+   if (clean.reason) parts.push(`reason ${clean.reason}`);
+   return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+ }
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+index e23aba4d5..72c3671b7 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+@@ -143,9 +143,15 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
+   const tracked = paths(git(baseline.root, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
+   const untracked = paths(git(baseline.root, ["ls-files", "--others", "--exclude-standard", "-z"]));
+   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-COMMIT-GIT");
+-  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) {
++  // C18-1C: a sibling host commit may have moved HEAD. Tolerated only on the normal path, only when the baseline is an ancestor of HEAD
++  // and nothing between them touches an allowed or claimed path. The admission then carries the HEAD it admitted against.
++  const headMoved = head.trim() !== baseline.candidateCommit;
++  const tolerated = headMoved && concurrent === null && sameTopLevel(topLevel, baseline.root) && conflicts.length === 0 && staged.length === 0
++    && siblingMovedHeadIsDisjoint(baseline.root, baseline.candidateCommit, head.trim(), [...allowedPaths, ...final.changedPaths]);
++  const admittedAgainst = tolerated ? head.trim() : baseline.candidateCommit;
++  if (!sameTopLevel(topLevel, baseline.root) || (headMoved && !tolerated) || conflicts.length !== 0 || staged.length !== 0) {
+     // AC-164: name which sub-condition fired (the admission decision itself is unchanged).
+-    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, head.trim() !== baseline.candidateCommit ? "head-moved" : null,
++    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, headMoved ? "head-moved" : null,
+       conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
+     return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
+   }
+@@ -183,5 +189,13 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
+       admittedBlobs.push({ path, oid: null });
+     }
+   }
+-  return { ok: true, code: "AGY-HOST-COMMIT-ADMITTED", root: baseline.root, candidateCommit: baseline.candidateCommit, paths: actual, admittedBlobs };
++  return { ok: true, code: "AGY-HOST-COMMIT-ADMITTED", root: baseline.root, candidateCommit: admittedAgainst, paths: actual, admittedBlobs, ...(tolerated ? { headMoved: true, baselineCommit: baseline.candidateCommit } : {}) };
++}
++/** True only when `from` is an ancestor of `head` and no path changed between them equals one of `watched`. Any git failure is false. */
++function siblingMovedHeadIsDisjoint(root, from, head, watched) {
++  if (!OID.test(head)) return false;
++  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", from, head], { encoding: "utf8", shell: false, timeout: 15_000, env: agyHostGitEnvironment() });
++  if (ancestor.error || ancestor.status !== 0) return false;
++  const changed = paths(git(root, ["diff", "--no-renames", "--name-only", "-z", from, head]));
++  return changed !== null && changed.every((path) => !watched.includes(path));
+ }
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+index 4cbc0efcd..9590da9ed 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+@@ -172,7 +172,61 @@ test("AHC12 AC-164: the hook notice prints a short sentence derived from the cod
+   assert.match(stop, /head-moved/u);
+ });
+ 
+-assert.equal(cases.length, 12, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
++const oneEdit = { final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] };
++function siblingCommit(context, file, text) {
++  mkdirSync(join(context.root, "src"), { recursive: true });
++  writeFileSync(join(context.root, file), text);
++  context.git("add", file);
++  context.git("commit", "-qm", "sibling host commit");
++  return context.git("rev-parse", "HEAD");
++}
++
++test("AHC13 AC-108: a sibling commit on disjoint paths that moved HEAD is admitted against the new HEAD", () => fixture((context) => {
++  const baseline = capture(context);
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  const head = siblingCommit(context, "src/sibling.mjs", "export const s = 1;\n");
++  const result = assessAgyHostCommit({ baseline, ...oneEdit });
++  assert.equal(result.code, "AGY-HOST-COMMIT-ADMITTED", JSON.stringify(result));
++  assert.equal(result.candidateCommit, head, "the admission carries the HEAD it admitted against");
++  assert.equal(result.baselineCommit, baseline.candidateCommit);
++  assert.deepEqual(result.paths, ["src/one.mjs"]);
++  assert.equal(baseline.candidateCommit === head, false, "the recorded baseline is not rewritten");
++}));
++
++test("AHC14 AC-108: a sibling commit that touched an allowed or claimed path keeps AGY-HOST-COMMIT-DRIFT", () => fixture((context) => {
++  const baseline = capture(context);
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  siblingCommit(context, "src/other.mjs", "export const o = 1;\n");
++  const claimed = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
++  assert.equal(claimed.code, "AGY-HOST-COMMIT-ADMITTED", "disjoint sibling is tolerated");
++  const allowedOverlap = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs", "src/other.mjs"] });
++  assert.equal(allowedOverlap.code, "AGY-HOST-COMMIT-DRIFT");
++  assert.deepEqual(allowedOverlap.detail, { conditions: ["head-moved"] });
++}));
++
++test("AHC15 AC-108: a baseline that is not an ancestor of HEAD (history rewritten) keeps AGY-HOST-COMMIT-DRIFT", () => fixture((context) => {
++  const baseline = capture(context);
++  context.git("checkout", "-q", "--orphan", "rewritten");
++  context.git("rm", "-rqf", "--cached", ".");
++  writeFileSync(join(context.root, "src", "elsewhere.mjs"), "export const e = 1;\n");
++  context.git("add", "src/elsewhere.mjs");
++  context.git("commit", "-qm", "unrelated history");
++  const result = assessAgyHostCommit({ baseline, ...oneEdit });
++  assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT");
++  assert.deepEqual(result.detail, { conditions: ["head-moved"] });
++}));
++
++test("AHC16 AC-108: a moved HEAD plus a staged change still drifts, naming both conditions", () => fixture((context) => {
++  const baseline = capture(context);
++  siblingCommit(context, "src/sibling.mjs", "export const s = 1;\n");
++  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
++  context.git("add", "src/one.mjs");
++  const result = assessAgyHostCommit({ baseline, ...oneEdit });
++  assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT");
++  assert.deepEqual(result.detail.conditions, ["head-moved", "index-staged"]);
++}));
++
++assert.equal(cases.length, 16,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 13dc626e4..8558f323f 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -3,7 +3,7 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
+ import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal } from './native-goldfish-host-state.mjs';
++import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld } from './native-goldfish-host-state.mjs';
+ import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
+ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
+ import { parseStrictJson } from './governance-event.mjs';
+@@ -209,6 +209,13 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+ // text can travel. Exported for the hook reader, which sanitizes again on read.
+ const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
+ const DETAIL_LIST_KEYS = ["conditions"];
++// C18-1C: the error message of a commit exception travels bounded (<= 160 chars, printable) and without any token that holds a path separator.
++const detailMessage = (value) => typeof value === "string" && value.length > 0 && value.length <= 160 && !/[\\/\u0000-\u001f]/u.test(value);
++export function boundedErrorMessage(error) {
++  if (typeof error?.message !== "string") return undefined;
++  const scrubbed = error.message.replace(/[\u0000-\u001f]+/gu, " ").replace(/\S*[\\/]\S*/gu, "<path>").trim().slice(0, 160);
++  return detailMessage(scrubbed) ? scrubbed : undefined;
++}
+ const DETAIL_PATH_KEYS = ["paths", "stagedPaths", "extraPaths", "missingPaths", "outsideAllowed"];
+ const DETAIL_COUNT_KEYS = ["extraCount", "missingCount"];
+ const detailSlug = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(value);
+@@ -218,6 +225,7 @@ export function sanitizeStopFailureDetail(detail) {
+   if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return null;
+   const out = {};
+   for (const key of DETAIL_SLUG_KEYS) if (detailSlug(detail[key])) out[key] = detail[key];
++  if (detailMessage(detail.errorMessage)) out.errorMessage = detail.errorMessage;
+   for (const key of DETAIL_LIST_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailSlug).slice(0, 5); if (list.length > 0) out[key] = list; }
+   for (const key of DETAIL_PATH_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailPath).slice(0, 5); if (list.length > 0) out[key] = list; }
+   for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
+@@ -254,7 +262,7 @@ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
+ 
+ // AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.
+ function exceptionDetail(error) {
+-  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined };
++  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined, errorMessage: boundedErrorMessage(error) };
+ }
+ 
+ // Only the host launch call and its correlated successful return are observed.
+@@ -380,6 +388,10 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   let admission = concurrent ? null : (dependencies.assess ?? assessAgyHostCommit)({ baseline: state.baseline,
+     final: observation.final, allowedPaths: state.binding.allowedPaths });
+   if (!concurrent && !admission?.ok) return withDetail(fail(admission?.code ?? "NGHF-COMMIT-ADMISSION"), admission?.detail);
++  // C18-1C GUARD (remove when native-goldfish-host-observation.mjs accepts a commit parent that is a descendant of the briefing's
++  // candidate): the observation receipt and record validators bind parent === candidateCommit (NGHO-DRAFT-BINDING), so a commit made
++  // on a moved HEAD could not be recorded. Until then a tolerated moved HEAD is refused BEFORE any commit, exactly as before.
++  if (!concurrent && admission?.headMoved) return withDetail(fail("AGY-HOST-COMMIT-DRIFT"), { conditions: ["head-moved"] });
+ 
+   // Read before committing; new public evidence is published afterwards so it
+   // cannot alter the exact diff admitted for this host commit.
+@@ -391,7 +403,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   try { observedAttempt = (dependencies.inspectAttempt ?? inspectNativeGoldfishDispatchAttempt)({ repoRoot: physical, runner, input: attemptInput }); }
+   catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
+ 
+-  try { (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}); }
++  // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
++  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: 5000, ...(dependencies.lockWait ?? {}) }); }
+   catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
+ 
+   let committed;
+@@ -399,8 +412,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+     const commit = nativeAuthority => {
+       if(nativeAuthority)admission=assessSourceOwnedNativeHostCommit({baseline:state.baseline,final:observation.final,allowedPaths:state.binding.allowedPaths,authority:nativeAuthority});
+       if(!admission?.ok)return admission;
++      // C18-1C: after a tolerated sibling commit the commit is made on the HEAD the admission was made against; the recorded pending
++      // state is not rewritten, only the baseline handed to this one commit call carries that HEAD as its parent.
++      const commitBaseline = admission.headMoved ? { ...state.baseline, candidateCommit: admission.candidateCommit } : state.baseline;
+       return (dependencies.commit ?? commitAdmittedNativeGoldfishReturn)({ runner,
+-        adapterVersion: state.binding.adapterVersion ?? 1, baseline: state.baseline,
++        adapterVersion: state.binding.adapterVersion ?? 1, baseline: commitBaseline,
+         final: observation.final, allowedPaths: state.binding.allowedPaths,
+         taskId: state.binding.dispatchId, priorAdmission: admission,...(nativeAuthority?{nativeAuthority}:{}) });
+     };
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 858ba17c0..7eb57a881 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -10,7 +10,7 @@ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+-import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
++import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
+ import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
+ import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
+ import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
+@@ -661,10 +661,11 @@ const cases = [
+     const boom = { ...dependencies, commit: () => { throw Object.assign(new Error(`boom at ${root}/secret stack`), { code: "SDC-ROOT", reason: "repository-binding-changed" }); } };
+     const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
+     assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(failed));
+-    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed" });
++    // C18-1C (f): the record now also names a bounded message with every path-bearing token replaced; the path itself still never travels.
++    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed", errorMessage: "boom at <path> stack" });
+     const [entry] = diagEntries(commonDir);
+     const text = readFileSync(join(diagDir(commonDir), entry), "utf8");
+-    assert.equal(text.includes("boom"), false);
++    assert.equal(text.includes("secret"), false);
+     assert.equal(text.includes(root), false);
+     assert.deepEqual(JSON.parse(text).detail, failed.detail);
+     assert.equal(facts.commits, 0);
+@@ -677,6 +678,59 @@ const cases = [
+     assert.deepEqual(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).detail, { condition: "candidate-commit" });
+     assert.match(nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) }), /candidate-commit/u);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
++  // NGHF33-NGHF36 -- C18-1C (AC-108): a sibling stop's registry lock is waited for, a long message is bounded, a moved HEAD is tolerated.
++  { id: "NGHF33", name: "A registry lock held by a sibling stop and released within the bound lets the stop succeed", run: () => fixture(({ root, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    let clock = 0, calls = 0;
++    const flaky = { ...dependencies, lockWait: { now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: (request) => {
++      calls += 1;
++      if (calls === 1) throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
++      if (calls === 2) throw Object.assign(new Error("held"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "state-push-owner-unavailable" });
++      return prepareNativeGoldfishAuthorityTerminal(request);
++    } };
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, flaky);
++    assert.equal(result.code, "NGHF-AUTHORED-RECORD-VERIFIED", JSON.stringify(result));
++    assert.equal(calls, 3);
++    assert.equal(facts.commits, 1);
++    assert.ok(clock > 0 && clock < 5000, "the wait is bounded and on the injected clock");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF34", name: "A registry lock held beyond the bound ends in the typed refusal with the stage, and nothing is committed", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    let clock = 0, calls = 0;
++    const held = { ...dependencies, lockWait: { budgetMs: 300, now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: () => {
++      calls += 1; throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" }); } };
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, held);
++    assert.equal(failed.code, "SDC-LOCK-HELD", JSON.stringify(failed));
++    assert.equal(failed.stage, "authority-terminal-prepare");
++    assert.equal(failed.causeReason, "registry-lock-held");
++    assert.ok(calls > 1 && calls < 20, "retried more than once, but bounded");
++    assert.ok(clock <= 300);
++    assert.equal(facts.commits, 0);
++    assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8")).code, "SDC-LOCK-HELD");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF35", name: "A commit exception message is bounded to 160 characters and carries no path-bearing token", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const boom = { ...dependencies, commit: () => { throw new Error(`${"x".repeat(400)} C:\\Users\\a\\b ${root}/p`); } };
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
++    assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION");
++    assert.equal(failed.detail.errorName, "Error");
++    assert.ok(failed.detail.errorMessage.length > 0 && failed.detail.errorMessage.length <= 160, failed.detail.errorMessage);
++    assert.equal(/[\\/]/u.test(failed.detail.errorMessage), false);
++    assert.equal(readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8").includes(root), false);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF36", name: "A sibling host commit on disjoint paths that moved HEAD does not stop the commit; it is made on the current HEAD", run: () => fixture(({ root, binding, dependencies, facts, git, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    writeFileSync(join(root, "src/sibling.mjs"), "export const sibling=1;\n");
++    git("add", "--", "src/sibling.mjs"); git("commit", "-qm", "sibling host commit");
++    const siblingHead = git("rev-parse", "HEAD");
++    assert.notEqual(siblingHead, binding.candidateCommit);
++    // Measured: the commit succeeds on the moved HEAD but the observation validators (out of this slice's scope) refuse the record with
++    // NGHO-DRAFT-BINDING, so the finalizer refuses BEFORE committing until they accept a descendant parent. Needed change is in the report.
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
++    assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT", JSON.stringify(result));
++    assert.equal(facts.commits, 0, "nothing is committed that could not be recorded");
++    assert.equal(git("rev-parse", "HEAD"), siblingHead);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 95c7b1e37..48cd0a832 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -982,7 +982,9 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
+     const entered={value:false};
+     try{return attempt(entered);}
+     catch(error){
+-      if(error?.code!=='SDC-LOCK-HELD'||entered.value||now()+delay>deadline)throw error;
++      // C18-1C: a sibling stop holding the registry also surfaces as SDC-AUTHORITY-UNAVAILABLE / state-push-owner-unavailable.
++      const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable');
++      if(!transient||entered.value||now()+delay>deadline)throw error;
+       sleep(delay);delay=Math.min(delay*2,1000);
+     }
+   }
