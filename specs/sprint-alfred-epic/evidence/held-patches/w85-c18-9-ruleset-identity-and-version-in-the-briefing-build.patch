@@ -1,0 +1,156 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 7a8221935..645b977db 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -947,6 +947,8 @@ export function generateDispatchBinding(options, deps = {}) {
+   let identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
+   let rulesetSha = null;
+   let rulesetFallback = null;
++  let rulesetIdentitySource = "loaded";
++  let rulesetFallbackIsWarning = false;
+   // K12: a lock-held registry is a transient state, never a reason to settle for a lesser identity. Before any
+   // fallback the lock is observed; a live or unjudgeable holder is waited for (bounded), the preflight is
+   // observed again once it clears, and a lock that stays held is refused typed, naming the holder and the retry.
+@@ -975,6 +977,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     if (installed?.status === "available" && typeof installed.value === "string" && SHA.test(installed.value)) {
+       rulesetSha = installed.value;
+       rulesetFallback = "installedIdentity.value of the preflight ruleset source";
++      rulesetFallbackIsWarning = true; // a recorded identity, not proven to be the loaded plugin's own
+     } else if (typeof observation?.pluginRoot === "string" && observation.pluginRoot !== "") {
+       try {
+         const snapshot = snapshotPluginRoot(observation.pluginRoot);
+@@ -984,12 +987,16 @@ export function generateDispatchBinding(options, deps = {}) {
+         }
+       } catch { /* no source exists: refused below */ }
+     }
+-    if (rulesetFallback) warnings.push({ code: "DBG-RULESET-FALLBACK", source: rulesetFallback, message: `the loaded ruleset identity is ${identityStatus}; used the ${rulesetFallback}` });
++    // The content hash of the loaded plugin root is a deterministic identity of that plugin (the only one a local-development
++    // install has): informational via `rulesetIdentitySource`, no warning. Only the lesser installed identity still warns.
++    if (rulesetFallback) rulesetIdentitySource = rulesetFallback;
++    if (rulesetFallback && rulesetFallbackIsWarning) warnings.push({ code: "DBG-RULESET-FALLBACK", source: rulesetFallback, message: `the loaded ruleset identity is ${identityStatus}; used the ${rulesetFallback}` });
+   }
+   if (rulesetSha === null) {
+     refuse("DBG-RULESET-UNAVAILABLE", `the loaded ruleset identity is not available (status: ${identityStatus}) and no installed identity or plugin-root content hash exists to fall back to`);
+   }
+   const rulesetVersion = observation.rulesetSource?.selectedPlugin?.version;
++  const pipelineVersion = typeof rulesetVersion === "string" && rulesetVersion !== "" ? rulesetVersion : null;
+ 
+   // Candidate: HEAD of --root, read-only.
+   let candidateCommit;
+@@ -1093,7 +1100,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
+ 
+   // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
+-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, budgetEnforcement, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
++  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, budgetEnforcement, skeleton, warnings, pipelineVersion, rulesetIdentitySource, ...(preDispatch === null ? {} : { preDispatch }) };
+ }
+ 
+ const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
+@@ -1182,7 +1189,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   };
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
++    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+   };
+ }
+ 
+@@ -1291,6 +1298,7 @@ export function probeDispatchReadiness(options, deps = {}) {
+   const base = ready && pkg !== null ? dispatchCallBase(pkg, generated?.binding?.agentType) : null;
+   return {
+     schema: DISPATCH_PROBE_SCHEMA, ok: ready, ready, findings, warnings,
++    pipelineVersion: generated?.pipelineVersion ?? null, rulesetIdentitySource: generated?.rulesetIdentitySource ?? null,
+     ...(skipped.length === 0 ? {} : { skipped }),
+     ...(ready ? { dispatchCall: base === null ? null : { ...base, prompt: `the briefing file that build --package ${options.package} --out scratch/<briefing>.md writes, verbatim including its final newline` } } : {}),
+   };
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 95e5b0b22..6dfae021e 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -186,7 +186,7 @@ test("binding fields equal the facts of their own sources", async () => {
+   const fx = makeFixture();
+   const result = runDispatchBriefing(argvOf(fx), depsOf(fx));
+   assert.equal(result.ok, true, JSON.stringify(result));
+-  assert.deepEqual(Object.keys(result).sort(), ["binding", "block", "budgetEnforcement", "ok", "schema", "skeleton", "warnings"]);
++  assert.deepEqual(Object.keys(result).sort(), ["binding", "block", "budgetEnforcement", "ok", "pipelineVersion", "rulesetIdentitySource", "schema", "skeleton", "warnings"]);
+   const b = result.binding;
+   assert.equal(b.schema, "pipeline.native-goldfish-host-briefing.v3");
+   assert.equal(b.dispatchId, "ALF-T1");
+@@ -1995,6 +1995,77 @@ test("probe: a ready package prints the dispatch call and keeps warnings apart f
+   assert.ok(result.warnings.some((warning) => warning.code === "DBG-PACKAGE-ESTIMATE-LOW"), "a warning stays a warning and does not flip ready");
+ });
+ 
++// C18-9 (AC-108): the result names the installed Pipeline version beside the ruleset identity; a content-hash identity of the loaded
++// plugin root is a deterministic identity (informational field), not a warning; an identity that cannot be formed stays a refusal.
++const hashOnlyObserver = (version = "0.7.0+claude.20261102073855.fba0507") => () => ({
++  rulesetSource: { selectedPlugin: { id: "pipeline-core", version }, loadedIdentity: { status: "unavailable" }, installedIdentity: { status: "unavailable" } },
++  pluginRoot: "/fixture/plugin-root",
++});
++const hashDeps = (fx, observePreflight) => depsOf(fx, { observePreflight, snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }), registryLock: () => ({ status: "absent" }) });
++
++test("C18-9 the binding result prints the Pipeline version and the identity source of a loaded identity", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.pipelineVersion, "9.9.9+test");
++  assert.equal(result.rulesetIdentitySource, "loaded");
++});
++
++test("C18-9 a content-hash identity is informational: the version is printed, the source is visible, no DBG-RULESET-FALLBACK warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), hashDeps(fx, hashOnlyObserver()));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.binding.rulesetSha, "e".repeat(64));
++  assert.equal(result.pipelineVersion, "0.7.0+claude.20261102073855.fba0507");
++  assert.match(result.rulesetIdentitySource, /content hash of the loaded plugin root/u);
++  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false);
++});
++
++test("C18-9 an installed identity (not the loaded plugin's own) keeps the DBG-RULESET-FALLBACK warning and names its source", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const observer = () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "unavailable" }, installedIdentity: { status: "available", value: "d".repeat(64) } } });
++  const result = runDispatchBriefing(argvOf(fx), hashDeps(fx, observer));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.binding.rulesetSha, "d".repeat(64));
++  assert.match(result.rulesetIdentitySource, /installedIdentity/u);
++  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), true);
++});
++
++test("C18-9 a preflight without a plugin version prints pipelineVersion null", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const observer = () => ({ rulesetSource: { loadedIdentity: { status: "available", algorithm: "content-sha256", value: RULESET } } });
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: observer }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.pipelineVersion, null);
++});
++
++test("C18-9 no loaded, installed or content-hash identity is still refused DBG-RULESET-UNAVAILABLE", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), hashDeps(fx, () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } } })));
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "DBG-RULESET-UNAVAILABLE");
++});
++
++test("C18-9 build and probe print the Pipeline version and identity source without a fallback warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const built = runDispatchBriefing(argv, hashDeps(fx, hashOnlyObserver()));
++  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 300));
++  assert.equal(built.pipelineVersion, "0.7.0+claude.20261102073855.fba0507");
++  assert.match(built.rulesetIdentitySource, /content hash/u);
++  assert.equal(built.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false);
++  const probe = packageFixture();
++  const probed = runDispatchBriefing(probeArgvOf(probe.fx), { ...probeDepsOf(probe.fx), observePreflight: hashOnlyObserver(), snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }), registryLock: () => ({ status: "absent" }) });
++  assert.equal(probed.pipelineVersion, "0.7.0+claude.20261102073855.fba0507");
++  assert.match(probed.rulesetIdentitySource, /content hash/u);
++  assert.equal(probed.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false);
++});
++
+ test("probe: writes no file and never takes the registry lock", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { fx } = packageFixture();
