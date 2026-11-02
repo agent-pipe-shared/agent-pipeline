@@ -6096,9 +6096,9 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
   const approvalKind = "feature-package-reconcile";
   const placeholders = [
     { flag: "--by", token: "<po-name>", from: "the PO's own name, supplied by the PO who ran the signing step; never the agent (EL-36)" },
-    { flag: "--proof-request", token: "<proof-request>", from: "requestPath (externalPaths.request) in the signing step's output" },
-    { flag: "--proof-authority", token: "<proof-authority>", from: "authorityPath (externalPaths.authority) in the signing step's output" },
-    { flag: "--proof", token: "<proof>", from: "proofPath (externalPaths.proof) in the signing step's output" },
+    { flag: "--proof-request", token: "<proof-request>", from: "scratchMirror.request (scratch/critical-feature-package-reconcile-request-<fingerprint>.json, readable by the agent) in the signing step's output, or requestPath (externalPaths.request)" },
+    { flag: "--proof-authority", token: "<proof-authority>", from: "scratchMirror.authority (scratch/critical-feature-package-reconcile-authority-<fingerprint>.json) in the signing step's output, or authorityPath (externalPaths.authority)" },
+    { flag: "--proof", token: "<proof>", from: "scratchMirror.proof (scratch/critical-feature-package-reconcile-proof-<fingerprint>.json) in the signing step's output, or proofPath (externalPaths.proof)" },
   ];
   const reconcileCommand = {
     executable: process.execPath,

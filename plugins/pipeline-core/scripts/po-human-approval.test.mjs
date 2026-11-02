@@ -4925,6 +4925,39 @@ test("authorize-critical round-trips kind publication exactly like push: one inv
   }
 });
 
+/* C18-11 (AC-262): every critical signing kind mirrors request, proof, authority and
+ * signer into this repository's scratch/ directory, exactly as the push kind does, so the
+ * agent can read what the PO signed without the PO pasting it into the chat. The mirror is
+ * a copy: the PO key directory stays the authority. */
+for (const kind of ["deploy", "publication", "release-preflight", "feature-package-reconcile"]) {
+  test(`C18-11: authorize-critical kind ${kind} mirrors request, proof, authority and signer into scratch/ as byte-equal copies`, { skip: REQUIRES_OPENSSL }, () => {
+    const dirs = fixtureDirs();
+    try {
+      writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+      writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+      keyFixture(dirs.directory);
+      const result = runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { kind })], {
+        observeCandidate: () => ({ commit: "d".repeat(40), tree: "e".repeat(40) }),
+        readConfirmation: () => "approve",
+      });
+      assert.equal(result.ok, true);
+      const fp = repositoryFingerprintFor(dirs.repoRoot);
+      const mirror = Object.fromEntries(["request", "proof", "authority", "signer"].map(name =>
+        [name, join(dirs.repoRoot, "scratch", `critical-${kind}-${name}-${fp}.json`)]));
+      assert.deepEqual(result.paths, mirror, "the result names the scratch mirror, not the key directory");
+      const source = criticalArtifacts(dirs, kind);
+      assert.equal(readFileSync(mirror.request, "utf8"), readFileSync(source.request, "utf8"));
+      assert.equal(readFileSync(mirror.proof, "utf8"), readFileSync(source.proof, "utf8"));
+      assert.equal(readFileSync(mirror.signer, "utf8"), readFileSync(source.signer, "utf8"));
+      assert.equal(readFileSync(mirror.authority, "utf8"), readFileSync(join(dirs.directory, "trust-policy.json"), "utf8"));
+      assert.deepEqual(result.externalPaths, { request: source.request, proof: source.proof, authority: join(dirs.directory, "trust-policy.json") },
+        "the PO key directory stays the authority");
+    } finally {
+      cleanup(dirs);
+    }
+  });
+}
+
 test("authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes)", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {

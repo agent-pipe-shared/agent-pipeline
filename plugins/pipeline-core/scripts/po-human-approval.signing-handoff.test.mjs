@@ -58,12 +58,32 @@ test("N31r: human-facing critical authorization of a non-push kind names the req
     paths: { request: "/keys/request.json", proof: "/keys/proof.json", signer: "/keys/signer.json" },
     externalPaths: { request: "/keys/request.json", proof: "/keys/proof.json", authority: "/keys/authority.json" } };
   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: true })),
-    { ok: true, code: result.code, proofPath: "/keys/proof.json", requestPath: "/keys/request.json", authorityPath: "/keys/authority.json" });
+    { ok: true, code: result.code, proofPath: "/keys/proof.json", requestPath: "/keys/request.json", authorityPath: "/keys/authority.json", scratchMirror: result.paths });
   const push = { ...result, action: { kind: "push" } };
   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(push, { humanFacing: true })),
     { ok: true, code: result.code, proofPath: "/keys/proof.json" }, "the push output stays as it was");
-  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
+  // C18-11 (restated, QG-04): the non-TTY output is still the full result, and now also carries the
+  // same path keys the TTY output names (it used to equal the bare result).
+  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })),
+    { ...result, proofPath: "/keys/proof.json", requestPath: "/keys/request.json", authorityPath: "/keys/authority.json", scratchMirror: result.paths });
 });
 
-if (cases.length !== 5) throw new Error("signing handoff case count drift");
+test("C18-11: a non-push critical result names the scratch mirror and the original paths on a TTY and on a non-TTY alike, never key material", () => {
+  const mirror = { request: "/repo/scratch/critical-deploy-request-fp.json", proof: "/repo/scratch/critical-deploy-proof-fp.json",
+    authority: "/repo/scratch/critical-deploy-authority-fp.json", signer: "/repo/scratch/critical-deploy-signer-fp.json" };
+  const result = { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", action: { kind: "deploy" }, paths: mirror,
+    externalPaths: { request: "/keys/request.json", proof: "/keys/proof.json", authority: "/keys/authority.json" } };
+  for (const humanFacing of [true, false]) {
+    const printed = JSON.parse(formatHumanApprovalCliResult(result, { humanFacing }));
+    assert.deepEqual(printed.scratchMirror, mirror, `humanFacing=${humanFacing}`);
+    assert.equal(printed.proofPath, "/keys/proof.json");
+    assert.equal(printed.requestPath, "/keys/request.json");
+    assert.equal(printed.authorityPath, "/keys/authority.json");
+    assert.equal(JSON.stringify(printed).includes("PRIVATE"), false);
+  }
+  const push = { ...result, action: { kind: "push" } };
+  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(push, { humanFacing: false })), push, "the push output is untouched");
+});
+
+if (cases.length !== 6) throw new Error("signing handoff case count drift");
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

@@ -517,6 +517,11 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
     "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
   ];
 }
+function nonPushCriticalHandoff(result) {
+  return { proofPath: result.externalPaths?.proof ?? null,
+    requestPath: result.externalPaths?.request ?? null, authorityPath: result.externalPaths?.authority ?? null,
+    scratchMirror: result.paths ?? null };
+}
 export function formatHumanApprovalCliResult(result, { humanFacing = process.stdout.isTTY === true } = {}) {
   if (humanFacing && result?.ok === true && ["PO-HUMAN-SIGN-INTENT-READY", "PO-HUMAN-PROOF-READY", "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"].includes(result.code)) {
     const proofPath = result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"
@@ -524,11 +529,16 @@ export function formatHumanApprovalCliResult(result, { humanFacing = process.std
       : result.paths?.proof ?? null;
     // N31r (D212): a non-push critical kind keeps its request and authority in the PO
     // key directory, which an agent cannot list; the follow-on command needs all three.
+    // C18-11: it also names the scratch mirror the agent can read.
     if (result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY" && result.action?.kind !== undefined && result.action.kind !== "push") {
-      return JSON.stringify({ ok: true, code: result.code, proofPath,
-        requestPath: result.externalPaths?.request ?? null, authorityPath: result.externalPaths?.authority ?? null }) + "\n";
+      return JSON.stringify({ ok: true, code: result.code, ...nonPushCriticalHandoff(result) }) + "\n";
     }
     return JSON.stringify({ ok: true, code: result.code, proofPath }) + "\n";
+  }
+  // C18-11 (AC-262): a non-TTY (agent-run) non-push critical result carries the same path
+  // keys as the TTY shape, on top of the full result. Paths only, never key material.
+  if (result?.ok === true && result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY" && result.action?.kind !== undefined && result.action.kind !== "push") {
+    return JSON.stringify({ ...result, ...nonPushCriticalHandoff(result) }, null, 2) + "\n";
   }
   return JSON.stringify(result, null, 2) + "\n";
 }
@@ -892,6 +902,16 @@ function artifactPath(directory, name) {
  * directory; push preparation consumes these exact names.
  */
 export function criticalPushScratchArtifactPaths(repository, gitCommonDir = repository) {
+  return criticalScratchArtifactPaths(repository, gitCommonDir, "push");
+}
+
+/**
+ * C18-11 (AC-262): the same mirror for every critical signing kind, so the agent reads
+ * the request, proof, authority and signer from scratch/ instead of the PO pasting them
+ * into the chat. The push names stay byte-identical (`critical-push-<name>-<fp>.json`).
+ */
+export function criticalScratchArtifactPaths(repository, gitCommonDir = repository, kind = "push") {
+  if (!/^[a-z][a-z0-9-]*$/u.test(String(kind))) fail("critical scratch artifacts require a plain lowercase kind name");
   const root = resolve(repository);
   const fingerprint = derivePoGateRepositoryFingerprint({
     gitCommonDir: gitCommonDir ?? root,
@@ -899,23 +919,23 @@ export function criticalPushScratchArtifactPaths(repository, gitCommonDir = repo
   }).slice(0, 12);
   const scratch = join(root, "scratch");
   return {
-    request: join(scratch, `critical-push-request-${fingerprint}.json`),
-    proof: join(scratch, `critical-push-proof-${fingerprint}.json`),
-    authority: join(scratch, `critical-push-authority-${fingerprint}.json`),
-    signer: join(scratch, `critical-push-signer-${fingerprint}.json`),
+    request: join(scratch, `critical-${kind}-request-${fingerprint}.json`),
+    proof: join(scratch, `critical-${kind}-proof-${fingerprint}.json`),
+    authority: join(scratch, `critical-${kind}-authority-${fingerprint}.json`),
+    signer: join(scratch, `critical-${kind}-signer-${fingerprint}.json`),
   };
 }
 
-function mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, io) {
-  const artifacts = criticalPushScratchArtifactPaths(repository, gitCommonDir);
+function mirrorCriticalArtifacts(repository, gitCommonDir, kind, request, signed, paths, io) {
+  const artifacts = criticalScratchArtifactPaths(repository, gitCommonDir, kind);
   const scratch = dirname(artifacts.request);
   mkdirSync(scratch, { recursive: true, mode: 0o700 });
   const scratchMetadata = lstatSync(scratch);
   if (!scratchMetadata.isDirectory() || scratchMetadata.isSymbolicLink()) {
-    fail("critical push scratch artifacts require a real scratch directory inside the repository");
+    fail(`critical ${kind} scratch artifacts require a real scratch directory inside the repository`);
   }
   const writeMirror = (path, data) => {
-    assertUnlinkedRegularFileOrAbsent(path, "critical push scratch artifacts must be unlinked regular files inside this repository's own scratch/ directory");
+    assertUnlinkedRegularFileOrAbsent(path, `critical ${kind} scratch artifacts must be unlinked regular files inside this repository's own scratch/ directory`);
     io.write(path, data, { mode: 0o600 });
   };
   writeMirror(artifacts.request, `${JSON.stringify(request, null, 2)}\n`);
@@ -2580,9 +2600,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // The human terminal owns durable external artifacts. For pushes, the next
     // agent-side `approve-push` consumes a repository-local mirror instead, so
     // its rendered command cannot disclose this host's private key location.
-    const resultPaths = args.kind === "push"
-      ? mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, { write, read })
-      : { request: paths.request, proof: paths.proof, signer: paths.signer };
+    const resultPaths = mirrorCriticalArtifacts(repository, gitCommonDir, args.kind, request, signed, paths, { write, read });
     return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths,
       externalPaths: { request: paths.request, proof: paths.proof, authority: paths.authority } };
   }
