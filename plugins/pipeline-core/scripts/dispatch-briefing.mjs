@@ -947,6 +947,8 @@ export function generateDispatchBinding(options, deps = {}) {
   let identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
   let rulesetSha = null;
   let rulesetFallback = null;
+  let rulesetIdentitySource = "loaded";
+  let rulesetFallbackIsWarning = false;
   // K12: a lock-held registry is a transient state, never a reason to settle for a lesser identity. Before any
   // fallback the lock is observed; a live or unjudgeable holder is waited for (bounded), the preflight is
   // observed again once it clears, and a lock that stays held is refused typed, naming the holder and the retry.
@@ -975,6 +977,7 @@ export function generateDispatchBinding(options, deps = {}) {
     if (installed?.status === "available" && typeof installed.value === "string" && SHA.test(installed.value)) {
       rulesetSha = installed.value;
       rulesetFallback = "installedIdentity.value of the preflight ruleset source";
+      rulesetFallbackIsWarning = true; // a recorded identity, not proven to be the loaded plugin's own
     } else if (typeof observation?.pluginRoot === "string" && observation.pluginRoot !== "") {
       try {
         const snapshot = snapshotPluginRoot(observation.pluginRoot);
@@ -984,12 +987,16 @@ export function generateDispatchBinding(options, deps = {}) {
         }
       } catch { /* no source exists: refused below */ }
     }
-    if (rulesetFallback) warnings.push({ code: "DBG-RULESET-FALLBACK", source: rulesetFallback, message: `the loaded ruleset identity is ${identityStatus}; used the ${rulesetFallback}` });
+    // The content hash of the loaded plugin root is a deterministic identity of that plugin (the only one a local-development
+    // install has): informational via `rulesetIdentitySource`, no warning. Only the lesser installed identity still warns.
+    if (rulesetFallback) rulesetIdentitySource = rulesetFallback;
+    if (rulesetFallback && rulesetFallbackIsWarning) warnings.push({ code: "DBG-RULESET-FALLBACK", source: rulesetFallback, message: `the loaded ruleset identity is ${identityStatus}; used the ${rulesetFallback}` });
   }
   if (rulesetSha === null) {
     refuse("DBG-RULESET-UNAVAILABLE", `the loaded ruleset identity is not available (status: ${identityStatus}) and no installed identity or plugin-root content hash exists to fall back to`);
   }
   const rulesetVersion = observation.rulesetSource?.selectedPlugin?.version;
+  const pipelineVersion = typeof rulesetVersion === "string" && rulesetVersion !== "" ? rulesetVersion : null;
 
   // Candidate: HEAD of --root, read-only.
   let candidateCommit;
@@ -1093,7 +1100,7 @@ export function generateDispatchBinding(options, deps = {}) {
   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
 
   // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, budgetEnforcement, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
+  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, budgetEnforcement, skeleton, warnings, pipelineVersion, rulesetIdentitySource, ...(preDispatch === null ? {} : { preDispatch }) };
 }
 
 const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
@@ -1182,7 +1189,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 
@@ -1291,6 +1298,7 @@ export function probeDispatchReadiness(options, deps = {}) {
   const base = ready && pkg !== null ? dispatchCallBase(pkg, generated?.binding?.agentType) : null;
   return {
     schema: DISPATCH_PROBE_SCHEMA, ok: ready, ready, findings, warnings,
+    pipelineVersion: generated?.pipelineVersion ?? null, rulesetIdentitySource: generated?.rulesetIdentitySource ?? null,
     ...(skipped.length === 0 ? {} : { skipped }),
     ...(ready ? { dispatchCall: base === null ? null : { ...base, prompt: `the briefing file that build --package ${options.package} --out scratch/<briefing>.md writes, verbatim including its final newline` } } : {}),
   };
