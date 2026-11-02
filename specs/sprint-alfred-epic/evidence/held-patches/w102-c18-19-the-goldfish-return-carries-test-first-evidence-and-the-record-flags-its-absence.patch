@@ -1,0 +1,269 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 40d075218..531324b65 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -243,6 +243,13 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
+ const factsBlock = (pkg) => (pkg.facts === undefined ? "" : `\n\nFacts established by the coordinator (do not re-derive):\n\n${pkg.facts.map((fact) => `- ${fact}`).join("\n")}`);
+ 
+ /** Renders the full briefing; `generated` is the binding builder's result for this package. */
++// C18-19 (AC-239): one fixed paragraph, only for a package that carries a criterion and names a test among its paths or its check.
++const TEST_PATH = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:tests?|__tests__)\/)/u;
++export function testFirstEvidenceParagraph(pkg) {
++  if (typeof pkg?.criterion !== "string" || ![...(pkg.paths ?? []), ...(typeof pkg.check === "string" ? [pkg.check] : [])].some((path) => TEST_PATH.test(path))) return "";
++  return `\n\nTest-first evidence in the return (optional, self-attested): add one more key to the JSON object, \`testFirst\`: \`{"red":[{"command":"<the RED command>","exitCode":<its non-zero exit code>,"evidencePath":"<repo-relative evidence file>"}],"greenCommand":"<the GREEN command>"}\`. Write the evidence file with the redacting evidence writer the template names, from the RED run you made before your first production edit. The host only checks that each evidence file exists, is a regular non-empty file inside the repository, and shows the result as \`testFirstEvidence\` (attested, unverifiable or absent) in the dispatch record; the flag is for the Critic and the close readback, never a gate, and the host never refuses a commit because of it. It is your own statement plus file existence: nobody observes the order of events.`;
++}
++
+ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
+   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
+     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
+@@ -266,7 +273,7 @@ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
+ {"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"${b.dispatchId}","candidateCommit":"${b.candidateCommit}","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+ \`\`\`
+ 
+-\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. Only when no file at all has been changed is a plain-text stop report the one legal form (no commit happens then). \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
++\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. Only when no file at all has been changed is a plain-text stop report the one legal form (no commit happens then). \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.${testFirstEvidenceParagraph(pkg)}
+ 
+ ## Briefing ${b.dispatchId}: ${pkg.title}
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index eba1a6844..50122b16a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -284,7 +284,27 @@ function observedNativeHostProgress({ state, observation }) {
+   ];
+ }
+ 
+-function draftRecord({ state, observation, commitReadback }) {
++// C18-19 (AC-239): a visible flag, never a gate. `attested` = every red evidencePath is a regular, non-empty, non-symlink file whose
++// real location is inside the repository; `unverifiable` = a testFirst block was returned but a file is missing, empty or outside;
++// `absent` = no block. It proves file existence only: neither the order of events nor the content is observed.
++export function testFirstEvidenceStatus(root, testFirst) {
++  if (testFirst === undefined || testFirst === null) return "absent";
++  try {
++    const realRoot = realpathSync(root);
++    for (const entry of testFirst.red) {
++      const path = resolve(realRoot, entry.evidencePath);
++      const info = lstatSync(path);
++      if (!info.isFile() || info.isSymbolicLink() || info.size === 0) return "unverifiable";
++      const real = realpathSync(path);
++      if (real !== join(realRoot, entry.evidencePath)) return "unverifiable";
++    }
++    return "attested";
++  } catch { return "unverifiable"; }
++}
++const testFirstNote = (status) => (status === "absent" ? "testFirstEvidence: absent (the return carried no testFirst block)."
++  : `testFirstEvidence: ${status} (self-attested; evidence file existence only, the order of events was not observed).`);
++
++function draftRecord({ state, observation, commitReadback, testFirstEvidence = "absent" }) {
+   const binding = state.binding;
+   const decision = validateCriticDecision(binding.criticDecision,
+     { required: binding.criticDecision.schema === CRITIC_REQUIRED_SCHEMA });
+@@ -297,7 +317,8 @@ function draftRecord({ state, observation, commitReadback }) {
+     model: binding.model, effort: binding.effort, rulesetSha: binding.rulesetSha,
+     dispatcher: "Elephant", candidateCommit: commitReadback.commit,
+     resultSha256: observation.final.reportSha256, outcome: "completed", commits: [commitReadback.commit],
+-    log: observedNativeHostProgress({ state, observation }), report,
++    log: observedNativeHostProgress({ state, observation }).map((entry) => entry.phase === "host-return-observed"
++      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}` } : entry), report,
+     outcomeClassification: { schema: OUTCOME_CLASSIFICATION_SCHEMA, kind: "authored-commit" },
+     ...(decision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: decision } : { criticSkip: decision }),
+   };
+@@ -426,7 +447,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+     attempt = bindNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input: attemptInput,
+       expectedPendingSha256: observedAttempt.pendingSha256 });
+     postCommitStage = "record-draft";
+-    const drafted = draftRecord({ state, observation, commitReadback: committed });
++    const testFirstEvidence = testFirstEvidenceStatus(physical, observation.final.testFirst);
++    const drafted = draftRecord({ state, observation, commitReadback: committed, testFirstEvidence });
+     if (!drafted.ok) return { ...fail(drafted.code), commit: committed.commit };
+     const recordBytes = nativeAuthoredRecordBytes(drafted.record);
+     postCommitStage = "observation-draft";
+@@ -452,7 +474,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+       postCommitStage = "checks-publication";
+       checks = publishNativeDispatchChecks({ physical, dispatchId: state.binding.dispatchId, commit: committed.commit, published, delivery: deliveryResult });
+     }
+-    return { attempt, terminalAssociation, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
++    return { attempt, terminalAssociation, testFirstEvidence, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
+       commit: committed.commit, record: { target: published.target, sha256: published.sha256,
+         authorship: "host-observed-local" } };
+   } catch(error) { return { ...fail(`NGHF-${postCommitStage.toUpperCase()}-EXCEPTION`), causeCode:error?.code??null, causeMessage:error?.message??null, stage:postCommitStage, causeReason:causeReason(error), commit: committed.commit }; }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index c6d3eba4d..41adeddbf 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -161,7 +161,28 @@ function itemFixture(check, options = {}) {
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ }
+ 
++// C18-19 (AC-239): the testFirst block of a return is self-attested; the host only checks that each evidence file exists
++// (regular, non-empty, inside the repository) and shows a flag. The flag never refuses or delays the commit.
++const testFirstCase = (id, name, { testFirst, plant, expected }) => ({ id, name, run: () => fixture(({ root, binding, dependencies, facts }) => {
++  if (plant !== null) writeFileSync(join(root, "evidence/red-run.txt"), plant);
++  const text = finalText(binding, testFirst === undefined ? {} : { testFirst });
++  const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
++    tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
++    tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text }] } };
++  const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++  assert.equal(result.status, "authored-commit-recorded", result.code);
++  assert.equal(facts.commits, 1);
++  assert.equal(result.testFirstEvidence, expected);
++  assert.equal(facts.publishedRecord.log.length, 2);
++  assert.match(facts.publishedRecord.log[1].note, new RegExp(`testFirstEvidence: ${expected}`, "u"));
++  if (expected !== "absent") assert.match(facts.publishedRecord.log[1].note, /self-attested/u);
++}) });
++const TF_BLOCK = { red: [{ command: "node --test src/change.test.mjs", exitCode: 1, evidencePath: "evidence/red-run.txt" }], greenCommand: "node --test src/change.test.mjs" };
+ const cases = [
++  testFirstCase("NGHF-TF1", "AC-239: testFirst with an existing non-empty evidence file is recorded as attested", { testFirst: TF_BLOCK, plant: "FAIL 1 case\n", expected: "attested" }),
++  testFirstCase("NGHF-TF2", "AC-239: testFirst naming a missing evidence file is unverifiable and the commit still lands", { testFirst: TF_BLOCK, plant: null, expected: "unverifiable" }),
++  testFirstCase("NGHF-TF3", "AC-239: testFirst naming an empty evidence file is unverifiable and the commit still lands", { testFirst: TF_BLOCK, plant: "", expected: "unverifiable" }),
++  testFirstCase("NGHF-TF4", "AC-239: a return without testFirst is recorded as absent", { testFirst: undefined, plant: null, expected: "absent" }),
+   { id: "NGHF01", name: "Claude valid PostToolUse return commits and publishes a host-observed v4 record last", run: () => fixture(({ root, binding, dependencies, facts }) => {
+     const text = JSON.stringify({ schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId,
+       candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Implemented and verified; independent review pending.",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index a84db0fb3..2cfcd3cf8 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -101,7 +101,8 @@ export function parseNativeGoldfishBriefing(prompt) {
+  * single conjunction, so admission is unchanged. */
+ function finalShapeCondition(value, binding, allowCheckpoint) {
+   const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
+-  if (!exact(value, FINAL_FIELDS)) return named("fields");
++  const hasTestFirst = value !== null && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "testFirst");
++  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return named("fields");
+   if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
+   if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
+   if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
+@@ -117,6 +118,26 @@ function finalShapeCondition(value, binding, allowCheckpoint) {
+   if ([...value.changedPaths].sort().join("\0") !== value.changedPaths.join("\0")) return named("paths-unsorted");
+   const outside = value.changedPaths.filter((path) => !binding.allowedPaths.includes(path));
+   if (outside.length > 0) return named("path-outside-allowed", outside);
++  if (hasTestFirst) return testFirstCondition(value.testFirst);
++  return null;
++}
++
++const TEST_FIRST_COMMAND_MAX = 500;
++const boundedCommand = (value) => typeof value === "string" && value.trim() !== "" && value.length <= TEST_FIRST_COMMAND_MAX && !/[\0\r\n]/u.test(value);
++/** C18-19 (AC-239): the optional `testFirst` block of a return. Self-attested evidence; its first failing sub-condition as a closed slug, or null. */
++function testFirstCondition(block) {
++  if (block === null || typeof block !== "object" || Array.isArray(block)) return { condition: "test-first-type" };
++  if (!exact(block, ["red", "greenCommand"])) return { condition: "test-first-fields" };
++  if (!Array.isArray(block.red)) return { condition: "test-first-red-type" };
++  if (block.red.length === 0) return { condition: "test-first-red-empty" };
++  if (block.red.length > 16) return { condition: "test-first-red-too-many" };
++  for (const entry of block.red) {
++    if (!exact(entry, ["command", "exitCode", "evidencePath"])) return { condition: "test-first-red-fields" };
++    if (!boundedCommand(entry.command)) return { condition: "test-first-red-command" };
++    if (!Number.isSafeInteger(entry.exitCode) || entry.exitCode === 0) return { condition: "test-first-red-exit-code" };
++    if (!normalizedPath(entry.evidencePath)) return { condition: "test-first-red-evidence-path" };
++  }
++  if (!boundedCommand(block.greenCommand)) return { condition: "test-first-green-command" };
+   return null;
+ }
+ 
+@@ -132,11 +153,14 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
+   if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
+   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
+   let resultSha256;
+-  try { resultSha256 = createHashSha256(canonicalizeJson(value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }
++  // C18-19: the result digest binds the return WITHOUT its optional testFirst block, because the observation receipt re-derives
++  // this digest from the record alone (native-goldfish-host-observation.mjs) and the record carries no testFirst block.
++  try { resultSha256 = createHashSha256(canonicalizeJson(Object.hasOwn(value, "testFirst") ? (({ testFirst: _t, ...rest }) => rest)(value) : value)); } catch { return fail("NGHR-FINAL-CANONICALIZATION"); }
+   return { ok: true, code: "NGHR-FINAL-VALIDATED", final: {
+     schema: value.schema, dispatchId: value.dispatchId, candidateCommit: value.candidateCommit,
+     outcome: value.outcome, report: value.report,
+     resultSha256, reportSha256: createHashSha256(value.report), changedPaths: [...value.changedPaths].sort(),
++    ...(Object.hasOwn(value, "testFirst") ? { testFirst: structuredClone(value.testFirst) } : {}),
+   } };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+index 567b5c9c5..82e00927a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+@@ -153,7 +153,40 @@ const cases = [
+     // The checkpoint outcome is an outcome failure only where it is not allowed.
+     assert.equal(run({ outcome: "checkpoint" }, { binding, allowCheckpoint: true }).ok, true);
+   }],
+-
++  ["NGHR11 AC-239: the return admits one optional closed testFirst block; every other shape is refused as NGHR-FINAL-SHAPE naming the field", () => {
++    const red = { command: "node --test src/change.test.mjs", exitCode: 1, evidencePath: "evidence/red-run.txt" };
++    const good = { red: [red], greenCommand: "node --test src/change.test.mjs" };
++    const run = (testFirst) => validateNativeGoldfishFinal(JSON.stringify({ ...final, testFirst }), { binding });
++    const admitted = run(good);
++    assert.equal(admitted.ok, true, admitted.code);
++    assert.deepEqual(admitted.final.testFirst, good);
++    // The result digest stays the digest of the return without the block (the observation receipt re-derives it from the record).
++    assert.equal(admitted.final.resultSha256, validateNativeGoldfishFinal(finalText, { binding }).final.resultSha256);
++    // A return without the key is unchanged: no testFirst on the validated final.
++    assert.equal(Object.hasOwn(validateNativeGoldfishFinal(finalText, { binding }).final, "testFirst"), false);
++    assert.equal(run({ ...good, red: [red, { ...red, exitCode: -1 }] }).ok, true);
++    const refused = [
++      [{ ...good, red: [{ ...red, exitCode: 0 }] }, "test-first-red-exit-code"],
++      [{ ...good, red: [{ ...red, exitCode: "1" }] }, "test-first-red-exit-code"],
++      [{ ...good, red: [] }, "test-first-red-empty"],
++      [{ ...good, red: "x" }, "test-first-red-type"],
++      [{ ...good, extra: true }, "test-first-fields"],
++      [{ red: good.red }, "test-first-fields"],
++      [{ ...good, red: [{ ...red, extra: 1 }] }, "test-first-red-fields"],
++      [{ ...good, red: [{ ...red, command: "" }] }, "test-first-red-command"],
++      [{ ...good, red: [{ ...red, command: "x".repeat(501) }] }, "test-first-red-command"],
++      [{ ...good, red: [{ ...red, evidencePath: "/abs/out.txt" }] }, "test-first-red-evidence-path"],
++      [{ ...good, red: [{ ...red, evidencePath: "../out.txt" }] }, "test-first-red-evidence-path"],
++      [{ ...good, greenCommand: "" }, "test-first-green-command"],
++      [{ ...good, greenCommand: 5 }, "test-first-green-command"],
++      [null, "test-first-type"], [[], "test-first-type"],
++    ];
++    for (const [testFirst, condition] of refused) {
++      const result = run(testFirst);
++      assert.equal(result.code, "NGHR-FINAL-SHAPE", condition);
++      assert.equal(result.detail?.condition, condition, JSON.stringify(result));
++    }
++  }],
+ ];
+ 
+ const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 95e5b0b22..a71b301fa 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2016,3 +2016,39 @@ test("probe: refuses a missing --package and names probe in the usage text", asy
+   const help = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
+   assert.match(help.stdout, /dispatch-briefing\.mjs probe --package/u);
+ });
++
++// C18-19 (AC-239): the testFirst paragraph is rendered only for a package that carries a criterion and at least one test path.
++const TEST_FIRST_MARK = /testFirst/u;
++test("C18-19: a criterion package with a test path states the testFirst return paragraph, self-attested and flag-only", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture({ criterion: "AC-1" });
++  const result = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.equal(result.text.split("`testFirst`").length >= 2, true);
++  assert.match(result.text, /testFirst/u);
++  assert.match(result.text, /RED command/u);
++  assert.match(result.text, /non-zero exit code/u);
++  assert.match(result.text, /evidence file/u);
++  assert.match(result.text, /self-attested/u);
++  assert.match(result.text, /never a gate/u);
++  assert.doesNotMatch(result.text, /order of events (?:was|is) verified/u);
++  assert.equal(result.text.split("testFirstEvidence").length, 2);
++});
++
++test("C18-19: a package without a criterion renders no testFirst paragraph at all", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { renderGoldfishBriefing, testFirstEvidenceParagraph } = await buildLib();
++  const { fx, argv } = packageFixture();
++  const result = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.doesNotMatch(result.text, TEST_FIRST_MARK);
++  assert.equal(typeof renderGoldfishBriefing, "function");
++  assert.equal(testFirstEvidenceParagraph({ paths: ["plugins/x/y.test.mjs"], check: CHECK }), "");
++});
++
++test("C18-19: a criterion package with no test among its paths and check renders no paragraph", async () => {
++  const { testFirstEvidenceParagraph } = await buildLib();
++  assert.equal(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "scripts/check.mjs" }), "");
++  assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs", "plugins/x/y.test.mjs"], check: "scripts/check.mjs" }), /testFirst/u);
++  assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "plugins/x/y.test.mjs" }), /testFirst/u);
++});
