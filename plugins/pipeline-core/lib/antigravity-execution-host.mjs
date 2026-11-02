@@ -156,7 +156,20 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
   args.push(`--print=${prompt}`);
 
   return new Promise((resolve) => {
-    const child = spawn(agyPath, args, { cwd, env });
+    // 17 (AGY greenfield, a child that never ended): the prompt travels in argv, so the child gets NO stdin (an open pipe that
+    // nobody writes or closes is a read that waits forever), and on POSIX it leads its own process group so a timeout or a
+    // cancel reaches a wrapper's grandchildren too. SIGTERM first, SIGKILL one second later; the result stays "unclosed"
+    // (recovery required) unless close was actually observed.
+    const ownGroup = process.platform !== "win32";
+    const child = spawn(agyPath, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: ownGroup });
+    const killChild = (signalName) => {
+      try {
+        if (ownGroup && Number.isInteger(child.pid) && child.pid > 0) process.kill(-child.pid, signalName);
+        else child.kill(signalName);
+      } catch {
+        try { child.kill(signalName); } catch { /* already gone */ }
+      }
+    };
     let settled = false;
     let processStarted = false;
     let processClosed = false;
@@ -179,11 +192,11 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
     const stop = (code, message) => {
       if (settled || forcedStop !== null) return;
       forcedStop = { ok: false, code, message };
-      child.kill();
+      killChild("SIGTERM");
       // A timeout/cancel cannot claim a complete transport observation until
       // close drains stdout. If close never arrives, the caller sees an
       // explicitly unclosed process and must require recovery.
-      terminationTimer = setTimeout(() => finish(forcedStop), 1000);
+      terminationTimer = setTimeout(() => { killChild("SIGKILL"); finish(forcedStop); }, 1000);
     };
     const timeoutId = setTimeout(() => stop(AGY_ERROR_TAXONOMY.TIMEOUT, "Execution timed out"), timeoutMs);
     const cancel = () => stop(AGY_ERROR_TAXONOMY.CANCELLED, "Execution cancelled");

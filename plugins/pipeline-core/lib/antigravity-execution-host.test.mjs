@@ -47,6 +47,8 @@ const args = process.argv.slice(2);
 appendFileSync(process.env.AGY_SPAWN_LOG, JSON.stringify(args) + "\\n");
 const prompt = args.at(-1).slice("--print=".length);
 if (prompt.includes("--timeout-test")) setTimeout(() => {}, 5000);
+else if (prompt.includes("--stdin-test")) { process.stdin.resume(); process.stdin.on("end", () => console.log(JSON.stringify({ status: "SUCCESS", response: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}))); }
+else if (prompt.includes("--stubborn-test")) { appendFileSync(process.env.AGY_SPAWN_LOG + ".pid", String(process.pid)); process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); }
 else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.stringify({ status: "SUCCESS", response: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }})), 1200);
 else if (prompt.includes("--auth-test")) { console.error("Please login to Vertex"); process.exit(1); }
 else if (prompt.includes("--fail-test")) process.exit(2);
@@ -273,7 +275,29 @@ for (const [id, suffix] of [["EPH23", "--oversized-stdout-test"], ["EPH24", "--o
   }));
 }
 
-assert.equal(cases.length, 24, "the complete Antigravity execution host corpus must be registered before execution begins");
+// 17 (AGY greenfield, a dispatch child that never ended): the child must not wait on a stdin nobody closes, and a child that
+// ignores SIGTERM must still be gone after the bounded timeout.
+check("EPH25 the child has no stdin to wait on", () => withFixture(async (fixture) => {
+  const started = Date.now();
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--stdin-test"), { timeoutMs: 4000 }));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(Date.now() - started < 3500, "the result came from the child's end of input, not from the timeout");
+}));
+check("EPH26 a child that ignores SIGTERM is killed after the bounded timeout", () => withFixture(async (fixture) => {
+  const started = Date.now();
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--stubborn-test"), { timeoutMs: 300 }));
+  assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
+  assert.ok(Date.now() - started < 4000, "the call is bounded by the timeout plus the one-second escalation");
+  const pid = Number(readFileSync(`${fixture.spawnLog}.pid`, "utf8"));
+  assert.ok(Number.isInteger(pid) && pid > 1, "the child recorded its pid");
+  let alive = true;
+  for (let attempt = 0; attempt < 40 && alive; attempt += 1) {
+    try { process.kill(pid, 0); await new Promise((resolve) => setTimeout(resolve, 50)); } catch { alive = false; }
+  }
+  assert.equal(alive, false, "SIGKILL reached the child that ignored SIGTERM");
+}));
+
+assert.equal(cases.length, 26, "the complete Antigravity execution host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
