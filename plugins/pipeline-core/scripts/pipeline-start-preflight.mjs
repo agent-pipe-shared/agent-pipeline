@@ -1781,6 +1781,8 @@ export function observePipelineStartPreflight({
       nextAction: architectureOrientationAction,
     },
     effectiveDecisions,
+    // A pointer only: the per-runner capability table lives in config/runner-capabilities.json and is read on demand, not carried here.
+    runnerCapabilities: { schema: "pipeline.runner-capabilities.v1", read: "scripts/runner-capabilities.mjs" },
     ...(continuityAuthorityDrift !== null ? { continuityAuthorityDrift } : {}),
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     ...(staleHookSnapshots.length > 0 ? { staleHookSnapshots } : {}),
