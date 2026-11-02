@@ -1,0 +1,171 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 48cd0a832..33e29f4ac 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1555,17 +1555,21 @@ export function observeGovernedItemIntegrationReadiness({root}={}) {
+ // PF-55: the result is a pure function of the candidate's immutable history and the slice rows, so a process
+ // reads it once per (root, candidate, rows) instead of once per collision check.
+ const commitIntegrationMemo=new Map();
+-export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,slices}) {
++export function readOrchestratorCommitIntegratedSlices(args) { return [...scanOrchestratorCommitIntegration(args).result]; }
++/** The integrating commit per slice that the same scan found by direct evidence (a superseded stopped attempt has none). */
++export function readOrchestratorCommitIntegratedCommits(args) { return new Map(scanOrchestratorCommitIntegration(args).commits); }
++function scanOrchestratorCommitIntegration({root,candidateCommit,slices}) {
+   const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:30000,maxBuffer:64*1024*1024,encoding:'utf8'});
+   const live=(slices??[]).filter(row=>row&&row.state!=='cancelled'&&row.tier!=='critic'&&Array.isArray(row.writeScope)&&row.writeScope.length>0
+     &&row.writeScope.every(path=>typeof path==='string')&&typeof row.delivery?.baseCommit==='string'&&/^[0-9a-f]{40}$/u.test(row.delivery.baseCommit));
+-  if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return [];
++  const none={result:[],commits:new Map()};
++  if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return none;
+   const memoKey=`${root}\0${candidateCommit}\0${nativeManagedDigest(live)}`;
+-  if(commitIntegrationMemo.has(memoKey))return [...commitIntegrationMemo.get(memoKey)];
++  if(commitIntegrationMemo.has(memoKey))return commitIntegrationMemo.get(memoKey);
+   const log=run(['log','--no-merges','--fixed-strings','--grep=(goldfish)','--name-only',
+     '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
+-  if(log.status!==0)return [];
+-  const byId=new Map(live.map(row=>[row.id,row])),direct=new Set();
++  if(log.status!==0)return none;
++  const byId=new Map(live.map(row=>[row.id,row])),direct=new Set(),commits=new Map();
+   for(const record of log.stdout.split('\x1e')){
+     const [sha,dispatch='',names='']=record.split('\x00');
+     if(!/^[0-9a-f]{40}$/u.test(sha?.trim()??''))continue;
+@@ -1573,7 +1577,7 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
+     for(const value of dispatch.split('\x1f').map(entry=>entry.trim())){
+       const match=/^(\S+) \(goldfish\)$/u.exec(value),slice=match&&byId.get(match[1]);
+       if(!slice||direct.has(slice.id)||sha.trim()===slice.delivery.baseCommit||!touched.some(path=>scopesOverlap([path],slice.writeScope)))continue;
+-      if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0)direct.add(slice.id);
++      if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0){direct.add(slice.id);commits.set(slice.id,sha.trim());}
+     }
+   }
+   // Only a `ready` predecessor can be a stopped attempt; held, deferred or blocked slices keep their hold.
+@@ -1581,8 +1585,9 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
+     &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
+   const result=[...direct,...superseded];
+   if(commitIntegrationMemo.size>=64)commitIntegrationMemo.delete(commitIntegrationMemo.keys().next().value);
+-  commitIntegrationMemo.set(memoKey,result);
+-  return [...result];
++  const scan={result,commits};
++  commitIntegrationMemo.set(memoKey,scan);
++  return scan;
+ }
+ /** Only the never-created registry catalogue counts as absent; a missing member or any other fault does not. */
+ export function sessionAuthorityRegistryAbsent(error) {
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index ee57691de..3b2f4a42c 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -108,7 +108,8 @@ export function planSettledPending({ pendingDir, reservations }) {
+         if (lstatSync(join(pendingDir, sibling)).isSymbolicLink()) blocked = `${sibling} is a symlink`; else siblings.push(sibling);
+       }
+       if (blocked !== null) { kept.push({ name, reason: blocked }); continue; }
+-      retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null, siblings });
++      retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null,
++        sliceId: typeof row.sliceId === "string" ? row.sliceId : null, commit: typeof row.commit === "string" && /^[0-9a-f]{40}$/u.test(row.commit) ? row.commit : null, siblings });
+     } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
+   }
+   return { retire, kept };
+@@ -286,19 +287,19 @@ export function runRoutineRepair(request, deps = {}) {
+   if (typeof request?.root === "string" && request.root !== "") {
+     try { root = resolve(request.root); commonDir = commonDirOf(root); } catch { commonDir = null; }
+   }
+-  const moved = [], retained = [];
++  const moved = [], retained = [], pointers = [];
+   let result;
+   if (!plan.ok) result = plan;
+   else if (commonDir === null) result = refuse("RR-ROOT", "--root is not a git repository");
+   else {
+     // ownerRouteSpawn (tests only): the owner-route orphan release is its own delegate, separate from the session-authority-repair stub.
+-    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained }); }
++    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained, pointers }); }
+     catch (error) { result = refuse("RR-FAILED", short(error)); }
+   }
+   const code = result.ok ? (result.code ?? "done") : result.code;
+   let ledgerError = null;
+   if (commonDir !== null) {
+-    const record = { schema: ROUTINE_REPAIR_RECORD_SCHEMA, kind: typeof request?.kind === "string" ? request.kind.slice(0, 40) : null, reason: reasonText, at: new Date(now()).toISOString(), result: code, moved, retained };
++    const record = { schema: ROUTINE_REPAIR_RECORD_SCHEMA, kind: typeof request?.kind === "string" ? request.kind.slice(0, 40) : null, reason: reasonText, at: new Date(now()).toISOString(), result: code, moved, retained, ...(pointers.length ? { retiredPending: pointers } : {}) };
+     try {
+       const path = join(commonDir, "agent-pipeline", "routine-repair-ledger.jsonl");
+       mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
+@@ -337,6 +338,8 @@ function retireSettledPending(ctx, inspect) {
+       ctx.moved.push({ from: rel(join(pendingDir, file)), to: `${abandonedRel(asideName)}/${file}` });
+     }
+     retiredPending.push(row);
++    // The pointer from the moved record to its dispatch, slice and integrating commit survives in the ledger line.
++    ctx.pointers?.push({ name: row.name, settled: row.settled, dispatchId: row.dispatchId, sliceId: row.sliceId, commit: row.commit });
+   }
+   for (const row of kept) ctx.retained.push(rel(join(pendingDir, row.name)));
+   // Authority records left without their pending file (by an earlier heal that moved only two kinds, or any other cause) make the host
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 50fb9692c..a8de54bfe 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -247,6 +247,24 @@ test("settled-pending-aside moves settled pending states with their terminal and
+   assert.equal(again.result.moved.length, 0);
+ }));
+ 
++test("settled-pending-aside keeps dispatch id, slice id and integrating commit of every moved pending state in its result and its ledger line", () => withRepo((root, ap) => {
++  const byCommit = writeNamedPending(ap, "D-K", { terminal: true });
++  const cancelled = writeNamedPending(ap, "D-N");
++  const commit = hex("a", 40);
++  const rows = [{ ...rowOf(byCommit, "integrated-by-commit"), sliceId: "SLICE-K", commit }, { ...rowOf(cancelled, "cancelled"), sliceId: "SLICE-N", commit: null }];
++  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(...rows)).spawn, ...SETTLED_DEPS });
++  assert.equal(exit, 0, JSON.stringify(result));
++  const pointer = (row) => ({ dispatchId: row.dispatchId, sliceId: row.sliceId, commit: row.commit });
++  const byName = (list, name) => list.find((row) => row.name === name);
++  assert.deepEqual(pointer(byName(result.retiredPending, byCommit.name)), { dispatchId: "D-K", sliceId: "SLICE-K", commit });
++  assert.deepEqual(pointer(byName(result.retiredPending, cancelled.name)), { dispatchId: "D-N", sliceId: "SLICE-N", commit: null });
++  const line = ledger(ap)[0];
++  assert.equal(line.schema, "pipeline.routine-repair-record.v1");
++  assert.deepEqual(byName(line.retiredPending, byCommit.name), { name: byCommit.name, settled: "integrated-by-commit", dispatchId: "D-K", sliceId: "SLICE-K", commit });
++  assert.equal(byName(line.retiredPending, cancelled.name).commit, null);
++  assert.match(byName(line.retiredPending, byCommit.name).commit, /^[0-9a-f]{40}$/u);
++}));
++
+ test("settled-pending-aside keys the siblings by the sha256 of the pending bytes, never by the key digest in the pending name", () => withRepo((root, ap) => {
+   const pending = writeNamedPending(ap, "D-M", { terminal: true });
+   const nameDigest = /^pending-claude-([a-f0-9]{64})\.json$/u.exec(pending.name)[1];
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index 6bf375af7..a2e3e0571 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -45,7 +45,7 @@ import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
+ import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+ import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+-import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
++import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+ import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
+ 
+@@ -146,6 +146,7 @@ function reservationReport(repository, root) {
+   const governed = resolveGovernedItemQueue({ root });
+   const slices = governed.status === "required" ? governed.normalized.slices : [];
+   const integrated = new Set(slices.length ? readOrchestratorCommitIntegratedSlices({ root: repository.primaryRoot, candidateCommit: repository.candidate.commit, slices }) : []);
++  const commits = slices.length ? readOrchestratorCommitIntegratedCommits({ root: repository.primaryRoot, candidateCommit: repository.candidate.commit, slices }) : new Map();
+   const rows = [];
+   for (const name of names.filter((entry) => entry.startsWith("pending-"))) {
+     let bytes, state;
+@@ -156,7 +157,8 @@ function reservationReport(repository, root) {
+     const nativeIntegrated = names.includes(`authority-integration-${sha}.json`);
+     const byCommit = sliceId !== null && integrated.has(sliceId);
+     rows.push({ pending: name, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, sessionId: typeof state?.sessionId === "string" ? state.sessionId : null, queueState,
+-      settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null });
++      settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null,
++      commit: !nativeIntegrated && byCommit ? commits.get(sliceId) ?? null : null });
+   }
+   return rows;
+ }
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 30e1e9158..49cea7264 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -34,7 +34,7 @@ You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, rea
+ spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
+ candidate. Pass the candidate Spec, every declared guardrail, each fresh
+ candidate-evidence path and, for a re-review, the separate prior-Critic path
+-to the preflight only.
++to the preflight only. Call shape: `node scripts/critic-dispatch-preflight.mjs --root . --base <commit> --candidate <commit> --spec <path>` (flags, no `--range`); the skill's own `$ARGUMENTS` are positional (`<spec-path> <range>`, see Grammar below), and a `key=value` form is accepted by neither.
+ Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
+ `packet-ready`. `packet-ready` has `spawnAuthorized: false` and names
+ `session-critic-dispatch` as its required next gate: the session orchestrator's
