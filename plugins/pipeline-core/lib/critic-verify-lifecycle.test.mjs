@@ -576,6 +576,49 @@ test("16c the close commit and handover-only commits carry the Critic; any sourc
   assert.equal(courseAdmission.criticCloseCommit(root, reviewed.commit, featureId), false, "the root commit has no single parent");
 });
 
+// Candidate 17 (Toolbox close): the close accepts content commits after the last Critic-reviewed candidate, the push carry-forward does not.
+// The advisory runs the carry-forward's own classification so the close can say so while the course is still open.
+test("17 the carry advisory names content commits after the last reviewed candidate and stays silent for carried ones", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const featureId = "advisory-feature";
+  git(["init", "--quiet"]);
+  for (const dir of [`specs/${featureId}/evidence`, "docs", "src"]) mkdirSync(join(root, dir), { recursive: true });
+  writeFileSync(join(root, "src/app.js"), "export const reviewed = 1;\n");
+  writeFileSync(join(root, "docs/state.md"), "# State\n");
+  writeFileSync(join(root, `specs/${featureId}/lifecycle.json`), `${JSON.stringify({ schema: "pipeline.feature-package.v1",
+    feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const reviewed = commitAll("reviewed source");
+  const history = (last) => () => ({ history: last === null ? [] : [{ candidate: { commit: last } }] });
+  const advise = (candidate, last = reviewed.commit) => courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId,
+    candidateCommit: candidate.commit, resolveHistoryFn: history(last) });
+
+  writeFileSync(join(root, "docs/state.md"), "# State\n\nClosed.\n");
+  const docsOnly = commitAll("documentation only");
+  assert.equal(advise(docsOnly), null, "a commit the carry-forward carries needs no advice");
+
+  writeFileSync(join(root, "package.json"), "{}\n");
+  const lock = commitAll("dependency bump");
+  writeFileSync(join(root, ".gitleaksignore"), "x\n");
+  const ignore = commitAll("ignore file");
+  const advice = advise(ignore);
+  assert.equal(advice.status, "content-after-last-review");
+  assert.deepEqual(advice.contentCommits, [lock.commit, ignore.commit], "the carried documentation commit is not listed");
+  assert.equal(advice.reviewedCandidate, reviewed.commit);
+  assert.match(advice.message, /BEFORE the close/u);
+  assert.match(advice.message, /new feature of rigor 1/u);
+  assert.equal(advise(ignore, null), null, "no registered review means nothing to compare against");
+  assert.equal(advise(reviewed), null, "the reviewed candidate itself");
+  assert.equal(courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId, candidateCommit: ignore.commit,
+    resolveHistoryFn: () => { throw new Error("unreadable"); } }), null, "an unreadable course never blocks");
+});
+
 // N22: a PO residual acceptance lives in a private record bound to the Critic receipt's own candidate and
 // reaches the carry-forward, the lifecycle recorder and the readiness check through one shared loader.
 import * as readiness from "./critic-verify-readiness.mjs";

@@ -34,6 +34,7 @@ import {
   writePrivateJsonAtomic,
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
@@ -642,6 +643,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   let boundEvidenceSha256 = null;
   let audit = null;
   let courseAuthorship = null;
+  let criticCarryNotice = null;
   if (values.phase === "checkpointed") {
     const feature = activeFeature(snapshot.state);
     if (feature.id !== stored.coordinator.featureId) fail("CLOSE-FEATURE", "checkpoint feature drifted");
@@ -763,6 +765,8 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     advance.candidateTree = candidate.tree;
     advance.inputDigest = snapshot.sha256;
     advance.observedDigest = sha256(canonical(candidate));
+    // Candidate 17: reported beside the plan, outside its digest (like courseAuthorship); never a refusal here.
+    criticCarryNotice = criticCarryAdvisory({ repoRoot: root, featureId: stored.coordinator.featureId, candidateCommit: candidate.oid });
     if (stored.coordinator.phase === "candidate-frozen") {
       // Candidate 16a: renew the freeze to a successor commit (security fixes found after the freeze). The close artefacts the earlier
       // phases bound must be unchanged, and the new candidate must descend from the frozen one; the changed paths enter the digest.
@@ -907,6 +911,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   // D55 Q1: the course's authorship classification is reported beside the plan, outside its digest. It names the
   // `unrecorded` slices the gate does not refuse, so the close states them instead of passing them silently.
   return { ...payload, planSha256: digest, ...(courseAuthorship ? { courseAuthorship } : {}),
+    ...(criticCarryNotice ? { criticCarryAdvisory: criticCarryNotice } : {}),
     nextAction: action("apply-transition", { ...values, root }, digest) };
 }
 

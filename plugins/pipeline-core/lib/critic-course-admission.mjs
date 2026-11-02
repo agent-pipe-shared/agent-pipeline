@@ -525,6 +525,30 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   });
 }
 
+const CARRY_ADVISORY_SCHEMA = "pipeline.critic-carry-advisory.v1";
+/**
+ * Candidate 17 (Toolbox close): the close accepts content commits after the last Critic-reviewed candidate (the 16a re-freeze admits every
+ * path outside the close artefacts), but the push gate's carry-forward does not carry them (CVL-CARRY-CONTENT-CHANGED), and a closed course
+ * takes no review any more. This read-only advisory runs the SAME classification the carry-forward uses over last-reviewed..candidate and
+ * names the content commits and the way out while the course is still open. Null when nothing needs saying or the course cannot be read.
+ */
+export function criticCarryAdvisory({ repoRoot, featureId, candidateCommit, resolveHistoryFn = resolveRegisteredCriticCourseHistory }) {
+  try {
+    const retained = resolveHistoryFn({ repoRoot, featureId, candidateCommit });
+    if (retained.history.length === 0) return null;
+    const reviewed = retained.history.at(-1).candidate.commit;
+    if (!OID.test(reviewed ?? "") || reviewed === candidateCommit) return null;
+    const range = classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit: reviewed, candidateCommit, admitCriticExports: true });
+    if (range.correctionCommits.length === 0) return null;
+    return Object.freeze({
+      schema: CARRY_ADVISORY_SCHEMA, status: "content-after-last-review", featureId,
+      reviewedCandidate: reviewed, candidate: candidateCommit,
+      contentCommitCount: range.correctionCommits.length, contentCommits: Object.freeze(range.correctionCommits.slice(0, 20)),
+      message: `${range.correctionCommits.length} commit(s) after the last Critic-reviewed candidate ${reviewed.slice(0, 12)} change content that no Critic has reviewed. The close accepts them, but a later push needs a Critic-bound Verify and the carry-forward does not carry content commits (CVL-CARRY-CONTENT-CHANGED). Do this BEFORE the close: register a correction-DIFF round for them (register-feature-package.mjs --help, section "Critic delta request route"). After the close this course takes no review (CCA-REGISTRATION-SHAPE, SCF-TAKEOVER-IDENTITY); the way is then a new feature of rigor 1 with a full Critic over these commits.`,
+    });
+  } catch { return null; }
+}
+
 /** Derive a read-only course decision from the retained source and exact range. */
 export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, baseCommit, candidateCommit, requestedMode, delta }) {
   const source = classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, baseCommit, candidateCommit });

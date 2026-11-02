@@ -144,7 +144,13 @@ of restarting: commit the fix on top of the frozen candidate, then plan `--phase
 (`CLOSE-REFREEZE` explains a refusal). The new candidate must descend from the frozen one and must not
 change the State file, `specs/<feature>/` or `audit-bundles/<feature>/` that earlier phases bound.
 The renewal is recorded as one more `candidate-frozen` effect; the final Verify and Security evidence
-must then name the new candidate. Findings you judge not relevant are put on the scanner's own ignore
+must then name the new candidate. Candidate 17: a `candidate-frozen` plan also prints `criticCarryAdvisory`
+(beside the plan, outside its digest) when commits after the last Critic-reviewed candidate change content
+(source, dependencies, configuration, agent prompts) that the push's Critic carry-forward will not carry.
+The close still accepts them, but the push then needs a Critic round for them, and that round is only
+possible while the course is open: register a correction-DIFF round BEFORE the close (route in
+`register-feature-package.mjs --help`, "Critic delta request route"). After the close the course takes no
+review; the way is a new feature of rigor 1 with a full Critic over those commits. Findings you judge not relevant are put on the scanner's own ignore
 route BEFORE the freeze, with a reason: gitleaks through `.gitleaksignore` (`gitleaks-repair-ignore.mjs`),
 dependency findings through the project's `osv-scanner.toml` (`[[IgnoredVulns]]` with `id`, `ignoreUntil`
 and `reason`). The shipped gitleaks configuration already exempts the bare hex digests the close itself
