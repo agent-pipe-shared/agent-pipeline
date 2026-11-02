@@ -260,4 +260,38 @@ try {
     assert.match(error.message, /--text-file/u);
     assert.match(error.message, /--text-file-sha256/u);
   }
+} }, { id: "CIP006", name: "AC-145: the remaining intake refusals end with the working text-file form", run: () => {
+try {
+  const pointerParts = ["--text-file", "--text-file-sha256", "sha256sum", "scratch/"];
+  const assertPointer = (text, label) => {
+    assert.equal(typeof text, "string", `${label}: refusal text present`);
+    for (const part of pointerParts) assert.ok(text.includes(part), `${label}: names ${part}`);
+  };
+  const root = fixture("pointer-refusals");
+  consent(root);
+  const captured = captureClaudeIntakePrompt(hostEvent(root, { prompt: "material" }));
+  assert.equal(captured.status, "available");
+
+  const shape = readClaudeIntakePromptCapture({ rootDir: root, sessionId: "session-001", reference: { ...captured.reference, path: "x" } });
+  assert.equal(shape.code, "CLAUDE-INTAKE-REFERENCE-SHAPE");
+  assertPointer(shape.message, "reference shape");
+
+  const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const dir = join(checkpoint.paths.directory, "claude-intake-prompt-captures");
+  const recordFile = join(dir, readdirSync(dir)[0]);
+  const damagedRecord = JSON.parse(readFileSync(recordFile, "utf8"));
+  damagedRecord.promptBase64 = Buffer.from("tampered", "utf8").toString("base64");
+  writeFileSync(recordFile, `${JSON.stringify(damagedRecord)}\n`, { mode: 0o600 });
+  const missing = readClaudeIntakePromptCapture({ rootDir: root, sessionId: "session-001", reference: captured.reference });
+  assert.equal(missing.status, "unavailable");
+  assertPointer(missing.message, "capture unavailable");
+
+  const script = join(import.meta.dirname, "..", "scripts", "project-onboarding-v3.mjs");
+  const cli = spawnSync(process.execPath, [script, "intake-capture-apply", "--root", root, "--text", "a", "--text-file", "b", "--activate", "--runner", "claude"],
+    { encoding: "utf8", shell: false });
+  assert.equal(cli.status, 2, `${cli.stdout}${cli.stderr}`);
+  assertPointer(`${cli.stdout}${cli.stderr}`, "text ambiguous");
+} finally {
+  cleanup();
+}
 } }], fd: 3, maxBytes: 65_536 });

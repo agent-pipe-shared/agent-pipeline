@@ -21,6 +21,7 @@ import { readIntakeMaterialReference } from "../lib/intake-material-reference.mj
 import {
   CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA,
   readClaudeIntakePromptCapture,
+  INTAKE_TEXT_FILE_POINTER,
 } from "../lib/claude-intake-prompt-capture.mjs";
 import {
   CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA,
@@ -147,7 +148,7 @@ function resolveIntakeCaptureText(options) {
 // inline/file routes) so intake-capture-apply can bind the reference into the checkpoint entry.
 function resolveIntakeCaptureInput(options) {
   if ([options.text, options.textFile, options.textTurnRef].filter((value) => value !== undefined).length > 1) {
-    const conflict = new Error("accepts exactly one of --text, --text-file, or --text-turn-ref");
+    const conflict = new Error(`accepts exactly one of --text, --text-file, or --text-turn-ref. ${INTAKE_TEXT_FILE_POINTER}`);
     conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
     throw conflict;
   }
@@ -170,7 +171,7 @@ function resolveIntakeCaptureInput(options) {
     }
     if (resolved?.status !== "available" || typeof resolved.text !== "string") {
       const code = typeof resolved?.code === "string" ? resolved.code : "INTAKE-CHAT-TURN-REFERENCE-UNAVAILABLE";
-      throw Object.assign(new Error(code), { code });
+      throw Object.assign(new Error(typeof resolved?.message === "string" ? resolved.message : code), { code });
     }
     return { text: resolved.text, captureReference: reference };
   }
@@ -449,10 +450,10 @@ function parse(args) {
   if (!output.help && !output.command) return { error: "one command is required" };
   if (!output.help && !output.root) return { error: "--root is required" };
   if ([output.text, output.textFile, output.textTurnRef].filter((value) => value !== undefined).length > 1) {
-    return { error: "accepts exactly one of --text, --text-file, or --text-turn-ref" };
+    return { error: `accepts exactly one of --text, --text-file, or --text-turn-ref. ${INTAKE_TEXT_FILE_POINTER}` };
   }
   if ([output.text, output.textFile, output.textTurnRef].filter((value) => value !== undefined).length > 1) {
-    return { error: "accepts exactly one of --text, --text-file, or --text-turn-ref" };
+    return { error: `accepts exactly one of --text, --text-file, or --text-turn-ref. ${INTAKE_TEXT_FILE_POINTER}` };
   }
   if (!output.help && ["intake-design-questions-apply", "intake-design-questions-replace"].includes(output.command)
     && output.answersJson === undefined && output.answersFile === undefined && output.answersFileSha256 === undefined) {

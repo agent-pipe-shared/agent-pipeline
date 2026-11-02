@@ -36,8 +36,15 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
 
+// AC-145 (C18-14B): the one sentence every unusable-reference refusal ends with. Wording only.
+export const INTAKE_TEXT_FILE_POINTER = "Working form: write the PO's intake material verbatim to a file under scratch/ and capture it with the text-file apply action that project-onboarding-v3.mjs prints (--text-file <path> --text-file-sha256 <digest>, digest from `sha256sum <file>`).";
+
 function unavailable(code) {
   return { status: "unavailable", code };
+}
+
+function unavailableWithPointer(code) {
+  return { status: "unavailable", code, message: `${code}: the native intake reference is unusable. ${INTAKE_TEXT_FILE_POINTER}` };
 }
 
 function physicalRoot(value) {
@@ -98,7 +105,7 @@ function captureDirectory(checkpoint) {
 }
 
 function recordPath(directory, sessionId) {
-  if (!SESSION_ID.test(sessionId)) throw new Error("CLAUDE-INTAKE-REFERENCE-SHAPE");
+  if (!SESSION_ID.test(sessionId)) throw new Error(`CLAUDE-INTAKE-REFERENCE-SHAPE: ${INTAKE_TEXT_FILE_POINTER}`);
   // One deterministic slot permits only one prompt capture per host session
   // and project, even if another action changes the pending checkpoint.
   return join(directory, `${sha256(sessionId)}.json`);
@@ -217,7 +224,7 @@ export function readClaudeIntakePromptCapture({ rootDir, sessionId, reference },
     || reference.sessionId !== sessionId || !SHA256.test(reference.transcriptPathSha256)
     || !SHA256.test(reference.promptSha256) || !Number.isSafeInteger(reference.byteLength)
     || reference.byteLength < 1 || reference.byteLength > MAX_PROMPT_BYTES) {
-    return unavailable("CLAUDE-INTAKE-REFERENCE-SHAPE");
+    return unavailableWithPointer("CLAUDE-INTAKE-REFERENCE-SHAPE");
   }
   try { assertIntakeCaptureReferenceLifetime(reference, { now: now() }); }
   catch (error) { return unavailable(error?.code || "INTAKE-CAPTURE-REFERENCE-MALFORMED"); }
@@ -236,7 +243,7 @@ export function readClaudeIntakePromptCapture({ rootDir, sessionId, reference },
     const raw = Buffer.from(readPrivateFile(path, "Claude intake prompt capture"), "utf8");
     parsed = decodeRecord(raw);
   } catch (error) {
-    return unavailable(error?.code || "CLAUDE-INTAKE-CAPTURE-UNAVAILABLE");
+    return error?.code ? unavailable(error.code) : unavailableWithPointer("CLAUDE-INTAKE-CAPTURE-UNAVAILABLE");
   }
   const record = parsed.record;
   if (record.root !== root || record.sessionId !== sessionId
