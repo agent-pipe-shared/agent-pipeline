@@ -18,7 +18,8 @@
 #   w87   intake capture prints the text-file form                  w92   remaining intake refusals point to it (rebased)
 #   w89   inspect names the approving instance                      w91   scope mismatch refusal names the required coverage
 #   w96-a18-m6  observation boundary row and carrier prepare command (rebased)   w101  Antigravity refusal texts name the way forward
-#   w104  first consent names what is installed and activated, hooks follow the promotion      w108  registration of four suites, vendored operating-model refresh (LAST)
+#   w104  first consent names what is installed and activated, hooks follow the promotion      w108  registration of four suites, vendored operating-model refresh
+#   w109  SPDX header for the fsync suite, no apostrophe in the late-verify pattern (two pins the Full Verify found; LAST)
 # Afterwards the Elephant refreshes the hooks, stamps, and the PO installs (only on the PO's word).
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate18.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -67,6 +68,7 @@ step2 w96-a18-m6-honest-observation-boundary-row-and-carrier-prepare-command "fi
 step2 w101-agy-refusal-texts-name-the-way-forward "fix(agy): make the Antigravity refusal texts name the way forward"
 step2 w104-c18-20-the-first-consent-names-what-is-installed-and-activated-and-the-mandatory-hooks-follow-the-promotion "feat(onboarding): name what is installed and activated in the first consent and hand over the mandatory hooks after the promotion (C18-20)"
 step2 w108-register-the-four-new-suites-and-refresh-the-vendored-operating-model-copy "chore(verify): register the four new suites and refresh the vendored operating-model copy"
+step2 w109-spdx-header-for-the-fsync-suite-and-no-apostrophe-in-the-late-verify-pattern "fix(verify): add the SPDX header to the fsync suite and keep an apostrophe out of the late-verify pattern"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
