@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 69bc300dc..d297c6d19 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -1781,6 +1781,8 @@ export function observePipelineStartPreflight({
+       nextAction: architectureOrientationAction,
+     },
+     effectiveDecisions,
++    // A pointer only: the per-runner capability table lives in config/runner-capabilities.json and is read on demand, not carried here.
++    runnerCapabilities: { schema: "pipeline.runner-capabilities.v1", read: "scripts/runner-capabilities.mjs" },
+     ...(continuityAuthorityDrift !== null ? { continuityAuthorityDrift } : {}),
+     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
+     ...(staleHookSnapshots.length > 0 ? { staleHookSnapshots } : {}),
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 91e362619..a98385ad5 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -361,6 +361,9 @@ test("all three runner bootstraps expose the same nonblocking decision digest",
+     assert.equal(result.effectiveDecisions.projectionSha256, expected);
+     assert.equal(result.effectiveDecisions.decisionCount, 1);
+     assert.equal(result.effectiveDecisions.taskScopeResolved, false);
++    // The capability table is a pointer on every runner, never the table itself, and the named script ships.
++    assert.deepEqual(result.runnerCapabilities, { schema: "pipeline.runner-capabilities.v1", read: "scripts/runner-capabilities.mjs" });
++    assert.ok(existsSync(new URL(`../${result.runnerCapabilities.read}`, import.meta.url)), "the pointed-at capability reader must ship");
+     assert.notEqual(result.status, "architecture-decision-blocked",
+       "a legacy warning cannot turn bootstrap into an implementation gate");
+   }
+@@ -425,7 +428,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
+   });
+   assert.deepEqual(Object.keys(result).sort(), [
+     "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation",
+-    "installedSource", "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
++    "installedSource", "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "runnerCapabilities", "schema", "status", "statusScope",
+     "version",
+   ]);
+   assert.equal(result.schema, SCHEMA);
