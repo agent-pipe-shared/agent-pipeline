@@ -1,0 +1,412 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 653bb3497..90a5af939 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -305,6 +305,7 @@
+         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
+         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-refresh-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
++        "verify-phase:harness/scripts/verify.mjs:close-chain-guide-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-advisor-execution-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 791932ff8..a22e5f3ca 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3797,6 +3797,12 @@
+       "invariantPinned": "Every script the happy-path guide names ships in scripts/, the start skill loads the guide, and the guide keeps its gap markers and holds no host path",
+       "nonOverlapNote": "Unique source-text pin for the happy-path reference (candidate 17); the owning references pin their own commands"
+     },
++    {
++      "name": "close-chain-guide-tests",
++      "file": "plugins/pipeline-core/lib/close-chain-guide.test.mjs",
++      "invariantPinned": "The close chain guide has one requirement entry per reachable coordinator phase, its human-gate phases are exactly the ones that need the authorized flag, the evidence schemas it names are the ones the coordinator's transition plan checks, and it names the remaining chain and the missing inputs of a step",
++      "nonOverlapNote": "Unique cases: lib/close-chain-guide.mjs against the coordinator source; the drive verb itself is pinned in close-coordinator.test.mjs"
++    },
+     {
+       "name": "dispatch-recovery-admission-tests",
+       "file": "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs",
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+new file mode 100644
+index 000000000..afe41ec2f
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -0,0 +1,126 @@
++// SPDX-License-Identifier: SUL-1.0
++// The ordered remainder of the feature-close chain for one coordinator phase: what each next transition needs, who or what produces it
++// and whether a human gate stands in front of it. Pure; the transitions themselves stay digest-bound plan/apply pairs in close-coordinator.mjs
++// (its `drive` verb walks them one at a time), this module only names them. The requirement table mirrors transitionPlan() in that script and
++// is pinned to it by close-chain-guide.test.mjs, so a changed requirement there turns the pin red instead of leaving this guide stale.
++
++import { coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
++
++export const CLOSE_CHAIN_SCHEMA = "pipeline.close-coordinator.chain.v1";
++
++const PUBLICATION_RESULT = "pipeline.publication-executor-result.v1";
++
++// phase -> what plan-transition needs for it.
++//   requires        the transition values that must be supplied (architectureImpact | evidence | publication)
++//   needsAuthorized the transition refuses without the explicit --authorized flag (a human-gate phase)
++//   flags           the option spellings, for the human-readable hint
++export const CLOSE_STEP_REQUIREMENTS = Object.freeze({
++  checkpointed: {
++    requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
++    producer: "the coordinator reads the active feature from pipeline state",
++  },
++  "feature-close-prepared": {
++    requires: ["architectureImpact"], needsAuthorized: false,
++    flags: ["--architecture-impact <typed impact>", "--continuity-close-request <path> (when the feature has one)", "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"],
++    evidenceSchema: "pipeline.feature-close-audit-request.v1", humanGate: false,
++    producer: "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++  },
++  "tracked-close-finalized": {
++    requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
++    evidenceSchema: "pipeline.close-tracked-effects.v1", humanGate: false,
++    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++  },
++  "candidate-frozen": {
++    requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
++    producer: "HEAD becomes the frozen candidate; from candidate-frozen the same phase renews the freeze to a descendant commit",
++  },
++  "final-verify-green": {
++    requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
++    evidenceSchema: "pipeline.close-final-verification.v1", humanGate: false,
++    producer: "a green Verify and a green security scan, both for the frozen candidate",
++  },
++  "publication-authorized": {
++    requires: ["evidence"], needsAuthorized: true, flags: ["--evidence <path>", "--authorized"],
++    evidenceSchema: "pipeline.close-publication-authorization.v1", humanGate: true,
++    producer: "the human's publication authorization for the frozen candidate",
++  },
++  published: {
++    requires: ["publication"], needsAuthorized: false, flags: ["--publication <path>"],
++    evidenceSchema: PUBLICATION_RESULT, humanGate: false,
++    producer: "the fixed publication executor",
++  },
++  "readback-confirmed": {
++    requires: ["publication"], needsAuthorized: false, flags: ["--publication <path>"],
++    evidenceSchema: PUBLICATION_RESULT, humanGate: false,
++    producer: "the fixed publication executor, read back against the destination",
++  },
++  "cleanup-complete": {
++    requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
++    evidenceSchema: "pipeline.close-cleanup-receipt.v1", humanGate: false,
++    producer: "close-coordinator.mjs write-cleanup-receipt --root <root> --lifecycle <id> (the drive verb runs it for you)",
++  },
++  "closed-local": {
++    requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
++    producer: "needs a complete cleanup receipt",
++  },
++  delivered: {
++    requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
++    producer: "needs a complete cleanup receipt and the publication readback",
++  },
++  "release-eligible": {
++    requires: ["evidence"], needsAuthorized: true, flags: ["--evidence <path>", "--authorized"],
++    evidenceSchema: "pipeline.close-release-eligible-authorization.v1", humanGate: true,
++    producer: "the human's release-eligibility authorization for the frozen candidate",
++  },
++  promoted: {
++    requires: ["evidence"], needsAuthorized: true, flags: ["--evidence <path>", "--authorized"],
++    evidenceSchema: "pipeline.close-promoted-authorization.v1", humanGate: true,
++    producer: "the human's promotion authorization for the frozen candidate",
++  },
++});
++
++const stepFor = (phase, root, lifecycle) => {
++  const need = CLOSE_STEP_REQUIREMENTS[phase];
++  return {
++    phase,
++    needs: need.flags,
++    evidenceSchema: need.evidenceSchema,
++    producer: need.producer,
++    humanGate: need.humanGate,
++    plan: `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${lifecycle} --actor <name> --phase ${phase}${need.flags.length > 0 ? " <needs>" : ""}`,
++  };
++};
++
++// The remainder of the chain from `phase`. Where the chain forks (final-verify-green may publish or go straight to cleanup, cleanup-complete
++// ends in closed-local or delivered) the fork is reported as `alternatives` and the walk continues on the first branch of each fork.
++export function describeCloseChain(phase, { root = "<root>", lifecycle = "<id>" } = {}) {
++  const steps = [];
++  const forks = [];
++  const seen = new Set();
++  let cursor = phase;
++  for (;;) {
++    const next = coordinatorNextPhases(cursor);
++    if (next.length === 0 || seen.has(cursor)) break;
++    seen.add(cursor);
++    if (next.length > 1) forks.push({ after: cursor, alternatives: next });
++    const chosen = next[0];
++    steps.push(stepFor(chosen, root, lifecycle));
++    cursor = chosen;
++  }
++  return {
++    schema: CLOSE_CHAIN_SCHEMA,
++    current: phase,
++    remaining: steps,
++    forks,
++    note: "Every step is a digest-bound plan-transition then apply-transition pair; the drive verb runs one step per call, never a human-gate step without its authorization evidence.",
++  };
++}
++
++// What the next step still lacks, given the transition values supplied so far. Pure; the transition's own refusals stay authoritative.
++export function missingCloseInputs(phase, values) {
++  const need = CLOSE_STEP_REQUIREMENTS[phase];
++  if (!need) return ["unknown phase"];
++  const missing = need.requires.filter((key) => typeof values?.[key] !== "string" || values[key] === "");
++  if (need.needsAuthorized && values?.authorized !== true) missing.push("authorized");
++  return missing;
++}
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.test.mjs b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+new file mode 100644
+index 000000000..a2cf260f2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { COORDINATOR_PHASES, coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
++import { PUBLICATION_EXECUTOR_RESULT_SCHEMA } from "../scripts/publication-executor.mjs";
++import { CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
++
++const COORDINATOR_SOURCE = readFileSync(fileURLToPath(new URL("../scripts/close-coordinator.mjs", import.meta.url)), "utf8");
++
++test("every phase the coordinator can move to has exactly one requirement entry, and nothing else does", () => {
++  const reachable = new Set(COORDINATOR_PHASES.flatMap((phase) => coordinatorNextPhases(phase)));
++  assert.deepEqual([...reachable].sort(), Object.keys(CLOSE_STEP_REQUIREMENTS).sort());
++});
++
++test("a human-gate phase is exactly a phase that needs the explicit authorized flag", () => {
++  for (const [phase, need] of Object.entries(CLOSE_STEP_REQUIREMENTS)) {
++    assert.equal(need.needsAuthorized, need.humanGate, `${phase}: humanGate and needsAuthorized must agree`);
++  }
++  assert.deepEqual(Object.entries(CLOSE_STEP_REQUIREMENTS).filter(([, need]) => need.humanGate).map(([phase]) => phase).sort(),
++    ["promoted", "publication-authorized", "release-eligible"]);
++});
++
++test("the evidence schemas the guide names are the ones the coordinator's transition plan checks", () => {
++  for (const [phase, need] of Object.entries(CLOSE_STEP_REQUIREMENTS)) {
++    if (need.evidenceSchema === null) continue;
++    if (phase === "published" || phase === "readback-confirmed") {
++      assert.equal(need.evidenceSchema, PUBLICATION_EXECUTOR_RESULT_SCHEMA, `${phase}: the publication phases read the executor result`);
++      continue;
++    }
++    const templated = /^pipeline\.close-(release-eligible|promoted)-authorization\.v1$/u.test(need.evidenceSchema);
++    const needle = templated ? "`pipeline.close-${values.phase}-authorization.v1`" : need.evidenceSchema;
++    assert.ok(COORDINATOR_SOURCE.includes(needle), `${phase}: the coordinator source no longer names ${need.evidenceSchema}`);
++  }
++  assert.ok(COORDINATOR_SOURCE.includes("PUBLICATION_EXECUTOR_RESULT_SCHEMA"), "the publication phases are checked against the executor result schema");
++});
++
++test("the chain from a phase lists the remaining transitions in coordinator order and reports the forks", () => {
++  const chain = describeCloseChain("candidate-frozen", { root: "/r", lifecycle: "close-x" });
++  assert.equal(chain.schema, CLOSE_CHAIN_SCHEMA);
++  assert.equal(chain.current, "candidate-frozen");
++  assert.equal(chain.remaining[0].phase, "final-verify-green");
++  assert.ok(chain.remaining.every((step) => step.plan.includes("--root /r --lifecycle close-x")));
++  assert.deepEqual(chain.forks.map((fork) => fork.after), ["final-verify-green", "cleanup-complete"]);
++  assert.deepEqual(chain.forks[0].alternatives, ["publication-authorized", "cleanup-complete"]);
++  assert.equal(describeCloseChain("promoted").remaining.length, 0);
++});
++
++test("the missing inputs of a step are named from the supplied values", () => {
++  assert.deepEqual(missingCloseInputs("checkpointed", {}), []);
++  assert.deepEqual(missingCloseInputs("feature-close-prepared", {}), ["architectureImpact"]);
++  assert.deepEqual(missingCloseInputs("final-verify-green", { evidence: "e.json" }), []);
++  assert.deepEqual(missingCloseInputs("final-verify-green", {}), ["evidence"]);
++  assert.deepEqual(missingCloseInputs("published", { publication: "p.json" }), []);
++  assert.deepEqual(missingCloseInputs("publication-authorized", { evidence: "e.json" }), ["authorized"]);
++  assert.deepEqual(missingCloseInputs("not-a-phase", {}), ["unknown phase"]);
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 054be647d..08708ecac 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -36,6 +36,7 @@ import {
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
++import { describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+@@ -82,9 +83,12 @@ const CLI_HELP = [
+   "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
+   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
+   "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
++  "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply]",
+   "       close-coordinator.mjs --help",
+   "",
+   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
++  "drive is the helper over the plan/apply pairs: it names the phase, the missing inputs and the remaining chain, plans one step (read-only), and with --apply",
++  "applies exactly that step. It writes the cleanup receipt itself and stops before every human-gate phase; it replaces none of the commands above.",
+ ].join("\n");
+ 
+ const canonical = (value) => {
+@@ -1148,6 +1152,46 @@ async function applyTransition(values, suppliedDigest) {
+   return result;
+ }
+ 
++// The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
++// never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
++async function driveClose(values, { apply }) {
++  const root = physicalRoot(values.root);
++  if (!ID.test(values.lifecycle ?? "") || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "drive identity is invalid");
++  const common = gitCommonDir(root);
++  const stored = readCloseCoordinator(common, values.lifecycle);
++  const phase = stored.coordinator.phase;
++  const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
++  const options = coordinatorNextPhases(phase);
++  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain };
++  if (options.length === 0) return { ...base, status: "terminal" };
++  const target = values.phase ?? options[0];
++  const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
++  if (!options.includes(target) && !renewal) {
++    fail("CLOSE-ORDER", `from ${phase} the reachable phases are ${options.join(", ")}; --phase ${target} is not one of them`);
++  }
++  const need = CLOSE_STEP_REQUIREMENTS[target];
++  const step = { phase: target, needs: need.flags, evidenceSchema: need.evidenceSchema, producer: need.producer };
++  if (need.humanGate) {
++    return { ...base, status: "human-gate", step,
++      message: `${target} is a human gate: the human's authorization evidence is required first, and this driver never applies it; use plan-transition with --authorized and then apply-transition` };
++  }
++  const transition = { ...values, phase: target };
++  let cleanup = null;
++  if (target === "cleanup-complete" && transition.evidence === undefined) {
++    if (!apply) return { ...base, status: "would-write-cleanup-receipt", step, message: "run again with --apply: the driver writes the cleanup receipt (the producer) and then applies cleanup-complete" };
++    cleanup = writeCleanupReceipt({ root, lifecycle: values.lifecycle });
++    transition.evidence = cleanup.receiptPath;
++  }
++  const missing = missingCloseInputs(target, transition);
++  if (missing.length > 0) return { ...base, status: "inputs-missing", step, missing, message: `${target} still needs: ${missing.join(", ")}` };
++  const plan = await transitionPlan(transition, { deriveCriticAddenda: true });
++  if (!apply) return { ...base, status: "planned", step, planSha256: plan.planSha256, nextAction: plan.nextAction, message: "planned only; run again with --apply to apply exactly this plan" };
++  const applied = await applyTransition(transition, plan.planSha256);
++  const after = readCloseCoordinator(common, values.lifecycle).coordinator.phase;
++  return { ...base, status: "applied", step, planSha256: plan.planSha256, applied, ...(cleanup === null ? {} : { cleanupReceipt: cleanup }),
++    phaseAfter: after, chainAfter: describeCloseChain(after, { root, lifecycle: values.lifecycle }) };
++}
++
+ const [command, ...argv] = process.argv.slice(2);
+ try {
+   if (command === "--help" && argv.length === 0) {
+@@ -1178,6 +1222,25 @@ try {
+       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
+       next: coordinatorNextPhases(stored.coordinator.phase),
+     });
++  } else if (command === "drive") {
++    const parsed = exactArgs(argv, new Set([
++      "root", "lifecycle", "actor", "phase", "evidence", "publication",
++      "continuity-close-request", "architecture-impact", "audit-request", "critic-verify-lifecycle",
++    ]), new Set(["apply"]));
++    if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor) fail("CLOSE-ARGS", "drive arguments invalid");
++    if (parsed.values.phase !== undefined && !COORDINATOR_PHASES.includes(parsed.values.phase)) fail("CLOSE-ARGS", "drive --phase is not a coordinator phase");
++    emit(await driveClose({
++      root: parsed.values.root,
++      lifecycle: parsed.values.lifecycle,
++      actor: parsed.values.actor,
++      phase: parsed.values.phase,
++      architectureImpact: parsed.values["architecture-impact"],
++      evidence: parsed.values.evidence,
++      publication: parsed.values.publication,
++      continuityCloseRequest: parsed.values["continuity-close-request"],
++      auditRequest: parsed.values["audit-request"],
++      criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
++    }, { apply: parsed.booleans.apply === true }));
+   } else if (command === "write-cleanup-receipt") {
+     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
+     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 9950d56ef..3093279c8 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -824,6 +824,51 @@ test("17 cleanup receipt: an own session that could not be derived is a typed re
+   assert.equal(legacy.ownSessionCode, null);
+ });
+ 
++test("process: drive names the missing input, plans without writing, applies one step, writes the cleanup receipt itself and stops at a human gate", () => {
++  const f = processFixture("drive", { stopAfterFreeze: true });
++  const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
++  const phaseNow = () => f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]).coordinator.phase;
++
++  const missing = drive([]);
++  assert.equal(missing.status, "inputs-missing");
++  assert.deepEqual(missing.missing, ["evidence"]);
++  assert.equal(missing.phase, "candidate-frozen");
++  assert.equal(missing.chain.remaining[0].phase, "final-verify-green");
++
++  const verifyPath = join(f.evidenceDirectory, "drive-verify.json");
++  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
++  const planned = drive(["--evidence", verifyPath]);
++  assert.equal(planned.status, "planned");
++  assert.match(planned.planSha256, /^[0-9a-f]{64}$/u);
++  assert.equal(phaseNow(), "candidate-frozen", "a planned step changes nothing");
++
++  const applied = drive(["--evidence", verifyPath, "--apply"]);
++  assert.equal(applied.status, "applied");
++  assert.equal(applied.phaseAfter, "final-verify-green");
++  assert.equal(applied.chainAfter.current, "final-verify-green");
++  assert.equal(phaseNow(), "final-verify-green");
++
++  const gate = drive([]);
++  assert.equal(gate.status, "human-gate", "the first branch after a green Verify is the publication authorization");
++  assert.equal(gate.step.phase, "publication-authorized");
++  assert.equal(drive(["--authorized"], 2).code, "CLOSE-ARGS", "the driver has no way to pass the human's authorization");
++  assert.equal(drive(["--phase", "promoted"], 2).code, "CLOSE-ORDER");
++
++  const would = drive(["--phase", "cleanup-complete"]);
++  assert.equal(would.status, "would-write-cleanup-receipt");
++  assert.equal(existsSync(join(f.evidenceDirectory, "cleanup-receipt.json")), false, "a read-only drive writes no receipt");
++  const cleaned = drive(["--phase", "cleanup-complete", "--apply"]);
++  assert.equal(cleaned.status, "applied");
++  assert.equal(cleaned.cleanupReceipt.status, "complete");
++  assert.equal(cleaned.phaseAfter, "cleanup-complete");
++
++  assert.equal(drive(["--apply"]).phaseAfter, "closed-local");
++  const release = drive([]);
++  assert.equal(release.status, "human-gate");
++  assert.equal(release.step.phase, "release-eligible");
++  rmSync(f.root, { recursive: true, force: true });
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 0659e7dc1..32a6283fb 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -205,6 +205,7 @@ separate coordinator transitions and are never implied by this skill.
+ 
+ A feature whose State carries `continuity` closes in this order. Every step is first a read-only plan, then an
+ `--activate` apply of the returned action after confirmation; nothing below signs or pushes on its own.
++`close-coordinator.mjs drive` (table below) walks the coordinator pairs one step per call and tells you what the next phase still needs; it replaces none of the commands.
+ 
+ 1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
+ 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+@@ -242,6 +243,7 @@ Spellings are taken from each script's own parser or help; `<...>` is a value.
+ | `close-coordinator.mjs apply-start` | the plan-start flags plus --plan-sha256 --activate |
+ | `close-coordinator.mjs plan-transition` | --root --lifecycle --actor --phase [--architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --authorized] |
+ | `close-coordinator.mjs apply-transition` | the plan-transition flags plus --plan-sha256 --activate |
++| `close-coordinator.mjs drive` | --root --lifecycle --actor [--phase --architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --apply]; the helper over the pairs above: names the phase, the missing inputs and the remaining chain, plans one step, and with --apply applies exactly that step; writes the cleanup receipt itself, stops before every human-gate phase and takes no --authorized |
+ | `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`); in the terminal it prints `proofPath`, plus `requestPath` and `authorityPath` for every kind except push |
+ 
+ A commit message goes in a file: `git commit -F <msgfile> -- <paths>` after `git add -- <paths>` (the refusals for several `-m`
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 03d417b2a..4c95e24b8 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -57,6 +57,7 @@ Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv f
+ 2. `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, apply the returned action, then
+    `plan-transition` / `apply-transition` through `checkpointed`, `feature-close-prepared`, `tracked-close-finalized`, `candidate-frozen`, `final-verify-green`,
+    `cleanup-complete` and `closed-local`. The cleanup receipt: `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (before `closed-local`).
++   To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
+ 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
+    `--continuity-close-request` when the returned argv carries it. **Antigravity** has one entry instead: `finish-feature.mjs --root <root> --by <actor> --architecture-impact <value> --audit-request <json> --critic-verify-lifecycle <id>`.
+ 4. Telemetry row (Claude only): `usage-ledger.mjs`; on Codex and Antigravity skip it and say so in the close report.
