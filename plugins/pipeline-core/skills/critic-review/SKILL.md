@@ -34,7 +34,7 @@ You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, rea
 spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
 candidate. Pass the candidate Spec, every declared guardrail, each fresh
 candidate-evidence path and, for a re-review, the separate prior-Critic path
-to the preflight only.
+to the preflight only. Call shape: `node scripts/critic-dispatch-preflight.mjs --root . --base <commit> --candidate <commit> --spec <path>` (flags, no `--range`); the skill's own `$ARGUMENTS` are positional (`<spec-path> <range>`, see Grammar below), and a `key=value` form is accepted by neither.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
 `packet-ready`. `packet-ready` has `spawnAuthorized: false` and names
 `session-critic-dispatch` as its required next gate: the session orchestrator's

@@ -247,6 +247,24 @@ test("settled-pending-aside moves settled pending states with their terminal and
   assert.equal(again.result.moved.length, 0);
 }));
 
+test("settled-pending-aside keeps dispatch id, slice id and integrating commit of every moved pending state in its result and its ledger line", () => withRepo((root, ap) => {
+  const byCommit = writeNamedPending(ap, "D-K", { terminal: true });
+  const cancelled = writeNamedPending(ap, "D-N");
+  const commit = hex("a", 40);
+  const rows = [{ ...rowOf(byCommit, "integrated-by-commit"), sliceId: "SLICE-K", commit }, { ...rowOf(cancelled, "cancelled"), sliceId: "SLICE-N", commit: null }];
+  const { exit, result } = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: stub(inspectRows(...rows)).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  const pointer = (row) => ({ dispatchId: row.dispatchId, sliceId: row.sliceId, commit: row.commit });
+  const byName = (list, name) => list.find((row) => row.name === name);
+  assert.deepEqual(pointer(byName(result.retiredPending, byCommit.name)), { dispatchId: "D-K", sliceId: "SLICE-K", commit });
+  assert.deepEqual(pointer(byName(result.retiredPending, cancelled.name)), { dispatchId: "D-N", sliceId: "SLICE-N", commit: null });
+  const line = ledger(ap)[0];
+  assert.equal(line.schema, "pipeline.routine-repair-record.v1");
+  assert.deepEqual(byName(line.retiredPending, byCommit.name), { name: byCommit.name, settled: "integrated-by-commit", dispatchId: "D-K", sliceId: "SLICE-K", commit });
+  assert.equal(byName(line.retiredPending, cancelled.name).commit, null);
+  assert.match(byName(line.retiredPending, byCommit.name).commit, /^[0-9a-f]{40}$/u);
+}));
+
 test("settled-pending-aside keys the siblings by the sha256 of the pending bytes, never by the key digest in the pending name", () => withRepo((root, ap) => {
   const pending = writeNamedPending(ap, "D-M", { terminal: true });
   const nameDigest = /^pending-claude-([a-f0-9]{64})\.json$/u.exec(pending.name)[1];

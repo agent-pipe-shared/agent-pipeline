@@ -108,7 +108,8 @@ export function planSettledPending({ pendingDir, reservations }) {
         if (lstatSync(join(pendingDir, sibling)).isSymbolicLink()) blocked = `${sibling} is a symlink`; else siblings.push(sibling);
       }
       if (blocked !== null) { kept.push({ name, reason: blocked }); continue; }
-      retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null, siblings });
+      retire.push({ name, settled: row.settled, dispatchId: typeof row.dispatchId === "string" ? row.dispatchId : null,
+        sliceId: typeof row.sliceId === "string" ? row.sliceId : null, commit: typeof row.commit === "string" && /^[0-9a-f]{40}$/u.test(row.commit) ? row.commit : null, siblings });
     } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
   }
   return { retire, kept };
@@ -286,19 +287,19 @@ export function runRoutineRepair(request, deps = {}) {
   if (typeof request?.root === "string" && request.root !== "") {
     try { root = resolve(request.root); commonDir = commonDirOf(root); } catch { commonDir = null; }
   }
-  const moved = [], retained = [];
+  const moved = [], retained = [], pointers = [];
   let result;
   if (!plan.ok) result = plan;
   else if (commonDir === null) result = refuse("RR-ROOT", "--root is not a git repository");
   else {
     // ownerRouteSpawn (tests only): the owner-route orphan release is its own delegate, separate from the session-authority-repair stub.
-    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained }); }
+    try { result = execute(plan, { root, commonDir, spawn, ownerSpawn: deps.ownerRouteSpawn ?? defaultSpawn, now, moved, retained, pointers }); }
     catch (error) { result = refuse("RR-FAILED", short(error)); }
   }
   const code = result.ok ? (result.code ?? "done") : result.code;
   let ledgerError = null;
   if (commonDir !== null) {
-    const record = { schema: ROUTINE_REPAIR_RECORD_SCHEMA, kind: typeof request?.kind === "string" ? request.kind.slice(0, 40) : null, reason: reasonText, at: new Date(now()).toISOString(), result: code, moved, retained };
+    const record = { schema: ROUTINE_REPAIR_RECORD_SCHEMA, kind: typeof request?.kind === "string" ? request.kind.slice(0, 40) : null, reason: reasonText, at: new Date(now()).toISOString(), result: code, moved, retained, ...(pointers.length ? { retiredPending: pointers } : {}) };
     try {
       const path = join(commonDir, "agent-pipeline", "routine-repair-ledger.jsonl");
       mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
@@ -337,6 +338,8 @@ function retireSettledPending(ctx, inspect) {
       ctx.moved.push({ from: rel(join(pendingDir, file)), to: `${abandonedRel(asideName)}/${file}` });
     }
     retiredPending.push(row);
+    // The pointer from the moved record to its dispatch, slice and integrating commit survives in the ledger line.
+    ctx.pointers?.push({ name: row.name, settled: row.settled, dispatchId: row.dispatchId, sliceId: row.sliceId, commit: row.commit });
   }
   for (const row of kept) ctx.retained.push(rel(join(pendingDir, row.name)));
   // Authority records left without their pending file (by an earlier heal that moved only two kinds, or any other cause) make the host

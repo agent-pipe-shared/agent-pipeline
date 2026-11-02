@@ -1555,17 +1555,21 @@ export function observeGovernedItemIntegrationReadiness({root}={}) {
 // PF-55: the result is a pure function of the candidate's immutable history and the slice rows, so a process
 // reads it once per (root, candidate, rows) instead of once per collision check.
 const commitIntegrationMemo=new Map();
-export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,slices}) {
+export function readOrchestratorCommitIntegratedSlices(args) { return [...scanOrchestratorCommitIntegration(args).result]; }
+/** The integrating commit per slice that the same scan found by direct evidence (a superseded stopped attempt has none). */
+export function readOrchestratorCommitIntegratedCommits(args) { return new Map(scanOrchestratorCommitIntegration(args).commits); }
+function scanOrchestratorCommitIntegration({root,candidateCommit,slices}) {
   const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:30000,maxBuffer:64*1024*1024,encoding:'utf8'});
   const live=(slices??[]).filter(row=>row&&row.state!=='cancelled'&&row.tier!=='critic'&&Array.isArray(row.writeScope)&&row.writeScope.length>0
     &&row.writeScope.every(path=>typeof path==='string')&&typeof row.delivery?.baseCommit==='string'&&/^[0-9a-f]{40}$/u.test(row.delivery.baseCommit));
-  if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return [];
+  const none={result:[],commits:new Map()};
+  if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return none;
   const memoKey=`${root}\0${candidateCommit}\0${nativeManagedDigest(live)}`;
-  if(commitIntegrationMemo.has(memoKey))return [...commitIntegrationMemo.get(memoKey)];
+  if(commitIntegrationMemo.has(memoKey))return commitIntegrationMemo.get(memoKey);
   const log=run(['log','--no-merges','--fixed-strings','--grep=(goldfish)','--name-only',
     '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
-  if(log.status!==0)return [];
-  const byId=new Map(live.map(row=>[row.id,row])),direct=new Set();
+  if(log.status!==0)return none;
+  const byId=new Map(live.map(row=>[row.id,row])),direct=new Set(),commits=new Map();
   for(const record of log.stdout.split('\x1e')){
     const [sha,dispatch='',names='']=record.split('\x00');
     if(!/^[0-9a-f]{40}$/u.test(sha?.trim()??''))continue;
@@ -1573,7 +1577,7 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
     for(const value of dispatch.split('\x1f').map(entry=>entry.trim())){
       const match=/^(\S+) \(goldfish\)$/u.exec(value),slice=match&&byId.get(match[1]);
       if(!slice||direct.has(slice.id)||sha.trim()===slice.delivery.baseCommit||!touched.some(path=>scopesOverlap([path],slice.writeScope)))continue;
-      if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0)direct.add(slice.id);
+      if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0){direct.add(slice.id);commits.set(slice.id,sha.trim());}
     }
   }
   // Only a `ready` predecessor can be a stopped attempt; held, deferred or blocked slices keep their hold.
@@ -1581,8 +1585,9 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
     &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
   const result=[...direct,...superseded];
   if(commitIntegrationMemo.size>=64)commitIntegrationMemo.delete(commitIntegrationMemo.keys().next().value);
-  commitIntegrationMemo.set(memoKey,result);
-  return [...result];
+  const scan={result,commits};
+  commitIntegrationMemo.set(memoKey,scan);
+  return scan;
 }
 /** Only the never-created registry catalogue counts as absent; a missing member or any other fault does not. */
 export function sessionAuthorityRegistryAbsent(error) {

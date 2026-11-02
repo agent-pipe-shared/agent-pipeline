@@ -45,7 +45,7 @@ import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
 import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
-import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
 
@@ -146,6 +146,7 @@ function reservationReport(repository, root) {
   const governed = resolveGovernedItemQueue({ root });
   const slices = governed.status === "required" ? governed.normalized.slices : [];
   const integrated = new Set(slices.length ? readOrchestratorCommitIntegratedSlices({ root: repository.primaryRoot, candidateCommit: repository.candidate.commit, slices }) : []);
+  const commits = slices.length ? readOrchestratorCommitIntegratedCommits({ root: repository.primaryRoot, candidateCommit: repository.candidate.commit, slices }) : new Map();
   const rows = [];
   for (const name of names.filter((entry) => entry.startsWith("pending-"))) {
     let bytes, state;
@@ -156,7 +157,8 @@ function reservationReport(repository, root) {
     const nativeIntegrated = names.includes(`authority-integration-${sha}.json`);
     const byCommit = sliceId !== null && integrated.has(sliceId);
     rows.push({ pending: name, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, sessionId: typeof state?.sessionId === "string" ? state.sessionId : null, queueState,
-      settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null });
+      settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null,
+      commit: !nativeIntegrated && byCommit ? commits.get(sliceId) ?? null : null });
   }
   return rows;
 }
