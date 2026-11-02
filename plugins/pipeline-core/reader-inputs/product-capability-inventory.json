@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "906219de735ac984b6c91f8565fdfbcc87968e01",
-    "tree": "94445d0ead7a3804b30afbaf2fc2b3b020ba3c7f"
+    "commit": "f8485accc7774ec067694c9b3c416d3a48d065a8",
+    "tree": "74e99c017b65b634eaa068b6fc845263e38ca28a"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -305,6 +305,7 @@
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-refresh-tests",
         "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-chain-guide-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisor-execution-tests",
@@ -786,6 +787,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-guard-push-refuses-read-only-git-without-push-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-guard-push-treats-gitleaks-as-a-git-command-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-handover-doc-committed-without-governance-classification-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-happy-path-guide-names-only-existing-scripts-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-hgo-patch-preflight-before-signature-tests",
@@ -1012,6 +1014,7 @@
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
         "verify-phase:harness/scripts/verify.mjs:rigor-floor-tests",
         "verify-phase:harness/scripts/verify.mjs:role-route-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:root-argument-tests",
         "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:routine-repair-tests",
@@ -1024,6 +1027,7 @@
         "verify-phase:harness/scripts/verify.mjs:run-codex-critic-probe-split-tests",
         "verify-phase:harness/scripts/verify.mjs:run-codex-isolation-control-decomposition-tests",
         "verify-phase:harness/scripts/verify.mjs:run-parallel-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-capabilities-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-contracts.schema-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
