@@ -197,6 +197,21 @@ test("AC-108: the AGY Goldfish dispatch reference forbids parallel file writes i
   assert.match(text, /A Goldfish makes no parallel file writes in one turn until the hook race is fixed/u);
 });
 
+// 17 (AGY greenfield): the reference says which route each role takes, names the implementation entry with its argv and its caveat, and
+// says to end the parent turn after a read-only subagent was dispatched.
+test("17: the AGY dispatch reference names the route per role, the implementation entry with its caveat, and the end-of-turn rule", () => {
+  const text = readFileSync(join(REPO, "plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md"), "utf8").replace(/\s+/gu, " ");
+  assert.match(text, /## Which route a role takes on Antigravity/u);
+  assert.match(text, /`critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` \(read-only\)/u);
+  assert.match(text, /A runner-native type such as `research` is not a Pipeline role and is refused \(`DISPATCH-WRITE-CARRIER-REQUIRED`\)/u);
+  assert.match(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
+  assert.match(text, /elephant-implementation-dispatch\.mjs dispatch --root <repository-root> --request/u);
+  assert.match(text, /documented as the Codex-to-Antigravity route/u);
+  assert.match(text, /Make at most one attempt and never retry a launched job/u);
+  assert.match(text, /end the parent turn without further tool calls/u);
+  assert.doesNotMatch(text, /do not start another `agy` process/u, "the old sentence contradicted the implementation route");
+});
+
 test("AC-108: the start preflight reports a sandbox-unreachable node with a typed code and the one-time remedy, and unknown is never ready", async () => {
   const { observeNodeSandboxProbe } = await import(
     pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href);

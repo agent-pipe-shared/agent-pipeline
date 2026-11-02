@@ -145,6 +145,29 @@ test("absence, stale session, altered route, scope and request binding fail on t
   assert.equal(invalidInput.launches(), 0);
 });
 
+// 17 (AGY greenfield): the selector is the Codex-to-Antigravity route. Called from an Antigravity-hosted Elephant it says so in the receipt
+// and names the way on (one attempt, then the PO), and it still launches exactly as before; from any other host the receipt is unchanged.
+test("an Antigravity-hosted Elephant gets the unproven-route advisory, any other host gets the unchanged receipt", async () => {
+  const hosted = fixture();
+  const withAdvisory = await dispatchElephantImplementation(input(hosted), { ...hosted.dependencies, resolveHostRunner: () => "antigravity" });
+  assert.equal(withAdvisory.status, "completed-undelivered");
+  assert.equal(hosted.launches(), 1, "the advisory refuses nothing");
+  assert.match(withAdvisory.advisory, /^AGY-HOSTED-ELEPHANT-UNPROVEN:/u);
+  assert.match(withAdvisory.advisory, /at most one attempt/u);
+  assert.match(withAdvisory.advisory, /ask the PO/u);
+  for (const runner of ["codex", "claude"]) {
+    const other = fixture();
+    const plain = await dispatchElephantImplementation(input(other), { ...other.dependencies, resolveHostRunner: () => runner });
+    assert.equal(Object.hasOwn(plain, "advisory"), false, `${runner}: no advisory key`);
+    assert.equal(other.launches(), 1);
+  }
+  const thrown = fixture();
+  const failed = await dispatchElephantImplementation(input(thrown), { ...thrown.dependencies, resolveHostRunner: () => "antigravity",
+    dispatchElephantAgyImplementation: async () => { throw new Error("x"); } });
+  assert.equal(failed.code, "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-EXCEPTION");
+  assert.match(failed.advisory, /^AGY-HOSTED-ELEPHANT-UNPROVEN:/u, "the advisory also rides on a recovery receipt");
+});
+
 test("outer CLI has the same closed argument surface as the sealed implementation route", () => {
   assert.deepEqual(parseArgs(["dispatch", "--root", "/repo", "--request", "/repo/request.json", "--result-path", "results/out.json", "--session-id", "session-1", "--descriptor-sha256", SHA]), { root: "/repo", dispatchRequestPath: "/repo/request.json", resultPath: "results/out.json", sessionId: "session-1", descriptorSha256: SHA });
   assert.throws(() => parseArgs(["dispatch", "--root", "/repo", "--fallback", "codex"]), /usage/u);

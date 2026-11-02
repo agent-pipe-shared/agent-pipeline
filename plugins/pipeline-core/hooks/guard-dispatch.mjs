@@ -250,7 +250,7 @@ export function writeCapableCarrierAdmission({ subagentType, transport = "direct
   if (transport === "codex" && type === "explorer") return null;
   if (transport === "direct" && type === "Explore") return null;
   if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
-  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; repair: select a shipped pipeline-core:goldfish-* or pipeline-core:critic role and dispatch its generated or required role briefing` };
+  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role, and dispatch its generated or required role briefing` };
 }
 
 // ---------------------------------------------------------------------------------------------

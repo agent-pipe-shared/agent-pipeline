@@ -888,6 +888,12 @@ check("Antigravity native implementation dispatch is refused even when candidate
   const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
+  // 17: the refusal is honest about the route it names (Codex-to-Antigravity, unproven from an AGY-hosted Elephant) and tells the Elephant to stop and ask.
+  assert.match(res.reason, /elephant-implementation-dispatch\.mjs \(argv: dispatch --root/u);
+  assert.match(res.reason, /Codex-to-Antigravity route/u);
+  assert.match(res.reason, /at most ONE attempt/u);
+  assert.match(res.reason, /ask the PO/u);
+  assert.match(res.reason, /Read-only roles \(critic, readiness-reviewer, plan-verifier, consult-advisor\)/u);
   rmSync(root, { recursive: true, force: true });
 });
 

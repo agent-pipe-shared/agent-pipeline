@@ -241,7 +241,7 @@ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
     tool_use_id: `gd2i-${builtIn}`,
     tool_name: "Agent",
     tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
-  }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
+  }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", `"${builtIn}" is not a shipped Pipeline role`, "pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor"] });
 }
 // QG-04 justification: a Workflow agent() Explore has transport `workflow`, and the carrier policy admits Explore only over a
 // direct call (guard-dispatch.mjs writeCapableCarrierAdmission); the direct-call Explore stays ALLOW in GD2i above.

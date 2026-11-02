@@ -1304,6 +1304,20 @@ test("K142 the Claude family refusal names a repair and keeps naming the alias f
   assert.match(result.message, /MP-29/u, "the escalation route stays named: only the tool-layer model parameter selects the model");
 });
 
+// 17 (AGY greenfield): a Gemini id on the default (Claude) path is not a model mistake to repair with a Claude id; the Antigravity
+// dispatch does not use this generator, and the refusal says so. A Claude-family mistake keeps the unchanged repair.
+test("17 a Gemini model id is told that an Antigravity dispatch does not use this generator", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const gemini = runDispatchBriefing(argvOf(fx, { "--model-id": "gemini-3.8-flash-medium" }), depsOf(fx));
+  assert.equal(gemini.code, "DBG-MODEL-FAMILY");
+  assert.match(gemini.message, /an Antigravity dispatch does not use this generator/u);
+  assert.match(gemini.message, /pipeline\.role-dispatch-request\.v1/u);
+  const claude = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
+  assert.equal(claude.code, "DBG-MODEL-FAMILY");
+  assert.doesNotMatch(claude.message, /Antigravity/u, "the Claude-family refusal is unchanged");
+});
+
 test("K142 build: a package that names runner codex renders a Codex briefing that parses back and verifies (needs the package-key part of the protected diff)", async () => {
   const { runDispatchBriefing } = await lib();
   const { verifyGeneratedBriefing } = await buildLib();
