@@ -780,6 +780,87 @@ test("an interrupted new attempt clears stale canonical success", async () => {
   });
 });
 
+// C18-3 (AC-140): the producer must not poison its own run. The output path below is NOT ignored by the
+// fixture's .gitignore, so the producer's own file is visible to `git status` exactly as in a consumer.
+const commitAll = (root, message) => {
+  git(root, ["add", "."]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+};
+
+test("C18-3 the untracked slice-queue.json a dispatch guard creates does not make a candidate run dirty", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const queue = join(root, "specs", "feature-a", "slice-queue.json");
+    mkdirSync(join(root, "specs", "feature-a"), { recursive: true });
+    writeFileSync(queue, `${JSON.stringify({ schema: "pipeline.slice-queue.v1", slices: [] })}\n`);
+    assert.notEqual(git(root, ["status", "--porcelain"]), "", "precondition: the queue is visible to git status");
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: "out/verify.json" });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.exitCode, 0);
+  });
+});
+
+test("C18-3 any other uncommitted file next to the queue still makes the run dirty", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    mkdirSync(join(root, "specs", "feature-a"), { recursive: true });
+    writeFileSync(join(root, "specs", "feature-a", "slice-queue.json"), "{}\n");
+    writeFileSync(join(root, "specs", "feature-a", "notes.md"), "not pipeline-owned\n");
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: "out/verify.json" });
+    assert.equal(result.status, "dirty");
+  });
+});
+
+test("C18-3 two candidate runs in a row, and a run after a leftover untracked output, all end non-dirty", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const out = "out/verify.json";
+    const first = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
+    assert.equal(first.status, "passed");
+    assert.equal(existsSync(join(root, out)), true);
+    const second = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
+    assert.equal(second.status, "passed", "the first run's own untracked output must not poison the second");
+    // A failed attempt's leftover (here: a recorded dirty rejection) is likewise the producer's own file.
+    writeFileSync(join(root, out), "{\"leftover\":true}\n");
+    const third = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
+    assert.equal(third.status, "passed");
+  });
+});
+
+test("C18-3 a tracked output file deleted by an aborted earlier run does not make the next run dirty", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const out = "out/verify.json";
+    mkdirSync(join(root, "out"), { recursive: true });
+    writeFileSync(join(root, out), "{\"old\":true}\n");
+    commitAll(root, "tracked previous output");
+    rmSync(join(root, out));
+    assert.match(git(root, ["status", "--porcelain"]), /out\/verify\.json/u);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
+    assert.equal(result.status, "passed");
+  });
+});
+
+test("C18-3 a run terminated half-way leaves the tracked output file in place and the tree clean", async () => {
+  const markerDir = mkdtempSync(join(tmpdir(), "vep-marker-"));
+  const marker = join(markerDir, "started").replaceAll("\\", "/");
+  const command = `node -e "require('fs').writeFileSync('${marker}','x');setTimeout(()=>{},8000)"`;
+  await withFixture(command, async (root) => {
+    const out = "out/verify.json";
+    mkdirSync(join(root, "out"), { recursive: true });
+    writeFileSync(join(root, out), "{\"old\":true}\n");
+    commitAll(root, "tracked previous output");
+    const script = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const child = spawn(process.execPath, [script, "--root", root, "--out", out, "--mode", "candidate"], { stdio: ["ignore", "pipe", "pipe"] });
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    try {
+      const deadline = Date.now() + 40000;
+      while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(existsSync(marker), true, "the configured verify command must have started");
+      child.kill("SIGTERM");
+      await closed;
+    } finally { child.kill("SIGKILL"); rmSync(markerDir, { recursive: true, force: true }); }
+    assert.equal(existsSync(join(root, out)), true, "an aborted run must not leave the tracked output deleted");
+    assert.equal(git(root, ["status", "--porcelain"]), "");
+  });
+});
+
 test("the producer registers the git common dir as a Windows boundary before registering the run record", () => {
   const source = readFileSync(fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "utf8");
   const boundary = source.indexOf("verifyWindowsRegisterCommon(gitCommonDir)");
