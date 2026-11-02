@@ -16,7 +16,7 @@ index 403ae6167..3e5de1110 100644
  same human to approve every internal plan digest. A restart resumes this local
  onboarding from its sanctioned state. This consent never covers remote/adoption
 diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
-index 6dae64e74..5658dae4a 100644
+index 6dae64e74..59f557b3e 100644
 --- a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
 +++ b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
 @@ -20,7 +20,7 @@ import { join } from "node:path";
@@ -24,11 +24,11 @@ index 6dae64e74..5658dae4a 100644
  import { fileURLToPath } from "node:url";
  
 -import { main as onboardingCli } from "./project-onboarding-v3.mjs";
-+import { main as onboardingCli, buildPostPromotionHookProvisioningAction } from "./project-onboarding-v3.mjs";
++import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor } from "./project-onboarding-v3.mjs";
  import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
  import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
  import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
-@@ -902,3 +902,29 @@ test("project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --langua
+@@ -902,3 +902,42 @@ test("project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --langua
      rmSync(dir, { recursive: true, force: true });
    }
  });
@@ -48,6 +48,19 @@ index 6dae64e74..5658dae4a 100644
 +  assert.deepEqual(action.expected, { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" });
 +});
 +
++test("C18-20b both promotion routes carry the hook provisioning action on success only", () => {
++  const root = "/work/project";
++  const expected = buildPostPromotionHookProvisioningAction({ rootDir: root });
++  // the bootstrap-bind-apply route: its own result schema
++  assert.deepEqual(postPromotionActionFor({ command: "bootstrap-bind-apply", rootDir: root }, { schema: "pipeline.codex-onboarding-kickoff-promotion-apply.v1", status: "applied" }), expected);
++  // the kickoff-promote-apply route: the shared v4 inspection shape, ready with a valid continuity
++  assert.deepEqual(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "valid" } }), expected);
++  // not on a not-ready observation (the early return of a promotion that did not run), not on another continuity, not on another command
++  assert.equal(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "kickoff-required", continuity: { status: "valid" } }), null);
++  assert.equal(postPromotionActionFor({ command: "kickoff-promote-apply", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "stale" } }), null);
++  assert.equal(postPromotionActionFor({ command: "inspect", rootDir: root }, { schema: "pipeline.project-onboarding.v4", status: "ready", continuity: { status: "valid" } }), null);
++});
++
 +test("C18-20 the initial question and both consent paragraphs disclose hook provisioning and activation", () => {
 +  const read = (path) => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), "utf8").replace(/\s+/gu, " ");
 +  const skill = read("plugins/pipeline-core/skills/pipeline-start/SKILL.md");
@@ -59,10 +72,10 @@ index 6dae64e74..5658dae4a 100644
 +  assert.match(model.slice(model.indexOf("Pipeline-use consent is likewise one bounded bootstrap consent")).slice(0, 2500), /hook/iu);
 +});
 diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
-index e7ddef17d..60a72ba86 100644
+index e7ddef17d..6a7abe5cd 100644
 --- a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
 +++ b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
-@@ -722,6 +722,26 @@ function buildPrePushHookOfferAction({ rootDir }) {
+@@ -722,6 +722,35 @@ function buildPrePushHookOfferAction({ rootDir }) {
  
  export { buildPrePushHookOfferAction };
  
@@ -84,19 +97,27 @@ index e7ddef17d..60a72ba86 100644
 +  };
 +}
 +
-+export { buildPostPromotionHookProvisioningAction };
++// C18-20b: when does an apply output carry that action. Two promotion routes exist: the bootstrap-bind-apply result has its own schema; the
++// `kickoff-promote-apply` result is the shared v4 inspection shape, where success is the ready status with a valid continuity (an early return
++// of a not-ready observation never has it, and every failing apply throws before an output exists). Anything else carries nothing.
++function postPromotionActionFor({ command, rootDir }, output) {
++  const promoted = output?.schema === KICKOFF_PROMOTION_APPLY_SCHEMA
++    || (command === "kickoff-promote-apply" && output?.status === "ready" && output?.continuity?.status === "valid");
++  return promoted ? buildPostPromotionHookProvisioningAction({ rootDir }) : null;
++}
++
++export { buildPostPromotionHookProvisioningAction, postPromotionActionFor };
 +
  function runGitObservation(spawn, root, args) {
    try {
      const result = spawn("git", args, {
-@@ -1071,6 +1091,10 @@ export function main(args = process.argv.slice(2), {
+@@ -1071,6 +1100,9 @@ export function main(args = process.argv.slice(2), {
          rootDir: options.root, runner: options.runner, intent: options.intent, deps,
        }).nextAction };
      }
 +    // C18-20: a promotion that applied hands over the hook provisioning as its typed next action.
-+    if (output?.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) {
-+      output = { ...output, postPromotionAction: buildPostPromotionHookProvisioningAction({ rootDir: options.root }) };
-+    }
++    const postPromotionAction = postPromotionActionFor({ command: options.command, rootDir: options.root }, output);
++    if (postPromotionAction !== null) output = { ...output, postPromotionAction };
    } catch (error) {
      const code = typeof error?.code === "string" ? error.code : "ONBOARDING-ERROR";
      const message = String(error?.message ?? "onboarding command failed").replace(/[\r\n]+/gu, " ");
