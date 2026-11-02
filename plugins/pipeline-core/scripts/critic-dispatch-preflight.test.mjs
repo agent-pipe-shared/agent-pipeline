@@ -20,7 +20,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
-import { runCriticDiagnosticCli } from "./critic-diagnostic-evidence.mjs";
+import { runCriticDiagnosticCli, CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "./critic-diagnostic-evidence.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
@@ -703,8 +703,14 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
     [{ candidate: "absent-candidate" }, "CDP-GIT"],
   ]) assert.deepEqual(directCli(fx, producerArgv(input(fx, patch))), { status: 1, stdout: "",
     stderr: JSON.stringify({ schema: "pipeline.critic-dispatch-preflight.v1", status: "rejected", code }) + "\n" });
-  assert.deepEqual(directCli(fx, ["--unknown"]), { status: 1, stdout: "",
-    stderr: '{"schema":"pipeline.critic-dispatch-preflight.v1","status":"rejected","code":"CDP-ARGUMENT"}\n' });
+  // C18-8 (AC-239) restatement, criterion kept (exit 1, empty stdout, same schema/status/code on stderr): the refusal used to be a bare code; it now also
+  // carries the human `reason` on the same stderr line, so the assertion compares the body without `reason` and requires the reason separately.
+  const unknownFlag = directCli(fx, ["--unknown"]);
+  assert.equal(unknownFlag.status, 1);
+  assert.equal(unknownFlag.stdout, "");
+  const { reason: unknownReason, ...unknownBody } = JSON.parse(unknownFlag.stderr);
+  assert.deepEqual(unknownBody, { schema: "pipeline.critic-dispatch-preflight.v1", status: "rejected", code: "CDP-ARGUMENT" });
+  assert.match(unknownReason, /Unknown argument: --unknown/u);
   assert.equal(git(fx.root, ["status", "--porcelain", "--untracked-files=all"]), before);
   assert.equal(fs.existsSync(join(fx.root, "telemetry")), false);
 });
@@ -729,6 +735,35 @@ test("shared argument parser preserves defaults scalar overwrites arrays and exa
       && !/there is no --range/u.test(error.message));
   assert.throws(() => parseCriticDispatchPreflightArgs(["--range", "a..b"]),
     (error) => error.code === "CDP-ARGUMENT" && /there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>/u.test(error.message));
+});
+
+// C18-8 (AC-239): a refusal of a consumer run names the flag, the checked path and one working example.
+test("C18-8 a CDP-ARGUMENT refusal prints its reason on stderr and a short commit id is refused with the flag and the full-id repair", () => {
+  const fx = fixture();
+  const short = directCli(fx, ["--registration-commit", "abc1234"]);
+  assert.equal(short.status, 1);
+  assert.equal(short.stdout, "");
+  const body = JSON.parse(short.stderr);
+  assert.equal(body.code, "CDP-ARGUMENT");
+  assert.match(body.reason, /--registration-commit/u);
+  assert.match(body.reason, /full 40-hex commit id/u);
+  assert.throws(() => parseCriticDispatchPreflightArgs(["--registration-commit", "abc1234"]),
+    (error) => error.code === "CDP-ARGUMENT" && /--registration-commit/u.test(error.message) && /pass the full 40-hex commit id/u.test(error.message));
+  const duplicate = JSON.parse(directCli(fx, ["--task-id", "A", "--task-id", "B"]).stderr);
+  assert.equal(duplicate.code, "CDP-ARGUMENT");
+  assert.match(duplicate.reason, /Duplicate --task-id/u);
+});
+
+test("C18-8 the diagnostic-evidence help names the checked registration path specs/<feature>/evidence/", () => {
+  const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
+  assert.match(text, /--log specs\/<feature>\/evidence\//u);
+  assert.match(text, /--out specs\/<feature>\/evidence\//u);
+  assert.doesNotMatch(text, /--(?:log|out) evidence\//u);
+  assert.match(text, /FPR-DIAG-PATH/u);
+  let usage = "";
+  try { runCriticDiagnosticCli(["--root", "."]); } catch (error) { usage = String(error.message); }
+  assert.match(usage, /--log specs\/<feature>\/evidence\//u);
+  assert.doesNotMatch(usage, /--(?:log|out) evidence\//u);
 });
 
 test("request destructuring retains original getter order and exceptions before body entry", () => {

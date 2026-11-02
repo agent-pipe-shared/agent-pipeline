@@ -141,10 +141,29 @@ function grammarShapeLines() {
   return ADMITTED_GRAMMAR_SHAPES.map((shape) => `- ${shape.spelling} (e.g. "${shape.example}").`);
 }
 
+// C18-8 (AC-239): the shape `cd <dir> && node --test <file> | tail -N` cost a consumer run several retries because the refusal named no working
+// alternative. The alternative is a test run as its own tool call from the project root; this example is pinned by g23-read-help.test.mjs to be
+// admitted by the guard itself.
+export const GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE = "node --test plugins/pipeline-core/lib/git-cmd.test.mjs";
+
+// C18-8 (AC-239): one working example per PowerShell shape GUARD-POWERSHELL-GRAMMAR refuses; each is pinned by g23-read-help.test.mjs to be admitted.
+export const POWERSHELL_GRAMMAR_EXAMPLES = {
+  literal: "Get-Content docs/a.md",
+  newItem: "New-Item -Path scratch/work -ItemType Directory",
+  contentWrite: "Set-Content -LiteralPath scratch/note.txt -Value 'text'",
+  read: "Get-Content -LiteralPath docs/a.md",
+};
+
+// C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
+export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
+  + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "
+  + "A glob pattern (Glob, or a Grep glob over a directory of plugin files) is not admitted; list the plugin directory by exact path and read each file you need.";
+
 // The lines every grammar denial prints. Kept in one table so all three grammar codes stay
 // byte-identical apart from their typed reason.
 export const GRAMMAR_DENIAL_REMEDY = [
   "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
+  `A shape such as "cd <dir> && node --test <file> | tail -N" is not admitted (a directory change and a piped test run); run the test as its own tool call from the project root, the path relative to it, e.g. "${GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE}".`,
   "Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.",
   "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
   "The complete admitted grammar, with bounds and exact spellings:",

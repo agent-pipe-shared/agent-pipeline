@@ -5,6 +5,7 @@ import { basename, win32 } from "node:path";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
+import { POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
 import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
 import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
 
@@ -68,12 +69,12 @@ export function powerShellScopeVerdict(input, root, dependencies) {
   if (sanctionedPowerShellNodeCall(command, root)) return verdict(0);
   // PowerShell interpolation and composition must never be interpreted as a literal path.
   if (/[\r\n;$`@|&<>]/u.test(command)) {
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
+    return verdict(2, powerShellGrammarDenial("use one literal command.", "literal"));
   }
   const parsed = parseGuardCommand(command, root, { platform: "win32" });
   if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) {
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
+    return verdict(2, powerShellGrammarDenial("use one literal command.", "literal"));
   }
   const { executable, argv } = parsed.segments[0];
   const name = basename(executable).toLowerCase();
@@ -85,7 +86,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
       && powerShellScratchPath(target, root, dependencies, itemType === "directory")) {
       return verdict(0);
     }
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: New-Item is limited to physically contained scratch files and directories.\n");
+    return verdict(2, powerShellGrammarDenial("New-Item is limited to physically contained scratch files and directories.", "newItem"));
   }
   if (name === "set-content" || name === "add-content") {
     const named = powerShellNamedArgs(argv, ["-path", "-literalpath", "-value", "-encoding"], ["-nonewline"]);
@@ -95,7 +96,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
     if (named && !(named.values.has("-literalpath") && named.values.has("-path"))
       && target && value !== undefined && (encoding === undefined || encoding.toLowerCase() === "utf8")
       && powerShellScratchPath(target, root, dependencies)) return verdict(0);
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files.\n");
+    return verdict(2, powerShellGrammarDenial("content writes are limited to physically contained scratch files.", "contentWrite"));
   }
   if (["get-content", "get-childitem", "get-item", "test-path"].includes(name)) {
     const namesOnly = name === "get-childitem"
@@ -105,16 +106,24 @@ export function powerShellScopeVerdict(input, root, dependencies) {
     if (readArgv.length === 0 && name === "get-childitem") target = ".";
     else if (readArgv.length === 1) target = readArgv[0];
     else if (readArgv.length === 2 && ["-literalpath", "-path"].includes(readArgv[0].toLowerCase())) target = readArgv[1];
-    else return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: unsupported read arguments.\n");
+    else return verdict(2, powerShellGrammarDenial("unsupported read arguments.", "read"));
     return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
       ? verdict(0)
-      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
+      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`);
   }
   if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
   if (["git", "git.exe"].includes(executable.toLowerCase())
     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
     && invalidSessionObservation(root, dependencies)) return verdict(0);
-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
+  return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
+}
+
+// C18-8 (AC-239): every GUARD-POWERSHELL-GRAMMAR refusal ends with one working example for the shape it refused (examples pinned as admitted
+// by g23-read-help.test.mjs); the code and its first sentence are unchanged.
+function powerShellGrammarDenial(sentence, shape) {
+  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
+    + `Working example: ${POWERSHELL_GRAMMAR_EXAMPLES[shape]}\n`;
 }

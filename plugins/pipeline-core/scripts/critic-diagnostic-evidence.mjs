@@ -8,7 +8,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export function runCriticDiagnosticCli(argv) {
   const split = argv.indexOf("--");
-  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
+  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log specs/<feature>/evidence/NAME.log --out specs/<feature>/evidence/NAME.json [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS (registration, FPR-DIAG-PATH, checks specs/<feature>/evidence/, not a bare evidence/)");
   const options = { guardrailPaths: [], pending: [], command: argv.slice(split + 1) };
   let out;
   for (let i = 0; i < split; i += 2) {
@@ -32,8 +32,9 @@ export function runCriticDiagnosticCli(argv) {
   return { schema: "pipeline.critic-diagnostic-production.v1", path: out, fullVerify: evidence.fullVerify.status, targeted: evidence.targeted.status, releaseQualified: false };
 }
 export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
-  "critic-diagnostic-evidence.mjs --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS",
+  "critic-diagnostic-evidence.mjs --root ROOT --spec PATH --log specs/<feature>/evidence/NAME.log --out specs/<feature>/evidence/NAME.json [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS",
   "",
+  "Paths: registration (FPR-DIAG-PATH) checks that the artifact lives under specs/<feature>/evidence/ for the active feature; a bare evidence/ path is produced but then refused at registration.",
   "Evidence route (run in this order):",
   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs (this script).",
   "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",

@@ -9,6 +9,8 @@ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-
 import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
 import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
+import * as denials from "./grammar-denials.mjs";
+import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
 const fixtureBase = resolve("scratch");
@@ -93,5 +95,48 @@ test("G23 missing local targets are distinct from unknown grammar and protected 
   }
 });
 
-if (cases.length !== 3) throw new Error("G23 read/help case count drift");
+// C18-8 (AC-239): refusal texts that cost a consumer run time name the working alternative, and every example printed is one the guard admits.
+test("C18-8 refusal texts carry one working example per refused shape, each admitted by the guard itself", () => {
+  mkdirSync(fixtureBase, { recursive: true });
+  const root = mkdtempSync(join(fixtureBase, "c18-8-"));
+  try {
+    mkdirSync(join(root, "docs"));
+    mkdirSync(join(root, "scratch"));
+    mkdirSync(join(root, "plugins", "pipeline-core", "lib"), { recursive: true });
+    writeFileSync(join(root, "docs", "a.md"), "safe\n");
+    writeFileSync(join(root, "plugins", "pipeline-core", "lib", "git-cmd.test.mjs"), "\n");
+    const ready = { requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }) };
+    const run = (tool_name, tool_input) => evaluateLifecycleReadyGuard({ tool_name, tool_input }, { projectDir: root, ...ready });
+    // (c) `cd <dir> && node --test ... | tail`: refused with the same code, and the text names the one-command-per-call alternative.
+    const refused = run("Bash", { command: "cd plugins/pipeline-core && node --test lib/git-cmd.test.mjs | tail -20" });
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(refused.stderr, /cd <dir> && node --test/u);
+    assert.ok(denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE, "the alternative example is exported");
+    assert.ok(refused.stderr.includes(denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE), "the printed text carries the example");
+    assert.equal(run("Bash", { command: denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE }).exitCode, 0, "the example is admitted by the guard");
+    // (d) GUARD-READ-TARGET for a glob read names an admitted way; the way named is admitted.
+    const glob = run("Glob", { pattern: "../*", path: root });
+    assert.equal(glob.exitCode, 2);
+    assert.match(glob.stderr, /GUARD-READ-TARGET:/u);
+    assert.match(glob.stderr, /exact file path/u);
+    assert.match(glob.stderr, /Read/u);
+    assert.equal(run("Read", { file_path: join(root, "docs", "a.md") }).exitCode, 0);
+    // (d) GUARD-POWERSHELL-GRAMMAR: one working example per refused shape; every example admitted.
+    const shapes = denials.POWERSHELL_GRAMMAR_EXAMPLES;
+    for (const key of ["literal", "newItem", "contentWrite", "read"]) {
+      assert.ok(typeof shapes[key] === "string", key);
+      assert.equal(run("PowerShell", { command: shapes[key] }).exitCode, 0, `${key}: ${shapes[key]}`);
+    }
+    for (const [command, key] of [["Get-Content a.md; Get-Content b.md", "literal"], ["New-Item -Path docs/x -ItemType Directory", "newItem"],
+      ["Set-Content -Path docs/x.txt -Value hi", "contentWrite"], ["Get-Content -Foo bar baz", "read"], ["Remove-Item docs/a.md", "literal"]]) {
+      const result = run("PowerShell", { command });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /GUARD-POWERSHELL-GRAMMAR/u, command);
+      assert.ok(result.stderr.includes(shapes[key]), `${command}: names the ${key} example`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+if (cases.length !== 4) throw new Error("G23 read/help case count drift");
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

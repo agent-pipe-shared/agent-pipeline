@@ -4,7 +4,7 @@
 import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
-import { nativeReadCredentialTargetDenialText } from "./grammar-denials.mjs";
+import { nativeReadCredentialTargetDenialText, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
 import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
@@ -738,7 +738,8 @@ export function readToolScopeVerdict(input, root, dependencies) {
   // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the
   // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
   if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
+  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+    + `${READ_TARGET_EXACT_FILE_ADVICE}\n`);
 }
 
 // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal

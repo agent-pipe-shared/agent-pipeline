@@ -673,7 +673,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
   }
   if (Object.keys(selectors).length !== 0) {
     if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
-    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", "An exact registration commit is required.");
+    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", selectors["--registration-commit"] === undefined
+      ? "An exact registration commit is required: --registration-commit <full 40-hex commit id>."
+      : "--registration-commit takes an exact commit id, not a short or symbolic one: pass the full 40-hex commit id (git rev-parse <ref> prints it).");
     const match = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
     if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec.");
     const acceptedPath = selectors["--accepted-contract"] === undefined ? null : normalizePath(selectors["--accepted-contract"], "accepted contract");
@@ -712,6 +714,9 @@ if (isDirectInvocation(import.meta.url)) {
       schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
       status: "rejected",
       code,
+      // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
+      // a reason a refusal already carries in its details is kept as it is.
+      ...(code === "CDP-ARGUMENT" && error instanceof CriticDispatchPreflightError ? { reason: error.message } : {}),
       ...(!sweep && details !== null ? details : {}),
     })}\n`);
     process.exitCode = 1;
