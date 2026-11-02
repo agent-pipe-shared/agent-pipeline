@@ -80,3 +80,7 @@ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied 
 ## Held-commit rehearsal
 
 `node scripts/rehearse-held.mjs <scratch/clones/<rehearsal> | .> [--only k1,k5]` fetches the head of each build clone named in its `ORDER` table and replays the unprotected, post-sitting commits into the target in that fixed order. `scripts/import-held.mjs` 3-way merges a file where main moved and stops at the first conflict. The `ORDER` table and its skip SHAs are per-run data of the 0.7.0 sprint; edit them when the held set changes. Rehearse in a clone first: with target `.` the commits land in the main checkout.
+
+## Scratch work trees: real copies, never links
+
+A scratch work tree that symlinks repository root entries lets the pipeline-state suites write through the link into the real tracked state (the architecture adoption state was once overwritten this way and had to be restored). Give a scratch tree real copies, or a shared clone, for every entry a suite can write; never a link. The slice-build and chain-rehearsal helpers of candidate 17 work on `git clone --shared` copies for that reason; their copies are kept in `specs/sprint-alfred-epic/plans/candidate-18-drafts/tools/`.

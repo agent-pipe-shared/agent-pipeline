@@ -8,6 +8,7 @@ is historical (superseded goals and counts).
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-11-02 | WSL PC autonomous round 2026-10-26: held kernel patches for sitting C29 committed, Q22 dispatch lock blocker resolved under D159, report 05 triaged, decisions D160-D162 taken; closed history, superseded by candidates 13 to 17. | [docs/state-archive/2026-11-02--wsl-pc-autonomous-round-2026-10-26-po-away.md](state-archive/2026-11-02--wsl-pc-autonomous-round-2026-10-26-po-away.md) |
 | 2026-10-26 | WSL PC re-entry 2026-10-26: two metadata-only commits from the original machine (64dbc35d0, 6f089c41b) to merge normally, never reset; P1 item push-approval-record-always-trails-the-signed-commit (AC-37) documented not fixed; one-time operator push exception not approved; chat:member-source-drift cleared by the sanctioned move-aside after PO confirmed workers stopped. | [docs/state-archive/2026-10-31--off-machine-follow-up-wsl-pc-re-entry-2026-10-26.md](state-archive/2026-10-31--off-machine-follow-up-wsl-pc-re-entry-2026-10-26.md) |
 
 ## Active goal and matrix
@@ -18,6 +19,10 @@ frozen. No close-block, feature close, main switch, merge or release is needed.
 Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 **Candidate 15c installed 2026-11-01** (29 patches `e4966002f`-`9618f9b4b`, stamp `c7c95b905`). Open: Full Verify, Critic, native, D231 slice 2, acceptance.
+**Candidate 17 (runner neutrality Claude/Codex/Antigravity, first consumer-run findings) delivered 2026-11-02** as held patches w48-w73 and one apply script
+(`specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate17.sh`; the PO applies it, then stamps and installs). Chain rehearsal exit 0 and the whole-chain checks green;
+implementation complete, PO acceptance pending. Open: Full Verify on the final tree, the batch Critic (paused by the PO), native Windows runs, real Codex and Antigravity runs, the security scan
+(`--remote upstream`). Not built, planned for candidate 18 with the draft native Antigravity admission: [candidate 18 plan](../specs/sprint-alfred-epic/plans/candidate-18-plan-2026-11-02.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
 contains **281 items:all at75;index75.0%** (15c: no stage change; candidate 14, 2026-10-31 evening: operator-applied through `88a800089`, stamped `e9454e59e`, installed and read back `0.7.0+claude.20261031181742.88a8000`; carries the consumer Critic-course chain, the green-Verify triage fixes, the Critic preimage re-pin (D221) and the D216 option A read/write split, decisions D219-D222; implementation complete, matrix not re-measured; Full Verify on this tree is red until candidate 15; open: batch Critic, native Windows runs, PO acceptance, drift-test debt for the read halves; no push planned; previous: `a2099ff5f` 10-31, candidate 13 installed, read back
@@ -222,44 +227,6 @@ P2/P3 and D26 live in `2026-10-26-toolbox-session-friction-and-feature-wishes.md
 first Goldfish dispatch without manual `icacls`, `git mv` or `discard-feature`.
 Toolbox ran on a build before S1-S3/S5/S7a; D2, D3, D5 and the D6 cause need a
 live confirmation on the installed candidate.
-
-## WSL PC autonomous round (2026-10-26, PO away)
-
-Held kernel patches committed for the bundled sitting C29 (all `git apply
---check` clean, suites re-run by the Coordinator): pre-ready ref Git
-`ed5b55474`, HGO request sweep `2e3aaf3c6`, route effort `b7fbc78b6`, Windows
-session locks `6e9a37f16`, Critic transaction owner recovery `a574a7c20`.
-Rows stay at their stage until the PO applies them. Behavioral-evidence oracle
-row moved 25→75 (`45612a7bd`). Tracked packager `scripts/pack-held-patch.mjs`.
-In progress, scratch only: identity/actor reuse (work copy GREEN on the guard
-suite and restart cases; C5 packaging pending) and G33 damaged-State recovery
-(new backlog item `35e93ec92`; RED confirmed; C2 apply/GREEN/package pending).
-**Blocker (Q22, P0 item `c647a524e`):** every governed dispatch from this
-session is refused with `SDC-LOCK-HELD` while `inspect` reads the lock absent.
-Built briefings wait in `scratch/wave3/` (`briefing-identity-c5.md`,
-`briefing-g33-c2.md`; rebuild at HEAD before use, pass with the trailing
-newline). Q22 resolved: the refusal came from a session-cleanup manifest lock a
-gone hook process left inside custody (not the registry lock); retired
-once under PO exception D159, dispatch resumed. Durable fix is held patch
-`p0-session-cleanup-lock-recovery.patch` (C29 item 8). G33 patch committed
-(`c42dbaf7f`); identity needs one more continuation (patch build, notes).
-Caution: scratch work trees that symlink root entries let pipeline-state
-suites overwrite the real `architecture/adoption-state.json` (restored). Consumer report 05 is triaged in
-`backlog/items/2026-10-26-report-05-consumer-findings.md` (blocker PF-58, four
-majors, all 0.7.0). Identity patch committed (`8cbd536ba`); PF-58 fixed directly
-(`29d4b4619`); PF-61 and PF-65 are held patches C29 items 9 and 10. Kernel paths
-(checked with `isNeverLiftableKernelPath`): `lib/dispatch-briefing-build.mjs`,
-`lib/dispatch-budget-notice.mjs`, `lib/onboarding-continuity.mjs`,
-`scripts/push-prepare.mjs`, `scripts/architecture-adoption.mjs`,
-`lib/architecture-entry-readiness.mjs`, so PF-64/69, PF-59 (D160), D161 and D162
-are held-patch work too; packages wait in `scratch/wave3/` (`pkg-pf64-grant-arrival.json`,
-`pkg-pf59-handover-block.json`). PO decisions today: D160 (Q23 a), D161 (Q21 a),
-D162 (brownfield architecture: no deferral, adoption as onboarding migration,
-old records migrated on contact). The PO plans the C29 sitting for about 15:00
-today; a bundle integration run of all ten patches is in progress because
-patch 3 turns the SubagentStop pin red (goldfish-deep effort versus the
-`duty.deep` route). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
-(C29, T3).
 
 ## Committed Source and actual qualification
 
