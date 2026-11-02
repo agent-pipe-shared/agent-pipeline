@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs
+index 1271917d4..bed7d53b0 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs
+@@ -80,9 +80,26 @@ test("baseline-only implementation exposes and completes the typed late verify r
+   assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
+     "the ordinary driver receives a typed recovery rather than discovering it at push time");
+ 
++  // C18-5 (AC-140): the confirmation names who clears it and that two independent gates exist.
++  assert.equal(action.applyAction.approvingInstance, "human",
++    "the confirmation is cleared by a human (the PO or the runner permission prompt), never by the pipeline");
++  assert.equal(action.approvingInstance, "human");
++  assert.ok(Array.isArray(action.applyAction.gates) && action.applyAction.gates.length >= 2,
++    "the apply action lists the closed set of gates");
++  assert.deepEqual(action.gates, action.applyAction.gates);
++  const gateText = action.applyAction.gates.join("\n");
++  assert.match(gateText, /Pipeline asks for confirmation/u);
++  assert.match(gateText, /runner'?s? permission layer may refuse/u);
++  assert.match(gateText, /ask the PO to allow that exact command once/u);
++  assert.match(gateText, /do not retry the same call in a loop/u);
++  assert.match(gateText, /do not edit calibration directly/u);
++  assert.match(action.guidance, /confirmation/u);
++  assert.match(action.guidance, /permission layer/u);
++  assert.match(action.guidance, /human/u);
++
+   const neutralPath = join(root, "project", "pipeline.json");
+   const legacyPath = join(root, ".claude", "pipeline.json");
+-  const before = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
++  const before =[readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
+   assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", " "], deps)).result, 2);
+   assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], before,
+     "a blank input fails before either calibration twin changes");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b8b97539b..5fbe65dbd 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -3672,6 +3672,12 @@ export function isLateVerifyRecoveryLifecycle(lifecycle) {
+     && lifecycle.approvalCurrent === true;
+ }
+ 
++const LATE_VERIFY_CONFIRMATION_GATES = Object.freeze([
++  "Gate 1: the Pipeline asks for confirmation before the calibration is changed; a human (the PO or the runner permission prompt) clears it, the pipeline never approves it itself.",
++  "Gate 2: the runner's permission layer may refuse the same call independently of gate 1.",
++  "If the runner refuses: ask the PO to allow that exact command once; do not retry the same call in a loop; do not edit calibration directly.",
++]);
++
+ /**
+  * Read-only, driver-safe presentation of the one sanctioned late recovery.
+  * Returning null is intentional for malformed state, stale authority, missing
+@@ -3706,7 +3712,9 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
+     }],
+     mutation: false,
+     requiresConfirmation: false,
+-    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability.",
++    approvingInstance: "human",
++    gates: LATE_VERIFY_CONFIRMATION_GATES,
++    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability. The apply action needs a confirmation cleared by a human (the PO or the runner permission prompt), never by the pipeline itself, and two independent gates exist: the Pipeline asks for confirmation, and the runner's permission layer may refuse the same call on its own. If the runner refuses, ask the PO to allow that exact command once; do not retry the same call in a loop.",
+     applyAction: {
+       kind: "command",
+       ...rendered,
+@@ -3716,6 +3724,8 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
+       // without a prompt, but the actual calibration mutation needs a fresh
+       // attended confirmation.
+       requiresConfirmation: true,
++      approvingInstance: "human",
++      gates: LATE_VERIFY_CONFIRMATION_GATES,
+     },
+     expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
+   };
