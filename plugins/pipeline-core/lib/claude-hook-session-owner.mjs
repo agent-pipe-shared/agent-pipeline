@@ -44,11 +44,14 @@ export function enterClaudeHookSessionOwner({ root, input } = {}) {
   return enterHookSessionOwner(root, claudeHookDescriptorSessionId(input?.session_id), CLAUDE_HOOK_SESSION_OWNER_SOURCE);
 }
 
+/** Map a Codex hook `session_id` to its private descriptor id, or null when unusable (the same id rule as the Claude form). */
+export function codexHookDescriptorSessionId(sessionId) {
+  return typeof sessionId === "string" && CLAUDE_SESSION_ID.test(sessionId) ? `codex-${sessionId}` : null;
+}
+
 /** Enter the scope from a parsed Codex hook input (`spawn_agent`). Returns whether a usable id was bound. */
 export function enterCodexHookSessionOwner({ root, input } = {}) {
-  const sessionId = input?.session_id;
-  const descriptorSessionId = typeof sessionId === "string" && CLAUDE_SESSION_ID.test(sessionId) ? `codex-${sessionId}` : null;
-  return enterHookSessionOwner(root, descriptorSessionId, CODEX_HOOK_SESSION_OWNER_SOURCE);
+  return enterHookSessionOwner(root, codexHookDescriptorSessionId(input?.session_id), CODEX_HOOK_SESSION_OWNER_SOURCE);
 }
 
 function enterHookSessionOwner(root, descriptorSessionId, ownerSource) {

@@ -171,16 +171,21 @@ so commit it BEFORE the freeze, or renew the freeze as above.
 `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (from `final-verify-green`,
 or `readback-confirmed` after a publication; candidate 16d). The command lists the active session descriptors and
 EXCLUDES the closing session's own: that session is still running, so its descriptor can only ever report
-`unavailable`, and it is derived from the runtime environment (`claude-<session id>`), never typed. The exclusion is
+`unavailable`, and it is derived from the runtime environment for the runner that is closing (`claude-<session id>` for
+Claude, `codex-<session id>` for Codex; Antigravity creates no session descriptor, so nothing is derived there), never
+typed. The command prints `runner`, `ownSessionDerivation` and the reason. The exclusion is
 named in the stored observation (`cleanup-observation.json`, beside the receipt) and the receipt's `evidenceDigest` is
 the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
-`uncertain`, and the output lists them. When the own session cannot be derived (a runner other than Claude), nothing
-is excluded and the receipt cannot be `complete` while any descriptor exists. A project with no descriptor at all
+`uncertain`, and the output lists them. When the own session cannot be derived (the runner exposed no usable session
+id), nothing is excluded, the receipt cannot be `complete` while any descriptor exists, and the output carries the
+typed code `CLOSE-CLEANUP-OWN-SESSION-UNDERIVED` instead of claiming that other sessions remain. A project with no descriptor at all
 gets `complete` with an observation that says so (no hand-chosen digest is needed any more). `uncertain` is accepted
 by `cleanup-complete`, but `closed-local` is then refused with `CLOSE-CLEANUP`; end or clear the other sessions,
 write the receipt again, and run `cleanup-complete` again with the new file (a later `cleanup-complete` with
 `complete` replaces it). Hand-written receipts with the empty-input digest (PO decision 2026-11-01) stay accepted,
-because only the format of `evidenceDigest` is checked, but the producer is the route.
+because only the format of `evidenceDigest` is checked, but the producer is the route. A hand-written receipt is an
+operator's assertion, not an observation, on every runner: say so in the close report (`operator-asserted`) and use it
+only when the producer's own output shows that the only remaining descriptor is the closing session's own.
 
 The Critic carry-forward of a Critic-bound Verify (`--mode release --critic-packet-id ...`) admits the close's
 own commit and handover-only commits after the last Critic round: a commit with one parent whose every changed

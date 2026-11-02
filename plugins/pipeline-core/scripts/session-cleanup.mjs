@@ -63,8 +63,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
-import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
@@ -326,9 +325,10 @@ function requesterOwnerNonce(flags, env, io = {}) {
  * otherwise indistinguishable from a crashed orphan; it is only used to REFUSE offering or
  * archiving the requester's own descriptor, so absence is not an error.
  */
-function requesterSessionId(env) {
-  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
-  return identity.ok ? claudeHookDescriptorSessionId(identity.sessionId) : null;
+function requesterSessionId(env, flags = {}) {
+  // 17: the requester's own descriptor is derived for the runner that is invoking (an explicit --runner first, then the ambient markers),
+  // not always as claude-<id>: a Codex process is `codex-<id>`, and Antigravity creates no descriptor (null, never a guess).
+  return resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env, flags?.runner), env }).descriptorSessionId;
 }
 
 function parseArchiveArgs(argv) {
@@ -575,7 +575,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       rootDir: repo,
       scriptPath: SESSION_CLEANUP_SCRIPT,
       requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
-      requesterSessionId: requesterSessionId(env),
+      requesterSessionId: requesterSessionId(env, flags),
       deps: dependencies,
     });
   } else if (command === "archive-orphan") {
@@ -592,16 +592,16 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       by: required(flags, "by"),
       reason: required(flags, "reason"),
       requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
-      requesterSessionId: requesterSessionId(env),
+      requesterSessionId: requesterSessionId(env, flags),
       deps: dependencies,
     });
   } else if (command === "plan-recovery") {
     const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
     output = promotionRecovery.status === "not-applicable"
-      ? planSessionCleanupRecovery({ rootDir: repo, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env) })
+      ? planSessionCleanupRecovery({ rootDir: repo, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env, flags) })
       : promotionRecovery;
   } else if (command === "plan-human-recovery") {
-    output = planHumanRecovery(repo, { ...dependencies, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env) });
+    output = planHumanRecovery(repo, { ...dependencies, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env, flags) });
   } else if (command === "apply-recovery") {
     const planSha256 = required(flags, "plan-sha256");
     const planPromotionRecovery = dependencies.planOnboardingKickoffPromotionCleanupRecoveryFn

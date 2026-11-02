@@ -27,6 +27,7 @@ import {
 } from "./publication-close-journal.mjs";
 import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const h = (c, n = 64) => c.repeat(n);
@@ -730,6 +731,94 @@ test("process: write-cleanup-receipt produces the private receipt the coordinato
   assert.equal(readFileSync(written.receiptPath, "utf8"), `${JSON.stringify(receipt, null, 2)}\n`, "the recorded receipt is untouched");
   rmSync(fixture.root, { recursive: true, force: true });
   rmSync(frozen.root, { recursive: true, force: true });
+});
+
+// Candidate 17 (runner neutrality): the closing session's own descriptor is derived for the runner that is closing. It used to be hard-coded to
+// claude, so on Codex the own `codex-<id>` descriptor counted as foreign and the receipt could never become complete.
+function runnerEnv(overrides) {
+  const env = childEnv();
+  for (const key of ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "ANTIGRAVITY_AGENT", "AI_AGENT"]) delete env[key];
+  return { ...env, ...overrides };
+}
+function receiptAs(fixture, overrides) {
+  const result = spawnSync(process.execPath, [CLI, "write-cleanup-receipt", "--root", fixture.root, "--lifecycle", fixture.lifecycle], { encoding: "utf8", shell: false, windowsHide: true, env: runnerEnv(overrides) });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
+
+test("17 cleanup receipt: each runner names how its own session was derived, and Antigravity says it cannot", () => {
+  const fixture = processFixture("receipt-runners");
+  try {
+    const claude = receiptAs(fixture, { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "11111111-aaaa-bbbb-cccc-222222222222" });
+    assert.equal(claude.runner, "claude");
+    assert.equal(claude.ownSessionDerivation, "observed");
+    const codex = receiptAs(fixture, { CODEX_THREAD_ID: "33333333-aaaa-bbbb-cccc-444444444444" });
+    assert.equal(codex.runner, "codex");
+    assert.equal(codex.ownSessionDerivation, "observed");
+    const codexBlind = receiptAs(fixture, {});
+    assert.equal(codexBlind.runner, "codex", "without any marker the default is the same as session-cleanup's");
+    assert.equal(codexBlind.ownSessionDerivation, "unavailable");
+    assert.match(codexBlind.ownSessionReason, /did not expose a usable session id/u);
+    const agy = receiptAs(fixture, { ANTIGRAVITY_AGENT: "1" });
+    assert.equal(agy.runner, "antigravity");
+    assert.equal(agy.ownSessionDerivation, "unavailable");
+    assert.match(agy.ownSessionReason, /antigravity creates no session descriptor/u);
+    // no descriptor exists in this fixture, so every runner is complete; what differs is that the observation says who derived what
+    for (const written of [claude, codex, codexBlind, agy]) assert.equal(written.status, "complete");
+    assert.equal(new Set([claude, codex, codexBlind, agy].map((written) => written.evidenceDigest)).size, 4, "the runner and the derivation are part of what the digest binds");
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("17 the invoking runner: an explicit valid runner wins, otherwise the ambient markers, otherwise codex", () => {
+  assert.equal(invokingRunnerFromEnv({ CLAUDECODE: "1" }), "claude");
+  assert.equal(invokingRunnerFromEnv({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
+  assert.equal(invokingRunnerFromEnv({ AI_AGENT: "antigravity" }), "antigravity");
+  assert.equal(invokingRunnerFromEnv({}), "codex");
+  assert.equal(invokingRunnerFromEnv({ CLAUDECODE: "1" }, "codex"), "codex", "an explicit runner beats the ambient marker");
+  assert.equal(invokingRunnerFromEnv({}, "bogus"), null, "an unknown explicit runner is not silently replaced");
+});
+
+test("17 the own descriptor id is derived per runner and is never guessed", () => {
+  const id = "11111111-aaaa-bbbb-cccc-222222222222";
+  assert.deepEqual(resolveOwnSessionDescriptor({ runner: "claude", env: { CLAUDE_CODE_SESSION_ID: id } }),
+    { runner: "claude", descriptorSessionId: `claude-${id}`, derivation: "observed", reason: "claude session id read from the process environment" });
+  assert.equal(resolveOwnSessionDescriptor({ runner: "codex", env: { CODEX_THREAD_ID: id } }).descriptorSessionId, `codex-${id}`);
+  assert.equal(resolveOwnSessionDescriptor({ runner: "codex", env: { CODEX_SESSION_ID: id } }).descriptorSessionId, `codex-${id}`);
+  const conflict = resolveOwnSessionDescriptor({ runner: "codex", env: { CODEX_SESSION_ID: id, CODEX_THREAD_ID: "99999999-aaaa" } });
+  assert.equal(conflict.descriptorSessionId, null, "two Codex variables that disagree derive nothing");
+  assert.equal(conflict.derivation, "unavailable");
+  assert.equal(resolveOwnSessionDescriptor({ runner: "claude", env: { CODEX_THREAD_ID: id } }).descriptorSessionId, null, "a Claude process never reads Codex variables");
+  assert.equal(resolveOwnSessionDescriptor({ runner: "codex", env: { CLAUDE_CODE_SESSION_ID: id } }).descriptorSessionId, null, "a Codex process never reads Claude variables");
+  const odd = resolveOwnSessionDescriptor({ runner: "claude", env: { CLAUDE_CODE_SESSION_ID: "abc_defghij.klm" } });
+  assert.equal(odd.descriptorSessionId, null);
+  assert.match(odd.reason, /does not form a session descriptor id/u, "a valid session identity that cannot form a descriptor id is reported, not silently dropped");
+  const agy = resolveOwnSessionDescriptor({ runner: "antigravity", env: { CLAUDE_CODE_SESSION_ID: id, CODEX_THREAD_ID: id } });
+  assert.equal(agy.descriptorSessionId, null);
+  assert.match(agy.reason, /antigravity creates no session descriptor/u);
+  assert.equal(resolveOwnSessionDescriptor({ runner: "other", env: { CLAUDE_CODE_SESSION_ID: id } }).descriptorSessionId, null);
+  assert.equal(resolveOwnSessionDescriptor({}).descriptorSessionId, null);
+});
+
+test("17 cleanup receipt: an own session that could not be derived is a typed result, not 'other sessions remain'", () => {
+  const oid = h("c", 40); const tree = h("d", 40);
+  const stranger = { sessionId: "codex-22222222", descriptorSha256: h("2"), status: "unavailable" };
+  const blind = { runner: "codex", derivation: "unavailable", reason: "codex did not expose a usable session id to this process" };
+  const underived = buildCleanupReceipt({ descriptors: [stranger], ownSessionId: null, candidateOid: oid, candidateTree: tree, ownSession: blind });
+  assert.equal(underived.receipt.status, "uncertain");
+  assert.equal(underived.ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED");
+  assert.equal(underived.observation.ownSessionDerivation, "unavailable");
+  const derived = buildCleanupReceipt({ descriptors: [stranger], ownSessionId: stranger.sessionId, candidateOid: oid, candidateTree: tree, ownSession: { runner: "codex", derivation: "observed", reason: "x" } });
+  assert.equal(derived.receipt.status, "complete");
+  assert.equal(derived.ownSessionCode, null);
+  const foreign = buildCleanupReceipt({ descriptors: [stranger, { ...stranger, sessionId: "codex-33333333" }], ownSessionId: stranger.sessionId, candidateOid: oid, candidateTree: tree, ownSession: { runner: "codex", derivation: "observed", reason: "x" } });
+  assert.equal(foreign.receipt.status, "uncertain");
+  assert.equal(foreign.ownSessionCode, null, "a derived own session with a real foreign session left is the ordinary 'others remain' result");
+  const nothing = buildCleanupReceipt({ descriptors: [], ownSessionId: null, candidateOid: oid, candidateTree: tree, ownSession: blind });
+  assert.equal(nothing.ownSessionCode, null, "no descriptor at all is complete, nothing to be unsure about");
+  // an old caller that says nothing about the runner keeps its exact observation shape
+  const legacy = buildCleanupReceipt({ descriptors: [stranger], ownSessionId: null, candidateOid: oid, candidateTree: tree });
+  assert.equal(Object.hasOwn(legacy.observation, "runner"), false);
+  assert.equal(legacy.ownSessionCode, null);
 });
 
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {

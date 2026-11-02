@@ -38,7 +38,7 @@ function refuse(message) {
  *          ownSessionId: string|null, candidateOid: string, candidateTree: string}} input
  * @returns {{observation: object, observationSha256: string, receipt: object}}
  */
-export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, candidateTree }) {
+export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, candidateTree, ownSession = null }) {
   if (!Array.isArray(descriptors)) refuse("descriptor listing is invalid");
   if (!OID.test(candidateOid ?? "") || !OID.test(candidateTree ?? "")) refuse("candidate identity is invalid");
   if (ownSessionId !== null && (typeof ownSessionId !== "string" || ownSessionId === "")) refuse("own session id is invalid");
@@ -61,12 +61,19 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
     // Named, never silent: the exclusion is part of what the digest binds.
     excludedOwnSession: own === null ? null : { sessionId: own.sessionId, descriptorSha256: own.descriptorSha256, status: own.status },
     ownSessionDerived: ownSessionId !== null,
+    // 17: the runner that derived (or failed to derive) the own session is part of what the digest binds, so a receipt cannot be
+    // re-read as if another runner's rule had produced it. Absent for a caller that does not say (the 16d callers).
+    ...(ownSession === null ? {} : { runner: ownSession.runner, ownSessionDerivation: ownSession.derivation, ownSessionReason: ownSession.reason }),
     otherActiveDescriptors: others,
   };
   const observationSha256 = createHash("sha256").update(canonical(observation)).digest("hex");
+  // A typed result for the case the old text got wrong: the own session could not be derived, so the closing session's own
+  // descriptor (if it has one) is among the "others". That is not "other sessions remain"; the person has to know which it is.
+  const ownSessionCode = ownSessionId === null && others.length > 0 && ownSession !== null ? "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED" : null;
   return {
     observation,
     observationSha256,
+    ownSessionCode,
     receipt: {
       schema: CLEANUP_RECEIPT_SCHEMA,
       status: others.length === 0 ? "complete" : "uncertain",

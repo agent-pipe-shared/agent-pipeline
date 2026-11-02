@@ -37,8 +37,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
-import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
-import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import {
   LEGACY_STATE,
@@ -929,8 +928,10 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
       + (behind ? ". Cleanup is already behind this lifecycle and the coordinator has no way back from it: the receipt recorded at cleanup-complete stays the close evidence (nothing was written). Use the producer at the next close, before cleanup-complete." : ""));
   }
   if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
-  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
-  const ownSessionId = identity.ok ? claudeHookDescriptorSessionId(identity.sessionId) : null;
+  // 17: the closing session's own descriptor is derived for the runner that is actually closing (it used to be hard-coded to claude, so
+  // on Codex the own `codex-<id>` descriptor counted as foreign and the receipt could never be complete).
+  const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env });
+  const ownSessionId = ownSession.descriptorSessionId;
   const descriptors = listDescriptors(root).map((descriptor) => {
     const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
     if (!observed || observed.schema !== "pipeline.session-owner-status.v1" || observed.sessionId !== descriptor.sessionId
@@ -938,7 +939,7 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
     return { sessionId: observed.sessionId, descriptorSha256: observed.descriptorSha256, status: observed.status };
   });
   const built = buildCleanupReceipt({
-    descriptors, ownSessionId, candidateOid: coordinator.candidateOid, candidateTree: coordinator.candidateTree,
+    descriptors, ownSessionId, candidateOid: coordinator.candidateOid, candidateTree: coordinator.candidateTree, ownSession,
   });
   const directory = ensurePrivateDirectory(join(publicationClosePaths(common, values.lifecycle).directory, "evidence"));
   const receiptPath = join(directory, "cleanup-receipt.json");
@@ -954,9 +955,15 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
     excludedOwnSession: built.observation.excludedOwnSession,
     ownSessionDerived: built.observation.ownSessionDerived,
     otherActiveDescriptors: built.observation.otherActiveDescriptors,
+    runner: ownSession.runner,
+    ownSessionDerivation: ownSession.derivation,
+    ownSessionReason: ownSession.reason,
+    ...(built.ownSessionCode === null ? {} : { code: built.ownSessionCode }),
     next: built.receipt.status === "complete"
       ? `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${values.lifecycle} --actor <name> --phase cleanup-complete --evidence ${receiptPath}`
-      : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
+      : built.ownSessionCode !== null
+        ? `${built.ownSessionCode}: this ${ownSession.runner} process could not tell which active session descriptor is its own (${ownSession.reason}), so it cannot exclude it and the receipt stays uncertain. Look at the listed descriptors (session-cleanup.mjs status): if the only remaining one is this closing session's own, the close needs the PO-accepted empty-input receipt convention (skills/close-feature, labelled operator-asserted); if another session is listed, end or clear it and write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
+        : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
   };
 }
 
