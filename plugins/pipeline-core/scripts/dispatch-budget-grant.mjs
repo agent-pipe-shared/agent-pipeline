@@ -107,7 +107,7 @@ export function grantDispatchBudget(argv, dependencies = {}) {
     if (commonDir === null) throw new Refusal("git-common-dir-unresolved", "no git common directory resolves from the working directory");
     const budgetDir = join(commonDir, "agent-pipeline", "dispatch-budget");
     const counterFile = join(budgetDir, `${args.agentId}.json`);
-    if (!existsSync(counterFile)) throw new Refusal("agent-counter-missing", "no budget counter exists for that agent id; the agent never ran under the budget guard here");
+    if (!existsSync(counterFile)) throw new Refusal("agent-counter-missing", "no budget counter exists for that agent id; the agent never ran under the budget guard here. Only a Claude dispatch has a per-agent counter. On Codex and Antigravity nothing counts the budget (the briefing says so), so there is nothing to grant: let the child finish or stop with its interim report, commit the verified partial state, and dispatch the remainder as a new task. Check the agent id against the Agent call's result when the runner is Claude");
     const counter = readJson(counterFile, "counter");
     if (counter?.agentId !== args.agentId || !Number.isSafeInteger(counter.maxTurns) || !Number.isSafeInteger(counter.baseCalls) || !Number.isSafeInteger(counter.workingCap)) {
       throw new Refusal("counter-unbound", "the agent's counter is not bound to this agent id");

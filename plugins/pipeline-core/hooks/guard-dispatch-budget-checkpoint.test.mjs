@@ -448,7 +448,11 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent 
   assert.equal(code(["41"]), "extra-out-of-range");
   assert.equal(code(["abc"]), "extra-out-of-range");
   assert.equal(code(["-3"]), "extra-out-of-range");
-  assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "nope", "--reason", "why", "--root", root]).code, "agent-counter-missing");
+  const missing = grantDispatchBudget(["--extra", "5", "--agent-id", "nope", "--reason", "why", "--root", root]);
+  assert.equal(missing.code, "agent-counter-missing");
+  assert.match(missing.message, /Only a Claude dispatch has a per-agent counter/u, "the refusal says the grant route is Claude-shaped");
+  assert.match(missing.message, /On Codex and Antigravity nothing counts the budget/u);
+  assert.match(missing.message, /dispatch the remainder as a new task/u, "and names what to do instead of a grant");
   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "../s1", "--reason", "why", "--root", root]).code, "agent-id-invalid");
   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "s1", "--reason", "line\nbreak", "--root", root]).code, "grant-reason-invalid");
   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "s1", "--reason", "x".repeat(501), "--root", root]).code, "grant-reason-invalid");
