@@ -141,7 +141,16 @@ function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(re
 function readRecord(repo,path){const read=readRaw(repo,path);try{const value=JSON.parse(read.bytes.toString('utf8'));if(canonical(value)!==read.bytes.toString('utf8'))fail('SDC-AUTHORITY-UNAVAILABLE','noncanonical-record-json');return {...read,value};}catch{fail('SDC-AUTHORITY-UNAVAILABLE','invalid-record-json');}}
 function readRef(repo,value){ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
 function privateDirectories(repo,path){if(process.platform==='win32'){let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))windowsAuthority.createWindowsOwnedAuthorityDirectory({path:cursor});windowsAuthority.inspectWindowsOwnedAuthorityPath({path:cursor,directory:true});}return;}let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))mkdirSync(cursor,{mode:0o700});owned(lstatSync(cursor),true);}}
-function syncDirectory(path){const fd=openSync(path,constants.O_RDONLY);try{fsyncSync(fd);}finally{closeSync(fd);}}
+// Directory fsync. On win32 the platform may refuse it (EPERM and siblings); that counts as a succeeded write and is
+// reported as a bounded warning field instead of being thrown. Platform and fs port are injectable for tests.
+const WIN32_DIRECTORY_FSYNC_TOLERATED=Object.freeze(['EPERM','EINVAL','EISDIR','EACCES','ENOTSUP']);
+export function syncRegistryDirectory(path,{platform=process.platform,fs:port={openSync,fsyncSync,closeSync}}={}){
+  let fd;
+  try{fd=port.openSync(path,constants.O_RDONLY);port.fsyncSync(fd);return {durability:'synced'};}
+  catch(error){if(platform!=='win32'||!WIN32_DIRECTORY_FSYNC_TOLERATED.includes(error?.code))throw error;return {durability:'unsupported',syncErrorCode:error.code};}
+  finally{if(fd!==undefined)port.closeSync(fd);}
+}
+function syncDirectory(path){return syncRegistryDirectory(path);}
 function publishOriginal(repo,path,value,expected=null,record=null){
   safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path),bytes=Buffer.from(canonical(value));
   if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');
