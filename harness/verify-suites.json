@@ -4422,6 +4422,30 @@
       "file": "plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs",
       "invariantPinned": "observeCandidate reads a tracked-input inventory larger than the default process buffer without losing the candidate identity",
       "nonOverlapNote": "Unique pin for the candidate-identity buffer defect of the security scan"
+    },
+    {
+      "name": "agy-native-implementation-admission-tests",
+      "file": "plugins/pipeline-core/lib/agy-native-implementation-admission.test.mjs",
+      "invariantPinned": "A native Antigravity implementation dispatch is admitted only for a session with a descriptor, a live owner and a stored v1 consent whose signed scope carries the native implementation grant for the role and model alias, every deny reason is typed and ordered, a model-family consent is refused, and nothing is written (A18-B1, AC-108)",
+      "nonOverlapNote": "Unique cases: lib/agy-native-implementation-admission.mjs with injected dependencies; the hook keeps its own guard case for the unchanged denial code"
+    },
+    {
+      "name": "close-quality-readback-tests",
+      "file": "plugins/pipeline-core/lib/close-quality-readback.test.mjs",
+      "invariantPinned": "The close-time quality readback returns one closed, ordered row per quality artefact (security scan, ADR decision, architecture fitness, Critic report file, handover freshness) with a present, missing, not-applicable or unknown status and a remedy, an absent or throwing reader is unknown and never present, and the audit index lists the change's artefacts with their digests without writing anything (C18-10, AC-239)",
+      "nonOverlapNote": "Unique cases: lib/close-quality-readback.mjs; the close coordinator suite pins its drive and audit-index output"
+    },
+    {
+      "name": "session-authority-registry-fsync-tests",
+      "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",
+      "invariantPinned": "On win32 a directory fsync that fails with EPERM, EINVAL, EISDIR, EACCES or ENOTSUP counts as a succeeded registry write and reports durability unsupported with the error code, while the same codes on another platform and any other code on win32 still throw (C18-6, AC-127)",
+      "nonOverlapNote": "Unique cases: the directory-fsync handling of the session authority registry writer"
+    },
+    {
+      "name": "goldfish-host-commit-recover-tests",
+      "file": "plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs",
+      "invariantPinned": "The host-commit recover command plans read-only and applies one orchestrator commit of exactly the claimed paths only when the plan digest still matches, with the guard-conformant trailers and a pointer to the stop-failure record, and refuses typed with zero effect on a moved head, a staged path, a path outside the allowed paths, no source or a digest mismatch (C18-1b, AC-164)",
+      "nonOverlapNote": "Unique cases: scripts/goldfish-host-commit-recover.mjs and its guard admission; the finalizer suite pins the diagnostics it reads"
     }
   ]
 }
