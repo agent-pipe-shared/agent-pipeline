@@ -20,8 +20,8 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 **Candidate 15c installed 2026-11-01** (29 patches `e4966002f`-`9618f9b4b`, stamp `c7c95b905`). Open: Full Verify, Critic, native, D231 slice 2, acceptance.
 **Candidate 17 (runner neutrality Claude/Codex/Antigravity, first consumer-run findings) delivered 2026-11-02** as held patches w48-w73 and one apply script
-(`specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate17.sh`; the PO applies it, then stamps and installs). Chain rehearsal exit 0 and the whole-chain checks green;
-implementation complete, PO acceptance pending. Open: Full Verify on the final tree, the batch Critic (paused by the PO), native Windows runs, real Codex and Antigravity runs, the security scan
+(`specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate17.sh`), applied by the PO the same day (`130ebba59` to `235014116`) and stamped `5337c081b`
+(`0.7.0+claude.20261102073855.fba0507`); not installed or read back on this machine yet. Rehearsal and whole-chain checks green; implementation complete, PO acceptance pending. Open: Full Verify on the final tree, the batch Critic (paused by the PO), native Windows runs, real Codex and Antigravity runs, the security scan
 (`--remote upstream`). Not built, planned for candidate 18 with the draft native Antigravity admission: [candidate 18 plan](../specs/sprint-alfred-epic/plans/candidate-18-plan-2026-11-02.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
