@@ -617,7 +617,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   }
   if (["closed-local", "delivered", "release-eligible", "promoted"].includes(values.phase)
     && stored.coordinator.cleanup.status !== "complete") {
-    fail("CLOSE-CLEANUP", "a clean terminal/release transition requires confirmed cleanup");
+    fail("CLOSE-CLEANUP", `a clean terminal/release transition requires confirmed cleanup; the cleanup status is "${stored.coordinator.cleanup.status}". Write the cleanup receipt first (close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>); when other session descriptors remain, end or clear those sessions (session-cleanup.mjs status lists them) and write the receipt again`);
   }
   if (values.phase === "delivered"
     && !SHA256.test(stored.coordinator.publication?.readbackReceiptDigest ?? "")) {

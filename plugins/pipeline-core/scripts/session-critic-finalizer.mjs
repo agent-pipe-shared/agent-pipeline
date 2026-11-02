@@ -137,7 +137,7 @@ function originGate(query, options, deps) {
     if (options.allowCallerAuthoredFallback === true) {
       return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
     }
-    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE");
+    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE", "no runner issues a Source return record for the fresh session yet; to finalize this verdict as caller-authored (a weaker, labelled independence marker) repeat the finalize call with the sixth argument --allow-caller-authored-fallback");
   }
   const now = (deps.originNowMsFn ?? Date.now)();
   if (!exact(record, ORIGINAL_SOURCE_RETURN_KEYS) || record.schema !== ORIGINAL_SOURCE_RETURN_SCHEMA || record.issuer !== "source"

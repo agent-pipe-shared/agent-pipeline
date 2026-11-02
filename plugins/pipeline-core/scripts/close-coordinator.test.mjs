@@ -623,6 +623,9 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
     "--actor", "PO", "--phase", "closed-local",
   ], 2);
   assert.equal(uncertainTerminal.code, "CLOSE-CLEANUP");
+  assert.match(uncertainTerminal.message, /cleanup status is "[a-z-]+"/u, "the refusal names the status it saw");
+  assert.match(uncertainTerminal.message, /write-cleanup-receipt --root <repository-root> --lifecycle <id>/u, "and the verb that writes the receipt");
+  assert.match(uncertainTerminal.message, /session-cleanup\.mjs status/u, "and the command that lists the remaining sessions");
   writePrivateJsonAtomic(cleanupPath, {
     schema: "pipeline.close-cleanup-receipt.v1",
     status: "complete",

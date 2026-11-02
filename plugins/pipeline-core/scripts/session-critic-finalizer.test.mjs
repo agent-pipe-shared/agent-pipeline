@@ -1489,6 +1489,8 @@ test("Cut A (1) a caller-authored verdict with no Source origin is refused typed
   try {
     const request = preadmitted(fx, { packetId: "7".repeat(32) });
     assert.throws(() => finalizeRaw(request), codeIs(ORIGIN_UNAVAILABLE));
+    assert.throws(() => finalizeRaw(request), (error) => /--allow-caller-authored-fallback/u.test(error.message) && /caller-authored/u.test(error.message),
+      "the refusal names the opt-in that is admitted");
     assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => { throw new Error("no producer"); } }), codeIs(ORIGIN_UNAVAILABLE));
     // Nothing was recorded or consumed, so the same admitted packet still finalizes once an origin exists.
     const done = finalizeRaw(request, { readOriginalSourceReturnFn: originStub() });
