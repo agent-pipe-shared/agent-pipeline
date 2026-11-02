@@ -4,6 +4,12 @@ Candidate 17 (runner neutrality across Claude, Codex and Antigravity, plus the f
 `specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate17.sh` (run from the repository root with `bash`; header lines list every step). Everything below is what
 candidate 17 did NOT contain, in the order to take it up on the next machine. State and decisions: `docs/state.md`. This file is the plan, not the record.
 
+## State at the hand-over to the next machine
+
+Candidate 17 is applied (operator commits `130ebba59` to `235014116`) and stamped (`5337c081b`, `0.7.0+claude.20261102073855.fba0507`); it is NOT installed or read back on the machine that built it.
+On the next machine: fetch and check out `feat/sprint-alfred`, read `docs/state.md`, run the start preflight, install the stamped build only if the PO wants it there, then take up the consumer findings below, C18-1 first.
+Nothing in this plan is applied; the native Antigravity draft is not in any apply script.
+
 ## Decisions already taken by the PO on 2026-11-02
 
 - The runner capability table appears in the start preflight readback as a pointer only (schema and reader script), not as the table. Built as w72.
