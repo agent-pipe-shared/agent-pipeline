@@ -2247,3 +2247,31 @@ test("A18-M1B claude and codex generation does not change: the runner field is t
   assert.equal(claude.skeleton.includes("antigravity"), false);
   assert.match(claude.skeleton, /Tool budget \(TB-09, hard cap\)/u);
 });
+
+// --- A18-M1C (AC-108): build renders and verifies an Antigravity briefing; the default host parser stays closed to it ---
+
+test("A18-M1C build --runner antigravity renders a verified briefing that names the runner, and the host parser admits it only on opt-in", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const route = await agyRouteOf("duty.implement");
+  const { fx, argv } = packageFixture({ modelId: route.nativeTier, runner: "antigravity" });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+  assert.match(built.text, /"runner":"antigravity"/u);
+  assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  const optIn = parseNativeGoldfishBriefing(built.text, { runners: ["claude", "codex", "antigravity"] });
+  assert.equal(optIn.ok, true, optIn.code);
+  assert.equal(optIn.binding.runner, "antigravity");
+  const closed = parseNativeGoldfishBriefing(built.text);
+  assert.equal(closed.ok, false, "the default parser used by the Claude and Codex host paths still refuses an Antigravity binding");
+  assert.equal(closed.code, "NGHR-BRIEFING-SHAPE");
+  // probe: the readiness findings of an Antigravity package are those of the same Claude package (the fixture has no plan approval, so both
+  // report the same state findings); no finding comes from the runner, the binding or the self-check.
+  const codesOf = (probe) => probe.findings.map((finding) => finding.code);
+  const probed = runDispatchBriefing(["probe", ...argv.slice(1)], depsOf(fx));
+  assert.equal(probed.schema, "pipeline.dispatch-readiness-probe.v1", JSON.stringify(probed).slice(0, 300));
+  const claude = packageFixture();
+  const claudeProbed = runDispatchBriefing(["probe", ...claude.argv.slice(1)], depsOf(claude.fx));
+  assert.deepEqual(codesOf(probed), codesOf(claudeProbed));
+  assert.equal(codesOf(probed).some((code) => /^(DBG-SELFCHECK|DBG-MODEL|NGHR)/u.test(code)), false);
+});

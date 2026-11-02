@@ -55,7 +55,7 @@ function normalizedPath(value) {
 function fail(code) { return { ok: false, code }; }
 
 /** Parse exactly one host-generated binding block from the dispatched prompt. */
-export function parseNativeGoldfishBriefing(prompt) {
+export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "codex"] } = {}) {
   if (typeof prompt !== "string" || prompt.length > 2 * 1024 * 1024) return fail("NGHR-BRIEFING-INPUT");
   const markers = ["<!-- pipeline-native-goldfish-host-commit:v1\n", "<!-- pipeline-native-goldfish-host-commit:v2\n", "<!-- pipeline-native-goldfish-host-commit:v3\n"];
   const found = markers.map((marker) => ({ marker, start: prompt.indexOf(marker) })).filter(({ start }) => start >= 0);
@@ -73,7 +73,7 @@ export function parseNativeGoldfishBriefing(prompt) {
   const codexNative = version === 2 || version === 3 && binding.runner === "codex";
   const validFields = [...(codexNative ? CODEX_BRIEFING_FIELDS : BRIEFING_FIELDS),...(version === 3 ? ["itemDelivery"] : [])];
   if (!exact(binding, validFields) || binding.schema !== (version === 3 ? NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA : version === 2 ? NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA : NATIVE_GOLDFISH_BRIEFING_SCHEMA)
-    || !["claude", "codex"].includes(binding.runner)
+    || !runners.includes(binding.runner)
     || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")
     || !OID.test(binding.candidateTree ?? "") || !Object.hasOwn(ROLE_TO_AGENT, binding.role)
     || (!codexNative && binding.agentType !== ROLE_TO_AGENT[binding.role])

@@ -1110,14 +1110,14 @@ export function generateDispatchBinding(options, deps = {}) {
 
   // Self-check: the host's own parser must accept exactly what is about to be handed out.
   if (skeleton.split(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2)).length !== 2) refuse("DBG-SELFCHECK-MARKER", "the skeleton must contain the binding opening marker exactly once");
-  // The host parser admits only claude and codex runners; an antigravity skeleton is read back with the runner field as claude (every other
-  // field is checked as for Claude) and compared to its own runner below.
-  const parsed = parseNativeGoldfishBriefing(runner === "antigravity" ? skeleton.replace('"runner":"antigravity"', '"runner":"claude"') : skeleton);
+  // The host parser admits only claude and codex runners by default (the Claude and Codex host paths rely on that); the generator opts in to
+  // antigravity so every field of an Antigravity skeleton is checked by the same parser as for Claude.
+  const parsed = parseNativeGoldfishBriefing(skeleton, { runners: RUNNERS });
   if (!parsed.ok) refuse("DBG-SELFCHECK-PARSE", `the host parser rejects the generated skeleton: ${parsed.code}`);
   const { criticDecision: _decision, ...parsedAll } = parsed.binding;
   // The host adds `agentType` and `adapterVersion` to a Codex-native binding it reads back; neither is in the block.
   const { agentType: _derived, adapterVersion: _adapter, ...parsedCodex } = parsedAll;
-  const parsedRest = runner === "codex" ? parsedCodex : runner === "antigravity" ? { ...parsedAll, runner } : parsedAll;
+  const parsedRest = runner === "codex" ? parsedCodex : parsedAll;
   const { criticDecision: _own, ...ownRest } = serialised;
   if (JSON.stringify(parsedRest) !== JSON.stringify(ownRest)) refuse("DBG-SELFCHECK-PARSE", "the host parser read back a different binding than was generated");
   const named = parseDispatchSlice(skeleton);
