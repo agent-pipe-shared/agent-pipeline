@@ -341,6 +341,39 @@ test("calibration-unavailable class 10 is preserved as report-only while other c
   assert.equal(result.fitness.reportOnly.length, 1);
 });
 
+// Candidate 17 (Toolbox, ARCHITECTURE-FITNESS-NOT-READY): the refusal names the blocking classes and answers with a repair action instead of
+// an unanswerable adoption-disposition prompt.
+test("a blocked planning fitness names the blocking classes and does not ask for an adoption disposition", () => {
+  const surfacePaths = ["package.json", "app/api/indexnow/route.ts"];
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/security-deps.md", paths: surfacePaths },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
+      checkPlanningAdoptionDisposition: readyDisposition,
+      evaluateArchitectureFitness: () => ({
+        overallStatus: "blocked",
+        summary: { passCount: 7, findingCount: 1, exceptedCount: 0, unavailableCount: 2, unsupportedCount: 0, unknownCount: 0, totalClasses: 10 },
+        outcomes: [
+          ...Array.from({ length: 6 }, (_, index) => ({ classId: index + 1, outcome: "pass" })),
+          { classId: 7, propertyId: "module-boundaries", outcome: "finding", violations: ["app/api/indexnow/route.ts imports outside its module"] },
+          { classId: 8, outcome: "pass" },
+          { classId: 9, outcome: "pass" },
+          { classId: 10, outcome: "unavailable", evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } },
+        ],
+      }),
+    },
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  assert.deepEqual(result.fitness.blockingOutcomes.map((outcome) => outcome.classId), [7], "the report-only class 10 is not listed");
+  assert.match(result.message, /class 7 \(module-boundaries\) finding: app\/api\/indexnow\/route\.ts imports outside its module/u);
+  assert.equal(result.nextAction.kind, "repair-required");
+  assert.equal(result.nextAction.code, "ARCHITECTURE-FITNESS-REPAIR");
+  assert.deepEqual(result.nextAction.planningSurfacePaths, surfacePaths);
+  assert.equal(result.nextAction.input, undefined, "no unanswerable collect-input");
+  assert.equal(result.nextAction.kind === "collect-input", false);
+});
+
 test("malformed or incomplete fitness outcomes fail closed", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,

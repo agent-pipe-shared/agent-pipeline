@@ -29,6 +29,26 @@ export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.
 export const ARCHITECTURE_ENTRY_SCOPE = "architecture/map/";
 
 /** The single definition of which planning-surface paths are architecture contracts (library and guard share it). */
+/** The outcomes that decide a blocked planning fitness: everything except the report-only ones, and only finding/unavailable/unknown/unsupported. */
+export function blockingFitnessOutcomes(outcomes, reportOnly = []) {
+  const skipped = new Set(Array.isArray(reportOnly) ? reportOnly : []);
+  return (Array.isArray(outcomes) ? outcomes : [])
+    .filter((outcome) => !skipped.has(outcome) && outcome?.outcome !== "pass" && outcome?.outcome !== "excepted")
+    .map((outcome) => ({
+      classId: outcome.classId,
+      propertyId: typeof outcome.propertyId === "string" ? outcome.propertyId : null,
+      outcome: outcome.outcome,
+      violations: (Array.isArray(outcome.violations) ? outcome.violations : []).slice(0, 5).map((violation) => {
+        const text = typeof violation === "string" ? violation : JSON.stringify(violation);
+        return text.length > 300 ? `${text.slice(0, 300)}...` : text;
+      }),
+    }));
+}
+export function describeBlockingOutcome(outcome) {
+  const first = outcome.violations[0];
+  return `class ${outcome.classId}${outcome.propertyId ? ` (${outcome.propertyId})` : ""} ${outcome.outcome}${first ? `: ${first}` : ""}`;
+}
+
 export function architectureTouchedContracts(paths) {
   return (Array.isArray(paths) ? paths : []).filter((candidate) => /^(architecture\/|docs\/adr\/|schemas\/)/u.test(candidate));
 }
@@ -459,13 +479,24 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     });
   }
   if (!(fitnessProjection.blockingOverallStatus === "pass" || fitnessProjection.blockingOverallStatus === "excepted")) {
-    return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {
+    // Candidate 17: name the blocking classes and their first violations in the result, and answer with a repair action. The default
+    // next action is an adoption-disposition prompt with no selectable values, which is not what blocks here.
+    const blockingOutcomes = blockingFitnessOutcomes(fitness.outcomes, fitnessProjection.reportOnly);
+    return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`
+      + (blockingOutcomes.length === 0 ? "" : `; blocking: ${blockingOutcomes.map(describeBlockingOutcome).join("; ")}`), artifacts, disposition, {
       overallStatus: fitness.overallStatus,
       blockingOverallStatus: fitnessProjection.blockingOverallStatus,
       reportOnly: fitnessProjection.reportOnly,
+      blockingOutcomes,
       outcomes: fitness.outcomes,
       summary: fitness.summary,
       planningSurface: surface,
+    }, {
+      kind: "repair-required",
+      code: "ARCHITECTURE-FITNESS-REPAIR",
+      blockingOutcomes,
+      planningSurfacePaths: surface.paths,
+      guidance: "Planning fitness runs over every path the PRD names (the planning surface listed here) and one or more of the ten fitness classes reports a finding or is unavailable. Fix the cause named in blockingOutcomes (the PRD path list, the fitness model, the baseline or the architecture map), then submit again. No adoption disposition is asked for here.",
     });
   }
 
