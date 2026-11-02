@@ -576,6 +576,13 @@ That matters because the harness classifier and the remote both refuse *after*
 the guard has already consumed the token — which cost two armings in the 0.5.3
 release.
 
+*Runner scope of this second gate:* the paragraphs below describe Claude Code's
+own classifier. Codex and Antigravity have their own approval prompts and
+sandboxes, which this document has not measured; on those runners a push that
+the Pipeline admitted can still stop at the runner's prompt. Treat that as the
+runner's gate, not as a Pipeline refusal, and ask the PO rather than editing
+runner settings.
+
 **Separately, and invisibly to the Pipeline**, Claude Code's own harness-level
 "auto mode classifier" may refuse the actual `git push`/`git restore`
 invocation regardless of Pipeline-side clearance — this is outside the

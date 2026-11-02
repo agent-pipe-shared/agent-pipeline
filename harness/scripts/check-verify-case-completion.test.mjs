@@ -155,6 +155,10 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // stack was already at 373 before slice 3, which adds 5, and the N43 follow-up text assertions add 4). Only these two numbers change.
   // Restated 2026-11-01 (candidate 15c, N38): critic-course-admission 334->337 (the delta candidate case adds 3 assertions). Only this number changes.
   // Restated 2026-11-01 (candidate 15c, N44): critic-course-admission 337->343 (the newest-delta-request case adds 6 assertions). Only this number changes.
+  // Restated 2026-11-02 (candidate 17, QG-04, own hunk): three sites counts were outgrown by their suites, measured on the applied candidate-17 chain with the
+  // unchanged classifier: critic-course-admission 343->349 and critic-dispatch-preflight 382->389 (both already outgrown on the base before the chain),
+  // guard-dispatch-budget-checkpoint 154->157 (the budget-grant refusal text cases of w67). Only these three numbers change; names, paths, classifications
+  // and the other counts stay as pinned, and no assertion is weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -176,8 +180,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",343],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",382],
+    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",389],
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",116],
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
@@ -210,7 +214,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
-    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",154],
+    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",157],
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
     ["guard-grep-max-count-read-tests","plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs","node-test-single",9],
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],

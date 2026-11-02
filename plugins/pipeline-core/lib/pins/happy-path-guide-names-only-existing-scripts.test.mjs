@@ -11,10 +11,10 @@ const SKILL = join(PLUGIN, "skills", "pipeline-start", "SKILL.md");
 
 test("the happy-path guide names only scripts that ship, and the start skill loads it", () => {
   const guide = readFileSync(GUIDE, "utf8");
-  const scripts = [...new Set([...guide.matchAll(/`([a-z0-9-]+\.mjs)\b/gu)].map((match) => match[1]))];
+  const scripts = [...new Set([...guide.matchAll(/\x60([a-z0-9-]+\.mjs)\b/gu)].map((match) => match[1]))];
   assert.ok(scripts.length >= 12, `the guide should name the lifecycle scripts, found ${scripts.length}`);
   for (const script of scripts) assert.ok(existsSync(join(PLUGIN, "scripts", script)), `${script} is named by the guide but does not ship in scripts/`);
-  assert.match(readFileSync(SKILL, "utf8"), /`references\/happy-path\.md` for the ordered command chain/u);
+  assert.match(readFileSync(SKILL, "utf8"), /\x60references\/happy-path\.md\x60 for the ordered command chain/u);
 });
 
 test("the guide keeps its honesty markers and holds no host path", () => {
