@@ -1,0 +1,91 @@
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index 0a018d7da..5ba2e081e 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -65,6 +65,13 @@
+       "codex": "the agent runs every preparation step; only the sign-off is the PO's",
+       "antigravity": "the agent runs every preparation step; only the sign-off is the PO's",
+       "owner": "docs/push-release-flow.md; skills/pipeline-start/references/push-approval.md"
++    },
++    {
++      "topic": "Observation boundary",
++      "claude": "tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary",
++      "codex": "tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured",
++      "antigravity": "tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured",
++      "owner": "hooks/guard-dispatch.mjs"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 3a6c7593d..9b0bf16ce 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -250,7 +250,7 @@ export function writeCapableCarrierAdmission({ subagentType, transport = "direct
+   if (transport === "codex" && type === "explorer") return null;
+   if (transport === "direct" && type === "Explore") return null;
+   if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
+-  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role, and dispatch its generated or required role briefing` };
++  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role, and dispatch its generated or required role briefing; the Antigravity prepare command is \`node <plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>\`` };
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 2243c5d96..42c2eafb2 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -243,6 +243,11 @@ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
+     tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+   }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", `"${builtIn}" is not a shipped Pipeline role`, "pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor"] });
+ }
++check("GD2i-prepare block a Plan dispatch and print the Antigravity prepare command in the repair", {
++  tool_use_id: "gd2i-prepare",
++  tool_name: "Agent",
++  tool_input: { subagent_type: "Plan", model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
++}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED", "antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>"] });
+ // QG-04 justification: a Workflow agent() Explore has transport `workflow`, and the carrier policy admits Explore only over a
+ // direct call (guard-dispatch.mjs writeCapableCarrierAdmission); the direct-call Explore stays ALLOW in GD2i above.
+ check("GD2j block a batch of two Explore dispatches through a Workflow script (carrier policy: direct transport only)", {
+@@ -1249,7 +1254,7 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
+   }
+ });
+ 
+-assert.equal(cases.length, 81, "the complete dispatch guard corpus must register before execution");
++assert.equal(cases.length, 82, "the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+index 9140fd431..87964486b 100644
+--- a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+@@ -35,6 +35,18 @@ test("the happy-path guide table is the projection of the JSON source, row for r
+   });
+ });
+ 
++test("AC-239: the observation-boundary row exists per runner and claims no containment", () => {
++  const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Observation boundary");
++  assert.ok(row, "the Observation boundary row exists");
++  for (const runner of ["claude", "codex", "antigravity"]) {
++    assert.ok(row[runner].length > 0, `${runner} has a sentence`);
++    assert.doesNotMatch(row[runner], /hermetic|sandbox|isolated/iu, `${runner} sentence claims no containment`);
++    assert.match(row[runner], /tool-level|not measured/u, `${runner} sentence states its level or that it is not measured`);
++  }
++  const guide = readFileSync(GUIDE, "utf8");
++  assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
++});
++
+ test("an owner that names a file in this plugin names one that ships", () => {
+   for (const row of readRunnerCapabilities().rows) {
+     for (const owner of row.owner.split(";").map((part) => part.trim())) {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 72da6f1c0..841713687 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -84,6 +84,7 @@ Owner: `docs/push-release-flow.md`.
+ | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
+ | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
+ | Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |
++| Observation boundary | tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured |
+ 
+ A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
+ (one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.

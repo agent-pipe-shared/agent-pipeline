@@ -1,0 +1,88 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 17b3d87ba..8082c0239 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -227,6 +227,7 @@
+         "verify-phase:harness/scripts/verify.mjs:agy-host-commit-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-host-commit-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-item-delivery-tests",
++        "verify-phase:harness/scripts/verify.mjs:agy-native-implementation-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
+@@ -308,6 +309,7 @@
+         "verify-phase:harness/scripts/verify.mjs:close-chain-guide-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
++        "verify-phase:harness/scripts/verify.mjs:close-quality-readback-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-advisor-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
+@@ -485,6 +487,7 @@
+         "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-live-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:goldfish-commit-command-flow-tests",
++        "verify-phase:harness/scripts/verify.mjs:goldfish-host-commit-recover-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-onboarding-tests",
+@@ -1068,6 +1071,7 @@
+         "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
+         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
++        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fsync-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-lost-binding-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a22e5f3ca..9d4506756 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4422,6 +4422,30 @@
+       "file": "plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs",
+       "invariantPinned": "observeCandidate reads a tracked-input inventory larger than the default process buffer without losing the candidate identity",
+       "nonOverlapNote": "Unique pin for the candidate-identity buffer defect of the security scan"
++    },
++    {
++      "name": "agy-native-implementation-admission-tests",
++      "file": "plugins/pipeline-core/lib/agy-native-implementation-admission.test.mjs",
++      "invariantPinned": "A native Antigravity implementation dispatch is admitted only for a session with a descriptor, a live owner and a stored v1 consent whose signed scope carries the native implementation grant for the role and model alias, every deny reason is typed and ordered, a model-family consent is refused, and nothing is written (A18-B1, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/agy-native-implementation-admission.mjs with injected dependencies; the hook keeps its own guard case for the unchanged denial code"
++    },
++    {
++      "name": "close-quality-readback-tests",
++      "file": "plugins/pipeline-core/lib/close-quality-readback.test.mjs",
++      "invariantPinned": "The close-time quality readback returns one closed, ordered row per quality artefact (security scan, ADR decision, architecture fitness, Critic report file, handover freshness) with a present, missing, not-applicable or unknown status and a remedy, an absent or throwing reader is unknown and never present, and the audit index lists the change's artefacts with their digests without writing anything (C18-10, AC-239)",
++      "nonOverlapNote": "Unique cases: lib/close-quality-readback.mjs; the close coordinator suite pins its drive and audit-index output"
++    },
++    {
++      "name": "session-authority-registry-fsync-tests",
++      "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",
++      "invariantPinned": "On win32 a directory fsync that fails with EPERM, EINVAL, EISDIR, EACCES or ENOTSUP counts as a succeeded registry write and reports durability unsupported with the error code, while the same codes on another platform and any other code on win32 still throw (C18-6, AC-127)",
++      "nonOverlapNote": "Unique cases: the directory-fsync handling of the session authority registry writer"
++    },
++    {
++      "name": "goldfish-host-commit-recover-tests",
++      "file": "plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs",
++      "invariantPinned": "The host-commit recover command plans read-only and applies one orchestrator commit of exactly the claimed paths only when the plan digest still matches, with the guard-conformant trailers and a pointer to the stop-failure record, and refuses typed with zero effect on a moved head, a staged path, a path outside the allowed paths, no source or a digest mismatch (C18-1b, AC-164)",
++      "nonOverlapNote": "Unique cases: scripts/goldfish-host-commit-recover.mjs and its guard admission; the finalizer suite pins the diagnostics it reads"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 403ae6167..3e5de1110 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -432,7 +432,11 @@ implementation-time approval prompts.
+ human agrees to use the Pipeline in a repository, that authorises its disclosed
+ local happy path through the first usable kickoff: plans/readbacks, portable
+ seed, any plan-disclosed local Git initialization, runtime initialization,
+-restart preparation and kickoff artifacts. The agent reports the bounded effect
++restart preparation and kickoff artifacts, and after the kickoff promotion the
++provisioning and activation of the mandatory git hooks (plus the runner's own
++host-boundary refresh step where it has one, at its declared boundary). The
++initial question itself states in a short list what agreeing installs and
++activates, so that this step needs no second question. The agent reports the bounded effect
+ once and then executes the digest-bound steps autonomously; it does not ask the
+ same human to approve every internal plan digest. A restart resumes this local
+ onboarding from its sanctioned state. This consent never covers remote/adoption
