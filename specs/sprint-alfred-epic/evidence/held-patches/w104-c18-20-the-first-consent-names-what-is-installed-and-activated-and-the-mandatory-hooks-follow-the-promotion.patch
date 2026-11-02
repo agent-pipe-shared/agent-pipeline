@@ -1,0 +1,165 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 403ae6167..3e5de1110 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -432,7 +432,11 @@ implementation-time approval prompts.
+ human agrees to use the Pipeline in a repository, that authorises its disclosed
+ local happy path through the first usable kickoff: plans/readbacks, portable
+ seed, any plan-disclosed local Git initialization, runtime initialization,
+-restart preparation and kickoff artifacts. The agent reports the bounded effect
++restart preparation and kickoff artifacts, and after the kickoff promotion the
++provisioning and activation of the mandatory git hooks (plus the runner's own
++host-boundary refresh step where it has one, at its declared boundary). The
++initial question itself states in a short list what agreeing installs and
++activates, so that this step needs no second question. The agent reports the bounded effect
+ once and then executes the digest-bound steps autonomously; it does not ask the
+ same human to approve every internal plan digest. A restart resumes this local
+ onboarding from its sanctioned state. This consent never covers remote/adoption
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+index 6dae64e74..5658dae4a 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+@@ -20,7 +20,7 @@ import { join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { main as onboardingCli } from "./project-onboarding-v3.mjs";
++import { main as onboardingCli, buildPostPromotionHookProvisioningAction } from "./project-onboarding-v3.mjs";
+ import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
+ import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
+ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+@@ -902,3 +902,29 @@ test("project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --langua
+     rmSync(dir, { recursive: true, force: true });
+   }
+ });
++
++// --- C18-20 (AC-145): the first consent discloses hook activation and the promotion hands over the hook provisioning ---
++
++test("C18-20 the post-promotion action is the existing hook provisioning command, covered by the initial consent", () => {
++  assert.equal(typeof buildPostPromotionHookProvisioningAction, "function");
++  const root = "/work/project";
++  const action = buildPostPromotionHookProvisioningAction({ rootDir: root });
++  assert.equal(action.kind, "command");
++  assert.equal(action.mutation, true);
++  assert.deepEqual(action.argv.slice(-3), ["--root", root, "--apply"]);
++  assert.match(action.argv[0], /clone-hook-readiness\.mjs$/u);
++  assert.equal(action.requiresConfirmation, false);
++  assert.equal(action.coveredByConsent, "initial-pipeline-use-consent");
++  assert.deepEqual(action.expected, { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" });
++});
++
++test("C18-20 the initial question and both consent paragraphs disclose hook provisioning and activation", () => {
++  const read = (path) => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), "utf8").replace(/\s+/gu, " ");
++  const skill = read("plugins/pipeline-core/skills/pipeline-start/SKILL.md");
++  const model = read("docs/operating-model.md");
++  const question = skill.slice(skill.indexOf("ask the human once whether this project should use the Pipeline"));
++  assert.match(question.slice(0, 900), /lists in short what agreeing installs and activates/iu);
++  assert.match(question.slice(0, 900), /git hooks/iu);
++  assert.match(skill.slice(skill.indexOf("One onboarding consent")).slice(0, 2500), /hook/iu);
++  assert.match(model.slice(model.indexOf("Pipeline-use consent is likewise one bounded bootstrap consent")).slice(0, 2500), /hook/iu);
++});
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+index e7ddef17d..60a72ba86 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+@@ -722,6 +722,26 @@ function buildPrePushHookOfferAction({ rootDir }) {
+ 
+ export { buildPrePushHookOfferAction };
+ 
++// C18-20: the kickoff promotion apply ends by handing back the EXISTING mandatory-hook
++// provisioning action (the one pipeline-start-preflight builds for status
++// `hook-provisioning-required`; same executable, argv, digest-bound apply and refusals).
++// The consent for it is the initial "should this project use the Pipeline?" answer, which
++// discloses hook provisioning, so `requiresConfirmation` is false and `coveredByConsent`
++// names that source -- no new question is asked. Read-only here: it builds, never runs it.
++function buildPostPromotionHookProvisioningAction({ rootDir }) {
++  return {
++    kind: "command",
++    executable: process.execPath,
++    argv: [fileURLToPath(new URL("./clone-hook-readiness.mjs", import.meta.url)), "--root", rootDir, "--apply"],
++    mutation: true,
++    requiresConfirmation: false,
++    coveredByConsent: "initial-pipeline-use-consent",
++    expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
++  };
++}
++
++export { buildPostPromotionHookProvisioningAction };
++
+ function runGitObservation(spawn, root, args) {
+   try {
+     const result = spawn("git", args, {
+@@ -1071,6 +1091,10 @@ export function main(args = process.argv.slice(2), {
+         rootDir: options.root, runner: options.runner, intent: options.intent, deps,
+       }).nextAction };
+     }
++    // C18-20: a promotion that applied hands over the hook provisioning as its typed next action.
++    if (output?.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) {
++      output = { ...output, postPromotionAction: buildPostPromotionHookProvisioningAction({ rootDir: options.root }) };
++    }
+   } catch (error) {
+     const code = typeof error?.code === "string" ? error.code : "ONBOARDING-ERROR";
+     const message = String(error?.message ?? "onboarding command failed").replace(/[\r\n]+/gu, " ");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index da7435e0a..96af6fd4d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -27,7 +27,8 @@ returned action at its declared boundary. Resolve role before preflight:
+ conflicting or unknown carriers stop — Critic is closed, never Elephant.
+ 
+ For `pipeline-governance-inactive`, ask the human once whether this project
+-should use the Pipeline. Only after an affirmative answer, execute the exact
++should use the Pipeline. That question lists in short what agreeing
++installs and activates, git hooks included. Only after an affirmative answer, execute the exact
+ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+ subsequent consent and mutations. A decline leaves the project inactive.
+ 
+@@ -56,8 +57,6 @@ recovery. Never reconstruct the argv or add a source path from conversation.
+ For a Claude or Antigravity `plugin-attestation-required` result with no
+ `nextAction`, stop and load `references/local-plugin-attestation.md`; recover
+ from a verified source checkout, never a guessed source path or gitless copy.
+-Rerun preflight after the documented recovery.
+-
+ Print only after a ready result:
+ 
+ `Agent Pipeline start: version {{MANIFEST_VERSION}} · plugin root {{ABSOLUTE_PLUGIN_ROOT}}`
+@@ -71,9 +70,9 @@ A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
+ ## Scratch space
+ 
+ Use only the repository's `scratch/` for temporary files in every lifecycle
+-phase, including intake. Do not use host temp or `.git/` as agent scratch; a
+-scratch refusal needs typed recovery. For cleanup-bound files, ignored evidence,
+-or any new durable directory, load `references/scratch-and-directory.md`.
++phase. Do not use host temp or `.git/` as agent scratch; a scratch refusal
++needs typed recovery. For cleanup-bound files, ignored evidence, or any new
++durable directory, load `references/scratch-and-directory.md`.
+ 
+ ## Normal bootstrap command sequence
+ 
+@@ -86,7 +85,8 @@ preparing it; never infer host approval from a saved consent or model label.
+ When the user has directly agreed to use Agent Pipeline for this repository,
+ consent authorizes the bounded local onboarding happy path: read-only plans
+ and readbacks, portable authority seed, any plan-disclosed local Git init,
+-runtime init, restart-barrier prep, and the first kickoff artifacts. State
++runtime init, restart-barrier prep, the first kickoff artifacts, and after the
++promotion mandatory-hook activation (plus the runner's own refresh step). State
+ the bounded effects once, then execute each returned digest-bound action and
+ readback without re-asking per digest. `requiresConfirmation` describes the
+ action's safety shape, not a second PO chat gate.
+@@ -160,7 +160,7 @@ recommendation.
+    same tool result. Never hand-reconstruct the command from memory of a
+    prior turn, even for an identical earlier restart action: re-read it.
+ 4. **Confirmation:** after all checks print exactly this line, five concrete
+-   fields, no placeholder (additions, role variants → typed references):
++   fields, no placeholder:
+ 
+    > Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
+ 
+@@ -216,7 +216,6 @@ recommendation.
+    failed or skipped read must be surfaced honestly, never silently skipped
+    or claimed as done when it was not; this is a MUST-DO consumption step, not
+    a new readiness precondition, so it never blocks or gates the session.
+-   Capture failure must be surfaced honestly, never claimed as persisted context.
+    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+    their shapes differ: `intent` is one string; the other three are **arrays** of
+    short strings, at most 4, 4 and 3 entries. Every entry is a distilled
