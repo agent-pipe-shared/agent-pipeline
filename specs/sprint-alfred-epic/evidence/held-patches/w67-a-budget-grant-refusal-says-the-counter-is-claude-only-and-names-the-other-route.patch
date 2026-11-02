@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+index 2886066c4..639991339 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+@@ -448,7 +448,11 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent
+   assert.equal(code(["41"]), "extra-out-of-range");
+   assert.equal(code(["abc"]), "extra-out-of-range");
+   assert.equal(code(["-3"]), "extra-out-of-range");
+-  assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "nope", "--reason", "why", "--root", root]).code, "agent-counter-missing");
++  const missing = grantDispatchBudget(["--extra", "5", "--agent-id", "nope", "--reason", "why", "--root", root]);
++  assert.equal(missing.code, "agent-counter-missing");
++  assert.match(missing.message, /Only a Claude dispatch has a per-agent counter/u, "the refusal says the grant route is Claude-shaped");
++  assert.match(missing.message, /On Codex and Antigravity nothing counts the budget/u);
++  assert.match(missing.message, /dispatch the remainder as a new task/u, "and names what to do instead of a grant");
+   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "../s1", "--reason", "why", "--root", root]).code, "agent-id-invalid");
+   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "s1", "--reason", "line\nbreak", "--root", root]).code, "grant-reason-invalid");
+   assert.equal(grantDispatchBudget(["--extra", "5", "--agent-id", "s1", "--reason", "x".repeat(501), "--root", root]).code, "grant-reason-invalid");
+diff --git a/plugins/pipeline-core/scripts/dispatch-budget-grant.mjs b/plugins/pipeline-core/scripts/dispatch-budget-grant.mjs
+index 087faafdd..4eecde135 100644
+--- a/plugins/pipeline-core/scripts/dispatch-budget-grant.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-budget-grant.mjs
+@@ -107,7 +107,7 @@ export function grantDispatchBudget(argv, dependencies = {}) {
+     if (commonDir === null) throw new Refusal("git-common-dir-unresolved", "no git common directory resolves from the working directory");
+     const budgetDir = join(commonDir, "agent-pipeline", "dispatch-budget");
+     const counterFile = join(budgetDir, `${args.agentId}.json`);
+-    if (!existsSync(counterFile)) throw new Refusal("agent-counter-missing", "no budget counter exists for that agent id; the agent never ran under the budget guard here");
++    if (!existsSync(counterFile)) throw new Refusal("agent-counter-missing", "no budget counter exists for that agent id; the agent never ran under the budget guard here. Only a Claude dispatch has a per-agent counter. On Codex and Antigravity nothing counts the budget (the briefing says so), so there is nothing to grant: let the child finish or stop with its interim report, commit the verified partial state, and dispatch the remainder as a new task. Check the agent id against the Agent call's result when the runner is Claude");
+     const counter = readJson(counterFile, "counter");
+     if (counter?.agentId !== args.agentId || !Number.isSafeInteger(counter.maxTurns) || !Number.isSafeInteger(counter.baseCalls) || !Number.isSafeInteger(counter.workingCap)) {
+       throw new Refusal("counter-unbound", "the agent's counter is not bound to this agent id");
