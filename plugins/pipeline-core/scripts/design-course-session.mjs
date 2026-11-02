@@ -11,6 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, constants, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, linkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeRootArgument } from "../lib/root-argument.mjs";
 
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const SOURCES = ["input", "prd", "spec", "design", "traceability"];
@@ -715,7 +716,7 @@ function parseCli(argv) {
       "--package": "packagePath", "--session-id": "sessionId", "--descriptor-sha256": "descriptorSha256" };
     const key = keyMap[flag]; const value = argv[index++];
     if (!key || value === undefined || Object.hasOwn(result, key)) fail("DESIGN-COURSE-CLI-USAGE");
-    result[key] = key === "queueRevision" ? Number(value) : value;
+    result[key] = key === "queueRevision" ? Number(value) : (key === "root" || key === "pluginRoot") ? normalizeRootArgument(value) : value;
   }
   return result;
 }

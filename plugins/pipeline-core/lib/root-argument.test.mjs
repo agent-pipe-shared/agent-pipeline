@@ -28,6 +28,7 @@ test("the strict root entries normalise the argument before comparing it", () =>
     ["scripts/dispatch-recovery.mjs", 'parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);'],
     ["scripts/continuity-owner-route.mjs", "const root = normalizeRootArgument(rawRoot);"],
     ["scripts/continuity-owner-route.mjs", "const orphanRoot = normalizeRootArgument(argv[2]);"],
+    ["scripts/design-course-session.mjs", '(key === "root" || key === "pluginRoot") ? normalizeRootArgument(value) : value;'],
   ]) {
     assert.ok(readFileSync(join(PLUGIN, file), "utf8").includes(needle), `${file} must contain ${needle}`);
   }
