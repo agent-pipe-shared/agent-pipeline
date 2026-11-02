@@ -19,6 +19,7 @@ import { lstatSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { normalizeRootArgument } from "../lib/root-argument.mjs";
 import {
   openDispatchRecovery,
   readDispatchRecovery,
@@ -187,6 +188,7 @@ function clear(options) {
 export async function runDispatchRecovery(argv) {
   const parsed = parseArgv(argv);
   if (!parsed.ok) return parsed;
+  parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);
   const rootRefusal = checkRoot(parsed.options["--root"]);
   if (rootRefusal !== null) return rootRefusal;
   const dispatchId = parsed.options["--dispatch-id"];

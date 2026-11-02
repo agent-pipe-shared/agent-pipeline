@@ -16,6 +16,7 @@ import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { isAbsolute, join, resolve } from 'node:path';
+import { normalizeRootArgument } from '../lib/root-argument.mjs';
 import { inspectSignedDescriptorCustodyRepository } from '../lib/worktree-lifecycle.mjs';
 import { createSourceOwnedContinuityOwnerRouteRequesterRuntime, inspectSourceOwnedContinuityOwnerRouteCourse } from '../lib/session-requester-bridge.mjs';
 import { bindOnboardingSessionCleanup, observeSessionCleanupState, releaseOnboardingSessionCleanup,
@@ -45,7 +46,8 @@ function parseRun(argv) {
     if (token.startsWith('-') && token !== '--root' && token !== '--lifecycle') refuse('COR-FOREIGN-FLAG', `${token} is not a flag of this command; the owner route accepts only --root and --lifecycle before "--": ${USAGE}`);
   }
   if (head.length !== 4 || head[0] !== '--root' || head[2] !== '--lifecycle' || tail.length < 1) refuse('COR-USAGE', USAGE);
-  const [, root, , lifecycleId] = head;
+  const [, rawRoot, , lifecycleId] = head;
+  const root = normalizeRootArgument(rawRoot);
   if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || process.cwd() !== root) refuse('COR-USAGE', `--root must be the absolute real path of the current directory: ${USAGE}`);
   return { root, lifecycleId, entry: tail[0], tail };
 }
@@ -116,8 +118,9 @@ async function run(argv) {
 }
 
 function releaseOrphan(argv) {
-  if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(argv[2]) || resolve(argv[2]) !== argv[2]) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
-  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: argv[2] }) };
+  const orphanRoot = normalizeRootArgument(argv[2]);
+  if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(orphanRoot) || resolve(orphanRoot) !== orphanRoot) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
+  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: orphanRoot }) };
 }
 
 const entry = process.argv[1] && resolve(process.argv[1]);
