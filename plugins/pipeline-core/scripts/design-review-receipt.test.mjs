@@ -189,6 +189,16 @@ test("an existing output is refused and left byte-identical", withRepo((repo) =>
   assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
 }));
 
+// C18 (AGY report): the refusal said only that the file is never overwritten; it now also names the way forward.
+test("DRC-OUT-EXISTS names a new --out path as the way forward and keeps the existing file", withRepo((repo) => {
+  writeFileSync(join(repo, RECEIPT1), "do not touch\n");
+  const result = createReceiptFromDisk(request(repo), { env: CLAUDE, now });
+  assert.equal(result.code, "DRC-OUT-EXISTS");
+  assert.match(result.message, /choose a new --out path/u);
+  assert.match(result.message, /never overwritten/u);
+  assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
+}));
+
 test("an output whose directory does not exist is refused, never created", withRepo((repo) => {
   const result = createReceiptFromDisk(request(repo, { outPath: "specs/feat-x/other/receipt.json" }), { env: CLAUDE, now });
   assert.equal(result.code, "DRC-OUT-PARENT-MISSING");

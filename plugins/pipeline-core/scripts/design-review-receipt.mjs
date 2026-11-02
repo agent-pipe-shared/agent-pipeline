@@ -115,7 +115,7 @@ function resolveOutput(repoReal, outPath) {
   const absolute = join(repoReal, ...outPath.split("/"));
   try {
     lstatSync(absolute);
-    return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${outPath}`);
+    return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${outPath}; choose a new --out path (for example the same name with a -2 suffix) and run the command again`);
   } catch (error) {
     if (error?.code !== "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory is not usable: ${outPath}`);
   }
@@ -253,7 +253,7 @@ export function createReceiptFromDisk(input, deps = {}) {
   try {
     writeFileSync(output.absolute, created.bytes, { flag: "wx" });
   } catch (error) {
-    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}`);
+    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}; choose a new --out path (for example the same name with a -2 suffix) and run the command again`);
     if (error?.code === "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory does not exist: ${request.outPath}`);
     return refuse("DRC-WRITE-FAILED", `the receipt could not be written: ${request.outPath}`);
   }

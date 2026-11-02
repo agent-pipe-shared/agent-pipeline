@@ -9968,7 +9968,7 @@ function writeDesignWorkflowApprovalRequest(dir, request) {
     if (existsSync(target)) {
       const stat = lstatSync(target);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
-        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT" };
+        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
       return { ok: true, path: `scratch/${name}`, replay: true };
     }
     let fd;
@@ -11869,7 +11869,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const result = createDesignApprovalRequest({ binding: binding.binding, candidate: designWorkflowGitCandidate(dir, deps) });
         if (!result.ok) { console.error(result.code); return 2; }
         const persisted = writeDesignWorkflowApprovalRequest(dir, result.request);
-        if (!persisted.ok) { console.error(persisted.code); return 2; }
+        if (!persisted.ok) { console.error(persisted.message ? `${persisted.code}: ${persisted.message}` : persisted.code); return 2; }
         approvalRequestPath = persisted.path;
         approvalReview = binding.binding;
       } else if (reviewPaths.length) { console.error("Error: mini-profile present-plan does not accept review receipts."); return 2; }
