@@ -1,0 +1,33 @@
+diff --git a/plugins/pipeline-core/lib/root-argument.test.mjs b/plugins/pipeline-core/lib/root-argument.test.mjs
+index 699101dc0..edd5f9e27 100644
+--- a/plugins/pipeline-core/lib/root-argument.test.mjs
++++ b/plugins/pipeline-core/lib/root-argument.test.mjs
+@@ -28,6 +28,7 @@ test("the strict root entries normalise the argument before comparing it", () =>
+     ["scripts/dispatch-recovery.mjs", 'parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);'],
+     ["scripts/continuity-owner-route.mjs", "const root = normalizeRootArgument(rawRoot);"],
+     ["scripts/continuity-owner-route.mjs", "const orphanRoot = normalizeRootArgument(argv[2]);"],
++    ["scripts/design-course-session.mjs", '(key === "root" || key === "pluginRoot") ? normalizeRootArgument(value) : value;'],
+   ]) {
+     assert.ok(readFileSync(join(PLUGIN, file), "utf8").includes(needle), `${file} must contain ${needle}`);
+   }
+diff --git a/plugins/pipeline-core/scripts/design-course-session.mjs b/plugins/pipeline-core/scripts/design-course-session.mjs
+index 606bb2eeb..093483d34 100644
+--- a/plugins/pipeline-core/scripts/design-course-session.mjs
++++ b/plugins/pipeline-core/scripts/design-course-session.mjs
+@@ -11,6 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
+ import { closeSync, constants, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, linkSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, relative, resolve, sep, join } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { normalizeRootArgument } from "../lib/root-argument.mjs";
+ 
+ const RUNNERS = new Set(["claude", "codex", "antigravity"]);
+ const SOURCES = ["input", "prd", "spec", "design", "traceability"];
+@@ -715,7 +716,7 @@ function parseCli(argv) {
+       "--package": "packagePath", "--session-id": "sessionId", "--descriptor-sha256": "descriptorSha256" };
+     const key = keyMap[flag]; const value = argv[index++];
+     if (!key || value === undefined || Object.hasOwn(result, key)) fail("DESIGN-COURSE-CLI-USAGE");
+-    result[key] = key === "queueRevision" ? Number(value) : value;
++    result[key] = key === "queueRevision" ? Number(value) : (key === "root" || key === "pluginRoot") ? normalizeRootArgument(value) : value;
+   }
+   return result;
+ }
