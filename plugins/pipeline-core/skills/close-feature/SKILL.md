@@ -31,7 +31,10 @@ ledger CLI:
 node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<feature-id>"
 ```
 
-(Windows: `"%USERPROFILE%\.claude\projects"`.) Append the printed row to the project's
+(Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
+only. On Codex or Antigravity it has no source: skip the step and say in the close report that the
+telemetry row is unavailable for this runner. Do not point the command at another runner's directory and
+do not invent a row. Append the printed row to the project's
 `telemetry/costs.md`. If that file does not exist yet, note that explicitly and SKIP this step --
 do not fail the close over a missing telemetry file. This is per-SESSION cost data only; it is NOT
 a feature-wide cost total (see "Explicitly out of scope" below).
