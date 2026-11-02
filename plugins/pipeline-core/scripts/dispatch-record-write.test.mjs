@@ -621,6 +621,60 @@ check("attested CLI: a second call for the same task is refused and the first re
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// 17 (PO 2026-11-01): the attested route for runners whose model nothing here can observe. A generated Codex briefing names the agent by
+// `nativeAgentType` and `role`; the record then carries a visible `declared-unobserved` label instead of being refused, and it never
+// satisfies a host-observed predicate.
+function codexBriefingBody(overrides = {}) {
+  const { agentType: _agentType, ...claudeShape } = JSON.parse(briefingBody().match(/v3\n(.*)\n-->/u)[1]);
+  const block = { ...claudeShape, runner: "codex", nativeAgentType: "worker", model: "gpt-5.5", effort: "high", ...overrides };
+  return `Read the obligations first.\n\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(block)}\n-->\n\n### 1. Goal\nDo it.\n`;
+}
+check("17 attested CLI: a generated Codex briefing is accepted and the record says its model is declared, not observed", () => {
+  const root = cliFixture({ briefing: codexBriefingBody() });
+  try {
+    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, runCli(root).target))));
+    assert.equal(persisted.runner, "codex");
+    assert.equal(persisted.agentType, "goldfish-implementor");
+    assert.equal(persisted.attestation.modelAssurance, "declared-unobserved");
+    assert.equal(persisted.attestation.assurance, "orchestrator-attested");
+    assert.match(persisted.log[0].note, /not an observation/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  const claude = cliFixture();
+  try {
+    const persisted = JSON.parse(readFileSync(join(claude, runCli(claude).target)));
+    assert.equal(Object.hasOwn(persisted.attestation, "modelAssurance"), false, "a Claude record keeps the four-key attestation");
+  } finally { rmSync(claude, { recursive: true, force: true }); }
+});
+
+check("17 attested CLI: the label is only for a runner other than claude, and no other value is accepted", () => {
+  const root = attestedRoot();
+  try {
+    const label = (modelAssurance) => ({ attestation: { ...attestedRecord().attestation, modelAssurance } });
+    refusedWith("record-attestation", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "claude", ...label("declared-unobserved") }) }, gitReaders()));
+    refusedWith("record-attestation", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex", ...label("host-observed") }) }, gitReaders()));
+    // without the label a Codex record is still refused by the model authority gate: the label is what makes the weaker assurance visible
+    refusedWith("record-model", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex" }) }, gitReaders()));
+    assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-ATT-1.json")), false);
+    // the label never admits an authored Codex record through the generic writers
+    refusedWith("record-attestation-route", () => writeDispatchRecordObject({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord({ runner: "codex", ...label("declared-unobserved") }) }, gitReaders()));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("17 attested CLI: a Codex briefing without a role to derive the agent from is refused and names the briefing to pass", () => {
+  const root = cliFixture({ briefing: codexBriefingBody({ role: "pipeline-core:not-a-goldfish" }) });
+  try {
+    assert.throws(() => runCli(root), (error) => error?.code === "attested-briefing" && /lacks agentType/u.test(error.message) && /dispatch-briefing\.mjs wrote/u.test(error.message));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("17 attested CLI: a file outside the briefed allowedPaths is refused with the repair recipe", () => {
+  const root = cliFixture({ briefing: codexBriefingBody({ allowedPaths: ["screenshots"] }) });
+  try {
+    assert.throws(() => runCli(root, gitReaders({ paths: ["screenshots/a.png"] })), (error) => error?.code === "attested-scope"
+      && /screenshots\/a\.png/u.test(error.message) && /exact files/u.test(error.message) && /dispatch-briefing\.mjs binding/u.test(error.message));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // N33 A+B+C (D212): the sanctioned addendum route. `--critic-addendum <request>` is the command the close gate's refusal names;
 // the request file IS the addendum object. The route refuses an addendum that no consumed, passed Critic receipt binds BEFORE it
 // publishes, because the publication is exclusive and a wrongly written addendum could never be replaced.
@@ -815,7 +869,7 @@ check("N35 --critic-addendum publishes an addendum for the last round of a resid
   } finally { rmSync(refused.root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 40, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 44, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

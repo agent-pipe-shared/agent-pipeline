@@ -388,6 +388,40 @@ for (const [name, overrides, extra, depOverrides, code, mention] of REFUSALS) {
   });
 }
 
+// 17 (PO 2026-11-01): every route reads allowedPaths as EXACT files, so a directory given as --path is resolved to the regular files it
+// holds today (visibly: DBG-DIRECTORY-EXPANDED), never kept as one useless entry and never widened into a prefix match.
+test("17 a --path that is an existing directory is resolved to its regular files and says so; a new file stays an exact entry", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const put = (rel, text = "x") => { mkdirSync(dirname(join(fx.root, rel)), { recursive: true }); writeFileSync(join(fx.root, rel), text); };
+  put("shots/a.png"); put("shots/sub/b.png"); put("shots/.git/config"); put("outside/secret.txt");
+  symlinkSync(join(fx.root, "outside", "secret.txt"), join(fx.root, "shots", "link.png"));
+  const result = runDispatchBriefing(argvOf(fx, {}, ["--path", "shots", "--path", "plugins/x/new-file.mjs"]), depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  assert.deepEqual(result.binding.allowedPaths, ["plugins/x/new-file.mjs", PATH_A, CHECK, "shots/a.png", "shots/sub/b.png"].sort());
+  assert.ok(!result.binding.allowedPaths.includes("shots"), "the directory itself is not an entry");
+  assert.ok(!result.binding.allowedPaths.some((path) => path.includes("link.png") || path.includes(".git")), "links and .git are never listed");
+  const note = result.warnings.find((warning) => warning.code === "DBG-DIRECTORY-EXPANDED");
+  assert.deepEqual(note?.files, ["shots/a.png", "shots/sub/b.png"]);
+  assert.match(note.message, /created there later is outside the scope/u);
+  assert.ok(result.binding.itemDelivery.checks[0].dependencies.includes("shots/a.png"), "every expanded file is a dependency of the check");
+});
+
+test("17 an empty directory and a directory that would exceed the host cap are refused with the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  mkdirSync(join(fx.root, "empty-dir"), { recursive: true });
+  const empty = runDispatchBriefing(argvOf(fx, {}, ["--path", "empty-dir"]), depsOf(fx));
+  assert.equal(empty.code, "DBG-PATH-EMPTY-DIRECTORY", empty.message);
+  assert.match(empty.message, /one --path each/u);
+  mkdirSync(join(fx.root, "many"), { recursive: true });
+  for (let index = 0; index < 70; index += 1) writeFileSync(join(fx.root, "many", `f${String(index).padStart(2, "0")}.txt`), "x");
+  const many = runDispatchBriefing(argvOf(fx, {}, ["--path", "many"]), depsOf(fx));
+  assert.equal(many.code, "DBG-SCOPE-TOO-MANY-PATHS", many.message);
+  assert.match(many.message, /at most 64/u);
+  assert.match(many.message, /many -> /u);
+});
+
 // K12: a transient registry lock must never degrade into a different ruleset identity.
 const heldLock = (over = {}) => ({ status: "held", owner: "live", pid: 4242, ageSeconds: 3, ...over });
 const unavailableObserver = () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } }, pluginRoot: "/fixture/plugin-root" });

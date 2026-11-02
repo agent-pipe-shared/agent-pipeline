@@ -32,7 +32,7 @@ export const HOST_CRITERION_ID_SOURCE = 'AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}
 const CRITERION_ID = new RegExp(`^${HOST_CRITERION_ID_SOURCE}$`, 'u');
 const CRITERION_ID_MAX_LENGTH = 64;
 const isCriterionId = (value) => typeof value === 'string' && value.length <= CRITERION_ID_MAX_LENGTH && CRITERION_ID.test(value);
-const ROLE_TO_AGENT = Object.freeze({
+export const ROLE_TO_AGENT = Object.freeze({
   "pipeline-core:goldfish-implementor": "goldfish-implementor",
   "pipeline-core:goldfish-mechanic": "goldfish-mechanic",
   "pipeline-core:goldfish-deep": "goldfish-deep",

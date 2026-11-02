@@ -157,7 +157,12 @@ The request is one closed JSON object: `schema` `pipeline.dispatch-attested-requ
 generated briefing, which must carry a required-review `criticDecision`), `handbackPath` (the hand-back text
 the Elephant received) and `commits` (full 40-hex shas in chain order). Both paths are repository-relative
 under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must lie inside the briefing's
-`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. Use the task id of
+`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. `allowedPaths` holds exact
+files: `dispatch-briefing.mjs binding` resolves a directory given as `--path` to the files it holds at that moment (and
+says so), so a file created there later needs a new briefing, not a looser match. For a runner other than `claude`
+(Codex; the generated Codex briefing names the agent by `role`) the record carries `attestation.modelAssurance:
+declared-unobserved`: its model and effort are the briefing's declaration, never an observation, and it does not satisfy
+any host-observed predicate. Use the task id of
 that record for every round (next section).
 
 ## Real commits after a consumed PASS (D199)

@@ -12,6 +12,8 @@ export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-o
 // host-observed authored commit. It is never a host-observation substitute (see dispatch-authorship-verify, follow-up slice).
 export const ORCHESTRATOR_ATTESTATION_SCHEMA = "pipeline.dispatch-orchestrator-attestation.v1";
 export const ORCHESTRATOR_ATTESTED_ASSURANCE = "orchestrator-attested";
+/** 17: the label of an orchestrator-attested record whose runner has no model authority here; the declared model is the briefing's, unobserved. */
+export const MODEL_ASSURANCE_DECLARED_UNOBSERVED = "declared-unobserved";
 const RESERVED_NON_AUTHORING_OUTCOMES = Object.freeze({ "read-only-completed": "read-only", "stopped-without-commit": "stopped-without-commit" });
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const NO_DELIVERY_OUTCOME = "completed-no-delivery";
@@ -203,7 +205,11 @@ function validateRecord(record, { legacy, v3 = false }) {
     } else if (Object.hasOwn(record, "observationIdentity")) fail("record-outcome-classification", "observationIdentity is reserved for completed-undelivered");
     if (kind === "orchestrator-attested") {
       if (!Object.hasOwn(record, "attestation")) fail("record-outcome-classification", "orchestrator-attested classification requires an attestation");
-      exactKeys(record.attestation, ["schema", "assurance", "briefingSha256", "handbackSha256"], "attestation");
+      // 17: `modelAssurance` is optional and exists only for a runner whose model nothing here can observe; it is a label, never a
+      // claim: a Claude record (whose model the agent frontmatter attests) must not carry it, and no other value is accepted.
+      const modelAssurance = Object.hasOwn(record.attestation ?? {}, "modelAssurance");
+      exactKeys(record.attestation, modelAssurance ? ["schema", "assurance", "briefingSha256", "handbackSha256", "modelAssurance"] : ["schema", "assurance", "briefingSha256", "handbackSha256"], "attestation");
+      if (modelAssurance && (record.attestation.modelAssurance !== MODEL_ASSURANCE_DECLARED_UNOBSERVED || record.runner === "claude" || typeof record.runner !== "string")) fail("record-attestation", `attestation modelAssurance is only ${MODEL_ASSURANCE_DECLARED_UNOBSERVED} and only for a runner other than claude`);
       if (record.attestation.schema !== ORCHESTRATOR_ATTESTATION_SCHEMA || record.attestation.assurance !== ORCHESTRATOR_ATTESTED_ASSURANCE) fail("record-attestation", "attestation schema or assurance is invalid");
       if (![record.attestation.briefingSha256, record.attestation.handbackSha256].every((value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value))) fail("record-attestation", "attestation digests must be lowercase SHA-256");
       if (!terminal) fail("record-outcome-classification", "orchestrator-attested record must be terminal");

@@ -7,7 +7,8 @@ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstat
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+import { ROLE_TO_AGENT } from "../lib/native-goldfish-host-return.mjs";
+import { MODEL_ASSURANCE_DECLARED_UNOBSERVED, DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
@@ -261,6 +262,8 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
       record, recordBytes: agyAuthoredRecordBytes(record) });
     if (!checked.ok) fail("record-host-observation", `Agy host observation is not independently readable: ${checked.code}`);
   } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted
+    && !(orchestratorAttested && record.attestation.modelAssurance === MODEL_ASSURANCE_DECLARED_UNOBSERVED
+      && modelCheck.classification === "runner-model-authority-required")
     && modelCheck.classification !== "model-matches"
     && !(record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
       && modelCheck.classification === "model-override-declared")) {
@@ -568,8 +571,12 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
   let block;
   try { block = JSON.parse(marker[1]); } catch { fail("attested-briefing", "the briefing block is not JSON"); }
   if (!block || typeof block !== "object" || Array.isArray(block)) fail("attested-briefing", "the briefing block is not an object");
+  // 17: a generated Codex briefing names the agent by `nativeAgentType: "worker"` plus `role` (the host derives the agent type from the
+  // role, lib/native-goldfish-host-return.mjs); every generated Codex briefing used to fail here with "lacks agentType".
+  if ((typeof block.agentType !== "string" || block.agentType === "") && block.runner === "codex" && block.nativeAgentType === "worker"
+    && typeof block.role === "string" && Object.hasOwn(ROLE_TO_AGENT, block.role)) block.agentType = ROLE_TO_AGENT[block.role];
   for (const key of ["dispatchId", "runner", "agentType", "model", "effort", "rulesetSha", "candidateCommit"]) {
-    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}`);
+    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}${key === "agentType" ? " (and no Codex role to derive it from); pass the briefing file that dispatch-briefing.mjs wrote for this dispatch: it holds the pipeline-native-goldfish-host-commit block with role, model, allowedPaths and a required-review criticDecision" : ""}`);
   }
   if (!Array.isArray(block.allowedPaths) || block.allowedPaths.length === 0 || !block.allowedPaths.every((entry) => typeof entry === "string" && entry !== "")) fail("attested-briefing", "the briefing block lacks allowedPaths");
   if (!block.criticDecision || block.criticDecision.schema !== CRITIC_REQUIRED_SCHEMA) fail("attested-briefing", "the briefing criticDecision is not a required-review decision");
@@ -592,17 +599,22 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
     for (const path of paths) changed.add(path);
   }
   const outside = [...changed].filter((path) => !inAllowedScope(path, block.allowedPaths));
-  if (outside.length !== 0) fail("attested-scope", `commit paths outside the briefed allowedPaths: ${outside.join(", ")}`);
+  if (outside.length !== 0) fail("attested-scope", `commit paths outside the briefed allowedPaths: ${outside.join(", ")}. allowedPaths holds exact files (a directory is resolved to the files it held when the briefing was generated, so a file created later is outside). repair: generate a new briefing whose --path list names every one of these files (node <plugin-root>/scripts/dispatch-briefing.mjs binding ... --path <file>), then pass that briefing in the attested request`);
   const report = { text, changedFiles: [...changed].sort() };
   const record = {
     schema: DISPATCH_RECORD_SCHEMA, runner: block.runner, taskId: block.dispatchId, agentType: block.agentType, model: block.model, effort: block.effort,
     rulesetSha: block.rulesetSha, dispatcher: "Elephant", candidateCommit: request.commits[request.commits.length - 1], resultSha256: reportSha256(text),
     outcome: "completed-orchestrator-attested", commits: [...request.commits],
-    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], report,
+    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: block.runner === "claude"
+      ? "tool-use count and worker model not observed"
+      : "tool-use count and worker model not observed; model and effort are the briefing's declaration, not an observation" }], report,
     criticRequired: block.criticDecision,
     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" },
+    // 17 (PO 2026-11-01): for a runner whose model nothing in this repository can observe (only Claude agent frontmatter attests a
+    // model), the record says so in its own attestation instead of being refused; it never claims a host observation.
     attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested",
-      briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex") },
+      briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex"),
+      ...(block.runner === "claude" ? {} : { modelAssurance: MODEL_ASSURANCE_DECLARED_UNOBSERVED }) },
   };
   const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
   // D212 (N33 D) early detection, AFTER the write and never instead of it: every attested record is Critic-required, so name the

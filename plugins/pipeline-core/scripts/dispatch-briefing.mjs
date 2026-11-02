@@ -198,6 +198,34 @@ function validRepoPath(value) {
     && value.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part !== ".git");
 }
 
+// The native host admits at most 64 exact paths in a binding (lib/native-goldfish-host-return.mjs parseNativeGoldfishBriefing).
+const MAX_ALLOWED_PATHS = 64;
+/**
+ * The regular files below `path` (repository-relative, posix) when it is an existing directory inside `root`, sorted; null when the path
+ * is not an existing directory (a file, or a file the dispatch will create). Links are never followed and never listed; `.git` is skipped;
+ * a name that would not be a valid exact path is skipped, so the result can always be bound.
+ */
+function listDirectoryFiles(root, path) {
+  const start = resolve(root, path);
+  const within = relative(root, start);
+  if (within.startsWith("..") || within === "") return null;
+  let info;
+  try { info = lstatSync(start); } catch { return null; }
+  if (info.isSymbolicLink() || !info.isDirectory()) return null;
+  const files = [];
+  const walk = (directory, prefix) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
+      const next = `${prefix}/${entry.name}`;
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) { if (files.length <= MAX_ALLOWED_PATHS) walk(resolve(directory, entry.name), next); continue; }
+      if (entry.isFile() && validRepoPath(next)) files.push(next);
+    }
+  };
+  walk(start, path.replace(/\/+$/u, ""));
+  return files.sort();
+}
+
 /** The Codex task route of a duty (read-only registry projection), or null when the registry yields none. */
 function defaultCodexRoute(taskRoute) {
   try {
@@ -649,10 +677,26 @@ export function generateDispatchBinding(options, deps = {}) {
   }
   if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
   if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
-  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...options.paths])].sort();
-
   let root;
   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+  // 17 (PO 2026-11-01): every route reads `allowedPaths` as EXACT files (this generator, the native host's `includes`, the attested
+  // writer), so a directory given as `--path` used to become one useless entry and every file under it was "outside the scope".
+  // A directory that exists is resolved here to the regular files it holds today. The expansion is a snapshot: the briefing says so
+  // (DBG-DIRECTORY-EXPANDED) and a file created later has to be added by a new binding, not by a looser match.
+  const expandedPaths = [];
+  const directoryExpansions = [];
+  for (const path of options.paths) {
+    const listed = listDirectoryFiles(root, path);
+    if (listed === null) { expandedPaths.push(path); continue; }
+    if (listed.length === 0) refuse("DBG-PATH-EMPTY-DIRECTORY", `path ${path} is a directory without regular files; name the files the dispatch will create, one --path each (a write scope is a list of exact files)`);
+    directoryExpansions.push({ path, files: listed });
+    expandedPaths.push(...listed);
+  }
+  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...expandedPaths])].sort();
+  if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
+  for (const entry of directoryExpansions) {
+    warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
+  }
 
   // D195: a command check is bound to the calibration file that registers it; the id must be registered at this commit.
   let commandCheckPath = null;
