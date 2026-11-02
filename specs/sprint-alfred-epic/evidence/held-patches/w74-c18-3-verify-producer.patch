@@ -1,0 +1,218 @@
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index aacbcf4a7..44c2c97f3 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -73,6 +73,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { porcelainPaths } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { loadResidualAcceptanceDepsForPacket } from "../lib/critic-verify-readiness.mjs";
+@@ -151,10 +152,22 @@ function git(root, args, timeout = 10_000) {
+   if (!isSuccessfulSpawn(result)) fail("VEP-GIT", `Git observation failed for ${args[0]}.`);
+   return String(result.stdout).trim();
+ }
+-/** Same "clean iff no porcelain output" reading this repository's own verify entry point uses. */
+-function candidateIdentity(root) {
+-  const porcelain = git(root, ["status", "--porcelain=v1"]);
+-  return { status: porcelain.length === 0 ? "clean" : "dirty", commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
++// The governed slice queue a dispatch guard creates (lib/pipeline-owned-files.mjs names the same shape).
++const SLICE_QUEUE_PATH = /^specs\/[A-Za-z0-9][A-Za-z0-9._-]*\/slice-queue\.json$/u;
++const repoRelative = (root, path) => relative(root, path).split(sep).join("/");
++/**
++ * "Clean iff no porcelain output", except for the files this run itself owns: the producer's own output
++ * target(s) (a failed or aborted attempt leaves them untracked, modified or deleted) and the dispatch
++ * guard's slice-queue.json. Every other path still makes the candidate dirty (C18-3, AC-140).
++ */
++function candidateIdentity(root, ownOutputs = []) {
++  const exempt = new Set(ownOutputs.map((path) => repoRelative(root, path)));
++  const porcelain = git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
++  const dirty = porcelain.split("\n").filter((line) => line.length > 0).some((line) => {
++    const paths = porcelainPaths(line);
++    return paths.length === 0 || !paths.every((path) => exempt.has(path) || SLICE_QUEUE_PATH.test(path));
++  });
++  return { status: dirty ? "dirty" : "clean", commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
+ }
+ 
+ function resolveCommit(root, ref) {
+@@ -194,6 +207,8 @@ function safeOutPath(root, outPath) {
+ 
+ function writeEvidence(root, target, evidence) {
+   safeOutPath(root, relative(root, target));
++  // A tracked previous output was kept during the run (see invalidatePriorOutputs); it is replaced only now.
++  rmSync(target, { force: true });
+   mkdirSync(dirname(target), { recursive: true });
+   safeOutPath(root, relative(root, target));
+   // Refuse a newly appeared leaf, including a symlink or hardlink, rather than
+@@ -325,7 +340,7 @@ async function produceVerifyEvidenceForCommit({ root, commit, prepareDependencie
+   }
+   const target = safeOutPath(root, outPath);
+   // Same rule as the checkout run: a replacement attempt never leaves the previous green consumable.
+-  rmSync(target, { force: true });
++  invalidatePriorOutputs(root, [target]);
+   const common = realpathSync(resolve(root, git(root, ["rev-parse", "--git-common-dir"])));
+   const container = join(common, "agent-pipeline", "verify", "commit-worktrees", `${sha.slice(0, 12)}-${randomBytes(6).toString("hex")}`);
+   const hooks = join(container, "no-hooks");
+@@ -351,6 +366,24 @@ async function produceVerifyEvidenceForCommit({ root, commit, prepareDependencie
+   return result;
+ }
+ 
++/**
++ * Invalidate the previous output before a replacement run. An output that is not tracked at HEAD is removed
++ * (a stale success is never consumable). An output that IS tracked is left in place -- removing it would
++ * make the run's own repository baseline fail on a missing tracked file and, if the run is stopped before
++ * it writes, leave a deleted tracked file behind -- and is put back from HEAD if an earlier aborted run
++ * deleted it; `writeEvidence` replaces it only on success. A tracked file is bound to an older commit, so
++ * it is never a fresh green for this candidate.
++ */
++function invalidatePriorOutputs(root, targets) {
++  for (const target of new Set(targets)) {
++    const rel = repoRelative(root, target);
++    let tracked = false;
++    try { git(root, ["cat-file", "-e", `HEAD:${rel}`]); tracked = true; } catch { /* not tracked at HEAD (or unborn) */ }
++    if (!tracked) { rmSync(target, { force: true }); continue; }
++    if (!existsSync(target)) git(root, ["checkout", "HEAD", "--", rel]);
++  }
++}
++
+ /**
+  * Run the project's configured verify command and, only on an honest pass,
+  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
+@@ -391,7 +424,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     try { configuration = readConsumerVerifyConfiguration(root); }
+     catch (error) { fail("VEP-CALIBRATION", error.message); }
+     if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+-    started = candidateIdentity(root);
++    started = candidateIdentity(root, [target, canonicalTarget]);
+     startedAt = new Date().toISOString();
+     if (started.status !== "clean") fail("VEP-EVENT-SOURCE", "Action event output requires a clean exact candidate before source execution.");
+     file = assertConsumerVerifyAdapter(root);
+@@ -399,7 +432,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+   }
+   // A release Verify-only rerun validates its prior public evidence before it
+   // is removed. Other modes retain the historic eager invalidation behavior.
+-  started ??= candidateIdentity(root);
++  started ??= candidateIdentity(root, [target, canonicalTarget]);
+   startedAt ??= new Date().toISOString();
+   if (configuration === undefined) {
+     try { configuration = readConsumerVerifyConfiguration(root); }
+@@ -412,14 +445,14 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     : null;
+   // Invalidate prior success before configuration, candidate checks or execution.
+   // An interrupted replacement attempt must never leave consumable stale green.
+-  for (const path of new Set([target, canonicalTarget])) rmSync(path, { force: true });
++  invalidatePriorOutputs(root, [target, canonicalTarget]);
+   if (configuration === undefined) {
+     try { configuration = readConsumerVerifyConfiguration(root); }
+     catch (error) { fail("VEP-CALIBRATION", error.message); }
+   }
+   const { fullCommand: command, project, projectIdentity } = configuration;
+   if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+-  started ??= candidateIdentity(root);
++  started ??= candidateIdentity(root, [target, canonicalTarget]);
+   startedAt ??= new Date().toISOString();
+   const rigorObservations = readRigorVerifyObservation(root);
+ 
+@@ -531,7 +564,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+   if (JSON.stringify(identityReadback) !== JSON.stringify(projectIdentity)) fail("VEP-DRIFT", "Project calibration identity changed during Verify.");
+   if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
+ 
+-  const finished = candidateIdentity(root);
++  const finished = candidateIdentity(root, [target, canonicalTarget]);
+   if (finished.status !== "clean" || finished.commit !== started.commit || finished.tree !== started.tree) {
+     fail("VEP-DRIFT", "The candidate commit or tree changed while the verify command ran -- no evidence was written.");
+   }
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 32b0e5d0b..40fc586f0 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -780,6 +780,87 @@ test("an interrupted new attempt clears stale canonical success", async () => {
+   });
+ });
+ 
++// C18-3 (AC-140): the producer must not poison its own run. The output path below is NOT ignored by the
++// fixture's .gitignore, so the producer's own file is visible to `git status` exactly as in a consumer.
++const commitAll = (root, message) => {
++  git(root, ["add", "."]);
++  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
++};
++
++test("C18-3 the untracked slice-queue.json a dispatch guard creates does not make a candidate run dirty", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    const queue = join(root, "specs", "feature-a", "slice-queue.json");
++    mkdirSync(join(root, "specs", "feature-a"), { recursive: true });
++    writeFileSync(queue, `${JSON.stringify({ schema: "pipeline.slice-queue.v1", slices: [] })}\n`);
++    assert.notEqual(git(root, ["status", "--porcelain"]), "", "precondition: the queue is visible to git status");
++    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: "out/verify.json" });
++    assert.equal(result.status, "passed");
++    assert.equal(result.evidence.exitCode, 0);
++  });
++});
++
++test("C18-3 any other uncommitted file next to the queue still makes the run dirty", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    mkdirSync(join(root, "specs", "feature-a"), { recursive: true });
++    writeFileSync(join(root, "specs", "feature-a", "slice-queue.json"), "{}\n");
++    writeFileSync(join(root, "specs", "feature-a", "notes.md"), "not pipeline-owned\n");
++    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: "out/verify.json" });
++    assert.equal(result.status, "dirty");
++  });
++});
++
++test("C18-3 two candidate runs in a row, and a run after a leftover untracked output, all end non-dirty", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    const out = "out/verify.json";
++    const first = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
++    assert.equal(first.status, "passed");
++    assert.equal(existsSync(join(root, out)), true);
++    const second = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
++    assert.equal(second.status, "passed", "the first run's own untracked output must not poison the second");
++    // A failed attempt's leftover (here: a recorded dirty rejection) is likewise the producer's own file.
++    writeFileSync(join(root, out), "{\"leftover\":true}\n");
++    const third = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
++    assert.equal(third.status, "passed");
++  });
++});
++
++test("C18-3 a tracked output file deleted by an aborted earlier run does not make the next run dirty", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    const out = "out/verify.json";
++    mkdirSync(join(root, "out"), { recursive: true });
++    writeFileSync(join(root, out), "{\"old\":true}\n");
++    commitAll(root, "tracked previous output");
++    rmSync(join(root, out));
++    assert.match(git(root, ["status", "--porcelain"]), /out\/verify\.json/u);
++    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", outPath: out });
++    assert.equal(result.status, "passed");
++  });
++});
++
++test("C18-3 a run terminated half-way leaves the tracked output file in place and the tree clean", async () => {
++  const markerDir = mkdtempSync(join(tmpdir(), "vep-marker-"));
++  const marker = join(markerDir, "started").replaceAll("\\", "/");
++  const command = `node -e "require('fs').writeFileSync('${marker}','x');setTimeout(()=>{},8000)"`;
++  await withFixture(command, async (root) => {
++    const out = "out/verify.json";
++    mkdirSync(join(root, "out"), { recursive: true });
++    writeFileSync(join(root, out), "{\"old\":true}\n");
++    commitAll(root, "tracked previous output");
++    const script = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
++    const child = spawn(process.execPath, [script, "--root", root, "--out", out, "--mode", "candidate"], { stdio: ["ignore", "pipe", "pipe"] });
++    const closed = new Promise((resolve) => child.once("close", resolve));
++    try {
++      const deadline = Date.now() + 40000;
++      while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
++      assert.equal(existsSync(marker), true, "the configured verify command must have started");
++      child.kill("SIGTERM");
++      await closed;
++    } finally { child.kill("SIGKILL"); rmSync(markerDir, { recursive: true, force: true }); }
++    assert.equal(existsSync(join(root, out)), true, "an aborted run must not leave the tracked output deleted");
++    assert.equal(git(root, ["status", "--porcelain"]), "");
++  });
++});
++
+ test("the producer registers the git common dir as a Windows boundary before registering the run record", () => {
+   const source = readFileSync(fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "utf8");
+   const boundary = source.indexOf("verifyWindowsRegisterCommon(gitCommonDir)");
