@@ -1,0 +1,250 @@
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index afe41ec2f..58f6838cc 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -116,6 +116,65 @@ export function describeCloseChain(phase, { root = "<root>", lifecycle = "<id>"
+   };
+ }
+ 
++export const CLOSE_ACTIONS_SCHEMA = "pipeline.close-coordinator.actions.v1";
++
++// The Continuity Result steps that stand between `checkpointed` and `feature-close-prepared`, exactly as the close-feature SKILL orders them
++// (section "Closing a feature with active Continuity", steps 3-5). `who` is read from that text: the reconcile signature is "PO only, in the PO's own
++// terminal ... never executed by the pipeline"; the rest are run by the agent. Only refusals the SKILL itself names are listed in mayRefuseWith.
++const CONTINUITY_RESULT_STEPS = Object.freeze([
++  {
++    id: "result-bootstrap-plan", who: "agent", mayRefuseWith: [],
++    command: "node <plugin-root>/scripts/pipeline-state.mjs continuity-result-bootstrap-plan (run in the project root; read-only)",
++    source: "close-feature SKILL, Continuity route step 3",
++  },
++  {
++    id: "result-bootstrap-apply", who: "agent", mayRefuseWith: ["SDC-AUTHORITY-UNAVAILABLE", "COR-BINDING-HELD"],
++    command: "the applyAction the plan returned (continuity-result-bootstrap-apply ... --activate); with a session-authority catalogue: node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- continuity-result-bootstrap-apply <flags from applyAction.argv>",
++    source: "close-feature SKILL, Continuity route step 3",
++  },
++  {
++    id: "reconcile-signature", who: "po-only", mayRefuseWith: [],
++    command: "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
++    source: "close-feature SKILL, Continuity route step 4",
++  },
++  {
++    id: "reconcile", who: "agent", mayRefuseWith: [],
++    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
++    source: "close-feature SKILL, Continuity route step 5",
++  },
++]);
++
++// Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
++// the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
++export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>" } = {}) {
++  const actions = [];
++  const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
++  if (phase === "active") {
++    push({ id: "checkpointed", who: "agent", command: stepFor("checkpointed", root, lifecycle).plan, source: "close-feature SKILL, Continuity route step 2" });
++  }
++  if (phase === "active" || phase === "checkpointed") for (const step of CONTINUITY_RESULT_STEPS) push({ ...step });
++  const chain = describeCloseChain(phase, { root, lifecycle });
++  for (const step of chain.remaining) {
++    if (step.phase === "checkpointed") continue;
++    const known = CLOSE_STEP_REQUIREMENTS[step.phase];
++    push({
++      id: step.phase,
++      who: known === undefined ? "unclassified" : known.humanGate ? "po-only" : "agent",
++      command: step.plan,
++      source: "close-chain-guide CLOSE_STEP_REQUIREMENTS",
++    });
++  }
++  const gate = actions.find((a) => a.who === "po-only");
++  return {
++    schema: CLOSE_ACTIONS_SCHEMA,
++    current: phase,
++    actions,
++    nextHumanGate: gate === undefined ? null : gate.id,
++    resumeCommand: `close-coordinator.mjs drive --root ${root} --lifecycle ${lifecycle} --actor <name>`,
++    note: "Stop cleanly at nextHumanGate; after the human step, call the resume command again: drive continues from the stored coordinator phase.",
++  };
++}
++
+ // What the next step still lacks, given the transition values supplied so far. Pure; the transition's own refusals stay authoritative.
+ export function missingCloseInputs(phase, values) {
+   const need = CLOSE_STEP_REQUIREMENTS[phase];
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.test.mjs b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+index a2cf260f2..f4637280d 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.test.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { COORDINATOR_PHASES, coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
+ import { PUBLICATION_EXECUTOR_RESULT_SCHEMA } from "../scripts/publication-executor.mjs";
+-import { CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
++import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
+ 
+ const COORDINATOR_SOURCE = readFileSync(fileURLToPath(new URL("../scripts/close-coordinator.mjs", import.meta.url)), "utf8");
+ 
+@@ -48,6 +48,28 @@ test("the chain from a phase lists the remaining transitions in coordinator orde
+   assert.equal(describeCloseChain("promoted").remaining.length, 0);
+ });
+ 
++test("AC-264: the action list names the Result bootstrap and the reconcile signature, each classified, and ends at the next human gate", () => {
++  const list = describeCloseActions("checkpointed", { root: "/r", lifecycle: "close-x" });
++  assert.equal(list.schema, CLOSE_ACTIONS_SCHEMA);
++  const ids = list.actions.map((a) => a.id);
++  const at = (id) => ids.indexOf(id);
++  assert.ok(at("result-bootstrap-plan") >= 0 && at("result-bootstrap-apply") > at("result-bootstrap-plan"));
++  assert.ok(at("reconcile-signature") > at("result-bootstrap-apply") && at("reconcile") > at("reconcile-signature"));
++  assert.ok(at("feature-close-prepared") > at("reconcile"), "the Result and reconcile steps stand before feature-close-prepared");
++  assert.equal(list.actions[at("reconcile-signature")].who, "po-only");
++  assert.equal(list.actions[at("result-bootstrap-apply")].who, "agent");
++  assert.ok(list.actions[at("result-bootstrap-apply")].mayRefuseWith.includes("SDC-AUTHORITY-UNAVAILABLE"));
++  assert.ok(list.actions.every((a) => ["agent", "po-only", "unclassified"].includes(a.who) && typeof a.command === "string" && a.command !== ""));
++  assert.ok(list.actions.every((a, i) => a.order === i + 1));
++  assert.equal(list.nextHumanGate, "reconcile-signature");
++  assert.match(list.resumeCommand, /close-coordinator\.mjs drive --root \/r --lifecycle close-x/u);
++  const later = describeCloseActions("candidate-frozen", { root: "/r", lifecycle: "close-x" });
++  assert.equal(later.actions.some((a) => a.id === "reconcile-signature"), false, "the Result steps are not listed once past checkpointed");
++  assert.equal(later.nextHumanGate, "publication-authorized");
++  assert.equal(later.actions.find((a) => a.id === "publication-authorized").who, "po-only");
++  assert.equal(describeCloseActions("promoted").nextHumanGate, null);
++});
++
+ test("the missing inputs of a step are named from the supplied values", () => {
+   assert.deepEqual(missingCloseInputs("checkpointed", {}), []);
+   assert.deepEqual(missingCloseInputs("feature-close-prepared", {}), ["architectureImpact"]);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 08708ecac..22466091f 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -36,7 +36,7 @@ import {
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+-import { describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
++import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+@@ -83,7 +83,7 @@ const CLI_HELP = [
+   "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
+   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
+   "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
+-  "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply]",
++  "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply | --dry-run]",
+   "       close-coordinator.mjs --help",
+   "",
+   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
+@@ -1154,7 +1154,7 @@ async function applyTransition(values, suppliedDigest) {
+ 
+ // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
+ // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
+-async function driveClose(values, { apply }) {
++async function driveClose(values, { apply, dryRun = false }) {
+   const root = physicalRoot(values.root);
+   if (!ID.test(values.lifecycle ?? "") || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "drive identity is invalid");
+   const common = gitCommonDir(root);
+@@ -1162,7 +1162,8 @@ async function driveClose(values, { apply }) {
+   const phase = stored.coordinator.phase;
+   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
+   const options = coordinatorNextPhases(phase);
+-  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain };
++  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle });
++  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions };
+   if (options.length === 0) return { ...base, status: "terminal" };
+   const target = values.phase ?? options[0];
+   const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
+@@ -1171,8 +1172,27 @@ async function driveClose(values, { apply }) {
+   }
+   const need = CLOSE_STEP_REQUIREMENTS[target];
+   const step = { phase: target, needs: need.flags, evidenceSchema: need.evidenceSchema, producer: need.producer };
++  if (dryRun) {
++    // Read-only feasibility of the NEXT step: no receipt, no apply. transitionPlan is the existing read-only plan; its typed refusal is reported, not hidden.
++    const feasibility = { step: target };
++    if (need.humanGate) Object.assign(feasibility, { state: "po-only", message: `${target} needs the human's authorization evidence` });
++    else if (target === "cleanup-complete" && values.evidence === undefined) Object.assign(feasibility, { state: "ready", message: "a real drive would write the cleanup receipt, then apply cleanup-complete" });
++    else {
++      const missing = missingCloseInputs(target, { ...values, phase: target });
++      if (missing.length > 0) Object.assign(feasibility, { state: "blocked", code: "CLOSE-INPUTS-MISSING", missing });
++      else {
++        try {
++          await transitionPlan({ ...values, phase: target }, { deriveCriticAddenda: true });
++          Object.assign(feasibility, { state: "ready" });
++        } catch (error) {
++          Object.assign(feasibility, { state: "blocked", code: error?.code ?? "CLOSE-FAILED", message: error instanceof Error ? error.message : "plan refused" });
++        }
++      }
++    }
++    return { ...base, status: "dry-run", step, feasibility, message: "dry run: nothing was written, locked or reserved; steps after the next one are not checked because they depend on it" };
++  }
+   if (need.humanGate) {
+-    return { ...base, status: "human-gate", step,
++    return { ...base, status: "human-gate", step, nextHumanGate: actions.nextHumanGate, resumeCommand: actions.resumeCommand,
+       message: `${target} is a human gate: the human's authorization evidence is required first, and this driver never applies it; use plan-transition with --authorized and then apply-transition` };
+   }
+   const transition = { ...values, phase: target };
+@@ -1226,8 +1246,9 @@ try {
+     const parsed = exactArgs(argv, new Set([
+       "root", "lifecycle", "actor", "phase", "evidence", "publication",
+       "continuity-close-request", "architecture-impact", "audit-request", "critic-verify-lifecycle",
+-    ]), new Set(["apply"]));
++    ]), new Set(["apply", "dry-run"]));
+     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor) fail("CLOSE-ARGS", "drive arguments invalid");
++    if (parsed.booleans["dry-run"] === true && parsed.booleans.apply === true) fail("CLOSE-ARGS", "drive --dry-run is read-only and cannot be combined with --apply");
+     if (parsed.values.phase !== undefined && !COORDINATOR_PHASES.includes(parsed.values.phase)) fail("CLOSE-ARGS", "drive --phase is not a coordinator phase");
+     emit(await driveClose({
+       root: parsed.values.root,
+@@ -1240,7 +1261,7 @@ try {
+       continuityCloseRequest: parsed.values["continuity-close-request"],
+       auditRequest: parsed.values["audit-request"],
+       criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
+-    }, { apply: parsed.booleans.apply === true }));
++    }, { apply: parsed.booleans.apply === true, dryRun: parsed.booleans["dry-run"] === true }));
+   } else if (command === "write-cleanup-receipt") {
+     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
+     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 3093279c8..179adced8 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -869,6 +869,43 @@ test("process: drive names the missing input, plans without writing, applies one
+   rmSync(f.root, { recursive: true, force: true });
+ });
+ 
++test("process: AC-264 drive lists every action with who, ends at the next human gate, and --dry-run reports feasibility without any write", () => {
++  const f = processFixture("drivedry", { stopAfterFreeze: true });
++  const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
++  const phaseNow = () => f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]).coordinator.phase;
++
++  const listed = drive([]);
++  assert.equal(listed.actions.schema, "pipeline.close-coordinator.actions.v1");
++  assert.equal(listed.actions.nextHumanGate, "publication-authorized");
++  assert.match(listed.actions.resumeCommand, /drive --root .* --lifecycle /u);
++
++  const dry = drive(["--dry-run"]);
++  assert.equal(dry.status, "dry-run");
++  assert.equal(dry.feasibility.state, "blocked");
++  assert.equal(dry.feasibility.code, "CLOSE-INPUTS-MISSING");
++  assert.deepEqual(dry.feasibility.missing, ["evidence"]);
++  assert.equal(dry.actions.nextHumanGate, "publication-authorized");
++
++  const refused = drive(["--dry-run", "--apply"], 2);
++  assert.equal(refused.code, "CLOSE-ARGS");
++
++  assert.equal(phaseNow(), "candidate-frozen", "a dry run changes nothing");
++  const verifyPath = join(f.evidenceDirectory, "dry-verify.json");
++  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
++  const readyStep = drive(["--dry-run", "--evidence", verifyPath]);
++  assert.equal(readyStep.feasibility.state, "ready");
++  assert.equal(phaseNow(), "candidate-frozen", "a ready dry run applies nothing");
++  assert.equal(drive(["--evidence", verifyPath, "--apply"]).phaseAfter, "final-verify-green");
++  const gate = drive(["--dry-run"]);
++  assert.equal(gate.feasibility.state, "po-only");
++  assert.equal(gate.feasibility.step, "publication-authorized");
++  const cleanup = drive(["--dry-run", "--phase", "cleanup-complete"]);
++  assert.equal(cleanup.feasibility.state, "ready");
++  assert.equal(existsSync(join(f.evidenceDirectory, "cleanup-receipt.json")), false, "a dry run writes no receipt");
++  assert.equal(phaseNow(), "final-verify-green");
++  rmSync(f.root, { recursive: true, force: true });
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
