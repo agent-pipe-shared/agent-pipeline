@@ -1,0 +1,31 @@
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index c37a1c56b..a33f169d4 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -1215,7 +1215,10 @@ async function driveClose(values, { apply, dryRun = false }) {
+   const qualityReadback = readQualityRows(root, stored.coordinator);
+   const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root), qualityReadback });
+   const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions, qualityReadback };
+-  if (options.length === 0) return { ...base, status: "terminal" };
++  if (options.length === 0) {
++    return { ...base, status: "terminal",
++      message: `lifecycle ${values.lifecycle} is already closed (phase ${phase}); there is nothing further to drive, and re-running drive changes nothing. Answer the human's next request as a new turn instead of repeating the close` };
++  }
+   const target = values.phase ?? options[0];
+   const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
+   if (!options.includes(target) && !renewal) {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 523bd14f9..6adb3a65c 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -665,6 +665,10 @@ test("process: local close is read-only planned, replay-safe, candidate-bound an
+     "inspect", "--root", fixture.root, "--lifecycle", fixture.lifecycle,
+   ]);
+   assert.equal(inspected.coordinator.phase, "promoted");
++  const terminalDrive = invoke(["drive", "--root", fixture.root, "--lifecycle", fixture.lifecycle, "--actor", "PO"]);
++  assert.equal(terminalDrive.status, "terminal");
++  assert.match(terminalDrive.message, /already closed \(phase promoted\)/u, "a closed lifecycle says so instead of returning a bare status");
++  assert.match(terminalDrive.message, /nothing further to drive/u);
+   assert.equal(git(fixture.root, ["status", "--porcelain=v1"]), "");
+   rmSync(fixture.root, { recursive: true, force: true });
+ });
