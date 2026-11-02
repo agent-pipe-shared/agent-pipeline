@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { COORDINATOR_PHASES, coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
 import { PUBLICATION_EXECUTOR_RESULT_SCHEMA } from "../scripts/publication-executor.mjs";
-import { CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
+import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
 
 const COORDINATOR_SOURCE = readFileSync(fileURLToPath(new URL("../scripts/close-coordinator.mjs", import.meta.url)), "utf8");
 
@@ -46,6 +46,28 @@ test("the chain from a phase lists the remaining transitions in coordinator orde
   assert.deepEqual(chain.forks.map((fork) => fork.after), ["final-verify-green", "cleanup-complete"]);
   assert.deepEqual(chain.forks[0].alternatives, ["publication-authorized", "cleanup-complete"]);
   assert.equal(describeCloseChain("promoted").remaining.length, 0);
+});
+
+test("AC-264: the action list names the Result bootstrap and the reconcile signature, each classified, and ends at the next human gate", () => {
+  const list = describeCloseActions("checkpointed", { root: "/r", lifecycle: "close-x" });
+  assert.equal(list.schema, CLOSE_ACTIONS_SCHEMA);
+  const ids = list.actions.map((a) => a.id);
+  const at = (id) => ids.indexOf(id);
+  assert.ok(at("result-bootstrap-plan") >= 0 && at("result-bootstrap-apply") > at("result-bootstrap-plan"));
+  assert.ok(at("reconcile-signature") > at("result-bootstrap-apply") && at("reconcile") > at("reconcile-signature"));
+  assert.ok(at("feature-close-prepared") > at("reconcile"), "the Result and reconcile steps stand before feature-close-prepared");
+  assert.equal(list.actions[at("reconcile-signature")].who, "po-only");
+  assert.equal(list.actions[at("result-bootstrap-apply")].who, "agent");
+  assert.ok(list.actions[at("result-bootstrap-apply")].mayRefuseWith.includes("SDC-AUTHORITY-UNAVAILABLE"));
+  assert.ok(list.actions.every((a) => ["agent", "po-only", "unclassified"].includes(a.who) && typeof a.command === "string" && a.command !== ""));
+  assert.ok(list.actions.every((a, i) => a.order === i + 1));
+  assert.equal(list.nextHumanGate, "reconcile-signature");
+  assert.match(list.resumeCommand, /close-coordinator\.mjs drive --root \/r --lifecycle close-x/u);
+  const later = describeCloseActions("candidate-frozen", { root: "/r", lifecycle: "close-x" });
+  assert.equal(later.actions.some((a) => a.id === "reconcile-signature"), false, "the Result steps are not listed once past checkpointed");
+  assert.equal(later.nextHumanGate, "publication-authorized");
+  assert.equal(later.actions.find((a) => a.id === "publication-authorized").who, "po-only");
+  assert.equal(describeCloseActions("promoted").nextHumanGate, null);
 });
 
 test("the missing inputs of a step are named from the supplied values", () => {

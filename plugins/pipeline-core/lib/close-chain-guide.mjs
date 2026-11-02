@@ -116,6 +116,65 @@ export function describeCloseChain(phase, { root = "<root>", lifecycle = "<id>" 
   };
 }
 
+export const CLOSE_ACTIONS_SCHEMA = "pipeline.close-coordinator.actions.v1";
+
+// The Continuity Result steps that stand between `checkpointed` and `feature-close-prepared`, exactly as the close-feature SKILL orders them
+// (section "Closing a feature with active Continuity", steps 3-5). `who` is read from that text: the reconcile signature is "PO only, in the PO's own
+// terminal ... never executed by the pipeline"; the rest are run by the agent. Only refusals the SKILL itself names are listed in mayRefuseWith.
+const CONTINUITY_RESULT_STEPS = Object.freeze([
+  {
+    id: "result-bootstrap-plan", who: "agent", mayRefuseWith: [],
+    command: "node <plugin-root>/scripts/pipeline-state.mjs continuity-result-bootstrap-plan (run in the project root; read-only)",
+    source: "close-feature SKILL, Continuity route step 3",
+  },
+  {
+    id: "result-bootstrap-apply", who: "agent", mayRefuseWith: ["SDC-AUTHORITY-UNAVAILABLE", "COR-BINDING-HELD"],
+    command: "the applyAction the plan returned (continuity-result-bootstrap-apply ... --activate); with a session-authority catalogue: node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- continuity-result-bootstrap-apply <flags from applyAction.argv>",
+    source: "close-feature SKILL, Continuity route step 3",
+  },
+  {
+    id: "reconcile-signature", who: "po-only", mayRefuseWith: [],
+    command: "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
+    source: "close-feature SKILL, Continuity route step 4",
+  },
+  {
+    id: "reconcile", who: "agent", mayRefuseWith: [],
+    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
+    source: "close-feature SKILL, Continuity route step 5",
+  },
+]);
+
+// Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
+// the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
+export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>" } = {}) {
+  const actions = [];
+  const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
+  if (phase === "active") {
+    push({ id: "checkpointed", who: "agent", command: stepFor("checkpointed", root, lifecycle).plan, source: "close-feature SKILL, Continuity route step 2" });
+  }
+  if (phase === "active" || phase === "checkpointed") for (const step of CONTINUITY_RESULT_STEPS) push({ ...step });
+  const chain = describeCloseChain(phase, { root, lifecycle });
+  for (const step of chain.remaining) {
+    if (step.phase === "checkpointed") continue;
+    const known = CLOSE_STEP_REQUIREMENTS[step.phase];
+    push({
+      id: step.phase,
+      who: known === undefined ? "unclassified" : known.humanGate ? "po-only" : "agent",
+      command: step.plan,
+      source: "close-chain-guide CLOSE_STEP_REQUIREMENTS",
+    });
+  }
+  const gate = actions.find((a) => a.who === "po-only");
+  return {
+    schema: CLOSE_ACTIONS_SCHEMA,
+    current: phase,
+    actions,
+    nextHumanGate: gate === undefined ? null : gate.id,
+    resumeCommand: `close-coordinator.mjs drive --root ${root} --lifecycle ${lifecycle} --actor <name>`,
+    note: "Stop cleanly at nextHumanGate; after the human step, call the resume command again: drive continues from the stored coordinator phase.",
+  };
+}
+
 // What the next step still lacks, given the transition values supplied so far. Pure; the transition's own refusals stay authoritative.
 export function missingCloseInputs(phase, values) {
   const need = CLOSE_STEP_REQUIREMENTS[phase];

@@ -869,6 +869,43 @@ test("process: drive names the missing input, plans without writing, applies one
   rmSync(f.root, { recursive: true, force: true });
 });
 
+test("process: AC-264 drive lists every action with who, ends at the next human gate, and --dry-run reports feasibility without any write", () => {
+  const f = processFixture("drivedry", { stopAfterFreeze: true });
+  const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
+  const phaseNow = () => f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]).coordinator.phase;
+
+  const listed = drive([]);
+  assert.equal(listed.actions.schema, "pipeline.close-coordinator.actions.v1");
+  assert.equal(listed.actions.nextHumanGate, "publication-authorized");
+  assert.match(listed.actions.resumeCommand, /drive --root .* --lifecycle /u);
+
+  const dry = drive(["--dry-run"]);
+  assert.equal(dry.status, "dry-run");
+  assert.equal(dry.feasibility.state, "blocked");
+  assert.equal(dry.feasibility.code, "CLOSE-INPUTS-MISSING");
+  assert.deepEqual(dry.feasibility.missing, ["evidence"]);
+  assert.equal(dry.actions.nextHumanGate, "publication-authorized");
+
+  const refused = drive(["--dry-run", "--apply"], 2);
+  assert.equal(refused.code, "CLOSE-ARGS");
+
+  assert.equal(phaseNow(), "candidate-frozen", "a dry run changes nothing");
+  const verifyPath = join(f.evidenceDirectory, "dry-verify.json");
+  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
+  const readyStep = drive(["--dry-run", "--evidence", verifyPath]);
+  assert.equal(readyStep.feasibility.state, "ready");
+  assert.equal(phaseNow(), "candidate-frozen", "a ready dry run applies nothing");
+  assert.equal(drive(["--evidence", verifyPath, "--apply"]).phaseAfter, "final-verify-green");
+  const gate = drive(["--dry-run"]);
+  assert.equal(gate.feasibility.state, "po-only");
+  assert.equal(gate.feasibility.step, "publication-authorized");
+  const cleanup = drive(["--dry-run", "--phase", "cleanup-complete"]);
+  assert.equal(cleanup.feasibility.state, "ready");
+  assert.equal(existsSync(join(f.evidenceDirectory, "cleanup-receipt.json")), false, "a dry run writes no receipt");
+  assert.equal(phaseNow(), "final-verify-green");
+  rmSync(f.root, { recursive: true, force: true });
+});
+
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
   const fixture = processFixture("delivery");
   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
