@@ -1,0 +1,308 @@
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 27d29afb1..558a05713 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -9,6 +9,8 @@ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
++import * as denials from "./grammar-denials.mjs";
++import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
+ 
+ const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
+ const fixtureBase = resolve("scratch");
+@@ -93,5 +95,48 @@ test("G23 missing local targets are distinct from unknown grammar and protected
+   }
+ });
+ 
+-if (cases.length !== 3) throw new Error("G23 read/help case count drift");
++// C18-8 (AC-239): refusal texts that cost a consumer run time name the working alternative, and every example printed is one the guard admits.
++test("C18-8 refusal texts carry one working example per refused shape, each admitted by the guard itself", () => {
++  mkdirSync(fixtureBase, { recursive: true });
++  const root = mkdtempSync(join(fixtureBase, "c18-8-"));
++  try {
++    mkdirSync(join(root, "docs"));
++    mkdirSync(join(root, "scratch"));
++    mkdirSync(join(root, "plugins", "pipeline-core", "lib"), { recursive: true });
++    writeFileSync(join(root, "docs", "a.md"), "safe\n");
++    writeFileSync(join(root, "plugins", "pipeline-core", "lib", "git-cmd.test.mjs"), "\n");
++    const ready = { requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }) };
++    const run = (tool_name, tool_input) => evaluateLifecycleReadyGuard({ tool_name, tool_input }, { projectDir: root, ...ready });
++    // (c) `cd <dir> && node --test ... | tail`: refused with the same code, and the text names the one-command-per-call alternative.
++    const refused = run("Bash", { command: "cd plugins/pipeline-core && node --test lib/git-cmd.test.mjs | tail -20" });
++    assert.equal(refused.exitCode, 2);
++    assert.match(refused.stderr, /GUARD-PARSE-UNSUPPORTED/u);
++    assert.match(refused.stderr, /cd <dir> && node --test/u);
++    assert.ok(denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE, "the alternative example is exported");
++    assert.ok(refused.stderr.includes(denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE), "the printed text carries the example");
++    assert.equal(run("Bash", { command: denials.GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE }).exitCode, 0, "the example is admitted by the guard");
++    // (d) GUARD-READ-TARGET for a glob read names an admitted way; the way named is admitted.
++    const glob = run("Glob", { pattern: "../*", path: root });
++    assert.equal(glob.exitCode, 2);
++    assert.match(glob.stderr, /GUARD-READ-TARGET:/u);
++    assert.match(glob.stderr, /exact file path/u);
++    assert.match(glob.stderr, /Read/u);
++    assert.equal(run("Read", { file_path: join(root, "docs", "a.md") }).exitCode, 0);
++    // (d) GUARD-POWERSHELL-GRAMMAR: one working example per refused shape; every example admitted.
++    const shapes = denials.POWERSHELL_GRAMMAR_EXAMPLES;
++    for (const key of ["literal", "newItem", "contentWrite", "read"]) {
++      assert.ok(typeof shapes[key] === "string", key);
++      assert.equal(run("PowerShell", { command: shapes[key] }).exitCode, 0, `${key}: ${shapes[key]}`);
++    }
++    for (const [command, key] of [["Get-Content a.md; Get-Content b.md", "literal"], ["New-Item -Path docs/x -ItemType Directory", "newItem"],
++      ["Set-Content -Path docs/x.txt -Value hi", "contentWrite"], ["Get-Content -Foo bar baz", "read"], ["Remove-Item docs/a.md", "literal"]]) {
++      const result = run("PowerShell", { command });
++      assert.equal(result.exitCode, 2, command);
++      assert.match(result.stderr, /GUARD-POWERSHELL-GRAMMAR/u, command);
++      assert.ok(result.stderr.includes(shapes[key]), `${command}: names the ${key} example`);
++    }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++if (cases.length !== 4) throw new Error("G23 read/help case count drift");
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index c45cf5dad..9b9bf4e9c 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -141,10 +141,29 @@ function grammarShapeLines() {
+   return ADMITTED_GRAMMAR_SHAPES.map((shape) => `- ${shape.spelling} (e.g. "${shape.example}").`);
+ }
+ 
++// C18-8 (AC-239): the shape `cd <dir> && node --test <file> | tail -N` cost a consumer run several retries because the refusal named no working
++// alternative. The alternative is a test run as its own tool call from the project root; this example is pinned by g23-read-help.test.mjs to be
++// admitted by the guard itself.
++export const GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE = "node --test plugins/pipeline-core/lib/git-cmd.test.mjs";
++
++// C18-8 (AC-239): one working example per PowerShell shape GUARD-POWERSHELL-GRAMMAR refuses; each is pinned by g23-read-help.test.mjs to be admitted.
++export const POWERSHELL_GRAMMAR_EXAMPLES = {
++  literal: "Get-Content docs/a.md",
++  newItem: "New-Item -Path scratch/work -ItemType Directory",
++  contentWrite: "Set-Content -LiteralPath scratch/note.txt -Value 'text'",
++  read: "Get-Content -LiteralPath docs/a.md",
++};
++
++// C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
++export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
++  + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "
++  + "A glob pattern (Glob, or a Grep glob over a directory of plugin files) is not admitted; list the plugin directory by exact path and read each file you need.";
++
+ // The lines every grammar denial prints. Kept in one table so all three grammar codes stay
+ // byte-identical apart from their typed reason.
+ export const GRAMMAR_DENIAL_REMEDY = [
+   "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
++  `A shape such as "cd <dir> && node --test <file> | tail -N" is not admitted (a directory change and a piped test run); run the test as its own tool call from the project root, the path relative to it, e.g. "${GRAMMAR_CD_TEST_ALTERNATIVE_EXAMPLE}".`,
+   "Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.",
+   "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
+   "The complete admitted grammar, with bounds and exact spellings:",
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index d6c8a58c0..0f606bff4 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -5,6 +5,7 @@ import { basename, win32 } from "node:path";
+ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
++import { POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
+ import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
+ import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
+ 
+@@ -68,12 +69,12 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+   if (sanctionedPowerShellNodeCall(command, root)) return verdict(0);
+   // PowerShell interpolation and composition must never be interpreted as a literal path.
+   if (/[\r\n;$`@|&<>]/u.test(command)) {
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
++    return verdict(2, powerShellGrammarDenial("use one literal command.", "literal"));
+   }
+   const parsed = parseGuardCommand(command, root, { platform: "win32" });
+   if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) {
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
++    return verdict(2, powerShellGrammarDenial("use one literal command.", "literal"));
+   }
+   const { executable, argv } = parsed.segments[0];
+   const name = basename(executable).toLowerCase();
+@@ -85,7 +86,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+       && powerShellScratchPath(target, root, dependencies, itemType === "directory")) {
+       return verdict(0);
+     }
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: New-Item is limited to physically contained scratch files and directories.\n");
++    return verdict(2, powerShellGrammarDenial("New-Item is limited to physically contained scratch files and directories.", "newItem"));
+   }
+   if (name === "set-content" || name === "add-content") {
+     const named = powerShellNamedArgs(argv, ["-path", "-literalpath", "-value", "-encoding"], ["-nonewline"]);
+@@ -95,7 +96,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+     if (named && !(named.values.has("-literalpath") && named.values.has("-path"))
+       && target && value !== undefined && (encoding === undefined || encoding.toLowerCase() === "utf8")
+       && powerShellScratchPath(target, root, dependencies)) return verdict(0);
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files.\n");
++    return verdict(2, powerShellGrammarDenial("content writes are limited to physically contained scratch files.", "contentWrite"));
+   }
+   if (["get-content", "get-childitem", "get-item", "test-path"].includes(name)) {
+     const namesOnly = name === "get-childitem"
+@@ -105,16 +106,24 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+     if (readArgv.length === 0 && name === "get-childitem") target = ".";
+     else if (readArgv.length === 1) target = readArgv[0];
+     else if (readArgv.length === 2 && ["-literalpath", "-path"].includes(readArgv[0].toLowerCase())) target = readArgv[1];
+-    else return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: unsupported read arguments.\n");
++    else return verdict(2, powerShellGrammarDenial("unsupported read arguments.", "read"));
+     return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
+       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
+       ? verdict(0)
+-      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
++      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`);
+   }
+   if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
+   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
+   if (["git", "git.exe"].includes(executable.toLowerCase())
+     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
+     && invalidSessionObservation(root, dependencies)) return verdict(0);
+-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
++  return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
++}
++
++// C18-8 (AC-239): every GUARD-POWERSHELL-GRAMMAR refusal ends with one working example for the shape it refused (examples pinned as admitted
++// by g23-read-help.test.mjs); the code and its first sentence are unchanged.
++function powerShellGrammarDenial(sentence, shape) {
++  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
++    + `Working example: ${POWERSHELL_GRAMMAR_EXAMPLES[shape]}\n`;
+ }
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 97820b8a4..c7a64e2c2 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -4,7 +4,7 @@
+ import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+-import { nativeReadCredentialTargetDenialText } from "./grammar-denials.mjs";
++import { nativeReadCredentialTargetDenialText, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
+ import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
+ import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
+@@ -738,7 +738,8 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the
+   // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
+   if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
+-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
++  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++    + `${READ_TARGET_EXACT_FILE_ADVICE}\n`);
+ }
+ 
+ // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index f970c1fb1..919885d95 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -8,7 +8,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ export function runCriticDiagnosticCli(argv) {
+   const split = argv.indexOf("--");
+-  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
++  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log specs/<feature>/evidence/NAME.log --out specs/<feature>/evidence/NAME.json [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS (registration, FPR-DIAG-PATH, checks specs/<feature>/evidence/, not a bare evidence/)");
+   const options = { guardrailPaths: [], pending: [], command: argv.slice(split + 1) };
+   let out;
+   for (let i = 0; i < split; i += 2) {
+@@ -32,8 +32,9 @@ export function runCriticDiagnosticCli(argv) {
+   return { schema: "pipeline.critic-diagnostic-production.v1", path: out, fullVerify: evidence.fullVerify.status, targeted: evidence.targeted.status, releaseQualified: false };
+ }
+ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
+-  "critic-diagnostic-evidence.mjs --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS",
++  "critic-diagnostic-evidence.mjs --root ROOT --spec PATH --log specs/<feature>/evidence/NAME.log --out specs/<feature>/evidence/NAME.json [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS",
+   "",
++  "Paths: registration (FPR-DIAG-PATH) checks that the artifact lives under specs/<feature>/evidence/ for the active feature; a bare evidence/ path is produced but then refused at registration.",
+   "Evidence route (run in this order):",
+   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs (this script).",
+   "  2. Register it WITHOUT committing first (registration reads the working tree): register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index e6b451007..3a2edc2c1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -673,7 +673,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
+   }
+   if (Object.keys(selectors).length !== 0) {
+     if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
+-    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", "An exact registration commit is required.");
++    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", selectors["--registration-commit"] === undefined
++      ? "An exact registration commit is required: --registration-commit <full 40-hex commit id>."
++      : "--registration-commit takes an exact commit id, not a short or symbolic one: pass the full 40-hex commit id (git rev-parse <ref> prints it).");
+     const match = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
+     if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec.");
+     const acceptedPath = selectors["--accepted-contract"] === undefined ? null : normalizePath(selectors["--accepted-contract"], "accepted contract");
+@@ -712,6 +714,9 @@ if (isDirectInvocation(import.meta.url)) {
+       schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+       status: "rejected",
+       code,
++      // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
++      // a reason a refusal already carries in its details is kept as it is.
++      ...(code === "CDP-ARGUMENT" && error instanceof CriticDispatchPreflightError ? { reason: error.message } : {}),
+       ...(!sweep && details !== null ? details : {}),
+     })}\n`);
+     process.exitCode = 1;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 19f9d6872..1a9c11058 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -20,7 +20,7 @@ import { syncBuiltinESMExports } from "node:module";
+ import { fileURLToPath } from "node:url";
+ import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+-import { runCriticDiagnosticCli } from "./critic-diagnostic-evidence.mjs";
++import { runCriticDiagnosticCli, CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "./critic-diagnostic-evidence.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+@@ -703,8 +703,14 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+     [{ candidate: "absent-candidate" }, "CDP-GIT"],
+   ]) assert.deepEqual(directCli(fx, producerArgv(input(fx, patch))), { status: 1, stdout: "",
+     stderr: JSON.stringify({ schema: "pipeline.critic-dispatch-preflight.v1", status: "rejected", code }) + "\n" });
+-  assert.deepEqual(directCli(fx, ["--unknown"]), { status: 1, stdout: "",
+-    stderr: '{"schema":"pipeline.critic-dispatch-preflight.v1","status":"rejected","code":"CDP-ARGUMENT"}\n' });
++  // C18-8 (AC-239) restatement, criterion kept (exit 1, empty stdout, same schema/status/code on stderr): the refusal used to be a bare code; it now also
++  // carries the human `reason` on the same stderr line, so the assertion compares the body without `reason` and requires the reason separately.
++  const unknownFlag = directCli(fx, ["--unknown"]);
++  assert.equal(unknownFlag.status, 1);
++  assert.equal(unknownFlag.stdout, "");
++  const { reason: unknownReason, ...unknownBody } = JSON.parse(unknownFlag.stderr);
++  assert.deepEqual(unknownBody, { schema: "pipeline.critic-dispatch-preflight.v1", status: "rejected", code: "CDP-ARGUMENT" });
++  assert.match(unknownReason, /Unknown argument: --unknown/u);
+   assert.equal(git(fx.root, ["status", "--porcelain", "--untracked-files=all"]), before);
+   assert.equal(fs.existsSync(join(fx.root, "telemetry")), false);
+ });
+@@ -731,6 +737,35 @@ test("shared argument parser preserves defaults scalar overwrites arrays and exa
+     (error) => error.code === "CDP-ARGUMENT" && /there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>/u.test(error.message));
+ });
+ 
++// C18-8 (AC-239): a refusal of a consumer run names the flag, the checked path and one working example.
++test("C18-8 a CDP-ARGUMENT refusal prints its reason on stderr and a short commit id is refused with the flag and the full-id repair", () => {
++  const fx = fixture();
++  const short = directCli(fx, ["--registration-commit", "abc1234"]);
++  assert.equal(short.status, 1);
++  assert.equal(short.stdout, "");
++  const body = JSON.parse(short.stderr);
++  assert.equal(body.code, "CDP-ARGUMENT");
++  assert.match(body.reason, /--registration-commit/u);
++  assert.match(body.reason, /full 40-hex commit id/u);
++  assert.throws(() => parseCriticDispatchPreflightArgs(["--registration-commit", "abc1234"]),
++    (error) => error.code === "CDP-ARGUMENT" && /--registration-commit/u.test(error.message) && /pass the full 40-hex commit id/u.test(error.message));
++  const duplicate = JSON.parse(directCli(fx, ["--task-id", "A", "--task-id", "B"]).stderr);
++  assert.equal(duplicate.code, "CDP-ARGUMENT");
++  assert.match(duplicate.reason, /Duplicate --task-id/u);
++});
++
++test("C18-8 the diagnostic-evidence help names the checked registration path specs/<feature>/evidence/", () => {
++  const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
++  assert.match(text, /--log specs\/<feature>\/evidence\//u);
++  assert.match(text, /--out specs\/<feature>\/evidence\//u);
++  assert.doesNotMatch(text, /--(?:log|out) evidence\//u);
++  assert.match(text, /FPR-DIAG-PATH/u);
++  let usage = "";
++  try { runCriticDiagnosticCli(["--root", "."]); } catch (error) { usage = String(error.message); }
++  assert.match(usage, /--log specs\/<feature>\/evidence\//u);
++  assert.doesNotMatch(usage, /--(?:log|out) evidence\//u);
++});
++
+ test("request destructuring retains original getter order and exceptions before body entry", () => {
+   const fields = ["root", "base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath"];
+   const order = [], request = {};
