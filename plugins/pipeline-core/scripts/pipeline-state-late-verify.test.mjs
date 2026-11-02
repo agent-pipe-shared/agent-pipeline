@@ -89,7 +89,7 @@ test("baseline-only implementation exposes and completes the typed late verify r
   assert.deepEqual(action.gates, action.applyAction.gates);
   const gateText = action.applyAction.gates.join("\n");
   assert.match(gateText, /Pipeline asks for confirmation/u);
-  assert.match(gateText, /runner'?s? permission layer may refuse/u);
+  assert.match(gateText, /permission layer may refuse/u); // no apostrophe in the pattern: the case-completion classifier's masker would read it as a string start and hide the second test
   assert.match(gateText, /ask the PO to allow that exact command once/u);
   assert.match(gateText, /do not retry the same call in a loop/u);
   assert.match(gateText, /do not edit calibration directly/u);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // AC-127 (C18-6): a directory fsync that Windows refuses must not abort the registry write path.
 import test from 'node:test';
 import assert from 'node:assert/strict';
