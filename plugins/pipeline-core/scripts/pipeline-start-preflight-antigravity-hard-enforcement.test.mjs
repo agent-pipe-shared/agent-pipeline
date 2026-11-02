@@ -498,7 +498,10 @@ test("Codex preflight output keys and status are unchanged by this addition (byt
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation", "installedSource",
-    "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
+    // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the Codex surface is not changed by the Antigravity addition):
+    // the preflight gained the runner-capabilities pointer for every runner (pipeline-start-preflight.test.mjs pins it at its own key list), so
+    // `runnerCapabilities` is part of the Codex surface too; no other key is added.
+    "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "runnerCapabilities", "schema", "status", "statusScope",
     "version",
   ]);
   assert.equal(result.status, "ready");

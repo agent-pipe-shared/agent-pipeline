@@ -99,7 +99,10 @@ const archivedDir = (root) => join(discoverRepository(root).commonDir, "agent-pi
 const archivedPath = (root, d) => join(archivedDir(root), `${d.sessionId}.${d.sha}.json`);
 const auditPath = (root) => join(discoverRepository(root).commonDir, "agent-pipeline", "session-descriptors", "orphan-archive-audit.jsonl");
 
-const OWN_ENV = { CLAUDE_CODE_SESSION_ID: OWN_UUID };
+// Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the running session's own descriptor is never offered): since b9fb54aad the
+// requester's descriptor is derived for the runner that is invoking, and the Claude runner is recognised by its ambient marker CLAUDECODE=1 (without it the
+// process reads as Codex, so a bare CLAUDE_CODE_SESSION_ID names no own descriptor). The injected env therefore carries the marker too.
+const OWN_ENV = { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: OWN_UUID };
 
 test("AC-203 own session (a): plan-human-recovery and plan-recovery never offer the running session's own descriptor; a foreign one stays offered", () => withFixture((root) => {
   const own = hookDescriptor(root, OWN_ID);
@@ -172,9 +175,9 @@ test("AC-203 own session: the library entry points honour requesterSessionId at 
 }));
 
 const NOT_OWN_ENVS = [
-  ["a different session id", { CLAUDE_CODE_SESSION_ID: FOREIGN_UUID }],
-  ["no CLAUDE_CODE_SESSION_ID", {}],
-  ["a session id too short to name a hook descriptor", { CLAUDE_CODE_SESSION_ID: "short" }],
+  ["a different session id", { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: FOREIGN_UUID }],
+  ["no CLAUDE_CODE_SESSION_ID", { CLAUDECODE: "1" }],
+  ["a session id too short to name a hook descriptor", { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "short" }],
 ];
 
 for (const [label, env] of NOT_OWN_ENVS) {

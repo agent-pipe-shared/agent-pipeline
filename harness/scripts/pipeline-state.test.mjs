@@ -3337,7 +3337,8 @@ function runFeaturePackageReadTests() {
   const planned = captureBoth(() => run(["feature-package-plan", "--root", fixture.dir, "--manifest", fixture.manifestRel, "--next-state", "awaiting-approval"]));
   const expected = planFeaturePackageTransition(fixture.dir, fixture.manifestRel, "awaiting-approval");
   ok("PS54p plan returns the planner's exact transition preview", planned.value === 0
-    && planned.out === JSON.stringify(expected, null, 2)
+    // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk): a printed preview now also carries `planSha256`, the canonical digest of the plan.
+    && planned.out === JSON.stringify({ ...expected, planSha256: sha256CanonicalJson(expected) }, null, 2)
     && JSON.parse(planned.out).status === "preview"
     && JSON.parse(planned.out).changes[0].operation === "submit", planned.out || planned.err);
 
@@ -3516,7 +3517,11 @@ function seedFullFeaturePackage(prefix, { id = "wr-pkg", state = "draft" } = {})
 function planDigest(dir, extraArgs) {
   const res = captureBoth(() => run(["feature-package-plan", "--root", dir, ...extraArgs]));
   const plan = JSON.parse(res.out || "{}");
-  return { plan, digest: sha256CanonicalJson(plan), raw: res };
+  // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the digest passed to apply is the digest of the preview the planner returned):
+  // a `preview` printed by feature-package-plan carries its own `planSha256` (the canonical digest of the plan WITHOUT that field), and apply recomputes
+  // exactly that value. Hashing the parsed output including the field gave a different digest, so every apply of a printed preview was refused.
+  const { planSha256: printedDigest, ...bare } = plan;
+  return { plan, digest: printedDigest ?? sha256CanonicalJson(bare), raw: res };
 }
 function applyCmd(dir, extraArgs, deps) {
   return captureBoth(() => run(["feature-package-apply", "--root", dir, ...extraArgs], deps));
