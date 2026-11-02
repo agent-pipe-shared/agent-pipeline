@@ -1,0 +1,97 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 958cfc272..5ccf8da1d 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -18,6 +18,13 @@ source references. A typed unavailable result ends the duty without a child
+ or a usability claim. Never describe the Codex transport as evidence that a
+ Claude or Antigravity route ran.
+ 
++Never state a proposed architecture scope or disposition as a fact: you cannot
++see the implementation surface. Phrase it as a question to the Elephant and
++name the coverage materialization checks: the plan path,
++`architecture/map/index.md`, `architecture/fitness-model.json`,
++`architecture/baseline.json`, every implementation-surface path and the task
++scope must each be covered by `disposition.scope`.
++
+ Return one concise readiness review with references. The host, not this agent,
+ creates the sanitized, dispatch-bound duty and execution receipts; never return
+ or persist raw prompts, answers, paths, credentials, or private coordinates.
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 319d5e754..edf46131b 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -256,12 +256,15 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+       }
+     }
+     const input = parseArchitectureDesign(prd);
+-    requireValue(covers(input.disposition.scope, authority.planPath)
+-      && covers(input.disposition.scope, "architecture/map/index.md")
+-      && covers(input.disposition.scope, "architecture/fitness-model.json")
+-      && covers(input.disposition.scope, "architecture/baseline.json")
+-      && input.implementationSurface.every(p => covers(input.disposition.scope, p))
+-      && (!taskScope || covers(input.disposition.scope, taskScope)), "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
++    // Same coverage condition as before; the refusal now also names which required paths the scope misses (bounded).
++    const requiredCoverage = [authority.planPath, "architecture/map/index.md", "architecture/fitness-model.json",
++      "architecture/baseline.json", ...input.implementationSurface, ...(taskScope ? [taskScope] : [])];
++    const uncovered = requiredCoverage.filter(p => !covers(input.disposition.scope, p));
++    if (uncovered.length) {
++      const shown = [...new Set(uncovered)].slice(0, 6).map(p => String(p).slice(0, 96));
++      rejectField("ARCHITECTURE-DESIGN-SCOPE-MISMATCH", "disposition.scope",
++        `disposition.scope must cover every required path; not covered: ${shown.join(", ")}`, shown[0]);
++    }
+     // Architecture materialization establishes design authority. Physical
+     // contracts and tests are authored by their implementation owners later.
+     // A materialized design is never proof that those files exist or pass.
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index e22e395bb..68dbe5298 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -247,12 +247,12 @@ function hf9Put(root, relative, text) {
+   writeFileSync(path, text);
+ }
+ 
+-function hf9Fixture(stage, { block = false, scaffold = "none", receipt = false, staleContinuity = false } = {}) {
++function hf9Fixture(stage, { block = false, scaffold = "none", receipt = false, staleContinuity = false, designInput = null } = {}) {
+   // Real source writers establish neutral manifest/state selection; the five
+   // original branch-test stubs below remain unchanged and are never DAB proof.
+   const root = actualAuthorityFixture({stage: "presented"}).dir;
+   for (const target of initialGreenfieldMapTargets("fresh")) unlinkSync(join(root, target.path));
+-  const prd = block ? `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(hf9Design())}\n\`\`\`\n` : HF9_PRD_NO_BLOCK;
++  const prd = block ? `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(designInput ?? hf9Design())}\n\`\`\`\n` : HF9_PRD_NO_BLOCK;
+   hf9Put(root, HF9_PLAN, prd);
+   hf9Put(root, HF9_SPEC, HF9_SPEC_TEXT);
+   hf9Put(root, "project/pipeline-state.json", JSON.stringify({
+@@ -336,6 +336,33 @@ test("hotfix 9: materializeArchitectureDesign returns the not-required result un
+   assert.deepEqual(snapshot(fixture.root), before);
+ });
+ 
++// --- C18-12 (AC-241): the scope-mismatch refusal names the required paths the approved scope does not cover ---
++test("C18-12: ARCHITECTURE-DESIGN-SCOPE-MISMATCH names each uncovered required path; code and condition are unchanged", async () => {
++  const { stage, mod } = await hf9Load();
++  const narrow = hf9Design();
++  narrow.disposition.scope = ["src/", "tests/", "docs/contract.md", "specs/"];
++  const refused = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact", designInput: narrow }).root, HF9_PLAN, {});
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
++  assert.equal(refused.field, "disposition.scope");
++  for (const path of ["architecture/map/index.md", "architecture/fitness-model.json", "architecture/baseline.json"]) assert.match(refused.expected, new RegExp(path.replace(/\./gu, "\\.")), path);
++  assert.doesNotMatch(refused.expected, /specs\/f\/prd\.md/u, "a covered path is not named");
++  assert.doesNotMatch(refused.expected, /src\/application\.mjs/u, "a covered implementation-surface path is not named");
++
++  const surface = hf9Design();
++  surface.disposition.scope = ["tests/", "docs/contract.md", "architecture/", "specs/"];
++  const bySurface = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact", designInput: surface }).root, HF9_PLAN, {});
++  assert.equal(bySurface.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
++  assert.match(bySurface.expected, /src\/application\.mjs/u);
++
++  const byTask = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact" }).root, "other/task.md", {});
++  assert.equal(byTask.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
++  assert.match(byTask.expected, /other\/task\.md/u);
++
++  const ok = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact" }).root, HF9_PLAN, {});
++  assert.equal(ok.status, "materialization-required", "a fully covering scope still passes");
++});
++
+ // --- W7: a module declared kind "documentation" with only non-executable owned paths needs no verification entry point (D9) ---
+ import { loadMapBundle } from "../scripts/module-inventory.mjs";
+ function docDesign(ownedPaths = ["docs/guide/**", "README.md"]) {
