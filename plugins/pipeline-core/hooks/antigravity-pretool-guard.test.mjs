@@ -897,6 +897,40 @@ check("Antigravity native implementation dispatch is refused even when candidate
   rmSync(root, { recursive: true, force: true });
 });
 
+// A18-B1 (closest accepted criterion AC-108): the refusal stays the default and now names why no grant admitted the call. An admit case needs a
+// live session owner plus a signed stored consent and is covered with injected dependencies in lib/agy-native-implementation-admission.test.mjs;
+// the hook payload's session id being the parent's is an unmeasured assumption.
+check("Antigravity native implementation dispatch names the admission check: no session, then an unknown session", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [{
+    TypeName: "pipeline-core:goldfish-implementor",
+    Role: "Goldfish Implementor",
+    Model: "flash",
+    Prompt: [
+      "## 1. Goal\nImplement the bounded change.",
+      "## 2. Context files\n- input.txt",
+      "## 3. DoD checks\n- bounded output",
+      "## 4. Forbidden\n- unrelated changes",
+      "## 5. Stop conditions\n- missing input",
+      "## 6. Dispatch-Metadata\nModel: gemini-3.8-flash-high; Ruleset-SHA: fixture.",
+      "- **Tool budget (hard cap, first-class field):** <=40 tool uses.",
+    ].join("\n"),
+  }];
+  prepareNative(root, nativeSubagents);
+  const call = { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } };
+  const noSession = decision(run({ tool_use_id: "agy-native-impl-nosession", toolCall: call }, root));
+  assert.equal(noSession.decision, "deny");
+  assert.match(noSession.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
+  assert.match(noSession.reason, /Native admission check: AGY-NATIVE-SESSION-UNIDENTIFIED/u);
+  assert.match(noSession.reason, /pipeline\.agy-native-implementation-scope\.v1/u);
+  assert.match(noSession.reason, /not been measured on a real Antigravity host/u);
+  const unknown = decision(run({ tool_use_id: "agy-native-impl-unknown", session_id: "fixture-session-1", toolCall: call }, root));
+  assert.equal(unknown.decision, "deny");
+  assert.match(unknown.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
+  assert.match(unknown.reason, /Native admission check: AGY-NATIVE-SESSION-UNKNOWN/u);
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("Antigravity pretool guard blocks direct writes to pipeline-state.json", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({

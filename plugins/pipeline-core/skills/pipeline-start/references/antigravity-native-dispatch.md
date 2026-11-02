@@ -11,7 +11,7 @@ the existing Workflow/worktree route.
 | Role | Route | Notes |
 |---|---|---|
 | `critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` (read-only) | this reference: prepare, then native `invoke_subagent` | Name the shipped Pipeline role as the `TypeName`. A runner-native type such as `research` is not a Pipeline role and is refused (`DISPATCH-WRITE-CARRIER-REQUIRED`): it carries no read-only guarantee. |
-| `goldfish-implementor` | not native: `invoke_subagent` is refused (`AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE`) | The one sanctioned entry is `scripts/elephant-implementation-dispatch.mjs` (below). It is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return. |
+| `goldfish-implementor` | native `invoke_subagent` is refused (`AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE`) unless a signed grant admits it (see "Native implementation admission") | Otherwise the one sanctioned entry is `scripts/elephant-implementation-dispatch.mjs` (below). It is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return. |
 | `goldfish-mechanic`, `goldfish-deep` | not available | The V3 registry marks both `unavailable` on Antigravity; only the implementor is opt-in. |
 
 `dispatch-briefing.mjs` builds the Claude and Codex briefing block. An
@@ -33,6 +33,38 @@ session. If the status is anything but `authored-commit-recorded`, stop and ask
 the PO how implementation is to be dispatched; do not write the implementation
 yourself unless the PO decides so. The child gets no stdin and is killed after
 its bounded timeout.
+
+### Native implementation admission
+
+Deny by default. A native call naming `goldfish-implementor` or `goldfish-mechanic`
+is admitted only when the hook payload names a session, that session has a live
+owner and a valid stored v1 session consent, and the consent's SIGNED subject
+scope carries `nativeImplementation` for the role and the call's `Model` alias.
+A model-family (v2) consent is refused. The refusal appends `Native admission
+check: <code>` naming the first failing step (`AGY-NATIVE-SESSION-UNIDENTIFIED`,
+`-SESSION-UNKNOWN`, the session owner or consent code, `-CONSENT-FAMILY-UNSUPPORTED`,
+`-SCOPE-NOT-GRANTED`, `AGY-CONSENT-ROLE-MISMATCH`, `-MODEL-NOT-GRANTED`).
+
+Consent subject scope example (the consent ceremony takes the subject as an external JSON file):
+
+```json
+{ "scope": { "nativeImplementation": { "schema": "pipeline.agy-native-implementation-scope.v1", "models": ["flash"] } } }
+```
+
+`models` is a non-empty subset of `flash_lite`, `flash`, `pro`; the subject's `roles` must list the implementation role.
+
+UNMEASURED ASSUMPTION: that the Antigravity hook payload's session id identifies the PARENT session has not been measured against a real
+Antigravity run; nothing here claims the admission works in a real run.
+
+Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `pipeline-core:critic`, `readiness-reviewer`, `plan-verifier`,
+`consult-advisor`. Prepare the call first with the command below. One example packet (field list: `schema`, `dispatchId`, `transport`, `role`,
+`prompt`, `candidate{commit,tree}`, `requiredPaths`, `requiredPathSha256`, `resultDestination`):
+
+```json
+{ "schema": "pipeline.role-dispatch-request.v1", "dispatchId": "review-1", "transport": "antigravity", "role": "pipeline-core:readiness-reviewer",
+  "prompt": "<briefing>", "candidate": { "commit": "<sha>", "tree": "<sha>" }, "requiredPaths": ["input.txt"],
+  "requiredPathSha256": { "input.txt": "<sha256>" }, "resultDestination": { "kind": "return" } }
+```
 
 Resolve the already loaded plugin root first. The required entrypoint is
 `scripts/antigravity-native-dispatch-prepare.mjs` below that root. Build one

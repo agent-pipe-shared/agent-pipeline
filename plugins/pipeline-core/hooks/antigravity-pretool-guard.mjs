@@ -41,6 +41,7 @@ import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+import { evaluateNativeImplementationAdmission, NATIVE_IMPLEMENTATION_SCOPE_SCHEMA } from "../lib/agy-native-implementation-admission.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
@@ -583,7 +584,19 @@ export async function runAntigravityPreToolGuard(rawInput) {
   }
   if (input?.toolCall?.name === "invoke_subagent"
     && normalized.nativeSubagents?.some(isNativeImplementationSubagent)) {
-    deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding for goldfish-implementor or goldfish-mechanic, so it is not a route for implementation. The one sanctioned entry is scripts/elephant-implementation-dispatch.mjs (argv: dispatch --root <repo> --request <role-dispatch-request.json under the repo> --result-path <new relative file> --session-id <id> --descriptor-sha256 <sha256>), which is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered). Make at most ONE attempt, do not retry a launched job, and if it does not return authored-commit-recorded stop and ask the PO how implementation is to be dispatched. Do not write the implementation yourself unless the PO decides so. Read-only roles (critic, readiness-reviewer, plan-verifier, consult-advisor) are the native route: references/antigravity-native-dispatch.md.");
+    // Deny by default. A native implementation call is admitted only under a stored, valid session consent whose SIGNED scope grants the
+    // native route and the Model aliases (lib/agy-native-implementation-admission.mjs). The hook payload's session id is the one
+    // unmeasured assumption; nothing is written.
+    let admissionRoot = null;
+    try {
+      const rawRoot = Array.isArray(input?.workspacePaths) && input.workspacePaths.length > 0 ? input.workspacePaths[0]
+        : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd());
+      admissionRoot = realpathSync(resolve(rawRoot));
+    } catch { admissionRoot = null; }
+    const admission = evaluateNativeImplementationAdmission({
+      root: admissionRoot, hookSessionId: nativeHookSessionId(input, {}), subagents: normalized.nativeSubagents,
+    });
+    if (!admission.ok) deny(`BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding for goldfish-implementor or goldfish-mechanic, so it is not a route for implementation. The one sanctioned entry is scripts/elephant-implementation-dispatch.mjs (argv: dispatch --root <repo> --request <role-dispatch-request.json under the repo> --result-path <new relative file> --session-id <id> --descriptor-sha256 <sha256>), which is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered). Make at most ONE attempt, do not retry a launched job, and if it does not return authored-commit-recorded stop and ask the PO how implementation is to be dispatched. Do not write the implementation yourself unless the PO decides so. Read-only roles (critic, readiness-reviewer, plan-verifier, consult-advisor) are the native route: references/antigravity-native-dispatch.md. Native admission check: ${admission.code}: ${admission.reason}. A native implementation call is admitted only under a stored session consent whose signed scope carries a nativeImplementation grant (schema ${NATIVE_IMPLEMENTATION_SCOPE_SCHEMA}) for the role and the Model alias; the hook payload's session id is the one assumption that has not been measured on a real Antigravity host.`);
   }
 
   // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
