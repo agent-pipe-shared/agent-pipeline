@@ -663,7 +663,9 @@ export function sanctionedHumanOverrideArgs(args, root) {
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
     return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
   }
-  if (args[0] === "prepare-for-signature") {
+  // `refreeze-plan` re-derives a signable plan for an existing request (guard-human-override.mjs); it is the step several guard
+  // messages already print, so it takes the exact shape of its sibling `prepare-for-signature` and nothing wider.
+  if (args[0] === "prepare-for-signature" || args[0] === "refreeze-plan") {
     const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "");
     return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));

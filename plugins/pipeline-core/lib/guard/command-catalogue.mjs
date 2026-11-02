@@ -498,7 +498,14 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === REFRESH_MANDATORY_HOOKS_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   // AC-123 (PF-21): the bootstrap's mandatory resume-hint read, exactly `inspect --root <this root>`, in every lifecycle state.
-  if (script === fileURLToPath(new URL("../../scripts/resume-hint.mjs", import.meta.url))) return args[0] === "inspect" && exactRoot(args, root, 1) && args.length === 3;
+  if (script === fileURLToPath(new URL("../../scripts/resume-hint.mjs", import.meta.url))) {
+    if (args[0] === "inspect") return exactRoot(args, root, 1) && args.length === 3;
+    // 17: the bootstrap skill (pipeline-start step 7) tells an agent to capture the material input BEFORE a restart, in a session that is
+    // not ready, and names exactly one argv shape for it: the card at the fixed path, consumed, no other flag. That shape is admitted in
+    // every lifecycle state, nothing wider (no other card path, no `--help`, no other flag).
+    return args[0] === "capture" && exactRoot(args, root, 1) && args.length === 6
+      && args[3] === "--card-file" && args[4] === join(root, "project", ".resume-hint-input.json") && args[5] === "--consume-card";
+  }
   // F6 is an obligatory read-only diagnosis after governance bootstrap reports failure.
   if (script === resolve(root, "harness/scripts/check-observation-governance.mjs")) return args.length === 0;
   // OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 tells every dispatched agent to

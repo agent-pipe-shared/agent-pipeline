@@ -3386,7 +3386,36 @@ test("17 emit-signature-digest and render-copy-safe are admitted in exactly thei
       `node '${HUMAN_OVERRIDE_SCRIPT}' render-copy-safe --repo '${path}' --request-sha256 ${"a".repeat(63)}`,
       // the arming and the chat-mode authorize are NOT widened by this: authorize-by-signature keeps its proof boundary
       `node '${HUMAN_OVERRIDE_SCRIPT}' sweep-requests --repo '${path}'`,
-      `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --repo '${path}' --request-sha256 ${request}`,
+    ]) assertGuardVerdict17(path, command, false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+const RESUME_HINT_SCRIPT_17 = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+test("17 refreeze-plan takes the shape of prepare-for-signature, and resume-hint capture is admitted as the one fixed pre-restart shape", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const refreeze = `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --repo '${path}' --request-sha256 ${request}`;
+    for (const command of [refreeze, `${refreeze} --author-source-root '${authorRoot}'`]) assertGuardVerdict17(path, command, true);
+    for (const command of [
+      `${refreeze} --activate`, `${refreeze} --author-source-root /tmp/other`, `${refreeze} --reason why`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --repo /tmp/other --request-sha256 ${request}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --repo '${path}' --request-sha256 ${"g".repeat(64)}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --request-sha256 ${request} --repo '${path}'`,
+    ]) assertGuardVerdict17(path, command, false);
+    const card = join(path, "project", ".resume-hint-input.json");
+    const capture = `node '${RESUME_HINT_SCRIPT_17}' capture --root '${path}' --card-file '${card}' --consume-card`;
+    assertGuardVerdict17(path, capture, true);
+    assertGuardVerdict17(path, `node '${RESUME_HINT_SCRIPT_17}' inspect --root '${path}'`, true);
+    for (const command of [
+      `node '${RESUME_HINT_SCRIPT_17}' capture --root '${path}' --card-file '${join(path, "scratch", "card.json")}' --consume-card`,
+      `node '${RESUME_HINT_SCRIPT_17}' capture --root '${path}' --card-file '${card}'`,
+      `${capture} --force`, `node '${RESUME_HINT_SCRIPT_17}' capture --root '${path}' --consume-card --card-file '${card}'`,
+      `node '${RESUME_HINT_SCRIPT_17}' capture --root /tmp/other --card-file '${card}' --consume-card`,
+      `node '${RESUME_HINT_SCRIPT_17}' capture --help`, `node '${RESUME_HINT_SCRIPT_17}' discard --root '${path}'`,
     ]) assertGuardVerdict17(path, command, false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
