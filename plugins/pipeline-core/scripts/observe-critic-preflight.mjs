@@ -15,8 +15,7 @@ import {
   resolveCriticPreflightContext,
 } from "../lib/critic-preflight-observer.mjs";
 import {
-  CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
-  CriticDispatchPreflightError,
+  criticDispatchPreflightRefusalLine,
   parseCriticDispatchPreflightArgs,
   preflightCriticDispatch,
 } from "./critic-dispatch-preflight.mjs";
@@ -43,8 +42,8 @@ function controllerFailure(code = "C1S-SHAPE") {
   return { schema: CONTROLLER_SCHEMA, status: "rejected", code };
 }
 function producerError(error) {
-  const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-  return `${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code })}\n`;
+  // The same bytes the direct CLI prints for this refusal (reason and details included): the controller preserves the producer protocol.
+  return criticDispatchPreflightRefusalLine(error);
 }
 function measuredTime(ports) {
   try { return ports.clock(); } catch { return undefined; }

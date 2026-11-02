@@ -707,20 +707,28 @@ if (isDirectInvocation(import.meta.url)) {
       if (result.status !== "packet-ready") process.exitCode = 1;
     }
   } catch (error) {
-    const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-    const details = error instanceof CriticDispatchPreflightError ? error.details : null;
-    const sweep = argv.includes("--sweep-evidence");
-    process.stderr.write(`${JSON.stringify({
-      schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
-      status: "rejected",
-      code,
-      // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
-      // a reason a refusal already carries in its details is kept as it is.
-      ...(code === "CDP-ARGUMENT" && error instanceof CriticDispatchPreflightError ? { reason: error.message } : {}),
-      ...(!sweep && details !== null ? details : {}),
-    })}\n`);
+    process.stderr.write(criticDispatchPreflightRefusalLine(error, { sweep: argv.includes("--sweep-evidence") }));
     process.exitCode = 1;
   }
+}
+
+/**
+ * The one stderr line of a refused preflight, shared by the direct CLI and the observed controller so the two can never print different bytes
+ * for the same refusal (the observed controller used to rebuild a bare line and dropped every reason and detail the producer carries).
+ */
+export function criticDispatchPreflightRefusalLine(error, { sweep = false } = {}) {
+  const typed = error instanceof CriticDispatchPreflightError;
+  const code = typed ? error.code : "CDP-UNEXPECTED";
+  const details = typed ? error.details : null;
+  return `${JSON.stringify({
+    schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+    status: "rejected",
+    code,
+    // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
+    // a reason a refusal already carries in its details is kept as it is.
+    ...(code === "CDP-ARGUMENT" && typed ? { reason: error.message } : {}),
+    ...(!sweep && details !== null ? details : {}),
+  })}\n`;
 }
 
 /** Explicit opaque launch-context entry; no observer or authority injection. */
