@@ -42,6 +42,23 @@ prints the exact `authorize-critical` command below, already filled in, for
 the human to run — the driver itself cannot sign it, approve it, or clear
 any gate.
 
+## Who prepares, who signs (every runner)
+
+On Claude, Codex and Antigravity alike the agent runs every preparation step itself
+and hands the PO only the sign-off command, already filled in. The PO never
+prepares, seeds or digests anything for the agent.
+
+| Kind | The agent prepares | Only the PO runs |
+|---|---|---|
+| push | `push-init.mjs` (or `push-prepare.mjs`), the threat-model artifact, the filled `authorize-critical` line | `po-human-approval.mjs authorize-critical` |
+| deploy, publication, release-preflight | `po-human-approval.mjs prepare-critical` / `verify-critical`, the subject digest | `authorize-critical` with that digest |
+| Critic-bound (residual acceptance, Critic export, Critic consent) | the request file under `scratch/` | `sign-intent --request <that file>` |
+| design approval | `pipeline-state.mjs inspect`, the design-approval request file under `scratch/` | `sign-intent --request <that file>`, then the agent runs `approve-plan --design-approval-request` |
+| a denied guarded edit | `guard-human-override.mjs plan`, `prepare-for-signature`, then `authorize-by-signature --proof` after the PO signed | `sign-intent` on the prepared request |
+
+Request files always live under `scratch/`, never elsewhere. A refusal that names
+a signing command means: hand that exact command to the PO and keep preparing.
+
 ## The one setting
 
 `gates.push_approval` in `pipeline.user.yaml` decides how a human clears a push.

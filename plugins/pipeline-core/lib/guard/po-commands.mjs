@@ -13,11 +13,17 @@ import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBo
 import { verdict } from "./verdict.mjs";
 import { hasExternalOutputRedirect, isNullDeviceStderrRedirect } from "./read-scope.mjs";
 
+// Signing parity (AC-262): one shared source for the "who acts next" sentences, so the Codex and
+// Antigravity adapters print the same words the refusal below does. Text only; no decision uses them.
+export const WHO_ACTS_NEXT_EXTERNAL_OPERATOR = "Who acts next: an attended person outside this session carries out the exact action named in this route; the agent prepares everything else itself and hands over only that sign-off.";
+export const WHO_ACTS_NEXT_AUTHOR_REPAIR = "Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs.";
+
 export function externalPoSigningOnly() {
   return verdict(
     2,
     "EXTERNAL ACTION REQUIRED (guard-lifecycle-ready, plugin pipeline-core): "
-      + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts.\n",
+      + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts; "
+      + "hand the exact command to the PO and run its preparation steps yourself.\n",
   );
 }
 

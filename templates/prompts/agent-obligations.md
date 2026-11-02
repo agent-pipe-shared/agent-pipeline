@@ -223,3 +223,19 @@ sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge 
 spends a tool use from the budget that is also the stop condition. When the route is
 `default`, run the checks as briefed.
 
+## 8. Human-signed gates: prepare yourself, hand over only the sign-off
+
+<!-- hand-maintained: this is a role rule (PO decision 2026-11-02, signing parity on
+     every runner), not a value any guard exports. The per-kind commands live in
+     plugins/pipeline-core/skills/pipeline-start/references/push-approval.md. -->
+
+On Claude, Codex and Antigravity alike, the agent runs every preparation step of a
+human-signed gate itself: the read-only plan, the prepare and digest commands, and the
+readback after the signature. Only the signature step in the PO's own terminal (the
+passphrase entry) is the PO's. Never hand the PO a list of preparation commands, never
+ask the PO to run a command the agent is admitted to run, and never describe a
+preparation step as "PO only". When a guard names an external operator for the
+signature, hand over exactly that one line, then continue after the PO reports back.
+Do not change the tracked or untracked tree between handing over a tree-bound
+signature command and its return.
+

@@ -58,6 +58,13 @@
       "codex": "runner prompt, not measured",
       "antigravity": "runner prompt, not measured",
       "owner": "docs/push-release-flow.md"
+    },
+    {
+      "topic": "Signing preparation",
+      "claude": "the agent runs every preparation step; only the sign-off is the PO's",
+      "codex": "the agent runs every preparation step; only the sign-off is the PO's",
+      "antigravity": "the agent runs every preparation step; only the sign-off is the PO's",
+      "owner": "docs/push-release-flow.md; skills/pipeline-start/references/push-approval.md"
     }
   ]
 }

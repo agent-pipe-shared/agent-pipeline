@@ -316,6 +316,23 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("spends a tool use from the budget that is also the stop condition. When the route is");
   put("`default`, run the checks as briefed.");
   put();
+
+  put("## 8. Human-signed gates: prepare yourself, hand over only the sign-off");
+  put();
+  put("<!-- hand-maintained: this is a role rule (PO decision 2026-11-02, signing parity on");
+  put("     every runner), not a value any guard exports. The per-kind commands live in");
+  put("     plugins/pipeline-core/skills/pipeline-start/references/push-approval.md. -->");
+  put();
+  put("On Claude, Codex and Antigravity alike, the agent runs every preparation step of a");
+  put("human-signed gate itself: the read-only plan, the prepare and digest commands, and the");
+  put("readback after the signature. Only the signature step in the PO's own terminal (the");
+  put("passphrase entry) is the PO's. Never hand the PO a list of preparation commands, never");
+  put("ask the PO to run a command the agent is admitted to run, and never describe a");
+  put("preparation step as \"PO only\". When a guard names an external operator for the");
+  put("signature, hand over exactly that one line, then continue after the PO reports back.");
+  put("Do not change the tracked or untracked tree between handing over a tree-bound");
+  put("signature command and its return.");
+  put();
   return `${lines.join("\n")}\n`;
 }
 

@@ -1190,6 +1190,39 @@ check("17 Antigravity containment ignores node -e text inside a quoted argument 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// AC-262 (signing parity): the same "who acts next" sentences Codex prints, from the one shared source.
+check("AC-262: Antigravity author-repair denial names who acts next next to the unchanged route", () => {
+  const root = readyLifecycleFixture("chat");
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  const sourceRoot = join(root, "plugins", "pipeline-core");
+  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
+  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
+  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
+  git("add", "plugins/pipeline-core");
+  git("commit", "-q", "-m", "author repair fixture");
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(sourceRoot, "lib", "repair.mjs"), TargetContent: "false", ReplacementContent: "true" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /Pipeline Author Repair is available/u);
+    assert.match(res.reason, /Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs\./u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// The planner-driven external-operator-required status cannot be produced by a real hook run in a
+// fixture, so this pins the adapter source: the sentence precedes the unchanged JSON route in both branches.
+check("AC-262: Antigravity external-operator-required routes print who acts next before the unchanged JSON", () => {
+  const source = readFileSync(adapter, "utf8");
+  assert.match(source, /import \{[^}]*WHO_ACTS_NEXT_EXTERNAL_OPERATOR[^}]*\} from "\.\.\/lib\/guard\/po-commands\.mjs"/u);
+  const printed = source.match(/\.\.\.\((?:planned\.status === "external-operator-required"|hostBoundary) \? \[WHO_ACTS_NEXT_EXTERNAL_OPERATOR\] : \[\]\),\n\s*"Guard recovery route:",/gu) ?? [];
+  assert.equal(printed.length, 2, "both external-operator-required branches must print the sentence immediately before the route");
+});
+
 check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
   const root = readyLifecycleFixture("chat");
   try {

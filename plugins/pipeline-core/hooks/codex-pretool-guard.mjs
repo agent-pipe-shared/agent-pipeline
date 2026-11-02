@@ -33,6 +33,7 @@ import {
   rememberedNativeHookFailure,
   rememberNativeHookFailure,
 } from "../lib/native-hook-failure-memory.mjs";
+import { WHO_ACTS_NEXT_AUTHOR_REPAIR, WHO_ACTS_NEXT_EXTERNAL_OPERATOR } from "../lib/guard/po-commands.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
@@ -624,10 +625,12 @@ if (denials.length > 0) {
             "plan", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
             "--author-source-root", forcedQuote(planned.candidateSourceRoot),
           ]),
+          WHO_ACTS_NEXT_AUTHOR_REPAIR,
         ].join("\n");
       } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
         overrideGuidance = [
           "",
+          ...(planned.status === "external-operator-required" ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
           "Guard recovery route:",
           JSON.stringify(planned),
         ].join("\n");
@@ -686,6 +689,7 @@ if (denials.length > 0) {
       }
       overrideGuidance = [
         "",
+        ...(hostBoundary ? [WHO_ACTS_NEXT_EXTERNAL_OPERATOR] : []),
         "Guard recovery route:",
         JSON.stringify(hostBoundary
           ? {

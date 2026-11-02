@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { fork, spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { externalPoSigningOnly } from "../lib/guard/po-commands.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
@@ -44,7 +45,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
 const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
 const shardCount = 3;
-const totalChecks = 39;
+const totalChecks = 42;
 const shardResults = [];
 const readyLifecycleEnvByRoot = new Map();
 const readyLifecycleExternalParents = new Set();
@@ -1042,6 +1043,51 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   assert.equal(allowed.stdout, "");
   assert.match(allowed.stderr, /exact one-time capability consumed/u);
   assert.equal(decision(run(input, root)).permissionDecision, "deny");
+});
+
+// AC-262 (signing parity, PO decision 2026-11-02): on every runner the agent prepares and only the
+// sign-off is the person's. The refusal for a human-terminal signing command carries that sentence.
+check("AC-262: the human-terminal signing refusal tells the agent to hand over the command and prepare itself", () => {
+  const refusal = externalPoSigningOnly();
+  assert.equal(refusal.exitCode, 2);
+  assert.match(refusal.stderr, /EXTERNAL ACTION REQUIRED/u);
+  assert.match(refusal.stderr, /hand the exact command to the PO and run its preparation steps yourself/u);
+});
+
+check("AC-262: an Author Repair denial names who acts next next to the unchanged route", () => {
+  const root = readyLifecycleFixture("chat");
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  const sourceRoot = join(root, "plugins", "pipeline-core");
+  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
+  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
+  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
+  git("add", "plugins/pipeline-core");
+  git("commit", "-q", "-m", "author repair fixture");
+  try {
+    const first = decision(run({
+      tool_name: "apply_patch",
+      tool_input: {
+        command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/lib/repair.mjs\n@@\n-export const repaired = false;\n+export const repaired = true;\n*** End Patch",
+      },
+    }, root));
+    assert.equal(first.permissionDecision, "deny");
+    assert.match(first.permissionDecisionReason, /Pipeline Author Repair is available/u);
+    assert.match(first.permissionDecisionReason, /Who acts next: the agent has prepared this request and runs every preparation step itself; only the person's confirmation is theirs\./u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The planner-driven external-operator-required status cannot be produced by a real hook run in a
+// fixture (the sensitive-input and plugin-cache cases are refused by the inner guard before the
+// planner branch), so this pins the adapter source: the sentence is printed before the JSON route in
+// every branch that prints status external-operator-required, never inside it.
+check("AC-262: every external-operator-required route prints who acts next before the unchanged JSON", () => {
+  const source = readFileSync(adapter, "utf8");
+  assert.match(source, /import \{[^}]*WHO_ACTS_NEXT_EXTERNAL_OPERATOR[^}]*\} from "\.\.\/lib\/guard\/po-commands\.mjs"/u);
+  const printed = source.match(/\.\.\.\((?:planned\.status === "external-operator-required"|hostBoundary) \? \[WHO_ACTS_NEXT_EXTERNAL_OPERATOR\] : \[\]\),\n\s*"Guard recovery route:",/gu) ?? [];
+  assert.equal(printed.length, 2, "both external-operator-required branches must print the sentence immediately before the route");
 });
 
 // ADR-0059 Decision 6 makes GUARD-CROSS-REPO-MUTATION liftable through HGO. The exact local
