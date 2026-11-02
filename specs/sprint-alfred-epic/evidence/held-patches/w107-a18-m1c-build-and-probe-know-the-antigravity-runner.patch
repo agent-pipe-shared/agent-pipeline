@@ -1,0 +1,81 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 2cfcd3cf8..d3997643d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -55,7 +55,7 @@ function normalizedPath(value) {
+ function fail(code) { return { ok: false, code }; }
+ 
+ /** Parse exactly one host-generated binding block from the dispatched prompt. */
+-export function parseNativeGoldfishBriefing(prompt) {
++export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "codex"] } = {}) {
+   if (typeof prompt !== "string" || prompt.length > 2 * 1024 * 1024) return fail("NGHR-BRIEFING-INPUT");
+   const markers = ["<!-- pipeline-native-goldfish-host-commit:v1\n", "<!-- pipeline-native-goldfish-host-commit:v2\n", "<!-- pipeline-native-goldfish-host-commit:v3\n"];
+   const found = markers.map((marker) => ({ marker, start: prompt.indexOf(marker) })).filter(({ start }) => start >= 0);
+@@ -73,7 +73,7 @@ export function parseNativeGoldfishBriefing(prompt) {
+   const codexNative = version === 2 || version === 3 && binding.runner === "codex";
+   const validFields = [...(codexNative ? CODEX_BRIEFING_FIELDS : BRIEFING_FIELDS),...(version === 3 ? ["itemDelivery"] : [])];
+   if (!exact(binding, validFields) || binding.schema !== (version === 3 ? NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA : version === 2 ? NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA : NATIVE_GOLDFISH_BRIEFING_SCHEMA)
+-    || !["claude", "codex"].includes(binding.runner)
++    || !runners.includes(binding.runner)
+     || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")
+     || !OID.test(binding.candidateTree ?? "") || !Object.hasOwn(ROLE_TO_AGENT, binding.role)
+     || (!codexNative && binding.agentType !== ROLE_TO_AGENT[binding.role])
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 31093e6f0..32d7230be 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -1110,14 +1110,14 @@ export function generateDispatchBinding(options, deps = {}) {
+ 
+   // Self-check: the host's own parser must accept exactly what is about to be handed out.
+   if (skeleton.split(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2)).length !== 2) refuse("DBG-SELFCHECK-MARKER", "the skeleton must contain the binding opening marker exactly once");
+-  // The host parser admits only claude and codex runners; an antigravity skeleton is read back with the runner field as claude (every other
+-  // field is checked as for Claude) and compared to its own runner below.
+-  const parsed = parseNativeGoldfishBriefing(runner === "antigravity" ? skeleton.replace('"runner":"antigravity"', '"runner":"claude"') : skeleton);
++  // The host parser admits only claude and codex runners by default (the Claude and Codex host paths rely on that); the generator opts in to
++  // antigravity so every field of an Antigravity skeleton is checked by the same parser as for Claude.
++  const parsed = parseNativeGoldfishBriefing(skeleton, { runners: RUNNERS });
+   if (!parsed.ok) refuse("DBG-SELFCHECK-PARSE", `the host parser rejects the generated skeleton: ${parsed.code}`);
+   const { criticDecision: _decision, ...parsedAll } = parsed.binding;
+   // The host adds `agentType` and `adapterVersion` to a Codex-native binding it reads back; neither is in the block.
+   const { agentType: _derived, adapterVersion: _adapter, ...parsedCodex } = parsedAll;
+-  const parsedRest = runner === "codex" ? parsedCodex : runner === "antigravity" ? { ...parsedAll, runner } : parsedAll;
++  const parsedRest = runner === "codex" ? parsedCodex : parsedAll;
+   const { criticDecision: _own, ...ownRest } = serialised;
+   if (JSON.stringify(parsedRest) !== JSON.stringify(ownRest)) refuse("DBG-SELFCHECK-PARSE", "the host parser read back a different binding than was generated");
+   const named = parseDispatchSlice(skeleton);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 4bcab4575..77f01b356 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2247,3 +2247,31 @@ test("A18-M1B claude and codex generation does not change: the runner field is t
+   assert.equal(claude.skeleton.includes("antigravity"), false);
+   assert.match(claude.skeleton, /Tool budget \(TB-09, hard cap\)/u);
+ });
++
++// --- A18-M1C (AC-108): build renders and verifies an Antigravity briefing; the default host parser stays closed to it ---
++
++test("A18-M1C build --runner antigravity renders a verified briefing that names the runner, and the host parser admits it only on opt-in", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { verifyGeneratedBriefing } = await buildLib();
++  const route = await agyRouteOf("duty.implement");
++  const { fx, argv } = packageFixture({ modelId: route.nativeTier, runner: "antigravity" });
++  const built = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
++  assert.match(built.text, /"runner":"antigravity"/u);
++  assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
++  const optIn = parseNativeGoldfishBriefing(built.text, { runners: ["claude", "codex", "antigravity"] });
++  assert.equal(optIn.ok, true, optIn.code);
++  assert.equal(optIn.binding.runner, "antigravity");
++  const closed = parseNativeGoldfishBriefing(built.text);
++  assert.equal(closed.ok, false, "the default parser used by the Claude and Codex host paths still refuses an Antigravity binding");
++  assert.equal(closed.code, "NGHR-BRIEFING-SHAPE");
++  // probe: the readiness findings of an Antigravity package are those of the same Claude package (the fixture has no plan approval, so both
++  // report the same state findings); no finding comes from the runner, the binding or the self-check.
++  const codesOf = (probe) => probe.findings.map((finding) => finding.code);
++  const probed = runDispatchBriefing(["probe", ...argv.slice(1)], depsOf(fx));
++  assert.equal(probed.schema, "pipeline.dispatch-readiness-probe.v1", JSON.stringify(probed).slice(0, 300));
++  const claude = packageFixture();
++  const claudeProbed = runDispatchBriefing(["probe", ...claude.argv.slice(1)], depsOf(claude.fx));
++  assert.deepEqual(codesOf(probed), codesOf(claudeProbed));
++  assert.equal(codesOf(probed).some((code) => /^(DBG-SELFCHECK|DBG-MODEL|NGHR)/u.test(code)), false);
++});
