@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/lib/agy-item-delivery.test.mjs b/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
+index 14b3664bd..a6d2394b6 100644
+--- a/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/agy-item-delivery.test.mjs
+@@ -19,7 +19,10 @@ import { nativeManagedDigest } from './native-managed-authority-support.mjs';
+ import { createAgyAuthorityJournalOwner } from './agy-host-observed-store.mjs';
+ 
+ async function fixture(run) {
+-  const parent=new URL('../../../../../fixtures/',import.meta.url).pathname;mkdirSync(parent,{recursive:true,mode:0o700});
++  // Restated 2026-11-02 (candidate 19, QG-04, own hunk): the fixtures lived five levels above this file, which is the home directory for a checkout
++  // below ~/src and the unwritable /home for a clone directly below the home directory (EACCES, all six cases red). They now live beside the
++  // checkout (four levels up), still outside the repository tree; the OS temp folder does not work (the Source member reads `unavailable` there).
++  const parent=new URL('../../../../fixtures/',import.meta.url).pathname;mkdirSync(parent,{recursive:true,mode:0o700});
+   const root=mkdtempSync(join(parent,'agy-item-'));
+   const git=(...args)=>execFileSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,...args],{encoding:'utf8'}).trim();
+   try{
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 558a05713..739f13cb0 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -19,7 +19,14 @@ function test(name, run) { cases.push({ id: `G23C${String(cases.length + 1).padS
+ 
+ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
+   mkdirSync(fixtureBase, { recursive: true });
+-  const root = mkdtempSync(join(fixtureBase, "g23-read-"));
++  // Restated 2026-11-02 (candidate 19, QG-04, own hunk; intent kept: a listing above the project root is refused): `ls -lh ../` is refused only when
++  // the parent holds something the passive read policy refuses (a credential-named file), not because it is outside the root. The parent used to be the
++  // repository's scratch folder, which holds such files in a long-used checkout and nothing in a fresh clone (green in one, red in the other). The
++  // fixture now owns its parent and plants the credential-named file itself.
++  const outer = mkdtempSync(join(fixtureBase, "g23-read-"));
++  writeFileSync(join(outer, ".env"), "x\n");
++  const root = join(outer, "project");
++  mkdirSync(root);
+   try {
+     mkdirSync(join(root, "docs"));
+     writeFileSync(join(root, "docs", "a.md"), "safe\n");
+@@ -51,7 +58,7 @@ test("G23 bounded repeated rg globs preserve hidden and credential exclusions",
+     for (const good of ["rg -l safe docs --glob '!*.patch'", "rg -l safe docs -g '!node_modules'", "rg -l safe docs -g '*.md'"]) {
+       assert.equal(isReadOnlyDiagnosticCommand(good, root), true, good);
+     }
+-  } finally { rmSync(root, { recursive: true, force: true }); }
++  } finally { rmSync(outer, { recursive: true, force: true }); }
+ });
+ 
+ test("G23 exact source-owned PO help is a pure CLI route", () => {
