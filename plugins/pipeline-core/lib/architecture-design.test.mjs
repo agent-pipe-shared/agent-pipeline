@@ -247,12 +247,12 @@ function hf9Put(root, relative, text) {
   writeFileSync(path, text);
 }
 
-function hf9Fixture(stage, { block = false, scaffold = "none", receipt = false, staleContinuity = false } = {}) {
+function hf9Fixture(stage, { block = false, scaffold = "none", receipt = false, staleContinuity = false, designInput = null } = {}) {
   // Real source writers establish neutral manifest/state selection; the five
   // original branch-test stubs below remain unchanged and are never DAB proof.
   const root = actualAuthorityFixture({stage: "presented"}).dir;
   for (const target of initialGreenfieldMapTargets("fresh")) unlinkSync(join(root, target.path));
-  const prd = block ? `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(hf9Design())}\n\`\`\`\n` : HF9_PRD_NO_BLOCK;
+  const prd = block ? `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(designInput ?? hf9Design())}\n\`\`\`\n` : HF9_PRD_NO_BLOCK;
   hf9Put(root, HF9_PLAN, prd);
   hf9Put(root, HF9_SPEC, HF9_SPEC_TEXT);
   hf9Put(root, "project/pipeline-state.json", JSON.stringify({
@@ -334,6 +334,33 @@ test("hotfix 9: materializeArchitectureDesign returns the not-required result un
   const result = mod.materializeArchitectureDesign(fixture.root, { lock: { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" } });
   assert.deepEqual(result, HF9_NOT_REQUIRED);
   assert.deepEqual(snapshot(fixture.root), before);
+});
+
+// --- C18-12 (AC-241): the scope-mismatch refusal names the required paths the approved scope does not cover ---
+test("C18-12: ARCHITECTURE-DESIGN-SCOPE-MISMATCH names each uncovered required path; code and condition are unchanged", async () => {
+  const { stage, mod } = await hf9Load();
+  const narrow = hf9Design();
+  narrow.disposition.scope = ["src/", "tests/", "docs/contract.md", "specs/"];
+  const refused = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact", designInput: narrow }).root, HF9_PLAN, {});
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
+  assert.equal(refused.field, "disposition.scope");
+  for (const path of ["architecture/map/index.md", "architecture/fitness-model.json", "architecture/baseline.json"]) assert.match(refused.expected, new RegExp(path.replace(/\./gu, "\\.")), path);
+  assert.doesNotMatch(refused.expected, /specs\/f\/prd\.md/u, "a covered path is not named");
+  assert.doesNotMatch(refused.expected, /src\/application\.mjs/u, "a covered implementation-surface path is not named");
+
+  const surface = hf9Design();
+  surface.disposition.scope = ["tests/", "docs/contract.md", "architecture/", "specs/"];
+  const bySurface = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact", designInput: surface }).root, HF9_PLAN, {});
+  assert.equal(bySurface.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
+  assert.match(bySurface.expected, /src\/application\.mjs/u);
+
+  const byTask = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact" }).root, "other/task.md", {});
+  assert.equal(byTask.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
+  assert.match(byTask.expected, /other\/task\.md/u);
+
+  const ok = mod.inspectArchitectureDesign(hf9Fixture(stage, { block: true, scaffold: "exact" }).root, HF9_PLAN, {});
+  assert.equal(ok.status, "materialization-required", "a fully covering scope still passes");
 });
 
 // --- W7: a module declared kind "documentation" with only non-executable owned paths needs no verification entry point (D9) ---

@@ -18,6 +18,13 @@ source references. A typed unavailable result ends the duty without a child
 or a usability claim. Never describe the Codex transport as evidence that a
 Claude or Antigravity route ran.
 
+Never state a proposed architecture scope or disposition as a fact: you cannot
+see the implementation surface. Phrase it as a question to the Elephant and
+name the coverage materialization checks: the plan path,
+`architecture/map/index.md`, `architecture/fitness-model.json`,
+`architecture/baseline.json`, every implementation-surface path and the task
+scope must each be covered by `disposition.scope`.
+
 Return one concise readiness review with references. The host, not this agent,
 creates the sanitized, dispatch-bound duty and execution receipts; never return
 or persist raw prompts, answers, paths, credentials, or private coordinates.

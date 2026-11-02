@@ -256,12 +256,15 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       }
     }
     const input = parseArchitectureDesign(prd);
-    requireValue(covers(input.disposition.scope, authority.planPath)
-      && covers(input.disposition.scope, "architecture/map/index.md")
-      && covers(input.disposition.scope, "architecture/fitness-model.json")
-      && covers(input.disposition.scope, "architecture/baseline.json")
-      && input.implementationSurface.every(p => covers(input.disposition.scope, p))
-      && (!taskScope || covers(input.disposition.scope, taskScope)), "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
+    // Same coverage condition as before; the refusal now also names which required paths the scope misses (bounded).
+    const requiredCoverage = [authority.planPath, "architecture/map/index.md", "architecture/fitness-model.json",
+      "architecture/baseline.json", ...input.implementationSurface, ...(taskScope ? [taskScope] : [])];
+    const uncovered = requiredCoverage.filter(p => !covers(input.disposition.scope, p));
+    if (uncovered.length) {
+      const shown = [...new Set(uncovered)].slice(0, 6).map(p => String(p).slice(0, 96));
+      rejectField("ARCHITECTURE-DESIGN-SCOPE-MISMATCH", "disposition.scope",
+        `disposition.scope must cover every required path; not covered: ${shown.join(", ")}`, shown[0]);
+    }
     // Architecture materialization establishes design authority. Physical
     // contracts and tests are authored by their implementation owners later.
     // A materialized design is never proof that those files exist or pass.
