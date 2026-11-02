@@ -1,0 +1,65 @@
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index f90ccb45f..e674ebf8d 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -115,7 +115,7 @@ function resolveOutput(repoReal, outPath) {
+   const absolute = join(repoReal, ...outPath.split("/"));
+   try {
+     lstatSync(absolute);
+-    return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${outPath}`);
++    return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${outPath}; choose a new --out path (for example the same name with a -2 suffix) and run the command again`);
+   } catch (error) {
+     if (error?.code !== "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory is not usable: ${outPath}`);
+   }
+@@ -253,7 +253,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+   try {
+     writeFileSync(output.absolute, created.bytes, { flag: "wx" });
+   } catch (error) {
+-    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}`);
++    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}; choose a new --out path (for example the same name with a -2 suffix) and run the command again`);
+     if (error?.code === "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory does not exist: ${request.outPath}`);
+     return refuse("DRC-WRITE-FAILED", `the receipt could not be written: ${request.outPath}`);
+   }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 35916abd7..ea467b4eb 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -189,6 +189,16 @@ test("an existing output is refused and left byte-identical", withRepo((repo) =>
+   assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
+ }));
+ 
++// C18 (AGY report): the refusal said only that the file is never overwritten; it now also names the way forward.
++test("DRC-OUT-EXISTS names a new --out path as the way forward and keeps the existing file", withRepo((repo) => {
++  writeFileSync(join(repo, RECEIPT1), "do not touch\n");
++  const result = createReceiptFromDisk(request(repo), { env: CLAUDE, now });
++  assert.equal(result.code, "DRC-OUT-EXISTS");
++  assert.match(result.message, /choose a new --out path/u);
++  assert.match(result.message, /never overwritten/u);
++  assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
++}));
++
+ test("an output whose directory does not exist is refused, never created", withRepo((repo) => {
+   const result = createReceiptFromDisk(request(repo, { outPath: "specs/feat-x/other/receipt.json" }), { env: CLAUDE, now });
+   assert.equal(result.code, "DRC-OUT-PARENT-MISSING");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b8b97539b..d726b57cd 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9958,7 +9958,7 @@ function writeDesignWorkflowApprovalRequest(dir, request) {
+     if (existsSync(target)) {
+       const stat = lstatSync(target);
+       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
+-        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT" };
++        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
+       return { ok: true, path: `scratch/${name}`, replay: true };
+     }
+     let fd;
+@@ -11854,7 +11854,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const result = createDesignApprovalRequest({ binding: binding.binding, candidate: designWorkflowGitCandidate(dir, deps) });
+         if (!result.ok) { console.error(result.code); return 2; }
+         const persisted = writeDesignWorkflowApprovalRequest(dir, result.request);
+-        if (!persisted.ok) { console.error(persisted.code); return 2; }
++        if (!persisted.ok) { console.error(persisted.message ? `${persisted.code}: ${persisted.message}` : persisted.code); return 2; }
+         approvalRequestPath = persisted.path;
+         approvalReview = binding.binding;
+       } else if (reviewPaths.length) { console.error("Error: mini-profile present-plan does not accept review receipts."); return 2; }
