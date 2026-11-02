@@ -3780,6 +3780,24 @@
       "nonOverlapNote": "Unique cases: the record, inspect and clear verbs over lib/dispatch-recovery-state.mjs"
     },
     {
+      "name": "runner-capabilities-tests",
+      "file": "plugins/pipeline-core/scripts/runner-capabilities.test.mjs",
+      "invariantPinned": "The sourced per-runner capability table is one JSON source with a cell per runner and an owner per row, its CLI prints the table or one runner's column and refuses anything else, and the happy-path guide table is the row-for-row projection of it",
+      "nonOverlapNote": "Unique cases: config/runner-capabilities.json and runner-capabilities.mjs (candidate 17); the guide pin only checks that the scripts it names ship"
+    },
+    {
+      "name": "root-argument-tests",
+      "file": "plugins/pipeline-core/lib/root-argument.test.mjs",
+      "invariantPinned": "A win32 root argument typed with forward slashes is rewritten to backslashes before the strict physical-path checks and nothing else changes (other platforms, non-strings, .., trailing separators), and the three raw-root entries normalise before comparing",
+      "nonOverlapNote": "Unique cases: lib/root-argument.mjs with an injected platform; the entries' own suites pin their other refusals"
+    },
+    {
+      "name": "pin-happy-path-guide-names-only-existing-scripts-tests",
+      "file": "plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs",
+      "invariantPinned": "Every script the happy-path guide names ships in scripts/, the start skill loads the guide, and the guide keeps its gap markers and holds no host path",
+      "nonOverlapNote": "Unique source-text pin for the happy-path reference (candidate 17); the owning references pin their own commands"
+    },
+    {
       "name": "dispatch-recovery-admission-tests",
       "file": "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs",
       "invariantPinned": "The guard admits exactly the three closed argv shapes of the dispatch recovery verb, root-bound and limited to scratch or evidence json paths (AC-245, D139)",

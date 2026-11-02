@@ -83,7 +83,8 @@ Owner: `docs/push-release-flow.md`.
 | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
 | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
 
-A row that is missing here has no source in this repository; ask the PO instead of assuming it.
+A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
+(one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.
 
 ## Gaps this guide does not close
 

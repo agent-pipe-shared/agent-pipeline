@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.runner-capabilities.v1",
+  "note": "Only facts that another shipped document or script states. A cell without such a source says it is not measured. The table in skills/pipeline-start/references/happy-path.md is checked against this file.",
+  "runners": ["claude", "codex", "antigravity"],
+  "rows": [
+    {
+      "topic": "Dispatch carrier",
+      "claude": "`Agent` / `Task`, functional `agentType`",
+      "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`",
+      "antigravity": "`antigravity-native-dispatch-prepare.mjs`, then `invoke_subagent`; implementation is not native",
+      "owner": "skills/pipeline-start/references/implementation-continuation.md; references/antigravity-native-dispatch.md"
+    },
+    {
+      "topic": "Mechanic and deep tiers",
+      "claude": "available",
+      "codex": "see `config/runner-profiles-v3.json`",
+      "antigravity": "`unavailable` there",
+      "owner": "config/runner-profiles-v3.json"
+    },
+    {
+      "topic": "Tool budget",
+      "claude": "per-agent counter; a grant raises it",
+      "codex": "nothing counts it (the briefing says so)",
+      "antigravity": "nothing counts it (the briefing says so)",
+      "owner": "hooks/guard-dispatch-budget.mjs; scripts/dispatch-budget-grant.mjs"
+    },
+    {
+      "topic": "Dispatch record model",
+      "claude": "host-observed",
+      "codex": "declared, labelled unobserved",
+      "antigravity": "see `references/antigravity-native-dispatch.md`",
+      "owner": "scripts/dispatch-record-write.mjs"
+    },
+    {
+      "topic": "Own session descriptor at close",
+      "claude": "derived for Claude",
+      "codex": "derived for the closing runner",
+      "antigravity": "derived for the closing runner",
+      "owner": "scripts/close-coordinator.mjs; skills/close-feature/SKILL.md"
+    },
+    {
+      "topic": "Close entry",
+      "claude": "coordinator route",
+      "codex": "coordinator route",
+      "antigravity": "`finish-feature.mjs` single entry",
+      "owner": "skills/close-feature/SKILL.md; references/antigravity-feature-close.md"
+    },
+    {
+      "topic": "Telemetry row at close",
+      "claude": "`usage-ledger.mjs`",
+      "codex": "not available",
+      "antigravity": "not available",
+      "owner": "skills/close-feature/SKILL.md"
+    },
+    {
+      "topic": "Push second gate",
+      "claude": "host classifier (settings entry)",
+      "codex": "runner prompt, not measured",
+      "antigravity": "runner prompt, not measured",
+      "owner": "docs/push-release-flow.md"
+    }
+  ]
+}
