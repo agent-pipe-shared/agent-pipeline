@@ -594,6 +594,11 @@ function requireAcceptedCriterion(specBytes, specPath, locator, describe) {
   }
 }
 
+/** `enforced` only where hooks/guard-dispatch-budget.mjs is wired and can identify the child (Claude); `unenforced:<runner>` otherwise. */
+export function budgetEnforcementFor(runner) {
+  return runner === "claude" ? "enforced" : `unenforced:${runner}`;
+}
+
 function toolBudgetFor(agentType, maxTurns) {
   const cap = /≤(\d+) tool uses/u.exec(dispatchBudgetLineForRole(agentType) ?? "");
   if (!cap) refuse("DBG-BUDGET-TIER", `no tool-budget tier cap is defined for ${agentType}`);
@@ -826,7 +831,7 @@ export function generateDispatchBinding(options, deps = {}) {
     .filter((entry) => !(Array.isArray(entry.writeScope) && entry.writeScope.length > 0 && !scopesOverlap(allowedPaths, entry.writeScope)))
     .map((entry) => entry.dispatchId).sort();
   for (const owner of startedOwners) {
-    warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent with SendMessage. A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });
+    warnings.push({ code: "DBG-CHECKPOINTED-OWNER", dispatchId: owner, message: `slice ${owner} of item ${itemId} is started and not finished, so a fresh dispatch for the same outcome is the successor route. Standard procedure: read its report, grant extra calls with node <plugin>/scripts/dispatch-budget-grant.mjs --agent-id <the agent id of that run> --extra <1..30> --reason "<why>" and resume the SAME agent through the runner's continuation route (SendMessage on Claude; on a runner without a budget counter there is no grant to record, so resume it with a fresh message that restates the remaining steps). A fresh dispatch is meant only for an agent that is lost or has run itself into a corner (successor reason elephant-restart, owner-lost, context-poisoned or new-vertical-outcome). To release the slice instead: node <plugin>/scripts/slice-queue.mjs cancel ${owner} --started --reason "<why>" --class budget` });
   }
 
   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
@@ -923,6 +928,8 @@ export function generateDispatchBinding(options, deps = {}) {
   try { maxTurns = Number.parseInt(parseAgentFrontmatter(readFileSync(resolve(agentsDir, `${agentType}.md`), "utf8")).maxTurns, 10); } catch { maxTurns = NaN; }
   if (!Number.isSafeInteger(maxTurns)) refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no integer maxTurns`);
   const budget = toolBudgetFor(agentType, maxTurns);
+  const budgetEnforcement = budgetEnforcementFor(runner);
+  if (budgetEnforcement !== "enforced") warnings.push({ code: "DBG-BUDGET-UNENFORCED", runner, budgetEnforcement, message: `${runner} has no tool-call counter: the briefing's cap is self-policed and no hook stops the agent at ${budget.budget} calls (a measured Codex child payload would be needed to build one); plan the slice size and the hand-back checkpoint accordingly` });
 
   // The ruleset identity. The host only format-checks `rulesetSha` (64 hex) and copies it into its
   // receipt and the dispatch record, so a lesser-but-real identity of the same kind is admissible when
@@ -1056,7 +1063,10 @@ export function generateDispatchBinding(options, deps = {}) {
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
     `- Slice: ${dispatchId}`,
     `- Write scope: ${allowedPaths.join(", ")}`,
-    `- **Tool budget (TB-09, hard cap):** ≤${budget.budget} tool uses (min(tier cap ${budget.tierCap}, maxTurns ${maxTurns} - 15)). 80 % checkpoint at about call ${budget.checkpoint}: stop editing and end the turn with an interim report naming what remains.`,
+    // 17 (runner neutrality): only the Claude route counts a child's tool calls (hooks/guard-dispatch-budget.mjs). Another runner's briefing
+    // says so in a machine-readable line, so the cap is a limit the agent polices itself on, never one described as counted.
+    `- **Tool budget (${budgetEnforcement === "enforced" ? "TB-09, hard cap" : `TB-09, self-policed on ${runner}`}):** ≤${budget.budget} tool uses (min(tier cap ${budget.tierCap}, maxTurns ${maxTurns} - 15)). 80 % checkpoint at about call ${budget.checkpoint}: stop editing and end the turn with an interim report naming what remains.`,
+    ...(budgetEnforcement === "enforced" ? [] : [`- **Budget enforcement:** \`${budgetEnforcement}\` -- no hook on ${runner} counts your tool calls and none will stop you at the cap, so count them yourself, checkpoint at about call ${budget.checkpoint}, and hand back with a continuation card; a message that tells you to continue is not a grant.`]),
   ];
   const skeleton = [
     block, "", NATIVE_GOLDFISH_HOST_DIRECTIVE, "",
@@ -1083,7 +1093,7 @@ export function generateDispatchBinding(options, deps = {}) {
   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
 
   // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
+  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, budgetEnforcement, skeleton, warnings, ...(preDispatch === null ? {} : { preDispatch }) };
 }
 
 const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });

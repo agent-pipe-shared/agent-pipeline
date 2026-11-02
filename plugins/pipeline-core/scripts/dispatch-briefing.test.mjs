@@ -186,7 +186,7 @@ test("binding fields equal the facts of their own sources", async () => {
   const fx = makeFixture();
   const result = runDispatchBriefing(argvOf(fx), depsOf(fx));
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(Object.keys(result).sort(), ["binding", "block", "ok", "schema", "skeleton", "warnings"]);
+  assert.deepEqual(Object.keys(result).sort(), ["binding", "block", "budgetEnforcement", "ok", "schema", "skeleton", "warnings"]);
   const b = result.binding;
   assert.equal(b.schema, "pipeline.native-goldfish-host-briefing.v3");
   assert.equal(b.dispatchId, "ALF-T1");
@@ -1187,6 +1187,33 @@ test("K142 --runner codex is admitted and the model id is checked against the mo
   assert.ok(result.skeleton.includes(`\`${route.selector.value}\``), "field 6 names the route model");
   assert.equal(resolveActiveRunner({ env: seen.env }), "codex", "the preflight observation is made as the requested runner");
   assert.equal(seen.cwd, fx.root);
+});
+
+// 17 (runner neutrality): only the Claude route counts a child's tool calls. A Codex briefing must not call the cap a counted hard cap; it says,
+// machine-readably, that nothing counts it, and the generator result and a warning carry the same readback.
+test("17 a Codex briefing names its tool budget self-policed with unenforced:codex; the Claude briefing keeps the counted hard cap", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { bindDispatchBudget } = await import("../lib/dispatch-budget-binding.mjs");
+  const fx = makeFixture();
+  const route = await codexRouteOf("duty.implement");
+  const codex = runDispatchBriefing(argvOf(fx, { "--model-id": route.selector.value }, CODEX), depsOf(fx, { observePreflight: () => availableObserver() }));
+  assert.equal(codex.ok, true, JSON.stringify(codex).slice(0, 400));
+  assert.equal(codex.budgetEnforcement, "unenforced:codex");
+  assert.match(codex.skeleton, /\*\*Tool budget \(TB-09, self-policed on codex\):\*\* ≤\d+ tool uses/u);
+  assert.match(codex.skeleton, /\*\*Budget enforcement:\*\* `unenforced:codex`/u);
+  assert.equal(codex.skeleton.includes("hard cap"), false, "a counted hard cap is not claimed on a runner that counts nothing");
+  const warning = codex.warnings.find((entry) => entry.code === "DBG-BUDGET-UNENFORCED");
+  assert.equal(warning?.runner, "codex");
+  assert.equal(warning?.budgetEnforcement, "unenforced:codex");
+  const bound = bindDispatchBudget({ prompt: codex.skeleton, maxTurns: 80, applicable: true });
+  assert.equal(bound.status, "prepared", "the existing cap parser still reads the cap from the self-policed line");
+  assert.equal(bound.baseCalls, budgetOf(codex.skeleton));
+  const claude = runDispatchBriefing(argvOf(fx, {}), depsOf(fx));
+  assert.equal(claude.ok, true, JSON.stringify(claude).slice(0, 400));
+  assert.equal(claude.budgetEnforcement, "enforced");
+  assert.match(claude.skeleton, /\*\*Tool budget \(TB-09, hard cap\):\*\* ≤\d+ tool uses/u);
+  assert.equal(claude.skeleton.includes("Budget enforcement"), false);
+  assert.equal(claude.warnings.some((entry) => entry.code === "DBG-BUDGET-UNENFORCED"), false);
 });
 
 test("K142 a Claude-family model under --runner codex is refused DBG-MODEL-FAMILY with a repair that names the route model and the flag", async () => {
