@@ -251,7 +251,10 @@ test("an unavailable loaded identity falls back to the installed identity, with 
   assert.ok(result.skeleton.includes(INSTALLED) && result.skeleton.includes("fallback"));
 });
 
-test("with no installed identity either, the loaded plugin root's content hash is used, with a warning", async () => {
+// Restated 2026-11-02 (candidate 18, C18-9, QG-04, own hunk; intent kept: the plugin root's content hash is the identity and its source stays visible):
+// a content hash of the loaded plugin root is a deterministic identity, so it is reported through `rulesetIdentitySource` and no longer as a
+// DBG-RULESET-FALLBACK warning; only the lesser installed identity still warns (pinned by the test above).
+test("with no installed identity either, the loaded plugin root's content hash is used and its source is visible without a warning", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();
   const seen = [];
@@ -260,9 +263,8 @@ test("with no installed identity either, the loaded plugin root's content hash i
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(seen, ["/plugin/root"]);
   assert.equal(result.binding.rulesetSha, SNAPSHOT);
-  assert.equal(result.warnings.length, 1);
-  assert.equal(result.warnings[0].code, "DBG-RULESET-FALLBACK");
-  assert.ok(result.warnings[0].source.includes("plugin root"), result.warnings[0].source);
+  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false);
+  assert.ok(result.rulesetIdentitySource.includes("plugin root"), result.rulesetIdentitySource);
 });
 
 test("the real plugin-root snapshot yields a 64-hex identity for a small plugin directory", async () => {

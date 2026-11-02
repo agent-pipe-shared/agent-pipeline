@@ -538,7 +538,9 @@ test("AFR18 a store write without a sealed root is a typed refusal and a foreign
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
     assert.equal(admitted.code, "AGY-HOST-COMMIT-ADMITTED");
     assert.deepEqual(assessAgyHostCommit({ baseline: { ...ok.baseline, root: sub }, ...claim }),
-      { ok: false, code: "AGY-HOST-COMMIT-DRIFT" });
+      // Restated 2026-11-02 (candidate 18, C18-1a, QG-04, own hunk; intent kept: the foreign top level is still the drift refusal): the refusal now names
+      // the failed comparison in `detail.conditions` so the operator can tell a moved top level from a moved head (diagnostics of the host commit).
+      { ok: false, code: "AGY-HOST-COMMIT-DRIFT", detail: { conditions: ["top-level-differs"] } });
     // A nested repository that has no commit yet returns earlier (before any top-level comparison).
     const nestedRoot = join(root, "nested");
     mkdirSync(nestedRoot);

@@ -158,7 +158,11 @@ test("TOFU measurement stops typed at the ADR-0085 single-review design-course b
   assert.equal(result.onboarding?.final?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1", stdout);
   assert.equal(result.onboarding?.final?.status, "signature-required", stdout);
   assert.equal(result.onboarding?.final?.nextAction?.argv?.[1], "sign-intent", stdout);
-  assert.match(result.onboarding?.error?.stderr ?? "", /PO-KEY-UNENCRYPTED/, stdout);
+  // Restated 2026-11-02 (candidate 18, A18-M2, QG-04, own hunk; intent kept: the walk ends typed at the signing step, before any signed push): the signing
+  // step now refuses BEFORE the passphrase prompt and before the key is used when pipeline.user.yaml differs from HEAD (the disposable fixture leaves it
+  // untracked), so the typed stop is PO-SIGN-APPROVAL-MODE-UNCOMMITTED, which names its repair. A fixture that commits the file reaches the key refusal
+  // PO-KEY-UNENCRYPTED instead; both are the same typed stop at the signature request.
+  assert.match(result.onboarding?.error?.stderr ?? "", /PO-SIGN-APPROVAL-MODE-UNCOMMITTED|PO-KEY-UNENCRYPTED/, stdout);
   // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
   assert.equal(result.steps.length, 2, stdout);
   assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);
