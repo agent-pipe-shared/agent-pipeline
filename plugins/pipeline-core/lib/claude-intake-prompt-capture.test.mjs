@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
+import * as onboarding from "./project-onboarding-v3.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { captureClaudeInitialPromptPointer, readClaudeInitialPromptPointerAfterConsent } from "./claude-initial-prompt-pointer.mjs";
 import {
@@ -231,4 +232,32 @@ try {
 } finally {
   cleanup();
 }
+} }, { id: "CIP004", name: "AC-145 the Claude intake capture action also spells the working text-file form with its digest, leaving the turn-ref and existing-file actions unchanged", run: () => {
+  const claude = onboarding.intakeCaptureAction("/r", "claude");
+  const script = claude.applyAction.argv[0];
+  assert.deepEqual(claude.applyAction.argv, [script, "intake-capture-apply", "--root", "/r",
+    "--text-turn-ref", "<native-text-turn-reference-json>", "--activate", "--runner", "claude"]);
+  assert.deepEqual(claude.existingFileApplyAction.argv, [script, "intake-capture-apply", "--root", "/r",
+    "--text-file", "<existing-repository-file>", "--text-file-sha256", "<sha256-of-existing-file>", "--activate", "--runner", "claude"]);
+  assert.ok(claude.textFileApplyAction, "the working text-file form is offered next to the turn-ref action");
+  assert.deepEqual(claude.textFileApplyAction.argv, [script, "intake-capture-apply", "--root", "/r",
+    "--text-file", "scratch/onboarding-intake.txt", "--text-file-sha256", "<sha256-of-scratch-text-file>", "--activate", "--runner", "claude"]);
+  assert.equal(claude.textFileApplyAction.mutation, claude.applyAction.mutation);
+  assert.deepEqual(claude.textFileApplyAction.expected, claude.applyAction.expected);
+  assert.match(claude.guidance, /scratch\/onboarding-intake\.txt/u);
+  assert.match(claude.guidance, /verbatim/u);
+  assert.match(claude.guidance, /sha256sum scratch\/onboarding-intake\.txt/u);
+  const other = onboarding.intakeCaptureAction("/r", "codex");
+  assert.equal(other.textFileApplyAction, undefined, "non-Claude runners are unchanged");
+  assert.deepEqual(other.applyAction.argv, [script, "intake-capture-apply", "--root", "/r",
+    "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex"]);
+} }, { id: "CIP005", name: "AC-145 a refused native intake text reference carries the working text-file pointer", run: () => {
+  for (const ref of ["{not-json", "[]", JSON.stringify({ schema: "unknown" })]) {
+    let error;
+    try { onboarding.applyProjectOnboardingIntakeCapture({ rootDir: "/nonexistent-root", textTurnRef: ref }); } catch (caught) { error = caught; }
+    assert.ok(error, `reference ${ref} is refused`);
+    assert.match(String(error.code), /^INTAKE-TEXT-TURN-REF-/u);
+    assert.match(error.message, /--text-file/u);
+    assert.match(error.message, /--text-file-sha256/u);
+  }
 } }], fd: 3, maxBytes: 65_536 });

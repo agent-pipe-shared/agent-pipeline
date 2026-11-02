@@ -3192,16 +3192,26 @@ const INTAKE_MATERIAL_TEXT_MAX_BYTES = 1_000_000;
 // multi-line prose (a PO message), so singleLine is false here -- no
 // consumer in this file validates that flag; it is descriptive metadata for
 // the caller collecting the value.
-function intakeCaptureAction(root, runner) {
+const INTAKE_TEXT_FILE_SHA256_PLACEHOLDER = "<sha256-of-scratch-text-file>";
+// The working way out when the native turn reference is unusable: the PO's first material message,
+// verbatim, in a scratch file plus its digest. Shared by the Claude capture guidance and the refusal text.
+const INTAKE_WORKING_TEXT_FILE_POINTER = `If the native reference is unusable, write the PO's first material message verbatim, once, to ${INTAKE_TEXT_FILE}, compute its digest with the command sha256sum ${INTAKE_TEXT_FILE}, and run textFileApplyAction (--text-file ${INTAKE_TEXT_FILE} --text-file-sha256 <digest>); the PO does not give the material twice.`;
+
+export function intakeCaptureAction(root, runner) {
   if (runner === "claude") return {
     kind: "collect-input",
     input: { name: "textTurnRef", encoding: "json", trim: true, minBytes: 1, maxBytes: 8192, singleLine: true, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: "Consent is already recorded. Supply only the opaque native UserPromptSubmit reference delivered in trusted hook context, then run applyAction. The reader resolves exact host-observed bytes after consent. Never supply a transcript path, paste prompt text as a reference, or use a guessed identifier. If no native reference is available, use existingFileApplyAction only for an existing regular repository file.",
+    guidance: `Consent is already recorded. Supply only the opaque native UserPromptSubmit reference delivered in trusted hook context, then run applyAction. The reader resolves exact host-observed bytes after consent. Never supply a transcript path, paste prompt text as a reference, or use a guessed identifier. ${INTAKE_WORKING_TEXT_FILE_POINTER} For material already in an existing regular repository file, use existingFileApplyAction.`,
     applyAction: commandAction(
       [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-turn-ref", INTAKE_TEXT_TURN_REF_PLACEHOLDER,
         "--activate", "--runner", runner],
+      true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
+    ),
+    textFileApplyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-file", INTAKE_TEXT_FILE,
+        "--text-file-sha256", INTAKE_TEXT_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
       true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
     ),
     existingFileApplyAction: commandAction(
@@ -3235,7 +3245,7 @@ function intakeCaptureAction(root, runner) {
 // captured but the one bundled design-question round has not been answered
 // yet (checkpoint transactionState "design-questions-pending").
 function intakeTextTurnReferenceFailure(code, message = "native intake text reference is unavailable") {
-  const error = new Error(message);
+  const error = new Error(`${message}. ${INTAKE_WORKING_TEXT_FILE_POINTER}`);
   error.code = code;
   throw error;
 }
