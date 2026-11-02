@@ -3672,6 +3672,12 @@ export function isLateVerifyRecoveryLifecycle(lifecycle) {
     && lifecycle.approvalCurrent === true;
 }
 
+const LATE_VERIFY_CONFIRMATION_GATES = Object.freeze([
+  "Gate 1: the Pipeline asks for confirmation before the calibration is changed; a human (the PO or the runner permission prompt) clears it, the pipeline never approves it itself.",
+  "Gate 2: the runner's permission layer may refuse the same call independently of gate 1.",
+  "If the runner refuses: ask the PO to allow that exact command once; do not retry the same call in a loop; do not edit calibration directly.",
+]);
+
 /**
  * Read-only, driver-safe presentation of the one sanctioned late recovery.
  * Returning null is intentional for malformed state, stale authority, missing
@@ -3706,7 +3712,9 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
     }],
     mutation: false,
     requiresConfirmation: false,
-    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability.",
+    approvingInstance: "human",
+    gates: LATE_VERIFY_CONFIRMATION_GATES,
+    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability. The apply action needs a confirmation cleared by a human (the PO or the runner permission prompt), never by the pipeline itself, and two independent gates exist: the Pipeline asks for confirmation, and the runner's permission layer may refuse the same call on its own. If the runner refuses, ask the PO to allow that exact command once; do not retry the same call in a loop.",
     applyAction: {
       kind: "command",
       ...rendered,
@@ -3716,6 +3724,8 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
       // without a prompt, but the actual calibration mutation needs a fresh
       // attended confirmation.
       requiresConfirmation: true,
+      approvingInstance: "human",
+      gates: LATE_VERIFY_CONFIRMATION_GATES,
     },
     expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
   };

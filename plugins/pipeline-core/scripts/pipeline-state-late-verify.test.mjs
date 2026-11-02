@@ -80,9 +80,26 @@ test("baseline-only implementation exposes and completes the typed late verify r
   assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
     "the ordinary driver receives a typed recovery rather than discovering it at push time");
 
+  // C18-5 (AC-140): the confirmation names who clears it and that two independent gates exist.
+  assert.equal(action.applyAction.approvingInstance, "human",
+    "the confirmation is cleared by a human (the PO or the runner permission prompt), never by the pipeline");
+  assert.equal(action.approvingInstance, "human");
+  assert.ok(Array.isArray(action.applyAction.gates) && action.applyAction.gates.length >= 2,
+    "the apply action lists the closed set of gates");
+  assert.deepEqual(action.gates, action.applyAction.gates);
+  const gateText = action.applyAction.gates.join("\n");
+  assert.match(gateText, /Pipeline asks for confirmation/u);
+  assert.match(gateText, /runner'?s? permission layer may refuse/u);
+  assert.match(gateText, /ask the PO to allow that exact command once/u);
+  assert.match(gateText, /do not retry the same call in a loop/u);
+  assert.match(gateText, /do not edit calibration directly/u);
+  assert.match(action.guidance, /confirmation/u);
+  assert.match(action.guidance, /permission layer/u);
+  assert.match(action.guidance, /human/u);
+
   const neutralPath = join(root, "project", "pipeline.json");
   const legacyPath = join(root, ".claude", "pipeline.json");
-  const before = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
+  const before =[readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
   assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", " "], deps)).result, 2);
   assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], before,
     "a blank input fails before either calibration twin changes");
