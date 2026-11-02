@@ -70,6 +70,21 @@ Owner: `docs/push-release-flow.md`.
 3. `pipeline-state.mjs approve-push --by <name> --remote <remote> --destination refs/heads/<branch>` with the proof flags in signature mode.
 4. `git push <remote> <branch>:refs/heads/<branch>` (full refspec; never force). A stop at the runner's own prompt is the runner's gate, not a Pipeline refusal.
 
+## What differs per runner (only rows with a source)
+
+| Topic | Claude | Codex | Antigravity |
+| --- | --- | --- | --- |
+| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `antigravity-native-dispatch-prepare.mjs`, then `invoke_subagent`; implementation is not native |
+| Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
+| Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
+| Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |
+| Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
+| Close entry | coordinator route | coordinator route | `finish-feature.mjs` single entry |
+| Telemetry row at close | `usage-ledger.mjs` | not available | not available |
+| Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
+
+A row that is missing here has no source in this repository; ask the PO instead of assuming it.
+
 ## Gaps this guide does not close
 
 - Complete lines for `approve-plan`, the `critic-dispatch-preflight.mjs` call and the `plan-transition` phases are not documented anywhere; this guide does not invent them.
