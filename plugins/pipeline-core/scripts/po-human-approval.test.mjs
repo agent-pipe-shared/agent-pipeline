@@ -6338,3 +6338,33 @@ test("accept-residual-critic-findings refuses a major without the class (SEVERIT
     cleanup(dirs);
   }
 });
+
+import { designSigningApprovalModeRefusal } from "./po-human-approval.mjs";
+import { readHumanApprovalMode as readApprovalModeForSigning } from "../lib/critical-human-proof-policy.mjs";
+
+// 17 (AGY greenfield): a design signature binds the candidate commit and tree. While pipeline.user.yaml is untracked or edited the
+// mode reads "uncommitted"; committing it after the signature moved the candidate, approve-plan refused the proof and the PO signed
+// twice. The signing path now refuses before any prompt, with the repair named.
+test("17 a design signature is refused before the prompt while pipeline.user.yaml is not part of HEAD", () => {
+  const root = mkdtempSync(join(tmpdir(), "dab-mode-"));
+  const git = (...args) => execFileSync("git", ["-C", root, "-c", "user.name=T", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" });
+  try {
+    git("init", "-q");
+    writeFileSync(join(root, "README.md"), "x\n");
+    git("add", "README.md");
+    git("commit", "-q", "-m", "init");
+    assert.equal(designSigningApprovalModeRefusal(readApprovalModeForSigning(root)), null, "no mode file at all: the source has no opinion");
+    writeFileSync(join(root, "pipeline.user.yaml"), "gates:\n  human_approval: signature\n");
+    const untracked = designSigningApprovalModeRefusal(readApprovalModeForSigning(root));
+    assert.equal(untracked?.code, "DAB-SIGN-APPROVAL-MODE-UNCOMMITTED");
+    assert.match(untracked.message, /commit pipeline\.user\.yaml/u);
+    git("add", "pipeline.user.yaml");
+    git("commit", "-q", "-m", "mode");
+    assert.equal(designSigningApprovalModeRefusal(readApprovalModeForSigning(root)), null, "a committed mode file is part of the candidate");
+    writeFileSync(join(root, "pipeline.user.yaml"), "gates:\n  human_approval: chat\n");
+    assert.equal(designSigningApprovalModeRefusal(readApprovalModeForSigning(root))?.code, "DAB-SIGN-APPROVAL-MODE-UNCOMMITTED", "an edit against HEAD is refused too");
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "po-human-approval.mjs"), "utf8");
+    assert.match(source, /const modeRefusal = designSigningApprovalModeRefusal\(mode\);\s+if \(modeRefusal !== null\) throw modeRefusal;\s+if \(!policy\.ok\) return null;/u, "the observation refuses before any other use of the mode");
+    assert.match(source, /error\?\.code === DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED\) throw error;/u, "the typed refusal is not collapsed into the generic invalid-request refusal");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

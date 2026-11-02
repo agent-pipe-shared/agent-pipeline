@@ -361,6 +361,15 @@ export function designSigningGit(repository, argv, dependencies = {}) {
   if (result.error || result.signal || result.status !== 0) throw Error("DAB-SIGN-GIT-UNAVAILABLE");
   return result.stdout;
 }
+// 17 (AGY greenfield): the design signature binds the candidate commit and tree. When `pipeline.user.yaml` (the file that names
+// the approval mode) is untracked, edited or deleted against HEAD, the mode reads as "uncommitted", and committing the file
+// AFTER the signature moves the candidate, so `approve-plan` refuses the proof (CAC-SOURCE-UNAVAILABLE) and the PO signs twice.
+// The refusal therefore comes BEFORE the passphrase prompt and names the repair.
+export const DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED = "DAB-SIGN-APPROVAL-MODE-UNCOMMITTED";
+export function designSigningApprovalModeRefusal(mode) {
+  if (mode?.source !== "uncommitted") return null;
+  return Object.assign(new Error(`${DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED}: pipeline.user.yaml differs from HEAD (untracked, edited or deleted), so the approval mode this signature is read under is not yet part of the candidate it binds; committing it after signing would move the candidate and make approve-plan refuse the proof. Repair: commit pipeline.user.yaml (or restore it to HEAD), rebuild the design approval request with present-plan so it binds the new HEAD, then sign once.`), { code: DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED });
+}
 function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
   try {
     if (!own(record, ["schema", "binding", "bindingSha256", "approvalIntent"]) || record.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA
@@ -402,6 +411,8 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
     observe("pipeline.user.yaml", { optional: true });
     observe("project/critical-human-proof.json", { optional: true, maxBytes: 32768 });
     const mode = readHumanApprovalMode(root), policy = readCriticalHumanProofPolicy(root);
+    const modeRefusal = designSigningApprovalModeRefusal(mode);
+    if (modeRefusal !== null) throw modeRefusal;
     if (!policy.ok) return null;
     const policySnapshot = { requiredKinds: [...policy.requiredKinds].sort(), waivers: [...policy.waivers].sort(), trustAnchor: policy.trustAnchor, trustAnchors: policy.trustAnchors };
     // Re-read every exact public byte after all observations, including committed mode lookup.
@@ -425,7 +436,7 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
   } catch (error) {
     // An unresolved git is a repairable host defect, not evidence that the request is invalid: keep its typed code and repair hint
     // instead of collapsing into the generic DAB-SIGN-REQUEST-INVALID refusal.
-    if (error?.code === "PO-SIGN-GIT-UNAVAILABLE") throw error;
+    if (error?.code === "PO-SIGN-GIT-UNAVAILABLE" || error?.code === DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED) throw error;
     return null;
   }
 }
