@@ -57,6 +57,7 @@ Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv f
 2. `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, apply the returned action, then
    `plan-transition` / `apply-transition` through `checkpointed`, `feature-close-prepared`, `tracked-close-finalized`, `candidate-frozen`, `final-verify-green`,
    `cleanup-complete` and `closed-local`. The cleanup receipt: `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (before `closed-local`).
+   To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
    `--continuity-close-request` when the returned argv carries it. **Antigravity** has one entry instead: `finish-feature.mjs --root <root> --by <actor> --architecture-impact <value> --audit-request <json> --critic-verify-lifecycle <id>`.
 4. Telemetry row (Claude only): `usage-ledger.mjs`; on Codex and Antigravity skip it and say so in the close report.

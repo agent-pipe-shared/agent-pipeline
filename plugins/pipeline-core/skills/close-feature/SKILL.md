@@ -205,6 +205,7 @@ separate coordinator transitions and are never implied by this skill.
 
 A feature whose State carries `continuity` closes in this order. Every step is first a read-only plan, then an
 `--activate` apply of the returned action after confirmation; nothing below signs or pushes on its own.
+`close-coordinator.mjs drive` (table below) walks the coordinator pairs one step per call and tells you what the next phase still needs; it replaces none of the commands.
 
 1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
@@ -242,6 +243,7 @@ Spellings are taken from each script's own parser or help; `<...>` is a value.
 | `close-coordinator.mjs apply-start` | the plan-start flags plus --plan-sha256 --activate |
 | `close-coordinator.mjs plan-transition` | --root --lifecycle --actor --phase [--architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --authorized] |
 | `close-coordinator.mjs apply-transition` | the plan-transition flags plus --plan-sha256 --activate |
+| `close-coordinator.mjs drive` | --root --lifecycle --actor [--phase --architecture-impact --continuity-close-request --evidence --publication --audit-request --critic-verify-lifecycle --apply]; the helper over the pairs above: names the phase, the missing inputs and the remaining chain, plans one step, and with --apply applies exactly that step; writes the cleanup receipt itself, stops before every human-gate phase and takes no --authorized |
 | `po-human-approval.mjs authorize-critical` | --repo-root --feature-id --plan --spec --kind --subject-sha256 --expires-at [--directory --subject] (the printed `signatureCommand`); in the terminal it prints `proofPath`, plus `requestPath` and `authorityPath` for every kind except push |
 
 A commit message goes in a file: `git commit -F <msgfile> -- <paths>` after `git add -- <paths>` (the refusals for several `-m`

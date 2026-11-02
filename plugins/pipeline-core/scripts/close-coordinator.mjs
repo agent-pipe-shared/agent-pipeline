@@ -36,6 +36,7 @@ import {
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+import { describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
@@ -82,9 +83,12 @@ const CLI_HELP = [
   "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
   "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
+  "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply]",
   "       close-coordinator.mjs --help",
   "",
   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
+  "drive is the helper over the plan/apply pairs: it names the phase, the missing inputs and the remaining chain, plans one step (read-only), and with --apply",
+  "applies exactly that step. It writes the cleanup receipt itself and stops before every human-gate phase; it replaces none of the commands above.",
 ].join("\n");
 
 const canonical = (value) => {
@@ -1148,6 +1152,46 @@ async function applyTransition(values, suppliedDigest) {
   return result;
 }
 
+// The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
+// never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
+async function driveClose(values, { apply }) {
+  const root = physicalRoot(values.root);
+  if (!ID.test(values.lifecycle ?? "") || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "drive identity is invalid");
+  const common = gitCommonDir(root);
+  const stored = readCloseCoordinator(common, values.lifecycle);
+  const phase = stored.coordinator.phase;
+  const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
+  const options = coordinatorNextPhases(phase);
+  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain };
+  if (options.length === 0) return { ...base, status: "terminal" };
+  const target = values.phase ?? options[0];
+  const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
+  if (!options.includes(target) && !renewal) {
+    fail("CLOSE-ORDER", `from ${phase} the reachable phases are ${options.join(", ")}; --phase ${target} is not one of them`);
+  }
+  const need = CLOSE_STEP_REQUIREMENTS[target];
+  const step = { phase: target, needs: need.flags, evidenceSchema: need.evidenceSchema, producer: need.producer };
+  if (need.humanGate) {
+    return { ...base, status: "human-gate", step,
+      message: `${target} is a human gate: the human's authorization evidence is required first, and this driver never applies it; use plan-transition with --authorized and then apply-transition` };
+  }
+  const transition = { ...values, phase: target };
+  let cleanup = null;
+  if (target === "cleanup-complete" && transition.evidence === undefined) {
+    if (!apply) return { ...base, status: "would-write-cleanup-receipt", step, message: "run again with --apply: the driver writes the cleanup receipt (the producer) and then applies cleanup-complete" };
+    cleanup = writeCleanupReceipt({ root, lifecycle: values.lifecycle });
+    transition.evidence = cleanup.receiptPath;
+  }
+  const missing = missingCloseInputs(target, transition);
+  if (missing.length > 0) return { ...base, status: "inputs-missing", step, missing, message: `${target} still needs: ${missing.join(", ")}` };
+  const plan = await transitionPlan(transition, { deriveCriticAddenda: true });
+  if (!apply) return { ...base, status: "planned", step, planSha256: plan.planSha256, nextAction: plan.nextAction, message: "planned only; run again with --apply to apply exactly this plan" };
+  const applied = await applyTransition(transition, plan.planSha256);
+  const after = readCloseCoordinator(common, values.lifecycle).coordinator.phase;
+  return { ...base, status: "applied", step, planSha256: plan.planSha256, applied, ...(cleanup === null ? {} : { cleanupReceipt: cleanup }),
+    phaseAfter: after, chainAfter: describeCloseChain(after, { root, lifecycle: values.lifecycle }) };
+}
+
 const [command, ...argv] = process.argv.slice(2);
 try {
   if (command === "--help" && argv.length === 0) {
@@ -1178,6 +1222,25 @@ try {
       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
       next: coordinatorNextPhases(stored.coordinator.phase),
     });
+  } else if (command === "drive") {
+    const parsed = exactArgs(argv, new Set([
+      "root", "lifecycle", "actor", "phase", "evidence", "publication",
+      "continuity-close-request", "architecture-impact", "audit-request", "critic-verify-lifecycle",
+    ]), new Set(["apply"]));
+    if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor) fail("CLOSE-ARGS", "drive arguments invalid");
+    if (parsed.values.phase !== undefined && !COORDINATOR_PHASES.includes(parsed.values.phase)) fail("CLOSE-ARGS", "drive --phase is not a coordinator phase");
+    emit(await driveClose({
+      root: parsed.values.root,
+      lifecycle: parsed.values.lifecycle,
+      actor: parsed.values.actor,
+      phase: parsed.values.phase,
+      architectureImpact: parsed.values["architecture-impact"],
+      evidence: parsed.values.evidence,
+      publication: parsed.values.publication,
+      continuityCloseRequest: parsed.values["continuity-close-request"],
+      auditRequest: parsed.values["audit-request"],
+      criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
+    }, { apply: parsed.booleans.apply === true }));
   } else if (command === "write-cleanup-receipt") {
     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");

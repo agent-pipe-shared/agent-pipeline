@@ -824,6 +824,51 @@ test("17 cleanup receipt: an own session that could not be derived is a typed re
   assert.equal(legacy.ownSessionCode, null);
 });
 
+test("process: drive names the missing input, plans without writing, applies one step, writes the cleanup receipt itself and stops at a human gate", () => {
+  const f = processFixture("drive", { stopAfterFreeze: true });
+  const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
+  const phaseNow = () => f.invoke(["inspect", "--root", f.root, "--lifecycle", f.lifecycle]).coordinator.phase;
+
+  const missing = drive([]);
+  assert.equal(missing.status, "inputs-missing");
+  assert.deepEqual(missing.missing, ["evidence"]);
+  assert.equal(missing.phase, "candidate-frozen");
+  assert.equal(missing.chain.remaining[0].phase, "final-verify-green");
+
+  const verifyPath = join(f.evidenceDirectory, "drive-verify.json");
+  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
+  const planned = drive(["--evidence", verifyPath]);
+  assert.equal(planned.status, "planned");
+  assert.match(planned.planSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(phaseNow(), "candidate-frozen", "a planned step changes nothing");
+
+  const applied = drive(["--evidence", verifyPath, "--apply"]);
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.phaseAfter, "final-verify-green");
+  assert.equal(applied.chainAfter.current, "final-verify-green");
+  assert.equal(phaseNow(), "final-verify-green");
+
+  const gate = drive([]);
+  assert.equal(gate.status, "human-gate", "the first branch after a green Verify is the publication authorization");
+  assert.equal(gate.step.phase, "publication-authorized");
+  assert.equal(drive(["--authorized"], 2).code, "CLOSE-ARGS", "the driver has no way to pass the human's authorization");
+  assert.equal(drive(["--phase", "promoted"], 2).code, "CLOSE-ORDER");
+
+  const would = drive(["--phase", "cleanup-complete"]);
+  assert.equal(would.status, "would-write-cleanup-receipt");
+  assert.equal(existsSync(join(f.evidenceDirectory, "cleanup-receipt.json")), false, "a read-only drive writes no receipt");
+  const cleaned = drive(["--phase", "cleanup-complete", "--apply"]);
+  assert.equal(cleaned.status, "applied");
+  assert.equal(cleaned.cleanupReceipt.status, "complete");
+  assert.equal(cleaned.phaseAfter, "cleanup-complete");
+
+  assert.equal(drive(["--apply"]).phaseAfter, "closed-local");
+  const release = drive([]);
+  assert.equal(release.status, "human-gate");
+  assert.equal(release.step.phase, "release-eligible");
+  rmSync(f.root, { recursive: true, force: true });
+});
+
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
   const fixture = processFixture("delivery");
   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");

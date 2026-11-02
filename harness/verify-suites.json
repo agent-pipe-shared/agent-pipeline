@@ -3798,6 +3798,12 @@
       "nonOverlapNote": "Unique source-text pin for the happy-path reference (candidate 17); the owning references pin their own commands"
     },
     {
+      "name": "close-chain-guide-tests",
+      "file": "plugins/pipeline-core/lib/close-chain-guide.test.mjs",
+      "invariantPinned": "The close chain guide has one requirement entry per reachable coordinator phase, its human-gate phases are exactly the ones that need the authorized flag, the evidence schemas it names are the ones the coordinator's transition plan checks, and it names the remaining chain and the missing inputs of a step",
+      "nonOverlapNote": "Unique cases: lib/close-chain-guide.mjs against the coordinator source; the drive verb itself is pinned in close-coordinator.test.mjs"
+    },
+    {
       "name": "dispatch-recovery-admission-tests",
       "file": "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs",
       "invariantPinned": "The guard admits exactly the three closed argv shapes of the dispatch recovery verb, root-bound and limited to scratch or evidence json paths (AC-245, D139)",

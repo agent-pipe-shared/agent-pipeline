@@ -305,6 +305,7 @@
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-refresh-tests",
         "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-chain-guide-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisor-execution-tests",
