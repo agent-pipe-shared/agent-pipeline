@@ -62,11 +62,20 @@ const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKIL
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
 const AGY_NATIVE_DISPATCH_PREPARE = join(PLUGIN_ROOT, "scripts", "antigravity-native-dispatch-prepare.mjs");
 const HOOK_STARTED_AT = Date.now();
-const HOOK_BUDGET_MS = 42_000;
+// 17 (runner neutrality): the Antigravity manifest (hooks.json at the plugin root) gives this hook 30 s, so the adapter's own budget has to sit
+// below that: with the old 42 s the host would have killed the hook before it could return its typed fail-closed denial. The shares are
+// derived from the budget the way the Codex adapter derives its own (a cold lifecycle readback legitimately takes about ten seconds; it used to
+// get 4 s here and ended in ETIMEDOUT, which the guard turns into a denial of an innocent call), and the push guard gets the larger share it needs.
+const HOOK_BUDGET_MS = 28_000;
+const LIFECYCLE_GUARD_BUDGET = Object.freeze({
+  capMs: Math.floor(HOOK_BUDGET_MS / 2),
+  reserveMs: Math.floor(HOOK_BUDGET_MS / 6),
+});
 const STDIN_TIMEOUT_MS = 1_000;
 const STDIN_MAX_BYTES = 1024 * 1024;
 const NESTED_GUARD_BUDGETS = Object.freeze({
-  "guard-lifecycle-ready.mjs": { capMs: 8_000, reserveMs: 5_000 },
+  "guard-lifecycle-ready.mjs": LIFECYCLE_GUARD_BUDGET,
+  "guard-push.mjs": { capMs: 16_000, reserveMs: 6_000 },
   default: { capMs: 8_000, reserveMs: 5_000 },
 });
 let completed = false;
@@ -713,9 +722,16 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // -c`) bypassed it. Allow any run of whitespace-separated tokens between the shell name
     // and the `-*c` cluster, not just direct adjacency; a bare `bash script.sh` (no `-`-flag
     // token anywhere) still does not match, since no token in that command matches `-[a-zA-Z]*c\b`.
+    // 17: the text of a quoted argument (a commit message, an echoed note) is data, so `git commit -m "... node -e ..."` is not inline execution.
+    // A quoted segment is replaced by a placeholder unless it IS a flag-shaped word (`node '-e' 'code'` still runs inline code), so the
+    // evasion by quoting the flag itself stays closed while prose that merely mentions the command no longer trips the containment.
+    const unquoted = trimCmd.replace(/"((?:[^"\\]|\\.)*)"|'([^']*)'/gu, (_match, double, single) => {
+      const content = double ?? single ?? "";
+      return content.startsWith("-") ? content : "Q";
+    });
     if (
-      /\b(?:node|python3?|ruby|perl|php)\s+(?:--eval\b|-(?:pe|p|e|c)\b)/.test(trimCmd)
-      || /\b(?:sh|bash|zsh|dash)\b(?:\s+\S+)*?\s+-[a-zA-Z]*c\b/.test(trimCmd)
+      /\b(?:node|python3?|ruby|perl|php)\s+(?:--eval\b|-(?:pe|p|e|c)\b)/.test(unquoted)
+      || /\b(?:sh|bash|zsh|dash)\b(?:\s+\S+)*?\s+-[a-zA-Z]*c\b/.test(unquoted)
     ) {
       deny("BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
     }
@@ -762,7 +778,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // plugin's own pipeline-state script and a physically contained request file, and pipeline-state.mjs itself verifies
     // the proof, its commit/tree/intent binding and the policy before writing. Every other spelling (a bare `--by`, a
     // missing, foreign or spliced request) stays refused here exactly as before.
-    const proofBearingRoute = isLifecycleTool && /(?:^|\s)--design-approval-request\s+\S/u.test(command);
+    // 17: the catalogue admits three proof-bearing transports (the design approval request, the design-workflow approval request and the
+    // bootstrap acknowledgement receipt), each only as a closed argv naming a physically contained request file the PO's proof sits behind.
+    // The adapter used to know the first one, so the other two were refused as "self-approval" although the shared admission let them through.
+    // A bare `--by <name>` carries none of them and stays refused here.
+    const proofBearingRoute = isLifecycleTool
+      && /(?:^|\s)--(?:design-approval-request|design-workflow-approval-request|bootstrap-acknowledgement-receipt)\s+\S/u.test(command);
     if (!globalChatAttribution && !proofBearingRoute) {
       deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name> (or, once the PO has signed the design-approval request, run the exact `approve-plan --design-approval-request <request>` command that inspect offers)");
     }
@@ -903,7 +924,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
         env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
         encoding: "utf8",
         input: canonicalPayload,
-      }, { capMs: 4_000, reserveMs: 1_500 });
+      }, LIFECYCLE_GUARD_BUDGET);
       const detail = String(lifecycle.stderr ?? "").trim();
       if (lifecycle.status === 2) denials.push({
         guard: lifecycleGuard,

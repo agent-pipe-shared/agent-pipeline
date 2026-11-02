@@ -1128,6 +1128,62 @@ check("Antigravity still refuses approve-plan without a proof-bearing request or
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// 17 (runner neutrality): the shared admission has three proof-bearing approve-plan transports; Antigravity knew one and refused the other two as
+// "self-approval". It now reaches the catalogue's decision for all three, and a bare --by (the agent approving itself) stays refused.
+check("17 Antigravity admits the design-workflow request and the bootstrap acknowledgement receipt as proof-bearing approve-plan routes", () => {
+  const { root, prefix, digest } = designApprovalFixture();
+  try {
+    const workflowRequest = `scratch/design-workflow-approval-request-${digest}.json`;
+    const receipt = `scratch/bootstrap-plan-acknowledgement-receipt-${digest}.json`;
+    writeFileSync(join(root, workflowRequest), "{}\n");
+    writeFileSync(join(root, receipt), "{}\n");
+    for (const command of [
+      `${prefix} approve-plan --by 'PO' --design-workflow-approval-request ${workflowRequest}`,
+      `${prefix} approve-plan --bootstrap-acknowledgement-receipt ${receipt}`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "allow", `${command}: ${JSON.stringify(res)}`);
+    }
+    for (const command of [
+      `${prefix} approve-plan --by 'Agent'`,
+      `${prefix} approve-plan --by 'Agent' --design-workflow-approval-request scratch/design-workflow-approval-request-${"d".repeat(64)}.json`,
+      `${prefix} approve-plan --by 'Agent' --design-workflow-approval-request ${workflowRequest} --extra`,
+      `${prefix} approve-plan --bootstrap-acknowledgement-receipt reviews/bootstrap-plan-acknowledgement-receipt-${digest}.json`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "deny", `${command}: ${JSON.stringify(res)}`);
+      assert.match(res.reason, /'approve-plan' is an explicit Human\/PO decision/u, command);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("17 Antigravity gives the cold lifecycle readback room inside the manifest's own hook timeout", () => {
+  const source = readFileSync(join(pluginRoot, "hooks", "antigravity-pretool-guard.mjs"), "utf8");
+  const budget = Number(/const HOOK_BUDGET_MS = ([\d_]+);/u.exec(source)?.[1]?.replaceAll("_", ""));
+  const manifest = JSON.parse(readFileSync(join(pluginRoot, "hooks.json"), "utf8"));
+  const guardEntry = manifest["pipeline-core"].PreToolUse.flatMap((entry) => entry.hooks).find((hook) => /antigravity-pretool-guard\.mjs/u.test(hook.command));
+  assert.ok(Number.isFinite(budget) && guardEntry, "the budget and the manifest entry are readable");
+  assert.ok(budget < guardEntry.timeout * 1000, `the adapter budget ${budget} ms must stay under the host's ${guardEntry.timeout} s timeout, or the host kills the hook before it can deny`);
+  assert.match(source, /LIFECYCLE_GUARD_BUDGET = Object\.freeze\(\{\s*capMs: Math\.floor\(HOOK_BUDGET_MS \/ 2\)/u, "the lifecycle share is derived from the budget");
+  assert.ok(Math.floor(budget / 2) >= 10_000, "a cold lifecycle readback (about ten seconds) fits in its share");
+  assert.match(source, /"guard-push\.mjs": \{ capMs: 16_000/u, "the push guard has its own larger share");
+});
+
+check("17 Antigravity containment ignores node -e text inside a quoted argument but not a quoted flag", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    for (const command of ['echo "node -e is blocked"', "echo 'python -c is blocked'"]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "allow", `${command}: ${JSON.stringify(res)}`);
+    }
+    for (const command of ["node -e \"console.log(1)\"", "node '-e' 'console.log(1)'", 'node "-p" "1"', "bash -c 'echo hi'", "bash --login -c 'echo hi'"]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "deny", `${command}: ${JSON.stringify(res)}`);
+      assert.match(res.reason, /Inline code execution/u, command);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
   const root = readyLifecycleFixture("chat");
   try {
