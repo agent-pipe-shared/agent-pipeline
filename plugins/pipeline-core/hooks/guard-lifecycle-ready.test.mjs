@@ -94,7 +94,9 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
-import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+import { evaluateArchitectureFitness, EVALUATION_MODES as FITNESS_SCRIPT_EVALUATION_MODES } from "../scripts/architecture-fitness.mjs";
+import { FITNESS_EVALUATION_MODES } from "../lib/guard/command-catalogue.mjs";
+import { canonicalRootSpelling, resolveSanctionedScriptInvocation, sanctionedHumanOverrideArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
 // TPSHELL-*: the shell lane of the test-path authority gate. Imported from the library the
 // guard defers to, for the same reason AC-10 states above -- and because the write lane
 // (guard-testpath.mjs) reads the identical exports, which is the property TPSHELL-5 pins.
@@ -3348,6 +3350,120 @@ test("signature mode's authorize-by-signature is admitted in exactly its printed
     rmSync(path, { recursive: true, force: true });
     rmSync(external, { recursive: true, force: true });
   }
+});
+
+// Candidate 17 (PO 2026-11-01: "as PO I only want to type the signing myself"; "a user repo must be able to analyse"). The ceremony
+// steps that only read, derive or print, the read-only fitness evaluation with a mode and a path list, and the lifecycle's own
+// set-feature replay are admitted in exactly their closed shapes; the signing and the arming stay outside. Positive and negative
+// shapes sit in one test on purpose (the negatives alone pass against the unfixed code, which refuses everything).
+const FITNESS_SCRIPT_17 = fileURLToPath(new URL("../scripts/architecture-fitness.mjs", import.meta.url));
+function assertGuardVerdict17(path, command, admitted) {
+  assert.equal(isSanctionedLifecycleCommand(command, path), admitted, command);
+  const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path, requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); } });
+  if (admitted) assert.deepEqual(result, { exitCode: 0, stderr: "" }, command);
+  else assert.equal(result.exitCode, 2, command);
+}
+
+test("17 emit-signature-digest and render-copy-safe are admitted in exactly their read-only shape", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const plan = "a".repeat(64);
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const digest = `node '${HUMAN_OVERRIDE_SCRIPT}' emit-signature-digest --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan}`;
+    const copySafe = `node '${HUMAN_OVERRIDE_SCRIPT}' render-copy-safe --repo '${path}' --request-sha256 ${request}`;
+    for (const command of [digest, `${digest} --author-source-root '${authorRoot}'`, copySafe, `${copySafe} --author-source-root '${authorRoot}'`]) assertGuardVerdict17(path, command, true);
+    for (const command of [
+      `${digest} --activate`, `${digest} --reason why`, `${digest} --author-source-root /tmp/other`, `${digest} --proof /tmp/proof.json`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' emit-signature-digest --repo '${path}' --request-sha256 ${request}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' emit-signature-digest --repo /tmp/other --request-sha256 ${request} --plan-sha256 ${plan}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' emit-signature-digest --repo '${path}' --plan-sha256 ${plan} --request-sha256 ${request}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' emit-signature-digest --repo '${path}' --request-sha256 ${"g".repeat(64)} --plan-sha256 ${plan}`,
+      `${copySafe} --activate`, `${copySafe} --plan-sha256 ${plan}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' render-copy-safe --repo /tmp/other --request-sha256 ${request}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' render-copy-safe --repo '${path}' --request-sha256 ${"a".repeat(63)}`,
+      // the arming and the chat-mode authorize are NOT widened by this: authorize-by-signature keeps its proof boundary
+      `node '${HUMAN_OVERRIDE_SCRIPT}' sweep-requests --repo '${path}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' refreeze-plan --repo '${path}' --request-sha256 ${request}`,
+    ]) assertGuardVerdict17(path, command, false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("17 architecture-fitness is admitted with a mode and a repository-relative path list, and nothing that qualifies a model", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const base = `node '${FITNESS_SCRIPT_17}' --root '${path}'`;
+    for (const command of [
+      base, `${base} --json`, `${base} --check`, `${base} --mode planning --json`,
+      `${base} --mode planning --json --diff docs/a.md specs/x/`,
+      `${base} --diff package.json package-lock.json AGENTS.md .gitleaksignore --mode candidate`,
+      ...FITNESS_EVALUATION_MODES.map((mode) => `${base} --mode ${mode}`),
+    ]) assertGuardVerdict17(path, command, true);
+    for (const command of [
+      `${base} --mode bogus`, `${base} --mode`, `${base} --diff`, `${base} --diff ../x`, `${base} --diff docs/../x`, `${base} --diff /etc/passwd`,
+      `${base} --diff ./a.md`, `${base} --diff a.md --diff b.md`, `${base} --diff 'a b.md'`, `${base} --diff 'a;b'`,
+      `${base} --qualify`, `${base} --checkpoint`, `${base} --commit abc`, `${base} --mode planning --qualify`,
+      `node '${FITNESS_SCRIPT_17}' --root /tmp/other --mode planning`, `node '${FITNESS_SCRIPT_17}' --mode planning`,
+      `${base} --mode planning --mode candidate`, `${base} --json --json`,
+      `${base} --diff ${Array.from({ length: 65 }, (_, i) => `f${i}.md`).join(" ")}`,
+    ]) assertGuardVerdict17(path, command, false);
+    // The guard keeps its own copy of the evaluator's modes (it must not import the evaluator on every tool call); they cannot drift.
+    assert.deepEqual([...FITNESS_EVALUATION_MODES], [...FITNESS_SCRIPT_EVALUATION_MODES]);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("17 set-feature is admitted as its closed flag set, so a corrected PRD can be rebound in a draft feature", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const base = `node '${PIPELINE_STATE_SCRIPT}' set-feature --id security-deps-okt26 --plan-path specs/security-deps-okt26/prd_security-deps-okt26.md`;
+    for (const command of [base, `${base} --spec-path specs/security-deps-okt26/spec.md`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-feature --plan-path specs/x/prd_x.md --id x`]) assertGuardVerdict17(path, command, true);
+    for (const command of [
+      `node '${PIPELINE_STATE_SCRIPT}' set-feature --id x`, `node '${PIPELINE_STATE_SCRIPT}' set-feature --plan-path specs/x/prd_x.md`,
+      `${base} --id y`, `${base} --by Andre`, `${base} --activate`, `${base} --spec-path ../spec.md`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-feature --id x --plan-path ../prd.md`, `node '${PIPELINE_STATE_SCRIPT}' set-feature --id x --plan-path /abs/prd.md`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-feature --id x --plan-path specs/./prd.md`, `node '${PIPELINE_STATE_SCRIPT}' set-feature --id '-x' --plan-path a.md`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-feature --id 'x y' --plan-path a.md`, `node '${PIPELINE_STATE_SCRIPT}' set-feature --id x --plan-path specs/dir/`,
+      // sibling verbs stay as they were: discard-feature is a human-terminal act and is not admitted here
+      `node '${PIPELINE_STATE_SCRIPT}' discard-feature --by Andre --reason why`,
+    ]) assertGuardVerdict17(path, command, false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("17 a root spelled with the other separator, another drive-letter case or an MSYS prefix is the same root on win32 only", () => {
+  const root32 = "D:\\Dev\\Web\\Toolbox";
+  const request = "f".repeat(64);
+  const verdict = (args, platform = "win32") => sanctionedHumanOverrideArgs(canonicalRootSpelling(args, root32, platform), root32);
+  const audit = (repo) => ["verify-audit", "--repo", repo];
+  for (const repo of ["D:\\Dev\\Web\\Toolbox", "D:/Dev/Web/Toolbox", "d:/dev/web/toolbox", "D:/Dev/Web/Toolbox/", "/d/Dev/Web/Toolbox"]) {
+    assert.equal(verdict(audit(repo)), true, repo);
+  }
+  for (const repo of ["D:/Dev/Web/ToolboxEvil", "D:/Dev/Web", "D:/Dev/Web/Toolbox/..", "D:/Dev/Web/Toolbox/sub", "E:/Dev/Web/Toolbox", "D:/Dev/Web/Toolbox/./", "//D:/Dev/Web/Toolbox"]) {
+    assert.equal(verdict(audit(repo)), false, repo);
+  }
+  // other platforms keep the strict comparison: a slash spelling is not the backslash root there
+  assert.equal(verdict(audit("D:/Dev/Web/Toolbox"), "linux"), false);
+  assert.equal(verdict(audit("D:/Dev/Web/Toolbox"), "darwin"), false);
+  // the optional author root is normalised the same way, and only for exactly <root>/plugins/pipeline-core
+  const plan = ["plan", "--repo", "D:/Dev/Web/Toolbox", "--request-sha256", request];
+  assert.equal(verdict([...plan, "--author-source-root", "D:/Dev/Web/Toolbox/plugins/pipeline-core"]), true);
+  assert.equal(verdict([...plan, "--author-source-root", "d:\\dev\\web\\toolbox\\plugins\\pipeline-core"]), true);
+  assert.equal(verdict([...plan, "--author-source-root", "D:/Dev/Web/Toolbox/plugins"]), false);
+  assert.equal(verdict([...plan, "--author-source-root", "D:/Dev/Web/Toolbox/plugins/pipeline-core/.."]), false);
+  assert.equal(verdict([...plan, "--author-source-root", "D:/Elsewhere/plugins/pipeline-core"]), false);
+  // the wiring: the catalogue's shared entry point hands the matchers the canonical spelling (any script word, args are normalised)
+  const resolved = resolveSanctionedScriptInvocation("node some-script.mjs verify-audit --repo D:/Dev/Web/Toolbox", root32, { platform: "win32" });
+  assert.deepEqual(resolved?.args, ["verify-audit", "--repo", root32]);
+  assert.deepEqual(resolveSanctionedScriptInvocation("node some-script.mjs verify-audit --repo D:/Dev/Web/Toolbox", root32, { platform: "linux" })?.args,
+    ["verify-audit", "--repo", "D:/Dev/Web/Toolbox"]);
+  // a value that is not a string, empty, or carries a control character is returned untouched
+  assert.deepEqual(canonicalRootSpelling(["--repo", "D:/Dev/Web/Toolbox\u0000"], root32, "win32"), ["--repo", "D:/Dev/Web/Toolbox\u0000"]);
 });
 
 test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents", () => {

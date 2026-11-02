@@ -344,10 +344,35 @@ function adoptionPhysicalOut(root, value) {
     return true;
   } catch { return false; }
 }
+// A local copy of architecture-fitness.mjs's EVALUATION_MODES: the guard runs on every tool call and must not import the
+// evaluator. A test pins this list to the script's own export so the two cannot drift apart.
+export const FITNESS_EVALUATION_MODES = Object.freeze(["planning", "dispatch", "candidate", "pre-close", "push", "ci"]);
 function sanctionedArchitectureAdoptionToolArgs(script, args, root) {
   const rootFlag = { "--root": (value) => value === root };
   if (script === ARCHITECTURE_MEASURE_SCRIPT) return matchFlagSpec(args, { requiredValue: rootFlag, optional: { "--apply": true } });
-  if (script === ARCHITECTURE_FITNESS_SCRIPT) return matchFlagSpec(args, { requiredValue: rootFlag, optional: { "--check": true, "--json": true } });
+  if (script === ARCHITECTURE_FITNESS_SCRIPT) {
+    // 17 (Toolbox + PO 2026-11-01, "a user repo must be able to analyse"): the read-only evaluation with an explicit mode
+    // and a candidate path list, e.g. `--mode planning --json --diff docs/a.md specs/x/`. `--diff` takes one or more
+    // repository-relative paths (the script reads every following word that does not start with `--`); each path has no dot
+    // segment and no leading slash. Only evaluation modes the script itself lists are admitted. `--checkpoint`, `--qualify`
+    // and `--commit` (a materialised-model qualification) stay outside the catalogue.
+    const diffAt = args.indexOf("--diff");
+    let rest = args, diffPaths = [];
+    if (diffAt !== -1) {
+      let end = diffAt + 1;
+      while (end < args.length && !args[end].startsWith("--")) end += 1;
+      diffPaths = args.slice(diffAt + 1, end);
+      rest = [...args.slice(0, diffAt), ...args.slice(end)];
+      const FITNESS_DIFF_PATH = /^[A-Za-z0-9._][A-Za-z0-9._/@+-]{0,239}$/u;
+      if (diffPaths.length === 0 || diffPaths.length > 64 || args.indexOf("--diff", diffAt + 1) !== -1
+        || diffPaths.some((value) => !FITNESS_DIFF_PATH.test(value) || value.split("/").some((part) => part === "." || part === ".."))) return false;
+    }
+    return matchFlagSpec(rest, {
+      requiredValue: rootFlag,
+      optionalValue: { "--mode": (value) => FITNESS_EVALUATION_MODES.includes(value) },
+      optional: { "--check": true, "--json": true },
+    });
+  }
   const rest = args.slice(1);
   if (["propose", "status", "check"].includes(args[0])) return matchFlagSpec(rest, { requiredValue: rootFlag, optional: { "--json": true } });
   if (args[0] !== "prepare") return false;

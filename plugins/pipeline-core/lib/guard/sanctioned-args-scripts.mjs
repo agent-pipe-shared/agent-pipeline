@@ -463,6 +463,19 @@ export function sanctionedPipelineStateArgs(args, root) {
       && args[9] === "--invalidation-sha256" && /^[a-f0-9]{64}$/u.test(args[10] ?? "")
       && args.length === 11;
   }
+  // 17 (Toolbox, 2026-11-01): in a feature that is still in lifecycle draft, re-running `set-feature` to bind a corrected PRD
+  // was refused as an opaque script and needed a signed override. The verb is the lifecycle's own first step; the writer
+  // keeps every check it has (blank id/path, active continuity, hash binding). Admitted only as its closed flag set:
+  // `--id`, `--plan-path`, optional `--spec-path`, each once, repository-relative paths without dot segments or a leading slash.
+  if (args[0] === "set-feature") {
+    const featureId = (value) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u.test(value ?? "");
+    const repoRelative = (value) => typeof value === "string" && /^[A-Za-z0-9._][A-Za-z0-9._/-]{0,239}$/u.test(value)
+      && !value.endsWith("/") && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: { "--id": featureId, "--plan-path": repoRelative },
+      optionalValue: { "--spec-path": repoRelative },
+    });
+  }
   if (args[0] === "submit-plan") {
     return args[1] === "--by" && validBy(args[2])
       && args[3] === "--profile" && new Set(["epic", "feature", "mini"]).has(args[4])
@@ -655,6 +668,23 @@ export function sanctionedHumanOverrideArgs(args, root) {
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "");
     return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
   }
+  // 17 (PO 2026-11-01: "as PO I only want to type the signing myself"): the two read-only ceremony steps that were not
+  // in the catalogue. `render-copy-safe` only prints the hand-off commands (guard-human-override.mjs: plan + a rendering,
+  // no write); `emit-signature-digest` derives the digest the person signs from the same library calls as `plan` +
+  // `prepare-authorization` and indexes the selection. Neither signs, authorizes or arms anything: the Ed25519 signature
+  // and `sign-intent` stay the person's own, and `authorize-by-signature` still verifies a proof under the committed
+  // trust anchor. Same exactness as the siblings: pinned flag order, pinned `--repo`, HEX digests, exact total length.
+  if (args[0] === "render-copy-safe") {
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "");
+    return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
+  }
+  if (args[0] === "emit-signature-digest") {
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "");
+    return base && (args.length === 7 || (exactAuthorRoot(7) && args.length === 9));
+  }
   if (args[0] === "prepare-authorization") {
     const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
@@ -721,7 +751,30 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   // matched by physical identity, so forward-slash, backslash, MSYS (/d/...) and
   // repository-relative spellings of the SAME file resolve to the canonical spelling
   // (case-folded on win32). A different file, or any spelling with a "." / ".." segment, stays lexical.
-  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args };
+  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args: canonicalRootSpelling(args, root, platform) };
+}
+
+/**
+ * 17 (Toolbox, native Windows, measured 2026-11-01): the matchers compare `--repo` / `--root` / `--author-source-root` with the
+ * guard's own root by strict equality. On Windows the guard's root is the backslash spelling (`D:\Dev\Web\Toolbox`) while an agent
+ * naturally types `D:/Dev/Web/Toolbox`; `verify-audit --repo "D:/Dev/Web/Toolbox"` was refused in a draft feature, the backslash
+ * spelling passed. The SCRIPT path already resolved either spelling. Here an argument that names exactly the root, or exactly
+ * `<root>/plugins/pipeline-core`, in another separator / drive-letter-case / MSYS (`/d/...`) spelling is rewritten to the canonical
+ * spelling BEFORE the matchers run, so every matcher keeps its strict comparison. Only win32 (a case-insensitive, separator-agnostic
+ * file system) is touched; a path with a dot segment, any other directory, or a prefix of the root is never rewritten.
+ */
+export function canonicalRootSpelling(args, root, platform) {
+  if (platform !== "win32" || typeof root !== "string" || root === "") return args;
+  const flat = (value) => value.replace(/^\/([A-Za-z])\/(?=.)/u, (_m, drive) => `${drive.toUpperCase()}:/`).replace(/\\/gu, "/").replace(/\/+$/u, "").toLowerCase();
+  const authorRoot = join(root, "plugins", "pipeline-core");
+  const rootKey = flat(root);
+  const authorKey = flat(authorRoot);
+  return args.map((value) => {
+    if (typeof value !== "string" || value === root || value === authorRoot || /[\x00-\x1f\x7f]/u.test(value)) return value;
+    if (value.split(/[\\/]/u).some((part) => part === "." || part === "..")) return value;
+    const key = flat(value);
+    return key === rootKey ? root : key === authorKey ? authorRoot : value;
+  });
 }
 
 /**
