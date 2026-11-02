@@ -1,0 +1,163 @@
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 1d356b053..280ae5419 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -370,6 +370,13 @@ export function designSigningApprovalModeRefusal(mode) {
+   if (mode?.source !== "uncommitted") return null;
+   return Object.assign(new Error(`${DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED}: pipeline.user.yaml differs from HEAD (untracked, edited or deleted), so the approval mode this signature is read under is not yet part of the candidate it binds; committing it after signing would move the candidate and make approve-plan refuse the proof. Repair: commit pipeline.user.yaml (or restore it to HEAD), rebuild the design approval request with present-plan so it binds the new HEAD, then sign once.`), { code: DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED });
+ }
++// A18-M2 (AC-264): the same refusal for every other sign-intent kind (bare digest and each --request schema), before any
++// confirmation, passphrase prompt or key-using spawn. Design requests keep their own DAB-coded refusal above.
++export const SIGNING_APPROVAL_MODE_UNCOMMITTED = "PO-SIGN-APPROVAL-MODE-UNCOMMITTED";
++export function signingApprovalModeRefusal(mode) {
++  if (mode?.source !== "uncommitted") return null;
++  return Object.assign(new Error(`${SIGNING_APPROVAL_MODE_UNCOMMITTED}: pipeline.user.yaml differs from HEAD (untracked, edited or deleted), so the approval mode this signature is read under is not yet part of the candidate it binds; committing it after signing would move the candidate and the consumer would refuse the proof, so you would have to sign twice. Repair: commit pipeline.user.yaml (or restore it to HEAD), rebuild the request so it binds the new HEAD, then sign once.`), { code: SIGNING_APPROVAL_MODE_UNCOMMITTED });
++}
+ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+   try {
+     if (!own(record, ["schema", "binding", "bindingSha256", "approvalIntent"]) || record.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA
+@@ -2607,6 +2614,10 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+     // ALF-C-SIGN-ORDER2 (AC-258): request checks come first; with --request, readiness is deferred but still
+     // precedes publication, disclosure, confirmation, passphrase and key-using spawns.
+     const assertReady = () => assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
++    if (!(text(args.request) && /(?:^|[\\/])design-approval-request-[a-f0-9]{64}\.json$/u.test(args.request))) {
++      const modeRefusal = signingApprovalModeRefusal(readHumanApprovalMode(repository));
++      if (modeRefusal !== null) throw modeRefusal;
++    }
+     if (!text(args.request)) assertReady();
+     let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null; let scratchRequestSha256 = null;
+     let portableRequestPath = null; let designSigningObservation = null;
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index cdf77a491..762cc4b81 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -6368,3 +6368,40 @@ test("17 a design signature is refused before the prompt while pipeline.user.yam
+     assert.match(source, /error\?\.code === DESIGN_SIGNING_APPROVAL_MODE_UNCOMMITTED\) throw error;/u, "the typed refusal is not collapsed into the generic invalid-request refusal");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// A18-M2 (AC-264): the refusal above covered the design signature only. Every other sign-intent kind (a bare digest and each
++// --request schema) must refuse BEFORE the confirmation, the passphrase prompt or any spawn while pipeline.user.yaml is not part of HEAD.
++const M2_SIGN_KINDS = [
++  ["a bare digest", null],
++  ["a quality-package request", "pipeline.signed-quality-package-request.v1"],
++  ["an adoption request", "pipeline.architecture-adoption-approval-request.v1"],
++  ["a bootstrap acknowledgement request", "pipeline.bootstrap-acknowledgement-request.v1"],
++  ["a guard-override signature digest request", "pipeline.human-guard-override-signature-digest.v1"],
++  ["a portable Critic export request", "pipeline.portable-critic-export-request.v1"],
++  ["an unknown-schema request", "pipeline.some-future-request.v1"],
++];
++for (const [label, schema] of M2_SIGN_KINDS) {
++  test(`A18-M2 sign-intent for ${label} refuses before any prompt while pipeline.user.yaml is not committed`, async () => {
++    const dirs = fixtureDirs();
++    try {
++      keyFixture(dirs.directory);
++      anchorFixtureKey(dirs.repoRoot, dirs.directory);
++      writeFileSync(join(dirs.repoRoot, "pipeline.user.yaml"), "gates:\n  human_approval: signature\n");
++      const intentSha256 = "b".repeat(64);
++      const argv = ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory];
++      if (schema === null) argv.push("--intent-sha256", intentSha256);
++      else {
++        mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
++        writeFileSync(join(dirs.repoRoot, "scratch", "m2-request.json"), JSON.stringify({ schema, intentSha256, approvalIntent: { sha256: intentSha256 }, intent: { sha256: intentSha256 } }));
++        argv.push("--request", "scratch/m2-request.json");
++      }
++      let asked = 0, spawned = 0;
++      await assert.rejects(
++        async () => runHumanApproval(argv, disclosureChannel({ readConfirmation: () => { asked++; return "approve"; }, spawn: () => { spawned++; throw Error("unexpected signing"); } })),
++        error => error.code === "PO-SIGN-APPROVAL-MODE-UNCOMMITTED" && /commit pipeline\.user\.yaml/u.test(error.message) && /Repair:/u.test(error.message),
++      );
++      assert.equal(asked, 0);
++      assert.equal(spawned, 0);
++    } finally { cleanup(dirs); }
++  });
++}
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 448501d34..be37e4593 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -300,6 +300,7 @@ export function checkCheckpointDestination(dir, { remote, destination, sourceRef
+   };
+ }
+ 
++const PUSH_THREAT_MODEL_REMEDY = "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it";
+ export function checkPushThreatModel(dir, deps = {}) {
+   const exists = (deps.exists ?? existsSync)(join(dir, PUSH_THREAT_MODEL_PATH));
+   if (!exists) {
+@@ -307,7 +308,7 @@ export function checkPushThreatModel(dir, deps = {}) {
+       id: "push-threat-model",
+       ok: false,
+       message: `${PUSH_THREAT_MODEL_PATH} does not exist.`,
+-      remedy: "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it",
++      remedy: PUSH_THREAT_MODEL_REMEDY,
+     };
+   }
+   return { id: "push-threat-model", ok: true, message: `${PUSH_THREAT_MODEL_PATH} is present.` };
+@@ -509,15 +510,19 @@ export function checkCriticalProofModeConflict(dir, deps = {}) {
+ export function preparePushSubject({ dir, by, remote, destination }, deps = {}) {
+   const runFn = deps.pipelineStateRun ?? pipelineStateRun;
+   let captured = "";
++  let capturedErr = "";
+   const originalLog = console.log;
++  const originalError = console.error;
+   console.log = (message) => { captured += `${message}\n`; };
++  console.error = (message) => { capturedErr += `${message}\n`; };
+   let exitCode;
+   try {
+     exitCode = runFn(["prepare-push-subject", "--by", by, "--remote", remote, "--destination", destination], { dir });
+   } finally {
+     console.log = originalLog;
++    console.error = originalError;
+   }
+-  if (exitCode !== 0) return { ok: false, raw: captured };
++  if (exitCode !== 0) return { ok: false, raw: captured, stderr: capturedErr };
+   try {
+     return { ok: true, value: JSON.parse(captured) };
+   } catch {
+@@ -854,9 +859,16 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   const subject = preparePushSubject({ dir, by, remote, destination }, deps);
+   if (!subject.ok) {
+     report.ready = false;
++    // A18-M2: the refusal for a missing push threat model carries a typed code; name the same remedy checkPushThreatModel names.
++    const missingThreatModel = typeof subject.stderr === "string" && subject.stderr.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE");
+     report.checks.push({
+-      id: "subject-hash", ok: false, message: "prepare-push-subject did not produce a usable subject hash.",
+-      remedy: `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
++      id: "subject-hash", ok: false,
++      message: missingThreatModel
++        ? `prepare-push-subject refused (CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE): ${PUSH_THREAT_MODEL_PATH} does not exist yet.`
++        : "prepare-push-subject did not produce a usable subject hash.",
++      remedy: missingThreatModel
++        ? PUSH_THREAT_MODEL_REMEDY
++        : `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
+     });
+     return { ok: true, report, lines: null };
+   }
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 7844bf374..2adf8104c 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -785,6 +785,23 @@ function readyDeps(overrides = {}) {
+   };
+ }
+ 
++// A18-M2: a prepare-push-subject refusal for the missing push threat model names the same remedy checkPushThreatModel names.
++test("A18-M2 pushPrepareReport names materialize-push-threat-model when prepare-push-subject refuses CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE", () => {
++  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
++    pipelineStateRun: () => {
++      console.error("Error: prepare-push-subject refused (CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE); no push threat-model artifact exists yet.");
++      return 2;
++    },
++  }));
++  assert.equal(result.report.ready, false);
++  const check = result.report.checks.find(entry => entry.id === "subject-hash");
++  assert.equal(check.ok, false);
++  assert.match(check.message, /CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE/u);
++  assert.match(check.remedy, /pipeline-state\.mjs materialize-push-threat-model/u);
++  const other = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ pipelineStateRun: () => 2 }));
++  assert.doesNotMatch(other.report.checks.find(entry => entry.id === "subject-hash").remedy, /materialize-push-threat-model/u, "an unrelated refusal keeps its own remedy");
++});
++
+ test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
+   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
+   assert.equal(result.ok, true);
