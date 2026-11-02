@@ -1,0 +1,464 @@
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index 8750989e4..63a7ab1ae 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -155,7 +155,13 @@ export function pushThreatModelDue(pushThreatModel) {
+   return pushThreatModel !== null && typeof pushThreatModel === "object" && pushThreatModel.required === true && pushThreatModel.present !== true;
+ }
+ 
+-export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null } = {}) {
++// `qualityReadback` is the row list of closeQualityReadback() as read by the caller (this module stays pure). Every row that is "missing" becomes an agent
++// action standing before the freeze with its remedy; "unknown" and "not-applicable" rows list nothing. It is advice, never a gate.
++export function missingQualityRows(qualityReadback) {
++  return Array.isArray(qualityReadback) ? qualityReadback.filter((r) => r !== null && typeof r === "object" && r.status === "missing") : [];
++}
++
++export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>", pushThreatModel = null, qualityReadback = null } = {}) {
+   const actions = [];
+   const push = (entry) => actions.push({ order: actions.length + 1, mayRefuseWith: [], ...entry });
+   if (phase === "active") {
+@@ -165,6 +171,15 @@ export function describeCloseActions(phase, { root = "<root>", lifecycle = "<id>
+   const chain = describeCloseChain(phase, { root, lifecycle });
+   for (const step of chain.remaining) {
+     if (step.phase === "checkpointed") continue;
++    if (step.phase === "candidate-frozen") {
++      for (const quality of missingQualityRows(qualityReadback)) {
++        push({
++          id: `quality-${quality.id}`, who: "agent",
++          command: quality.remedy ?? `no sanctioned command: produce the ${quality.id} artefact for this change`,
++          source: "close-quality-readback (advice, not a gate)",
++        });
++      }
++    }
+     if (step.phase === "candidate-frozen" && pushThreatModelDue(pushThreatModel)) {
+       push({
+         id: "materialize-push-threat-model", who: "agent",
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.test.mjs b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+index cf412cb24..e079ce639 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.test.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.test.mjs
+@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { COORDINATOR_PHASES, coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
+ import { PUBLICATION_EXECUTOR_RESULT_SCHEMA } from "../scripts/publication-executor.mjs";
+-import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs } from "./close-chain-guide.mjs";
++import { CLOSE_ACTIONS_SCHEMA, CLOSE_CHAIN_SCHEMA, CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain, missingCloseInputs, missingQualityRows } from "./close-chain-guide.mjs";
+ 
+ const COORDINATOR_SOURCE = readFileSync(fileURLToPath(new URL("../scripts/close-coordinator.mjs", import.meta.url)), "utf8");
+ 
+@@ -99,6 +99,26 @@ test("AC-264: the threat-model action is absent when the file exists, when the g
+   assert.equal(ids("final-verify-green", { required: true, present: false }).includes("materialize-push-threat-model"), false);
+ });
+ 
++test("AC-239: every missing quality row is an agent action before the freeze with its remedy; other statuses list nothing", () => {
++  const quality = [
++    { id: "security-scan", status: "missing", evidence: null, remedy: "node <plugin-root>/scripts/security-scan.mjs" },
++    { id: "adr-decision", status: "unknown", evidence: null, remedy: null },
++    { id: "architecture-fitness", status: "not-applicable", evidence: null, remedy: null },
++    { id: "handover-freshness", status: "missing", evidence: "docs/state.md", remedy: null },
++    { id: "critic-report-file", status: "present", evidence: "x", remedy: null },
++  ];
++  const list = describeCloseActions("tracked-close-finalized", { root: "/r", lifecycle: "close-x", qualityReadback: quality }).actions;
++  const ids = list.map((a) => a.id);
++  assert.deepEqual(ids.filter((id) => id.startsWith("quality-")), ["quality-security-scan", "quality-handover-freshness"]);
++  assert.ok(ids.indexOf("quality-handover-freshness") < ids.indexOf("candidate-frozen"));
++  const scan = list.find((a) => a.id === "quality-security-scan");
++  assert.equal(scan.who, "agent");
++  assert.match(scan.command, /security-scan\.mjs/u);
++  assert.match(list.find((a) => a.id === "quality-handover-freshness").command, /^no sanctioned command/u);
++  assert.equal(missingQualityRows(null).length, 0);
++  assert.equal(describeCloseActions("candidate-frozen", { qualityReadback: quality }).actions.some((a) => a.id.startsWith("quality-")), false, "after the freeze nothing is listed");
++});
++
+ test("the missing inputs of a step are named from the supplied values", () => {
+   assert.deepEqual(missingCloseInputs("checkpointed", {}), []);
+   assert.deepEqual(missingCloseInputs("feature-close-prepared", {}), ["architectureImpact"]);
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+new file mode 100644
+index 000000000..e8fc9a7e4
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -0,0 +1,131 @@
++// SPDX-License-Identifier: SUL-1.0
++// Read-only readback of the quality artefacts a change should have at close, plus the audit index of one change. It is NOT a gate: it never writes,
++// never runs a scan, never calls the network, and a row whose signal cannot be read is "unknown", never "present". Every reader is injected.
++// Rules (one sentence each):
++//   security-scan         present when both evidence/security-latest.v2.json and its .verdict.json exist (the files check-close-security-completeness.mjs reads).
++//   adr-decision          the typed architecture impact of the close decides: a decision-added/-superseded impact is present when docs/adr has a record and missing otherwise,
++//                         any other typed impact is not-applicable, and no impact signal is unknown.
++//   architecture-fitness  present when the Pipeline State rigorHistory holds an observation for the feature that carries a fitness projection; missing when history is readable without one.
++//   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
++//   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
++// Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
++// handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer. A reader that throws or is not supplied yields "unknown".
++
++import { createHash } from "node:crypto";
++
++export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
++export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
++export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
++
++export const SECURITY_ENVELOPE_PATH = "evidence/security-latest.v2.json";
++export const SECURITY_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
++const ADR_DIR = "docs/adr";
++const DECISION_IMPACTS = new Set(["architecture-decision-added", "architecture-decision-superseded"]);
++const NO_DECISION_IMPACTS = new Set(["architecture-conforms", "architecture-summary-updated", "no-architecture-impact"]);
++
++const row = (id, status, evidence = null, remedy = null) => ({ id, status, evidence, remedy });
++const unknown = (id, remedy = null) => row(id, "unknown", null, remedy);
++const call = (fn, ...args) => {
++  if (typeof fn !== "function") return { ok: false };
++  try { return { ok: true, value: fn(...args) }; } catch { return { ok: false }; }
++};
++
++function securityRow(readers) {
++  const id = "security-scan";
++  const remedy = "node <plugin-root>/scripts/security-scan.mjs";
++  const envelope = call(readers.exists, SECURITY_ENVELOPE_PATH);
++  const verdict = call(readers.exists, SECURITY_VERDICT_PATH);
++  if (!envelope.ok || !verdict.ok) return unknown(id, remedy);
++  return envelope.value === true && verdict.value === true ? row(id, "present", SECURITY_ENVELOPE_PATH) : row(id, "missing", null, remedy);
++}
++
++function adrRow(readers) {
++  const id = "adr-decision";
++  const impact = call(readers.architectureImpact);
++  if (!impact.ok || typeof impact.value !== "string") return unknown(id);
++  if (NO_DECISION_IMPACTS.has(impact.value)) return row(id, "not-applicable");
++  if (!DECISION_IMPACTS.has(impact.value)) return unknown(id);
++  const listing = call(readers.listDir, ADR_DIR);
++  if (!listing.ok || !Array.isArray(listing.value)) return unknown(id);
++  return listing.value.length > 0 ? row(id, "present", ADR_DIR) : row(id, "missing");
++}
++
++function fitnessRow(readers, featureId) {
++  const id = "architecture-fitness";
++  const remedy = "node <plugin-root>/scripts/architecture-fitness.mjs --root <root> --check";
++  const history = call(readers.rigorHistory);
++  if (!history.ok || !Array.isArray(history.value)) return unknown(id, remedy);
++  const recorded = history.value.some((entry) => entry?.body?.featureId === featureId && entry.body.fitnessProjection !== null && entry.body.fitnessProjection !== undefined);
++  return recorded ? row(id, "present") : row(id, "missing", null, remedy);
++}
++
++function criticRow(readers, featureId) {
++  const id = "critic-report-file";
++  const remedy = "node <plugin-root>/scripts/session-critic-finalizer.mjs export --root <root> --request <request.json>";
++  const dir = `specs/${featureId}/evidence/critic`;
++  const packets = call(readers.listDir, dir);
++  if (!packets.ok || !Array.isArray(packets.value)) return unknown(id, remedy);
++  for (const packet of packets.value) {
++    const path = `${dir}/${packet}/report.md`;
++    const found = call(readers.exists, path);
++    if (!found.ok) return unknown(id, remedy);
++    if (found.value === true) return row(id, "present", path);
++  }
++  return row(id, "missing", null, remedy);
++}
++
++function handoverRow(readers, handoverPath) {
++  const id = "handover-freshness";
++  const updated = call(readers.handoverUpdatedMs);
++  const head = call(readers.headCommitMs);
++  if (!updated.ok || !head.ok || !Number.isFinite(updated.value) || !Number.isFinite(head.value)) return unknown(id);
++  return head.value - updated.value <= HANDOVER_FRESHNESS_BOUND_MS ? row(id, "present", handoverPath) : row(id, "missing", handoverPath);
++}
++
++export function closeQualityReadback({ featureId, handoverPath = "docs/state.md", readers = {} } = {}) {
++  return [
++    securityRow(readers),
++    adrRow(readers),
++    fitnessRow(readers, featureId),
++    criticRow(readers, featureId),
++    handoverRow(readers, handoverPath),
++  ];
++}
++
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++// One JSON index of the change: each path with the sha256 of the file when it exists. Read-only; nothing is written.
++export function buildAuditIndex({ featureId, prdPath = null, specPath = null, rows = [], readers = {} } = {}) {
++  const fileEntry = (id, path) => {
++    if (typeof path !== "string") return { id, path: null, sha256: null };
++    const found = call(readers.exists, path);
++    if (!found.ok || found.value !== true) return { id, path, sha256: null };
++    const bytes = call(readers.readBytes, path);
++    return { id, path, sha256: bytes.ok ? sha256(bytes.value) : null };
++  };
++  const criticDir = `specs/${featureId}/evidence/critic`;
++  const reports = [];
++  const packets = call(readers.listDir, criticDir);
++  if (packets.ok && Array.isArray(packets.value)) {
++    for (const packet of packets.value) {
++      const entry = fileEntry("critic-report", `${criticDir}/${packet}/report.md`);
++      if (entry.sha256 !== null) reports.push(entry);
++    }
++  }
++  return {
++    schema: AUDIT_INDEX_SCHEMA,
++    featureId,
++    entries: [
++      fileEntry("prd", prdPath),
++      fileEntry("spec", specPath),
++      fileEntry("plan", `specs/${featureId}/plan.md`),
++      fileEntry("verify-evidence", "evidence/verify-latest.json"),
++      { id: "critic-reports", path: criticDir, files: reports },
++      fileEntry("security-scan-evidence", SECURITY_ENVELOPE_PATH),
++      fileEntry("fitness-evidence", "architecture/baseline.json"),
++      fileEntry("push-threat-model", "project/push-threat-model.md"),
++    ],
++    qualityRows: rows,
++  };
++}
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+new file mode 100644
+index 000000000..c4db76b74
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-239: the close reads back which quality artefacts exist for the change. Readers are injected; no repository fixture is needed.
++
++import test from "node:test";
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { QUALITY_ROW_IDS, HANDOVER_FRESHNESS_BOUND_MS, closeQualityReadback, buildAuditIndex } from "./close-quality-readback.mjs";
++
++const FEATURE = "feature";
++const SEC = "evidence/security-latest.v2.json";
++const SEC_VERDICT = "evidence/security-latest.v2.verdict.json";
++const CRITIC_DIR = `specs/${FEATURE}/evidence/critic`;
++
++// A reader set describing a change where every artefact exists.
++const full = (over = {}) => ({
++  exists: (p) => new Set([SEC, SEC_VERDICT, `${CRITIC_DIR}/pk-1/report.md`, "docs/state.md"]).has(p),
++  listDir: (p) => (p === CRITIC_DIR ? ["pk-1"] : p === "docs/adr" ? ["0001-x.md"] : []),
++  architectureImpact: () => "architecture-decision-added",
++  rigorHistory: () => [{ body: { featureId: FEATURE, fitnessProjection: { outcomes: [] } } }],
++  handoverUpdatedMs: () => 1_000_000,
++  headCommitMs: () => 1_000_000 + 1000,
++  ...over,
++});
++const rows = (readers) => Object.fromEntries(closeQualityReadback({ root: "<root>", featureId: FEATURE, readers }).map((r) => [r.id, r]));
++
++test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
++  const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
++  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++  assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
++  for (const row of list) {
++    assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
++    assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
++  }
++  assert.ok(list.every((r) => r.status === "present"), JSON.stringify(list));
++});
++
++test("AC-239 security-scan: present with the envelope path, missing with the scan command, unknown when unreadable", () => {
++  assert.equal(rows(full())["security-scan"].evidence, SEC);
++  const missing = rows(full({ exists: () => false }))["security-scan"];
++  assert.equal(missing.status, "missing");
++  assert.match(missing.remedy, /security-scan\.mjs/u);
++  const unknown = rows(full({ exists: () => { throw new Error("boom"); } }))["security-scan"];
++  assert.equal(unknown.status, "unknown");
++});
++
++test("AC-239 adr-decision: present, not-applicable when no decision qualifies, missing when claimed but absent, unknown without a signal", () => {
++  assert.equal(rows(full())["adr-decision"].status, "present");
++  assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");
++  assert.equal(rows(full({ listDir: () => [] }))["adr-decision"].status, "missing");
++  const unknown = rows(full({ architectureImpact: () => null }))["adr-decision"];
++  assert.equal(unknown.status, "unknown");
++  assert.equal(unknown.remedy, null);
++});
++
++test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
++  assert.equal(rows(full())["architecture-fitness"].status, "present");
++  const missing = rows(full({ rigorHistory: () => [{ body: { featureId: "other", fitnessProjection: {} } }] }))["architecture-fitness"];
++  assert.equal(missing.status, "missing");
++  assert.match(missing.remedy, /architecture-fitness\.mjs/u);
++  assert.equal(rows(full({ rigorHistory: () => null }))["architecture-fitness"].status, "unknown");
++});
++
++test("AC-239 critic-report-file: present with the report path, missing with the export command, unknown when the directory cannot be listed", () => {
++  assert.equal(rows(full())["critic-report-file"].evidence, `${CRITIC_DIR}/pk-1/report.md`);
++  const missing = rows(full({ listDir: (p) => (p === "docs/adr" ? ["a.md"] : []) }))["critic-report-file"];
++  assert.equal(missing.status, "missing");
++  assert.match(missing.remedy, /session-critic-finalizer\.mjs export --root <root> --request <request\.json>/u);
++  assert.equal(rows(full({ listDir: (p) => { if (p === CRITIC_DIR) throw new Error("x"); return []; } }))["critic-report-file"].status, "unknown");
++});
++
++test("AC-239 handover-freshness: within the bound present, older than the bound missing, unreadable unknown", () => {
++  assert.equal(rows(full())["handover-freshness"].evidence, "docs/state.md");
++  const stale = rows(full({ headCommitMs: () => 1_000_000 + HANDOVER_FRESHNESS_BOUND_MS + 1 }))["handover-freshness"];
++  assert.equal(stale.status, "missing");
++  assert.equal(rows(full({ handoverUpdatedMs: () => null }))["handover-freshness"].status, "unknown");
++  assert.ok(HANDOVER_FRESHNESS_BOUND_MS > 0);
++});
++
++test("AC-239: a row is never present when its signal cannot be read, and the readback writes nothing", () => {
++  const all = rows({});
++  for (const id of QUALITY_ROW_IDS) assert.equal(all[id].status, "unknown", id);
++});
++
++test("AC-239 audit index: paths with sha256 only where the file exists", () => {
++  const bytes = { "specs/feature/prd.md": "p", [SEC]: "s" };
++  const index = buildAuditIndex({
++    featureId: FEATURE, prdPath: "specs/feature/prd.md", specPath: "specs/feature/spec.md", rows: [],
++    readers: { exists: (p) => p in bytes, readBytes: (p) => Buffer.from(bytes[p]), listDir: () => [] },
++  });
++  const by = Object.fromEntries(index.entries.map((e) => [e.id, e]));
++  assert.equal(by.prd.sha256, createHash("sha256").update("p").digest("hex"));
++  assert.equal(by.spec.sha256, null);
++  assert.equal(by["security-scan-evidence"].path, SEC);
++  for (const id of ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]) assert.ok(by[id], id);
++  assert.deepEqual(index.qualityRows, []);
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index e98a4a1ea..c37a1c56b 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -37,6 +37,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
++import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+@@ -85,11 +86,13 @@ const CLI_HELP = [
+   "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
+   "       close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>",
+   "       close-coordinator.mjs drive --root <repository-root> --lifecycle <id> --actor <name> [--phase <phase>] [transition inputs] [--apply | --dry-run]",
++  "       close-coordinator.mjs audit-index --root <repository-root> --lifecycle <id>",
+   "       close-coordinator.mjs --help",
+   "",
+   "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
+   "drive is the helper over the plan/apply pairs: it names the phase, the missing inputs and the remaining chain, plans one step (read-only), and with --apply",
+   "applies exactly that step. It writes the cleanup receipt itself and stops before every human-gate phase; it replaces none of the commands above.",
++  "drive prints a read-only qualityReadback (security scan, ADR decision, fitness run, Critic report file, handover freshness); audit-index prints one read-only JSON index of the change with sha256 per existing file.",
+ ].join("\n");
+ 
+ const canonical = (value) => {
+@@ -1159,6 +1162,46 @@ function readPushThreatModelState(root) {
+   return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
+ }
+ 
++// The real readers behind closeQualityReadback and buildAuditIndex: filesystem and git reads only, nothing is written or run.
++function qualityReaders(root) {
++  const abs = (rel) => join(root, rel);
++  const handoverPath = (() => {
++    try {
++      const configured = JSON.parse(readFileSync(abs("project/pipeline.json"), "utf8")).handover;
++      return typeof configured === "string" && SAFE_RELATIVE.test(configured) ? configured : "docs/state.md";
++    } catch { return "docs/state.md"; }
++  })();
++  const readers = {
++    exists: (rel) => existsSync(abs(rel)),
++    listDir: (rel) => {
++      try { return readdirSync(abs(rel)); } catch (error) { if (error?.code === "ENOENT") return []; throw error; }
++    },
++    readBytes: (rel) => readFileSync(abs(rel)),
++    rigorHistory: () => { const history = stateSnapshot(root).state.rigorHistory; return history === undefined ? [] : history; },
++    handoverUpdatedMs: () => {
++      if (!existsSync(abs(handoverPath))) return null;
++      if (git(root, ["status", "--porcelain", "--", handoverPath]) !== "") return lstatSync(abs(handoverPath)).mtimeMs;
++      const seconds = Number(git(root, ["log", "-1", "--format=%ct", "--", handoverPath]));
++      return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
++    },
++    headCommitMs: () => { const seconds = Number(git(root, ["log", "-1", "--format=%ct", "HEAD"])); return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null; },
++  };
++  return { readers, handoverPath };
++}
++function readQualityRows(root, coordinator) {
++  const { readers, handoverPath } = qualityReaders(root);
++  const impact = coordinator.architectureImpact ?? null;
++  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact } });
++}
++function auditPackageIndex(root, coordinator) {
++  const { readers } = qualityReaders(root);
++  let state = null;
++  try { state = stateSnapshot(root).state; } catch { /* paths fall back to the conventional spec directory */ }
++  const prdPath = state?.planSubmission?.planPath ?? state?.activeFeature?.planPath ?? `specs/${coordinator.featureId}/prd.md`;
++  const specPath = state?.planSubmission?.specPath ?? `specs/${coordinator.featureId}/spec.md`;
++  return buildAuditIndex({ featureId: coordinator.featureId, prdPath, specPath, rows: readQualityRows(root, coordinator), readers });
++}
++
+ // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
+ // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
+ async function driveClose(values, { apply, dryRun = false }) {
+@@ -1169,8 +1212,9 @@ async function driveClose(values, { apply, dryRun = false }) {
+   const phase = stored.coordinator.phase;
+   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
+   const options = coordinatorNextPhases(phase);
+-  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root) });
+-  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions };
++  const qualityReadback = readQualityRows(root, stored.coordinator);
++  const actions = describeCloseActions(phase, { root, lifecycle: values.lifecycle, pushThreatModel: readPushThreatModelState(root), qualityReadback });
++  const base = { schema: "pipeline.close-coordinator.drive.v1", lifecycleId: values.lifecycle, phase, chain, actions, qualityReadback };
+   if (options.length === 0) return { ...base, status: "terminal" };
+   const target = values.phase ?? options[0];
+   const renewal = target === phase && (phase === "candidate-frozen" || phase === "cleanup-complete");
+@@ -1269,6 +1313,12 @@ try {
+       auditRequest: parsed.values["audit-request"],
+       criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
+     }, { apply: parsed.booleans.apply === true, dryRun: parsed.booleans["dry-run"] === true }));
++  } else if (command === "audit-index") {
++    const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
++    if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "audit-index arguments invalid");
++    const root = physicalRoot(parsed.values.root);
++    const stored = readCloseCoordinator(gitCommonDir(root), parsed.values.lifecycle);
++    emit({ lifecycleId: parsed.values.lifecycle, ...auditPackageIndex(root, stored.coordinator) });
+   } else if (command === "write-cleanup-receipt") {
+     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
+     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "write-cleanup-receipt arguments invalid");
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 8b11c8680..523bd14f9 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -941,6 +941,47 @@ test("process: AC-264 drive and --dry-run list materialize-push-threat-model bef
+   assert.equal(seen.materialized, false, "drive materializes nothing");
+ });
+ 
++test("process: AC-239 drive and --dry-run print qualityReadback, a missing row is an agent action before the freeze, and audit-index prints the index and writes nothing", () => {
++  const seen = {};
++  const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;
++  processFixture("quality", {
++    afterPrepared({ root }) {
++      const lifecycle = "close-quality";
++      const run = (args) => invoke([...args, "--root", root, "--lifecycle", lifecycle, ...(args[0] === "drive" ? ["--actor", "PO"] : [])]);
++      const before = status(root);
++      seen.drive = run(["drive"]);
++      seen.dry = run(["drive", "--dry-run"]);
++      mkdirSync(join(root, "evidence"), { recursive: true });
++      writeFileSync(join(root, "evidence", "security-latest.v2.json"), "{}\n");
++      writeFileSync(join(root, "evidence", "security-latest.v2.verdict.json"), "{}\n");
++      seen.afterScan = run(["drive"]);
++      rmSync(join(root, "evidence", "security-latest.v2.json"), { force: true });
++      rmSync(join(root, "evidence", "security-latest.v2.verdict.json"), { force: true });
++      seen.dirtyBefore = status(root);
++      seen.index = run(["audit-index"]);
++      seen.dirtyAfter = status(root);
++      seen.cleanBefore = before;
++    },
++  });
++  for (const out of [seen.drive, seen.dry]) {
++    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++    const scan = out.qualityReadback.find((r) => r.id === "security-scan");
++    assert.equal(scan.status, "missing");
++    const ids = out.actions.actions.map((a) => a.id);
++    assert.ok(ids.includes("quality-security-scan"));
++    assert.ok(ids.indexOf("quality-security-scan") < ids.indexOf("candidate-frozen"), "the quality action stands before the freeze");
++    assert.match(out.actions.actions.find((a) => a.id === "quality-security-scan").command, /security-scan\.mjs/u);
++  }
++  assert.equal(seen.afterScan.qualityReadback.find((r) => r.id === "security-scan").status, "present");
++  assert.equal(seen.afterScan.actions.actions.some((a) => a.id === "quality-security-scan"), false);
++  assert.equal(seen.index.schema, "pipeline.close-audit-package-index.v1");
++  assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
++  const prd = seen.index.entries.find((e) => e.id === "prd");
++  assert.equal(prd.sha256, digest("# PRD\n"));
++  assert.equal(seen.index.qualityRows.length, 5);
++  assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
