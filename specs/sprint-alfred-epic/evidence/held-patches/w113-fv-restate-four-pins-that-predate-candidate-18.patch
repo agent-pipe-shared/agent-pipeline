@@ -1,0 +1,108 @@
+diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
+index c18e5d485..a6a557d6b 100644
+--- a/harness/scripts/pipeline-state.test.mjs
++++ b/harness/scripts/pipeline-state.test.mjs
+@@ -3337,7 +3337,8 @@ function runFeaturePackageReadTests() {
+   const planned = captureBoth(() => run(["feature-package-plan", "--root", fixture.dir, "--manifest", fixture.manifestRel, "--next-state", "awaiting-approval"]));
+   const expected = planFeaturePackageTransition(fixture.dir, fixture.manifestRel, "awaiting-approval");
+   ok("PS54p plan returns the planner's exact transition preview", planned.value === 0
+-    && planned.out === JSON.stringify(expected, null, 2)
++    // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk): a printed preview now also carries `planSha256`, the canonical digest of the plan.
++    && planned.out === JSON.stringify({ ...expected, planSha256: sha256CanonicalJson(expected) }, null, 2)
+     && JSON.parse(planned.out).status === "preview"
+     && JSON.parse(planned.out).changes[0].operation === "submit", planned.out || planned.err);
+ 
+@@ -3516,7 +3517,11 @@ function seedFullFeaturePackage(prefix, { id = "wr-pkg", state = "draft" } = {})
+ function planDigest(dir, extraArgs) {
+   const res = captureBoth(() => run(["feature-package-plan", "--root", dir, ...extraArgs]));
+   const plan = JSON.parse(res.out || "{}");
+-  return { plan, digest: sha256CanonicalJson(plan), raw: res };
++  // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the digest passed to apply is the digest of the preview the planner returned):
++  // a `preview` printed by feature-package-plan carries its own `planSha256` (the canonical digest of the plan WITHOUT that field), and apply recomputes
++  // exactly that value. Hashing the parsed output including the field gave a different digest, so every apply of a printed preview was refused.
++  const { planSha256: printedDigest, ...bare } = plan;
++  return { plan, digest: printedDigest ?? sha256CanonicalJson(bare), raw: res };
+ }
+ function applyCmd(dir, extraArgs, deps) {
+   return captureBoth(() => run(["feature-package-apply", "--root", dir, ...extraArgs], deps));
+diff --git a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+index 26aa311fa..27bc2d1fa 100644
+--- a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
++++ b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+@@ -99,7 +99,10 @@ const archivedDir = (root) => join(discoverRepository(root).commonDir, "agent-pi
+ const archivedPath = (root, d) => join(archivedDir(root), `${d.sessionId}.${d.sha}.json`);
+ const auditPath = (root) => join(discoverRepository(root).commonDir, "agent-pipeline", "session-descriptors", "orphan-archive-audit.jsonl");
+ 
+-const OWN_ENV = { CLAUDE_CODE_SESSION_ID: OWN_UUID };
++// Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the running session's own descriptor is never offered): since b9fb54aad the
++// requester's descriptor is derived for the runner that is invoking, and the Claude runner is recognised by its ambient marker CLAUDECODE=1 (without it the
++// process reads as Codex, so a bare CLAUDE_CODE_SESSION_ID names no own descriptor). The injected env therefore carries the marker too.
++const OWN_ENV = { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: OWN_UUID };
+ 
+ test("AC-203 own session (a): plan-human-recovery and plan-recovery never offer the running session's own descriptor; a foreign one stays offered", () => withFixture((root) => {
+   const own = hookDescriptor(root, OWN_ID);
+@@ -172,9 +175,9 @@ test("AC-203 own session: the library entry points honour requesterSessionId at
+ }));
+ 
+ const NOT_OWN_ENVS = [
+-  ["a different session id", { CLAUDE_CODE_SESSION_ID: FOREIGN_UUID }],
+-  ["no CLAUDE_CODE_SESSION_ID", {}],
+-  ["a session id too short to name a hook descriptor", { CLAUDE_CODE_SESSION_ID: "short" }],
++  ["a different session id", { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: FOREIGN_UUID }],
++  ["no CLAUDE_CODE_SESSION_ID", { CLAUDECODE: "1" }],
++  ["a session id too short to name a hook descriptor", { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "short" }],
+ ];
+ 
+ for (const [label, env] of NOT_OWN_ENVS) {
+diff --git a/plugins/pipeline-core/scripts/check-backlog-state.test.mjs b/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
+index 08d7646dc..b7b2b390b 100644
+--- a/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
++++ b/plugins/pipeline-core/scripts/check-backlog-state.test.mjs
+@@ -421,18 +421,19 @@ try {
+     );
+     const acceptedLostReconciliationBatch = result.drift
+       .filter((entry) => entry.acceptedReason === "accepted-po-2026-09-15-lost-reconciliation-batch");
+-    assert.deepEqual(
+-      acceptedLostReconciliationBatch.map((entry) => entry.finding),
+-      // The rebased ledger has been reconciled; a historical exception is not
+-      // itself evidence that the current checkout still has unreachable OIDs.
+-      // D222 (2026-10-31): the PO accepted the two events whose evidence commit
+-      // never reached this checkout (2356, 2358) as lost reconciliation, so
+-      // exactly those two stay reported as accepted drift.
+-      [
+-        "ledger event 2356: evidence.commit is not a reachable local Git commit",
+-        "ledger event 2358: evidence.commit is not a reachable local Git commit",
+-      ],
+-    );
++    // The rebased ledger has been reconciled; a historical exception is not
++    // itself evidence that the current checkout still has unreachable OIDs.
++    // D222 (2026-10-31): the PO accepted the two events whose evidence commit
++    // never reached this checkout (2356, 2358) as lost reconciliation.
++    // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: only those two events may ever be reported as accepted drift):
++    // whether they are reported depends on whether the checkout holds those commits (the PO works on two machines, and a checkout that holds them
++    // reports nothing), so the accepted set must be a subset of the two and never contain any other finding.
++    const lostReconciliationExceptions = [
++      "ledger event 2356: evidence.commit is not a reachable local Git commit",
++      "ledger event 2358: evidence.commit is not a reachable local Git commit",
++    ];
++    const reportedLostReconciliation = acceptedLostReconciliationBatch.map((entry) => entry.finding);
++    assert.ok(reportedLostReconciliation.every((finding) => lostReconciliationExceptions.includes(finding)), reportedLostReconciliation.join("; "));
+     assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
+   });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs
+index 93af193e8..86d670fba 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs
+@@ -498,7 +498,10 @@ test("Codex preflight output keys and status are unchanged by this addition (byt
+   });
+   assert.deepEqual(Object.keys(result).sort(), [
+     "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation", "installedSource",
+-    "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
++    // Restated 2026-11-02 (candidate 18 Full Verify, QG-04, own hunk; intent kept: the Codex surface is not changed by the Antigravity addition):
++    // the preflight gained the runner-capabilities pointer for every runner (pipeline-start-preflight.test.mjs pins it at its own key list), so
++    // `runnerCapabilities` is part of the Codex surface too; no other key is added.
++    "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "runnerCapabilities", "schema", "status", "statusScope",
+     "version",
+   ]);
+   assert.equal(result.status, "ready");

@@ -1,0 +1,77 @@
+diff --git a/plugins/pipeline-core/lib/agy-final-return.test.mjs b/plugins/pipeline-core/lib/agy-final-return.test.mjs
+index 405577d56..70dc309f9 100644
+--- a/plugins/pipeline-core/lib/agy-final-return.test.mjs
++++ b/plugins/pipeline-core/lib/agy-final-return.test.mjs
+@@ -538,7 +538,9 @@ test("AFR18 a store write without a sealed root is a typed refusal and a foreign
+     assert.equal(admitted.ok, true, JSON.stringify(admitted));
+     assert.equal(admitted.code, "AGY-HOST-COMMIT-ADMITTED");
+     assert.deepEqual(assessAgyHostCommit({ baseline: { ...ok.baseline, root: sub }, ...claim }),
+-      { ok: false, code: "AGY-HOST-COMMIT-DRIFT" });
++      // Restated 2026-11-02 (candidate 18, C18-1a, QG-04, own hunk; intent kept: the foreign top level is still the drift refusal): the refusal now names
++      // the failed comparison in `detail.conditions` so the operator can tell a moved top level from a moved head (diagnostics of the host commit).
++      { ok: false, code: "AGY-HOST-COMMIT-DRIFT", detail: { conditions: ["top-level-differs"] } });
+     // A nested repository that has no commit yet returns earlier (before any top-level comparison).
+     const nestedRoot = join(root, "nested");
+     mkdirSync(nestedRoot);
+diff --git a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+index 6a1515af9..e91b4c95a 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+@@ -251,7 +251,10 @@ test("an unavailable loaded identity falls back to the installed identity, with
+   assert.ok(result.skeleton.includes(INSTALLED) && result.skeleton.includes("fallback"));
+ });
+ 
+-test("with no installed identity either, the loaded plugin root's content hash is used, with a warning", async () => {
++// Restated 2026-11-02 (candidate 18, C18-9, QG-04, own hunk; intent kept: the plugin root's content hash is the identity and its source stays visible):
++// a content hash of the loaded plugin root is a deterministic identity, so it is reported through `rulesetIdentitySource` and no longer as a
++// DBG-RULESET-FALLBACK warning; only the lesser installed identity still warns (pinned by the test above).
++test("with no installed identity either, the loaded plugin root's content hash is used and its source is visible without a warning", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();
+   const seen = [];
+@@ -260,9 +263,8 @@ test("with no installed identity either, the loaded plugin root's content hash i
+   assert.equal(result.ok, true, JSON.stringify(result));
+   assert.deepEqual(seen, ["/plugin/root"]);
+   assert.equal(result.binding.rulesetSha, SNAPSHOT);
+-  assert.equal(result.warnings.length, 1);
+-  assert.equal(result.warnings[0].code, "DBG-RULESET-FALLBACK");
+-  assert.ok(result.warnings[0].source.includes("plugin root"), result.warnings[0].source);
++  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false);
++  assert.ok(result.rulesetIdentitySource.includes("plugin root"), result.rulesetIdentitySource);
+ });
+ 
+ test("the real plugin-root snapshot yields a 64-hex identity for a small plugin directory", async () => {
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 6e49aaba4..aade3ca36 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -113,7 +113,11 @@ test("AC1: submit-plan never emits a content-acknowledgement stop on a clean pla
+   const f = fixture("pin-no-stop");
+   const result = capture(submitArgs(), f.deps);
+   assert.equal(result.status, 0, result.err);
+-  assert.equal(result.err, "");
++  // Restated 2026-11-02 (candidate 18, C18-2, QG-04, own hunk; intent kept: a clean submission emits no stop and no acknowledgement request):
++  // a project without a verify command now gets one informational line naming configure-verify (a warning, the submission continues). The
++  // fixture has no verify command, so exactly that line may appear; every other stderr byte is still refused.
++  const noVerifyCommand = /^Warning: submit-plan: the project verify command is missing\. [^\n]*configure-verify[^\n]*$/mu;
++  assert.equal(result.err.replace(noVerifyCommand, "").trim(), "");
+   assert.ok(!result.out.includes("pipeline.submit-plan-stop.v1"));
+   assert.ok(!result.out.includes("PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"));
+ });
+diff --git a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+index df9106b96..a18e1d51a 100644
+--- a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+@@ -158,7 +158,11 @@ test("TOFU measurement stops typed at the ADR-0085 single-review design-course b
+   assert.equal(result.onboarding?.final?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1", stdout);
+   assert.equal(result.onboarding?.final?.status, "signature-required", stdout);
+   assert.equal(result.onboarding?.final?.nextAction?.argv?.[1], "sign-intent", stdout);
+-  assert.match(result.onboarding?.error?.stderr ?? "", /PO-KEY-UNENCRYPTED/, stdout);
++  // Restated 2026-11-02 (candidate 18, A18-M2, QG-04, own hunk; intent kept: the walk ends typed at the signing step, before any signed push): the signing
++  // step now refuses BEFORE the passphrase prompt and before the key is used when pipeline.user.yaml differs from HEAD (the disposable fixture leaves it
++  // untracked), so the typed stop is PO-SIGN-APPROVAL-MODE-UNCOMMITTED, which names its repair. A fixture that commits the file reaches the key refusal
++  // PO-KEY-UNENCRYPTED instead; both are the same typed stop at the signature request.
++  assert.match(result.onboarding?.error?.stderr ?? "", /PO-SIGN-APPROVAL-MODE-UNCOMMITTED|PO-KEY-UNENCRYPTED/, stdout);
+   // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
+   assert.equal(result.steps.length, 2, stdout);
+   assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);

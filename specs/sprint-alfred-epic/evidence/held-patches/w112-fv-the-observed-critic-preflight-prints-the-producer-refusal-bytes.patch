@@ -1,0 +1,72 @@
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 3a2edc2c1..6240eefbb 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -707,22 +707,30 @@ if (isDirectInvocation(import.meta.url)) {
+       if (result.status !== "packet-ready") process.exitCode = 1;
+     }
+   } catch (error) {
+-    const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+-    const details = error instanceof CriticDispatchPreflightError ? error.details : null;
+-    const sweep = argv.includes("--sweep-evidence");
+-    process.stderr.write(`${JSON.stringify({
+-      schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+-      status: "rejected",
+-      code,
+-      // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
+-      // a reason a refusal already carries in its details is kept as it is.
+-      ...(code === "CDP-ARGUMENT" && error instanceof CriticDispatchPreflightError ? { reason: error.message } : {}),
+-      ...(!sweep && details !== null ? details : {}),
+-    })}\n`);
++    process.stderr.write(criticDispatchPreflightRefusalLine(error, { sweep: argv.includes("--sweep-evidence") }));
+     process.exitCode = 1;
+   }
+ }
+ 
++/**
++ * The one stderr line of a refused preflight, shared by the direct CLI and the observed controller so the two can never print different bytes
++ * for the same refusal (the observed controller used to rebuild a bare line and dropped every reason and detail the producer carries).
++ */
++export function criticDispatchPreflightRefusalLine(error, { sweep = false } = {}) {
++  const typed = error instanceof CriticDispatchPreflightError;
++  const code = typed ? error.code : "CDP-UNEXPECTED";
++  const details = typed ? error.details : null;
++  return `${JSON.stringify({
++    schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
++    status: "rejected",
++    code,
++    // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
++    // a reason a refusal already carries in its details is kept as it is.
++    ...(code === "CDP-ARGUMENT" && typed ? { reason: error.message } : {}),
++    ...(!sweep && details !== null ? details : {}),
++  })}\n`;
++}
++
+ /** Explicit opaque launch-context entry; no observer or authority injection. */
+ export function preflightCriticDispatchWithLaunchContext(input, options) {
+   if (options === undefined || (isObject(options) && Object.keys(options).length === 0)
+diff --git a/plugins/pipeline-core/scripts/observe-critic-preflight.mjs b/plugins/pipeline-core/scripts/observe-critic-preflight.mjs
+index 021dd9713..02231c61d 100644
+--- a/plugins/pipeline-core/scripts/observe-critic-preflight.mjs
++++ b/plugins/pipeline-core/scripts/observe-critic-preflight.mjs
+@@ -15,8 +15,7 @@ import {
+   resolveCriticPreflightContext,
+ } from "../lib/critic-preflight-observer.mjs";
+ import {
+-  CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+-  CriticDispatchPreflightError,
++  criticDispatchPreflightRefusalLine,
+   parseCriticDispatchPreflightArgs,
+   preflightCriticDispatch,
+ } from "./critic-dispatch-preflight.mjs";
+@@ -43,8 +42,8 @@ function controllerFailure(code = "C1S-SHAPE") {
+   return { schema: CONTROLLER_SCHEMA, status: "rejected", code };
+ }
+ function producerError(error) {
+-  const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+-  return `${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code })}\n`;
++  // The same bytes the direct CLI prints for this refusal (reason and details included): the controller preserves the producer protocol.
++  return criticDispatchPreflightRefusalLine(error);
+ }
+ function measuredTime(ports) {
+   try { return ports.clock(); } catch { return undefined; }

@@ -1,0 +1,50 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index efd3b96c5..1e29e4bbf 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -159,6 +159,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // unchanged classifier: critic-course-admission 343->349 and critic-dispatch-preflight 382->389 (both already outgrown on the base before the chain),
+   // guard-dispatch-budget-checkpoint 154->157 (the budget-grant refusal text cases of w67). Only these three numbers change; names, paths, classifications
+   // and the other counts stay as pinned, and no assertion is weakened.
++  // Restated 2026-11-02 (candidate 18, QG-04, own hunk): four sites counts were outgrown by their suites, measured on the applied candidate-18 chain with the
++  // unchanged classifier: claude-intake-prompt-capture 48->69, critic-dispatch-preflight 389->406, g23-read-help 20->36, po-human-approval-signing-handoff 17->23.
++  // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
+@@ -170,7 +173,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",51],
+     ["bootstrap-acknowledgement-mode-tests","plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","top-level-assertions",15],
+     ["bound-design-line-endings-tests","plugins/pipeline-core/lib/bound-design-line-endings.test.mjs","top-level-assertions",22],
+-    ["claude-intake-prompt-capture-tests","plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs","top-level-assertions",48],
++    ["claude-intake-prompt-capture-tests","plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs","top-level-assertions",69],
+     ["claude-intake-prompt-hook-tests","plugins/pipeline-core/hooks/claude-intake-prompt-capture.test.mjs","top-level-assertions",25],
+     ["claude-intake-reference-admission-tests","plugins/pipeline-core/hooks/claude-intake-reference-admission.test.mjs","top-level-assertions",6],
+     ["claude-native-capture-entry-tests","plugins/pipeline-core/hooks/claude-native-capture-entry.test.mjs","top-level-assertions",9],
+@@ -181,7 +184,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
+-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",389],
++    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",406],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",116],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+@@ -204,7 +207,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
+     ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
+     ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",18],
+-    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",20],
++    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",36],
+     ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
+     ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
+     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
+@@ -237,7 +240,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
+     ["pipeline-state-calibration-recovery-tests","plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs","top-level-assertions",69],
+     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
+-    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",17],
++    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",23],
+     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
+     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
+     ["project-onboarding-temp-root-tests","plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs","top-level-assertions",20],
