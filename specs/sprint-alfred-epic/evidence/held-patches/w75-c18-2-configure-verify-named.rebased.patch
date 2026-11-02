@@ -1,0 +1,126 @@
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+index 5fe70d13f..24c21aeea 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+@@ -156,12 +156,12 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
+   Object.freeze({
+     id: "GS-10",
+     path: "project/pipeline.json",
+-    reason: "the project authority configuration declares verify and core settings and must not be edited directly. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
++    reason: "the project authority configuration declares verify and core settings and must not be edited directly. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>. Its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+   }),
+   Object.freeze({
+     id: "GS-11",
+     path: ".claude/pipeline.json",
+-    reason: "the legacy-tier project authority configuration declares verify and core settings. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
++    reason: "the legacy-tier project authority configuration declares verify and core settings. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>. Its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+   }),
+   Object.freeze({
+     id: "GS-12",
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+index 92e4fb32e..ac3857ab8 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+@@ -1015,6 +1015,8 @@ try {
+       // Toolbox follow-up: every signature binds to the exact HEAD, so the second ceremony can only run after the first commit.
+       assert.match(refused.stderr, /binds to the exact HEAD/u, path);
+       assert.match(refused.stderr, /commit this file first/u, path);
++      // C18-2: the refusal also names the one sanctioned way to set the verify command, so no one edits the calibration by hand.
++      assert.match(refused.stderr, /pipeline-state\.mjs configure-verify --verify-command <project verify command>/u, path);
+     }
+     // The unrelated root manifest rule keeps its text: no mirror sentence where there is no mirror.
+     const rootManifest = ask(root, "pipeline.json");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b8b97539b..1f7ab5d24 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11623,6 +11623,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
+         return 2;
+       }
++      // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
++      const submitVerifyStatus = readCalibrationVerifyStatus(dir);
++      if (submitVerifyStatus.status !== "configured") {
++        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it before implementation with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (never edit project/pipeline.json directly; GS-10 refuses it). The submission continues.`);
++      }
+       const profileSha256 = sha256CanonicalJson(profile.value);
+       const expectedPlanSha256 = authority.value.planSha256;
+       const expectedSpecSha256 = authority.value.specSha256;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 1211d8845..feb8b1068 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1455,6 +1455,18 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
+   }
+ }
+ 
++// C18-2: a null verify command is found late (VEP-NO-COMMAND at the first Verify); submit-plan warns, names configure-verify, and still submits.
++{
++  const featureId = "c18-2-verify-warning";
++  const { root, deps } = planAuthorityFixture({ featureId, planPath: `specs/${featureId}/prd_${featureId}.md`, specPath: `specs/${featureId}/spec.md` });
++  mkdirSync(join(root, "project"), { recursive: true });
++  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: featureId, verify: null }, null, 2)}\n`);
++  const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
++  assert.equal(submitted.result, 0, `a null verify command must warn, not refuse submit-plan: ${submitted.lines.join(" ")}`);
++  assert.ok(submitted.lines.some((line) => line.includes("configure-verify --verify-command <project verify command>")),
++    `submit-plan must name the sanctioned configure-verify route: ${submitted.lines.join(" ")}`);
++}
++
+ // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
+ // the PO signs, instead of letting set-phase implementation refuse it later.
+ {
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 44c2c97f3..33182d91e 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -111,6 +111,8 @@ export class VerifyEvidenceError extends Error {
+   }
+ }
+ const fail = (code, message) => { throw new VerifyEvidenceError(code, message); };
++// C18-2: the refusal names the one sanctioned route; a direct edit of the calibration file is refused (GS-10).
++export const noVerifyCommandMessage = (mode) => `${mode} Verify requires configured product verification. Set it with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (do not edit project/pipeline.json directly; GS-10 refuses it).`;
+ const LIFECYCLE_ID = /^[a-f0-9]{64}$/u;
+ 
+ export function summarizeVerifyFailures(run) {
+@@ -423,7 +425,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     // replacement run invalidates prior public evidence.
+     try { configuration = readConsumerVerifyConfiguration(root); }
+     catch (error) { fail("VEP-CALIBRATION", error.message); }
+-    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
++    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
+     started = candidateIdentity(root, [target, canonicalTarget]);
+     startedAt = new Date().toISOString();
+     if (started.status !== "clean") fail("VEP-EVENT-SOURCE", "Action event output requires a clean exact candidate before source execution.");
+@@ -437,7 +439,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+   if (configuration === undefined) {
+     try { configuration = readConsumerVerifyConfiguration(root); }
+     catch (error) { fail("VEP-CALIBRATION", error.message); }
+-    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
++    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
+   }
+   const governedCritic = (mode === "release" || (mode === "candidate"
+     && (criticPacketId !== null || criticReverifyReceiptId !== null))) && started.status === "clean"
+@@ -451,7 +453,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     catch (error) { fail("VEP-CALIBRATION", error.message); }
+   }
+   const { fullCommand: command, project, projectIdentity } = configuration;
+-  if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
++  if (command === null) fail("VEP-NO-COMMAND", noVerifyCommandMessage(mode));
+   started ??= candidateIdentity(root, [target, canonicalTarget]);
+   startedAt ??= new Date().toISOString();
+   const rigorObservations = readRigorVerifyObservation(root);
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 40fc586f0..c3f60bf55 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -494,7 +494,9 @@ test("a calibration naming no verify command cannot produce success at any bound
+     for (const mode of ["work", "critic", "push", "candidate", "release"]) {
+       await assert.rejects(
+         () => produceVerifyEvidence({ rootDir: root, outPath: `evidence/${mode}.json`, mode }),
+-        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
++        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND"
++          // C18-2: the refusal names the sanctioned route; a direct edit of the calibration file is refused by GS-10.
++          && /pipeline-state\.mjs configure-verify --verify-command <project verify command>/u.test(error.message),
+       );
+       assert.equal(existsSync(join(root, "evidence", `${mode}.json`)), false);
+     }
