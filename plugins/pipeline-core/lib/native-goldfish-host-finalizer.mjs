@@ -3,7 +3,7 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
 import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal } from './native-goldfish-host-state.mjs';
+import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld } from './native-goldfish-host-state.mjs';
 import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
 import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
 import { parseStrictJson } from './governance-event.mjs';
@@ -209,6 +209,13 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
 // text can travel. Exported for the hook reader, which sanitizes again on read.
 const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
 const DETAIL_LIST_KEYS = ["conditions"];
+// C18-1C: the error message of a commit exception travels bounded (<= 160 chars, printable) and without any token that holds a path separator.
+const detailMessage = (value) => typeof value === "string" && value.length > 0 && value.length <= 160 && !/[\\/\u0000-\u001f]/u.test(value);
+export function boundedErrorMessage(error) {
+  if (typeof error?.message !== "string") return undefined;
+  const scrubbed = error.message.replace(/[\u0000-\u001f]+/gu, " ").replace(/\S*[\\/]\S*/gu, "<path>").trim().slice(0, 160);
+  return detailMessage(scrubbed) ? scrubbed : undefined;
+}
 const DETAIL_PATH_KEYS = ["paths", "stagedPaths", "extraPaths", "missingPaths", "outsideAllowed"];
 const DETAIL_COUNT_KEYS = ["extraCount", "missingCount"];
 const detailSlug = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(value);
@@ -218,6 +225,7 @@ export function sanitizeStopFailureDetail(detail) {
   if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return null;
   const out = {};
   for (const key of DETAIL_SLUG_KEYS) if (detailSlug(detail[key])) out[key] = detail[key];
+  if (detailMessage(detail.errorMessage)) out.errorMessage = detail.errorMessage;
   for (const key of DETAIL_LIST_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailSlug).slice(0, 5); if (list.length > 0) out[key] = list; }
   for (const key of DETAIL_PATH_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailPath).slice(0, 5); if (list.length > 0) out[key] = list; }
   for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
@@ -254,7 +262,7 @@ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
 
 // AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.
 function exceptionDetail(error) {
-  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined };
+  return { errorName: error?.name, errorCode: error?.code, reason: causeReason(error) ?? undefined, errorMessage: boundedErrorMessage(error) };
 }
 
 // Only the host launch call and its correlated successful return are observed.
@@ -380,6 +388,10 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   let admission = concurrent ? null : (dependencies.assess ?? assessAgyHostCommit)({ baseline: state.baseline,
     final: observation.final, allowedPaths: state.binding.allowedPaths });
   if (!concurrent && !admission?.ok) return withDetail(fail(admission?.code ?? "NGHF-COMMIT-ADMISSION"), admission?.detail);
+  // C18-1C GUARD (remove when native-goldfish-host-observation.mjs accepts a commit parent that is a descendant of the briefing's
+  // candidate): the observation receipt and record validators bind parent === candidateCommit (NGHO-DRAFT-BINDING), so a commit made
+  // on a moved HEAD could not be recorded. Until then a tolerated moved HEAD is refused BEFORE any commit, exactly as before.
+  if (!concurrent && admission?.headMoved) return withDetail(fail("AGY-HOST-COMMIT-DRIFT"), { conditions: ["head-moved"] });
 
   // Read before committing; new public evidence is published afterwards so it
   // cannot alter the exact diff admitted for this host commit.
@@ -391,7 +403,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   try { observedAttempt = (dependencies.inspectAttempt ?? inspectNativeGoldfishDispatchAttempt)({ repoRoot: physical, runner, input: attemptInput }); }
   catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
 
-  try { (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}); }
+  // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
+  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: 5000, ...(dependencies.lockWait ?? {}) }); }
   catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
 
   let committed;
@@ -399,8 +412,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     const commit = nativeAuthority => {
       if(nativeAuthority)admission=assessSourceOwnedNativeHostCommit({baseline:state.baseline,final:observation.final,allowedPaths:state.binding.allowedPaths,authority:nativeAuthority});
       if(!admission?.ok)return admission;
+      // C18-1C: after a tolerated sibling commit the commit is made on the HEAD the admission was made against; the recorded pending
+      // state is not rewritten, only the baseline handed to this one commit call carries that HEAD as its parent.
+      const commitBaseline = admission.headMoved ? { ...state.baseline, candidateCommit: admission.candidateCommit } : state.baseline;
       return (dependencies.commit ?? commitAdmittedNativeGoldfishReturn)({ runner,
-        adapterVersion: state.binding.adapterVersion ?? 1, baseline: state.baseline,
+        adapterVersion: state.binding.adapterVersion ?? 1, baseline: commitBaseline,
         final: observation.final, allowedPaths: state.binding.allowedPaths,
         taskId: state.binding.dispatchId, priorAdmission: admission,...(nativeAuthority?{nativeAuthority}:{}) });
     };

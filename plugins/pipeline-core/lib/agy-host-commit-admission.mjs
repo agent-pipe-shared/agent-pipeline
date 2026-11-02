@@ -143,9 +143,15 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
   const tracked = paths(git(baseline.root, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(baseline.root, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-COMMIT-GIT");
-  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) {
+  // C18-1C: a sibling host commit may have moved HEAD. Tolerated only on the normal path, only when the baseline is an ancestor of HEAD
+  // and nothing between them touches an allowed or claimed path. The admission then carries the HEAD it admitted against.
+  const headMoved = head.trim() !== baseline.candidateCommit;
+  const tolerated = headMoved && concurrent === null && sameTopLevel(topLevel, baseline.root) && conflicts.length === 0 && staged.length === 0
+    && siblingMovedHeadIsDisjoint(baseline.root, baseline.candidateCommit, head.trim(), [...allowedPaths, ...final.changedPaths]);
+  const admittedAgainst = tolerated ? head.trim() : baseline.candidateCommit;
+  if (!sameTopLevel(topLevel, baseline.root) || (headMoved && !tolerated) || conflicts.length !== 0 || staged.length !== 0) {
     // AC-164: name which sub-condition fired (the admission decision itself is unchanged).
-    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, head.trim() !== baseline.candidateCommit ? "head-moved" : null,
+    const conditions = [!sameTopLevel(topLevel, baseline.root) ? "top-level-differs" : null, headMoved ? "head-moved" : null,
       conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
     return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
   }
@@ -183,5 +189,13 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
       admittedBlobs.push({ path, oid: null });
     }
   }
-  return { ok: true, code: "AGY-HOST-COMMIT-ADMITTED", root: baseline.root, candidateCommit: baseline.candidateCommit, paths: actual, admittedBlobs };
+  return { ok: true, code: "AGY-HOST-COMMIT-ADMITTED", root: baseline.root, candidateCommit: admittedAgainst, paths: actual, admittedBlobs, ...(tolerated ? { headMoved: true, baselineCommit: baseline.candidateCommit } : {}) };
+}
+/** True only when `from` is an ancestor of `head` and no path changed between them equals one of `watched`. Any git failure is false. */
+function siblingMovedHeadIsDisjoint(root, from, head, watched) {
+  if (!OID.test(head)) return false;
+  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", from, head], { encoding: "utf8", shell: false, timeout: 15_000, env: agyHostGitEnvironment() });
+  if (ancestor.error || ancestor.status !== 0) return false;
+  const changed = paths(git(root, ["diff", "--no-renames", "--name-only", "-z", from, head]));
+  return changed !== null && changed.every((path) => !watched.includes(path));
 }

@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
-import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
+import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
 import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
 import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
 import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
@@ -661,10 +661,11 @@ const cases = [
     const boom = { ...dependencies, commit: () => { throw Object.assign(new Error(`boom at ${root}/secret stack`), { code: "SDC-ROOT", reason: "repository-binding-changed" }); } };
     const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
     assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(failed));
-    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed" });
+    // C18-1C (f): the record now also names a bounded message with every path-bearing token replaced; the path itself still never travels.
+    assert.deepEqual(failed.detail, { errorName: "Error", errorCode: "SDC-ROOT", reason: "repository-binding-changed", errorMessage: "boom at <path> stack" });
     const [entry] = diagEntries(commonDir);
     const text = readFileSync(join(diagDir(commonDir), entry), "utf8");
-    assert.equal(text.includes("boom"), false);
+    assert.equal(text.includes("secret"), false);
     assert.equal(text.includes(root), false);
     assert.deepEqual(JSON.parse(text).detail, failed.detail);
     assert.equal(facts.commits, 0);
@@ -676,6 +677,59 @@ const cases = [
     const [entry] = diagEntries(commonDir);
     assert.deepEqual(JSON.parse(readFileSync(join(diagDir(commonDir), entry), "utf8")).detail, { condition: "candidate-commit" });
     assert.match(nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) }), /candidate-commit/u);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  // NGHF33-NGHF36 -- C18-1C (AC-108): a sibling stop's registry lock is waited for, a long message is bounded, a moved HEAD is tolerated.
+  { id: "NGHF33", name: "A registry lock held by a sibling stop and released within the bound lets the stop succeed", run: () => fixture(({ root, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    let clock = 0, calls = 0;
+    const flaky = { ...dependencies, lockWait: { now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: (request) => {
+      calls += 1;
+      if (calls === 1) throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
+      if (calls === 2) throw Object.assign(new Error("held"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "state-push-owner-unavailable" });
+      return prepareNativeGoldfishAuthorityTerminal(request);
+    } };
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, flaky);
+    assert.equal(result.code, "NGHF-AUTHORED-RECORD-VERIFIED", JSON.stringify(result));
+    assert.equal(calls, 3);
+    assert.equal(facts.commits, 1);
+    assert.ok(clock > 0 && clock < 5000, "the wait is bounded and on the injected clock");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF34", name: "A registry lock held beyond the bound ends in the typed refusal with the stage, and nothing is committed", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    let clock = 0, calls = 0;
+    const held = { ...dependencies, lockWait: { budgetMs: 300, now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: () => {
+      calls += 1; throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" }); } };
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, held);
+    assert.equal(failed.code, "SDC-LOCK-HELD", JSON.stringify(failed));
+    assert.equal(failed.stage, "authority-terminal-prepare");
+    assert.equal(failed.causeReason, "registry-lock-held");
+    assert.ok(calls > 1 && calls < 20, "retried more than once, but bounded");
+    assert.ok(clock <= 300);
+    assert.equal(facts.commits, 0);
+    assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8")).code, "SDC-LOCK-HELD");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF35", name: "A commit exception message is bounded to 160 characters and carries no path-bearing token", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const boom = { ...dependencies, commit: () => { throw new Error(`${"x".repeat(400)} C:\\Users\\a\\b ${root}/p`); } };
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, boom);
+    assert.equal(failed.code, "NGHF-COMMIT-EXCEPTION");
+    assert.equal(failed.detail.errorName, "Error");
+    assert.ok(failed.detail.errorMessage.length > 0 && failed.detail.errorMessage.length <= 160, failed.detail.errorMessage);
+    assert.equal(/[\\/]/u.test(failed.detail.errorMessage), false);
+    assert.equal(readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8").includes(root), false);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF36", name: "A sibling host commit on disjoint paths that moved HEAD does not stop the commit; it is made on the current HEAD", run: () => fixture(({ root, binding, dependencies, facts, git, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    writeFileSync(join(root, "src/sibling.mjs"), "export const sibling=1;\n");
+    git("add", "--", "src/sibling.mjs"); git("commit", "-qm", "sibling host commit");
+    const siblingHead = git("rev-parse", "HEAD");
+    assert.notEqual(siblingHead, binding.candidateCommit);
+    // Measured: the commit succeeds on the moved HEAD but the observation validators (out of this slice's scope) refuse the record with
+    // NGHO-DRAFT-BINDING, so the finalizer refuses BEFORE committing until they accept a descendant parent. Needed change is in the report.
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+    assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT", JSON.stringify(result));
+    assert.equal(facts.commits, 0, "nothing is committed that could not be recorded");
+    assert.equal(git("rev-parse", "HEAD"), siblingHead);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
 ];
 

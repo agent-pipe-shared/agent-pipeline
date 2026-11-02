@@ -172,7 +172,61 @@ test("AHC12 AC-164: the hook notice prints a short sentence derived from the cod
   assert.match(stop, /head-moved/u);
 });
 
-assert.equal(cases.length, 12, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
+const oneEdit = { final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] };
+function siblingCommit(context, file, text) {
+  mkdirSync(join(context.root, "src"), { recursive: true });
+  writeFileSync(join(context.root, file), text);
+  context.git("add", file);
+  context.git("commit", "-qm", "sibling host commit");
+  return context.git("rev-parse", "HEAD");
+}
+
+test("AHC13 AC-108: a sibling commit on disjoint paths that moved HEAD is admitted against the new HEAD", () => fixture((context) => {
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  const head = siblingCommit(context, "src/sibling.mjs", "export const s = 1;\n");
+  const result = assessAgyHostCommit({ baseline, ...oneEdit });
+  assert.equal(result.code, "AGY-HOST-COMMIT-ADMITTED", JSON.stringify(result));
+  assert.equal(result.candidateCommit, head, "the admission carries the HEAD it admitted against");
+  assert.equal(result.baselineCommit, baseline.candidateCommit);
+  assert.deepEqual(result.paths, ["src/one.mjs"]);
+  assert.equal(baseline.candidateCommit === head, false, "the recorded baseline is not rewritten");
+}));
+
+test("AHC14 AC-108: a sibling commit that touched an allowed or claimed path keeps AGY-HOST-COMMIT-DRIFT", () => fixture((context) => {
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  siblingCommit(context, "src/other.mjs", "export const o = 1;\n");
+  const claimed = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
+  assert.equal(claimed.code, "AGY-HOST-COMMIT-ADMITTED", "disjoint sibling is tolerated");
+  const allowedOverlap = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs", "src/other.mjs"] });
+  assert.equal(allowedOverlap.code, "AGY-HOST-COMMIT-DRIFT");
+  assert.deepEqual(allowedOverlap.detail, { conditions: ["head-moved"] });
+}));
+
+test("AHC15 AC-108: a baseline that is not an ancestor of HEAD (history rewritten) keeps AGY-HOST-COMMIT-DRIFT", () => fixture((context) => {
+  const baseline = capture(context);
+  context.git("checkout", "-q", "--orphan", "rewritten");
+  context.git("rm", "-rqf", "--cached", ".");
+  writeFileSync(join(context.root, "src", "elsewhere.mjs"), "export const e = 1;\n");
+  context.git("add", "src/elsewhere.mjs");
+  context.git("commit", "-qm", "unrelated history");
+  const result = assessAgyHostCommit({ baseline, ...oneEdit });
+  assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT");
+  assert.deepEqual(result.detail, { conditions: ["head-moved"] });
+}));
+
+test("AHC16 AC-108: a moved HEAD plus a staged change still drifts, naming both conditions", () => fixture((context) => {
+  const baseline = capture(context);
+  siblingCommit(context, "src/sibling.mjs", "export const s = 1;\n");
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  context.git("add", "src/one.mjs");
+  const result = assessAgyHostCommit({ baseline, ...oneEdit });
+  assert.equal(result.code, "AGY-HOST-COMMIT-DRIFT");
+  assert.deepEqual(result.detail.conditions, ["head-moved", "index-staged"]);
+}));
+
+assert.equal(cases.length, 16,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

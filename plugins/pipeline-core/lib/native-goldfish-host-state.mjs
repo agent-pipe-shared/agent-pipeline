@@ -982,7 +982,9 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
     const entered={value:false};
     try{return attempt(entered);}
     catch(error){
-      if(error?.code!=='SDC-LOCK-HELD'||entered.value||now()+delay>deadline)throw error;
+      // C18-1C: a sibling stop holding the registry also surfaces as SDC-AUTHORITY-UNAVAILABLE / state-push-owner-unavailable.
+      const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable');
+      if(!transient||entered.value||now()+delay>deadline)throw error;
       sleep(delay);delay=Math.min(delay*2,1000);
     }
   }

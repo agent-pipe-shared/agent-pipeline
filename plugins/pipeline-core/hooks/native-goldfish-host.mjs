@@ -84,6 +84,7 @@ function describeFailureDetail(detail) {
   if (clean.extraPaths) parts.push(`changed but not claimed ${clean.extraPaths.join(", ")}${clean.extraCount > clean.extraPaths.length ? ` (+${clean.extraCount - clean.extraPaths.length} more)` : ""}`);
   if (clean.missingPaths) parts.push(`claimed but not changed ${clean.missingPaths.join(", ")}${clean.missingCount > clean.missingPaths.length ? ` (+${clean.missingCount - clean.missingPaths.length} more)` : ""}`);
   if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
+  if (clean.errorMessage) parts.push(`message "${clean.errorMessage}"`);
   if (clean.reason) parts.push(`reason ${clean.reason}`);
   return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
 }
