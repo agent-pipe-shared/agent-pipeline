@@ -3,6 +3,7 @@
 # scripts/refresh-derived-files.mjs). PO terminal, repository root. Plan: specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md
 #   w115  the g23-read-help and agy-item-delivery suites no longer depend on the checkout location
 #   w116  the draft inspection refuses an uncovered design scope before the PO signs (C18-12 follow-up)
+#   w117  a bound-document drift names its cause and its two typed exits (C19-G3)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -19,6 +20,7 @@ step2() {
 }
 step2 w115-fv-make-the-g23-read-help-and-agy-item-delivery-suites-independent-of-the-checkout-location "test(verify): make the g23 read-help and agy item delivery suites independent of the checkout location"
 step2 w116-c18-12-the-draft-inspection-refuses-an-uncovered-design-scope-before-the-po-signs "feat(architecture): refuse an uncovered design scope on the draft, before the PO signs"
+step2 w117-c19-g3-a-drift-that-a-typed-command-lifts-is-never-worded-as-a-block "fix(continuity): name the cause and the two typed exits of a bound-document drift instead of reading as a dead end"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
