@@ -23,6 +23,7 @@
 #   w134  the close readback checks every ADR path the design names, report-only (F4, Codex greenfield; Goldfish slice)
 #   w135  the receipt of a caller-authored Critic verdict says freshContext false and carries its independence label (D2a, AGY greenfield; Goldfish slice, finished by the Elephant)
 #   w136  the intake design plan warns when its generated text holds a private identifier (E5, Claude Windows greenfield; Goldfish slice, finished by the Elephant)
+#   w137  a caller-authored Critic verdict satisfies the close gate only at rigor 0 and low risk (D2b, PO decision 2026-11-03; Goldfish slice; needs w135)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
@@ -65,6 +66,7 @@ step2 w133-e6-the-critic-preflight-path-refusal-names-the-rules-and-the-signatur
 step2 w134-f4-the-close-readback-names-every-adr-path-the-design-promises "feat(close): the close readback checks every ADR path the design names, report-only"
 step2 w135-d2a-a-caller-authored-critic-verdict-is-not-recorded-as-a-fresh-context-review "feat(critic): the receipt of a caller-authored verdict says freshContext false and carries its independence label"
 step2 w136-e5-the-intake-design-plan-warns-when-its-text-holds-a-private-identifier "feat(intake): the intake design plan warns when its generated text holds a private identifier"
+step2 w137-d2b-a-caller-authored-critic-verdict-satisfies-the-close-gate-only-at-rigor-0-and-low-risk "feat(close): a caller-authored Critic verdict satisfies the close gate only at rigor 0 and low risk"
 # The lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. PO decision 2026-11-03: adopt (measured on two past slices,
 # 11 % and 31 % fewer changed lines, indicative). Applied by default; leave out with:  APPLY_LEAN_RULE=0 bash <this script>
 if [ "${APPLY_LEAN_RULE:-1}" != "0" ]; then
