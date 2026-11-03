@@ -4,7 +4,10 @@
 #   w115  the g23-read-help and agy-item-delivery suites no longer depend on the checkout location
 #   w116  the draft inspection refuses an uncovered design scope before the PO signs (C18-12 follow-up)
 #   w117  a bound-document drift names its cause and its two typed exits (C19-G3)
+#   w118  routine-repair heal defers the retirement of settled pending states while a member is armed (C18-6 rest)
 #   w119  the Full Verify keeps bounded logs of red suites and can resume an interrupted run
+#   w120  (opt-in) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
+#   w121  (opt-in) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -23,6 +26,15 @@ step2 w115-fv-make-the-g23-read-help-and-agy-item-delivery-suites-independent-of
 step2 w116-c18-12-the-draft-inspection-refuses-an-uncovered-design-scope-before-the-po-signs "feat(architecture): refuse an uncovered design scope on the draft, before the PO signs"
 step2 w117-c19-g3-a-drift-that-a-typed-command-lifts-is-never-worded-as-a-block "fix(continuity): name the cause and the two typed exits of a bound-document drift instead of reading as a dead end"
 step2 w119-c19-the-full-verify-keeps-red-suite-logs-and-resumes-from-its-journal "feat(verify): keep bounded logs of red suites and resume an interrupted Full Verify from its journal"
+step2 w118-c19-heal-defers-the-retirement-while-a-member-is-armed "fix(repair): defer the retirement of settled pending states while a dispatch's member is armed"
+# OPT-IN, not measured yet: the lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. The seed asks for a measurement
+# on two or three past slices before adoption; apply only on the PO's word, with:  APPLY_LEAN_RULE=1 bash <this script>
+if [ "${APPLY_LEAN_RULE:-0}" = "1" ]; then
+  step2 w120-b1-the-goldfish-rule-gf-10-and-the-critic-search-item-unrequested-addition "docs(roles): add the Goldfish rule GF-10 (smallest complete change) and the Critic search item unrequested addition"
+  step2 w121-b1-the-generated-goldfish-briefing-renders-the-smallest-complete-change-paragraph "feat(dispatch): render the smallest-complete-change paragraph (GF-10) in the generated Goldfish briefing"
+else
+  echo "skipped w120/w121 (lean-change rule GF-10, opt-in, not measured): set APPLY_LEAN_RULE=1 to apply"
+fi
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

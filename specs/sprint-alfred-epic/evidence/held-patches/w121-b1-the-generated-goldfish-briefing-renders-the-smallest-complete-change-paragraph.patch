@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 4ab6c05c4..b46a9dbd1 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -280,6 +280,13 @@ export function testFirstEvidenceParagraph(pkg) {
+   return `\n\nTest-first evidence in the return (optional, self-attested): add one more key to the JSON object, \`testFirst\`: \`{"red":[{"command":"<the RED command>","exitCode":<its non-zero exit code>,"evidencePath":"<repo-relative evidence file>"}],"greenCommand":"<the GREEN command>"}\`. Write the evidence file with the redacting evidence writer the template names, from the RED run you made before your first production edit. The host only checks that each evidence file exists, is a regular non-empty file inside the repository, and shows the result as \`testFirstEvidence\` (attested, unverifiable or absent) in the dispatch record; the flag is for the Critic and the close readback, never a gate, and the host never refuses a commit because of it. It is your own statement plus file existence: nobody observes the order of events.`;
+ }
+ 
++// Candidate 19 (B1, role rule GF-10): one fixed paragraph, our own wording of the smallest-complete-change rule, for every dispatch that carries a
++// criterion except the purely mechanical tier. About 110 words; the rule itself lives in roles/goldfish.md and this is its short rendering.
++export function smallestChangeParagraph(pkg) {
++  if (typeof pkg?.criterion !== "string" || pkg.agentType === "goldfish-mechanic") return "";
++  return `\n\nSmallest complete change (role rule GF-10): before the first edit, list what the change must reach (callers, tests, fixtures, configuration, exports). Deliver the briefed outcome with the smallest change that fully works: reuse what exists, keep the structure, prefer removing code to adding it, and add no abstraction, wrapper, option, dependency or code for later that the briefing did not ask for. Fix a defect once at its shared cause. Moved code keeps its validation and error handling; never shorten validation at a trust boundary, data-loss handling, security or anything the briefing names. Report what you left out on purpose, and any risk, under "Deliberately not changed".`;
++}
++
+ /** Renders the full briefing; `generated` is the binding builder's result for this package. */
+ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
+   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
+@@ -304,7 +311,7 @@ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
+ {"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"${b.dispatchId}","candidateCommit":"${b.candidateCommit}","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+ \`\`\`
+ 
+-\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. Only when no file at all has been changed is a plain-text stop report the one legal form (no commit happens then). \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.${testFirstEvidenceParagraph(pkg)}
++\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. Only when no file at all has been changed is a plain-text stop report the one legal form (no commit happens then). \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.${testFirstEvidenceParagraph(pkg)}${smallestChangeParagraph(pkg)}
+ 
+ ## Briefing ${b.dispatchId}: ${pkg.title}
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 77f01b356..e3d4e9a52 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2126,6 +2126,29 @@ test("C18-19: a criterion package with no test among its paths and check renders
+   assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "plugins/x/y.test.mjs" }), /testFirst/u);
+ });
+ 
++// --- Candidate 19, B1 (role rule GF-10): the smallest-complete-change paragraph ---
++
++test("B1: the smallest-complete-change paragraph renders for a criterion package except the mechanical tier, in at most 130 words", async () => {
++  const { smallestChangeParagraph } = await buildLib();
++  assert.equal(smallestChangeParagraph({ paths: ["plugins/x/y.mjs"] }), "", "no criterion, no paragraph");
++  assert.equal(smallestChangeParagraph({ criterion: "AC-1", agentType: "goldfish-mechanic" }), "", "the mechanical tier gets none");
++  for (const agentType of ["goldfish-implementor", "goldfish-deep", undefined]) {
++    const text = smallestChangeParagraph({ criterion: "AC-1", agentType });
++    assert.match(text, /GF-10/u);
++    assert.match(text, /Deliberately not changed/u);
++    assert.ok(text.trim().split(/\s+/u).length <= 130, `paragraph too long: ${text.trim().split(/\s+/u).length} words`);
++  }
++});
++
++test("B1: a generated briefing carries the paragraph exactly once and it states no test-first exception", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture({ criterion: "AC-1" });
++  const result = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.equal(result.text.split("Smallest complete change (role rule GF-10)").length, 2);
++  assert.doesNotMatch(result.text, /skip (the )?test/iu);
++});
++
+ // --- C18-15 (AC-239): an optional visual check in the generated briefing ---
+ 
+ const VISUAL = { question: "Does the camera show the stair block fully lit from the front?", evidencePath: "specs/sample-feature/evidence/stair-block.png" };
