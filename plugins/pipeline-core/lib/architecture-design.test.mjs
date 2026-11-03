@@ -363,6 +363,26 @@ test("C18-12: ARCHITECTURE-DESIGN-SCOPE-MISMATCH names each uncovered required p
   assert.equal(ok.status, "materialization-required", "a fully covering scope still passes");
 });
 
+// --- C18-12 follow-up (candidate 19): the same rule runs on the draft, before the PO is asked to sign ---
+test("C18-12 follow-up: the draft inspection refuses a scope that misses required paths, with the same detail, before any signature", async () => {
+  const { stage, mod } = await hf9Load();
+  const narrow = hf9Design();
+  narrow.disposition.scope = ["src/", "tests/", "docs/contract.md", "specs/"];
+  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: narrow });
+  const draft = mod.inspectArchitectureDesignDraft({ rootDir: fixture.root, planPath: fixture.planPath, expectedPlanSha256: fixture.prdSha });
+  assert.equal(draft.ok, false);
+  assert.equal(draft.required, true);
+  assert.equal(draft.code, "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
+  assert.equal(draft.field, "disposition.scope");
+  for (const path of ["architecture/map/index.md", "architecture/fitness-model.json", "architecture/baseline.json"]) assert.match(draft.expected, new RegExp(path.replace(/\./gu, "\\.")), path);
+  assert.doesNotMatch(draft.expected, /src\/application\.mjs/u, "a covered implementation-surface path is not named");
+
+  const good = hf9Fixture(stage, { block: true, scaffold: "exact" });
+  const accepted = mod.inspectArchitectureDesignDraft({ rootDir: good.root, planPath: good.planPath, expectedPlanSha256: good.prdSha });
+  assert.equal(accepted.ok, true, "a fully covering scope still passes the draft");
+  assert.equal(accepted.required, true);
+});
+
 // --- W7: a module declared kind "documentation" with only non-executable owned paths needs no verification entry point (D9) ---
 import { loadMapBundle } from "../scripts/module-inventory.mjs";
 function docDesign(ownedPaths = ["docs/guide/**", "README.md"]) {
