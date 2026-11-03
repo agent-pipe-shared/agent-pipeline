@@ -93,6 +93,16 @@ Quick fixes from the report text, taken along:
 | Q5 | The runner can write the control plane with a `node scratch/*.mjs` helper (`.git/agent-pipeline/publication-close/...` written at transcript line 1231); the observation boundary is not sealed at host level | Security finding; PO decision before any change | PO decision |
 | Q6 | `architectureOrientation: adoption-required` shown for a one-module feature | Informational | none |
 
+### M1 (core of the Alfred sprint, PO 2026-11-03): the architecture gate does not produce modular designs
+
+PO observation: agent architectures must modularize massively because of context limits, so that projects do not end in huge modules and files; the three runners differ (Claude and Antigravity planned one module, Codex split). Measured in the source and in the two result repositories:
+
+- **Cause 1, the skeleton.** `renderArchitectureDesignSkeleton` (`lib/design-authoring.mjs`) hands every agent a draft with exactly one module `application` (owned paths `src/**`, `tests/**`, one implementation file `src/application.mjs`, one test entry) and the hint "Split modules as needed". The Antigravity result is that skeleton with the responsibility text replaced (`profileId: greenfield-single-module-web-app`, one module, `src/**`), and it then wrote one file of about 2600 lines for five functional areas. Codex's fitness model has four modules (domain, storage, ui, offline) with explicit owned paths: it ignored the default on its own.
+- **Cause 2, no rule anywhere.** The validator (`validateArchitectureDesign`) requires at least one module; no guardrail, skill reference, readiness criterion or ADR states how to cut modules or bounds a file or module size (searched in `docs/adr`, `guardrails`, the skill references and the lib). The skeleton also carries `antiFragmentationPolicy.rejectTrivialFacades: true` with no opposing anti-monolith counterweight.
+- **Cause 3, nothing after the design.** The fitness check has no size budget, so a module that grows during development is never reported.
+
+Fix, in three parts, drafted as ADR `draft-modular-design-by-default-with-size-budgets` (EL-04: a new quality bar of the architecture gate): (1) skeleton with a split and a cut rule (small, can be built now); (2) a decomposition criterion in the readiness review and the design guidance; (3) `sizeBudgets` in the fitness model with a check at verify (Goldfish, deep tier, after the PO's decision and a measurement of sensible defaults on the three results). Part 4 of the ADR: slices follow modules, so parallel dispatch becomes possible.
+
 Decisions for the PO from this report: (1) may a caller-authored Critic verdict satisfy the close gate once D1 makes native subagents work on Antigravity (recommendation: no, require the native review, keep the fallback only as a labelled degraded path that the close readback names); (2) the observation boundary hole Q5; (3) candidate equality over the product subtree (D4b).
 
 ## Order of work

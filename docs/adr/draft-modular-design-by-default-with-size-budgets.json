@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-modular-design-by-default-with-size-budgets",
+  "title": "Modular design by default, with size budgets that keep modules and files small",
+  "status": "proposed",
+  "digest": "475ce7a5bf062c7e5b2072abb785c4679c7c7018d509e368b9719812f8c7a49b",
+  "scope": "global",
+  "date": "2026-11-03"
+}

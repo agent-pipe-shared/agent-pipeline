@@ -336,6 +336,8 @@
           "docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
+          "docs/adr/draft-modular-design-by-default-with-size-budgets.json",
+          "docs/adr/draft-modular-design-by-default-with-size-budgets.md",
           "docs/adr/draft-po-acceptance-points.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-repair-availability.json",
