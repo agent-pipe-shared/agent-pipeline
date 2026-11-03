@@ -19,7 +19,14 @@ function test(name, run) { cases.push({ id: `G23C${String(cases.length + 1).padS
 
 test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
   mkdirSync(fixtureBase, { recursive: true });
-  const root = mkdtempSync(join(fixtureBase, "g23-read-"));
+  // Restated 2026-11-02 (candidate 19, QG-04, own hunk; intent kept: a listing above the project root is refused): `ls -lh ../` is refused only when
+  // the parent holds something the passive read policy refuses (a credential-named file), not because it is outside the root. The parent used to be the
+  // repository's scratch folder, which holds such files in a long-used checkout and nothing in a fresh clone (green in one, red in the other). The
+  // fixture now owns its parent and plants the credential-named file itself.
+  const outer = mkdtempSync(join(fixtureBase, "g23-read-"));
+  writeFileSync(join(outer, ".env"), "x\n");
+  const root = join(outer, "project");
+  mkdirSync(root);
   try {
     mkdirSync(join(root, "docs"));
     writeFileSync(join(root, "docs", "a.md"), "safe\n");
@@ -51,7 +58,7 @@ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", 
     for (const good of ["rg -l safe docs --glob '!*.patch'", "rg -l safe docs -g '!node_modules'", "rg -l safe docs -g '*.md'"]) {
       assert.equal(isReadOnlyDiagnosticCommand(good, root), true, good);
     }
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(outer, { recursive: true, force: true }); }
 });
 
 test("G23 exact source-owned PO help is a pure CLI route", () => {

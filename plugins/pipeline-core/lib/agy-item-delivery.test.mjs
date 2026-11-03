@@ -19,7 +19,10 @@ import { nativeManagedDigest } from './native-managed-authority-support.mjs';
 import { createAgyAuthorityJournalOwner } from './agy-host-observed-store.mjs';
 
 async function fixture(run) {
-  const parent=new URL('../../../../../fixtures/',import.meta.url).pathname;mkdirSync(parent,{recursive:true,mode:0o700});
+  // Restated 2026-11-02 (candidate 19, QG-04, own hunk): the fixtures lived five levels above this file, which is the home directory for a checkout
+  // below ~/src and the unwritable /home for a clone directly below the home directory (EACCES, all six cases red). They now live beside the
+  // checkout (four levels up), still outside the repository tree; the OS temp folder does not work (the Source member reads `unavailable` there).
+  const parent=new URL('../../../../fixtures/',import.meta.url).pathname;mkdirSync(parent,{recursive:true,mode:0o700});
   const root=mkdtempSync(join(parent,'agy-item-'));
   const git=(...args)=>execFileSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,...args],{encoding:'utf8'}).trim();
   try{
