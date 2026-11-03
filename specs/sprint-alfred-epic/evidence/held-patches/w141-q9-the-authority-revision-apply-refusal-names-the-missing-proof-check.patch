@@ -1,0 +1,36 @@
+diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
+index a6a557d6b..a8e8c4e5d 100644
+--- a/harness/scripts/pipeline-state.test.mjs
++++ b/harness/scripts/pipeline-state.test.mjs
+@@ -3913,6 +3913,15 @@ function runAuthorityRevisionTests() {
+     && /AR-NEXT-AUTHORITY-STALE/.test(applied.err), applied.err);
+   ok("AR03d State is untouched after the TOCTOU refusal", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
+ }
++{
++  // AR03d2 -- Q9: without an injected PO proof check the refusal says what is missing and where the request comes from.
++  const { fx, request } = preparedRevision("ar03-no-approval-dep");
++  const preBytes = stateBytes(fx.dir);
++  const applied = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", { ...fx.deps, authorityRevisionApproval: undefined });
++  ok("AR03d2 an apply without a wired PO proof check is refused (AR-APPROVAL-UNAVAILABLE) with the missing piece and the plan command named, zero mutation",
++    applied.value === 2 && /AR-APPROVAL-UNAVAILABLE/.test(applied.err) && /no PO proof check/.test(applied.err)
++    && /continuity-authority-revision-plan --proposal-file/.test(applied.err) && stateBytes(fx.dir).equals(preBytes), applied.err);
++}
+ {
+   // AR03e-g -- apply RECHECKS the State preimage itself at apply time (not just the next-authority
+   // artifact AR03c already covers): a legitimate OTHER continuity mutation landing between plan and
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b14f87e1f..cb0b7ebb8 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -5684,7 +5684,10 @@ function runAuthorityRevisionApplyCommand(dir, rest, deps) {
+   const intentValue = requestDoc.intent;
+ 
+   if (typeof deps.authorityRevisionApproval !== "function") {
+-    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation.");
++    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation."
++      + " This command run alone has no PO proof check wired in: --request-file, --request-sha256 and --lock-token are not enough."
++      + " Get the request and its digest from continuity-authority-revision-plan --proposal-file <repo-relative-json>,"
++      + " then apply through the signed authority-revision route that supplies the PO proof, not by repeating this call.");
+     return 2;
+   }
+   const approvalCheck = deps.authorityRevisionApproval({

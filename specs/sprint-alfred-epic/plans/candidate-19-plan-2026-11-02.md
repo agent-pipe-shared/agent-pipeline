@@ -209,7 +209,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | planned | Elephant (text); guard part with the Windows session |
 | Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
 | Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | built (exact root path added to the shared scaffold predicate; the onboarding end-to-end suite was not run) | w139 |
-| Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | planned | Elephant (text) |
+| Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | built (w141, text only; the signed route is not rebuilt) | Elephant (text) |
 | Q10 | `WIN-AUTH-OPEN` names the exact path and offers a preview | planned | with E6 |
 
 ### Codex (F)
@@ -239,9 +239,9 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a, D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, F2 build (analysis lane), M1.1 to M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, Q9, F9 rest. Q8 and F1 are built (w139, w138 opt-in). Nothing here is claimed done.
+Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a, D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, F2 build (analysis lane), M1.2 to M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1 and Q9 are built (w139, w138 opt-in, w140, w141). Nothing here is claimed done.
 
-Count now: **built 16 items** (the 14 below plus Q8 and F1/opt-in) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
+Count now: **built 18 items** (the 14 below plus Q8, F1/opt-in, M1.1 and Q9) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
 PO decisions of 2026-11-03 (second round, all recommendations): (1) rehearse the apply script in a clone now with the existing chain, then add the remaining items in waves and rehearse after each wave; (2) ADR enforcement from the design (F4b) starts report-only; (3) analysis runs in the control directory keep the last five runs and at most seven days, no network policy yet; (4) no Critic carry-forward in the authority ADR (only Verify and Security evidence).
 
