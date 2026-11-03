@@ -67,6 +67,19 @@ C19-G4 (minor, found while building candidate 19): a Goldfish dispatched on the 
 - **C19-G7 is the same fix from the close side.** The close and push runbook makes the ordering rule an explicit step (every commit before the first signature; a commit after signing voids it) and one prepared signing plan lists all subjects. Check that separates the hypotheses: was each of the four signatures preceded by a commit made after the previous signature? If yes, the runner broke the ordering rule, and the immediate workaround is all commits first, then sign once.
 - **Decision tier.** Changing every command's result contract plus a new Verify suite is EL-04 territory (an ADR). Not drafted before the transcript gap list exists.
 
+### GF-10 measurement result (2026-11-03, indicative, n = 2)
+
+Method: the same slice at the same base commit, once as it was delivered without the rule (held patches w104 and w85) and once redone by a fresh implementor Goldfish with the GF-10 paragraph in the briefing (the paragraph text of w121, placed as a coordinator fact because the briefing file is hash-pinned; held patches of the redo kept outside the apply folder in `scratch/gf10/`). Both redo briefings said it was an independent redo and named the existing patch as not-an-input.
+
+| Slice | Arm | Files | Changed lines | Patch bytes | Tool calls |
+|---|---|---|---|---|---|
+| C18-20 (consent and hook handover) | without rule (w104) | 4 | 88 | 12657 | not recorded |
+| C18-20 | with rule | 4 | 78 | 9809 | 62 |
+| C18-9 (ruleset identity and version in the briefing build) | without rule (w85) | 2 | 80 | 11715 | not recorded |
+| C18-9 | with rule | 2 | 55 | 10438 | 37 |
+
+Reading: same files in both arms, 11 % and 31 % fewer changed lines with the rule, 22 % and 11 % fewer bytes; the with-rule runs reported what they left out on purpose. Caveats: one run per arm, the delivered patches may carry Elephant corrections, and the C18-20 redo stopped before the onboarding-continuity suites and the SKILL pins (budget spent on a stale-base contradiction), so green checks are not comparable there. It shows no harm and a modest reduction on two slices; it does not prove an effect. The decision stays with the PO; if adopted, apply with `APPLY_LEAN_RULE=1`.
+
 ## D. First runner report: Antigravity greenfield (TabletApp_agy_070_1, 2026-11-03)
 
 PO decision 2026-11-03: fix every defect of priority 1 to 8, small ones directly by the Elephant, larger ones as pipeline Goldfish slices, plus the quick fixes from the report text. Report copy: `scratch/agy/docs/` (not tracked). Facts of the run: 1290 steps, 62 refusals or errors, 171 min active time of which 55 % in the close phase, 5 PO signatures instead of 2, pipeline administration 53.5 % of the non-cache tokens against 7.8 % product work. Elephant reading below is measured in the source on 2026-11-03.
