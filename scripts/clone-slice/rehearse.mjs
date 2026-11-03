@@ -14,8 +14,9 @@ rmSync(clone, { recursive: true, force: true });
 const head = sh("git", ["rev-parse", "HEAD"], repo).stdout.trim();
 sh("git", ["clone", "--shared", "--no-checkout", repo, clone], repo);
 sh("git", ["checkout", "--detach", head], clone);
+sh("git", ["remote", "add", "upstream", repo], clone); // the Full Verify's security step looks for a remote named upstream
 mkdirSync(resolve(clone, "scratch"), { recursive: true });
 copyFileSync(resolve(repo, script), resolve(clone, "scratch", basename(script)));
 const r = sh("bash", [`scratch/${basename(script)}`], clone, { GIT_AUTHOR_NAME: "Rehearsal", GIT_AUTHOR_EMAIL: "rehearsal@example.invalid", GIT_COMMITTER_NAME: "Rehearsal", GIT_COMMITTER_EMAIL: "rehearsal@example.invalid" });
-writeFileSync(resolve(import.meta.dirname, `out-${process.argv[3] ?? "clone"}.log`), `${r.stdout}\n--- stderr ---\n${r.stderr}`);
+writeFileSync(resolve(import.meta.dirname, `out-${basename(process.argv[3] ?? "clone")}.log`), `${r.stdout}\n--- stderr ---\n${r.stderr}`);
 console.log(`start ${head}\nexit ${r.status}\n${r.stdout.split("\n").slice(-30).join("\n")}\n${r.stderr.split("\n").slice(-15).join("\n")}`);
