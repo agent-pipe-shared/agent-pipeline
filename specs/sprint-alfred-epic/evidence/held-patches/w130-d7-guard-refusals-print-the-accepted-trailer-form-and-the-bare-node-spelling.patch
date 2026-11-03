@@ -1,0 +1,63 @@
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index 448f3cadd..08a3bf153 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -1122,6 +1122,10 @@ let inspection;
+       "guardrails/git.md GIT-03: the anonymous `AI-Assisted: true` marker is the COMPLETE assistance signal.",
+       "Provider or model co-author trailers, session URLs or IDs, and account identifiers turn public history into a correlation index, and public history cannot be unpublished.",
+       "There is no override for this rule. Rewrite the message.",
++      // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
++      ...(blocking.some((f) => conventionCodes.has(f.code))
++        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own."]
++        : []),
+       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
+     ]);
+   }
+diff --git a/plugins/pipeline-core/hooks/guard-git.test.mjs b/plugins/pipeline-core/hooks/guard-git.test.mjs
+index 6d3ede1ff..bede7913f 100644
+--- a/plugins/pipeline-core/hooks/guard-git.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.test.mjs
+@@ -821,7 +821,8 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
+ // the consuming repository has no guard-config yet.
+ check("GIT03-6 block  a missing marker is enforced by default", 'git commit -m "chore: bump"', BLOCK, {
+   projectDir: NO_CONFIG_DIR,
+-  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
++  // Candidate 19 (D7): the refusal also prints the accepted trailer form, so an agent does not need a second attempt to learn it.
++  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`"],
+ });
+ // GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
+ // commitMessageFindings' readFile throw, the throw was swallowed, and the commit went
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs
+index c4f486c24..8fd234dcf 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs
+@@ -67,6 +67,8 @@ for (const [name, attempted, supplied] of controls) check(`draft shell refuses $
+   assert.equal(hit?.verdict, 'block');
+   assert.equal(hit?.lifecycleStatus, 'draft');
+   assert.equal(hit?.lane, 'opaque-script-execution');
++  // Candidate 19 (D7): an absolute interpreter path in the refused command gets the bare-node spelling hint.
++  assert.match(hit?.reason ?? '', /Use the bare `node`/u);
+ });
+ for (const [name, metadata] of [
+   ['matching planner marked mutating', { mutation: true, requiresConfirmation: true }],
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index 83db4016c..cb3f5bcca 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -168,7 +168,15 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+         };
+       }
+       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
+-      if (result.verdict === "block") return { ...result, candidate, lane };
++      if (result.verdict === "block") {
++        // Candidate 19 (D7): an absolute interpreter path is not the draft scratch-script shape, so the command reads as an opaque script run; say so and name the working spelling.
++        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 0
++          && isAbsolute(words[0]) && ["node", "node.exe"].includes(basename(words[0]).toLowerCase());
++        const reason = absoluteNode && typeof result.reason === "string"
++          ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
++          : result.reason;
++        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
++      }
+       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
+       if (advisory === null && typeof result.advisory === "string") {
+         advisory = { advisory: true, notice: result.advisory, code: result.advisoryCode ?? null, candidate, lane };

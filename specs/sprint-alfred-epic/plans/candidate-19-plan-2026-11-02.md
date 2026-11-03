@@ -154,6 +154,19 @@ PO decision: take all P0 and P1 points and, after verification, the P2 points in
 
 Further points from the report text (not in its table): a second design signature because the schema value was wrong (the parser should run before the first review and signature; same family as D3), a PO-terminal approval that failed on an unclean repository (D3), and the missing runner export of phase windows, token deltas and a/b/c bucket (the report asks for it; large, deferred past candidate 19).
 
+## PO decisions on the tiles (2026-11-03)
+
+| Topic | Decision | Consequence for the build |
+|---|---|---|
+| Authority carry-forward (D3, D4b, E3, F1) | ADR plus build as an opt-in block | An ADR draft (Proposed, independent review), then the patches behind their own opt-in block in the apply script; the PO applies or leaves them out |
+| Analysis lane (F2) | scratch-clone lane | A sanctioned command makes a throwaway clone under `scratch/` and runs the tests there; the working tree stays untouched, no lifecycle mutation, no signature. Needs the ADR for the guard exception |
+| Caller-authored Critic verdict (D2 part 2) | no at rigor 1 or higher or high risk | The fallback stays a labelled degraded path; it satisfies the close gate only at rigor 0 and low risk; the close readback names it |
+| Modular design (M1) | skeleton and criterion, budgets report-only | Several modules by a cut rule in the skeleton, a decomposition criterion in the readiness review, `sizeBudgets` reported not blocking (500 lines per file, 2500 per module as starting values) |
+| Control-plane write (Q5) | block it now with a guard | The guard refuses a script run whose target is a path under `.git/agent-pipeline/`; own review; known limit: another interpreter is not covered without host sandboxing |
+| GF-10 (w120/w121) | adopt | The apply script applies both by default (`APPLY_LEAN_RULE=0` leaves them out); the Critic search item belongs to the PO's open Critic preimage re-pin |
+| Late-binding ADR | accept, build in candidate 19 | The ADR becomes Accepted; the build (guard tripwire, seal, shared reader) is a Goldfish chain with its own Critic review |
+| Assignment of unclear topics | in 19: M1 parts 2 and 3, the generated runbook (G5), Windows lock and registry (E2 cause, E4); to 0.7.1: the runner export of phase windows and token buckets | The session "Claude Fam App" is a Windows run and answers on request, so the Windows items can be checked live there |
+
 ## Order of work
 
 A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, then A6, then B1 when decided. Greenfield findings jump the queue by severity.

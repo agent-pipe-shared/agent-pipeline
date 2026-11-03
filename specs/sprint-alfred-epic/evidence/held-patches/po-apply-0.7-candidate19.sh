@@ -16,8 +16,9 @@
 #   w129  the security scan has a typed local-only mode and the push gate keeps refusing it (D8, AGY greenfield; Goldfish slice)
 #   w129a the generated result record claims no stale state (F3/Q1, Codex and Claude greenfield)
 #   w129b the critic report readback names the passing review (F6, Codex greenfield)
-#   w120  (opt-in) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
-#   w121  (opt-in) the short rendering of GF-10 in the generated Goldfish briefing (B1)
+#   w130  the commit trailer refusal prints the accepted form and the shell refusal names the bare node spelling (D7, AGY and Codex greenfield)
+#   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
+#   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -47,13 +48,14 @@ step2 w128-q7-the-design-surface-refusal-names-the-invalid-entry "fix(architectu
 step2 w129-d8-the-security-scan-has-a-typed-local-only-mode-for-a-repository-without-a-remote "feat(security): the security scan has a typed local-only mode for a repository without a remote and the push gate keeps refusing it"
 step2 w129a-f3-the-generated-result-record-claims-no-stale-state "fix(feature-package): the generated result record no longer claims an implementation state that stays bound after the close"
 step2 w129b-f6-the-critic-report-readback-names-the-passing-review "fix(close): the critic report readback names the passing review, not the first report in listing order"
-# OPT-IN, not measured yet: the lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. The seed asks for a measurement
-# on two or three past slices before adoption; apply only on the PO's word, with:  APPLY_LEAN_RULE=1 bash <this script>
-if [ "${APPLY_LEAN_RULE:-0}" = "1" ]; then
+step2 w130-d7-guard-refusals-print-the-accepted-trailer-form-and-the-bare-node-spelling "fix(guard): the commit trailer refusal prints the accepted form and the shell refusal names the bare node spelling"
+# The lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. PO decision 2026-11-03: adopt (measured on two past slices,
+# 11 % and 31 % fewer changed lines, indicative). Applied by default; leave out with:  APPLY_LEAN_RULE=0 bash <this script>
+if [ "${APPLY_LEAN_RULE:-1}" != "0" ]; then
   step2 w120-b1-the-goldfish-rule-gf-10-and-the-critic-search-item-unrequested-addition "docs(roles): add the Goldfish rule GF-10 (smallest complete change) and the Critic search item unrequested addition"
   step2 w121-b1-the-generated-goldfish-briefing-renders-the-smallest-complete-change-paragraph "feat(dispatch): render the smallest-complete-change paragraph (GF-10) in the generated Goldfish briefing"
 else
-  echo "skipped w120/w121 (lean-change rule GF-10, opt-in, not measured): set APPLY_LEAN_RULE=1 to apply"
+  echo "skipped w120/w121 (lean-change rule GF-10) because APPLY_LEAN_RULE=0"
 fi
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
