@@ -69,6 +69,10 @@ Clone below the home directory with an `upstream` remote, built by rehearsing `p
 
 One real finding (g23), one patch (w125). Not covered by this run: main-tree checks, batch Critic (paused), native Windows runs, real Codex/Antigravity runs, hook activation on a real promotion, parallel host commits in a real run, PO acceptance.
 
+## PO decisions after the apply (2026-11-03)
+
+Candidate 19 is applied (`4924916bf`; w120/w121 not). Decisions: GF-10 is measured on two or three past slices before any adoption; the late-binding ADR gets an independent review, then the PO decides; C18-5 (pre-granted allowlist) is not introduced; next is waiting for the greenfield reports, with no stamp and no main-tree Full Verify until they are in. The GF-10 measurement and the ADR review are queued preparation, not started.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
