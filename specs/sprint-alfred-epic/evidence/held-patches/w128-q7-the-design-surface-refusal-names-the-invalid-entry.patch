@@ -1,0 +1,52 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 8c7482ffc..2bc115276 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -120,8 +120,15 @@ export function parseArchitectureDesign(prd) {
+     }
+   }
+   requireValue(input.modules.every(module => module.allowedDependencies.every(id => ids.has(id))), "ARCHITECTURE-DESIGN-DEPENDENCY-INVALID");
+-  requireValue(Array.isArray(input.implementationSurface) && input.implementationSurface.length > 0
+-    && input.implementationSurface.every(p => bounded(p) && resolveModuleForPath(p, input.modules)), "ARCHITECTURE-DESIGN-SURFACE-INVALID");
++  requireValue(Array.isArray(input.implementationSurface) && input.implementationSurface.length > 0, "ARCHITECTURE-DESIGN-SURFACE-INVALID");
++  // Candidate 19 (Q7, Claude greenfield report): the refusal named neither the field nor the entry, so a trailing slash in one of 29 entries
++  // was found only by reading this source. The field and the rule are named now, one entry at a time.
++  input.implementationSurface.forEach((path, index) => {
++    requireField(bounded(path), "ARCHITECTURE-DESIGN-SURFACE-INVALID", `implementationSurface[${index}]`,
++      "a bounded repository-relative file path: no trailing slash (a directory is not an entry; name its files), no glob, no `..`", path);
++    requireField(resolveModuleForPath(path, input.modules), "ARCHITECTURE-DESIGN-SURFACE-INVALID", `implementationSurface[${index}]`,
++      "a path owned by exactly one declared module (a module's ownedPaths must cover it)", path);
++  });
+   const model = input.fitnessModel;
+   requireValue(model?.schema === "pipeline.fitness-model.v1" && model.profileId?.trim() && model.revision === 1
+     && Array.isArray(model.allowedBoundaryCrossings) && model.antiFragmentationPolicy
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index eb5d08250..5631ac2bf 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -94,6 +94,9 @@ test("field-local diagnostics identify the single invalid architecture input", (
+     [input => { input.modules[0].ownedPaths[0] = "../escape/**"; }, "modules[0].ownedPaths[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+     [input => { input.modules[0].publicContracts[0] = "docs/*"; }, "modules[0].publicContracts[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+     [input => { input.modules[0].verificationEntryPoints[0] = "tests/*"; }, "modules[0].verificationEntryPoints[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
++    // Candidate 19 (Q7): the surface refusal names the entry that is invalid, not only the code.
++    [input => { input.implementationSurface = ["src/application.mjs", "src/icons/"]; }, "implementationSurface[1]", "ARCHITECTURE-DESIGN-SURFACE-INVALID"],
++    [input => { input.implementationSurface = ["unowned.mjs"]; }, "implementationSurface[0]", "ARCHITECTURE-DESIGN-SURFACE-INVALID"],
+   ]) {
+     const input = design(); mutate(input);
+     assert.throws(() => parseArchitectureDesign(prd(input)), error =>
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b14f87e1f..6b54420d2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11625,7 +11625,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+           planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
+         if (!designDraft.ok) {
+-          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
++          // Candidate 19 (Q7): the inspection already carries the invalid field and what it expects; the message dropped them.
++          const designDraftDetail = typeof designDraft.field === "string"
++            ? ` (field ${designDraft.field}: ${designDraft.expected}${typeof designDraft.rejectedValue === "string" ? `; rejected value ${designDraft.rejectedValue}` : ""})` : "";
++          console.error(`Error: submit-plan blocked by ${designDraft.code}${designDraftDetail}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+           return 2;
+         }
+         submitDesignDraft = designDraft;

@@ -12,6 +12,7 @@
 #   w125  the case-completion policy of the g23 read-help suite lists G23C004 (found by Full Verify 6)
 #   w126  the Antigravity runner view maps the agent tools list to the runner's registry names (D1, AGY greenfield priority 1)
 #   w127  the Antigravity pre-tool header names the real guard code of a refused native read (D5)
+#   w128  the design surface refusal names the invalid entry and the submit-plan message carries the field detail (Q7, Claude greenfield)
 #   w120  (opt-in) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (opt-in) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
@@ -39,6 +40,7 @@ step2 w124-c19-register-the-continuity-drift-exits-and-the-full-verify-wrapper-s
 step2 w125-c19-the-g23-read-help-case-completion-policy-lists-g23c004 "fix(verify): list G23C004 in the case-completion policy of the g23 read-help suite"
 step2 w126-d1-the-agy-runner-view-maps-the-agent-tools-list-to-the-runner-registry-names "fix(agy): map the agent tools list to the runner registry names in the Antigravity runner view"
 step2 w127-d5-the-agy-pretool-header-names-the-real-guard-code-of-a-refused-native-read "fix(agy): the pre-tool diagnostic header names the real guard code of a refused native read"
+step2 w128-q7-the-design-surface-refusal-names-the-invalid-entry "fix(architecture): the design surface refusal names the invalid entry and the submit-plan message carries the field detail"
 # OPT-IN, not measured yet: the lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. The seed asks for a measurement
 # on two or three past slices before adoption; apply only on the PO's word, with:  APPLY_LEAN_RULE=1 bash <this script>
 if [ "${APPLY_LEAN_RULE:-0}" = "1" ]; then

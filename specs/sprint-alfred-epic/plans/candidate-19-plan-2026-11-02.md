@@ -134,6 +134,26 @@ PO decision: take all seven points of section 8.2 of the report into candidate 1
 
 Additional quick fixes from the table of section 3.1: Q7 `ARCHITECTURE-DESIGN-SURFACE-INVALID` names only the code, not the field (directory entries with a trailing slash in `implementationSurface`); Q8 `.gitattributes` written by the onboarding itself is refused by the lifecycle policy in the first commit (`GUARD-DEVPLAN-LIFECYCLE`), so the policy needs an exception for the onboarding's own files; Q9 `AR-APPROVAL-UNAVAILABLE`: the help names `--proposal-file` but the apply is only runnable with an injected verification; Q10 `WIN-AUTH-OPEN`: name the exact path and offer the repair with a preview. Single-module finding: Claude and Antigravity cut one module, Codex four; see M1.
 
+## F. Third runner report: Codex (TabletApp_codex_070_1, 2026-11-03), each point checked against the source
+
+PO decision: take all P0 and P1 points and, after verification, the P2 points into candidate 19. Report copy: `scratch/codex/docs/` (not tracked). The run is a retrospective after a closed local feature; the report is honest about its limits (the long main segment was only read at head and tail, so whole-run counts stay unmeasured). Verified here by reading the plugin source at HEAD:
+
+| ID | Report prio | Point | Verification result | Route |
+|---|---|---|---|---|
+| F1 | P0 | `ARCHITECTURE-DESIGN-RECEIPT-STALE` blocks the next feature | Confirmed: `lib/architecture-design.mjs` line 287 compares the whole receipt (it binds `featureId` and `planPath`) with the receipt rebuilt for the new feature, so every second feature with an unchanged design fails. Same defect family as D4b/E3 | ADR (inheritance by equality over the design), then Goldfish deep |
+| F2 | P0 | Read-only retrospective cannot run the product tests while a feature is `approved` | Confirmed: `lib/guard/devplan-shell-lane.mjs` line 192 maps `node --test <file>` to an opaque-script candidate with `forceLifecycleGate`, so any test run is refused outside the implementation phase. The rule is deliberate (an opaque script may write); the gap is that no sanctioned route exists to run tests with scratch-only output. The clone-slice route used for candidate building is the model | design question for the PO (analysis lane), ADR draft, then Goldfish deep |
+| F3 | P1 | Bound `result.md` says "Implementation is in progress" after close | Confirmed: `lib/feature-package-registration.mjs` line 107 writes `- Status: implementation is in progress.` at registration; nothing rewrites it at close. Same as Q1 | Elephant (small) plus close-feature check |
+| F4 | P1 | ADRs promised by the spec are missing and the close readback says not applicable | Mechanism confirmed: `lib/close-quality-readback.mjs` `adrRow` decides only from the typed architecture impact; nothing compares the spec's promised deliverables. The spec text itself was not read | Goldfish (small): a row that lists spec-promised ADR paths |
+| F5 | P1 | Evidence rests partly on coordinator attestation, tool count 0 | Confirmed from the source: `session-critic-finalizer.mjs` lines 133 to 150 (caller-authored fallback) and 488/513 (`freshContext: true`). Same as D2 | D2 part 1 (label and flags), part 2 later |
+| F6 | P1 | `critic-report-file` row points at the first report, not the final PASS | Confirmed: `criticRow` returns the first packet in listing order that holds a `report.md`; with three packets it names the oldest (a FAIL) | Elephant (small): resolve the packet the close consumed, show its verdict |
+| F7 | P1 | AC3 provenance collision in the product code | Confirmed statically by reading `src/domain.mjs` lines 25 to 27, 42, 46: after an edit B/C the new ingredient C at index 1 gets the key of the old B (`transferIngredients`), the insert is skipped and `validateState` refuses the duplicate source. This is a product defect of the TabletApp, not of the plugin | PO list only; no plugin change. Process lesson: combine state transitions in tests |
+| F8 | P2 | Two different Critic round limits in the operating model | Confirmed: the English text (D190) has no round count, the German reference block still names a limit of four | Elephant (small): align the German block; consistency test |
+| F9 | P2 | Shell forms missed repeatedly | Overlaps D7/Q2 (exact spellings and the `rg --files` hint in refusal text) | with D7 |
+| F10 | P2 | Browser evidence not bound to the integrated commit | Process finding, no plugin defect found; fixture and app hash capture is part of the candidate-bound evidence work | later, with D4 |
+| F11 | P2 | No vertical slice before the full build | Overlaps M1 (slices follow modules) | with M1 |
+
+Further points from the report text (not in its table): a second design signature because the schema value was wrong (the parser should run before the first review and signature; same family as D3), a PO-terminal approval that failed on an unclean repository (D3), and the missing runner export of phase windows, token deltas and a/b/c bucket (the report asks for it; large, deferred past candidate 19).
+
 ## Order of work
 
 A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, then A6, then B1 when decided. Greenfield findings jump the queue by severity.
