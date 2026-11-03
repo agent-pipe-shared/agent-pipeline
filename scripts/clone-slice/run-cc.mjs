@@ -32,7 +32,9 @@ const r = spawnSync(nodeBinary, [file], { cwd: clone, env, encoding: "utf8", max
 const bytes = readFileSync(ccPath);
 const { parseVerifyCaseCompletion } = await import(pathToFileURL(join(clone, "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs")).href);
 let verdict = "accepted";
-try { parseVerifyCaseCompletion(bytes, policy); } catch (error) { verdict = `REJECTED: ${error.message}`; }
+// A suite with no case-completion policy at all (no augmentation row, no inline ids) that also emits nothing is not case-checked by the Full Verify: say so instead of a false REJECTED.
+if (!aug && policy.caseIds.length === 0 && bytes.length === 0) verdict = "no case-completion policy (not checked)";
+else try { parseVerifyCaseCompletion(bytes, policy); } catch (error) { verdict = `REJECTED: ${error.message}`; }
 const emitted = [...new Set([...bytes.toString("utf8").matchAll(/"([A-Z]{2,6}\d{2,3})"/gu)].map((m) => m[1]))];
 const short = (ids) => (ids.length > 10 ? `${ids.slice(0, 10).join(",")}… (${ids.length})` : ids.join(",") || "none");
 console.log(`${suite}: exit ${r.status}; policy ${aug ? "augmentation" : "inline"} ${policy.caseIds.length} ids; emitted ${emitted.length}; ${verdict}; unregistered: ${short(emitted.filter((id) => !policy.caseIds.includes(id)))}; missing: ${short(policy.caseIds.filter((id) => !emitted.includes(id)))}`);
