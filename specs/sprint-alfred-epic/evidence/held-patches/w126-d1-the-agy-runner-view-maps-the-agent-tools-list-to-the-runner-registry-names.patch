@@ -1,0 +1,74 @@
+diff --git a/plugins/pipeline-core/lib/agy-central-snapshot.mjs b/plugins/pipeline-core/lib/agy-central-snapshot.mjs
+index 6934e9c8f..642615c78 100644
+--- a/plugins/pipeline-core/lib/agy-central-snapshot.mjs
++++ b/plugins/pipeline-core/lib/agy-central-snapshot.mjs
+@@ -502,6 +502,10 @@ export function classifyAgySnapshot({ observation = {}, deps = {} } = {}) {
+ // The table is PO decision D13 (Antigravity model tier mapping): sonnet and haiku run on the flash tier, opus on the pro tier.
+ // `inherit` is not a target, and every other `model:` value (inherit, flash, pro, any full model id) is a typed refusal.
+ export const AGY_RUNNER_MODEL_MAP = Object.freeze({ sonnet: 'flash', haiku: 'flash', opus: 'pro' });
++// Candidate 19 (D1, AGY greenfield): the runner's tool registry has no Claude tool names; `invoke_subagent` failed at once with
++// `unknown component: tool "Read" not found in registry`, so no pipeline subagent could start. The frontmatter `tools:` list is rewritten through
++// this second closed table; the names come from the runner's own registry as reported by that run (a real Antigravity smoke run is still open).
++export const AGY_RUNNER_TOOL_MAP = Object.freeze({ Read: 'read_file', Write: 'write_file', Edit: 'edit_file', Bash: 'run_command', Grep: 'grep_search', Glob: 'find_by_name' });
+ const VIEW_DIR = 'agy-runner-view';
+ const VIEW_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
+ const AGENT_FILE = /^agents\/[^/]+\.md$/;
+@@ -516,12 +520,26 @@ export function transformAgyRunnerAgent(relPath, bytes) {
+   const close = lines.findIndex((line, index) => index > 0 && line.replace(/\r$/, '') === '---');
+   if (close === -1) return bytes;
+   const hits = [];
+-  for (let index = 1; index < close; index++) if (/^model:/.test(lines[index])) hits.push(index);
+-  if (hits.length === 0) return bytes;
++  const toolHits = [];
++  for (let index = 1; index < close; index++) {
++    if (/^model:/.test(lines[index])) hits.push(index);
++    if (/^tools:/.test(lines[index])) toolHits.push(index);
++  }
+   if (hits.length > 1) throw fail('AGV-AGENT-MODEL-AMBIGUOUS', relPath);
+-  const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
+-  if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
+-  lines[hits[0]] = `model: ${AGY_RUNNER_MODEL_MAP[match[1]]}${match[2]}`;
++  if (toolHits.length > 1) throw fail('AGV-AGENT-TOOLS-AMBIGUOUS', relPath);
++  if (hits.length === 0 && toolHits.length === 0) return bytes;
++  if (hits.length === 1) {
++    const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
++    if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
++    lines[hits[0]] = `model: ${AGY_RUNNER_MODEL_MAP[match[1]]}${match[2]}`;
++  }
++  if (toolHits.length === 1) {
++    const match = /^tools:[ \t]*\[(.*)\][ \t]*(\r?)$/.exec(lines[toolHits[0]]);
++    if (!match) throw fail('AGV-AGENT-TOOLS-UNPARSEABLE', relPath);
++    const names = match[1].split(',').map((name) => name.trim()).filter((name) => name !== '');
++    if (names.some((name) => !Object.hasOwn(AGY_RUNNER_TOOL_MAP, name))) throw fail('AGV-AGENT-TOOL-UNMAPPED', relPath);
++    lines[toolHits[0]] = `tools: [${names.map((name) => AGY_RUNNER_TOOL_MAP[name]).join(', ')}]${match[2]}`;
++  }
+   return Buffer.from(lines.join('\n'), 'utf8');
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+index 614db14bf..61cce0951 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+@@ -265,6 +265,22 @@ test('the transform is one closed table: frontmatter model line only, anything u
+   assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\nmodel: sonnet\nmodel: haiku\n---\n')), { code: 'AGV-AGENT-MODEL-AMBIGUOUS' });
+ });
+ 
++test('the runner view also maps the frontmatter tools list to the runner registry names, one closed table, typed refusals (D1)', () => {
++  const view = (tools, model = 'model: sonnet\n') => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from(`---\nname: x\n${model}tools: ${tools}\n---\nbody\n`)).toString();
++  assert.equal(view('[Read, Grep, Glob]', ''), '---\nname: x\ntools: [read_file, grep_search, find_by_name]\n---\nbody\n', 'an agent without a model line still gets its tools mapped');
++  assert.equal(view('[Read, Edit, Write, Grep, Glob, Bash]'), '---\nname: x\nmodel: flash\ntools: [read_file, edit_file, write_file, grep_search, find_by_name, run_command]\n---\nbody\n');
++  assert.equal(view('[]', ''), '---\nname: x\ntools: []\n---\nbody\n', 'an empty list stays empty');
++  assert.throws(() => view('[Read, WebFetch]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' });
++  assert.throws(() => view('[read_file]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' }, 'a name that is already native is not silently accepted');
++  assert.throws(() => view('Read, Grep'), { code: 'AGV-AGENT-TOOLS-UNPARSEABLE' });
++  assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\ntools: [Read]\ntools: [Grep]\n---\n')), { code: 'AGV-AGENT-TOOLS-AMBIGUOUS' });
++  for (const name of ['critic', 'goldfish-implementor', 'goldfish-deep', 'goldfish-mechanic', 'readiness-reviewer', 'plan-verifier', 'consult-advisor', 'afk-claude-worker']) {
++    const source = readFileSync(join(import.meta.dirname, '..', '..', 'agents', `${name}.md`));
++    const out = snap.transformAgyRunnerAgent(`agents/${name}.md`, source).toString();
++    assert.doesNotMatch(out, /^tools:.*\b(Read|Write|Edit|Bash|Grep|Glob)\b/mu, `${name}: no Claude tool name survives in the runner view`);
++  }
++});
++
+ test('an agent with an unmapped model value refuses the global install before anything changes', (t) => {
+   const w = world(t, { agents: { 'a.md': agentFile('sonnet'), 'c.md': agentFile('inherit') } });
+   halfDone(w);

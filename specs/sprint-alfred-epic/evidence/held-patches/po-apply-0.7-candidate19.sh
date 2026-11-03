@@ -10,6 +10,7 @@
 #   w122  the agent prints the authorize-critical line for deploy, publication and release-preflight (C19-G1, AC-140)
 #   w124  Verify registration of the two new suites (continuity drift exits, Full Verify wrapper)
 #   w125  the case-completion policy of the g23 read-help suite lists G23C004 (found by Full Verify 6)
+#   w126  the Antigravity runner view maps the agent tools list to the runner's registry names (D1, AGY greenfield priority 1)
 #   w120  (opt-in) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (opt-in) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
@@ -35,6 +36,7 @@ step2 w123-fv-the-dispatch-briefing-help-audit-passes-in-a-checkout-below-the-ho
 step2 w122-c19-g1-the-agent-prints-the-authorize-critical-line-for-deploy-publication-and-release-preflight "feat(auth): the agent prints the plugin-built authorize-critical line for deploy, publication and release-preflight"
 step2 w124-c19-register-the-continuity-drift-exits-and-the-full-verify-wrapper-suites "chore(verify): register the continuity drift exits and the full verify wrapper suites"
 step2 w125-c19-the-g23-read-help-case-completion-policy-lists-g23c004 "fix(verify): list G23C004 in the case-completion policy of the g23 read-help suite"
+step2 w126-d1-the-agy-runner-view-maps-the-agent-tools-list-to-the-runner-registry-names "fix(agy): map the agent tools list to the runner registry names in the Antigravity runner view"
 # OPT-IN, not measured yet: the lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. The seed asks for a measurement
 # on two or three past slices before adoption; apply only on the PO's word, with:  APPLY_LEAN_RULE=1 bash <this script>
 if [ "${APPLY_LEAN_RULE:-0}" = "1" ]; then
