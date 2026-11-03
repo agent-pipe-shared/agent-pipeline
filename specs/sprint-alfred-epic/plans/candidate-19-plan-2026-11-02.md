@@ -9,21 +9,21 @@ Method: the held-patch route of candidate 18 (clone slices under `scratch/`, `wN
 | ID | Item | Source | State |
 |---|---|---|---|
 | A1 | Case-completion tools `run-cc` / `cc-sync` in `scripts/clone-slice/` + `docs/operating-tools.md` entry | seed, Full Verify observations | done, `6e93f0350` (no derived-files refresh yet, see end note) |
-| A2 | A suite that declares more case ids than its effective policy must fail in a normal run, not only in the Full Verify. Design question first: the declared ids exist only at run time (`registerTestCaseCompletion` cases), so a static registry check cannot see them; options are (a) `registerTestCaseCompletion` compares its ids with the effective policy when no descriptor is announced, (b) a light registry check that runs each required suite's declaration step, (c) a post-run check in `verify.mjs` | seed | design open |
+| A2 | A suite that declares more case ids than its effective policy must fail in a normal run, not only in the Full Verify. Design question first: the declared ids exist only at run time (`registerTestCaseCompletion` cases), so a static registry check cannot see them; options are (a) `registerTestCaseCompletion` compares its ids with the effective policy when no descriptor is announced, (b) a light registry check that runs each required suite's declaration step, (c) a post-run check in `verify.mjs` | seed | built as the pre-stamp tool `scripts/clone-slice/cc-changed.mjs` (`8a8982ac2`): maps the changed test files to their Verify suites, runs `run-cc` for each, lists unregistered test files. Option (a)/(c) (a check in the normal run) stays open |
 | A3 | Make `g23-read-help-tests` (case G23C001, `ls -lh ../`) and `agy-item-delivery-tests` independent of the clone location (green below the home directory), or skip with a stated reason | open-by-design reds of 18 | held as w115 (causes measured: agy fixtures five levels up = home / unwritable `/home`; g23 relied on credential-named files in the repository's scratch folder). Green in two clone locations; Full Verify run open |
-| A4 | Full Verify keeps bounded logs of red suites in the run record | seed | not started |
-| A5 | Full Verify resume from the progress journal | seed | not started |
+| A4 | Full Verify keeps bounded logs of red suites in the run record | seed | held as w119 (`logs/<id>.red-excerpt.log`) |
+| A5 | Full Verify resume from the progress journal | seed | held as w119 (`full-verify.mjs --resume`, `PIPELINE_VERIFY_RESUME_RUN`); the chained resume is untested |
 | A6a | G8 / A18-M5: remedy text on the `prepare-push-subject` path | state.md deferred list | no patch needed: checked 2026-11-02, `pipeline-state.mjs` `prepare-push-subject` already prints the `materialize-push-threat-model` remedy for `CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE` (as `approve-push` does), and w93 lists the action before the Close commit, which answers the PO question |
-| A6b | G1 authorize-critical builder for deploy, publication and release-preflight kinds | state.md deferred list | large (catalog migration): pipeline Goldfish |
-| A6c | C18-5 pre-granted allowlist rule for the second approval gate | state.md deferred list | small to medium: Elephant, after A6b design is known |
+| A6b | G1 authorize-critical builder for deploy, publication and release-preflight kinds | state.md deferred list | large (catalog migration): pipeline Goldfish; slice `C19-G1-AUTHORIZE-CRITICAL-BUILDERS-2` delivered/running (result is committed as w122 when verified) |
+| A6c | C18-5 pre-granted allowlist rule for the second approval gate | state.md deferred list | PO decision, not built: it changes runner permission settings (what a runner may pre-grant), which is a trust boundary and not the Elephant's call. Recommendation: allow-list only the read-only `inspect`/`prepare-*` calls |
 | A6d | C18-12 `--plan` dry run for the readiness reviewer's scope advice | state.md deferred list | held as w116, in another form: no new CLI mode; the existing draft inspection (run at present-plan/submit-plan) now applies the same scope rule, so the refusal comes before the first signature. RED/GREEN case; related pins green; `project-onboarding-e2e` and `pipeline-state` not yet run |
-| A6e | C18-6 rest: `heal` defers the retirement while a member is armed (tests encode the opposite, restate under QG-04) | state.md deferred list | medium: Elephant or Goldfish by size |
+| A6e | C18-6 rest: `heal` defers the retirement while a member is armed (tests encode the opposite, restate under QG-04) | state.md deferred list | held as w118 (Goldfish; `heal` defers the retirement while any producer is in flight; two cases restated under QG-04) |
 
 ## B. Needs a PO decision before it starts
 
 | ID | Item | Decision needed |
 |---|---|---|
-| B1 | Ponytail best practices for the Goldfish (seed section 1) | PO 2026-11-02: logic yes, wording never; own definition. Still open: (1) where the rendered paragraph lives (Elephant recommendation: canonical rule in `roles/goldfish.md`, short paragraph rendered by the briefing generator, conditional on the task kind); (2) a bloat finding class for the Critic (recommendation: yes, narrow and evidence-gated; bundle with the PO's pending Critic pin re-pin) |
+| B1 | Ponytail best practices for the Goldfish (seed section 1) | PO 2026-11-02: logic yes, wording never; own definition. Still open: (1) where the rendered paragraph lives (Elephant recommendation: canonical rule in `roles/goldfish.md`, short paragraph rendered by the briefing generator, conditional on the task kind); (2) a bloat finding class for the Critic (recommendation: yes, narrow and evidence-gated; bundle with the PO's pending Critic pin re-pin). Built as opt-in w120 (`roles/goldfish.md` GF-10, Critic search item "unrequested addition") and w121 (a `smallestChangeParagraph` in the briefing generator); applied only with `APPLY_LEAN_RULE=1`; effect unmeasured |
 | B2 | Work split | DECIDED (PO 2026-11-02): small items the Elephant builds itself, large ones via the pipeline Goldfish agents |
 
 ## C. From the greenfield tests of candidate 18
@@ -49,6 +49,10 @@ Consequences:
 - Not a small patch: do not squeeze it into the end of candidate 19 without a design review.
 
 Recommendation: (1) now, in 19, the cheap relief that also answers C19-G1: a design-phase driver plus, while no approval exists yet, a single agent-executable `design-amend` step that hides reopen, edit window and resubmit from the runner (needs a decision on the `--by` label for unapproved drafts, since no human act is being replaced before the first approval); (2) the late binding as a drafted ADR with an independent review, built in 19 only if the review is positive, else 0.7.1. Greenfield transcripts of the three runners are needed to see which exact refusals they hit; the PO's report is the source.
+
+Status 2026-11-03: the cheap relief for G3 is held as w117 (cause named, "not terminal", both exits). The late binding is drafted as `docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md` (proposed, not built, `cb915f3d4`); it needs an independent review and the PO's decision. G1 (design driver) stays open: `nextAction` is unchanged by w117; the runners' transcripts are still needed.
+
+C19-G4 (minor, found while building candidate 19): a Goldfish dispatched on the clone-slice route cannot land its host commit (`NGHF-PENDING-UNAVAILABLE`, `NGHF-COMMIT-EXCEPTION`); the Elephant verifies the three deliverable files and commits them itself. Not a defect of the delivered work; record for the dispatch tooling.
 
 ## Order of work
 
