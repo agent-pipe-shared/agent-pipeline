@@ -186,7 +186,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | D7 | GIT-03 refusal prints the accepted form; shell refusal names the bare `node` | built | w130 |
 | D8 | Security scan accepts a repository without a remote as a typed local-only subject; push gate still refuses it | built | w129 (Goldfish; the push-guard suite was run by the Elephant, green) |
 | Q1 | `result.md` status sentence cannot go stale | built | w129a |
-| Q2 | Intended read refusals say they are intended and name the alternative | planned | Elephant (text) |
+| Q2 | Intended read refusals say they are intended and name the alternative | planned; deferred on purpose: the refusal texts are pinned by several suites (g23-read-help, g23-quoted-pipeline-reads, the cross-runner passive matrix), so a wording change needs a coordinated test pass, not a quick edit | later wave with F9's `rg --files` hint |
 | Q3 | Audit bundle binds the signature proofs, release verify and security scan | planned (after D3) | with the D3 slice |
 | Q4 | One module, no parallel slices | see M1 | M1 |
 | Q5 | Control-plane write by a `node scratch/*.mjs` helper | built (decided: guard now) | w131 in the apply script (static scan; exact-path exemption for `scripts/housekeeping.mjs`; other interpreters stay a known limit) |
@@ -208,7 +208,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | E6 | Wrong hook text about the proof import; ACL repair with a preview; verify command set | text planned; rest planned | Elephant (text); Goldfish (rest) |
 | E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | planned | Elephant (text); guard part with the Windows session |
 | Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
-| Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | planned | Goldfish slice (guard) |
+| Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | built (exact root path added to the shared scaffold predicate; the onboarding end-to-end suite was not run) | w139 |
 | Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | planned | Elephant (text) |
 | Q10 | `WIN-AUTH-OPEN` names the exact path and offers a preview | planned | with E6 |
 
@@ -216,7 +216,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 
 | ID | Item | Status | Patch or route |
 |---|---|---|---|
-| F1 | `ARCHITECTURE-DESIGN-RECEIPT-STALE` blocks the next feature | ADR first (decided: opt-in block) | one ADR with D3, D4b, E3 |
+| F1 | `ARCHITECTURE-DESIGN-RECEIPT-STALE` blocks the next feature | built as OPT-IN (`APPLY_AUTHORITY_CARRY=1`): the check accepts the receipt of a closed predecessor when the design and every target digest are equal, nothing is rewritten, no inheritance command (ADR point 1, minimal form); the ADR text has no second review yet | w138; D3, D4b, E3 remain ADR points still unbuilt |
 | F2 | Read-only analysis lane while a feature is approved | ADR first (decided: scratch-clone lane) | ADR, then Goldfish slice |
 | F3 | Result record claims no stale state | built | w129a |
 | F4 | ADR promised by the Spec but missing at close | built, report-only (reads the module map's adrReferences, all modules, not only this feature's) | w134 (rebased patch on the chain) |
@@ -239,7 +239,9 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Count now: **built 14 items** (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
+Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a, D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, F2 build (analysis lane), M1.1 to M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, Q9, F9 rest. Q8 and F1 are built (w139, w138 opt-in). Nothing here is claimed done.
+
+Count now: **built 16 items** (the 14 below plus Q8 and F1/opt-in) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
 PO decisions of 2026-11-03 (second round, all recommendations): (1) rehearse the apply script in a clone now with the existing chain, then add the remaining items in waves and rehearse after each wave; (2) ADR enforcement from the design (F4b) starts report-only; (3) analysis runs in the control directory keep the last five runs and at most seven days, no network policy yet; (4) no Critic carry-forward in the authority ADR (only Verify and Security evidence).
 
