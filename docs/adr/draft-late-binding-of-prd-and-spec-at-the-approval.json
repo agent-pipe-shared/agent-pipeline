@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-late-binding-of-prd-and-spec-at-the-approval",
+  "title": "Bind the PRD and the Spec at the approval, not at the end of onboarding",
+  "status": "proposed",
+  "digest": "8805ea6427d968b7b16b0bfc9ebda423272adf52d94335a03136ac13aea0a1f0",
+  "scope": "global",
+  "date": "2026-11-03"
+}

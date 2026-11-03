@@ -332,6 +332,8 @@
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.md",
           "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
           "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+          "docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.json",
+          "docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
           "docs/adr/draft-po-acceptance-points.md",
