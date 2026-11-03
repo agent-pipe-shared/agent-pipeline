@@ -1,0 +1,218 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c37445a14..a826220b2 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -2243,6 +2243,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/existing-public-anchor.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/existing-public-anchor.test.mjs"
+     },
++    {
++      "name": "control-plane-script-scan-tests",
++      "file": "plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs",
++      "invariantPinned": "A node script run from a repository path that names the Pipeline control-plane directory is refused with GUARD-CONTROLPLANE-SCRIPT; unreadable, oversized, symlinked and sanctioned plugin scripts are not claimed (C19-Q5, AC-108)",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs"
++    },
+     {
+       "name": "git-stash-readonly-tests",
+       "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
+new file mode 100644
+index 000000000..98cc35c33
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
+@@ -0,0 +1,82 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19-Q5 (AC-108): static scan of a repository-local node script for the Pipeline control-plane directory.
++// The shell guard cannot see what a script does; it can read the script text. Another interpreter, or a path
++// built at run time, is NOT covered -- the real boundary for those is host sandboxing.
++import { lstatSync, readFileSync, realpathSync } from "node:fs";
++import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
++import { verdict } from "./verdict.mjs";
++
++export const CONTROLPLANE_SCRIPT_DENIAL_CODE = "GUARD-CONTROLPLANE-SCRIPT";
++export const MAX_SCANNED_SCRIPT_BYTES = 256 * 1024;
++const SCRIPT_EXTENSION = /\.(?:mjs|cjs|js)$/u;
++const EXEMPT_PREFIX = "plugins/pipeline-core/";
++const SPELLINGS = [
++  /\.git[\\/]+agent-pipeline/u,
++  /['"`]\.git['"`]\s*,\s*['"`]agent-pipeline['"`]/u,
++];
++const GIT_DIR_EXPRESSION = /git-common-dir|gitCommonDir|gitDir|git_dir/u;
++const AGENT_PIPELINE_LITERAL = /['"`][\\/]?agent-pipeline(?:[\\/]|['"`])/u;
++
++function matchedSpelling(text) {
++  for (const pattern of SPELLINGS) {
++    const hit = pattern.exec(text);
++    if (hit) return hit[0];
++  }
++  if (GIT_DIR_EXPRESSION.test(text)) {
++    const hit = AGENT_PIPELINE_LITERAL.exec(text);
++    if (hit) return `${GIT_DIR_EXPRESSION.exec(text)[0]} with ${hit[0]}`;
++  }
++  return null;
++}
++
++function words(segment) {
++  return [...segment.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/gu)].map((m) => m[1] ?? m[2] ?? m[3]);
++}
++
++function scriptCandidates(command) {
++  const candidates = [];
++  for (const segment of command.split(/[;&|\n]+/u)) {
++    const [executable, ...args] = words(segment);
++    if (executable === undefined || !/^node(?:\.exe)?$/iu.test(basename(executable.replaceAll("\\", "/")))) continue;
++    for (const arg of args) if (!arg.startsWith("-") && SCRIPT_EXTENSION.test(arg)) candidates.push(arg);
++  }
++  return candidates;
++}
++
++function readableScript(arg, root) {
++  try {
++    const file = resolve(root, arg);
++    const rel = relative(root, file);
++    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
++    const posixRel = rel.split(sep).join("/");
++    if (posixRel.startsWith(EXEMPT_PREFIX)) return null;
++    const stat = lstatSync(file);
++    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_SCANNED_SCRIPT_BYTES) return null;
++    if (realpathSync(file) !== join(realpathSync(root), rel)) return null;
++    return { rel: posixRel, text: readFileSync(file, "utf8") };
++  } catch {
++    return null;
++  }
++}
++
++/** Returns { script, spelling } for the first script that names the control plane, else null. */
++export function controlPlaneScriptHit(command, root) {
++  if (typeof command !== "string") return null;
++  for (const arg of scriptCandidates(command)) {
++    const script = readableScript(arg, root);
++    if (script === null) continue;
++    const spelling = matchedSpelling(script.text);
++    if (spelling !== null) return { script: script.rel, spelling };
++  }
++  return null;
++}
++
++export function controlPlaneScriptBlocked(hit) {
++  return verdict(
++    2,
++    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
++      + `${CONTROLPLANE_SCRIPT_DENIAL_CODE}: the script "${hit.script}" names the Pipeline control-plane directory (matched: ${hit.spelling}); `
++      + "a script run through node is not allowed to read or write that state.\n"
++      + "Use the sanctioned Pipeline commands for that state. A script that only READS evidence should take the path from a command-line argument instead of naming the directory itself.\n",
++  );
++}
+diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
+new file mode 100644
+index 000000000..a5806d002
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
+@@ -0,0 +1,84 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19-Q5 (AC-108): a node script that names the Pipeline control-plane directory is refused by the shell guard.
++// Plain node:test file; fixtures are real files in a private temp project root, nothing is executed.
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
++
++const CODE = "GUARD-CONTROLPLANE-SCRIPT";
++const root = realpathSync(mkdtempSync(join(tmpdir(), "cp-script-")));
++test.after(() => rmSync(root, { recursive: true, force: true }));
++
++function put(rel, text) {
++  const file = join(root, rel);
++  mkdirSync(join(file, ".."), { recursive: true });
++  writeFileSync(file, text);
++  return file;
++}
++function run(command, toolName = "Bash") {
++  return evaluateLifecycleReadyGuard({ tool_name: toolName, tool_input: { command } }, {
++    projectDir: root,
++    observeGovernanceScopeFn: () => ({ requiresEnforcement: true }),
++  });
++}
++const refused = (result) => result.exitCode === 2 && result.stderr.includes(CODE);
++
++test("a scratch script that joins .git and agent-pipeline is refused with the typed code", () => {
++  put("scratch/join.mjs", "import { join } from 'node:path';\nconst p = join(root, '.git', 'agent-pipeline', 'x');\n");
++  const result = run("node scratch/join.mjs");
++  assert.ok(refused(result), result.stderr);
++});
++
++test("the literal .git/agent-pipeline is refused, also in the backslash spelling", () => {
++  put("scratch/lit.mjs", "const p = '.git/agent-pipeline/publication-close/a.json';\n");
++  assert.ok(refused(run("node scratch/lit.mjs")));
++  put("scratch/win.mjs", "const p = '.git\\\\agent-pipeline\\\\a';\n");
++  assert.ok(refused(run("node scratch/win.mjs")));
++});
++
++test("a git-dir expression combined with the literal agent-pipeline is refused", () => {
++  put("scratch/gd.mjs", "const d = execSync('git rev-parse --git-common-dir');\nconst p = d + '/agent-pipeline/x';\n");
++  assert.ok(refused(run("node scratch/gd.mjs")));
++});
++
++test("a harmless scratch script is not refused by this rule", () => {
++  put("scratch/ok.mjs", "console.log('hello');\n");
++  assert.ok(!refused(run("node scratch/ok.mjs")));
++});
++
++test("the plugin name in a comment without a .git segment is not refused", () => {
++  put("scratch/comment.mjs", "// agent-pipeline plugin helper\nconsole.log('agent-pipeline');\n");
++  assert.ok(!refused(run("node scratch/comment.mjs")));
++});
++
++test("a missing, an oversized and a symlinked script are not refused by this rule", () => {
++  assert.ok(!refused(run("node scratch/missing.mjs")));
++  put("scratch/big.mjs", `${"x".repeat(256 * 1024 + 1)}\n// .git/agent-pipeline\n`);
++  assert.ok(!refused(run("node scratch/big.mjs")));
++  const target = put("scratch/target.mjs", "const p = '.git/agent-pipeline';\n");
++  symlinkSync(target, join(root, "scratch/link.mjs"));
++  assert.ok(!refused(run("node scratch/link.mjs")));
++});
++
++test("a script under plugins/pipeline-core/ is exempt", () => {
++  put("plugins/pipeline-core/scripts/sanctioned.mjs", "const p = '.git/agent-pipeline/x';\n");
++  assert.ok(!refused(run("node plugins/pipeline-core/scripts/sanctioned.mjs")));
++});
++
++test("an absolute node path and an absolute script path run the same scan", () => {
++  const file = put("scratch/abs.mjs", "const p = '.git/agent-pipeline';\n");
++  assert.ok(refused(run(`/usr/bin/node ${file}`)));
++  assert.ok(refused(run("node scratch/abs.mjs", "PowerShell")));
++});
++
++test("the refusal applies after a chained cd and names the script and the matched spelling", () => {
++  put("scratch/named.mjs", "const p = join(a, '.git', 'agent-pipeline');\n");
++  const result = run("echo ready && node scratch/named.mjs --flag");
++  assert.ok(refused(result));
++  assert.match(result.stderr, /scratch\/named\.mjs/u);
++  assert.match(result.stderr, /'\.git', 'agent-pipeline'/u);
++  assert.match(result.stderr, /command-line argument/u);
++});
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 44076764a..dddeac044 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -18,6 +18,7 @@ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL
+ import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
++import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+ import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
+ import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
+ import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
+@@ -273,7 +274,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+     return verdict(0);
+   }
+   if (SHELL_TOOLS.includes(toolName)) {
+-    const gateStrength = gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
++    const controlPlaneHit = controlPlaneScriptHit((input.tool_input.command ?? input.tool_input.CommandLine), root);
++    if (controlPlaneHit !== null) return controlPlaneScriptBlocked(controlPlaneHit);
++    const gateStrength =gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+     if (gateStrength !== null) return gateStrength;
+     // Second, and only when gate strength had nothing to say: the test-path authority gate's
+     // shell lane. Ordered after its stricter sibling deliberately -- a command that weakens

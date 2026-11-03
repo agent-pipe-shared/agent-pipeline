@@ -220,10 +220,11 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | F2 | Read-only analysis lane while a feature is approved | ADR first (decided: scratch-clone lane) | ADR, then Goldfish slice |
 | F3 | Result record claims no stale state | built | w129a |
 | F4 | ADR promised by the Spec but missing at close | planned | Goldfish slice (small) |
+| F4b | Decisions to record are enforced from the design on (PO idea 2026-11-03: none of the three runs wrote an ADR) | planned | Skeleton rubric "decisions to record" (title, trigger, ADR path) that fills the existing `adrReferences` fields, a readiness criterion for the classic triggers (module boundaries, data keeping, offline and error strategy, security trade-off), the F4 close row checking every named path (report-only first, blocking after a measurement), and a runbook step that calls the `architecture-decision` skill when the design is promoted. No schema change |
 | F5 | Attestation versus observation in the receipts | planned | = D2a, D2b |
 | F6 | Close readback names the passing Critic round | built | w129b |
 | F7 | AC3 provenance collision in the TabletApp | PO list (product defect, no plugin change) | none |
-| F8 | German Critic round limit differs from the English rule | planned | Elephant (doc and consistency test) |
+| F8 | German Critic round limit differs from the English rule | PO list: agents must not read the German reference block (CLAUDE.md language rule); the PO aligns the two lines of `docs/operating-model.md` below the DE marker that name a limit of four to the English rule (D190, no round count) | PO list |
 | F9 | Shell forms missed repeatedly | partly built (accepted forms printed) | w130; the `rg --files` hint is planned |
 | F10 | Browser evidence not bound to the integrated commit | moved | with the carry-forward ADR |
 | F11 | No vertical slice before the full build | planned | = M1.4 |

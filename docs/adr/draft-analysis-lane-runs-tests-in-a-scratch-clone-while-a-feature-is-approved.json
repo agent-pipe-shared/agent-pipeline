@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-analysis-lane-runs-tests-in-a-scratch-clone-while-a-feature-is-approved",
+  "title": "An analysis lane runs tests in a scratch clone while a feature is approved",
+  "status": "proposed",
+  "digest": "f3a9dac96cf31bfcd34eae8c52809e360410c17b57424330a6cad7cc0701d27b",
+  "scope": "global",
+  "date": "2026-11-03"
+}
