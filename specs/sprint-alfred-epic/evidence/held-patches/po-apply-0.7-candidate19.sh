@@ -29,6 +29,7 @@
 #   w141  the authority revision apply refusal names the missing proof check and the plan command (Q9, Claude Windows greenfield)
 #   w142  the Goldfish task template says it is the field specification and the briefing is generated (E7 template part; the Critic template stays unchanged, it is in the pinned preimage)
 #   w143  the fitness evaluation reports file and module size against optional sizeBudgets, report-only (M1.3, all three greenfield runs; Goldfish slice, imported by the Elephant)
+#   w144  the readiness reviewer raises a decomposition question for a single module that carries several responsibilities (M1.2, all three greenfield runs)
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
@@ -78,6 +79,7 @@ step2 w140-m11-the-design-skeleton-states-the-module-cut-rule "feat(design): the
 step2 w141-q9-the-authority-revision-apply-refusal-names-the-missing-proof-check "fix(state): the authority revision apply refusal without a PO proof check names what is missing and the plan command"
 step2 w142-e7-the-goldfish-task-template-says-the-briefing-is-generated "docs(templates): the Goldfish task template says it is the field specification and the briefing is generated"
 step2 w143-m13-the-fitness-evaluation-reports-size-budgets-without-blocking "feat(architecture): the fitness evaluation reports file and module size against optional sizeBudgets as a non-blocking advisory"
+step2 w144-m12-the-readiness-reviewer-raises-a-decomposition-question "feat(readiness): the readiness reviewer raises a decomposition question for a single module that carries several responsibilities"
 # OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then
