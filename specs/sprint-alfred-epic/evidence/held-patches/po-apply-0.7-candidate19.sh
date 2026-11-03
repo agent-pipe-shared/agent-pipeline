@@ -29,6 +29,10 @@ H=specs/sprint-alfred-epic/evidence/held-patches
 STAGE=(.gitignore .gitleaksignore .gitleaks.toml setup.test.mjs plugins/pipeline-core harness docs scripts evidence roles templates guardrails policies schemas backlog specs)
 # One held patch, one commit; the subject is given inline (GIT-03 trailers only). --no-verify is used here and nowhere else.
 step2() {
+  # Idempotent: a patch whose exact commit subject is already in the history of HEAD was applied by an earlier run of this script and is skipped.
+  local subjects
+  subjects=$(git log --format=%s)
+  if grep -Fxq -- "$2" <<<"$subjects"; then echo "already applied $1"; return 0; fi
   local patch="$H/$1.patch"
   if [ -f "$H/$1.rebased.patch" ]; then patch="$H/$1.rebased.patch"; fi
   git apply "$patch"

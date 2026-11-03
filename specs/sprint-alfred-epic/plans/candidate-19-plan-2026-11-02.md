@@ -241,6 +241,8 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 
 Count now: **built 10 items** (D1, D5, D6, D7, D8, Q1 and F3, F6, Q5, Q7, in patches w126 to w132 with w129a and w129b), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
+PO decisions of 2026-11-03 (second round, all recommendations): (1) rehearse the apply script in a clone now with the existing chain, then add the remaining items in waves and rehearse after each wave; (2) ADR enforcement from the design (F4b) starts report-only; (3) analysis runs in the control directory keep the last five runs and at most seven days, no network policy yet; (4) no Critic carry-forward in the authority ADR (only Verify and Security evidence).
+
 PO list additions (2026-11-03): host sandboxing for test execution (residual of the analysis lane and the control-plane scan, due before the 0.8 candidate); the `scripts/housekeeping.mjs` exemption of w131 (edits to that path need normal review); the commit of the ADR drafts held a design trailer with more than ten paths, so the authorship verifier reports it as unverifiable (later commits split ADRs and held-patch files). The earlier candidate 19 patches w115 to w125 are applied; w126 and later are not.
 
 ## Order of work
