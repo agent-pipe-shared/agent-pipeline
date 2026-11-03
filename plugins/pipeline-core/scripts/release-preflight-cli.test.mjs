@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
+import { ReleasePreflightCliError, buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./release-preflight-cli.mjs";
 import { READER_REVIEW_PATHS, snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
@@ -732,6 +732,47 @@ try {
     const { record } = build(fixture({ source: true, dirtyDeleteMember: true }));
     assert.equal(record.status, "blocked");
     assert.deepEqual(record.reasons, ["repository-not-clean"]);
+  });
+
+  // C19-G1 (AC-140): the agent prints the exact authorize-critical line instead of hand-formatting it.
+  check("RPC22 prepareReleasePreflightAuthorizeLine binds the same subject digest the verifier recomputes", () => {
+    const context = fixture();
+    const prepared = prepareReleasePreflightAuthorizeLine({
+      rootDir: context.base, baseCommit: context.baseCommit, lifecyclePath: "lifecycle.json", retentionPolicySha256: POLICY,
+      plan: "plan.md", spec: "spec.md", expiresAt: "2099-01-01T00:00:00.000Z",
+    });
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const expected = criticalActionSubjectSha256({ kind: "release-preflight", candidate, subject: subjectFor(context) });
+    assert.equal(prepared.subjectSha256, expected);
+    assert.ok(prepared.argv.includes("authorize-critical"));
+    assert.ok(prepared.argv.includes(expected), "the line carries the plugin-computed digest");
+    assert.equal(prepared.expiresAt, "2099-01-01T00:00:00.000Z");
+  });
+
+  check("RPC23 --print-authorize-critical prints the line as JSON and writes nothing", () => {
+    const context = fixture();
+    const before = context.git("status", "--porcelain");
+    const result = spawnSync(process.execPath, [
+      CLI_PATH, "--print-authorize-critical", "--base", context.baseCommit, "--lifecycle", "lifecycle.json",
+      "--retention-policy", POLICY, "--plan", "plan.md", "--spec", "spec.md", "--expires-at", "2099-01-01T00:00:00.000Z",
+      "--root", context.base,
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const printed = JSON.parse(result.stdout);
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    assert.equal(printed.subjectSha256, criticalActionSubjectSha256({ kind: "release-preflight", candidate, subject: subjectFor(context) }));
+    assert.ok(Array.isArray(printed.argv) && printed.argv.includes("authorize-critical"));
+    assert.equal(context.git("status", "--porcelain"), before, "the print mode must not write into the repository");
+  });
+
+  check("RPC24 --print-authorize-critical without --plan and --spec is a usage error", () => {
+    const context = fixture();
+    const result = spawnSync(process.execPath, [
+      CLI_PATH, "--print-authorize-critical", "--base", context.baseCommit, "--lifecycle", "lifecycle.json",
+      "--retention-policy", POLICY, "--root", context.base,
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /RPC-USAGE/u);
   });
 
   console.log(`\nrelease-preflight-cli: ${passed} passed, ${failed} failed`);

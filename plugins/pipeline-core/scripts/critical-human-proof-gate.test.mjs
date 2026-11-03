@@ -85,6 +85,19 @@ const deployRequestPath = join(external, "deploy-request.json");
 const deployProofPath = join(external, "deploy-proof.json");
 writeFileSync(deployRequestPath, JSON.stringify(deployRequest)); writeFileSync(deployProofPath, JSON.stringify(deployProof));
 assert.equal(run(["approve-deploy", "--env", deploySubject.environment, "--artifact", deploySubject.artifact, "--by", "PO"], deps), 2);
+// C19-G1 (AC-140): a deploy refused for its proof prints the plugin-built signing line for the SUBJECT that was asked for
+// (here an artifact the signed request does not cover), so the agent relays it instead of hand-assembling the command.
+const wrongDeploySubject = { artifact: "v0.5.1-rc.2", environment: deploySubject.environment };
+const capturedErrors = [];
+const originalConsoleError = console.error;
+console.error = (...parts) => { capturedErrors.push(parts.join(" ")); };
+try {
+  assert.equal(run(["approve-deploy", "--env", wrongDeploySubject.environment, "--artifact", wrongDeploySubject.artifact, "--by", "PO", "--proof-request", deployRequestPath, "--proof-authority", authorityPath, "--proof", deployProofPath], deps), 2);
+} finally { console.error = originalConsoleError; }
+const signingLine = capturedErrors.find((line) => line.startsWith("Signing line for the PO"));
+assert.ok(signingLine, `a refused deploy proof must print the signing line: ${capturedErrors.join(" | ")}`);
+assert.ok(signingLine.includes("authorize-critical"), signingLine);
+assert.ok(signingLine.includes(criticalActionSubjectSha256({ kind: "deploy", candidate, subject: wrongDeploySubject })), "the line carries the digest of the subject that was asked for");
 assert.equal(run(["approve-deploy", "--env", deploySubject.environment, "--artifact", deploySubject.artifact, "--by", "PO", "--proof-request", deployRequestPath, "--proof-authority", authorityPath, "--proof", deployProofPath], deps), 0);
 const deployed = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
 assert.equal(deployed.deployApprovals.at(-1).forArtifact, deploySubject.artifact);
@@ -127,7 +140,13 @@ const publicationProofRequestPath = join(external, "publication-request.json");
 const publicationProofPath = join(external, "publication-proof.json");
 writeFileSync(publicationProofRequestPath, JSON.stringify(publicationProofRequest)); writeFileSync(publicationProofPath, JSON.stringify(publicationProof));
 writeFileSync(publicationRequestPath, JSON.stringify(publicationRequest(0, prepared.publicationStateSha256, approvalInput)));
-assert.equal(run(["publication-approve", "--request-file", "publication-request.json"], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 2);
+const publicationErrors = [];
+console.error = (...parts) => { publicationErrors.push(parts.join(" ")); };
+try {
+  assert.equal(run(["publication-approve", "--request-file", "publication-request.json"], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 2);
+} finally { console.error = originalConsoleError; }
+// C19-G1 (AC-140): the refused publication prints the plugin-built signing line, not a hand-assembled one.
+assert.ok(publicationErrors.some((line) => line.startsWith("Signing line for the PO") && line.includes("--kind publication") && line.includes("authorize-critical")), publicationErrors.join(" | "));
 assert.equal(run(["publication-approve", "--request-file", "publication-request.json", "--proof-request", publicationProofRequestPath, "--proof-authority", authorityPath, "--proof", publicationProofPath], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 0);
 const published = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
 assert.equal(typeof published.publicationCriticalProofs[transactionId]?.proofSha256, "string");

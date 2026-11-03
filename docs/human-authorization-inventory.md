@@ -125,10 +125,10 @@ new approval gates.
 | Inventory id | Disposition | Catalog/template id |
 |---|---|---|
 | `push-signature` | `registered` | `critical-push-authorize` |
-| `deploy-signature` | `legacy-renderer` | — |
-| `publication-signature` | `legacy-renderer` | — |
+| `deploy-signature` | `registered` | `critical-deploy-authorize` |
+| `publication-signature` | `registered` | `critical-publication-authorize` |
 | `feature-package-reconcile-signature` | `legacy-renderer` | — |
-| `release-preflight-signature` | `legacy-renderer` | — |
+| `release-preflight-signature` | `registered` | `critical-release-preflight-authorize` |
 | `governance-fork-disposition` | `legacy-renderer` | — |
 | `interruption-promotion` | `legacy-renderer` | — |
 | `accept-residual-critic-findings` | `legacy-renderer` | — |

@@ -57,6 +57,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { prepareAuthorizeCriticalLine } from "./po-human-approval.mjs";
 import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
@@ -536,6 +537,45 @@ function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, pr
   fail("RPC-CONSENT-UNVERIFIED", `the release-preflight consent proof was not verified (${verified.code})`);
 }
 
+function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 }) {
+  const lifecycleInput = readJson(root, lifecyclePath, "lifecycle");
+  const repository = observeRepository(root);
+  const candidate = { commit: repository.headCommit, tree: repository.headTree };
+  const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
+  const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
+  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
+  const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
+  const manifestSha256 = sha256(readFileSync(manifestAbsolute));
+  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
+  const subject = {
+    schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
+    version: candidateVersion,
+    base,
+    lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
+    retentionPolicySha256,
+  };
+  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject };
+}
+
+/**
+ * C19-G1 (AC-140): the exact `authorize-critical` line for the release-preflight consent, built by the plugin. The
+ * `--subject-sha256` is computed from the SAME subject `buildReleasePreflight` verifies the proof against, so it can
+ * never disagree with it. Renders only; never signs, never writes.
+ */
+export function prepareReleasePreflightAuthorizeLine({
+  rootDir = process.cwd(), baseCommit, lifecyclePath, retentionPolicySha256, plan, spec, expiresAt,
+  now = new Date().toISOString(),
+}) {
+  const root = resolve(rootDir);
+  const observed = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
+  const resolvedExpiry = expiresAt ?? new Date((Date.parse(now) || Date.now()) + 3_600_000).toISOString();
+  const prepared = prepareAuthorizeCriticalLine({
+    kind: "release-preflight", candidate: observed.candidate, subject: observed.subject,
+    repoRoot: root, featureId: observed.lifecycleInput.featureId, plan, spec, expiresAt: resolvedExpiry,
+  });
+  return { command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: resolvedExpiry, candidate: observed.candidate };
+}
+
 export function buildReleasePreflight({
   rootDir = process.cwd(), preflightId, baseCommit, consentPath = null,
   proofRequestPath = null, proofPath = null, lifecyclePath, retentionPolicySha256,
@@ -553,22 +593,9 @@ export function buildReleasePreflight({
     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
   }
 
-  const lifecycleInput = readJson(root, lifecyclePath, "lifecycle");
-  const repository = observeRepository(root);
-  const candidate = { commit: repository.headCommit, tree: repository.headTree };
-  const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
-  const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
-  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
-  const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
-  const manifestSha256 = sha256(readFileSync(manifestAbsolute));
-  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
-  const subject = {
-    schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
-    version: candidateVersion,
-    base,
-    lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
-    retentionPolicySha256,
-  };
+  const {
+    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject,
+  } = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
   const consent = consentPath !== null
     ? resolveHandSuppliedConsent(root, consentPath)
     : proofRequestPath !== null
@@ -658,8 +685,43 @@ function parseArgs(argv) {
   };
 }
 
+const PRINT_FLAG = "--print-authorize-critical";
+const PRINT_USAGE = `Usage: release-preflight-cli.mjs ${PRINT_FLAG} --base <commit> --lifecycle <path> --retention-policy <sha256> --plan <path> --spec <path> [--expires-at <iso>] [--root <repo>]`;
+
+/**
+ * C19-G1 (AC-140): `--print-authorize-critical` prints the exact `authorize-critical` line the human runs for the
+ * release-preflight consent. It reads and renders only; it writes nothing and never signs.
+ */
+function runPrintAuthorizeCritical(argv) {
+  const value = {};
+  const rest = argv.filter((entry) => entry !== PRINT_FLAG);
+  for (let index = 0; index < rest.length; index += 2) {
+    const flag = rest[index];
+    const next = rest[index + 1];
+    if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) fail("RPC-USAGE", PRINT_USAGE);
+    value[flag] = next;
+  }
+  for (const required of ["--base", "--lifecycle", "--retention-policy", "--plan", "--spec"]) {
+    if (!value[required]) fail("RPC-USAGE", `${required} is required with ${PRINT_FLAG}`);
+  }
+  const prepared = prepareReleasePreflightAuthorizeLine({
+    rootDir: value["--root"] ?? process.cwd(),
+    baseCommit: value["--base"],
+    lifecyclePath: value["--lifecycle"],
+    retentionPolicySha256: value["--retention-policy"],
+    plan: value["--plan"],
+    spec: value["--spec"],
+    expiresAt: value["--expires-at"],
+  });
+  process.stdout.write(`${JSON.stringify({ command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: prepared.expiresAt }, null, 2)}\n`);
+}
+
 if (isDirectInvocation(import.meta.url)) {
   try {
+    if (process.argv.slice(2).includes(PRINT_FLAG)) {
+      runPrintAuthorizeCritical(process.argv.slice(2));
+      process.exit(0);
+    }
     const options = parseArgs(process.argv.slice(2));
     const built = buildReleasePreflight(options);
     writeOutput(options.rootDir, options.outPath, built.record);

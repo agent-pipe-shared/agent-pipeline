@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
+  authorizeCriticalDeployCommand,
+  authorizeCriticalPublicationCommand,
   authorizeCriticalPushCommand,
+  authorizeCriticalReleasePreflightCommand,
   poHumanApprovalSetupCommand,
   readPoHumanApprovalAuthority,
 } from "../scripts/po-human-approval.mjs";
@@ -49,6 +52,9 @@ const PLATFORMS = new Set(["posix", "windows"]);
 // tuple and update both authorities together.
 const REGISTERED_BOUNDARIES = Object.freeze({
   "authorize-critical-push": null,
+  "authorize-critical-deploy": null,
+  "authorize-critical-publication": null,
+  "authorize-critical-release-preflight": null,
   "po-human-approval-setup": PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
 });
 
@@ -60,6 +66,21 @@ const BUILDERS = Object.freeze({
   "authorize-critical-push": Object.freeze({
     build: authorizeCriticalPushCommand,
     boundary: REGISTERED_BOUNDARIES["authorize-critical-push"],
+    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+  }),
+  "authorize-critical-deploy": Object.freeze({
+    build: authorizeCriticalDeployCommand,
+    boundary: REGISTERED_BOUNDARIES["authorize-critical-deploy"],
+    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+  }),
+  "authorize-critical-publication": Object.freeze({
+    build: authorizeCriticalPublicationCommand,
+    boundary: REGISTERED_BOUNDARIES["authorize-critical-publication"],
+    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+  }),
+  "authorize-critical-release-preflight": Object.freeze({
+    build: authorizeCriticalReleasePreflightCommand,
+    boundary: REGISTERED_BOUNDARIES["authorize-critical-release-preflight"],
     source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
   }),
   "po-human-approval-setup": Object.freeze({

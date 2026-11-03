@@ -101,41 +101,192 @@
       "id": "deploy-signature",
       "inventoryId": "deploy-signature",
       "revision": 1,
-      "purpose": "Record the deploy signature terminal-template disposition",
+      "purpose": "Render the candidate-bound critical deploy authorization command",
       "audience": "user",
-      "disposition": "legacy-renderer",
-      "templateId": null,
-      "builderId": null,
+      "disposition": "registered",
+      "templateId": "critical-deploy-authorize",
+      "builderId": "authorize-critical-deploy",
       "producerRefs": [
-        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalDeployCommand"
       ],
       "boundary": null,
-      "mutation": null,
-      "requiresPoApproval": null,
-      "slots": null,
-      "expectedReadback": null,
-      "runners": null,
-      "platforms": null
+      "mutation": true,
+      "requiresPoApproval": true,
+      "slots": [
+        {
+          "name": "repoRoot",
+          "type": "absolute-directory",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Repository root"
+        },
+        {
+          "name": "directory",
+          "type": "absolute-directory",
+          "source": "human-input",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "External PO material directory"
+        },
+        {
+          "name": "featureId",
+          "type": "safe-id",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Active feature id"
+        },
+        {
+          "name": "plan",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approved plan path"
+        },
+        {
+          "name": "spec",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Bound specification path"
+        },
+        {
+          "name": "subjectSha256",
+          "type": "sha256",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Prepared deploy subject digest"
+        },
+        {
+          "name": "expiresAt",
+          "type": "iso8601",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approval expiry"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed approval driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": null,
+        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
+        "command": "verify-critical"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
     },
     {
       "id": "publication-signature",
       "inventoryId": "publication-signature",
       "revision": 1,
-      "purpose": "Record the publication signature terminal-template disposition",
+      "purpose": "Render the candidate-bound critical publication authorization command",
       "audience": "user",
-      "disposition": "legacy-renderer",
-      "templateId": null,
-      "builderId": null,
+      "disposition": "registered",
+      "templateId": "critical-publication-authorize",
+      "builderId": "authorize-critical-publication",
       "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalPublicationCommand",
         "plugins/pipeline-core/scripts/pipeline-state.mjs#runPublicationCommand"
       ],
       "boundary": null,
-      "mutation": null,
-      "requiresPoApproval": null,
-      "slots": null,
-      "expectedReadback": null,
-      "runners": null,
-      "platforms": null
+      "mutation": true,
+      "requiresPoApproval": true,
+      "slots": [
+        {
+          "name": "repoRoot",
+          "type": "absolute-directory",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Repository root"
+        },
+        {
+          "name": "directory",
+          "type": "absolute-directory",
+          "source": "human-input",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "External PO material directory"
+        },
+        {
+          "name": "featureId",
+          "type": "safe-id",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Active feature id"
+        },
+        {
+          "name": "plan",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approved plan path"
+        },
+        {
+          "name": "spec",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Bound specification path"
+        },
+        {
+          "name": "subjectSha256",
+          "type": "sha256",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Prepared publication subject digest"
+        },
+        {
+          "name": "expiresAt",
+          "type": "iso8601",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approval expiry"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed approval driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": null,
+        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
+        "command": "verify-critical"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
     },
     {
       "id": "feature-package-reconcile-signature",
@@ -161,21 +312,97 @@
       "id": "release-preflight-signature",
       "inventoryId": "release-preflight-signature",
       "revision": 1,
-      "purpose": "Record the release preflight signature terminal-template disposition",
+      "purpose": "Render the candidate-bound critical release-preflight consent authorization command",
       "audience": "user",
-      "disposition": "legacy-renderer",
-      "templateId": null,
-      "builderId": null,
+      "disposition": "registered",
+      "templateId": "critical-release-preflight-authorize",
+      "builderId": "authorize-critical-release-preflight",
       "producerRefs": [
-        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalReleasePreflightCommand",
+        "plugins/pipeline-core/scripts/release-preflight-cli.mjs#prepareReleasePreflightAuthorizeLine"
       ],
       "boundary": null,
-      "mutation": null,
-      "requiresPoApproval": null,
-      "slots": null,
-      "expectedReadback": null,
-      "runners": null,
-      "platforms": null
+      "mutation": true,
+      "requiresPoApproval": true,
+      "slots": [
+        {
+          "name": "repoRoot",
+          "type": "absolute-directory",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Repository root"
+        },
+        {
+          "name": "directory",
+          "type": "absolute-directory",
+          "source": "human-input",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "External PO material directory"
+        },
+        {
+          "name": "featureId",
+          "type": "safe-id",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Active feature id"
+        },
+        {
+          "name": "plan",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approved plan path"
+        },
+        {
+          "name": "spec",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Bound specification path"
+        },
+        {
+          "name": "subjectSha256",
+          "type": "sha256",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Prepared release-preflight subject digest"
+        },
+        {
+          "name": "expiresAt",
+          "type": "iso8601",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approval expiry"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed approval driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": null,
+        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
+        "command": "verify-critical"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
     },
     {
       "id": "governance-fork-disposition",

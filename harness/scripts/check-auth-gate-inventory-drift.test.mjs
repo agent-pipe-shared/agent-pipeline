@@ -65,6 +65,7 @@ const BASE_DOC = `
 | Deploy <!-- inventory-id: deploy-signature --> | ... | \`deploy\` (\`approve-deploy\`) |
 | Publication <!-- inventory-id: publication-signature --> | ... | \`publication\` |
 | Feature-package reconcile <!-- inventory-id: feature-package-reconcile-signature --> | ... | \`feature-package-reconcile\` |
+| Release preflight consent <!-- inventory-id: release-preflight-signature --> | ... | ... |
 | Governance fork disposition <!-- inventory-id: governance-fork-disposition --> | ... | \`governance-fork-disposition\` |
 | Critical action <!-- inventory-id: critical-action-family --> | ... | \`critical-action\` |
 
@@ -85,9 +86,10 @@ Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
 | Inventory id | Disposition | Catalog/template id |
 |---|---|---|
 | \`push-signature\` | \`registered\` | \`critical-push-authorize\` |
-| \`deploy-signature\` | \`legacy-renderer\` | — |
-| \`publication-signature\` | \`legacy-renderer\` | — |
+| \`deploy-signature\` | \`registered\` | \`critical-deploy-authorize\` |
+| \`publication-signature\` | \`registered\` | \`critical-publication-authorize\` |
 | \`feature-package-reconcile-signature\` | \`legacy-renderer\` | — |
+| \`release-preflight-signature\` | \`registered\` | \`critical-release-preflight-authorize\` |
 | \`governance-fork-disposition\` | \`legacy-renderer\` | — |
 | \`critical-action-family\` | \`abstract-family\` | — |
 | \`plan-prd-approval\` | \`legacy-renderer\` | — |
@@ -118,9 +120,10 @@ const BASE_CATALOG = JSON.stringify({
   schema: "pipeline.human-terminal-action-catalog.v1",
   entries: [
     catalogEntry("push-signature", "registered", "critical-push-authorize", "authorize-critical-push"),
-    catalogEntry("deploy-signature", "legacy-renderer"),
-    catalogEntry("publication-signature", "legacy-renderer"),
+    catalogEntry("deploy-signature", "registered", "critical-deploy-authorize", "authorize-critical-deploy"),
+    catalogEntry("publication-signature", "registered", "critical-publication-authorize", "authorize-critical-publication"),
     catalogEntry("feature-package-reconcile-signature", "legacy-renderer"),
+    catalogEntry("release-preflight-signature", "registered", "critical-release-preflight-authorize", "authorize-critical-release-preflight"),
     catalogEntry("governance-fork-disposition", "legacy-renderer"),
     catalogEntry("critical-action-family", "abstract-family"),
     catalogEntry("plan-prd-approval", "legacy-renderer"),
@@ -171,7 +174,7 @@ test("canonical terminal rows derive their ids from the authorization and non-au
   assert.deepEqual(
     extractCanonicalHumanAuthorizationRows(BASE_DOC).map((row) => row.inventoryId),
     ["push-signature", "deploy-signature", "publication-signature", "feature-package-reconcile-signature",
-      "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
+      "release-preflight-signature", "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
       "po-key-setup"],
   );
 });
@@ -243,10 +246,10 @@ test("a missing CRITICAL_ACTION_KINDS declaration is reported as a missing signa
 });
 
 test("terminal disposition drift and missing catalog coverage fail closed", () => {
-  const drifted = BASE_DOC.replace("| `deploy-signature` | `legacy-renderer` | — |", "| `deploy-signature` | `excluded` | — |");
+  const drifted = BASE_DOC.replace("| `feature-package-reconcile-signature` | `legacy-renderer` | — |", "| `feature-package-reconcile-signature` | `excluded` | — |");
   assert.equal(
     checkAuthGateInventoryDrift(REPO, fixture({ doc: drifted })).findings
-      .some((finding) => finding.includes("AUTH-GATE-TERMINAL-DISPOSITION-DRIFT deploy-signature")),
+      .some((finding) => finding.includes("AUTH-GATE-TERMINAL-DISPOSITION-DRIFT feature-package-reconcile-signature")),
     true,
   );
   const extra = `${BASE_DOC}\n| \`new-human-action\` | \`excluded\` | — |\n`;
@@ -282,7 +285,8 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
-    "authorize-critical-push", "po-human-approval-setup",
+    "authorize-critical-deploy", "authorize-critical-publication", "authorize-critical-push",
+    "authorize-critical-release-preflight", "po-human-approval-setup",
   ]);
 });
 
@@ -439,7 +443,7 @@ test("published registered/inactive schema branches and runtime reject the same 
   };
   for (const [field, value] of Object.entries(inactiveValues)) {
     const changed = structuredClone(base);
-    changed.entries[1][field] = value;
+    changed.entries.find((entry) => entry.disposition !== "registered")[field] = value;
     assert.equal(validateHumanTerminalActionCatalog(changed).valid, false, field);
   }
 

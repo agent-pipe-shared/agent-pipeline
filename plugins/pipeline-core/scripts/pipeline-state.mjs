@@ -546,7 +546,7 @@ import {
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
 import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
-import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -3283,6 +3283,23 @@ function publicationReplayMatches(sub, current, expectedRevision, expectedDigest
   return false;
 }
 
+/**
+ * C19-G1 (AC-140): the exact `authorize-critical` line for a kind whose proof is missing, built by the plugin
+ * (`prepareAuthorizeCriticalLine`) with the subject digest computed from the prepared subject, so the agent relays it
+ * verbatim instead of hand-assembling it. Returns the stderr line, or null when it cannot be built; never signs.
+ */
+function authorizeCriticalLineMessage(dir, base, kind, candidate, subject, deps = {}) {
+  try {
+    const featureId = base?.activeFeature?.id;
+    const plan = base?.activeFeature?.planPath;
+    if (typeof featureId !== "string" || featureId === "" || typeof plan !== "string" || plan === "") return null;
+    const spec = `${dirname(plan).split(sep).join("/")}/spec.md`;
+    const expiresAt = new Date((Date.parse((deps.now ?? (() => new Date().toISOString()))()) || Date.now()) + 3_600_000).toISOString();
+    const prepared = prepareAuthorizeCriticalLine({ kind, candidate, subject, repoRoot: realpathSync(resolve(dir)), featureId, plan, spec, expiresAt });
+    return `Signing line for the PO (plugin-built, relay verbatim; --subject-sha256 ${prepared.subjectSha256} is computed from the prepared ${kind} subject): ${prepared.command}`;
+  } catch { return null; }
+}
+
 function runPublicationCommand(sub, flags, deps) {
   const dir = deps.dir ?? projectDir();
   const request = readContinuityRequest(dir, flags["request-file"]);
@@ -3371,19 +3388,24 @@ function runPublicationCommand(sub, flags, deps) {
           if (publicationProofRequired) {
             if (prior === null) throw new Error("publication proof requires a prepared State projection");
             const candidate = { commit: prior.candidateOid, tree: prior.candidateTree };
+            const publicationSubject = {
+              transactionId: request.value.transactionId,
+              channel: prior.channel,
+              expectedRevision: expected.value,
+              expectedStateSha256: request.value.expectedStateSha256,
+              input,
+            };
             const verified = verifyCriticalHumanProof({
               dir, state: base, kind: "publication", candidate,
-              subject: {
-                transactionId: request.value.transactionId,
-                channel: prior.channel,
-                expectedRevision: expected.value,
-                expectedStateSha256: request.value.expectedStateSha256,
-                input,
-              },
+              subject: publicationSubject,
               flags,
               now: new Date().toISOString(),
             });
-            if (!verified.ok) throw new Error(verified.code);
+            if (!verified.ok) {
+              const line = authorizeCriticalLineMessage(dir, base, "publication", candidate, publicationSubject, deps);
+              if (line !== null) console.error(line);
+              throw new Error(verified.code);
+            }
             criticalProof = verified.proof;
             criticalProofWaiver = verified.waived ?? null;
           }
@@ -13503,7 +13525,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           dir, state: base, kind: "deploy", candidate,
           subject: { artifact, environment: env }, flags: parsed.value, now: approvedAt,
         });
-        if (!verified.ok) { console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`); return 2; }
+        if (!verified.ok) {
+          console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`);
+          const line = authorizeCriticalLineMessage(dir, base, "deploy", { commit: candidate.commit, tree: candidate.tree }, { artifact, environment: env });
+          if (line !== null) console.error(line);
+          return 2;
+        }
         proof = verified.proof;
         waiver = verified.waived ?? null;
       }

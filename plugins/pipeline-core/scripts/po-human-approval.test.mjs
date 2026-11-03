@@ -4580,6 +4580,50 @@ test("N30: authorizeCriticalActionCommand refuses an unknown kind and a missing 
   assert.throws(() => authorizeCriticalPushCommand(pushCommandFixture({ plan: "" })), /authorizeCriticalPushCommand requires a non-empty plan/u);
 });
 
+// AC-140 (C19-G1): deploy, publication and release-preflight get the same plugin-built authorize-critical line
+// as push: kind fixed by the builder, the subject digest computed by the plugin from the prepared subject.
+const C19_G1_KINDS = Object.freeze({
+  deploy: { builder: "authorizeCriticalDeployCommand", catalogId: "deploy-signature", builderId: "authorize-critical-deploy",
+    subject: { artifact: "dist/app.tgz", environment: "staging" } },
+  publication: { builder: "authorizeCriticalPublicationCommand", catalogId: "publication-signature", builderId: "authorize-critical-publication",
+    subject: { transactionId: "tx-1", channel: "stable", expectedRevision: 1, expectedStateSha256: "b".repeat(64), input: {} } },
+  "release-preflight": { builder: "authorizeCriticalReleasePreflightCommand", catalogId: "release-preflight-signature", builderId: "authorize-critical-release-preflight",
+    subject: { version: "1.2.3", lifecycle: { featureId: "cyb-6" } } },
+});
+const C19_G1_CANDIDATE = Object.freeze({ commit: "1".repeat(40), tree: "2".repeat(40) });
+
+for (const [kind, spec] of Object.entries(C19_G1_KINDS)) {
+  test(`AC-140: the ${kind} authorize-critical line is built by the plugin with the kind, a plugin-computed subject digest and a quoted request path`, async () => {
+    const ns = await import("./po-human-approval.mjs");
+    assert.equal(typeof ns[spec.builder], "function", `${spec.builder} must be exported`);
+    assert.equal(typeof ns.prepareAuthorizeCriticalLine, "function", "prepareAuthorizeCriticalLine must be exported");
+    const built = ns[spec.builder](pushCommandFixture());
+    assert.deepEqual(built.argv.slice(1), authorizeCriticalActionCommand({ kind, ...pushCommandFixture() }).argv.slice(1));
+    assert.ok(built.argv.includes(kind) && built.argv[built.argv.indexOf("--kind") + 1] === kind);
+    const prepared = ns.prepareAuthorizeCriticalLine({
+      kind, candidate: C19_G1_CANDIDATE, subject: spec.subject,
+      repoRoot: "/repo root", featureId: "cyb-6", plan: "specs/x y/prd.md", spec: "specs/x/spec.md", expiresAt: "2026-08-10T12:00:00.000Z",
+    });
+    assert.match(prepared.subjectSha256, /^[0-9a-f]{64}$/u);
+    assert.equal(prepared.subjectSha256, criticalActionSubjectSha256({ kind, candidate: C19_G1_CANDIDATE, subject: spec.subject }));
+    assert.equal(prepared.argv[prepared.argv.indexOf("--subject-sha256") + 1], prepared.subjectSha256);
+    assert.equal(prepared.argv[prepared.argv.indexOf("--kind") + 1], kind);
+    assert.match(prepared.command, /'specs\/x y\/prd\.md'/u, "a path with a space is single-quoted");
+    assert.match(prepared.command, new RegExp(`--kind ${kind} `, "u"));
+  });
+
+  test(`AC-140: the human-terminal-action catalog registers ${kind} with builder ${spec.builderId}`, async () => {
+    const catalog = await import("../lib/human-terminal-action-catalog.mjs");
+    const loaded = catalog.loadHumanTerminalActionCatalog();
+    const entry = loaded.entries.find((candidate) => candidate.id === spec.catalogId);
+    assert.equal(entry.disposition, "registered");
+    assert.equal(entry.builderId, spec.builderId);
+    assert.ok(catalog.registeredHumanTerminalActionBuilderIds().includes(spec.builderId));
+    const viaCatalog = catalog.buildRegisteredHumanTerminalAction(spec.builderId, pushCommandFixture());
+    assert.equal(viaCatalog.output.argv[viaCatalog.output.argv.indexOf("--kind") + 1], kind);
+  });
+}
+
 test("GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory", () => {
   for (const field of ["launcher", "repoRoot", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
     assert.throws(

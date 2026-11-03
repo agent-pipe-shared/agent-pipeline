@@ -2084,6 +2084,31 @@ export function authorizeCriticalActionCommand({
   });
 }
 
+/**
+ * C19-G1 (AC-140): the deploy, publication and release-preflight cases of `authorizeCriticalActionCommand`, one named
+ * builder per kind (the same shape as the push builder), so the agent relays a plugin-built line instead of
+ * hand-formatting a quote-sensitive command. They render only; they never sign or read a key.
+ */
+export function authorizeCriticalDeployCommand(input = {}) {
+  return authorizeCriticalActionCommand({ ...input, kind: "deploy" });
+}
+export function authorizeCriticalPublicationCommand(input = {}) {
+  return authorizeCriticalActionCommand({ ...input, kind: "publication" });
+}
+export function authorizeCriticalReleasePreflightCommand(input = {}) {
+  return authorizeCriticalActionCommand({ ...input, kind: "release-preflight" });
+}
+
+/**
+ * C19-G1: computes the `--subject-sha256` from the prepared candidate and subject (the same
+ * `criticalActionSubjectSha256` the verifier recomputes) and renders the exact line, so no agent ever hand-computes
+ * the digest. Returns the rendering plus the digest and the subject it binds. Never signs, never executes.
+ */
+export function prepareAuthorizeCriticalLine({ kind, candidate, subject, ...rest } = {}) {
+  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+  return { ...authorizeCriticalActionCommand({ kind, subjectSha256, ...rest }), kind, subjectSha256, subject, candidate };
+}
+
 function renderAuthorizeCriticalCommand(name, {
   kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
 }) {
