@@ -1,0 +1,14 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 9d4506756..db2620014 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3900,7 +3900,8 @@
+         "caseIds": [
+           "G23C001",
+           "G23C002",
+-          "G23C003"
++          "G23C003",
++          "G23C004"
+         ],
+         "maxBytes": 65536
+       }
