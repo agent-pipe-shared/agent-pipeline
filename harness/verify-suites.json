@@ -4446,6 +4446,18 @@
       "file": "plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs",
       "invariantPinned": "The host-commit recover command plans read-only and applies one orchestrator commit of exactly the claimed paths only when the plan digest still matches, with the guard-conformant trailers and a pointer to the stop-failure record, and refuses typed with zero effect on a moved head, a staged path, a path outside the allowed paths, no source or a digest mismatch (C18-1b, AC-164)",
       "nonOverlapNote": "Unique cases: scripts/goldfish-host-commit-recover.mjs and its guard admission; the finalizer suite pins the diagnostics it reads"
+    },
+    {
+      "name": "continuity-drift-exits-tests",
+      "file": "plugins/pipeline-core/lib/continuity-drift-exits.test.mjs",
+      "invariantPinned": "A bound-document drift is worded as a state a typed command lifts: the cause code is carried to the onboarding diagnostic, the text says it is not terminal and names both typed exits (submit-plan and authority-restore restore), and the design-lock denial names the same exits (C19-G3, AC-115)",
+      "nonOverlapNote": "Unique cases: explainContinuityUnavailable and its two consumers (project-onboarding-v3 diagnostic, denial route); the continuity suites keep the observation and promotion contracts"
+    },
+    {
+      "name": "full-verify-wrapper-tests",
+      "file": "scripts/full-verify.test.mjs",
+      "invariantPinned": "The Full Verify wrapper chooses the newest safe run directory for --resume, counts only resumed progress lines and states the resumed count in its summary only when resuming (C19 A5, AC-140)",
+      "nonOverlapNote": "Unique pure-function cases of scripts/full-verify.mjs; the journal behaviour itself is pinned by nova-verify-journal-tests"
     }
   ]
 }
