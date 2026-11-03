@@ -1,0 +1,44 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs b/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+index 46e9c09b7..b2bfbc7a0 100644
+--- a/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+@@ -227,3 +227,23 @@ test("D87-6 the denial text is the one the Claude native Read produces, so the t
+     assert.match(d.text, /non-credential file/u, `${name}: the typed refusal states its repair\n${d.text}`);
+   }
+ }));
++
++// Candidate 19 (D5, AGY greenfield priority 5): the diagnostic header on stderr named a fixed credential-root code for every refused native read, so a
++// plain missing project file read as a credential block. The header now carries the guard code the refusal text names.
++function headerCode(root, toolCall) {
++  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
++  const child = spawnSync(process.execPath, [adapter], {
++    cwd: root, input: JSON.stringify({ cwd: root, ...toolCall }), encoding: "utf8", timeout: 60000,
++    env: { ...baseEnv, CLAUDE_PROJECT_DIR: root },
++  });
++  return /\bcode=(\S+)/u.exec(String(child.stderr))?.[1] ?? null;
++}
++
++test("D5 the diagnostic header names the real guard code: a missing project file is GUARD-READ-TARGET-MISSING, a credential file GUARD-READ-CREDENTIAL-TARGET", { timeout: 300000 }, () => withFixture((root) => {
++  for (const path of [join(root, "docs", "does-not-exist.md"), "docs/does-not-exist.md"]) {
++    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-TARGET-MISSING", path);
++  }
++  for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
++    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-CREDENTIAL-TARGET", path);
++  }
++}));
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 435eb6c73..3944f3f1c 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -638,7 +638,10 @@ export async function runAntigravityPreToolGuard(rawInput) {
+       }
+       for (const target of readTargets) {
+         const refusal = nativeReadTargetRefusal(target, readRoot, workspaceRoots);
+-        if (refusal !== null) deny(refusal, { code: "native-read-credential-root", fields: { tool: normalized.toolName, kind: target.kind } });
++        // Candidate 19 (D5): the diagnostic header carries the guard code the refusal text itself names (GUARD-READ-TARGET-MISSING for a plain
++        // missing project file) instead of a fixed credential-root label that read as a credential block for every refused native read.
++        const innerCode = /\bGUARD-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/u.exec(refusal)?.[0];
++        if (refusal !== null) deny(refusal, { code: innerCode ?? "native-read-refused", fields: { tool: normalized.toolName, kind: target.kind } });
+       }
+     }
+     allow();
