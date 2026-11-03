@@ -167,6 +167,79 @@ Further points from the report text (not in its table): a second design signatur
 | Late-binding ADR | accept, build in candidate 19 | The ADR becomes Accepted; the build (guard tripwire, seal, shared reader) is a Goldfish chain with its own Critic review |
 | Assignment of unclear topics | in 19: M1 parts 2 and 3, the generated runbook (G5), Windows lock and registry (E2 cause, E4); to 0.7.1: the runner export of phase windows and token buckets | The session "Claude Fam App" is a Windows run and answers on request, so the Windows items can be checked live there |
 
+## Completion matrix of the three runner reports (status 2026-11-03, updated with every patch)
+
+Legend: **built** = held patch exists, applies to HEAD, own tests green in a clone, notes and check test written; it is NOT applied, NOT Critic-reviewed and NOT run in a real consumer repository. **running** = a Goldfish slice is in flight. **planned** = decided, not yet started. **ADR first** = a decision record comes before the build. **moved** = not in candidate 19. None of the rows is "done": open for all are Full Verify of the final state, independent Critic review, real runner runs and PO acceptance.
+
+### Antigravity (D, Q, M1)
+
+| ID | Item | Status | Patch or route |
+|---|---|---|---|
+| D1 | Runner view maps the `tools:` list to the registry names | built | w126 (real Antigravity smoke run open) |
+| D2a | Receipt of a caller-authored verdict says `freshContext: false` and carries the label | planned | Elephant, with D2b |
+| D2b | A caller-authored verdict satisfies the close gate only at rigor 0 and low risk | planned (decided) | Goldfish slice |
+| D3 | Signatures: dirty-tree check before the ceremony, a signed reconcile commits its own files, no double signature | ADR first (decided: opt-in block) | one ADR with D4b, E3, F1 |
+| D4a | Push threat model materialized in the design phase when a push approval is active | planned | Goldfish slice |
+| D4b | Evidence-only commits carry Verify and Security forward (candidate equality over the product subtree) | ADR first (decided: opt-in block) | one ADR with D3, E3, F1 |
+| D5 | Pre-tool header names the real guard code | built | w127 |
+| D6 | Exact CLI signatures in `happy-path.md` and the close skill | planned | Elephant (doc) |
+| D7 | GIT-03 refusal prints the accepted form; shell refusal names the bare `node` | built | w130 |
+| D8 | Security scan accepts a repository without a remote as a typed local-only subject; push gate still refuses it | built | w129 (Goldfish; the push-guard suite was run by the Elephant, green) |
+| Q1 | `result.md` status sentence cannot go stale | built | w129a |
+| Q2 | Intended read refusals say they are intended and name the alternative | planned | Elephant (text) |
+| Q3 | Audit bundle binds the signature proofs, release verify and security scan | planned (after D3) | with the D3 slice |
+| Q4 | One module, no parallel slices | see M1 | M1 |
+| Q5 | Control-plane write by a `node scratch/*.mjs` helper | running (decided: guard now) | Goldfish slice w131 (static scan; other interpreters stay a known limit) |
+| Q6 | `adoption-required` shown for a one-module feature | no action (informational) | after M1 it disappears for a split design |
+| M1.1 | Design skeleton with several modules and a cut rule | planned | Elephant (small) |
+| M1.2 | Decomposition criterion in the readiness review and design guidance | planned (decided: in 19) | Goldfish slice |
+| M1.3 | `sizeBudgets` in the fitness model, reported not blocking | planned (decided: in 19) | Goldfish slice |
+| M1.4 | Slices follow modules (parallel dispatch) | planned | with M1.2 and the slice planner |
+
+### Claude Code on Windows (E, Q7 to Q10)
+
+| ID | Item | Status | Patch or route |
+|---|---|---|---|
+| E1 | Host commit 0 of 11: name the preparation code, typed orchestrator-commit helper | planned (cause on Windows open) | Goldfish slice; the session "Claude Fam App" is asked for the stop-failure records |
+| E2 | Fail fast at bootstrap when close or push cannot work on the platform; Windows registry lock cause | planned (decided: in 19) | Goldfish slice (probe); lock cause needs the Windows session |
+| E3 | Evidence loop ordered recipe and carry-forward | ADR first | one ADR with D3, D4b, F1; recipe is the generated runbook (G5) |
+| E4 | Parallelism: registry concurrency and slicing hint | planned (decided: in 19) | with M1 and E2 |
+| E5 | Private identifier warned at intake, not only at the commit | planned | Goldfish slice (small) |
+| E6 | Wrong hook text about the proof import; ACL repair with a preview; verify command set | text planned; rest planned | Elephant (text); Goldfish (rest) |
+| E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | planned | Elephant (text); guard part with the Windows session |
+| Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
+| Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | planned | Goldfish slice (guard) |
+| Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | planned | Elephant (text) |
+| Q10 | `WIN-AUTH-OPEN` names the exact path and offers a preview | planned | with E6 |
+
+### Codex (F)
+
+| ID | Item | Status | Patch or route |
+|---|---|---|---|
+| F1 | `ARCHITECTURE-DESIGN-RECEIPT-STALE` blocks the next feature | ADR first (decided: opt-in block) | one ADR with D3, D4b, E3 |
+| F2 | Read-only analysis lane while a feature is approved | ADR first (decided: scratch-clone lane) | ADR, then Goldfish slice |
+| F3 | Result record claims no stale state | built | w129a |
+| F4 | ADR promised by the Spec but missing at close | planned | Goldfish slice (small) |
+| F5 | Attestation versus observation in the receipts | planned | = D2a, D2b |
+| F6 | Close readback names the passing Critic round | built | w129b |
+| F7 | AC3 provenance collision in the TabletApp | PO list (product defect, no plugin change) | none |
+| F8 | German Critic round limit differs from the English rule | planned | Elephant (doc and consistency test) |
+| F9 | Shell forms missed repeatedly | partly built (accepted forms printed) | w130; the `rg --files` hint is planned |
+| F10 | Browser evidence not bound to the integrated commit | moved | with the carry-forward ADR |
+| F11 | No vertical slice before the full build | planned | = M1.4 |
+
+### Further decided items and what moved
+
+| Item | Status |
+|---|---|
+| GF-10 adoption (w120, w121) | built earlier; the apply script now applies both by default |
+| Late-binding ADR | accepted by the PO; build in candidate 19 planned as a Goldfish chain with its own review |
+| Generated runbook (C19-G5) | planned (decided: in 19); stage 1 is D6 |
+| Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
+| C18-5 pre-granted allowlist | decided: not introduced |
+
+Count now: **built 8 items** (D1, D5, D7, D8, Q1 and F3, F6, Q7, in seven patches w126 to w130 with w129a and w129b), **running 1** (Q5), **ADR first 5** (D3, D4b, E3, F1, F2), **planned** the rest. The earlier candidate 19 patches w115 to w125 are applied; w126 and later are not.
+
 ## Order of work
 
 A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, then A6, then B1 when decided. Greenfield findings jump the queue by severity.
