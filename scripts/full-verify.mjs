@@ -3,7 +3,10 @@
 //          turned green steps red in the first dev-build Full Verify: (1) no `init.defaultBranch=main` in the private HOME,
 //          (2) a long TMPDIR pushing a socket path over the 96-byte limit (wsl-ipc-compatibility-tests), (3) node resolved
 //          through a per-shell fnm path that is not stable for child processes.
-// Usage:   node scripts/full-verify.mjs <clone-dir> [<label>] [--reuse]
+// Usage:   node scripts/full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume]
+//          --resume continues the newest earlier run of the same clone: suites completed (exit 0) there for the same candidate
+//          commit and tree are skipped and counted as "resumed"; a run of another candidate is refused. Separate from --reuse.
+//          A red suite leaves a bounded redacted excerpt (logs/<id>.red-excerpt.log) in its run directory.
 //          (run from any checkout; <clone-dir> must be a clean clone whose committed HEAD is the candidate; label defaults to "fv")
 // Inputs:  git identity copied from `git config user.name/user.email` of the current directory; `--reuse` drops --no-reuse.
 // Output:  verify's stdout+stderr in <clone-dir>/scratch/<label>-output.txt; on stdout the exit code, the duration, the output
@@ -12,7 +15,7 @@
 //          under 30 characters; a longer one is refused with exit 2 rather than silently breaking socket-path tests.
 // Read-only toward the source: it writes only the output file, the run record verify itself writes in the clone, and the temp dirs.
 import { spawn, execFileSync } from "node:child_process";
-import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,12 +33,30 @@ export function redStepNames(record) {
   return steps.filter((step) => step && step.exitCode !== 0).map((step) => String(step.name));
 }
 
+/** Pure: the newest run id among run directory entries ({ name, mtimeMs }), or null. Used by --resume. */
+export function newestRunId(entries) {
+  const usable = (Array.isArray(entries) ? entries : []).filter((entry) => typeof entry?.name === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(entry.name) && Number.isFinite(entry.mtimeMs));
+  usable.sort((a, b) => b.mtimeMs - a.mtimeMs || (a.name < b.name ? 1 : -1));
+  return usable.length === 0 ? null : usable[0].name;
+}
+
+/** Pure: how many suites the run skipped as already completed in the resumed run (progress lines with state "resumed"). */
+export function countResumed(outputText) {
+  let count = 0;
+  for (const line of String(outputText ?? "").split("\n")) {
+    if (!line.startsWith("{")) continue;
+    try { const event = JSON.parse(line); if (event?.schema === "pipeline.verify-progress.v1" && event.state === "resumed") count += 1; } catch { /* not a progress line */ }
+  }
+  return count;
+}
+
 /** Pure: the concise summary lines printed at the end of a run. */
-export function summarize({ exitCode, seconds, outputPath, record }) {
+export function summarize({ exitCode, seconds, outputPath, record, resumed = null }) {
   const red = record === null ? null : redStepNames(record);
   const total = Array.isArray(record?.steps) ? record.steps.length : 0;
   return [
     `verify exit ${exitCode} after ${seconds} s; output in ${outputPath}`,
+    ...(resumed === null ? [] : [`resumed over ${resumed} suite(s) already completed in the earlier run (not freshly run)`]),
     red === null ? "run record: unreadable or absent (evidence/verify-latest.json)" : `steps ${total}, red ${red.length}`,
     ...(red ?? []).map((name) => `  red: ${name}`),
   ];
@@ -48,8 +69,9 @@ export function privateGitConfig({ name, email }) {
 
 function main(argv) {
   const reuse = argv.includes("--reuse");
-  const [cloneArg, label = "fv"] = argv.filter((arg) => arg !== "--reuse");
-  if (!cloneArg) { console.error("usage: full-verify.mjs <clone-dir> [<label>] [--reuse]"); return 2; }
+  const resume = argv.includes("--resume");
+  const [cloneArg, label = "fv"] = argv.filter((arg) => arg !== "--reuse" && arg !== "--resume");
+  if (!cloneArg) { console.error("usage: full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume]"); return 2; }
   const clone = resolve(cloneArg);
   const base = join(homedir(), ".fv", label);
   const home = join(base, "h");
@@ -65,8 +87,18 @@ function main(argv) {
   const env = { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, GIT_CONFIG_GLOBAL: gitConfigGlobal,
     PATH: `${dirname(nodeBinary)}${delimiter}${process.env.PATH ?? ""}` };
   delete env.NODE_TEST_CONTEXT;
+  delete env.PIPELINE_VERIFY_RESUME_RUN;
+  if (resume) {
+    // The earlier (interrupted) run of THIS clone: the newest run directory under its git common directory.
+    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: clone, encoding: "utf8" }).trim();
+    const runsRoot = join(common, "agent-pipeline", "verify", "runs");
+    const entries = existsSync(runsRoot) ? readdirSync(runsRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => ({ name: e.name, mtimeMs: statSync(join(runsRoot, e.name)).mtimeMs })) : [];
+    const previous = newestRunId(entries);
+    if (previous === null) { console.error("full-verify: REFUSED: --resume found no earlier run in this clone"); return 2; }
+    env.PIPELINE_VERIFY_RESUME_RUN = previous;
+  }
   mkdirSync(join(clone, "scratch"), { recursive: true });
-  const outputRel = `scratch/${label}-output.txt`;
+  const outputRel = `scratch/${label}-output${resume ? "-resume" : ""}.txt`;
   const out = createWriteStream(join(clone, outputRel));
   const started = Date.now();
   const args = ["harness/scripts/verify.mjs", "--mode", "candidate", ...(reuse ? [] : ["--no-reuse"])];
@@ -78,7 +110,9 @@ function main(argv) {
     const recordPath = join(clone, "evidence", "verify-latest.json");
     let record = null;
     try { if (existsSync(recordPath)) record = JSON.parse(readFileSync(recordPath, "utf8")); } catch { record = null; }
-    for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record })) console.log(line);
+    let resumed = null;
+    if (resume) { try { resumed = countResumed(readFileSync(join(clone, outputRel), "utf8")); } catch { resumed = 0; } }
+    for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record, resumed })) console.log(line);
     process.exit(code ?? 1);
   });
   return null;

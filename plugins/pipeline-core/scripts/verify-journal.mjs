@@ -21,7 +21,27 @@ import { observeNativeWindowsProcess, sameNativeWindowsProcess } from "../lib/wi
 import { readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, createWindowsOwnedAuthorityDirectory, inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from "../lib/windows-owned-authority-backend.mjs";
 import { registerVerifyRunRecord, settleVerifyRunRecord, sweepStaleVerifyRunRecords } from "../lib/verify-run-record.mjs";
 
+import { redactResidualHostPaths } from "./capture-evidence.mjs";
+
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
+// KEEP (C19): a red suite leaves a bounded, redacted excerpt next to its full log.
+export const RED_EXCERPT_MAX_LINES = 200;
+export const RED_EXCERPT_MAX_BYTES = 64 * 1024;
+const SECRET_ASSIGNMENT = /\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY)[A-Za-z0-9_]*)\s*[=:]\s*\S+/giu;
+
+/** Pure: header (suite, exit code, suite file) plus the last 200 lines, at most 64 KiB, redacted. Never reads the environment. */
+export function buildRedExcerpt({ suiteName, suiteFile, exitCode, logBytes }) {
+  const lines = Buffer.from(logBytes).toString("utf8").split("\n");
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  const tail = lines.slice(-RED_EXCERPT_MAX_LINES);
+  const header = `suite: ${suiteName}\nexit: ${exitCode}\nfile: ${suiteFile}\nexcerpt: last ${tail.length} of ${lines.length} lines\n---\n`;
+  let body = redactResidualHostPaths(tail.join("\n")).replace(SECRET_ASSIGNMENT, "$1=<redacted>");
+  let bytes = Buffer.from(body);
+  const room = Math.max(0, RED_EXCERPT_MAX_BYTES - Buffer.byteLength(header));
+  if (bytes.length > room) bytes = bytes.subarray(bytes.length - room);
+  body = bytes.toString("utf8");
+  return Buffer.from(`${header}${body}\n`).subarray(0, RED_EXCERPT_MAX_BYTES);
+}
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const RUN_MANIFEST_SCHEMA = "pipeline.verify-run-manifest.v1";
@@ -476,6 +496,48 @@ export function loadVerifyResumeArtifacts({ runsRoot, currentRunId, suites }) {
     }
   }
   return { receipts, logs };
+}
+
+// RESUME (C19): load an explicitly named earlier run of the SAME clone as the source of already-completed suites.
+// Keys on suite name + candidate commit + tree + a `completed`/`resumed` journal entry whose receipt exits 0 and whose
+// log is intact. A suite whose last entry is `started` (the interruption point) is simply absent from the result and re-runs.
+// A source run of a different candidate is refused with a typed error and nothing is skipped.
+export function loadVerifyResumeSource({ runsRoot, sourceRunId, currentRunId, candidate, registrations }) {
+  if (typeof sourceRunId !== "string" || !SAFE_ID.test(sourceRunId) || sourceRunId === currentRunId) throw new Error("VERIFY-RESUME-SOURCE-INVALID");
+  const directory = join(runsRoot, sourceRunId);
+  try {
+    assertPhysicalDirectory(directory, { privateState: true });
+  } catch { throw new Error(`VERIFY-RESUME-SOURCE-MISSING:${sourceRunId}`); }
+  const manifest = readJson(join(directory, "manifest.json"));
+  if (!validManifest(manifest, directory)) throw new Error(`VERIFY-RESUME-SOURCE-INVALID:${sourceRunId}`);
+  if (manifest.candidate?.commit !== candidate.commit || manifest.candidate?.tree !== candidate.tree) throw new Error(`VERIFY-RESUME-CANDIDATE-MISMATCH:${sourceRunId}`);
+  if (!reusableRunLock(directory)) throw new Error(`VERIFY-RESUME-SOURCE-ACTIVE:${sourceRunId}`);
+  const journal = readPrivateBytes(join(directory, "progress.jsonl"));
+  const last = new Map();
+  for (const line of (journal === null ? "" : journal.toString("utf8")).split("\n")) {
+    if (line.trim() === "") continue;
+    let event;
+    try { event = JSON.parse(line); } catch { continue; }
+    if (event?.schema === VERIFY_PROGRESS_SCHEMA && event.candidate?.commit === candidate.commit && event.candidate?.tree === candidate.tree) last.set(event.suite, event);
+  }
+  const resumable = new Map();
+  for (const registration of registrations) {
+    const event = last.get(registration.id);
+    if (!event || (event.state !== "completed" && event.state !== "resumed")) continue;
+    const artifactName = verifySuiteArtifactName(registration.id);
+    const receipt = readJson(join(directory, "receipts", `${artifactName}.json`));
+    if (!receipt || receipt.status !== "completed" || receipt.exitCode !== 0 || receipt.runId !== sourceRunId
+      || receipt.receiptSha256 !== event.receiptSha256
+      || receipt.candidate?.commit !== candidate.commit || receipt.candidate?.tree !== candidate.tree
+      || receipt.implementationSha256 !== registration.implementationSha256
+      || receipt.environmentContractSha256 !== registration.environmentContractSha256
+      || digestJson(receipt.inputs) !== digestJson(registration.inputs)) continue;
+    const logPath = join(directory, "logs", `${artifactName}.log`);
+    const bytes = readPrivateBytes(logPath);
+    if (bytes === null || sha(bytes) !== receipt.log?.fileSha256 || bytes.length !== receipt.log?.byteLength || receipt.log?.truncated === true) continue;
+    resumable.set(registration.id, { receipt, log: { path: relative(directory, logPath).split(sep).join("/"), fileSha256: sha(bytes), byteLength: bytes.length, truncated: false } });
+  }
+  return resumable;
 }
 
 // ADR-0065 candidate (b): Tier-B narrowing is a lookup keyed by suite name/id, not a suite
@@ -936,7 +998,7 @@ function createSemaphore(limit) {
 //   - `serialLaneSuites` members share ONE dedicated 1-slot semaphore (`laneSemaphore`) instead of
 //     the main pool semaphore, so they never overlap EACH OTHER, but still run concurrently
 //     alongside ordinary pool suites during the concurrent phase.
-async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal = null, serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
+async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal = null, serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES, resume = null }) {
   const total = suites.length;
   const steps = new Array(total);
   const receiptBySuite = {};
@@ -961,9 +1023,12 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
     await Promise.all((registration.dependsOn ?? []).map((name) => completion.get(name)?.promise ?? Promise.resolve()));
     if (signal?.aborted) { completion.get(suite.name).resolveFn(); return; }
     let receipt;
-    const reused = plan.reusable.includes(suite.name);
+    const resumedSource = resume?.get(suite.name) ?? null;
+    const reused = resumedSource !== null || plan.reusable.includes(suite.name);
     if (reused) {
-      receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total, clock });
+      receipt = resumedSource !== null
+        ? reuseSuite({ suite, registration, sourceReceipt: resumedSource.receipt, sourceLog: resumedSource.log, run, candidate, policySha256, index: offset + 1, total, clock, state: "resumed" })
+        : reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total, clock });
       closeProofBySuite.set(suite.name, true);
     } else {
       await gate.acquire();
@@ -983,7 +1048,7 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
       }
     }
     receiptBySuite[suite.name] = receipt;
-    steps[offset] = { name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused, durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) };
+    steps[offset] = { name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused, ...(resumedSource === null ? {} : { resumed: true }), durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) };
     completion.get(suite.name).resolveFn();
   }
   const exclusiveGate = createSemaphore(1);
@@ -1050,6 +1115,12 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
   const exitCode = truncated || completionError !== null
     ? 1
     : (spawnSucceeded ? 0 : (typeof result.status === "number" && result.status !== 0 ? result.status : 1));
+  let excerptPath = null;
+  if (exitCode !== 0) {
+    excerptPath = `logs/${artifact}.red-excerpt.log`;
+    const suiteFileRel = relative(suite.cwd, resolve(suite.cwd, suite.file)).split(sep).join("/");
+    writeDurable(join(run.logsDir, `${artifact}.red-excerpt.log`), buildRedExcerpt({ suiteName: suite.name, suiteFile: suiteFileRel, exitCode, logBytes }), "wx");
+  }
   const completedAt = now(clock);
   const receipt = sealVerifySuiteReceipt({
     runId: run.manifest.runId,
@@ -1067,14 +1138,14 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     completedAt,
   });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null, caseCompletionError: completionError?.message ?? null }) }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null, caseCompletionError: completionError?.message ?? null }), ...(excerptPath === null ? {} : { excerpt: excerptPath }) }, console.log);
   return {
     receipt,
     childCloseProved: spawn === spawnAsync && result.closeStatusProved === true && Number.isSafeInteger(result.status),
   };
 }
 
-function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candidate, policySha256, index, total, clock }) {
+function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candidate, policySha256, index, total, clock, state = "reused" }) {
   const startedAt = now(clock);
   const sourceRunDir = dirname(dirname(resolve(run.runsRoot, sourceReceipt.runId, sourceLog.path)));
   const sourcePath = resolve(sourceRunDir, sourceLog.path);
@@ -1087,7 +1158,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   const completedAt = now(clock);
   const receipt = sealVerifySuiteReceipt({ runId: run.manifest.runId, candidate, suite: suite.name, implementationSha256: registration.implementationSha256, inputs: registration.inputs, environmentContractSha256: registration.environmentContractSha256, policySha256, status: "completed", exitCode: 0, log: { path: `logs/${artifact}.log`, fileSha256: sha(bytes), byteLength: bytes.length, truncated: false }, caseCompletion: sourceReceipt.caseCompletion ?? null, startedAt, completedAt });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "reused", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ sourceRunId: sourceReceipt.runId, sourceReceiptSha256: sourceReceipt.receiptSha256 }) }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state, startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ sourceRunId: sourceReceipt.runId, sourceReceiptSha256: sourceReceipt.receiptSha256 }) }, console.log);
   return receipt;
 }
 
@@ -1104,7 +1175,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 // calibration > DEFAULT_VERIFY_CONCURRENCY), raising real production concurrency above 1 for the
 // first time. `environment` mirrors compileVerifySuites' own existing convention (defaults to
 // `process.env`, overridable so a test never depends on ambient environment or leaks into it).
-export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, signal = null, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
+export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, signal = null, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES, resumeFromRunId = typeof environment?.PIPELINE_VERIFY_RESUME_RUN === "string" && environment.PIPELINE_VERIFY_RESUME_RUN !== "" ? environment.PIPELINE_VERIFY_RESUME_RUN : null }) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
   // WINVERIFY: the win32 hard maximum also binds an explicit argument; recorded poolWidth is the effective one.
   concurrency = clampWindowsVerifyConcurrency(concurrency);
@@ -1162,6 +1233,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
       ?? registerRun({ schema: "pipeline.verify-cleanup-registration-request.v1", runId, runPath, candidate, policySha256 });
     if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath })) throw new Error("VERIFY-CLEANUP-REGISTRATION-INVALID");
     run = createVerifyRun({ gitCommonDir, runId, candidate, policySha256, suites: registrations, cleanupRegistration, clock });
+    const resume = resumeFromRunId === null ? null : loadVerifyResumeSource({ runsRoot: run.runsRoot, sourceRunId: resumeFromRunId, currentRunId: runId, candidate, registrations });
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
     const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse, reuseReceipts });
     atomicJson(join(run.runDir, "resume-plan.json"), plan);
@@ -1173,7 +1245,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     // would misrepresent both this run's own timing and how much the reuse mechanism is saving.
     // `steps` is materialized in registration order regardless of real completion order (see
     // runSuitePool's own comment) -- never completion order.
-    const pooled = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal: effectiveSignal, serialLaneSuites, exclusiveSuites });
+    const pooled = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal: effectiveSignal, serialLaneSuites, exclusiveSuites, resume });
     const { steps, receiptBySuite, childCloseProved: allChildrenClosed } = pooled;
     childCloseProved = allChildrenClosed;
     if (pooled.interrupted) {

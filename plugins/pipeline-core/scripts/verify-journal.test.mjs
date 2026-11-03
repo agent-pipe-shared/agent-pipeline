@@ -1998,3 +1998,92 @@ test("ALFRED-RF1: a real SIGINT delivered by the operating system retires the ow
     } finally { rmSync(f.root, { recursive: true, force: true }); }
   }
 });
+
+// C19 / AC-140: the Full Verify keeps a bounded log of a red suite and can resume an interrupted run.
+function c19Fixture() {
+  const f = fixture();
+  const green = join(f.root, "green.test.mjs");
+  const red = join(f.root, "red.test.mjs");
+  writeFileSync(green, "process.stdout.write('green\\n')\n", { mode: 0o600 });
+  writeFileSync(red, "process.exit(1)\n", { mode: 0o600 });
+  return { ...f, suites: [{ name: "green-suite", file: green }, { name: "red-suite", file: red }] };
+}
+const progressEvents = (runDir) => readFileSync(join(runDir, "progress.jsonl"), "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+const redLog = Buffer.from(`${Array.from({ length: 500 }, (_, i) => `line ${i}`).join("\n")}\nAPI_TOKEN=hunter2-secret\nsee ${["", "home", "someone", "proj", "file.mjs"].join("/")} here\n`);
+const spawnByName = (calls) => (command, argv) => {
+  const name = String(argv[argv.length - 1]).includes("red.test") ? "red-suite" : "green-suite";
+  calls.push(name);
+  return name === "red-suite" ? { status: 1, stdout: redLog, stderr: Buffer.alloc(0), error: undefined } : spawnPass();
+};
+
+test("C19 KEEP: a red suite leaves a bounded redacted excerpt referenced by the journal; a green suite leaves none", async () => {
+  const f = c19Fixture();
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-keep", spawn: spawnByName([]), registerRun, reuseReceipts: false });
+    assert.equal(result.terminal.status, "failed");
+    const red = verifySuiteArtifactName("red-suite");
+    const green = verifySuiteArtifactName("green-suite");
+    const excerpt = readFileSync(join(result.runDir, "logs", `${red}.red-excerpt.log`), "utf8");
+    assert.ok(Buffer.byteLength(excerpt) <= 64 * 1024);
+    assert.match(excerpt, /^suite: red-suite\nexit: 1\nfile: red\.test\.mjs\n/u);
+    assert.match(excerpt, /line 499/u);
+    assert.doesNotMatch(excerpt, /line 10\b/u, "only the last 200 lines are kept");
+    assert.doesNotMatch(excerpt, /hunter2-secret|someone/u, "secrets and host paths are redacted");
+    assert.equal(existsSync(join(result.runDir, "logs", `${green}.red-excerpt.log`)), false);
+    const completed = progressEvents(result.runDir).filter((event) => event.state === "completed");
+    assert.equal(completed.find((event) => event.suite === "red-suite").excerpt, `logs/${red}.red-excerpt.log`);
+    assert.equal("excerpt" in completed.find((event) => event.suite === "green-suite"), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C19 RESUME: completed suites of the same candidate are skipped and recorded as resumed; others run", async () => {
+  const f = c19Fixture();
+  try {
+    await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-first", spawn: spawnByName([]), registerRun, reuseReceipts: false });
+    const calls = [];
+    const second = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-second", spawn: spawnByName(calls), registerRun, reuseReceipts: false, resumeFromRunId: "verify-first" });
+    assert.deepEqual(calls, ["red-suite"], "the red suite re-runs, the green one is skipped");
+    const stepOf = (name) => second.steps.find((step) => step.name === name);
+    assert.equal(stepOf("green-suite").resumed, true);
+    assert.equal(stepOf("green-suite").reused, true);
+    assert.equal(stepOf("red-suite").resumed, undefined);
+    assert.equal(stepOf("red-suite").reused, false);
+    assert.deepEqual(progressEvents(second.runDir).filter((event) => event.state === "resumed").map((event) => event.suite), ["green-suite"]);
+    assert.equal(second.terminal.receipts.length, 2, "the final record stays complete");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C19 RESUME: the environment variable selects the run; a suite left at started re-runs", async () => {
+  const f = c19Fixture();
+  try {
+    const first = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-first", spawn: spawnByName([]), registerRun, reuseReceipts: false });
+    const journalPath = join(first.runDir, "progress.jsonl");
+    const kept = readFileSync(journalPath, "utf8").split("\n").filter((line) => line !== "" && !(JSON.parse(line).suite === "green-suite" && JSON.parse(line).state === "completed"));
+    writeFileSync(journalPath, `${kept.join("\n")}\n`, { mode: 0o600 });
+    const calls = [];
+    const second = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-second", spawn: spawnByName(calls), registerRun, reuseReceipts: false, environment: { ...process.env, PIPELINE_VERIFY_RESUME_RUN: "verify-first" } });
+    assert.deepEqual([...calls].sort(), ["green-suite", "red-suite"]);
+    assert.equal(second.steps.some((step) => step.resumed === true), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C19 RESUME: a journal of another candidate is refused with a typed message and nothing is skipped", async () => {
+  const f = c19Fixture();
+  try {
+    await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-first", spawn: spawnByName([]), registerRun, reuseReceipts: false });
+    const calls = [];
+    await assert.rejects(runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate: { commit: "3".repeat(40), tree: candidate.tree }, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-second", spawn: spawnByName(calls), registerRun, reuseReceipts: false, resumeFromRunId: "verify-first" }), /VERIFY-RESUME-CANDIDATE-MISMATCH/u);
+    assert.deepEqual(calls, []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C19 RESUME: without the flag nothing is resumed and every suite runs", async () => {
+  const f = c19Fixture();
+  try {
+    await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-first", spawn: spawnByName([]), registerRun, reuseReceipts: false });
+    const calls = [];
+    const second = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-second", spawn: spawnByName(calls), registerRun, reuseReceipts: false, environment: {} });
+    assert.equal(calls.length, 2);
+    assert.equal(second.steps.some((step) => step.resumed === true), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
