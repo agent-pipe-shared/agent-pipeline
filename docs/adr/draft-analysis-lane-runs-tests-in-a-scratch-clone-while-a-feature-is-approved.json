@@ -3,7 +3,7 @@
   "id": "draft-analysis-lane-runs-tests-in-a-scratch-clone-while-a-feature-is-approved",
   "title": "An analysis lane runs tests in a scratch clone while a feature is approved",
   "status": "proposed",
-  "digest": "f3a9dac96cf31bfcd34eae8c52809e360410c17b57424330a6cad7cc0701d27b",
+  "digest": "83c3f528209d7cf7b5946dd8092e512023cf23e346da7dd42d474ec50e1277e7",
   "scope": "global",
   "date": "2026-11-03"
 }

@@ -189,7 +189,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Q2 | Intended read refusals say they are intended and name the alternative | planned | Elephant (text) |
 | Q3 | Audit bundle binds the signature proofs, release verify and security scan | planned (after D3) | with the D3 slice |
 | Q4 | One module, no parallel slices | see M1 | M1 |
-| Q5 | Control-plane write by a `node scratch/*.mjs` helper | running (decided: guard now) | Goldfish slice w131 (static scan; other interpreters stay a known limit) |
+| Q5 | Control-plane write by a `node scratch/*.mjs` helper | built (decided: guard now) | w131 in the apply script (static scan; exact-path exemption for `scripts/housekeeping.mjs`; other interpreters stay a known limit) |
 | Q6 | `adoption-required` shown for a one-module feature | no action (informational) | after M1 it disappears for a split design |
 | M1.1 | Design skeleton with several modules and a cut rule | planned | Elephant (small) |
 | M1.2 | Decomposition criterion in the readiness review and design guidance | planned (decided: in 19) | Goldfish slice |
@@ -239,7 +239,9 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Count now: **built 8 items** (D1, D5, D7, D8, Q1 and F3, F6, Q7, in seven patches w126 to w130 with w129a and w129b), **running 1** (Q5), **ADR first 5** (D3, D4b, E3, F1, F2), **planned** the rest. The earlier candidate 19 patches w115 to w125 are applied; w126 and later are not.
+Count now: **built 10 items** (D1, D5, D6, D7, D8, Q1 and F3, F6, Q5, Q7, in patches w126 to w132 with w129a and w129b), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
+
+PO list additions (2026-11-03): host sandboxing for test execution (residual of the analysis lane and the control-plane scan, due before the 0.8 candidate); the `scripts/housekeeping.mjs` exemption of w131 (edits to that path need normal review); the commit of the ADR drafts held a design trailer with more than ten paths, so the authorship verifier reports it as unverifiable (later commits split ADRs and held-patch files). The earlier candidate 19 patches w115 to w125 are applied; w126 and later are not.
 
 ## Order of work
 
