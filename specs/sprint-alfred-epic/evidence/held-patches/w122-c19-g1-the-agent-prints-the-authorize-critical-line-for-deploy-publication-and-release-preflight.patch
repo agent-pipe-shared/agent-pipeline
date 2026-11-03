@@ -1,0 +1,874 @@
+diff --git a/docs/human-authorization-inventory.md b/docs/human-authorization-inventory.md
+index 84d6d52e3..342e4785c 100644
+--- a/docs/human-authorization-inventory.md
++++ b/docs/human-authorization-inventory.md
+@@ -125,10 +125,10 @@ new approval gates.
+ | Inventory id | Disposition | Catalog/template id |
+ |---|---|---|
+ | `push-signature` | `registered` | `critical-push-authorize` |
+-| `deploy-signature` | `legacy-renderer` | — |
+-| `publication-signature` | `legacy-renderer` | — |
++| `deploy-signature` | `registered` | `critical-deploy-authorize` |
++| `publication-signature` | `registered` | `critical-publication-authorize` |
+ | `feature-package-reconcile-signature` | `legacy-renderer` | — |
+-| `release-preflight-signature` | `legacy-renderer` | — |
++| `release-preflight-signature` | `registered` | `critical-release-preflight-authorize` |
+ | `governance-fork-disposition` | `legacy-renderer` | — |
+ | `interruption-promotion` | `legacy-renderer` | — |
+ | `accept-residual-critic-findings` | `legacy-renderer` | — |
+diff --git a/harness/scripts/check-auth-gate-inventory-drift.test.mjs b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+index 46b243dce..3abb049d8 100644
+--- a/harness/scripts/check-auth-gate-inventory-drift.test.mjs
++++ b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+@@ -65,6 +65,7 @@ const BASE_DOC = `
+ | Deploy <!-- inventory-id: deploy-signature --> | ... | \`deploy\` (\`approve-deploy\`) |
+ | Publication <!-- inventory-id: publication-signature --> | ... | \`publication\` |
+ | Feature-package reconcile <!-- inventory-id: feature-package-reconcile-signature --> | ... | \`feature-package-reconcile\` |
++| Release preflight consent <!-- inventory-id: release-preflight-signature --> | ... | ... |
+ | Governance fork disposition <!-- inventory-id: governance-fork-disposition --> | ... | \`governance-fork-disposition\` |
+ | Critical action <!-- inventory-id: critical-action-family --> | ... | \`critical-action\` |
+ 
+@@ -85,9 +86,10 @@ Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
+ | Inventory id | Disposition | Catalog/template id |
+ |---|---|---|
+ | \`push-signature\` | \`registered\` | \`critical-push-authorize\` |
+-| \`deploy-signature\` | \`legacy-renderer\` | — |
+-| \`publication-signature\` | \`legacy-renderer\` | — |
++| \`deploy-signature\` | \`registered\` | \`critical-deploy-authorize\` |
++| \`publication-signature\` | \`registered\` | \`critical-publication-authorize\` |
+ | \`feature-package-reconcile-signature\` | \`legacy-renderer\` | — |
++| \`release-preflight-signature\` | \`registered\` | \`critical-release-preflight-authorize\` |
+ | \`governance-fork-disposition\` | \`legacy-renderer\` | — |
+ | \`critical-action-family\` | \`abstract-family\` | — |
+ | \`plan-prd-approval\` | \`legacy-renderer\` | — |
+@@ -118,9 +120,10 @@ const BASE_CATALOG = JSON.stringify({
+   schema: "pipeline.human-terminal-action-catalog.v1",
+   entries: [
+     catalogEntry("push-signature", "registered", "critical-push-authorize", "authorize-critical-push"),
+-    catalogEntry("deploy-signature", "legacy-renderer"),
+-    catalogEntry("publication-signature", "legacy-renderer"),
++    catalogEntry("deploy-signature", "registered", "critical-deploy-authorize", "authorize-critical-deploy"),
++    catalogEntry("publication-signature", "registered", "critical-publication-authorize", "authorize-critical-publication"),
+     catalogEntry("feature-package-reconcile-signature", "legacy-renderer"),
++    catalogEntry("release-preflight-signature", "registered", "critical-release-preflight-authorize", "authorize-critical-release-preflight"),
+     catalogEntry("governance-fork-disposition", "legacy-renderer"),
+     catalogEntry("critical-action-family", "abstract-family"),
+     catalogEntry("plan-prd-approval", "legacy-renderer"),
+@@ -171,7 +174,7 @@ test("canonical terminal rows derive their ids from the authorization and non-au
+   assert.deepEqual(
+     extractCanonicalHumanAuthorizationRows(BASE_DOC).map((row) => row.inventoryId),
+     ["push-signature", "deploy-signature", "publication-signature", "feature-package-reconcile-signature",
+-      "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
++      "release-preflight-signature", "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
+       "po-key-setup"],
+   );
+ });
+@@ -243,10 +246,10 @@ test("a missing CRITICAL_ACTION_KINDS declaration is reported as a missing signa
+ });
+ 
+ test("terminal disposition drift and missing catalog coverage fail closed", () => {
+-  const drifted = BASE_DOC.replace("| `deploy-signature` | `legacy-renderer` | — |", "| `deploy-signature` | `excluded` | — |");
++  const drifted = BASE_DOC.replace("| `feature-package-reconcile-signature` | `legacy-renderer` | — |", "| `feature-package-reconcile-signature` | `excluded` | — |");
+   assert.equal(
+     checkAuthGateInventoryDrift(REPO, fixture({ doc: drifted })).findings
+-      .some((finding) => finding.includes("AUTH-GATE-TERMINAL-DISPOSITION-DRIFT deploy-signature")),
++      .some((finding) => finding.includes("AUTH-GATE-TERMINAL-DISPOSITION-DRIFT feature-package-reconcile-signature")),
+     true,
+   );
+   const extra = `${BASE_DOC}\n| \`new-human-action\` | \`excluded\` | — |\n`;
+@@ -282,7 +285,8 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
+   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
+   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
+-    "authorize-critical-push", "po-human-approval-setup",
++    "authorize-critical-deploy", "authorize-critical-publication", "authorize-critical-push",
++    "authorize-critical-release-preflight", "po-human-approval-setup",
+   ]);
+ });
+ 
+@@ -439,7 +443,7 @@ test("published registered/inactive schema branches and runtime reject the same
+   };
+   for (const [field, value] of Object.entries(inactiveValues)) {
+     const changed = structuredClone(base);
+-    changed.entries[1][field] = value;
++    changed.entries.find((entry) => entry.disposition !== "registered")[field] = value;
+     assert.equal(validateHumanTerminalActionCatalog(changed).valid, false, field);
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/human-terminal-action-catalog.mjs b/plugins/pipeline-core/lib/human-terminal-action-catalog.mjs
+index 1ffd6d105..a88e0203f 100644
+--- a/plugins/pipeline-core/lib/human-terminal-action-catalog.mjs
++++ b/plugins/pipeline-core/lib/human-terminal-action-catalog.mjs
+@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
+ 
+ import {
+   PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
++  authorizeCriticalDeployCommand,
++  authorizeCriticalPublicationCommand,
+   authorizeCriticalPushCommand,
++  authorizeCriticalReleasePreflightCommand,
+   poHumanApprovalSetupCommand,
+   readPoHumanApprovalAuthority,
+ } from "../scripts/po-human-approval.mjs";
+@@ -49,6 +52,9 @@ const PLATFORMS = new Set(["posix", "windows"]);
+ // tuple and update both authorities together.
+ const REGISTERED_BOUNDARIES = Object.freeze({
+   "authorize-critical-push": null,
++  "authorize-critical-deploy": null,
++  "authorize-critical-publication": null,
++  "authorize-critical-release-preflight": null,
+   "po-human-approval-setup": PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
+ });
+ 
+@@ -62,6 +68,21 @@ const BUILDERS = Object.freeze({
+     boundary: REGISTERED_BOUNDARIES["authorize-critical-push"],
+     source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+   }),
++  "authorize-critical-deploy": Object.freeze({
++    build: authorizeCriticalDeployCommand,
++    boundary: REGISTERED_BOUNDARIES["authorize-critical-deploy"],
++    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
++  }),
++  "authorize-critical-publication": Object.freeze({
++    build: authorizeCriticalPublicationCommand,
++    boundary: REGISTERED_BOUNDARIES["authorize-critical-publication"],
++    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
++  }),
++  "authorize-critical-release-preflight": Object.freeze({
++    build: authorizeCriticalReleasePreflightCommand,
++    boundary: REGISTERED_BOUNDARIES["authorize-critical-release-preflight"],
++    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
++  }),
+   "po-human-approval-setup": Object.freeze({
+     build: poHumanApprovalSetupCommand,
+     readback: ({ values }) => readPoHumanApprovalAuthority(values),
+diff --git a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+index c6a7b36d0..638168faa 100644
+--- a/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs
+@@ -85,6 +85,19 @@ const deployRequestPath = join(external, "deploy-request.json");
+ const deployProofPath = join(external, "deploy-proof.json");
+ writeFileSync(deployRequestPath, JSON.stringify(deployRequest)); writeFileSync(deployProofPath, JSON.stringify(deployProof));
+ assert.equal(run(["approve-deploy", "--env", deploySubject.environment, "--artifact", deploySubject.artifact, "--by", "PO"], deps), 2);
++// C19-G1 (AC-140): a deploy refused for its proof prints the plugin-built signing line for the SUBJECT that was asked for
++// (here an artifact the signed request does not cover), so the agent relays it instead of hand-assembling the command.
++const wrongDeploySubject = { artifact: "v0.5.1-rc.2", environment: deploySubject.environment };
++const capturedErrors = [];
++const originalConsoleError = console.error;
++console.error = (...parts) => { capturedErrors.push(parts.join(" ")); };
++try {
++  assert.equal(run(["approve-deploy", "--env", wrongDeploySubject.environment, "--artifact", wrongDeploySubject.artifact, "--by", "PO", "--proof-request", deployRequestPath, "--proof-authority", authorityPath, "--proof", deployProofPath], deps), 2);
++} finally { console.error = originalConsoleError; }
++const signingLine = capturedErrors.find((line) => line.startsWith("Signing line for the PO"));
++assert.ok(signingLine, `a refused deploy proof must print the signing line: ${capturedErrors.join(" | ")}`);
++assert.ok(signingLine.includes("authorize-critical"), signingLine);
++assert.ok(signingLine.includes(criticalActionSubjectSha256({ kind: "deploy", candidate, subject: wrongDeploySubject })), "the line carries the digest of the subject that was asked for");
+ assert.equal(run(["approve-deploy", "--env", deploySubject.environment, "--artifact", deploySubject.artifact, "--by", "PO", "--proof-request", deployRequestPath, "--proof-authority", authorityPath, "--proof", deployProofPath], deps), 0);
+ const deployed = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+ assert.equal(deployed.deployApprovals.at(-1).forArtifact, deploySubject.artifact);
+@@ -127,7 +140,13 @@ const publicationProofRequestPath = join(external, "publication-request.json");
+ const publicationProofPath = join(external, "publication-proof.json");
+ writeFileSync(publicationProofRequestPath, JSON.stringify(publicationProofRequest)); writeFileSync(publicationProofPath, JSON.stringify(publicationProof));
+ writeFileSync(publicationRequestPath, JSON.stringify(publicationRequest(0, prepared.publicationStateSha256, approvalInput)));
+-assert.equal(run(["publication-approve", "--request-file", "publication-request.json"], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 2);
++const publicationErrors = [];
++console.error = (...parts) => { publicationErrors.push(parts.join(" ")); };
++try {
++  assert.equal(run(["publication-approve", "--request-file", "publication-request.json"], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 2);
++} finally { console.error = originalConsoleError; }
++// C19-G1 (AC-140): the refused publication prints the plugin-built signing line, not a hand-assembled one.
++assert.ok(publicationErrors.some((line) => line.startsWith("Signing line for the PO") && line.includes("--kind publication") && line.includes("authorize-critical")), publicationErrors.join(" | "));
+ assert.equal(run(["publication-approve", "--request-file", "publication-request.json", "--proof-request", publicationProofRequestPath, "--proof-authority", authorityPath, "--proof", publicationProofPath], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 0);
+ const published = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+ assert.equal(typeof published.publicationCriticalProofs[transactionId]?.proofSha256, "string");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index da1fb610a..b14f87e1f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -546,7 +546,7 @@ import {
+   readHumanApprovalMode,
+ } from "../lib/critical-human-proof-policy.mjs";
+ import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+-import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
++import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import {
+   lifecycleDigest as closeCoordinatorDigest,
+   readCloseCoordinator,
+@@ -3283,6 +3283,23 @@ function publicationReplayMatches(sub, current, expectedRevision, expectedDigest
+   return false;
+ }
+ 
++/**
++ * C19-G1 (AC-140): the exact `authorize-critical` line for a kind whose proof is missing, built by the plugin
++ * (`prepareAuthorizeCriticalLine`) with the subject digest computed from the prepared subject, so the agent relays it
++ * verbatim instead of hand-assembling it. Returns the stderr line, or null when it cannot be built; never signs.
++ */
++function authorizeCriticalLineMessage(dir, base, kind, candidate, subject, deps = {}) {
++  try {
++    const featureId = base?.activeFeature?.id;
++    const plan = base?.activeFeature?.planPath;
++    if (typeof featureId !== "string" || featureId === "" || typeof plan !== "string" || plan === "") return null;
++    const spec = `${dirname(plan).split(sep).join("/")}/spec.md`;
++    const expiresAt = new Date((Date.parse((deps.now ?? (() => new Date().toISOString()))()) || Date.now()) + 3_600_000).toISOString();
++    const prepared = prepareAuthorizeCriticalLine({ kind, candidate, subject, repoRoot: realpathSync(resolve(dir)), featureId, plan, spec, expiresAt });
++    return `Signing line for the PO (plugin-built, relay verbatim; --subject-sha256 ${prepared.subjectSha256} is computed from the prepared ${kind} subject): ${prepared.command}`;
++  } catch { return null; }
++}
++
+ function runPublicationCommand(sub, flags, deps) {
+   const dir = deps.dir ?? projectDir();
+   const request = readContinuityRequest(dir, flags["request-file"]);
+@@ -3371,19 +3388,24 @@ function runPublicationCommand(sub, flags, deps) {
+           if (publicationProofRequired) {
+             if (prior === null) throw new Error("publication proof requires a prepared State projection");
+             const candidate = { commit: prior.candidateOid, tree: prior.candidateTree };
++            const publicationSubject = {
++              transactionId: request.value.transactionId,
++              channel: prior.channel,
++              expectedRevision: expected.value,
++              expectedStateSha256: request.value.expectedStateSha256,
++              input,
++            };
+             const verified = verifyCriticalHumanProof({
+               dir, state: base, kind: "publication", candidate,
+-              subject: {
+-                transactionId: request.value.transactionId,
+-                channel: prior.channel,
+-                expectedRevision: expected.value,
+-                expectedStateSha256: request.value.expectedStateSha256,
+-                input,
+-              },
++              subject: publicationSubject,
+               flags,
+               now: new Date().toISOString(),
+             });
+-            if (!verified.ok) throw new Error(verified.code);
++            if (!verified.ok) {
++              const line = authorizeCriticalLineMessage(dir, base, "publication", candidate, publicationSubject, deps);
++              if (line !== null) console.error(line);
++              throw new Error(verified.code);
++            }
+             criticalProof = verified.proof;
+             criticalProofWaiver = verified.waived ?? null;
+           }
+@@ -13503,7 +13525,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           dir, state: base, kind: "deploy", candidate,
+           subject: { artifact, environment: env }, flags: parsed.value, now: approvedAt,
+         });
+-        if (!verified.ok) { console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`); return 2; }
++        if (!verified.ok) {
++          console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`);
++          const line = authorizeCriticalLineMessage(dir, base, "deploy", { commit: candidate.commit, tree: candidate.tree }, { artifact, environment: env });
++          if (line !== null) console.error(line);
++          return 2;
++        }
+         proof = verified.proof;
+         waiver = verified.waived ?? null;
+       }
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ce75172cf..091919205 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -2084,6 +2084,31 @@ export function authorizeCriticalActionCommand({
+   });
+ }
+ 
++/**
++ * C19-G1 (AC-140): the deploy, publication and release-preflight cases of `authorizeCriticalActionCommand`, one named
++ * builder per kind (the same shape as the push builder), so the agent relays a plugin-built line instead of
++ * hand-formatting a quote-sensitive command. They render only; they never sign or read a key.
++ */
++export function authorizeCriticalDeployCommand(input = {}) {
++  return authorizeCriticalActionCommand({ ...input, kind: "deploy" });
++}
++export function authorizeCriticalPublicationCommand(input = {}) {
++  return authorizeCriticalActionCommand({ ...input, kind: "publication" });
++}
++export function authorizeCriticalReleasePreflightCommand(input = {}) {
++  return authorizeCriticalActionCommand({ ...input, kind: "release-preflight" });
++}
++
++/**
++ * C19-G1: computes the `--subject-sha256` from the prepared candidate and subject (the same
++ * `criticalActionSubjectSha256` the verifier recomputes) and renders the exact line, so no agent ever hand-computes
++ * the digest. Returns the rendering plus the digest and the subject it binds. Never signs, never executes.
++ */
++export function prepareAuthorizeCriticalLine({ kind, candidate, subject, ...rest } = {}) {
++  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
++  return { ...authorizeCriticalActionCommand({ kind, subjectSha256, ...rest }), kind, subjectSha256, subject, candidate };
++}
++
+ function renderAuthorizeCriticalCommand(name, {
+   kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+ }) {
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 321849005..6bbf99e93 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -4580,6 +4580,50 @@ test("N30: authorizeCriticalActionCommand refuses an unknown kind and a missing
+   assert.throws(() => authorizeCriticalPushCommand(pushCommandFixture({ plan: "" })), /authorizeCriticalPushCommand requires a non-empty plan/u);
+ });
+ 
++// AC-140 (C19-G1): deploy, publication and release-preflight get the same plugin-built authorize-critical line
++// as push: kind fixed by the builder, the subject digest computed by the plugin from the prepared subject.
++const C19_G1_KINDS = Object.freeze({
++  deploy: { builder: "authorizeCriticalDeployCommand", catalogId: "deploy-signature", builderId: "authorize-critical-deploy",
++    subject: { artifact: "dist/app.tgz", environment: "staging" } },
++  publication: { builder: "authorizeCriticalPublicationCommand", catalogId: "publication-signature", builderId: "authorize-critical-publication",
++    subject: { transactionId: "tx-1", channel: "stable", expectedRevision: 1, expectedStateSha256: "b".repeat(64), input: {} } },
++  "release-preflight": { builder: "authorizeCriticalReleasePreflightCommand", catalogId: "release-preflight-signature", builderId: "authorize-critical-release-preflight",
++    subject: { version: "1.2.3", lifecycle: { featureId: "cyb-6" } } },
++});
++const C19_G1_CANDIDATE = Object.freeze({ commit: "1".repeat(40), tree: "2".repeat(40) });
++
++for (const [kind, spec] of Object.entries(C19_G1_KINDS)) {
++  test(`AC-140: the ${kind} authorize-critical line is built by the plugin with the kind, a plugin-computed subject digest and a quoted request path`, async () => {
++    const ns = await import("./po-human-approval.mjs");
++    assert.equal(typeof ns[spec.builder], "function", `${spec.builder} must be exported`);
++    assert.equal(typeof ns.prepareAuthorizeCriticalLine, "function", "prepareAuthorizeCriticalLine must be exported");
++    const built = ns[spec.builder](pushCommandFixture());
++    assert.deepEqual(built.argv.slice(1), authorizeCriticalActionCommand({ kind, ...pushCommandFixture() }).argv.slice(1));
++    assert.ok(built.argv.includes(kind) && built.argv[built.argv.indexOf("--kind") + 1] === kind);
++    const prepared = ns.prepareAuthorizeCriticalLine({
++      kind, candidate: C19_G1_CANDIDATE, subject: spec.subject,
++      repoRoot: "/repo root", featureId: "cyb-6", plan: "specs/x y/prd.md", spec: "specs/x/spec.md", expiresAt: "2026-08-10T12:00:00.000Z",
++    });
++    assert.match(prepared.subjectSha256, /^[0-9a-f]{64}$/u);
++    assert.equal(prepared.subjectSha256, criticalActionSubjectSha256({ kind, candidate: C19_G1_CANDIDATE, subject: spec.subject }));
++    assert.equal(prepared.argv[prepared.argv.indexOf("--subject-sha256") + 1], prepared.subjectSha256);
++    assert.equal(prepared.argv[prepared.argv.indexOf("--kind") + 1], kind);
++    assert.match(prepared.command, /'specs\/x y\/prd\.md'/u, "a path with a space is single-quoted");
++    assert.match(prepared.command, new RegExp(`--kind ${kind} `, "u"));
++  });
++
++  test(`AC-140: the human-terminal-action catalog registers ${kind} with builder ${spec.builderId}`, async () => {
++    const catalog = await import("../lib/human-terminal-action-catalog.mjs");
++    const loaded = catalog.loadHumanTerminalActionCatalog();
++    const entry = loaded.entries.find((candidate) => candidate.id === spec.catalogId);
++    assert.equal(entry.disposition, "registered");
++    assert.equal(entry.builderId, spec.builderId);
++    assert.ok(catalog.registeredHumanTerminalActionBuilderIds().includes(spec.builderId));
++    const viaCatalog = catalog.buildRegisteredHumanTerminalAction(spec.builderId, pushCommandFixture());
++    assert.equal(viaCatalog.output.argv[viaCatalog.output.argv.indexOf("--kind") + 1], kind);
++  });
++}
++
+ test("GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory", () => {
+   for (const field of ["launcher", "repoRoot", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
+     assert.throws(
+diff --git a/plugins/pipeline-core/scripts/release-preflight-cli.mjs b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+index afefc3fb2..ca97cd813 100644
+--- a/plugins/pipeline-core/scripts/release-preflight-cli.mjs
++++ b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+@@ -57,6 +57,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { prepareAuthorizeCriticalLine } from "./po-human-approval.mjs";
+ import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+ import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+ import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
+@@ -536,6 +537,45 @@ function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, pr
+   fail("RPC-CONSENT-UNVERIFIED", `the release-preflight consent proof was not verified (${verified.code})`);
+ }
+ 
++function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 }) {
++  const lifecycleInput = readJson(root, lifecyclePath, "lifecycle");
++  const repository = observeRepository(root);
++  const candidate = { commit: repository.headCommit, tree: repository.headTree };
++  const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
++  const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
++  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
++  const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
++  const manifestSha256 = sha256(readFileSync(manifestAbsolute));
++  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
++  const subject = {
++    schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
++    version: candidateVersion,
++    base,
++    lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
++    retentionPolicySha256,
++  };
++  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject };
++}
++
++/**
++ * C19-G1 (AC-140): the exact `authorize-critical` line for the release-preflight consent, built by the plugin. The
++ * `--subject-sha256` is computed from the SAME subject `buildReleasePreflight` verifies the proof against, so it can
++ * never disagree with it. Renders only; never signs, never writes.
++ */
++export function prepareReleasePreflightAuthorizeLine({
++  rootDir = process.cwd(), baseCommit, lifecyclePath, retentionPolicySha256, plan, spec, expiresAt,
++  now = new Date().toISOString(),
++}) {
++  const root = resolve(rootDir);
++  const observed = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
++  const resolvedExpiry = expiresAt ?? new Date((Date.parse(now) || Date.now()) + 3_600_000).toISOString();
++  const prepared = prepareAuthorizeCriticalLine({
++    kind: "release-preflight", candidate: observed.candidate, subject: observed.subject,
++    repoRoot: root, featureId: observed.lifecycleInput.featureId, plan, spec, expiresAt: resolvedExpiry,
++  });
++  return { command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: resolvedExpiry, candidate: observed.candidate };
++}
++
+ export function buildReleasePreflight({
+   rootDir = process.cwd(), preflightId, baseCommit, consentPath = null,
+   proofRequestPath = null, proofPath = null, lifecyclePath, retentionPolicySha256,
+@@ -553,22 +593,9 @@ export function buildReleasePreflight({
+     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
+   }
+ 
+-  const lifecycleInput = readJson(root, lifecyclePath, "lifecycle");
+-  const repository = observeRepository(root);
+-  const candidate = { commit: repository.headCommit, tree: repository.headTree };
+-  const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
+-  const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
+-  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
+-  const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
+-  const manifestSha256 = sha256(readFileSync(manifestAbsolute));
+-  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
+-  const subject = {
+-    schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
+-    version: candidateVersion,
+-    base,
+-    lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
+-    retentionPolicySha256,
+-  };
++  const {
++    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject,
++  } = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
+   const consent = consentPath !== null
+     ? resolveHandSuppliedConsent(root, consentPath)
+     : proofRequestPath !== null
+@@ -658,8 +685,43 @@ function parseArgs(argv) {
+   };
+ }
+ 
++const PRINT_FLAG = "--print-authorize-critical";
++const PRINT_USAGE = `Usage: release-preflight-cli.mjs ${PRINT_FLAG} --base <commit> --lifecycle <path> --retention-policy <sha256> --plan <path> --spec <path> [--expires-at <iso>] [--root <repo>]`;
++
++/**
++ * C19-G1 (AC-140): `--print-authorize-critical` prints the exact `authorize-critical` line the human runs for the
++ * release-preflight consent. It reads and renders only; it writes nothing and never signs.
++ */
++function runPrintAuthorizeCritical(argv) {
++  const value = {};
++  const rest = argv.filter((entry) => entry !== PRINT_FLAG);
++  for (let index = 0; index < rest.length; index += 2) {
++    const flag = rest[index];
++    const next = rest[index + 1];
++    if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) fail("RPC-USAGE", PRINT_USAGE);
++    value[flag] = next;
++  }
++  for (const required of ["--base", "--lifecycle", "--retention-policy", "--plan", "--spec"]) {
++    if (!value[required]) fail("RPC-USAGE", `${required} is required with ${PRINT_FLAG}`);
++  }
++  const prepared = prepareReleasePreflightAuthorizeLine({
++    rootDir: value["--root"] ?? process.cwd(),
++    baseCommit: value["--base"],
++    lifecyclePath: value["--lifecycle"],
++    retentionPolicySha256: value["--retention-policy"],
++    plan: value["--plan"],
++    spec: value["--spec"],
++    expiresAt: value["--expires-at"],
++  });
++  process.stdout.write(`${JSON.stringify({ command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: prepared.expiresAt }, null, 2)}\n`);
++}
++
+ if (isDirectInvocation(import.meta.url)) {
+   try {
++    if (process.argv.slice(2).includes(PRINT_FLAG)) {
++      runPrintAuthorizeCritical(process.argv.slice(2));
++      process.exit(0);
++    }
+     const options = parseArgs(process.argv.slice(2));
+     const built = buildReleasePreflight(options);
+     writeOutput(options.rootDir, options.outPath, built.record);
+diff --git a/plugins/pipeline-core/scripts/release-preflight-cli.test.mjs b/plugins/pipeline-core/scripts/release-preflight-cli.test.mjs
+index 0c3fccc8a..2a1be1e93 100644
+--- a/plugins/pipeline-core/scripts/release-preflight-cli.test.mjs
++++ b/plugins/pipeline-core/scripts/release-preflight-cli.test.mjs
+@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+-import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
++import { ReleasePreflightCliError, buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./release-preflight-cli.mjs";
+ import { READER_REVIEW_PATHS, snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
+ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+ import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
+@@ -734,6 +734,47 @@ try {
+     assert.deepEqual(record.reasons, ["repository-not-clean"]);
+   });
+ 
++  // C19-G1 (AC-140): the agent prints the exact authorize-critical line instead of hand-formatting it.
++  check("RPC22 prepareReleasePreflightAuthorizeLine binds the same subject digest the verifier recomputes", () => {
++    const context = fixture();
++    const prepared = prepareReleasePreflightAuthorizeLine({
++      rootDir: context.base, baseCommit: context.baseCommit, lifecyclePath: "lifecycle.json", retentionPolicySha256: POLICY,
++      plan: "plan.md", spec: "spec.md", expiresAt: "2099-01-01T00:00:00.000Z",
++    });
++    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
++    const expected = criticalActionSubjectSha256({ kind: "release-preflight", candidate, subject: subjectFor(context) });
++    assert.equal(prepared.subjectSha256, expected);
++    assert.ok(prepared.argv.includes("authorize-critical"));
++    assert.ok(prepared.argv.includes(expected), "the line carries the plugin-computed digest");
++    assert.equal(prepared.expiresAt, "2099-01-01T00:00:00.000Z");
++  });
++
++  check("RPC23 --print-authorize-critical prints the line as JSON and writes nothing", () => {
++    const context = fixture();
++    const before = context.git("status", "--porcelain");
++    const result = spawnSync(process.execPath, [
++      CLI_PATH, "--print-authorize-critical", "--base", context.baseCommit, "--lifecycle", "lifecycle.json",
++      "--retention-policy", POLICY, "--plan", "plan.md", "--spec", "spec.md", "--expires-at", "2099-01-01T00:00:00.000Z",
++      "--root", context.base,
++    ], { encoding: "utf8" });
++    assert.equal(result.status, 0, result.stderr);
++    const printed = JSON.parse(result.stdout);
++    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
++    assert.equal(printed.subjectSha256, criticalActionSubjectSha256({ kind: "release-preflight", candidate, subject: subjectFor(context) }));
++    assert.ok(Array.isArray(printed.argv) && printed.argv.includes("authorize-critical"));
++    assert.equal(context.git("status", "--porcelain"), before, "the print mode must not write into the repository");
++  });
++
++  check("RPC24 --print-authorize-critical without --plan and --spec is a usage error", () => {
++    const context = fixture();
++    const result = spawnSync(process.execPath, [
++      CLI_PATH, "--print-authorize-critical", "--base", context.baseCommit, "--lifecycle", "lifecycle.json",
++      "--retention-policy", POLICY, "--root", context.base,
++    ], { encoding: "utf8" });
++    assert.equal(result.status, 2, result.stderr);
++    assert.match(result.stderr, /RPC-USAGE/u);
++  });
++
+   console.log(`\nrelease-preflight-cli: ${passed} passed, ${failed} failed`);
+ } finally {
+   for (const entry of roots) rmSync(entry, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+index a5eca4b05..956953ba8 100644
+--- a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
++++ b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+@@ -101,41 +101,192 @@
+       "id": "deploy-signature",
+       "inventoryId": "deploy-signature",
+       "revision": 1,
+-      "purpose": "Record the deploy signature terminal-template disposition",
++      "purpose": "Render the candidate-bound critical deploy authorization command",
+       "audience": "user",
+-      "disposition": "legacy-renderer",
+-      "templateId": null,
+-      "builderId": null,
++      "disposition": "registered",
++      "templateId": "critical-deploy-authorize",
++      "builderId": "authorize-critical-deploy",
+       "producerRefs": [
+-        "plugins/pipeline-core/scripts/po-human-approval.mjs"
++        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalDeployCommand"
+       ],
+       "boundary": null,
+-      "mutation": null,
+-      "requiresPoApproval": null,
+-      "slots": null,
+-      "expectedReadback": null,
+-      "runners": null,
+-      "platforms": null
++      "mutation": true,
++      "requiresPoApproval": true,
++      "slots": [
++        {
++          "name": "repoRoot",
++          "type": "absolute-directory",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Repository root"
++        },
++        {
++          "name": "directory",
++          "type": "absolute-directory",
++          "source": "human-input",
++          "required": true,
++          "sensitivity": "machine-private",
++          "prompt": "External PO material directory"
++        },
++        {
++          "name": "featureId",
++          "type": "safe-id",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Active feature id"
++        },
++        {
++          "name": "plan",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approved plan path"
++        },
++        {
++          "name": "spec",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Bound specification path"
++        },
++        {
++          "name": "subjectSha256",
++          "type": "sha256",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Prepared deploy subject digest"
++        },
++        {
++          "name": "expiresAt",
++          "type": "iso8601",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approval expiry"
++        },
++        {
++          "name": "launcher",
++          "type": "absolute-file",
++          "source": "tool-result",
++          "required": false,
++          "sensitivity": "machine-private",
++          "prompt": "Installed approval driver"
++        }
++      ],
++      "expectedReadback": {
++        "schema": null,
++        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
++        "command": "verify-critical"
++      },
++      "runners": [
++        "claude",
++        "codex",
++        "antigravity"
++      ],
++      "platforms": [
++        "posix"
++      ]
+     },
+     {
+       "id": "publication-signature",
+       "inventoryId": "publication-signature",
+       "revision": 1,
+-      "purpose": "Record the publication signature terminal-template disposition",
++      "purpose": "Render the candidate-bound critical publication authorization command",
+       "audience": "user",
+-      "disposition": "legacy-renderer",
+-      "templateId": null,
+-      "builderId": null,
++      "disposition": "registered",
++      "templateId": "critical-publication-authorize",
++      "builderId": "authorize-critical-publication",
+       "producerRefs": [
++        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalPublicationCommand",
+         "plugins/pipeline-core/scripts/pipeline-state.mjs#runPublicationCommand"
+       ],
+       "boundary": null,
+-      "mutation": null,
+-      "requiresPoApproval": null,
+-      "slots": null,
+-      "expectedReadback": null,
+-      "runners": null,
+-      "platforms": null
++      "mutation": true,
++      "requiresPoApproval": true,
++      "slots": [
++        {
++          "name": "repoRoot",
++          "type": "absolute-directory",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Repository root"
++        },
++        {
++          "name": "directory",
++          "type": "absolute-directory",
++          "source": "human-input",
++          "required": true,
++          "sensitivity": "machine-private",
++          "prompt": "External PO material directory"
++        },
++        {
++          "name": "featureId",
++          "type": "safe-id",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Active feature id"
++        },
++        {
++          "name": "plan",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approved plan path"
++        },
++        {
++          "name": "spec",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Bound specification path"
++        },
++        {
++          "name": "subjectSha256",
++          "type": "sha256",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Prepared publication subject digest"
++        },
++        {
++          "name": "expiresAt",
++          "type": "iso8601",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approval expiry"
++        },
++        {
++          "name": "launcher",
++          "type": "absolute-file",
++          "source": "tool-result",
++          "required": false,
++          "sensitivity": "machine-private",
++          "prompt": "Installed approval driver"
++        }
++      ],
++      "expectedReadback": {
++        "schema": null,
++        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
++        "command": "verify-critical"
++      },
++      "runners": [
++        "claude",
++        "codex",
++        "antigravity"
++      ],
++      "platforms": [
++        "posix"
++      ]
+     },
+     {
+       "id": "feature-package-reconcile-signature",
+@@ -161,21 +312,97 @@
+       "id": "release-preflight-signature",
+       "inventoryId": "release-preflight-signature",
+       "revision": 1,
+-      "purpose": "Record the release preflight signature terminal-template disposition",
++      "purpose": "Render the candidate-bound critical release-preflight consent authorization command",
+       "audience": "user",
+-      "disposition": "legacy-renderer",
+-      "templateId": null,
+-      "builderId": null,
++      "disposition": "registered",
++      "templateId": "critical-release-preflight-authorize",
++      "builderId": "authorize-critical-release-preflight",
+       "producerRefs": [
+-        "plugins/pipeline-core/scripts/po-human-approval.mjs"
++        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalReleasePreflightCommand",
++        "plugins/pipeline-core/scripts/release-preflight-cli.mjs#prepareReleasePreflightAuthorizeLine"
+       ],
+       "boundary": null,
+-      "mutation": null,
+-      "requiresPoApproval": null,
+-      "slots": null,
+-      "expectedReadback": null,
+-      "runners": null,
+-      "platforms": null
++      "mutation": true,
++      "requiresPoApproval": true,
++      "slots": [
++        {
++          "name": "repoRoot",
++          "type": "absolute-directory",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Repository root"
++        },
++        {
++          "name": "directory",
++          "type": "absolute-directory",
++          "source": "human-input",
++          "required": true,
++          "sensitivity": "machine-private",
++          "prompt": "External PO material directory"
++        },
++        {
++          "name": "featureId",
++          "type": "safe-id",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Active feature id"
++        },
++        {
++          "name": "plan",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approved plan path"
++        },
++        {
++          "name": "spec",
++          "type": "repo-relative-path",
++          "source": "repository-observation",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Bound specification path"
++        },
++        {
++          "name": "subjectSha256",
++          "type": "sha256",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Prepared release-preflight subject digest"
++        },
++        {
++          "name": "expiresAt",
++          "type": "iso8601",
++          "source": "tool-result",
++          "required": true,
++          "sensitivity": "public",
++          "prompt": "Approval expiry"
++        },
++        {
++          "name": "launcher",
++          "type": "absolute-file",
++          "source": "tool-result",
++          "required": false,
++          "sensitivity": "machine-private",
++          "prompt": "Installed approval driver"
++        }
++      ],
++      "expectedReadback": {
++        "schema": null,
++        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
++        "command": "verify-critical"
++      },
++      "runners": [
++        "claude",
++        "codex",
++        "antigravity"
++      ],
++      "platforms": [
++        "posix"
++      ]
+     },
+     {
+       "id": "governance-fork-disposition",
