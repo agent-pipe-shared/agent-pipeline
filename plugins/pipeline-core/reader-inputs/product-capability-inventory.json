@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "57fc112f564dfd9bb712830012ced2ca2cdef46d",
-    "tree": "aec13ff2212b9549eee1c015180e0d858f06a359"
+    "commit": "7281e012cd6a791e54d3931034b457730cc3f720",
+    "tree": "777e725fb60eeb8247b9cb70789c43ce840dd172"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -359,6 +359,7 @@
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-drift-exits-tests",
         "verify-phase:harness/scripts/verify.mjs:control-placement-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
@@ -459,6 +460,7 @@
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
+        "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
