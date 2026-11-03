@@ -1,0 +1,116 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index ee33ca853..410da6d63 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -19,6 +19,7 @@ import {
+   timingSafeEqual,
+ } from "node:crypto";
+ import { spawnSync } from "node:child_process";
++import { derivePatterns, inspectAddedLines } from "../scripts/check-private-identifiers.mjs";
+ import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+ import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+ import {inspectSourceOwnedControlledMethodDispatchHandle} from "./controlled-continuity-method-dispatch.mjs";
+@@ -7520,7 +7521,7 @@ function intakeGenerateApplyAction(root, planSha256, runner) {
+ }
+ 
+ function buildOnboardingIntakeGeneratePlan({
+-  rootDir, runner, repositoryCapability = "local", spawn = defaultGitSpawn,
++  rootDir, runner, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null,
+ } = {}) {
+   const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+   if (observed.status !== "present") {
+@@ -7578,7 +7579,45 @@ function buildOnboardingIntakeGeneratePlan({
+   const authoringCopy = observeIntakeAuthoringCopyAdmission({
+     root: binding.root, featureId, repositoryCapability, spawn,
+   });
+-  return { ...binding, planSha256, authoringCopy, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner) };
++  const warnings = intakePrivateIdentifierWarnings({ root: binding.root, targets, spawn, patterns: privateIdentifierPatterns });
++  return {
++    ...binding, planSha256, authoringCopy, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner),
++    ...(warnings.length > 0 ? { warnings } : {}),
++  };
++}
++
++// An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
++// (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
++// reports category and target names only, never the matched value. Any failure is silent.
++function intakePrivateIdentifierWarnings({ root, targets, spawn, patterns }) {
++  try {
++    let active = patterns;
++    if (!active) {
++      const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
++      const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
++      const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
++      active = derivePatterns({
++        email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
++      });
++    }
++    const categories = new Set();
++    const matched = [];
++    for (const target of Object.values(targets)) {
++      const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
++      if (found.size === 0) continue;
++      for (const category of found.keys()) categories.add(category);
++      matched.push(basename(target.path));
++    }
++    if (matched.length === 0) return [];
++    return [{
++      code: "INTAKE-PRIVATE-IDENTIFIER",
++      categories: [...categories].sort(),
++      targets: matched,
++      remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
++    }];
++  } catch {
++    return [];
++  }
+ }
+ 
+ // The private authoring copy is admitted ONLY when its path is git-ignored in the target
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index 36a5f1eb3..7db7b1b6e 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -85,6 +85,7 @@ import {
+   validateKickoffGoal,
+ } from "./onboarding-continuity.mjs";
+ import { devNull } from "node:os";
++import { derivePatterns } from "../scripts/check-private-identifiers.mjs";
+ import { bindRealSessionCleanup, startBoundRequester } from "./test-session-cleanup-requester-fixture.mjs";
+ 
+ const cases = [];
+@@ -3917,6 +3918,35 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path
+     assert.equal(readFileSync(absolute, "utf8").includes("this staging file is NOT yet bound as project authority"), false,
+       `${key}: canonical generated artifacts must not claim they are pre-authority staging files`);
+   }
++
++  // AC-108 / E5: a private identifier in the generated text is an early typed warning, never a
++  // refusal, and never changes the bound plan. Patterns are injected, not read from this machine.
++  // The injected pattern is a local pattern on a distinctive token of the text this very project generated, so the
++  // fixture needs no second answer round (a second, different answer round is refused by the intake itself).
++  const sampleLine = plan.targets.designInput.content.split("\n").map((line) => line.trim()).find((line) => line.length >= 12 && !line.startsWith("#") && !line.includes("sha256"));
++  assert.ok(sampleLine, "the generated design-input.md has a plain text line to build a pattern from");
++  const leakedValue = sampleLine.slice(0, 12);
++  const injected = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "local-pattern", value: leakedValue }] });
++  const noMatch = derivePatterns({ home: "", username: "", userProfile: "", email: "no.match.intake@example.invalid" });
++  const cleanPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: noMatch });
++  assert.equal("warnings" in cleanPlan, false, "no match: the result shape is unchanged");
++  const leakPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: injected });
++  const plainPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: [] });
++  assert.equal("warnings" in plainPlan, false);
++  assert.equal(leakPlan.warnings.length, 1);
++  const [warning] = leakPlan.warnings;
++  assert.equal(warning.code, "INTAKE-PRIVATE-IDENTIFIER");
++  assert.deepEqual(warning.categories, ["local-pattern"]);
++  assert.ok(warning.targets.includes("design-input.md"));
++  assert.equal(JSON.stringify(warning).includes(leakedValue), false, "the warning never carries the matched value");
++  assert.match(warning.remedy, /pre-commit/u);
++  assert.equal(leakPlan.planSha256, plainPlan.planSha256);
++  assert.deepEqual(leakPlan.targets, plainPlan.targets);
++  // A detector failure is silent: an early hint, not a gate.
++  const broken = [{ category: "email", expression: { test() { throw new Error("detector failure"); } } }];
++  const failed = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: broken });
++  assert.equal("warnings" in failed, false);
++  assert.equal(failed.planSha256, plainPlan.planSha256);
+ });
+ 
+ // NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
