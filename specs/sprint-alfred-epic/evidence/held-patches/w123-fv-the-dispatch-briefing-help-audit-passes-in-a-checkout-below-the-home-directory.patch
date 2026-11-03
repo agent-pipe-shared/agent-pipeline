@@ -1,0 +1,15 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index e3d4e9a52..d76f49ed6 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -141,7 +141,9 @@ for(const key of ['readFileSync','lstatSync','statSync','existsSync','readdirSyn
+  const original=fs[key];
+  const wrapped=function(path,...args) {
+   const text=String(path);
+-  if(text.startsWith(process.cwd()) || text.startsWith(process.env.HOME) || text.includes('/.git/agent-pipeline/')) { calls.push(key); throw new Error('HELP-FORBIDDEN-IO'); }
++  // Restated 2026-11-03 (candidate 19, QG-04, own hunk; intent kept: help reads no private or project state): the plugin's own source tree is not private state. A
++  // checkout below the real home directory (the usual place) has its plugin root under HOME, so the old HOME prefix test refused the module's own source reads there.
++  if((text.startsWith(process.cwd()) || text.startsWith(process.env.HOME) || text.includes('/.git/agent-pipeline/')) && !text.startsWith(${JSON.stringify(dirname(dirname(SCRIPT)))})) { calls.push(key); throw new Error('HELP-FORBIDDEN-IO'); }
+   return original.call(this,path,...args);
+  };
+  if(original.native) wrapped.native=wrapped;
