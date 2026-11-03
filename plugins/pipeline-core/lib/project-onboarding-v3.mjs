@@ -45,6 +45,7 @@ import {
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   classifyOnboardingContinuity,
+  explainContinuityUnavailable,
   INTAKE_CAPTURE_APPLY_SCHEMA,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
@@ -4173,6 +4174,39 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     });
   }
   if (continuity.status !== "valid") {
+    // AC-115 / C19-G3: a bound PRD, Spec or design input that no longer matches its digest
+    // is lifted by a typed command, so it is never worded as a dead end. The cause is read
+    // beside `continuity` (its pinned shape is untouched); every other cause keeps the
+    // wording below exactly.
+    let driftCode = null;
+    try {
+      driftCode = (fs.explainContinuityUnavailable ?? explainContinuityUnavailable)({
+        rootDir: root,
+        repositoryCapability: repository.mode,
+        spawn: fs.spawnSync,
+      });
+    } catch { driftCode = null; }
+    if (driftCode !== null) {
+      const restoreScript = fileURLToPath(new URL("../scripts/authority-restore.mjs", import.meta.url));
+      return lifecycleResult({
+        status: "continuity-observation-unavailable",
+        root,
+        runner,
+        intent,
+        repository,
+        runtime,
+        continuity: { ...continuity, status: "unavailable" },
+        appServer,
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "continuity_bound_document_drift",
+          `${driftCode}: a bound PRD, Spec or design input no longer matches its recorded digest; this state is not terminal`,
+          "two typed commands lift it: re-submit the plan with `submit-plan --by <name> --profile <epic|feature|mini>` "
+          + "(it rebinds the edited documents), or return the approved bytes with "
+          + `\`node ${restoreScript} restore --root ${root}\`. Do not stop here.`,
+        )],
+      });
+    }
     return lifecycleResult({
       status: "continuity-observation-unavailable",
       root,

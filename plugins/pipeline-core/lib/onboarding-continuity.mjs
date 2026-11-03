@@ -1375,6 +1375,26 @@ export function classifyOnboardingContinuity(options = {}) {
   return observeDetailed(options).continuity;
 }
 
+const BOUND_DOCUMENT_DRIFT_CODES = Object.freeze([
+  "KICKOFF-PROMOTION-AUTHORITY-DRIFT",
+  "KICKOFF-PROMOTION-EVIDENCE-DRIFT",
+]);
+
+/**
+ * Read-only companion to classifyOnboardingContinuity: when the observation is
+ * `unavailable` because a bound PRD, Spec or design input no longer matches its recorded
+ * digest, return that closed cause code; return null for every other case (including a
+ * state that observes fine). The cause travels beside `continuity`, never inside it, so
+ * the digest-bound and pinned `continuity` shape stays byte-identical. A typed command
+ * lifts this state (`submit-plan` rebinds, `authority-restore restore` returns the
+ * approved bytes), so callers must not word it as a dead end.
+ */
+export function explainContinuityUnavailable(options = {}) {
+  const observed = observeDetailed(options);
+  const code = observed.error?.code;
+  return observed.continuity.status === "unavailable" && BOUND_DOCUMENT_DRIFT_CODES.includes(code) ? code : null;
+}
+
 function repairArtifact(root, path, label) {
   const safe = safeRelativePath(path, label);
   const observed = observeOptionalProjectFile(root, safe, label);

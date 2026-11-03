@@ -282,6 +282,9 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath, root) {
       + "without reopening design or editing the file directly.\n"
       + "If an edit gets through anyway (any route that bypasses this refusal), the approval is invalidated: the file no "
       + "longer matches its approved digest and the design lock engages (readiness drops to partial).\n"
+      + "That drift is not a dead end: a typed command lifts it. Re-submit the plan with `submit-plan --by "
+      + "<name> --profile <epic|feature|mini>` (it rebinds the edited documents), or return the approved bytes with "
+      + "the restore command below.\n"
       + "Undo an edit that already happened, with no PO round trip and no new design review: "
       + `\`${restoreCommand}\` restores the exact approved bytes from git (add \`--commit <full sha>\` to name another source) `
       + "and refuses, writing nothing, when those bytes are not the approved ones.\n",
