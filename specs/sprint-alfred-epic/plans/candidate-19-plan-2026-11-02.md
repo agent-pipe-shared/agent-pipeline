@@ -58,6 +58,17 @@ C19-G4 (minor, found while building candidate 19): a Goldfish dispatched on the 
 
 A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, then A6, then B1 when decided. Greenfield findings jump the queue by severity.
 
+## Full Verify 6 on the applied state (2026-11-03)
+
+Clone below the home directory with an `upstream` remote, built by rehearsing `po-apply-0.7-candidate19.sh` (default, without the lean rule) from HEAD `b61d60a87`; 1154 steps, 6565 s, 4 red. Rerun alone, one at a time:
+
+- `codex-pretool-guard-tests`: green alone (272 s); red only inside the full run, so load.
+- `g23-read-help-tests`: green alone (4 s); red inside the full run, cause not isolated. w115 made the suite location-independent, so a remaining interaction with the run is possible; watch it in the next Full Verify.
+- `codex-isolated-critic-protected-preimage-tests`: red, open by design (PO re-pin; never re-pinned by the Elephant).
+- `security-scan`: red, `remote-ambiguous` with two remotes in the clone; open by design (run with `--remote upstream`).
+
+No real finding, so no further held patch. Not covered by this run: main-tree checks, batch Critic (paused), native Windows runs, real Codex/Antigravity runs, hook activation on a real promotion, parallel host commits in a real run, PO acceptance.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
