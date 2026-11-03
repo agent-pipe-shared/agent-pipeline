@@ -206,7 +206,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | E4 | Parallelism: registry concurrency and slicing hint | planned (decided: in 19) | with M1 and E2 |
 | E5 | Private identifier warned at intake, not only at the commit | built (warning in the intake generate plan; the e-mail category itself is not exercised by a test) | w136 |
 | E6 | Wrong hook text about the proof import; ACL repair with a preview; verify command set | text planned; rest planned | Elephant (text); Goldfish (rest) |
-| E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | planned | Elephant (text); guard part with the Windows session |
+| E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | partly built: Goldfish template text (w142), `CDP-PATH` hint (w133); the Critic template is in the pinned preimage and stays unchanged; PowerShell part and the Critic skill receipt note open | Elephant (text); guard part with the Windows session |
 | Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
 | Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | built (exact root path added to the shared scaffold predicate; the onboarding end-to-end suite was not run) | w139 |
 | Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | built (w141, text only; the signed route is not rebuilt) | Elephant (text) |
