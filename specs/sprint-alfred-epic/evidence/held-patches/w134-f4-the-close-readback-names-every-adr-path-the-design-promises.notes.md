@@ -2,6 +2,8 @@
 
 Applies on top of the chain at w133. Criterion binding: AC-108 is the closest existing accepted criterion; the PRD and the Spec are unchanged.
 
+> Chain note: the apply script uses `w134-...rebased.patch`, which is this patch rebuilt on the chain state after w133 (w129b changed the same header comment of `close-quality-readback.mjs`). The original `.patch` applies to the repository HEAD at its own base only. The rebased one was run through `close-quality-readback.test.mjs` (9 of 9) in the rehearsal clone.
+
 ## What it adds
 
 - `lib/close-quality-readback.mjs`: a new injected reader `promisedAdrPaths()` (array of repository-relative ADR paths the design names, or null). Row rule for `adr-decision`, checked before the typed impact:

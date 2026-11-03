@@ -1,0 +1,93 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index ca9e96c8c..c25a74bb3 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -5,12 +5,13 @@
+ //   security-scan         present when both evidence/security-latest.v2.json and its .verdict.json exist (the files check-close-security-completeness.mjs reads).
+ //   adr-decision          the typed architecture impact of the close decides: a decision-added/-superseded impact is present when docs/adr has a record and missing otherwise,
+ //                         any other typed impact is not-applicable, and no impact signal is unknown.
++//                         Before that, every ADR path the design names (promisedAdrPaths) must exist: all there is present, any absent is missing and wins over a not-applicable impact (report-only).
+ //   architecture-fitness  present when the Pipeline State rigorHistory holds an observation for the feature that carries a fitness projection; missing when history is readable without one.
+ //   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
+ //                         When the receipts are readable the row names a PASSING review's report (the last in listing order) and is missing when every report records a fail.
+ //   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
+ // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
+-// handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer. A reader that throws or is not supplied yields "unknown".
++// handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+ import { createHash } from "node:crypto";
+ 
+@@ -43,6 +44,16 @@ function securityRow(readers) {
+ 
+ function adrRow(readers) {
+   const id = "adr-decision";
++  const promised = call(readers.promisedAdrPaths);
++  if (promised.ok && Array.isArray(promised.value) && promised.value.length > 0) {
++    const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
++    if (checks.every((c) => c.found.ok)) {
++      const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
++      return absent.length === 0
++        ? row(id, "present", promised.value.join(", "))
++        : row(id, "missing", null, `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
++    }
++  }
+   const impact = call(readers.architectureImpact);
+   if (!impact.ok || typeof impact.value !== "string") return unknown(id);
+   if (NO_DECISION_IMPACTS.has(impact.value)) return row(id, "not-applicable");
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 367668dad..516f0c80f 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -50,6 +50,25 @@ test("AC-239 adr-decision: present, not-applicable when no decision qualifies, m
+   const unknown = rows(full({ architectureImpact: () => null }))["adr-decision"];
+   assert.equal(unknown.status, "unknown");
+   assert.equal(unknown.remedy, null);
++  // Every ADR path the design names must exist; the check takes precedence over a not-applicable impact (report-only).
++  const promised = ["docs/adr/0001-a.md", "docs/adr/0002-b.md"];
++  const withPromise = (paths, over = {}) => full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => paths, exists: (p) => new Set([...promised.slice(0, 1), ...(over.have ?? [])]).has(p), ...(over.readers ?? {}) });
++  const allThere = rows(withPromise(promised, { have: [promised[1]] }))["adr-decision"];
++  assert.equal(allThere.status, "present");
++  assert.match(String(allThere.evidence), /0001-a\.md/u);
++  assert.match(String(allThere.evidence), /0002-b\.md/u);
++  const gap = rows(withPromise(promised))["adr-decision"];
++  assert.equal(gap.status, "missing");
++  assert.match(gap.remedy, /docs\/adr\/0002-b\.md/u);
++  assert.doesNotMatch(gap.remedy, /0001-a\.md/u);
++  assert.match(gap.remedy, /architecture-decision/u);
++  // Absent, throwing or null reader, and an empty array, leave every existing impact outcome unchanged.
++  for (const reader of [undefined, () => { throw new Error("x"); }, () => null, () => []]) {
++    assert.equal(rows(full({ promisedAdrPaths: reader }))["adr-decision"].status, "present");
++    assert.equal(rows(full({ promisedAdrPaths: reader, architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");
++    assert.equal(rows(full({ promisedAdrPaths: reader, listDir: () => [] }))["adr-decision"].status, "missing");
++    assert.equal(rows(full({ promisedAdrPaths: reader, architectureImpact: () => null }))["adr-decision"].status, "unknown");
++  }
+ });
+ 
+ test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index a33f169d4..05e0872e3 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -38,6 +38,7 @@ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+ import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
++import { loadMapBundle } from "./module-inventory.mjs";
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+@@ -1191,7 +1192,13 @@ function qualityReaders(root) {
+ function readQualityRows(root, coordinator) {
+   const { readers, handoverPath } = qualityReaders(root);
+   const impact = coordinator.architectureImpact ?? null;
+-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact } });
++  // The ADR paths the design records in the module map's adrReferences (architecture/map/*.md); null when the map cannot be read.
++  const promisedAdrPaths = () => {
++    const bundle = loadMapBundle(root);
++    if (!bundle.ok) return null;
++    return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
++  };
++  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
+ }
+ function auditPackageIndex(root, coordinator) {
+   const { readers } = qualityReaders(root);
