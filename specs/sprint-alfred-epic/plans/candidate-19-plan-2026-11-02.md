@@ -56,6 +56,17 @@ Status 2026-11-03: the cheap relief for G3 is held as w117 (cause named, "not te
 
 C19-G4 (minor, found while building candidate 19): a Goldfish dispatched on the clone-slice route cannot land its host commit (`NGHF-PENDING-UNAVAILABLE`, `NGHF-COMMIT-EXCEPTION`); the Elephant verifies the three deliverable files and commits them itself. Not a defect of the delivered work; record for the dispatch tooling.
 
+### C19-G5 analysis: a generated runbook (worked out with the advisor, PO idea 2026-11-03)
+
+- **Map versus position.** `inspect`'s `nextAction` is the agent's current position; the runbook is the whole map of one lifecycle path. Both must be projections of the same state machine, otherwise they drift apart; that shared source is the design driver.
+- **Generated, never authored.** Derived from the lifecycle transitions behind `buildInspectNextAction`, the human terminal action catalog (it already knows agent-eligible and human-only steps and signing subjects), the close coordinator's drive sequence, the typed retry actions of the guards and the evidence producers. A Verify suite regenerates and compares the committed copy (the mechanism of the vendored-canon and template-sync checks). "Kept current" then means the drift test is green.
+- **Format.** Per step the typed action shape the preflight already emits (`executable`/`argv`, `executionBoundary`, `mutation`, `requiresPoApproval`, expected result schema), plus `preconditions` (read-only checks), `evidence` (schema, location, tracked or ignored), `commit` (scope, GIT-03 trailer form) and `signature` (none, or the subject). A path is an ordered step list, an index lists the paths; schema-versioned.
+- **How the link arrives.** Standard commands are stateless and a stuck agent is rarely on its first call, so not "first call": every standard command result carries a small typed `runbook` field (path id, the step id this command sits at, a resolvable plugin-root-relative or repo-relative path, schema, digest). Refusals carry the step id too, which is the C19-G1/G3 fix stated generally: every refusal says where on the map the agent is. The bootstrap `ready` envelope carries the index once.
+- **Scope.** One small runbook per path (start, design to approval, implement and dispatch, close and push), loaded only for the path the agent is on; the bootstrap payload budget (10-15k target, 45k refused) is the constraint.
+- **Build order.** Runner transcripts first, giving the list of states where the runners stuck and `inspect` offered no `nextAction`; then extend `nextAction` and the close drive for those states (C19-G1); only then generate. Generating first would publish a map with the same holes. So C19-G5 depends on C19-G1.
+- **C19-G7 is the same fix from the close side.** The close and push runbook makes the ordering rule an explicit step (every commit before the first signature; a commit after signing voids it) and one prepared signing plan lists all subjects. Check that separates the hypotheses: was each of the four signatures preceded by a commit made after the previous signature? If yes, the runner broke the ordering rule, and the immediate workaround is all commits first, then sign once.
+- **Decision tier.** Changing every command's result contract plus a new Verify suite is EL-04 territory (an ADR). Not drafted before the transcript gap list exists.
+
 ## Order of work
 
 A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, then A6, then B1 when decided. Greenfield findings jump the queue by severity.
