@@ -1,0 +1,228 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 8c7482ffc..3c723115a 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -126,6 +126,10 @@ export function parseArchitectureDesign(prd) {
+   requireValue(model?.schema === "pipeline.fitness-model.v1" && model.profileId?.trim() && model.revision === 1
+     && Array.isArray(model.allowedBoundaryCrossings) && model.antiFragmentationPolicy
+     && (model.modules === undefined || Array.isArray(model.modules)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
++  const budgets = model.sizeBudgets;
++  requireValue(budgets === undefined || (budgets !== null && typeof budgets === "object" && !Array.isArray(budgets)
++    && Object.keys(budgets).every(key => ["maxFileLines", "maxModuleLines"].includes(key))
++    && Object.values(budgets).every(value => Number.isInteger(value) && value > 0)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
+   const moduleRows = input.modules.map(module => ({ id: module.id,
+     ownedPaths: module.ownedPaths, allowedDependencies: module.allowedDependencies,
+     authorityEffects: module.authorityEffects, verificationEntryPoints: module.verificationEntryPoints,
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index eb5d08250..6e479afc4 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -105,6 +105,27 @@ test("field-local diagnostics identify the single invalid architecture input", (
+     error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH"
+       && error.field === "fitnessModel.modules[0].ownedPaths");
+ });
++test("fitness model sizeBudgets accepts positive integers, refuses others and is passed through unchanged (AC-108)", () => {
++  const accepted = design();
++  accepted.fitnessModel.sizeBudgets = { maxFileLines: 300, maxModuleLines: 1500 };
++  const parsed = parseArchitectureDesign(prd(accepted));
++  assert.deepEqual(parsed.fitnessModel.sizeBudgets, { maxFileLines: 300, maxModuleLines: 1500 });
++  assert.deepEqual(JSON.parse(architectureDesignTargets(parsed).find(row => row.path === "architecture/fitness-model.json").bytes).sizeBudgets,
++    { maxFileLines: 300, maxModuleLines: 1500 });
++  const partial = design();
++  partial.fitnessModel.sizeBudgets = { maxFileLines: 10 };
++  assert.deepEqual(parseArchitectureDesign(prd(partial)).fitnessModel.sizeBudgets, { maxFileLines: 10 });
++  for (const bad of [0, -1, 1.5, "500"]) {
++    const input = design();
++    input.fitnessModel.sizeBudgets = { maxFileLines: bad };
++    assert.throws(() => parseArchitectureDesign(prd(input)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH", String(bad));
++  }
++  const unknownKey = design();
++  unknownKey.fitnessModel.sizeBudgets = { maxFiles: 5 };
++  assert.throws(() => parseArchitectureDesign(prd(unknownKey)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
++  const without = JSON.parse(architectureDesignTargets(parseArchitectureDesign(prd(design()))).find(row => row.path === "architecture/fitness-model.json").bytes);
++  assert.equal("sizeBudgets" in without, false);
++});
+ function snapshot(root) {
+   const result = {};
+   function visit(directory, prefix = "") {
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.mjs b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+index eb250480e..1bb7dade2 100755
+--- a/plugins/pipeline-core/scripts/architecture-fitness.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+@@ -967,6 +967,71 @@ export function runFitnessQualification({ rootDir = DEFAULT_ROOT, mode = "candid
+   return { ...qualifyFitnessModelRun({ materialization, run, candidateCommit }), materialization };
+ }
+ 
++const DEFAULT_MAX_FILE_LINES = 500;
++const DEFAULT_MAX_MODULE_LINES = 2500;
++
++function countTextLines(absPath) {
++  let buffer;
++  try {
++    if (!fs.statSync(absPath).isFile()) return null;
++    buffer = fs.readFileSync(absPath);
++  } catch { return null; }
++  if (buffer.includes(0)) return null;
++  let count = 0;
++  for (const byte of buffer) if (byte === 10) count += 1;
++  return buffer.length > 0 && buffer[buffer.length - 1] !== 10 ? count + 1 : count;
++}
++
++function listFiles(absDir, relDir, out) {
++  let entries;
++  try { entries = fs.readdirSync(absDir, { withFileTypes: true }); } catch { return; }
++  for (const entry of entries) {
++    if (entry.name === ".git" || entry.name === "node_modules") continue;
++    const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
++    if (entry.isDirectory()) listFiles(path.join(absDir, entry.name), rel, out);
++    else if (entry.isFile()) out.add(rel);
++  }
++}
++
++/**
++ * Advisory size report (never an outcome, finding or part of overallStatus):
++ * lists files and modules over the optional fitness-model sizeBudgets.
++ */
++export function evaluateSizeBudgets({ rootDir = DEFAULT_ROOT, inventory = [], fitnessModel = {} } = {}) {
++  const configured = fitnessModel?.sizeBudgets || {};
++  const budgets = {
++    maxFileLines: configured.maxFileLines ?? DEFAULT_MAX_FILE_LINES,
++    maxModuleLines: configured.maxModuleLines ?? DEFAULT_MAX_MODULE_LINES
++  };
++  const overBudget = [];
++  for (const mod of inventory) {
++    const candidates = new Set();
++    for (const pattern of mod.ownedPaths || []) {
++      const base = pattern.replace(/\\/g, "/").replace(/\/\*\*?$/, "");
++      const abs = path.join(rootDir, base);
++      let stat = null;
++      try { stat = fs.statSync(abs); } catch { /* missing path is skipped */ }
++      if (stat?.isDirectory()) listFiles(abs, base, candidates);
++      else if (stat?.isFile()) candidates.add(base);
++    }
++    let total = 0;
++    for (const rel of [...candidates].sort()) {
++      if (resolveModuleForPath(rel, inventory)?.id !== mod.id) continue;
++      const lines = countTextLines(path.join(rootDir, rel));
++      if (lines === null) continue;
++      total += lines;
++      if (lines > budgets.maxFileLines) {
++        overBudget.push({ module: mod.id, scope: "file", path: rel, lines, budget: budgets.maxFileLines });
++      }
++    }
++    if (total > budgets.maxModuleLines) {
++      overBudget.push({ module: mod.id, scope: "module", path: null, lines: total, budget: budgets.maxModuleLines });
++    }
++  }
++  overBudget.sort((a, b) => a.module.localeCompare(b.module) || String(a.path).localeCompare(String(b.path)));
++  return { budgets, overBudget };
++}
++
+ /**
+  * Main evaluation entry point: evaluates architecture fitness across all 10 property classes.
+  */
+@@ -1174,6 +1239,7 @@ export function evaluateArchitectureFitness(options = {}) {
+       totalClasses: evaluatedOutcomes.length
+     },
+     stalenessDebt: collectedStalenessDebt,
++    sizeBudgetAdvisory: evaluateSizeBudgets({ rootDir, inventory, fitnessModel }),
+     reducedBaseline,
+     timestamp: (now instanceof Date ? now : new Date(now)).toISOString()
+   };
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+index 4a9124e03..e000bf176 100644
+--- a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+@@ -26,6 +26,7 @@ import {
+   evaluateParallelOverlap,
+   evaluateProfileDrift,
+   evaluateCalibratedFrictionThresholds,
++  evaluateSizeBudgets,
+   OUTCOME_PASS,
+   OUTCOME_FINDING,
+   OUTCOME_UNAVAILABLE,
+@@ -57,6 +58,70 @@ it("physical fitness rejects empty and whitespace-only contract and verification
+   } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+ });
+ 
++describe("size budgets are an advisory that never changes the evaluation (AC-108)", () => {
++  const lines = (n) => "x\n".repeat(n);
++  const makeRoot = (files) => {
++    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-size-"));
++    for (const [rel, body] of Object.entries(files)) {
++      fs.mkdirSync(path.dirname(path.join(rootDir, rel)), { recursive: true });
++      fs.writeFileSync(path.join(rootDir, rel), body);
++    }
++    return rootDir;
++  };
++  const inventory = [{ id: "app", ownedPaths: ["src/**"] }, { id: "other", ownedPaths: ["lib/**"] }];
++
++  it("a 501-line file is reported as a file row against the default 500", () => {
++    const rootDir = makeRoot({ "src/big.mjs": lines(501), "src/small.mjs": lines(500) });
++    try {
++      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: {} });
++      assert.deepEqual(res.budgets, { maxFileLines: 500, maxModuleLines: 2500 });
++      assert.deepEqual(res.overBudget, [{ module: "app", scope: "file", path: "src/big.mjs", lines: 501, budget: 500 }]);
++    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
++  });
++
++  it("files that together exceed 2500 lines yield a module row", () => {
++    const files = {};
++    for (let i = 0; i < 6; i += 1) files[`lib/f${i}.mjs`] = lines(450);
++    const rootDir = makeRoot(files);
++    try {
++      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: {} });
++      assert.deepEqual(res.overBudget, [{ module: "other", scope: "module", path: null, lines: 2700, budget: 2500 }]);
++    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
++  });
++
++  it("sizeBudgets overrides one budget and leaves the other default", () => {
++    const rootDir = makeRoot({ "src/a.mjs": lines(11), "src/b.mjs": lines(5) });
++    try {
++      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: { sizeBudgets: { maxFileLines: 10 } } });
++      assert.deepEqual(res.budgets, { maxFileLines: 10, maxModuleLines: 2500 });
++      assert.deepEqual(res.overBudget, [{ module: "app", scope: "file", path: "src/a.mjs", lines: 11, budget: 10 }]);
++    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
++  });
++
++  it("missing and binary files are skipped without throwing", () => {
++    const rootDir = makeRoot({ "src/blob.bin": Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(lines(900))]).toString("latin1") });
++    fs.writeFileSync(path.join(rootDir, "src/blob.bin"), Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(lines(900))]));
++    try {
++      const withMissing = [...inventory, { id: "ghost", ownedPaths: ["nowhere/**", "absent.txt"] }];
++      const res = evaluateSizeBudgets({ rootDir, inventory: withMissing, fitnessModel: {} });
++      assert.deepEqual(res.overBudget, []);
++    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
++  });
++
++  it("the advisory leaves overallStatus, summary and outcomes exactly as they are", () => {
++    const now = new Date("2026-01-01T00:00:00Z");
++    const base = evaluateArchitectureFitness({ rootDir: REPO_ROOT, now });
++    const tight = evaluateArchitectureFitness({ rootDir: REPO_ROOT, now,
++      fitnessModel: { ...loadFitnessModel(REPO_ROOT), sizeBudgets: { maxFileLines: 1, maxModuleLines: 1 } } });
++    assert.ok(tight.sizeBudgetAdvisory.overBudget.length > 0);
++    assert.deepEqual(base.sizeBudgetAdvisory.budgets, { maxFileLines: 500, maxModuleLines: 2500 });
++    assert.equal(tight.overallStatus, base.overallStatus);
++    assert.deepEqual(tight.summary, base.summary);
++    assert.deepEqual(tight.outcomes, base.outcomes);
++    assert.equal(validateAgainstSchema(tight, fitnessEvidenceSchema).valid, true);
++  });
++});
++
+ import * as class9Authority from "../lib/architecture-adoption-authority.mjs";
+ 
+ it("D165-S3: class 9 is evaluable, not unavailable, for a scope that carries the class 9 constant", () => {
+diff --git a/schemas/pipeline.fitness-evidence.v1.json b/schemas/pipeline.fitness-evidence.v1.json
+index 05b28bf46..7c71a057c 100644
+--- a/schemas/pipeline.fitness-evidence.v1.json
++++ b/schemas/pipeline.fitness-evidence.v1.json
+@@ -139,6 +139,9 @@
+     "stalenessDebt": {
+       "type": "array"
+     },
++    "sizeBudgetAdvisory": {
++      "type": "object"
++    },
+     "reducedBaseline": {
+       "type": "object"
+     },
