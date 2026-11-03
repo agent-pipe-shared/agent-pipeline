@@ -176,13 +176,13 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | ID | Item | Status | Patch or route |
 |---|---|---|---|
 | D1 | Runner view maps the `tools:` list to the registry names | built | w126 (real Antigravity smoke run open) |
-| D2a | Receipt of a caller-authored verdict says `freshContext: false` and carries the label | planned | Elephant, with D2b |
-| D2b | A caller-authored verdict satisfies the close gate only at rigor 0 and low risk | planned (decided) | Goldfish slice |
+| D2a | Receipt of a caller-authored verdict says `freshContext: false` and carries the label | built | w135 |
+| D2b | A caller-authored verdict satisfies the close gate only at rigor 0 and low risk | built (decided); the rigor-0 branches are covered by code reading only, because the audit route always has a package at rigor 1 or 2; the risk class has no State source and is read from the authored dispatch records | w137 (needs w135) |
 | D3 | Signatures: dirty-tree check before the ceremony, a signed reconcile commits its own files, no double signature | ADR first (decided: opt-in block) | one ADR with D4b, E3, F1 |
 | D4a | Push threat model materialized in the design phase when a push approval is active | planned | Goldfish slice |
 | D4b | Evidence-only commits carry Verify and Security forward (candidate equality over the product subtree) | ADR first (decided: opt-in block) | one ADR with D3, E3, F1 |
 | D5 | Pre-tool header names the real guard code | built | w127 |
-| D6 | Exact CLI signatures in `happy-path.md` and the close skill | planned | Elephant (doc) |
+| D6 | Exact CLI signatures in `happy-path.md` and the close skill | built (flag sets of the critic preflight and the close transitions; the full generated runbook is G5) | w132 |
 | D7 | GIT-03 refusal prints the accepted form; shell refusal names the bare `node` | built | w130 |
 | D8 | Security scan accepts a repository without a remote as a typed local-only subject; push gate still refuses it | built | w129 (Goldfish; the push-guard suite was run by the Elephant, green) |
 | Q1 | `result.md` status sentence cannot go stale | built | w129a |
@@ -204,7 +204,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | E2 | Fail fast at bootstrap when close or push cannot work on the platform; Windows registry lock cause | planned (decided: in 19) | Goldfish slice (probe); lock cause needs the Windows session |
 | E3 | Evidence loop ordered recipe and carry-forward | ADR first | one ADR with D3, D4b, F1; recipe is the generated runbook (G5) |
 | E4 | Parallelism: registry concurrency and slicing hint | planned (decided: in 19) | with M1 and E2 |
-| E5 | Private identifier warned at intake, not only at the commit | planned | Goldfish slice (small) |
+| E5 | Private identifier warned at intake, not only at the commit | built (warning in the intake generate plan; the e-mail category itself is not exercised by a test) | w136 |
 | E6 | Wrong hook text about the proof import; ACL repair with a preview; verify command set | text planned; rest planned | Elephant (text); Goldfish (rest) |
 | E7 | Template reads as if freehand is allowed; `CDP-PATH` hint; PowerShell inconsistency | planned | Elephant (text); guard part with the Windows session |
 | Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
@@ -219,7 +219,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | F1 | `ARCHITECTURE-DESIGN-RECEIPT-STALE` blocks the next feature | ADR first (decided: opt-in block) | one ADR with D3, D4b, E3 |
 | F2 | Read-only analysis lane while a feature is approved | ADR first (decided: scratch-clone lane) | ADR, then Goldfish slice |
 | F3 | Result record claims no stale state | built | w129a |
-| F4 | ADR promised by the Spec but missing at close | planned | Goldfish slice (small) |
+| F4 | ADR promised by the Spec but missing at close | built, report-only (reads the module map's adrReferences, all modules, not only this feature's) | w134 (rebased patch on the chain) |
 | F4b | Decisions to record are enforced from the design on (PO idea 2026-11-03: none of the three runs wrote an ADR) | planned | Skeleton rubric "decisions to record" (title, trigger, ADR path) that fills the existing `adrReferences` fields, a readiness criterion for the classic triggers (module boundaries, data keeping, offline and error strategy, security trade-off), the F4 close row checking every named path (report-only first, blocking after a measurement), and a runbook step that calls the `architecture-decision` skill when the design is promoted. No schema change |
 | F5 | Attestation versus observation in the receipts | planned | = D2a, D2b |
 | F6 | Close readback names the passing Critic round | built | w129b |
@@ -239,7 +239,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Count now: **built 10 items** (D1, D5, D6, D7, D8, Q1 and F3, F6, Q5, Q7, in patches w126 to w132 with w129a and w129b), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
+Count now: **built 14 items** (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
 PO decisions of 2026-11-03 (second round, all recommendations): (1) rehearse the apply script in a clone now with the existing chain, then add the remaining items in waves and rehearse after each wave; (2) ADR enforcement from the design (F4b) starts report-only; (3) analysis runs in the control directory keep the last five runs and at most seven days, no network policy yet; (4) no Critic carry-forward in the authority ADR (only Verify and Security evidence).
 
