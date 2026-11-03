@@ -1,0 +1,47 @@
+diff --git a/plugins/pipeline-core/lib/critic-required-guardrails.mjs b/plugins/pipeline-core/lib/critic-required-guardrails.mjs
+index 57a26640f..9db2831ca 100644
+--- a/plugins/pipeline-core/lib/critic-required-guardrails.mjs
++++ b/plugins/pipeline-core/lib/critic-required-guardrails.mjs
+@@ -41,10 +41,10 @@ function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0;
+ function normalizePath(value, label) {
+   if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX || value.trim() !== value
+     || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")) {
+-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
+   }
+   if (value.split("/").some((part) => part === "" || part === "." || part === "..")) {
+-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
+   }
+   return value;
+ }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 6240eefbb..66fdd5f4c 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -95,10 +95,10 @@ function isObject(value) { return value !== null && typeof value === "object" &&
+ function normalizePath(value, label) {
+   if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX || value.trim() !== value
+     || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")) {
+-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
+   }
+   if (value.split("/").some((part) => part === "" || part === "." || part === "..")) {
+-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
+   }
+   return value;
+ }
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.mjs b/plugins/pipeline-core/scripts/guard-human-override.mjs
+index f1a90a45e..afaac1ce0 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.mjs
+@@ -513,7 +513,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
+       // channel only; the proof path is never printed into the operator block, whose lines stay
+       // within the copy-safe bound no matter how long the key directory path is.
+       write(hasReadiness ? `${JSON.stringify(output)}\n` : `${JSON.stringify(output, null, 2)}\n`);
+-      writeError(`${signIntent}\n\nThis is the only command you run.\nThe agent imports the signed proof itself.\n`);
++      writeError(`${signIntent}\n\nThis is the only command you run.\nThe agent imports the signed proof itself:\nit runs authorizeBySignatureCommand of the JSON output.\n`);
+       return 0;
+     }
+     if (command === "refreeze-plan") {
