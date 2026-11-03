@@ -17,6 +17,7 @@
 #   w129a the generated result record claims no stale state (F3/Q1, Codex and Claude greenfield)
 #   w129b the critic report readback names the passing review (F6, Codex greenfield)
 #   w130  the commit trailer refusal prints the accepted form and the shell refusal names the bare node spelling (D7, AGY and Codex greenfield)
+#   w131  the shell guard refuses a node script that names the Pipeline control-plane directory (Q5, Claude Windows greenfield; Goldfish slice)
 #   w132  the happy-path guide carries the critic preflight flags and the close transition shape (D6, AGY greenfield)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
@@ -50,6 +51,7 @@ step2 w129-d8-the-security-scan-has-a-typed-local-only-mode-for-a-repository-wit
 step2 w129a-f3-the-generated-result-record-claims-no-stale-state "fix(feature-package): the generated result record no longer claims an implementation state that stays bound after the close"
 step2 w129b-f6-the-critic-report-readback-names-the-passing-review "fix(close): the critic report readback names the passing review, not the first report in listing order"
 step2 w130-d7-guard-refusals-print-the-accepted-trailer-form-and-the-bare-node-spelling "fix(guard): the commit trailer refusal prints the accepted form and the shell refusal names the bare node spelling"
+step2 w131-q5-a-scratch-script-that-names-the-pipeline-control-plane-is-refused "feat(guard): refuse a node script that names the Pipeline control-plane directory"
 step2 w132-d6-the-happy-path-guide-carries-the-critic-preflight-flags-and-the-close-transition-shape "docs(happy-path): carry the flag set of the critic preflight and the shape of the close transitions"
 # The lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. PO decision 2026-11-03: adopt (measured on two past slices,
 # 11 % and 31 % fewer changed lines, indicative). Applied by default; leave out with:  APPLY_LEAN_RULE=0 bash <this script>

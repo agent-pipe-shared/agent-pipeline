@@ -9,14 +9,14 @@ Criterion binding: AC-108 is the closest existing accepted criterion; the PRD an
   (regular file, at most 256 KiB, no symlink at the file or a parent) and refuses the command when the text names the control-plane directory: `.git/agent-pipeline` or `.git\agent-pipeline`, the literal pair `'.git', 'agent-pipeline'`
   (covers `join(`/`resolve(` calls), or a `gitDir`/`git-common-dir` expression combined with a quoted `agent-pipeline` literal.
 - The refusal is typed `GUARD-CONTROLPLANE-SCRIPT`, names the script and the matched spelling, and says what to do: use the sanctioned Pipeline commands, or let a read-only script take the path from a command-line argument.
-- Missing, oversized, symlinked or unreadable scripts are not claimed; scripts under `plugins/pipeline-core/` are exempt. The lane runs for every lifecycle state.
+- Missing, oversized, symlinked or unreadable scripts are not claimed; scripts under `plugins/pipeline-core/` and the one tracked script `scripts/housekeeping.mjs` (exact path; it owns the hook-snapshot cleanup under the control-plane directory) are exempt. Known loophole: an agent that edits an exempt script can use the exemption, so edits to those paths belong under normal review. The lane runs for every lifecycle state.
 - `evaluate.mjs`: one call at the head of the shell-tool block, before the gate-strength lane (two lines plus the import). The command is split on `;`, `&`, `|` and newlines, so a script behind `cd x && node ...` is reached.
 - `control-plane-script-scan.test.mjs` (plain node:test, 9 cases, written RED first: 5 refusal cases failed on the original code) and its entry in `harness/verify-suites.json`.
 
 ## Checks
 
-- New suite: 9 of 9 pass in the clone.
-- `guard-lifecycle-ready.test.mjs` and one neighbouring guard suite: see the dispatch report.
+- New suite: 9 of 9 pass in the clone (including the exact-path exemption and a refused copy of the exempt name).
+- `guard-lifecycle-ready.test.mjs` run alone in the clone: 430 tests, 427 pass, 0 fail, 3 skipped. `lib/guard/po-only-discard-boundary.test.mjs` run alone: 8 of 8 pass.
 - `w131-...check.test.mjs`: the patch exists, applies to the real HEAD and touches only the four files.
 
 ## Not changed / not proven

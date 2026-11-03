@@ -17,10 +17,10 @@ index c37445a14..a826220b2 100644
        "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
 diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
 new file mode 100644
-index 000000000..98cc35c33
+index 000000000..036e77684
 --- /dev/null
 +++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,85 @@
 +// SPDX-License-Identifier: SUL-1.0
 +// C19-Q5 (AC-108): static scan of a repository-local node script for the Pipeline control-plane directory.
 +// The shell guard cannot see what a script does; it can read the script text. Another interpreter, or a path
@@ -33,6 +33,9 @@ index 000000000..98cc35c33
 +export const MAX_SCANNED_SCRIPT_BYTES = 256 * 1024;
 +const SCRIPT_EXTENSION = /\.(?:mjs|cjs|js)$/u;
 +const EXEMPT_PREFIX = "plugins/pipeline-core/";
++// Exact tracked paths outside the plugin that legitimately own control-plane housekeeping. Known loophole: an
++// agent that edits an exempt script can use the exemption, so edits to these paths belong under normal review.
++const EXEMPT_PATHS = new Set(["scripts/housekeeping.mjs"]);
 +const SPELLINGS = [
 +  /\.git[\\/]+agent-pipeline/u,
 +  /['"`]\.git['"`]\s*,\s*['"`]agent-pipeline['"`]/u,
@@ -72,7 +75,7 @@ index 000000000..98cc35c33
 +    const rel = relative(root, file);
 +    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
 +    const posixRel = rel.split(sep).join("/");
-+    if (posixRel.startsWith(EXEMPT_PREFIX)) return null;
++    if (posixRel.startsWith(EXEMPT_PREFIX) || EXEMPT_PATHS.has(posixRel)) return null;
 +    const stat = lstatSync(file);
 +    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_SCANNED_SCRIPT_BYTES) return null;
 +    if (realpathSync(file) !== join(realpathSync(root), rel)) return null;
@@ -105,10 +108,10 @@ index 000000000..98cc35c33
 +}
 diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
 new file mode 100644
-index 000000000..a5806d002
+index 000000000..5f9fca4a8
 --- /dev/null
 +++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,89 @@
 +// SPDX-License-Identifier: SUL-1.0
 +// C19-Q5 (AC-108): a node script that names the Pipeline control-plane directory is refused by the shell guard.
 +// Plain node:test file; fixtures are real files in a private temp project root, nothing is executed.
@@ -177,6 +180,11 @@ index 000000000..a5806d002
 +test("a script under plugins/pipeline-core/ is exempt", () => {
 +  put("plugins/pipeline-core/scripts/sanctioned.mjs", "const p = '.git/agent-pipeline/x';\n");
 +  assert.ok(!refused(run("node plugins/pipeline-core/scripts/sanctioned.mjs")));
++  // the one tracked script outside the plugin that owns control-plane housekeeping is exempt by exact path only
++  put("scripts/housekeeping.mjs", "const p = '.git/agent-pipeline/x';\n");
++  assert.ok(!refused(run("node scripts/housekeeping.mjs")));
++  put("scripts/housekeeping-copy.mjs", "const p = '.git/agent-pipeline/x';\n");
++  assert.ok(refused(run("node scripts/housekeeping-copy.mjs")));
 +});
 +
 +test("an absolute node path and an absolute script path run the same scan", () => {
