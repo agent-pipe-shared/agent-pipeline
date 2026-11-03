@@ -191,7 +191,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Q4 | One module, no parallel slices | see M1 | M1 |
 | Q5 | Control-plane write by a `node scratch/*.mjs` helper | built (decided: guard now) | w131 in the apply script (static scan; exact-path exemption for `scripts/housekeeping.mjs`; other interpreters stay a known limit) |
 | Q6 | `adoption-required` shown for a one-module feature | no action (informational) | after M1 it disappears for a split design |
-| M1.1 | Design skeleton with several modules and a cut rule | planned | Elephant (small) |
+| M1.1 | Design skeleton with several modules and a cut rule | built as a cut rule in the skeleton comment (the skeleton keeps one example module; no generated multi-module layout) | w140 |
 | M1.2 | Decomposition criterion in the readiness review and design guidance | planned (decided: in 19) | Goldfish slice |
 | M1.3 | `sizeBudgets` in the fitness model, reported not blocking | planned (decided: in 19) | Goldfish slice |
 | M1.4 | Slices follow modules (parallel dispatch) | planned | with M1.2 and the slice planner |
