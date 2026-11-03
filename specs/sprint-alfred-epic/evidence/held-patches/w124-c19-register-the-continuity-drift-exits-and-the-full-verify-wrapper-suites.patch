@@ -1,0 +1,43 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 84a2d8d28..276c75e58 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -359,6 +359,7 @@
+         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
++        "verify-phase:harness/scripts/verify.mjs:continuity-drift-exits-tests",
+         "verify-phase:harness/scripts/verify.mjs:control-placement-tests",
+         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
+         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
+@@ -459,6 +460,7 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
+         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 9d4506756..55b911768 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4446,6 +4446,18 @@
+       "file": "plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs",
+       "invariantPinned": "The host-commit recover command plans read-only and applies one orchestrator commit of exactly the claimed paths only when the plan digest still matches, with the guard-conformant trailers and a pointer to the stop-failure record, and refuses typed with zero effect on a moved head, a staged path, a path outside the allowed paths, no source or a digest mismatch (C18-1b, AC-164)",
+       "nonOverlapNote": "Unique cases: scripts/goldfish-host-commit-recover.mjs and its guard admission; the finalizer suite pins the diagnostics it reads"
++    },
++    {
++      "name": "continuity-drift-exits-tests",
++      "file": "plugins/pipeline-core/lib/continuity-drift-exits.test.mjs",
++      "invariantPinned": "A bound-document drift is worded as a state a typed command lifts: the cause code is carried to the onboarding diagnostic, the text says it is not terminal and names both typed exits (submit-plan and authority-restore restore), and the design-lock denial names the same exits (C19-G3, AC-115)",
++      "nonOverlapNote": "Unique cases: explainContinuityUnavailable and its two consumers (project-onboarding-v3 diagnostic, denial route); the continuity suites keep the observation and promotion contracts"
++    },
++    {
++      "name": "full-verify-wrapper-tests",
++      "file": "scripts/full-verify.test.mjs",
++      "invariantPinned": "The Full Verify wrapper chooses the newest safe run directory for --resume, counts only resumed progress lines and states the resumed count in its summary only when resuming (C19 A5, AC-140)",
++      "nonOverlapNote": "Unique pure-function cases of scripts/full-verify.mjs; the journal behaviour itself is pinned by nova-verify-journal-tests"
+     }
+   ]
+ }
