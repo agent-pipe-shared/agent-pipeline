@@ -63,7 +63,7 @@ A3 and A2 first (both remove noise from every future Full Verify), then A4/A5, t
 Clone below the home directory with an `upstream` remote, built by rehearsing `po-apply-0.7-candidate19.sh` (default, without the lean rule) from HEAD `b61d60a87`; 1154 steps, 6565 s, 4 red. Rerun alone, one at a time:
 
 - `codex-pretool-guard-tests`: green alone (272 s); red only inside the full run, so load.
-- `g23-read-help-tests`: green alone (4 s), red in the full run with `VERIFY-CASE-COMPLETION-DECLARATION`: the suite declares G23C001 to G23C004 (G23C004 came with C18-8), its policy in `harness/verify-suites.json` listed three ids. A real finding, fixed by w125 (one line, applies after w124, rehearsed clean). Not re-measured: `run-cc.mjs` does not read `verify-suites.json` policies (tool follow-up); the next Full Verify is the proof.
+- `g23-read-help-tests`: green alone (4 s), red in the full run with `VERIFY-CASE-COMPLETION-DECLARATION`: the suite declares G23C001 to G23C004 (G23C004 came with C18-8), its policy in `harness/verify-suites.json` listed three ids. A real finding, fixed by w125 (one line, applies after w124, rehearsed clean). Measured with the real parser on the recorded stream: without G23C004 rejected (`VERIFY-CASE-COMPLETION-DECLARATION`), with w125 accepted. Not re-run as a whole Full Verify; `run-cc.mjs` does not read `verify-suites.json` policies (tool follow-up).
 - `codex-isolated-critic-protected-preimage-tests`: red, open by design (PO re-pin; never re-pinned by the Elephant).
 - `security-scan`: red, `remote-ambiguous` with two remotes in the clone; open by design (run with `--remote upstream`).
 

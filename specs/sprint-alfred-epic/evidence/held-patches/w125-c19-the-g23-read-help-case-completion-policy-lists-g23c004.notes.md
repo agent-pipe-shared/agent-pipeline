@@ -6,5 +6,6 @@ Change: one line, `G23C004` added to the `caseIds` of the suite. Nothing else.
 
 Evidence and limits:
 - The patch applies cleanly after w124 (checked in the applied-state clone) and to the repository HEAD.
-- Not re-measured in a Full Verify: the case-completion tool `run-cc.mjs` reads only the augmentation row and the inline policies of `verify.mjs`, not `verify-suites.json`, so it cannot confirm this fix (it reports 0 ids for this suite). The reasoning rests on the red excerpt; the next Full Verify is the proof.
+- Measured with the clone's own parser (`parseVerifyCaseCompletion`) on the recorded stream of the suite (DECLARED G23C001 to G23C004, all four passed): the policy without G23C004 is REJECTED with `VERIFY-CASE-COMPLETION-DECLARATION` (RED), the policy with w125 is accepted (GREEN).
+- Not re-measured in a whole Full Verify. The case-completion tool `run-cc.mjs` reads only the augmentation row and the inline policies of `verify.mjs`, not `verify-suites.json`, so it reports 0 ids for this suite.
 - Tooling follow-up: teach `run-cc.mjs` to read the `caseCompletion` policy of `harness/verify-suites.json`.
