@@ -24,6 +24,8 @@
 #   w135  the receipt of a caller-authored Critic verdict says freshContext false and carries its independence label (D2a, AGY greenfield; Goldfish slice, finished by the Elephant)
 #   w136  the intake design plan warns when its generated text holds a private identifier (E5, Claude Windows greenfield; Goldfish slice, finished by the Elephant)
 #   w137  a caller-authored Critic verdict satisfies the close gate only at rigor 0 and low risk (D2b, PO decision 2026-11-03; Goldfish slice; needs w135)
+#   w139  the onboarding's own .gitattributes is admitted by the draft lifecycle (Q8, Claude Windows greenfield)
+#   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
@@ -67,6 +69,14 @@ step2 w134-f4-the-close-readback-names-every-adr-path-the-design-promises "feat(
 step2 w135-d2a-a-caller-authored-critic-verdict-is-not-recorded-as-a-fresh-context-review "feat(critic): the receipt of a caller-authored verdict says freshContext false and carries its independence label"
 step2 w136-e5-the-intake-design-plan-warns-when-its-text-holds-a-private-identifier "feat(intake): the intake design plan warns when its generated text holds a private identifier"
 step2 w137-d2b-a-caller-authored-critic-verdict-satisfies-the-close-gate-only-at-rigor-0-and-low-risk "feat(close): a caller-authored Critic verdict satisfies the close gate only at rigor 0 and low risk"
+step2 w139-q8-the-onboardings-own-gitattributes-is-admitted-by-the-draft-lifecycle "fix(guard): the onboarding's own .gitattributes is part of the scaffold the draft lifecycle admits"
+# OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
+# independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
+if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then
+  step2 w138-f1-a-closed-predecessors-design-receipt-is-accepted-for-the-next-feature-when-the-design-is-equal "feat(architecture): accept the design receipt of a closed predecessor feature when the design package and every target digest are equal"
+else
+  echo "skipped w138 (authority carry-forward block) because APPLY_AUTHORITY_CARRY is not 1"
+fi
 # The lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. PO decision 2026-11-03: adopt (measured on two past slices,
 # 11 % and 31 % fewer changed lines, indicative). Applied by default; leave out with:  APPLY_LEAN_RULE=0 bash <this script>
 if [ "${APPLY_LEAN_RULE:-1}" != "0" ]; then
