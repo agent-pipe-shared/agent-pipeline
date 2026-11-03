@@ -14,16 +14,25 @@ Three runners in the candidate 18 greenfield tests (PO report 2026-11-03) kept m
 
 Two states of the design package.
 
-1. **draft**: the package paths are registered in State; no digest is bound; ordinary edits are admitted by the guard. `design-input.md` stays immutable once captured (provenance). Readiness reviews, advisories and the Critic preflight bind the digest of the exact bytes they read and become stale when the document changes afterwards (the invariant that holds today after the seal).
-2. **sealed**: one agent-prepared, digest-bound step binds the digests in the same transaction as the approval, so the PO signs one thing. From then on everything stays as today: the lock, `reopen-design`, rebind.
+1. **draft**: the package paths are registered in State; no authority digest is bound; ordinary edits to the PRD and the Spec are admitted by the guard. `design-input.md` stays refused for edits in the draft state as well: its digest is recorded at capture (provenance, in the promotion record, not as an authority digest), and the seal refuses when the bytes differ from that record, so a draft edit cannot launder the provenance. Readiness reviews, advisories and the Critic preflight bind the digest of the exact bytes they read and become stale when the document changes afterwards.
+2. **sealed**: one agent-prepared, digest-bound plan binds the digests in the same transaction as the approval, so the PO signs one thing. From then on everything stays as today: the lock, `reopen-design`, rebind.
 
 The seal replaces the current promotion bind as the point where `continuity.authority` receives digests. Until the seal, `continuity.authority` carries the paths and a `sealed: false` marker.
+
+### The control that replaces the lock (refusal rules, not a label)
+
+"Stale" is not a control by itself. The seal is specified by its refusals, each fail-closed:
+
+- **Seal refuses on a stale review.** The prepared plan lists the digest of every PRD, Spec and design-input byte it seals and the digest each readiness review, advisory and Critic preflight bound. The seal refuses when any bound review digest differs from the bytes being sealed.
+- **Apply refuses on drift since prepare.** The plan carries the digests it was prepared against and the signature covers the plan digest; the apply step re-reads the documents under the writer lock and refuses when any byte differs (the draft admits edits, so nothing else holds the bytes during the signing window).
+- **Readers fail closed.** One shared reader returns `{sealed, digests}`; the readers that are authority-bearing gates (approval, close, release preflight, push and publication subjects, the guard tripwire) refuse on `sealed: false`, with the typed exit "prepare the seal". Only the drift detectors treat a draft as not drifting, and the build plan lists them explicitly. No reader decides its own default for an unsealed package.
+- **Seal trigger by scope.** The late bind applies to packages that need the PRD release (EL-19: rigor >= 1 or risk class high). A package outside that scope has no approval to seal at, so it keeps the bind at the end of onboarding exactly as today.
 
 ## Consequences
 
 - No lock before the approval; one ceremony instead of two; the runner needs no knowledge of the rebind sequence for a draft edit.
-- The bound digests are read in about 70 files (continuity observation, readiness review, design advisory, Critic preflight, close, the guard tripwire). Each reader needs a defined behaviour for an unsealed package. The drift detectors must treat a draft as not drifting.
-- Projects that are already bound stay sealed (migration is the identity).
+- The bound digests are read in about 70 files (continuity observation, readiness review, design advisory, Critic preflight, close, the guard tripwire). They move behind the one shared reader above; the build plan counts and lists them (the figure is to be re-measured, not taken from this draft).
+- Already bound projects: bound and approved projects are sealed (migration is the identity). Bound but not yet approved projects stay under the old rule, locked, until their approval, which then seals as usual; they are not labelled sealed without an approval.
 - Trust model: between the bind and the seal the guard no longer protects the documents; the protection moves to the digests of the reviews and of the approval. An agent could change the documents between a review and the approval, but the approval signature covers the final bytes and a review of other bytes is stale.
 - Test surface: the continuity, readiness, advisory, close and guard suites and the three-runner happy-path pins.
 
@@ -37,8 +46,12 @@ The seal replaces the current promotion bind as the point where `continuity.auth
 1. Is a `sealed: false` marker in `continuity.authority` acceptable to every reader, or does the seal need its own record?
 2. Does the readiness review bind to the digest at request time, or must it be re-requested after any edit? (Proposed: bind at request time, stale on change.)
 3. Should the seal and the approval be one command or two prepared steps? (Proposed: one prepared plan, one signature.)
-4. Is the migration of in-flight draft projects (bound under the old rule, not yet approved) automatic?
+4. Bound but not yet approved projects: stay locked under the old rule until their approval (proposed above), or offer a typed one-way move to the draft state?
+
+## Review record
+
+An independent Critic review (fresh context, review tier, one pass over the first version of this draft) returned five findings, all addressed in this revision: F1 (major) the replacement control was a label, now the refusal rules above; F2 the "already bound stay sealed" contradiction, now stated per bound/approved state; F3 no seal trigger outside EL-19 scope, now stated; F4 the design-input provenance had no mechanism, now the capture record and the seal refusal; F5 the authorship trailer of the first commit named the stage-0 fast path for three files, a form error of the commit (design-phase authoring uses the design trailer), not of the content. The revision is not re-reviewed; a delta review against the first version is the next step if the PO wants the proposal built. Not verified by the Critic: the named commands and the `continuity.authority` shape.
 
 ## Not decided
 
-This draft makes no change to State, the guard or any reader. It needs an independent review (fresh context, ADR-0014 contract) and the PO's decision before any build (EL-04).
+This draft makes no change to State, the guard or any reader. It needs the PO's decision before any build (EL-04).
