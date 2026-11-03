@@ -22,7 +22,7 @@ export const ROUTINE_REPAIRS = Object.freeze([
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
   Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
-  Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate" }),
+  Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate, except while a producer reports a bound member armed or running: it then defers the retirement and reports settledPending.deferred (count, reason); run heal again when nothing is armed" }),
 ]);
 const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
 const SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -152,6 +152,13 @@ export function readSettledPendingPreview(root, deps = {}) {
     const run = (deps.spawn ?? defaultSpawn)(SAR, ["inspect", "--root", resolved], resolved);
     const inspect = run.status === 0 ? parseJson(run.stdout) : null;
     if (inspect === null) return null;
+    return previewSettledPending(commonDir, inspect);
+  } catch { return null; }
+}
+
+/** The read-only computation shared by the briefing preview and the deferral report of heal. */
+function previewSettledPending(commonDir, inspect) {
+  {
     const pendingDir = pendingDirOf(commonDir);
     const { retire } = planSettledPending({ pendingDir, reservations: inspect.reservations });
     const retiring = new Set(retire.flatMap((row) => [row.name]));
@@ -181,7 +188,7 @@ export function readSettledPendingPreview(root, deps = {}) {
       }
     }
     return { settledCount: retire.length, leavingDispatchIds: [...leaving].sort() };
-  } catch { return null; }
+  }
 }
 
 const refuse = (code, reason, next) => ({ ok: false, status: "refused", code, reason, ...(next ? { next } : {}) });
@@ -253,6 +260,7 @@ function autoMoveAsideAdmitted({ settledPending, findings }) {
   if ((settledPending?.keptPending?.length ?? 0) > 0) return "a pending state was kept (unsettled or unreadable), so its Goldfish may still run";
   if ((settledPending?.keptOrphanAuthority?.length ?? 0) > 0) return "an authority record was kept, so heal cannot rule out a live dispatch";
   if (!onlyReconcileRefused(findings)) return "inspect reports a finding other than a reconcile-refused or drifted producer";
+  if (settledPending?.deferred !== undefined) return "the retirement of settled pending states was deferred because a member is armed or running, so a Goldfish is in flight";
   return null;
 }
 const autoMoveAsideReason = (reason) => `heal retired settled pending states and the registry still refuses (namespace drift under an unreleased member); nothing is open or unsettled: ${reason}`.slice(0, 500);
@@ -357,6 +365,17 @@ function retireSettledPending(ctx, inspect) {
   return { retiredPending, keptPending: kept, retiredOrphanAuthority: orphans.retire, keptOrphanAuthority: orphans.kept, retiredStopFailures: stop.retired, keptStopFailures: stop.kept };
 }
 
+/** C19: the in-flight predicate is inspect's own (producer.inFlight counts bound members that are armed or running); it is consumed, not re-defined. */
+const anyMemberInFlight = (inspect) => (inspect?.registry?.producers ?? []).some((row) => Number(row?.inFlight) > 0);
+
+/** C19: nothing moves; reports how many settled pending states, orphaned authority records and stop-failure records a heal with nothing armed would retire. */
+function deferredSettledPending(commonDir, inspect) {
+  const pendingDir = pendingDirOf(commonDir);
+  const preview = previewSettledPending(commonDir, inspect);
+  const count = preview.settledCount + planOrphanAuthority({ pendingDir }).retire.length + preview.leavingDispatchIds.length;
+  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed" } };
+}
+
 /** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
 function releaseOwnerRouteOrphan(spawn, root) {
   try {
@@ -380,7 +399,11 @@ function execute(plan, ctx) {
     try {
       const run = spawn(SAR, ["inspect", "--root", root], root);
       const inspect = run.status === 0 ? parseJson(run.stdout) : null;
-      settledPending = inspect === null ? { skipped: "session-authority-repair inspect did not report, so no pending state was classified" } : retireSettledPending(ctx, inspect);
+      // C19 (AC-127): while any producer reports a bound member armed or running, the retirement is deferred (it drifted the registry
+      // namespace under a sibling dispatch on 2026-11-02); a later heal with nothing armed retires the same states.
+      if (inspect === null) settledPending = { skipped: "session-authority-repair inspect did not report, so no pending state was classified" };
+      else if (anyMemberInFlight(inspect)) settledPending = deferredSettledPending(commonDir, inspect);
+      else settledPending = retireSettledPending(ctx, inspect);
     } catch (error) { settledPending = { skipped: short(error) }; }
     const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
     // D203: a producer still reconcile-refused after heal names the move-aside routine as the next step.

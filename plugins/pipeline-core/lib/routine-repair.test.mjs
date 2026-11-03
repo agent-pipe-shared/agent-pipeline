@@ -342,6 +342,47 @@ test("heal retires settled pending states before its delegate runs, and reports 
   assert.ok(!existsSync(join(commitDir(ap), settled.name)) && existsSync(join(commitDir(ap), ready.name)));
 }));
 
+const driftedIdle = { ...driftedLive, registry: { ...driftedLive.registry, producers: driftedLive.registry.producers.map((row) => ({ ...row, inFlight: 0 })) } };
+// AC-127 / C19: while any producer reports a bound member armed or running, heal does not retire the settled pending states and
+// stop-failure records of OTHER dispatches (the 2026-11-02 namespace drift that blocked the next dispatch); it reports them deferred.
+const armedProducer = { producerId: "native-goldfish", status: "ok", drifted: [], inFlight: 1 };
+const idleProducer = { ...armedProducer, inFlight: 0 };
+const withProducer = (producer, ...reservations) => ({ ...emptyInspect, reservations, registry: { status: "present", producers: [producer], read: { status: "ok" } } });
+
+test("C19: heal with a member armed leaves the settled pending states and stop-failure records in place and reports them deferred; a later heal with nothing armed retires them", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-DONE", { terminal: true });
+  const stopName = writeStopFailure(ap, "5", "D-DONE");
+  const armed = stub(withProducer(armedProducer, rowOf(settled, "integrated-by-commit")));
+  const first = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: armed.spawn, ...SETTLED_DEPS });
+  assert.equal(first.exit, 0, JSON.stringify(first.result));
+  assert.deepEqual(armed.calls.map((call) => call.args[0]), ["inspect", "heal", "inspect"]);
+  assert.ok(existsSync(join(commitDir(ap), settled.name)) && existsSync(join(commitDir(ap), settled.siblings[0])), "the settled pending state stays");
+  assert.ok(existsSync(join(diagDir(ap), stopName)), "the stop-failure record stays");
+  assert.deepEqual(files(join(ap, "session-authority-abandoned")), [], "nothing moved aside by the retirement");
+  assert.equal(first.result.settledPending.retiredPending, undefined);
+  assert.equal(first.result.settledPending.deferred.count, 2);
+  assert.match(first.result.settledPending.deferred.reason, /armed or running/u);
+  assert.match(first.result.settledPending.deferred.reason, /run heal again/u);
+  const idle = stub(withProducer(idleProducer, rowOf(settled, "integrated-by-commit")));
+  const second = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: idle.spawn, ...SETTLED_DEPS });
+  assert.equal(second.exit, 0, JSON.stringify(second.result));
+  assert.equal(second.result.settledPending.deferred, undefined);
+  assert.deepEqual(second.result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+  assert.ok(!existsSync(join(commitDir(ap), settled.name)) && !existsSync(join(diagDir(ap), stopName)));
+}));
+
+test("C19: a deferred retirement is not 'clear' for the automatic move-aside, so a registry that still does not read is not moved aside while a dispatch runs", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-DONE2", { terminal: true });
+  const inFlightDrifted = { ...driftedLive, reservations: [rowOf(settled, "integrated-by-commit")] };
+  const { calls, spawn: base } = stub(inFlightDrifted);
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
+  assert.equal(exit, 2);
+  assert.ok(!calls.some((call) => call.args[0] === "move-aside"), "no move-aside ran");
+  assert.equal(result.autoMoveAside.attempted, false);
+  assert.match(result.autoMoveAside.why, /deferred|armed or running/u);
+  assert.ok(existsSync(join(commitDir(ap), settled.name)), "the settled pending state stays");
+}));
+
 test("the closed list is frozen, names exactly five kinds, and plan refuses everything else without mutating", () => {
   assert.deepEqual(ROUTINE_REPAIRS.map((row) => row.kind), ["heal", "slice-cancel", "stop-failure-aside", "move-aside", "settled-pending-aside"]);
   assert.ok(Object.isFrozen(ROUTINE_REPAIRS) && ROUTINE_REPAIRS.every((row) => Object.isFrozen(row)));
@@ -385,7 +426,8 @@ const healIncompleteSpawn = (base, { moveAside } = {}) => (script, args) => {
 
 test("interim: a heal that ends SAR-HEAL-INCOMPLETE with nothing open or kept moves the registry aside itself, verifies it, and records one ledger line", () => withRepo((root, ap) => {
   const settled = writeNamedPending(ap, "D-AUTO", { terminal: false });
-  const withSettled = { ...driftedLive, reservations: [rowOf(settled, "integrated-by-commit")] };
+  // QG-04 restatement (C19, AC-127): this case is "nothing can be running"; its fixture carried inFlight 1, which now defers the retirement.
+  const withSettled = { ...driftedIdle, reservations: [rowOf(settled, "integrated-by-commit")] };
   const { calls, spawn: base } = stub([withSettled, driftedLive, emptyInspect]);
   const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "retire settled pending states before dispatch" }, { spawn: healIncompleteSpawn(base), ...SETTLED_DEPS });
   assert.equal(exit, 0, JSON.stringify(result));
@@ -440,12 +482,13 @@ test("interim: a heal that fails for another reason, or one that succeeded, neve
 }));
 
 test("interim: when the move-aside itself fails, or the registry still refuses after it, heal reports that and stays refused", () => withRepo((root) => {
+  // QG-04 restatement (C19, AC-127): the auto move-aside is attempted only with nothing in flight; the fixture is the idle variant.
   const refusedMove = { status: 2, stdout: `${JSON.stringify({ status: "refused", code: "SAR-GOLDFISH-ASSERTION", reason: "no" })}\n`, stderr: "" };
-  const failed = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedLive).spawn, { moveAside: refusedMove }), ...SETTLED_DEPS });
+  const failed = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedIdle).spawn, { moveAside: refusedMove }), ...SETTLED_DEPS });
   assert.equal(failed.exit, 2);
   assert.equal(failed.result.autoMoveAside.attempted, true);
   assert.equal(failed.result.autoMoveAside.code, "SAR-GOLDFISH-ASSERTION");
-  const still = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedLive).spawn), ...SETTLED_DEPS });
+  const still = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: healIncompleteSpawn(stub(driftedIdle).spawn), ...SETTLED_DEPS });
   assert.equal(still.exit, 2);
   assert.equal(still.result.autoMoveAside.code, "RR-STILL-REFUSED");
 }));
