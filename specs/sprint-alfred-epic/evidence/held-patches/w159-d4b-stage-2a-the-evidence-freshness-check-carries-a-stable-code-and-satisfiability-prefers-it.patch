@@ -1,0 +1,207 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 05b427d10..5eeb96901 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -449,6 +449,7 @@
+         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
+         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-carry-forward-tests",
++        "verify-phase:harness/scripts/verify.mjs:evidence-freshness-codes-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
+         "verify-phase:harness/scripts/verify.mjs:execution-lane-credential-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 74a2a8c46..af5d6c326 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4501,6 +4501,12 @@
+       "file": "plugins/pipeline-core/lib/record-only-paths.test.mjs",
+       "invariantPinned": "The record-only path set that the production push gate accepts through the release-promotion envelope is byte-identical to the one it had before it moved into its own module and is re-exported unchanged; the two classes the authority carry-forward draft adds are separate and not record-only; the narrower carry-forward decision never accepts a path outside the shared set plus the extension (C19 D4b/E3 stage 2, AC-108)",
+       "nonOverlapNote": "Unique cases: lib/record-only-paths.mjs and the identity of its re-exports; release-promotion-envelope.test.mjs, guard-push-promotion.test.mjs and push-prepare.test.mjs pin the envelope and the push behaviour that use the set"
++    },
++    {
++      "name": "evidence-freshness-codes-tests",
++      "file": "plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs",
++      "invariantPinned": "The push-prepare evidence freshness check carries a stable code next to its unchanged message for a missing, failed and stale record, the push gate satisfiability classification prefers the code and falls back to the prose for a result without one, and a code never overrides a green result (C19 D4b/E3 stage 2a, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/evidence-freshness-codes.mjs b/plugins/pipeline-core/lib/evidence-freshness-codes.mjs
+new file mode 100644
+index 000000000..2c67a1adc
+--- /dev/null
++++ b/plugins/pipeline-core/lib/evidence-freshness-codes.mjs
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Stable codes for the push-gate evidence freshness verdicts (candidate 19, D4b/E3 order of work, step 2a; see
++ * docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md, "Proposed amendment of 2026-11-04").
++ *
++ * The freshness comparison is written out by hand in several places and its failures are free text; a consumer such as
++ * scripts/push-gate-satisfiability.mjs classified them by substring. A code next to the message lets a consumer stop reading prose.
++ * The messages are NOT changed by this module. A result that carries no code (older checkers, injected test doubles) is still
++ * classified by the consumer's prose fallback, so adding a code can only make a classification more exact, never different.
++ */
++
++export const EVIDENCE_FRESHNESS_CODES = Object.freeze({
++  MISSING: "EF-MISSING",
++  EXIT_NOT_ZERO: "EF-EXIT-NOT-ZERO",
++  STALE_COMMIT: "EF-STALE-COMMIT",
++  NOT_PUSH_BOUNDARY: "EF-NOT-PUSH-BOUNDARY",
++});
++
++const STATUS_BY_CODE = Object.freeze({
++  [EVIDENCE_FRESHNESS_CODES.MISSING]: "missing",
++  [EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO]: "verify-failed",
++  [EVIDENCE_FRESHNESS_CODES.STALE_COMMIT]: "stale-commit",
++});
++
++/** The satisfiability status a code stands for, or null when the code is absent, unknown or has no dedicated status. */
++export function satisfiabilityStatusForFreshnessCode(code) {
++  return typeof code === "string" && Object.hasOwn(STATUS_BY_CODE, code) ? STATUS_BY_CODE[code] : null;
++}
+diff --git a/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs b/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs
+new file mode 100644
+index 000000000..a71477539
+--- /dev/null
++++ b/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs
+@@ -0,0 +1,70 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++
++import { EVIDENCE_FRESHNESS_CODES, satisfiabilityStatusForFreshnessCode } from "./evidence-freshness-codes.mjs";
++import { checkEvidenceFreshness } from "../scripts/push-prepare.mjs";
++import { checkVerifyEvidenceBound } from "../scripts/push-gate-satisfiability.mjs";
++
++const scratchRoots = [];
++test.after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, force: true }); });
++
++const HEAD = "a".repeat(40);
++const OTHER = "b".repeat(40);
++
++function evidenceDir(files) {
++  const dir = mkdtempSync(join(tmpdir(), "efc-"));
++  scratchRoots.push(dir);
++  for (const [path, content] of Object.entries(files)) {
++    mkdirSync(dirname(join(dir, path)), { recursive: true });
++    writeFileSync(join(dir, path), content);
++  }
++  return dir;
++}
++
++test("EFC1: the codes are the documented, frozen strings and map to the satisfiability statuses", () => {
++  assert.deepEqual({ ...EVIDENCE_FRESHNESS_CODES }, { MISSING: "EF-MISSING", EXIT_NOT_ZERO: "EF-EXIT-NOT-ZERO", STALE_COMMIT: "EF-STALE-COMMIT", NOT_PUSH_BOUNDARY: "EF-NOT-PUSH-BOUNDARY" });
++  assert.ok(Object.isFrozen(EVIDENCE_FRESHNESS_CODES));
++  assert.equal(satisfiabilityStatusForFreshnessCode("EF-MISSING"), "missing");
++  assert.equal(satisfiabilityStatusForFreshnessCode("EF-EXIT-NOT-ZERO"), "verify-failed");
++  assert.equal(satisfiabilityStatusForFreshnessCode("EF-STALE-COMMIT"), "stale-commit");
++  for (const code of ["EF-NOT-PUSH-BOUNDARY", "EF-UNKNOWN", "", undefined, null, 7, "__proto__", "toString"]) {
++    assert.equal(satisfiabilityStatusForFreshnessCode(code), null, String(code));
++  }
++});
++
++test("EFC2: push-prepare carries the code next to the unchanged message for a missing, failed and stale record", () => {
++  const missing = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", evidenceDir({}), HEAD);
++  assert.equal(missing.ok, false);
++  assert.equal(missing.code, "EF-MISSING");
++  assert.equal(missing.message, "evidence/verify-latest.json is missing or unreadable.");
++  const failed = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", evidenceDir({ "evidence/verify-latest.json": JSON.stringify({ exitCode: 1, commit: HEAD }) }), HEAD);
++  assert.equal(failed.code, "EF-EXIT-NOT-ZERO");
++  assert.equal(failed.message, "evidence/verify-latest.json: exitCode=1 (expected 0).");
++  const stale = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", evidenceDir({ "evidence/verify-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }) }), HEAD);
++  assert.equal(stale.ok, false);
++  assert.equal(stale.code, "EF-STALE-COMMIT");
++  assert.equal(stale.message, `evidence/verify-latest.json: commit="${OTHER}" is stale (HEAD is "${HEAD}").`);
++});
++
++test("EFC3: satisfiability uses the code, and falls back to the prose for a result that has none", () => {
++  const dir = evidenceDir({ "evidence/verify-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }) });
++  const viaCode = checkVerifyEvidenceBound(dir, HEAD, { resolveEvidenceProjectDir: () => dir });
++  assert.equal(viaCode.status, "stale-commit");
++  const proseOnly = (message) => ({ checkEvidenceFreshness: () => ({ ok: false, message, remedy: "r" }), resolveEvidenceProjectDir: () => dir });
++  assert.equal(checkVerifyEvidenceBound(dir, HEAD, proseOnly("evidence/verify-latest.json: commit=\"x\" is stale (HEAD is \"y\").")).status, "stale-commit");
++  assert.equal(checkVerifyEvidenceBound(dir, HEAD, proseOnly("evidence/verify-latest.json is missing or unreadable.")).status, "missing");
++  assert.equal(checkVerifyEvidenceBound(dir, HEAD, proseOnly("evidence/verify-latest.json: exitCode=1 (expected 0).")).status, "verify-failed");
++  assert.equal(checkVerifyEvidenceBound(dir, HEAD, proseOnly("something else")).status, "unknown-failure");
++});
++
++test("EFC4: a wrong code never overrides a green result, and an unknown code falls back to the prose", () => {
++  const dir = evidenceDir({});
++  const ok = checkVerifyEvidenceBound(dir, HEAD, { checkEvidenceFreshness: () => ({ ok: true, code: "EF-STALE-COMMIT", message: "fresh" }), resolveEvidenceProjectDir: () => dir });
++  assert.equal(ok.status, "fresh-and-bound");
++  const unknown = checkVerifyEvidenceBound(dir, HEAD, { checkEvidenceFreshness: () => ({ ok: false, code: "EF-NOPE", message: "x is missing or unreadable." }), resolveEvidenceProjectDir: () => dir });
++  assert.equal(unknown.status, "missing");
++});
+diff --git a/plugins/pipeline-core/scripts/push-gate-satisfiability.mjs b/plugins/pipeline-core/scripts/push-gate-satisfiability.mjs
+index 4d2d95c42..a5501133a 100644
+--- a/plugins/pipeline-core/scripts/push-gate-satisfiability.mjs
++++ b/plugins/pipeline-core/scripts/push-gate-satisfiability.mjs
+@@ -59,6 +59,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
++import { satisfiabilityStatusForFreshnessCode } from "../lib/evidence-freshness-codes.mjs";
+ import {
+   checkCriticalHumanProofPolicy,
+   checkCriticalProofModeConflict,
+@@ -148,7 +149,10 @@ export function checkVerifyEvidenceBound(dir, headCommit, deps = {}) {
+   const evidenceDir = resolveEvidenceDir(dir, deps);
+   const check = checker("verify-evidence-bound", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps);
+   let status;
++  // A typed code wins over the message; a result without one (an older checker, an injected double) is classified by the prose as before.
++  const typed = check.ok ? null : satisfiabilityStatusForFreshnessCode(check.code);
+   if (check.ok) status = "fresh-and-bound";
++  else if (typed !== null) status = typed;
+   else if (check.message.includes("is missing or unreadable")) status = "missing";
+   else if (check.message.includes("exitCode=")) status = "verify-failed";
+   else if (check.message.includes("is stale (HEAD is")) status = "stale-commit";
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index be37e4593..66272e275 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -54,6 +54,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
++import { EVIDENCE_FRESHNESS_CODES } from "../lib/evidence-freshness-codes.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
+@@ -219,8 +220,8 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+   const data = evidenceInput?.data ?? null;
+   const remedy = resolveVerifyRemedy(dir, relPath, deps);
+   const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
+-  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
+-  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
++  if (data === null) return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.MISSING, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
++  if (data.exitCode !== 0) return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
+   if (data.commit !== headCommit) {
+     const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
+     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
+@@ -243,7 +244,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+       if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
+         if (id === "verify-evidence") {
+           if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
+-            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
++            return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+           }
+           return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+         }
+@@ -252,10 +253,10 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+         }
+       }
+     }
+-    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
++    return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
+   }
+   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
+-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
++    return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+   }
+   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
+ }
