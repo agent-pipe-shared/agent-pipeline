@@ -473,6 +473,7 @@
         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+        "verify-phase:harness/scripts/verify.mjs:generate-runbook-tests",
         "verify-phase:harness/scripts/verify.mjs:generate-vendored-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-push-classifier-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",

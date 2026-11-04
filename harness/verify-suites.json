@@ -4483,6 +4483,12 @@
       "file": "plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs",
       "invariantPinned": "The shell guard admits the analysis-run command only by its closed argument shape (--root once, optional --commit HEAD or hex, optional --timeout-seconds 1 to 1800), keeps every other argument shape, script copy and node --test run refused, and the Dev-Plan lane makes no opaque-script candidate of the admitted shape only (C19 F2b, AC-108)",
       "nonOverlapNote": "Unique cases: sanctionedAnalysisRunArgs and its Dev-Plan lane effect; the command itself is pinned by analysis-run-lib-tests and analysis-run-cli-tests"
+    },
+    {
+      "name": "generate-runbook-tests",
+      "file": "plugins/pipeline-core/scripts/generate-runbook.test.mjs",
+      "invariantPinned": "The committed close-path runbook and its index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the generation is deterministic, and every phase of the close requirement table appears exactly once as a step (C19 G5 stage 1, AC-108)",
+      "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs and the two committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
     }
   ]
 }
