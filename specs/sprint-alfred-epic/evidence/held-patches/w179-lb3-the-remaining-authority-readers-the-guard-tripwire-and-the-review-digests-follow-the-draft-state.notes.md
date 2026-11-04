@@ -1,0 +1,42 @@
+# w179-lb3 — the remaining authority readers, the guard tripwire and the review digests follow the draft state (candidate 19c, late-binding build step 3)
+
+Delta on w177 (the clone base is the repository state plus the delivered held patch w177, because both edit the same files). **Apply order: w177 first, then this patch.** `git apply --check` against the repository alone is expected to fail until w177 is applied; against the repository plus w177 it exits 0 (checked in a chain clone).
+
+Criterion binding: AC-108 is the closest existing accepted criterion; this is a fresh bounded attempt under its unchanged Spec text. The PRD and the Spec are unchanged. Design source: `docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md` and the PO decisions of 2026-11-04 (marker `sealed: false` inside `continuity.authority`, a draft binds no digest, a review binds the digest at request time, no deadlock).
+
+Working rule used everywhere: **only a well-formed draft (`readAuthoritySeal(...).status === "draft"`) is branched on.** A sealed package and a state without the marker (including shapes the strict reader would call invalid, such as the path-only guard fixture or an authority with a digest and no path) keep their exact old verdict, because the existing fixtures of those readers use such shapes.
+
+## What it changes
+
+- `lib/guard/denial-route.mjs` (`boundAuthorityDocumentPath`, the GUARD-LIFECYCLE-AUTHORITY-BOUND tripwire; also the predicate `evaluate.mjs` and `scripts/authority-restore.mjs` call): a draft admits ordinary edits to the registered PRD and Spec paths and keeps matching `design-input.md` (sibling of the Spec; its capture digest is provenance and the seal will refuse on a difference). The draft check runs before the design-phase release, which would otherwise admit the design input too. A draft whose design was reopened (`planInvalidation` newer than the submission and approval) releases everything as before, so `reopen-design` stays a real exit. The refusal text already names `reopen-design`. Sealed and unmarked states take the unchanged code path.
+- `lib/continuity-authority-drift.mjs` (`projectContinuityAuthorityDrift`, the drift detector behind `inspect`): a draft is not drifting (status `current`, artifacts in state `unbound`, no recovery). A sealed package keeps its verdict.
+- `lib/runner-native-continuation.mjs`: a draft gets `RNC-UNSEALED` with the exits `prepare-seal`, `reopen-design`.
+- `lib/workflow-writer-preflight.mjs`: the continuity binding and the failover trust check refuse a draft with the new code `WF-CONTINUITY-UNSEALED` (added to `WORKFLOW_WRITER_PREFLIGHT_CODES`).
+- `lib/architecture-design.mjs`: the authority-bearing architecture-design gate refuses a draft with `ARCHITECTURE-DESIGN-AUTHORITY-NOT-SEALED` instead of reading it as a stale digest.
+- `lib/critic-preflight-observer.mjs` (Critic preflight): for a draft the Spec path is still matched against State, no recorded digest is compared (none exists), and the digest of the exact bytes read at request time is returned and recorded in the existing `ownerBinding.specSha256` (no new field). The existing before/after re-read keeps reporting `C1O-SCOPE-STALE` for bytes that differ afterwards, and a later qualification compares the candidate's committed Spec against the bytes bound here (`C1O-SCOPE-BINDING`). Re-requesting binds the new bytes. A sealed package keeps the old digest comparison.
+- `scripts/pipeline-state.mjs`: new local `isDraftAuthority` / `continuityRefusal`. The three PO routes that compare and rewrite bound digests (`PO-REBIND-CONTINUITY`, `PO-DECISION-CONTINUITY`, `PO-ACK-CONTINUITY`) refuse a draft with the unchanged code plus `exits: [prepare-seal, reopen-design]`; `resultBootstrapEligible` (the writer that adds a result digest) refuses a draft. `inspect` uses the drift detector above.
+- Tests: `lib/authority-seal-readers.test.mjs` cases LB3-1 to LB3-7 (guard draft/sealed/unmarked, reopened draft, refusal text, drift detector, native continuation, shared-reader pins); `lib/workflow-writer-preflight.test.mjs` one row; `scripts/observe-critic-preflight.test.mjs` two cases (draft binds and a new request carries the new digest; sealed keeps `C1O-SCOPE-BINDING`).
+
+## The `rg -n "authority\.(prd|spec)"` list (non-test), re-measured
+
+Moved: `lib/guard/denial-route.mjs`, `lib/runner-native-continuation.mjs`, `lib/workflow-writer-preflight.mjs`, `lib/architecture-design.mjs`, `lib/critic-preflight-observer.mjs`, `lib/continuity-authority-drift.mjs` (missed by the regex: it indexes `authority[role]`), `scripts/pipeline-state.mjs` (gates listed above).
+
+Left, with the reason:
+- `scripts/pipeline-state.mjs` result flows (rebind, case migration, bootstrap apply and replay, about 40 hits): they compare `authority.result.sha256` or the PRD/Spec digest with a request, a file hash or a recorded plan, each guarded by a prior hex check or by `authority.result === null`; for a draft the recorded digest is `undefined`, so every comparison fails closed into its existing refusal code and no write follows. Not moved, not unit-tested individually.
+- `scripts/close-coordinator.mjs`, `scripts/publication-close-journal.mjs`: the hits read `observed.authority.prdSha256` / `specDigests` of the coordinator's own observation or journal, not `continuity.authority`; the close gate itself is `beginCloseTransition` / `bindContinuityResultForClose`, moved in w177 (`CS-UNSEALED`).
+- `scripts/authority-restore.mjs` (comment only) and `lib/authority-restore.mjs`: a draft has no approved digest, so the plan already refuses `AUTHORITY-RESTORE-NOT-BOUND` ("edit them normally"); it uses the guard's predicate, which is moved.
+- `scripts/audit-index.mjs` line 162: reads `authority.spec?.path` only; a draft carries the path.
+- `lib/design-advisory-final-approval.mjs`, `lib/rebind-approval.mjs`, `hooks/guard-devplan.mjs` (`state.planApproval.poGateAuthority`, a record that exists only after the approval), `lib/afk-assumption-mode.mjs` (an `instruction.authority` object), `lib/architecture-design.mjs` lines 386-403 (the same approval record), the two `*.fixture.mjs` files (a local `authority` result object): not `continuity.authority` reads. `hooks/guard-devplan.mjs` and `hooks/guard-el01-tripwire.mjs` read no digest of the continuity authority: the first exempts `specs/` and `docs/` before any approval, the second reads only `continuity.authority.spec.path` (present for a draft) to find the risk-class row. Both already admit a PRD or Spec edit in the draft; no code change.
+- `scripts/design-advisory-coordinator.mjs` line 123: compares an authoring dispatch's digests with the continuity digests; a draft can carry no dispatch, so it answers "unbound" as before.
+
+## Where the typed exits point
+
+`prepare-seal` is the next slice (the seal plan and apply); it names a command that is not built yet. `reopen-design` exists and is executable for a draft (w177). No command moves a draft forward in this slice because the seal itself does not exist yet; `submit-plan` still binds by path (w177).
+
+## Not changed / not proven
+
+- Readiness review and design advisory receipts: they bind `planSha256`/`specSha256` through the plan submission and the approval record, which exist only after the submit; no request-time binding against a draft is added here. Only the Critic preflight (the one review module that reads `continuity.authority`) is moved. The seal slice should decide whether a pre-seal readiness review gets its own request-time digest field.
+- `lib/guard-maintenance-window.mjs` `NEVER_LIFTABLE_KERNEL_PATHS` and the threat-model doc are untouched: the only new import edge is to `lib/authority-seal-reader.mjs`, which the delivered closure repair w192 lists. The kernel closure suite is red in the chain clone for exactly the reader module (8 violations) until w192 is applied; this patch adds three more import edges to the same module and no new module.
+- No new suite is created (cases extend the registered `authority-seal-readers-tests` and two existing files), so `harness/verify-suites.json` and the inventory are unchanged.
+- Test-first: the guard, drift detector and native continuation cases were RED against the original code before the first production edit (3 failures in the first run). The workflow-preflight row and the two Critic preflight cases were written after the production edit and run GREEN only (not run RED).
+- No Full Verify and no Critic review; the independent review of the late-binding chain runs after the chain is built.

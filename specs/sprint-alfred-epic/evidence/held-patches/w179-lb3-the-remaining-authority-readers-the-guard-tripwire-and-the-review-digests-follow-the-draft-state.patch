@@ -1,0 +1,472 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index e144476e7..216b13f03 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -3,6 +3,7 @@
+ import { createHash } from "node:crypto";
+ import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
+ import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+@@ -242,6 +243,9 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+     const lifecycle = derivePlanLifecycle(state, observation);
+     requireValue(lifecycle.ok && ["approved", "implementing"].includes(lifecycle.status), "ARCHITECTURE-DESIGN-APPROVAL-STALE");
+     const continuity = state.continuity;
++    // Late binding: an architecture design is an authority-bearing gate after the approval, so a draft package is refused with its own
++    // typed code (exits: prepare-seal, reopen-design) instead of reading as a stale digest.
++    requireValue(readAuthoritySeal(continuity?.authority).status !== "draft", "ARCHITECTURE-DESIGN-AUTHORITY-NOT-SEALED");
+     requireValue(continuity?.featureId === state.activeFeature.id
+       && continuity.authority?.prd?.path === authority.planPath && continuity.authority.prd.sha256 === observation.planSha256
+       && continuity.authority?.spec?.path === authority.specPath && continuity.authority.spec.sha256 === observation.specSha256,
+diff --git a/plugins/pipeline-core/lib/authority-seal-readers.test.mjs b/plugins/pipeline-core/lib/authority-seal-readers.test.mjs
+index b3ea9b88b..90f99c0f8 100644
+--- a/plugins/pipeline-core/lib/authority-seal-readers.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-readers.test.mjs
+@@ -4,10 +4,15 @@
+ // the continuity schema knows the draft state (`sealed: false`, paths without digests) and the core readers of the bound
+ // authority sit on the shared seal reader. Cases are written from the ADR and the PO decisions of 2026-11-04, not from the code.
+ import assert from "node:assert/strict";
+-import { readFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join, resolve } from "node:path";
+ import test from "node:test";
+ 
+ import { AUTHORITY_SEAL_EXITS } from "./authority-seal-reader.mjs";
++import { projectContinuityAuthorityDrift } from "./continuity-authority-drift.mjs";
++import { boundAuthorityDocumentPath, protectedAuthorityDocumentWriteOnly } from "./guard/denial-route.mjs";
++import { buildRunnerNativeContinuationRequest } from "./runner-native-continuation.mjs";
+ import {
+   beginCloseTransition,
+   compareAndSwapContinuity,
+@@ -217,3 +222,109 @@ test("LB2-12 the core readers sit on the shared seal reader and no longer read t
+   assert.doesNotMatch(read("continuity-state.mjs"), /state\.authority\.(prd|spec)\.sha256/u);
+   assert.doesNotMatch(read("continuity-state.mjs"), /current\.authority\.(prd|spec)\.sha256/u);
+ });
++
++// ---- build step 3 (LB3): the remaining readers, the guard tripwire, the drift detector ----
++
++const D = "d".repeat(64);
++
++function withStateFile(state, run) {
++  const root = mkdtempSync(join(tmpdir(), "lb3-"));
++  try {
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state));
++    return run(root, (relative) => resolve(root, relative));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++const DESIGN_INPUT = "specs/feature/design-input.md";
++
++test("LB3-1 the guard admits an ordinary PRD and Spec edit in the draft state and still refuses design-input.md", () => {
++  const draftDesign = { activeFeature: { id: FEATURE, phase: "design" }, planApproved: false, continuity: { authority: draftAuthority() } };
++  withStateFile(draftDesign, (root, abs) => {
++    assert.equal(boundAuthorityDocumentPath(root, abs(PRD)), null);
++    assert.equal(boundAuthorityDocumentPath(root, abs(SPEC)), null);
++    assert.equal(boundAuthorityDocumentPath(root, abs(DESIGN_INPUT)), DESIGN_INPUT);
++  });
++  // the draft rule does not depend on the phase flag: a draft outside the design phase is guarded the same way
++  const draftElsewhere = { activeFeature: { id: FEATURE, phase: "implementation" }, planApproved: true, continuity: { authority: draftAuthority() } };
++  withStateFile(draftElsewhere, (root, abs) => {
++    assert.equal(boundAuthorityDocumentPath(root, abs(PRD)), null);
++    assert.equal(boundAuthorityDocumentPath(root, abs(SPEC)), null);
++    assert.equal(boundAuthorityDocumentPath(root, abs(DESIGN_INPUT)), DESIGN_INPUT);
++  });
++});
++
++test("LB3-2 a draft whose design was reopened releases design-input.md too, so reopen-design is a real exit", () => {
++  const reopened = { activeFeature: { id: FEATURE, phase: "design" }, planApproved: false, planInvalidation: { invalidatedAt: "2026-11-04T10:00:00.000Z" }, continuity: { authority: draftAuthority() } };
++  withStateFile(reopened, (root, abs) => {
++    assert.equal(boundAuthorityDocumentPath(root, abs(DESIGN_INPUT)), null);
++  });
++});
++
++test("LB3-3 the sealed state and a state without the marker are guarded exactly as before", () => {
++  const approved = { activeFeature: { id: FEATURE, phase: "implementation" }, planApproved: true, continuity: { authority: sealedAuthority() } };
++  withStateFile(approved, (root, abs) => {
++    for (const path of [PRD, SPEC, DESIGN_INPUT]) assert.equal(boundAuthorityDocumentPath(root, abs(path)), path);
++    assert.equal(boundAuthorityDocumentPath(root, abs("specs/feature/other.md")), null);
++  });
++  // the pre-existing fixture shape: paths without a marker and without digests is NOT a draft, the old rule applies
++  const unmarked = { activeFeature: { id: FEATURE, phase: "implementation" }, planApproved: true, continuity: { authority: { prd: { path: PRD }, spec: { path: SPEC } } } };
++  withStateFile(unmarked, (root, abs) => {
++    for (const path of [PRD, SPEC, DESIGN_INPUT]) assert.equal(boundAuthorityDocumentPath(root, abs(path)), path);
++  });
++  // a sealed design-phase package that is not approved yet keeps its old release
++  const sealedDesign = { activeFeature: { id: FEATURE, phase: "design" }, planApproved: false, continuity: { authority: sealedAuthority() } };
++  withStateFile(sealedDesign, (root, abs) => {
++    for (const path of [PRD, SPEC, DESIGN_INPUT]) assert.equal(boundAuthorityDocumentPath(root, abs(path)), null);
++  });
++});
++
++test("LB3-4 the refusal of design-input.md in a draft names reopen-design", () => {
++  const refusal = protectedAuthorityDocumentWriteOnly(DESIGN_INPUT, "/project");
++  assert.match(refusal.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u);
++  assert.match(refusal.stderr, /reopen-design/u);
++});
++
++test("LB3-5 a drift detector treats a draft as not drifting and a sealed package keeps its verdict", () => {
++  const observeAll = () => D;
++  const draft = projectContinuityAuthorityDrift(continuity(draftAuthority()), observeAll);
++  assert.equal(draft.status, "current");
++  assert.equal(draft.recovery, null);
++  assert.deepEqual(draft.artifacts.map((entry) => entry.state), ["unbound", "unbound"]);
++  const sealedDrift = projectContinuityAuthorityDrift(continuity(sealedAuthority()), observeAll);
++  assert.equal(sealedDrift.status, "drift");
++  assert.deepEqual(sealedDrift.artifacts.map((entry) => entry.state), ["changed", "changed"]);
++  const sealedCurrent = projectContinuityAuthorityDrift(continuity(sealedAuthority()), (path) => (path === PRD ? A : B));
++  assert.equal(sealedCurrent.status, "current");
++});
++
++test("LB3-7 the remaining readers sit on the shared seal reader", () => {
++  const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
++  for (const relative of [
++    "./guard/denial-route.mjs", "./continuity-authority-drift.mjs", "./runner-native-continuation.mjs", "./workflow-writer-preflight.mjs",
++    "./architecture-design.mjs", "./critic-preflight-observer.mjs", "../scripts/pipeline-state.mjs",
++  ]) {
++    assert.match(read(relative), /from ["'](?:\.\.?\/)+(?:lib\/)?authority-seal-reader\.mjs["']/u, `${relative} imports the shared reader`);
++  }
++  // the PO rebind, decision and acknowledge routes and the result bootstrap refuse a draft with the typed exits
++  const state = read("../scripts/pipeline-state.mjs");
++  assert.match(state, /continuityRefusal\("PO-REBIND-CONTINUITY", state\)/u);
++  assert.match(state, /continuityRefusal\("PO-DECISION-CONTINUITY", state\)/u);
++  assert.match(state, /continuityRefusal\("PO-ACK-CONTINUITY", state\)/u);
++  assert.match(state, /!isDraftAuthority\(continuity\)\s+&& continuity\.authority\.result === null/u);
++});
++
++test("LB3-6 the native continuation request needs a sealed package: a draft gets the typed refusal, a sealed one the old request", () => {
++  const request = (authority) => buildRunnerNativeContinuationRequest({
++    continuationId: "nova-b0", activeFeature: { id: "nova", phase: "implementation" },
++    continuity: { featureId: "nova", revision: 3, blocker: null, queueHead: { packageId: "b0", actionId: "implement" }, authority },
++    runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" }, acceptance: [], evidence: [], progress: [],
++  });
++  const refused = request(draftAuthority());
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "RNC-UNSEALED");
++  assert.deepEqual(refused.exits, BOTH_EXITS);
++  const sealed = request({ prd: { sha256: D }, spec: { sha256: D } });
++  assert.equal(sealed.ok, true);
++  assert.equal(sealed.request.subject.planSha256, D);
++});
+diff --git a/plugins/pipeline-core/lib/continuity-authority-drift.mjs b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+index 653aed1a1..c4f2dffd0 100644
+--- a/plugins/pipeline-core/lib/continuity-authority-drift.mjs
++++ b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+@@ -6,7 +6,9 @@
+  * digests are ever emitted; observer error text is never propagated.
+  */
+ 
+-export const CONTINUITY_AUTHORITY_DRIFT_SCHEMA = "pipeline.continuity-authority-drift.v1";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
++
++export const CONTINUITY_AUTHORITY_DRIFT_SCHEMA ="pipeline.continuity-authority-drift.v1";
+ export const CONTINUITY_AUTHORITY_DRIFT_CODE = "CONTINUITY-AUTHORITY-DRIFT";
+ export const CONTINUITY_AUTHORITY_DRIFT_ROUTE = "continuity-authority-revision-plan";
+ 
+@@ -53,6 +55,18 @@ function observeSafely(observeSha256, path) {
+ }
+ 
+ export function projectContinuityAuthorityDrift(continuity, observeSha256) {
++  // A draft package (late binding, `sealed: false`) records paths and no digest: there is nothing to drift from until the seal.
++  const seal = readAuthoritySeal(continuity.authority);
++  if (seal.status === "draft") {
++    return {
++      schema: CONTINUITY_AUTHORITY_DRIFT_SCHEMA,
++      status: "current",
++      featureId: continuity.featureId,
++      revision: continuity.revision,
++      artifacts: ROLES.map((role) => ({ role, path: seal.paths[role], recordedSha256: null, observedSha256: null, state: "unbound" })),
++      recovery: null,
++    };
++  }
+   const artifacts = ROLES.map((role) => {
+     const recorded = continuity.authority[role];
+     const observed = observeSafely(observeSha256, recorded.path);
+diff --git a/plugins/pipeline-core/lib/critic-preflight-observer.mjs b/plugins/pipeline-core/lib/critic-preflight-observer.mjs
+index 76e001835..e52f359b1 100644
+--- a/plugins/pipeline-core/lib/critic-preflight-observer.mjs
++++ b/plugins/pipeline-core/lib/critic-preflight-observer.mjs
+@@ -6,6 +6,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
+ import { validateContinuityState } from "./continuity-state.mjs";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ 
+ const SOURCE_KEYS = ["schema", "producer", "observationRevision", "stage", "outcome", "code", "candidate", "specSha256"];
+ const STAGES = ["arguments", "request", "candidate", "paths", "inventory", "manifest", "governance", "candidate-files", "evidence", "prior-evidence", "complete"];
+@@ -111,9 +112,12 @@ function ownerSnapshot(root, statePath, specPath) {
+   if (state === null || typeof state !== "object" || Array.isArray(state) || state.activeFeature === null || typeof state.activeFeature !== "object" || Array.isArray(state.activeFeature)
+     || typeof state.activeFeature.id !== "string" || !validateContinuityState(state.continuity, state.activeFeature.id).ok) fail("C1O-SCOPE-UNAVAILABLE");
+   const continuity = state.continuity;
+-  if (continuity.authority.spec.path !== specPath || !DIGEST.test(continuity.authority.spec.sha256)) fail("C1O-SCOPE-BINDING");
++  // Late binding: a draft package records the Spec path and no digest. The review then binds the digest of the exact bytes read here
++  // (returned as specSha256 and recorded in the owner binding), and a difference afterwards is C1O-SCOPE-STALE (re-request the review).
++  const draft = readAuthoritySeal(continuity.authority).status === "draft";
++  if (continuity.authority.spec.path !== specPath || (!draft && !DIGEST.test(continuity.authority.spec.sha256))) fail("C1O-SCOPE-BINDING");
+   const specBytes = boundedFile(root, specPath, "C1O-SCOPE-BINDING"), specSha256 = sha256(specBytes);
+-  if (specSha256 !== continuity.authority.spec.sha256) fail("C1O-SCOPE-BINDING");
++  if (!draft && specSha256 !== continuity.authority.spec.sha256) fail("C1O-SCOPE-BINDING");
+   if (!ID.test(continuity.featureId)) fail("C1O-SCOPE-UNAVAILABLE");
+   const phase = typeof state.activeFeature.phase === "string" && ID.test(state.activeFeature.phase) ? state.activeFeature.phase : null;
+   return { stateBytes, stateSha256: sha256(stateBytes), revision: continuity.revision, specBytes, specSha256, featureId: continuity.featureId, phase };
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index 822cd27dd..9c974ce86 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -7,6 +7,7 @@ import { isSessionCapabilityFailurePhase } from "../codex-onboarding-capabilitie
+ import { placeholder, renderHumanCopySafeCommand } from "../copy-safe-command.mjs";
+ import { consumeHumanGuardOverride, humanGuardRouteUnavailableReason, recordHumanGuardDenial } from "../human-guard-override.mjs";
+ import { readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
++import { readAuthoritySeal } from "../authority-seal-reader.mjs";
+ import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_CREDENTIAL_TARGET_REMEDY, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
+ import { verdict } from "./verdict.mjs";
+@@ -352,8 +353,20 @@ export function boundAuthorityDocumentPath(root, requested) {
+     }
+     if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
+     if (planInvalidationReleasesBinding(state)) return null;
+-    if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
+     const authority = state.continuity?.authority;
++    // Late binding (ADR draft-late-binding-of-prd-and-spec-at-the-approval): a draft package carries paths and no digest, so the PRD and
++    // the Spec are ordinary editable files until the seal. The design input stays guarded: its capture digest is provenance and the seal
++    // refuses on a difference. This check runs before the design-phase release below, which would admit the design input as well.
++    // Only a well-formed draft takes this branch; an unmarked or invalid shape falls through to the unchanged rules.
++    if (readAuthoritySeal(authority).status === "draft") {
++      const designInput = join(dirname(authority.spec.path), "design-input.md");
++      try {
++        return resolve(root, designInput) === requested ? designInput : null;
++      } catch {
++        return null;
++      }
++    }
++    if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
+     if (authority === null || typeof authority !== "object") return null;
+     const prdPath = authority.prd?.path;
+     const specPath = authority.spec?.path;
+diff --git a/plugins/pipeline-core/lib/runner-native-continuation.mjs b/plugins/pipeline-core/lib/runner-native-continuation.mjs
+index f680dc874..da3e0f2ee 100644
+--- a/plugins/pipeline-core/lib/runner-native-continuation.mjs
++++ b/plugins/pipeline-core/lib/runner-native-continuation.mjs
+@@ -8,6 +8,7 @@
+  * prompt.
+  */
+ import { createHash } from "node:crypto";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ 
+ export const RUNNER_NATIVE_CONTINUATION_SCHEMA = "pipeline.runner-native-continuation.v1";
+ export const CONTINUATION_STATES = Object.freeze([
+@@ -152,6 +153,9 @@ export function buildRunnerNativeContinuationRequest({ continuationId, activeFea
+     || !object(continuity) || continuity.featureId !== activeFeature.id || continuity.blocker !== null
+     || !object(continuity.queueHead) || !object(continuity.authority) || !validRunner(runner)
+     || !validAcceptance(acceptance) || !validEvidence(evidence) || !validProgress(progress)) return { ok: false, code: "RNC-SCHEMA" };
++  const seal = readAuthoritySeal(continuity.authority);
++  // A native goal binds the approved plan and Spec digests; a draft package carries none (typed exits: prepare-seal, reopen-design).
++  if (seal.status === "draft") return { ok: false, code: "RNC-UNSEALED", exits: seal.exits };
+   const head = continuity.queueHead;
+   const subject = {
+     featureId: activeFeature.id, phase: activeFeature.phase,
+diff --git a/plugins/pipeline-core/lib/workflow-writer-preflight.mjs b/plugins/pipeline-core/lib/workflow-writer-preflight.mjs
+index bd2525f69..15085c18f 100644
+--- a/plugins/pipeline-core/lib/workflow-writer-preflight.mjs
++++ b/plugins/pipeline-core/lib/workflow-writer-preflight.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Deterministic, provider-neutral workflow dispatch preflight. */
+ import { createHash } from "node:crypto";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ import { validateContinuityState } from "./continuity-state.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE } from "./project-authority.mjs";
+ 
+@@ -251,6 +252,9 @@ function validPhase26Envelope(request, calibration, capabilities) {
+ function validateContinuityBinding(request, state) {
+   const valid = validateContinuityState(state, request.continuityBinding.featureId);
+   if (!valid.ok) return "WF-CONTINUITY-INVALID";
++  // A dispatch binds the authority digests; a draft package (late binding) has none until the seal (exits: prepare-seal, reopen-design).
++  const seal = readAuthoritySeal(state.authority);
++  if (seal.status === "draft") return "WF-CONTINUITY-UNSEALED";
+   const binding = request.continuityBinding;
+   if (binding.queueRevision !== state.revision) return "WF-CONTINUITY-STALE";
+   const head = state.queueHead;
+@@ -386,6 +390,7 @@ function hasStrictNarrowing(request, failover, trusted) {
+ function validateFailoverTrust(request, state, trusted) {
+   const failover = request.failover;
+   if (!validTrustedCoordinatorContext(trusted, request)) return "WF-FAILOVER-TRUST";
++  if (readAuthoritySeal(state.authority).status === "draft") return "WF-CONTINUITY-UNSEALED";
+   if (failover.createdByDuty !== trusted.creator.duty
+     || !sameAuthorityDigests(trusted.creator.authorityDigests, request.continuityBinding.authorityDigests)
+     || trusted.creator.authorityDigests.prdSha256 !== state.authority.prd.sha256
+@@ -637,7 +642,7 @@ export const WORKFLOW_WRITER_PREFLIGHT_CODES = Object.freeze([
+   "WF-MALFORMED", "WF-MODE", "WF-SIDE-EFFECTS", "WF-PATHS", "WF-ISOLATION",
+   "WF-GUARD", "WF-ALLOWLIST", "WF-VERIFY", "WF-ESCALATION", "WF-NO-WRITE",
+   "WF-BOUNDED-CAPABILITY", "WF-ISOLATED-CAPABILITY", "WF-PHASE26-SCHEMA",
+-  "WF-CONTINUITY-INVALID", "WF-CONTINUITY-STALE", "WF-CONTINUITY-HEAD",
++  "WF-CONTINUITY-INVALID", "WF-CONTINUITY-STALE", "WF-CONTINUITY-HEAD", "WF-CONTINUITY-UNSEALED",
+   "WF-ROUTE-BINDING", "WF-GLOBAL-STATE-PROHIBITED", "WF-FAILOVER-SCHEMA",
+   "WF-FAILOVER-TRUST", "WF-FAILOVER-TRUST-READ", "WF-FAILOVER-NARROWING",
+   "WF-FAILOVER-FROZEN", "WF-FAILOVER-IDENTITY", "WF-FAILOVER-STATE",
+diff --git a/plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs b/plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs
+index 42680fd8e..4027afca8 100644
+--- a/plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs
++++ b/plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs
+@@ -289,6 +289,11 @@ for (const [name, mutate, code] of [
+   ["different head", (input) => { input.continuityBinding.actionId = "other-action"; }, "WF-CONTINUITY-HEAD"],
+   ["different authority", (input) => { input.continuityBinding.authorityDigests.prdSha256 = E; }, "WF-CONTINUITY-HEAD"],
+   ["different active duty", (_input, state) => { state.runtime.activeDuty = "Critic"; }, "WF-CONTINUITY-HEAD"],
++  // late binding (LB3): a draft package binds no authority digest, so no dispatch can bind it; the sealed rows above keep their verdicts
++  ["unsealed draft package", (_input, state) => {
++    state.queueHead.dispatch = null; // a draft state can carry no dispatch; it is the only valid draft shape here
++    state.authority = { sealed: false, prd: { path: "specs/prd.md" }, spec: { path: "specs/spec.md" }, result: { path: "specs/result.md" } };
++  }, "WF-CONTINUITY-UNSEALED"],
+   ["delegation request", (input) => { input.mayDelegate = true; }, "WF-PHASE26-SCHEMA"],
+   ["OS isolation assertion", (input) => { input.assurance.osIsolationAsserted = true; }, "WF-PHASE26-SCHEMA"],
+ ]) {
+diff --git a/plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs b/plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs
+index 309811100..130feae3b 100644
+--- a/plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs
+@@ -7,6 +7,7 @@ import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync,
+ import { join } from "node:path";
+ import test from "node:test";
+ import { runObservedCriticPreflight } from "./observe-critic-preflight.mjs";
++import { resolveCriticPreflightContext } from "../lib/critic-preflight-observer.mjs";
+ import { planVerifySelection } from "../lib/verify-selection.mjs";
+ 
+ const here = new URL(".", import.meta.url);
+@@ -71,6 +72,49 @@ function args(fx, evidence = true) {
+   return result;
+ }
+ 
++// Late binding (LB3): rewrite the fixture State into a draft package (paths, no digests, `sealed: false`).
++function makeDraft(fx) {
++  const statePath = join(fx.root, "project/pipeline-state.json");
++  const state = JSON.parse(readFileSync(statePath, "utf8"));
++  const a = state.continuity.authority;
++  state.continuity.authority = {
++    sealed: false,
++    prd: { path: a.prd.path },
++    spec: { path: a.spec.path },
++    result: a.result === null || a.result === undefined ? null : { path: a.result.path },
++  };
++  state.continuity.queueHead.dispatch = null;
++  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
++}
++
++test("LB3: a draft package binds the digest of the bytes the review read, and an edit afterwards makes a new request carry a new digest", () => {
++  const fx = fixture();
++  try {
++    makeDraft(fx);
++    const specPath = "specs/sprint-alfred-epic/spec.md";
++    const first = resolveCriticPreflightContext({ root: fx.root, specPath });
++    assert.equal(first.ok, true, JSON.stringify(first));
++    const bound = createHash("sha256").update(readFileSync(join(fx.root, specPath))).digest("hex");
++    assert.equal(first.context.ownerBinding.specSha256, bound);
++    writeFileSync(join(fx.root, specPath), `${readFileSync(join(fx.root, specPath), "utf8")}\nedited in the draft\n`);
++    const second = resolveCriticPreflightContext({ root: fx.root, specPath });
++    assert.equal(second.ok, true, JSON.stringify(second));
++    assert.notEqual(second.context.ownerBinding.specSha256, first.context.ownerBinding.specSha256, "the first binding is stale after the edit; re-request binds the new bytes");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("LB3: a sealed package keeps its digest comparison: an edit without a rebind is refused", () => {
++  const fx = fixture();
++  try {
++    const specPath = "specs/sprint-alfred-epic/spec.md";
++    assert.equal(resolveCriticPreflightContext({ root: fx.root, specPath }).ok, true);
++    writeFileSync(join(fx.root, specPath), `${readFileSync(join(fx.root, specPath), "utf8")}\nedited after the seal\n`);
++    const refused = resolveCriticPreflightContext({ root: fx.root, specPath });
++    assert.equal(refused.ok, false);
++    assert.equal(refused.code, "C1O-SCOPE-BINDING");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("observed controller preserves real rejected producer bytes and retains same-lineage immutable receipts", () => {
+   const fx = fixture();
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c3165e1a7..fa46ebc62 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -449,6 +449,7 @@ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs'
+ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
+ import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
+ import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
++import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+@@ -6022,6 +6023,7 @@ function resultBootstrapEligible(state, prd, spec) {
+   return Boolean(state?.activeFeature && lifecycle.ok && lifecycle.status === "implementing"
+     && validateContinuityState(continuity, state.activeFeature.id).ok
+     && continuity.featureId === state.activeFeature.id
++    && !isDraftAuthority(continuity)
+     && continuity.authority.result === null
+     && continuity.queueHead !== null && continuity.queueHead.dispatch === null
+     && continuity.blocker === null && continuity.acknowledgedFinal === null
+@@ -7092,9 +7094,19 @@ function validPriorAuthority(state, prd, spec) {
+   return authority;
+ }
+ 
++// Late binding: a draft package (`sealed: false`) binds no PRD/Spec digest. The PO rebind, decision and acknowledge routes compare and
++// rewrite bound digests, so they refuse a draft; the refusal keeps its code and adds the typed exits (prepare-seal, reopen-design).
++function isDraftAuthority(continuity) {
++  return readAuthoritySeal(continuity?.authority).status === "draft";
++}
++
++function continuityRefusal(code, state) {
++  return isDraftAuthority(state?.continuity) ? { ok: false, code, exits: readAuthoritySeal(state.continuity.authority).exits } : { ok: false, code };
++}
++
+ function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
+   const continuity = state?.continuity;
+-  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
++  if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
+     || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
+     || continuity.authority.prd.sha256 !== oldAuthority.planSha256
+     || continuity.authority.spec.sha256 !== oldAuthority.specSha256
+@@ -7106,7 +7118,7 @@ function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
+ 
+ function eligibleDecisionContinuity(state, prd, spec) {
+   const continuity = state?.continuity;
+-  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
++  if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
+     || continuity.authority.prd.path !== prd.path
+     || continuity.authority.spec.path !== spec.path
+     || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
+@@ -7139,7 +7151,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
+   const oldAuthority = validRebindApproval(state, prd, spec, profile);
+   if (oldAuthority === null || oldAuthority.specSha256 !== marker.digest || oldAuthority.specSha256 === spec.sha256) return { ok: false, code: "PO-REBIND-APPROVAL" };
+   const continuity = eligibleRebindContinuity(state, prd, spec, oldAuthority);
+-  if (continuity === null) return { ok: false, code: "PO-REBIND-CONTINUITY" };
++  if (continuity === null) return continuityRefusal("PO-REBIND-CONTINUITY", state);
+   const nextPrdBytes = replaceRebindMarker(prd.bytes, marker, spec.sha256);
+   if (nextPrdBytes === null) return { ok: false, code: "PO-REBIND-PRD-MARKER" };
+   const nextPrdSha256 = sha256Bytes(nextPrdBytes);
+@@ -7226,7 +7238,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
+     return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
+   }
+   const continuity = eligibleDecisionContinuity(state, prd, spec);
+-  if (continuity === null) return { ok: false, code: "PO-DECISION-CONTINUITY" };
++  if (continuity === null) return continuityRefusal("PO-DECISION-CONTINUITY", state);
+   const documentDrift = marker.digest !== spec.sha256;
+   const bindingDrift = priorAuthority.planSha256 !== prd.sha256
+     || priorAuthority.specSha256 !== spec.sha256
+@@ -7650,6 +7662,7 @@ export function resolvePoRebindRunner(explicitRunner, env) {
+ // not merely trusted.
+ function eligibleAcknowledgeContinuity(state, prd, spec, reopenedApprovedDraft = false) {
+   const continuity = state?.continuity;
++  if (isDraftAuthority(continuity)) return null;
+   const currentBinding = continuity?.authority?.prd?.sha256 === prd.sha256
+     && continuity?.authority?.spec?.sha256 === spec.sha256;
+   const invalidatedBinding = reopenedApprovedDraft
+@@ -7744,7 +7757,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
+     return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+   }
+   const continuity = eligibleAcknowledgeContinuity(state, prd, spec, changingProfile ? false : reopenedApprovedDraft);
+-  if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
++  if (continuity === null) return continuityRefusal("PO-ACK-CONTINUITY", state);
+   if (changingProfile && (continuity.authority.result !== null || continuity.acknowledgedFinal !== null
+     || continuity.recovery !== null || (marker !== null && marker.digest !== spec.sha256))) {
+     return { ok: false, code: "PO-ACK-CONTINUITY" };

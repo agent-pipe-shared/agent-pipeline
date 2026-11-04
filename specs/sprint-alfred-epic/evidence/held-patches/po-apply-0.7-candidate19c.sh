@@ -16,6 +16,7 @@
 #   w169  the PowerShell guard admits what the Bash guard admits and its refusals name the way out (E7 PowerShell part, W4, W5)
 #   w170  one typed orchestrator commit helper: check, commit with the trailer, write the dispatch record (E1 second half)
 #   w177  the continuity schema accepts the draft authority and the core readers move onto the shared seal reader (late-binding build step 2)
+#   w179  the guard admits PRD and Spec edits in the draft state, the remaining authority readers follow the draft, the Critic preflight binds the digest it read (late-binding build step 3)
 #   w174  the audit bundle binds proofs, release Verify and Security scan to the candidate; a read-only trace proves every human approval back to the human (Q3)
 #   w175  generated runbooks for the start, plan, implement, close and push paths and a typed runbook link in the first call of each standard command (G5)
 #   w176  the push threat model gate refuses at plan approval, push preparation and feature close when a push approval is active; the briefing tool derives each module slice's write scope and refuses a scope that crosses the module cut (D4a, M1.4)
@@ -52,6 +53,7 @@ step2 w172-win-rest-the-failed-path-in-the-powershell-envelope-eperm-retry-the-h
 step2 w169-ps-the-powershell-guard-admits-what-the-bash-guard-admits-and-its-refusals-name-the-way-out "feat(guard): the PowerShell guard admits what the Bash guard admits and its refusals name the way out"
 step2 w170-e1-one-typed-orchestrator-commit-helper-checks-commits-with-the-trailer-and-writes-the-dispatch-record "feat(dispatch): one typed orchestrator commit helper checks a Goldfish diff, commits it with the trailer and writes the dispatch record"
 step2 w177-lb2-the-continuity-schema-knows-the-draft-state-and-the-core-readers-move-onto-the-shared-seal-reader "feat(authority): the continuity schema accepts the draft authority and the core readers of the bound authority move onto the shared seal reader"
+step2 w179-lb3-the-remaining-authority-readers-the-guard-tripwire-and-the-review-digests-follow-the-draft-state "feat(authority): the guard admits PRD and Spec edits in the draft state, the remaining authority readers follow the draft and the Critic preflight binds the digest of the bytes it read"
 step2 w174-q3-the-audit-bundle-binds-the-signature-proofs-and-every-human-approval-traces-back-to-the-human "feat(audit): the audit bundle binds the signature proofs, the release Verify and the Security scan to the candidate and a read-only trace proves every human approval back to the human"
 step2 w175-g5-runbooks-of-every-lifecycle-path-and-the-runbook-link-in-the-first-call "feat(runbook): generated runbooks for the start, plan, implement, close and push paths and a typed runbook link in the first call of each standard command"
 step2 w176-d4a-push-threat-model-gate-and-m14-module-scopes-derived-and-enforced "feat(gates): the push threat model gate refuses at plan approval, push preparation and feature close when a push approval is active and the briefing tool derives and enforces the write scope of a module slice"
