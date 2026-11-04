@@ -24,6 +24,7 @@ const pkg = {
   schema: "pipeline.dispatch-briefing-package.v1",
   id: s.id, item: s.slug, agentType: s.agentType ?? "goldfish-implementor", modelId: "claude-sonnet-5-5",
   criterion: s.criterion, estimatedToolCalls: s.estimatedToolCalls ?? 60,
+  ...(s.effortEscalation ? { effortEscalation: s.effortEscalation, modelWhy: s.modelWhy ?? "deep tier: guard, continuity and authority code with real design latitude" } : {}),
   check: `${stem}.check.test.mjs`, title: s.title, ac: s.criterion,
   goal: `${s.goal} Delivered as the held patch ${stem}.patch (developed and tested in ${s.clone}).`,
   paths: [`${stem}.notes.md`],

@@ -8,6 +8,7 @@ import { mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 const args = process.argv.slice(2);
 const clone = resolve(args.shift());
+const fullAt = args.indexOf("--full"); const fullOut = fullAt >= 0; if (fullOut) args.splice(fullAt, 1);
 const nameAt = args.indexOf("--name");
 const nameArgs = nameAt >= 0 ? ["--test-name-pattern", args.splice(nameAt, 2)[1]] : [];
 const tmp = `/tmp/tin-${clone.split("/").pop()}`; // one TMPDIR per clone so parallel slice runs do not collide
@@ -18,4 +19,5 @@ const lines = (r.stdout + r.stderr).split("\n");
 console.log(lines.filter((l) => /^\s*(✖|not ok)/u.test(l)).join("\n"));
 if (r.status !== 0) console.log(lines.filter((l) => /(AssertionError|Error:|expected|actual|\+ |- )/u.test(l)).slice(0, 40).join("\n"));
 console.log(lines.filter((l) => /^ℹ (tests|pass|fail|skipped)/u.test(l)).join("\n"));
+if (fullOut && r.status !== 0) console.log(lines.slice(0, 200).join("\n"));
 console.log("exit", r.status);

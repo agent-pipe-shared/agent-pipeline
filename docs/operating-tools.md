@@ -95,10 +95,10 @@ Candidate 18 was built as held patches from scratch clones (`git clone --shared`
 | `mkclone.mjs <dir> [base-sha]`, `clone-of.mjs <src> <dst>` | a shared clone of the repository (detached at a base) or of another scratch clone |
 | `applyin.mjs <clone> <patch> [flags]` | `git apply` inside a clone, with `--check`, `--3way` or `--reject` |
 | `commit-in.mjs <clone> "<message>"` | commit everything in a clone with a throwaway identity (optional `--rebaseline`) |
-| `test-in.mjs <clone> <test file>... [--name <pattern>]` | `node --test` in a clone with a private TMPDIR, failing lines and summary only; one suite at a time |
+| `test-in.mjs <clone> <test file>... [--name <pattern>] [--full]` | `node --test` in a clone with a private TMPDIR, failing lines and summary only (`--full` prints the first 200 output lines of a failing run, e.g. the whole violation list of a closure suite); one suite at a time |
 | `run-in.mjs <clone> <script> [args]` | run a node script with the clone as working directory |
 | `save-patch.mjs <clone> <base> <rev> <out> [<check-clone>]` | write `git diff --binary` and prove `git apply --check` on the repository or on a chain clone |
-| `mkpkg.mjs <slice.json> <package.json>` | compact slice description to a full `pipeline.dispatch-briefing-package.v1` (feed `dispatch-briefing.mjs build`) |
+| `mkpkg.mjs <slice.json> <package.json>` | compact slice description to a full `pipeline.dispatch-briefing-package.v1` (feed `dispatch-briefing.mjs build`); a slice with `effortEscalation: "MP-05"` and `modelWhy` carries the deep-tier escalation into the package |
 | `chain-apply.mjs <clone> <order file> [--from n]`, `chain-commit.mjs <clone> <name>` | apply the held patches of an order file one commit each (a `.rebased.patch` beside a patch wins); commit a manually resolved step |
 | `toplevels.mjs <order file>` | the top-level paths the patches of an order file touch (feeds the `STAGE` list of an apply script) |
 | `rehearse.mjs <apply script> [<clone-name>]` | run a PO apply script in a fresh clone of the current HEAD (the script and patches must be committed); after an exit 0 it also runs `harness/scripts/check-verify-suite-registration.mjs` on the resulting tree and prints that result, because a chain that applies can still leave a registered suite uncategorized (candidate 19, w155); it also runs `harness/scripts/check-verify-case-completion.mjs` on the tree, because a suite can register its cases and still lack a completion-registry row (candidate 19, w160) |
