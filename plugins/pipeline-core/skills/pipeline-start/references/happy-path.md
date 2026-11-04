@@ -24,6 +24,7 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses
    if the file exists) and commit `project/push-threat-model.md` with the draft commit. A threat model first created at the Close moves the candidate
    after the Critic and Verify already ran, which forces a second round for no product change (Antigravity greenfield finding D4a).
+   The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
 7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
 
 ## 2. Implementation (one dispatch per task, from the template)

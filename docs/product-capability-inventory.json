@@ -1014,6 +1014,7 @@
         "verify-phase:harness/scripts/verify.mjs:reference-path-check",
         "verify-phase:harness/scripts/verify.mjs:reference-path-tests",
         "verify-phase:harness/scripts/verify.mjs:refresh-mandatory-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:register-feature-package-readback-tests",
         "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:release-promotion-envelope-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",

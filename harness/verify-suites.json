@@ -4522,6 +4522,12 @@
       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
       "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
       "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
+    },
+    {
+      "name": "register-feature-package-readback-tests",
+      "file": "plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs",
+      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback is advice only and writes nothing (C19 D4a)",
+      "nonOverlapNote": "Unique cases: the pushThreatModelReadback helper of scripts/register-feature-package.mjs; the pins that run the registration end to end pin the rest of its output"
     }
   ]
 }

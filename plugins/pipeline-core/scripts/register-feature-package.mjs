@@ -25,9 +25,10 @@
 // commits. The result names the rigor level and its `rigorSource`. Prints one JSON result.
 // Exit 0: registered | already-registered. Exit 2: refused (typed FPR-* code).
 import { spawnSync } from "node:child_process";
-import { realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
@@ -47,7 +48,25 @@ function commitPlan(root, result) {
     { step: 3, action: "commit all of commitPaths in one commit (Conventional Commits, the dispatch trailers your role requires)" },
     { step: 4, action: "only then generate the item binding: dispatch-briefing.mjs binding --root <root> ... (a binding generated before this commit carries a stale candidate)" },
   ];
-  return { commitPaths: [result.manifestPath, result.envelopePath, ...generatedPaths], envelopeTracked: trackedEnvelope, envelopeIgnored: forceEnvelope, order: steps };
+  return { commitPaths: [result.manifestPath, result.envelopePath, ...generatedPaths], envelopeTracked: trackedEnvelope, envelopeIgnored: forceEnvelope, order: steps, pushThreatModel: pushThreatModelReadback(root) };
+}
+
+/**
+ * D4a readback: every non-checkpoint push demands `project/push-threat-model.md` (push-prepare's `push-threat-model` check). A model first created at
+ * the Close changes the candidate after the Critic and Verify already ran and forces a second round for no product change, so the registration (the
+ * draft commit, before the binding) says whether it exists and, when it does not, names the command and where its output belongs. Advice only: it
+ * writes nothing and enforces nothing.
+ */
+export function pushThreatModelReadback(root) {
+  const present = existsSync(resolve(root, PUSH_THREAT_MODEL_FILE));
+  if (present) return { path: PUSH_THREAT_MODEL_FILE, present: true };
+  return {
+    path: PUSH_THREAT_MODEL_FILE,
+    present: false,
+    materializeCommand: "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model",
+    commitWith: "commitPaths, in the same draft commit, before the item binding is generated",
+    why: "a push needs this file; created at the Close it moves the candidate after the Critic and Verify ran and forces a second round",
+  };
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
