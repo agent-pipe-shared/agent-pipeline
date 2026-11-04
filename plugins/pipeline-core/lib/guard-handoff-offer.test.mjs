@@ -448,6 +448,34 @@ test("PF-51: a full journal is moved aside and retained at the next offer, and t
   }
 });
 
+test("the denial path leaves closed phase marks for the authority trace: tool and reason codes only, never a command or a path", () => {
+  const root = fixture();
+  const writerKey = Symbol.for("pipeline.authority-trace-progress");
+  const prior = globalThis[writerKey];
+  try {
+    const marks = [];
+    globalThis[writerKey] = (phase) => marks.push(phase);
+    // An eligible denial builds and publishes a request: every expensive step is marked in order.
+    const planned = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: ".claude/pipeline-state.json", content: "secret-canary-not-a-secret" }, denials: denial, nowMs: NOW });
+    assert.equal(planned.status, "planned");
+    assert.deepEqual(marks, [
+      "hgo-start:Write:GUARD-DEVPLAN-NOT-READY", "hgo-eligibility:eligible", "hgo-observed", "hgo-policy", "hgo-policy-done",
+      "hgo-plugin-identity", "hgo-publish-wait", "hgo-publish-held",
+    ]);
+    // A denial that is not eligible stops after the observation and names its code.
+    marks.length = 0;
+    recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials: denial, nowMs: NOW });
+    assert.equal(marks[0], "hgo-start:Read:GUARD-DEVPLAN-NOT-READY", JSON.stringify(marks));
+    assert.match(marks[1], /^hgo-eligibility:HGO-[A-Z-]+$/u, JSON.stringify(marks));
+    assert.equal(marks.includes("hgo-plugin-identity"), false, "a denial that is not eligible builds no request");
+    for (const mark of marks) assert.equal(/canary|\/|\\|\.mjs|secret/u.test(mark), false, mark);
+  } finally {
+    if (prior === undefined) delete globalThis[writerKey]; else globalThis[writerKey] = prior;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the producer refuses anything but an external-operator route and any unverified append", () => {
   const context = {
     toolName: "Bash",
