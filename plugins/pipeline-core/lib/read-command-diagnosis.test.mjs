@@ -87,6 +87,16 @@ test("RCD11: the refusal names the glob value and the admitted forms, and still 
   assert.equal(isReadOnlyDiagnosticCommand(command, root), false);
 });
 
+test("RCD12: the outside-root read refusal says it is intended and names the native Read alternative, and stays a refusal", async () => {
+  const command = "grep -n needle /etc/hostname";
+  assert.equal(isReadOnlyDiagnosticCommand(command, root), false, "fixture must be refused");
+  const result = await refusal(command);
+  assert.equal(result.exitCode, 2);
+  assert.match(String(result.stderr), /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  assert.match(String(result.stderr), /This refusal is intended, not a fault of the command/u);
+  assert.match(String(result.stderr), /native Read tool/u);
+});
+
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
   const command = "rg --hidden needle README.md";
   assert.equal(firstUnadmittedFlag(command, root), "--hidden");

@@ -180,6 +180,8 @@ export const READ_SCOPE_DENIAL_REMEDY = [
   "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head / rg-to-tail pipeline is admitted when every read target resolves inside the project root.",
   "Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal.",
   "Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root.",
+  // Q2 (candidate 19): the refusal is intended; say so and name the one alternative that exists besides re-targeting.
+  "This refusal is intended, not a fault of the command: shell reads are kept inside the project root. For one exact file outside the root, the native Read tool with that file path is the alternative; it applies its own read-scope rules.",
 ];
 
 // NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME
