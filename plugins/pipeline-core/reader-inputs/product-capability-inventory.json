@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "b3c727418453e8193eff321e6adfdc87b5216117",
-    "tree": "2980d4e2ed89a3ed01e19d5b7beca3e4bb491e47"
+    "commit": "e6664464e2b608e1f778be8ad5bffb8475fa44c9",
+    "tree": "16b9472db07b10c2cecec9c7f6f7d4787f8a0dfb"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -254,6 +254,9 @@
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-restore-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-seal-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-seal-reader-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-seal-readers-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-trace-preload-tests",
@@ -373,6 +376,7 @@
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-evidence-carry-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
@@ -392,6 +396,7 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:d3-signed-reconcile-commit-tests",
         "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
         "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
         "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
@@ -674,6 +679,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:orchestrator-commit-record-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-store-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-tests",
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
@@ -940,6 +946,7 @@
         "verify-phase:harness/scripts/verify.mjs:portable-critic-export-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-fanout-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+        "verify-phase:harness/scripts/verify.mjs:powershell-bash-guard-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
@@ -997,6 +1004,7 @@
         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
         "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
         "verify-phase:harness/scripts/verify.mjs:push-destination-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-gate-real-decision-carry-tests",
         "verify-phase:harness/scripts/verify.mjs:push-gate-satisfiability-tests",
         "verify-phase:harness/scripts/verify.mjs:push-init-tests",
         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
@@ -1161,6 +1169,8 @@
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:win-authority-readiness-and-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:win-authority-rest-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-native-type-cache-tests",
@@ -2366,7 +2376,9 @@
         "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-command-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-tests"
       ],
       "runners": [
         "host-only"
