@@ -32,6 +32,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
 // which is out of scope for this file.
 export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
 export const AUDIT_PACK_SCRIPT = fileURLToPath(new URL("../../scripts/audit-pack.mjs", import.meta.url));
+export const HUMAN_APPROVAL_TRACE_SCRIPT = fileURLToPath(new URL("../../scripts/human-approval-trace.mjs", import.meta.url));
 export const ANALYSIS_RUN_SCRIPT = fileURLToPath(new URL("../../scripts/analysis-run.mjs", import.meta.url));
 
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");

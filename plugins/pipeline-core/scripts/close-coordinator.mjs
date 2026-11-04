@@ -279,7 +279,9 @@ function action(command, values, planSha256) {
 
 function auditRequest(root, path) {
   const request = readJsonFile(root, path, "feature-close audit request");
-  const expected = ["schema", "manifestPath", "coreVersion", "packs", "criticVerifyLifecycleId"].sort().join("\0");
+  // Q3: `evidence` is optional -- the approval trace report, detached proofs, release Verify record and security scan the audit bundle carries.
+  const keys = ["schema", "manifestPath", "coreVersion", "packs", "criticVerifyLifecycleId"];
+  const expected = (Object.hasOwn(request.value, "evidence") ? [...keys, "evidence"] : keys).sort().join("\0");
   if (request.value.schema !== "pipeline.feature-close-audit-request.v1"
     || Object.keys(request.value).sort().join("\0") !== expected
     || !SAFE_RELATIVE.test(request.value.manifestPath ?? "")
@@ -731,6 +733,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
         manifestPath: request.value.manifestPath,
         coreVersion: request.value.coreVersion,
         packs: request.value.packs,
+        ...(request.value.evidence !== undefined ? { evidence: request.value.evidence } : {}),
       };
       const auditPlan = await planFeatureCloseAudit(options);
       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");

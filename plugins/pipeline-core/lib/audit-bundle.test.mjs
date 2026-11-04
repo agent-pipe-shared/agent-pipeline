@@ -8,6 +8,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { buildAuditBundle, planAuditBundle, planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
+import { planVerifySelection } from "./verify-selection.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
@@ -150,6 +151,64 @@ test("E-AC-20 leaves the plan and manifest unchanged when no export metadata is 
   assert.equal(receipt.status, "built");
   const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
   assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "readmeSha256", "schema"]);
+});
+// Q3 / AC-108: the bundle binds the audited candidate itself, carries the approval trace with its detached proofs, the
+// release Verify record and the security scan, and reports every missing item as a typed gap.
+const CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
+const SELECTION_POLICY = { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] };
+function evidenceFiles(root, { traceCandidate = CANDIDATE, traceStatus = "traced", verifyCandidate = CANDIDATE, verifyMode = "release", securityCandidate = CANDIDATE, securityFindings = [] } = {}) {
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: "c".repeat(64), keyReference: "po-key-1", publicKey: "-----BEGIN PUBLIC KEY-----\nx\n-----END PUBLIC KEY-----\n", signatureBase64: "c2ln" };
+  const write = (name, value) => { writeFileSync(join(root, "evidence", name), `${JSON.stringify(value)}\n`); return `evidence/${name}`; };
+  const selection = planVerifySelection({ mode: verifyMode, candidateCommit: verifyCandidate.commit, registeredSuiteIds: ["test"], policy: SELECTION_POLICY });
+  return {
+    traceReportPath: write("trace.json", { schema: "pipeline.human-approval-trace.v1", candidate: traceCandidate, status: traceStatus, counts: {}, rows: [{ kind: "push", verdict: traceStatus, proof }], outOfCandidate: 0, notEnumerated: [] }),
+    proofPaths: [{ kind: "push", path: write("push-proof.json", proof) }],
+    verifyRecordPath: write("verify.json", { schema: "pipeline.verify-evidence.v0", ...verifyCandidate, candidate: verifyCandidate, exitCode: 0, selection }),
+    securityScanPath: write("security.json", { schema: "pipeline.security-evidence.v0", candidate: securityCandidate, findings: securityFindings, exitCode: 0 }),
+  };
+}
+const planWith = (input, extra) => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], ...extra });
+test("Q3 the bundle carries the trace, the detached proof, the release Verify record and the security scan, bound to the audited candidate", async () => {
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: evidenceFiles(input.root) });
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}`), ["approval-trace:carried", "approval-proofs:push:carried", "verify-record:carried", "security-scan:carried"]);
+  assert.ok(plan.evidence.items.every((entry) => entry.code === null)); assert.equal(plan.evidence.traceStatus, "traced");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+  assert.equal(manifest.candidate.commit, CANDIDATE.commit); assert.equal(manifest.candidate.tree, CANDIDATE.tree);
+  assert.deepEqual(manifest.artifacts.slice(5).map((entry) => entry.path.replace(/^artifacts\/\d{3}-/u, "")), ["approval-trace", "approval-proof", "verify-record", "security-scan"]);
+  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /Human approval evidence/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+  writeFileSync(join(input.root, "bundle", manifest.artifacts[8].path), "tampered");
+  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
+});
+test("Q3 a missing item is a typed gap, never silently skipped", () => {
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: {} });
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
+  assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
+});
+test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
+  const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();
+  const plan = planWith(input, { evidence: { ...evidenceFiles(input.root, { traceCandidate: other, verifyCandidate: other, securityCandidate: other }) } });
+  assert.deepEqual(plan.evidence.items.filter((entry) => entry.status === "gap").map((entry) => `${entry.item}:${entry.code}`), ["approval-trace:OTHER-CANDIDATE", "verify-record:OTHER-CANDIDATE", "security-scan:OTHER-CANDIDATE"]);
+  const input2 = fixture(); const plan2 = planWith(input2, { evidence: evidenceFiles(input2.root, { verifyMode: "candidate", securityFindings: [{ id: "x" }] }) });
+  assert.deepEqual(plan2.evidence.items.filter((entry) => entry.status === "gap").map((entry) => `${entry.item}:${entry.code}`), ["verify-record:NOT-RELEASE-VERIFY", "security-scan:NOT-PASSING"]);
+});
+test("Q3 an untraceable or attribution-only trace is carried with its verdict named, not hidden", () => {
+  const input = fixture(); const plan = planWith(input, { evidence: evidenceFiles(input.root, { traceStatus: "untraceable" }) });
+  assert.equal(plan.evidence.traceStatus, "untraceable"); assert.equal(plan.evidence.items[0].code, "TRACE-UNTRACEABLE");
+  const input2 = fixture(); assert.equal(planWith(input2, { evidence: evidenceFiles(input2.root, { traceStatus: "attribution-only" }) }).evidence.items[0].code, "TRACE-ATTRIBUTION-ONLY");
+});
+test("Q3 the bundle binds the audited candidate, not its parent, and refuses a different candidate", () => {
+  const input = fixture(); assert.equal(planWith(input, { candidate: CANDIDATE }).candidate.commit, CANDIDATE.commit);
+  for (const wrong of [{ commit: "9".repeat(40), tree: CANDIDATE.tree }, { commit: CANDIDATE.commit, tree: "9".repeat(40) }, { commit: CANDIDATE.commit }]) assert.throws(() => planWith(input, { candidate: wrong }), (error) => error.code === "AB-CANDIDATE-MISMATCH");
+});
+test("Q3 verification rejects a carried trace that is bound to another commit than the manifest", async () => {
+  const input = fixture(); const plan = planWith(input, { evidence: evidenceFiles(input.root) }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  const bundle = join(input.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")); const tracePath = manifest.artifacts.find((entry) => entry.path.endsWith("approval-trace")).path;
+  const forged = Buffer.from(`${JSON.stringify({ schema: "pipeline.human-approval-trace.v1", candidate: { commit: "e".repeat(40), tree: "f".repeat(40) }, status: "traced", rows: [] })}\n`); writeFileSync(join(bundle, tracePath), forged);
+  manifest.artifacts = manifest.artifacts.map((entry) => entry.path === tracePath ? { ...entry, sha256: hash(forged) } : entry); writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`);
+  assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-EVIDENCE-TRACE-CANDIDATE"));
 });
 // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
 // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)

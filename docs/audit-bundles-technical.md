@@ -66,3 +66,35 @@ does not trust any value it did not itself recompute
 provider-neutral step layered on an unchanged, already-built bundle; no key
 or key location ever enters the bundle content itself
 (`audit-bundle.mjs:54-83`).
+
+## Human approval evidence and the approval trace
+
+A plan may name an optional `evidence` input (keys `traceReportPath`,
+`proofPaths` (at most 16), `verifyRecordPath`, `securityScanPath`; repository
+relative paths). The bundle then carries, by path and digest, the approval
+trace report, the detached signature proofs, the release-mode Verify record and
+the Security scan record, all bound to the candidate the bundle audits (the
+last close commit itself). An item that is not named, unreadable, bound to
+another candidate, not a release Verify, or not a passing scan is a typed gap
+in the manifest (`NOT-REFERENCED`, `UNREADABLE`, `OTHER-CANDIDATE`,
+`NOT-RELEASE-VERIFY`, `NOT-PASSING`), never silently skipped. A plan whose
+candidate differs from the package candidate is refused
+(`AB-CANDIDATE-MISMATCH`). Without `evidence` the bundle is byte-identical to
+before.
+
+The trace itself is `scripts/human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json]`,
+a read-only operator command (`--out` writes the JSON report create-only inside
+the repository, for the bundle to carry; the guard admits only `--repo`,
+`--commit` and `--format`). For a candidate it enumerates the approval records
+the gates consumed (push approval, plan and design approvals, critical-action
+authorizations, override capabilities, chat-mode attributions) and proves each
+chain: the record names the exact candidate or plan digest, a detached Ed25519
+proof exists whose signed digest equals that binding, it verifies against the
+project's key directory and trust anchor with a registered human key, and it was
+consumed once. Verdicts: `traced`; `attribution-only` (a chat-mode approval, an
+attribution record and not proof); `untraceable` with the exact break (exit 1).
+It never signs, never consumes a proof and never approves anything. Records that
+the stores do not retain a proof for are reported as untraceable with their
+reason code (`PROOF-NOT-RETAINED-IN-CAPABILITY`, `PLAN-PROOF-NOT-RETAINED`,
+`DESIGN-INTENT-NOT-RECONSTRUCTIBLE`); publication, release-preflight and briefed
+test authorizations are named as not enumerated in every result.

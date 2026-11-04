@@ -7,12 +7,18 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 import { validateFeaturePackage } from "./feature-package-topology.mjs";
 import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u; const BUNDLE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za-z0-9_-]{16,16384}$/u;
 function fail(code, message = "Audit bundle operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function evidenceSection(manifest) {
+  if (!Object.hasOwn(manifest, "evidence")) return "";
+  const lines = manifest.evidence.items.map((entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`).join("\n");
+  return `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${lines}\n`;
+}
 function auditorReadme(manifest) {
   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
   return `# Audit bundle: ${manifest.bundleId}
@@ -28,7 +34,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
 ## Artifacts
 
 ${artifactLines}
-
+${evidenceSection(manifest)}
 ## Offline verification
 
 Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
@@ -65,17 +71,98 @@ function sanitizeExportEvidence(exportEvidence) {
   if (hasReceipt && !receiptShape(exportEvidence.receipt)) fail("AB-EXPORT-RECEIPT");
   return Object.freeze({ ...(hasProfile ? { profileDigest: canonicalSha256(exportEvidence.profile) } : {}), ...(hasReceipt ? { receipt: Object.freeze({ ...exportEvidence.receipt }) } : {}) });
 }
-function planShape(plan) { const hasExport = hasExportMetadata(plan); return exact(plan, hasExport ? ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", "exportMetadata"] : ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts"])
-  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExport || exportMetadataShape(plan.exportMetadata)); }
+// Q3: the optional top-level keys a plan or manifest may carry, each validated when present. The absent case keeps the
+// exact key list it always had, so old bundles and plans stay byte-identical and verifiable.
+const OPTIONAL_KEYS = ["exportMetadata", "evidence"];
+function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
+const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
+const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+function evidenceShape(value) {
+  return exact(value, ["schema", "candidateBound", "traceStatus", "items"]) && value.schema === "pipeline.audit-bundle-evidence.v1" && value.candidateBound === true
+    && (value.traceStatus === null || TRACE_STATUSES.has(value.traceStatus)) && Array.isArray(value.items) && value.items.length <= 64
+    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
+      && (entry.status === "carried" || entry.status === "gap") && (entry.code === null || /^[A-Z0-9-]{3,48}$/u.test(entry.code))
+      && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
+}
+function planShape(plan) { return exact(plan, ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", ...optionalKeys(plan)])
+  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)); }
 
-export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence } = {}) {
+function readEvidenceFile(root, path) {
+  let source; try { source = rootPath(root, path, "AB-EVIDENCE-PATH"); } catch { return null; }
+  try { const bytes = readFileSync(source); return { bytes, sha256: digest(bytes) }; } catch { return null; }
+}
+function jsonOrNull(bytes) { try { return parseStrictJson(bytes); } catch { return null; } }
+const sameCandidate = (value, candidate) => value !== null && typeof value === "object" && value.commit === candidate.commit && value.tree === candidate.tree;
+/**
+ * Q3: carry, by path and digest, the evidence an auditor needs to follow every human approval back to the human: the
+ * human-approval trace report (which embeds each detached proof), any explicitly referenced detached proof files, the
+ * release-mode Verify record and the security scan, each bound to the audited candidate. An item that is missing or
+ * bound to another candidate is a typed gap in the manifest, never silently skipped. Nothing here signs or approves.
+ */
+function collectEvidence(root, candidate, evidence, firstIndex) {
+  if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"]);
+  if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
+  const artifacts = []; const items = []; let traceStatus = null; let traceHasProof = false;
+  const carry = (cls, sourcePath, sha256) => { const bundlePath = `artifacts/${String(firstIndex + artifacts.length + 1).padStart(3, "0")}-${cls}`; artifacts.push({ sourcePath, bundlePath, sha256 }); return bundlePath; };
+  const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
+  let traceBundlePath = null;
+  if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
+  else {
+    const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
+    if (!report || report.schema !== TRACE_SCHEMA || !TRACE_STATUSES.has(report.status) || !Array.isArray(report.rows)) gap("approval-trace", "UNREADABLE");
+    else if (!sameCandidate(report.candidate, candidate)) gap("approval-trace", "OTHER-CANDIDATE");
+    else {
+      traceStatus = report.status; traceHasProof = report.rows.some((row) => row?.proof !== null && typeof row?.proof === "object");
+      traceBundlePath = carry(EVIDENCE_CLASSES.trace, evidence.traceReportPath, file.sha256);
+      items.push({ item: "approval-trace", status: "carried", code: report.status === "traced" ? null : report.status === "attribution-only" ? "TRACE-ATTRIBUTION-ONLY" : "TRACE-UNTRACEABLE", bundlePath: traceBundlePath });
+    }
+  }
+  const proofs = evidence.proofPaths ?? [];
+  if (proofs.length === 0) { if (traceBundlePath !== null && traceHasProof) items.push({ item: "approval-proofs", status: "carried", code: null, bundlePath: traceBundlePath }); else gap("approval-proofs", "NOT-REFERENCED"); }
+  for (const entry of proofs) {
+    if (!exact(entry, ["kind", "path"]) || !/^[a-z-]{1,40}$/u.test(entry.kind)) fail("AB-EVIDENCE-INPUT");
+    const file = readEvidenceFile(root, entry.path); const proof = file && jsonOrNull(file.bytes);
+    if (!exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || proof.schema !== PROOF_SCHEMA || !SHA.test(proof.intentSha256)) { gap(`approval-proofs:${entry.kind}`, "UNREADABLE"); continue; }
+    items.push({ item: `approval-proofs:${entry.kind}`, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.proof, entry.path, file.sha256) });
+  }
+  if (evidence.verifyRecordPath === undefined) gap("verify-record", "NOT-REFERENCED");
+  else {
+    const file = readEvidenceFile(root, evidence.verifyRecordPath); const record = file && jsonOrNull(file.bytes);
+    if (!record || record.schema !== "pipeline.verify-evidence.v0") gap("verify-record", "UNREADABLE");
+    else if (record.commit !== candidate.commit || record.tree !== candidate.tree || !sameCandidate(record.candidate, candidate)) gap("verify-record", "OTHER-CANDIDATE");
+    else if (verifyEvidenceSatisfiesBoundary(record, "release") !== true) gap("verify-record", "NOT-RELEASE-VERIFY");
+    else items.push({ item: "verify-record", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.verify, evidence.verifyRecordPath, file.sha256) });
+  }
+  if (evidence.securityScanPath === undefined) gap("security-scan", "NOT-REFERENCED");
+  else {
+    const file = readEvidenceFile(root, evidence.securityScanPath); const record = file && jsonOrNull(file.bytes);
+    if (!record || record.schema !== "pipeline.security-evidence.v0" || !Array.isArray(record.findings)) gap("security-scan", "UNREADABLE");
+    else if (!sameCandidate(record.candidate, candidate)) gap("security-scan", "OTHER-CANDIDATE");
+    else if (record.exitCode !== 0 || record.findings.length > 0) gap("security-scan", "NOT-PASSING");
+    else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
+  }
+  return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
+}
+
+/**
+ * `candidate` (optional) is the commit and tree the caller is auditing: when given it must equal the feature package's
+ * candidate exactly, so a bundle is never labelled with the parent of the commit it was asked to audit (Q3).
+ * `evidence` (optional) carries the approval trace, detached proofs, release Verify record and security scan; see `collectEvidence`.
+ */
+export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence } = {}) {
   const root = resolve(repositoryRoot ?? ""); if (!BUNDLE_ID.test(bundleId ?? "")) fail("AB-BUNDLE-ID");
   const packageCheck = validateFeaturePackage(root, manifestPath); if (!packageCheck.ok || !packageCheck.receipt?.candidate) fail("AB-PACKAGE");
+  if (candidate !== undefined && !(exact(candidate, ["commit", "tree"]) && OID.test(candidate.commit) && OID.test(candidate.tree) && candidate.commit === packageCheck.receipt.candidate.commit && candidate.tree === packageCheck.receipt.candidate.tree)) fail("AB-CANDIDATE-MISMATCH", "The audited candidate is not the feature package candidate.");
   const policy = resolveEffectiveOrganizationPolicy({ coreVersion, packs });
   const manifest = JSON.parse(readFileSync(join(root, packageCheck.receipt.manifest), "utf8"));
   const artifacts = manifest.artifacts.map((entry, index) => ({ sourcePath: entry.path, bundlePath: `artifacts/${String(index + 1).padStart(3, "0")}-${entry.class}`, sha256: entry.sha256 }));
   const exportMetadata = sanitizeExportEvidence(exportEvidence);
-  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}) });
+  const carried = evidence === undefined ? null : collectEvidence(root, packageCheck.receipt.candidate, evidence, artifacts.length);
+  if (carried !== null) artifacts.push(...carried.artifacts);
+  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}) });
 }
 
 export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
@@ -83,7 +170,7 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
-  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}) };
+  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}) };
   const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
@@ -93,11 +180,26 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
 export function verifyAuditBundleSync({ bundleRoot } = {}) {
   const root = resolve(bundleRoot ?? ""); let manifest;
   try { manifest = parseStrictJson(readFileSync(join(root, "manifest.json"))); } catch { return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: "invalid", findings: Object.freeze(["AB-MANIFEST"]) }); }
-  const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256");
-  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
+  const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256"); const hasEvidence = Object.hasOwn(manifest, "evidence");
+  if (!exact(manifest, manifestKeys(manifest, hasReadme)) || (hasEvidence && !evidenceShape(manifest.evidence)) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
   if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
+  if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
+}
+function manifestKeys(manifest, hasReadme) { return ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", ...optionalKeys(manifest), ...(hasReadme ? ["readmeSha256"] : [])]; }
+// Q3: every carried evidence item must name an artifact the manifest lists, and the carried trace report must be bound to
+// the manifest's own candidate -- a bundle cannot present another commit's trace as its evidence.
+function evidenceFindings(root, manifest) {
+  const findings = []; const listed = new Set(Array.isArray(manifest.artifacts) ? manifest.artifacts.filter((entry) => entry !== null && typeof entry === "object").map((entry) => entry.path) : []);
+  for (const item of manifest.evidence.items) {
+    if (item.bundlePath !== null && !listed.has(item.bundlePath)) { findings.push(`AB-EVIDENCE-ITEM ${item.item}`); continue; }
+    if (item.item === "approval-trace" && item.bundlePath !== null) {
+      let report = null; try { report = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { report = null; }
+      if (report?.schema !== TRACE_SCHEMA || !sameCandidate(report.candidate, manifest.candidate ?? {}) || report.status !== manifest.evidence.traceStatus) findings.push("AB-EVIDENCE-TRACE-CANDIDATE");
+    }
+  }
+  return findings;
 }
 
 export async function verifyAuditBundle(options = {}) { return verifyAuditBundleSync(options); }
@@ -107,7 +209,7 @@ async function signatureRequest(bundleRoot) {
   try { bytes = await readFile(join(root, "manifest.json")); manifest = parseStrictJson(bytes); } catch { fail("AB-SIGNATURE-MANIFEST"); }
   const hasExport = hasExportMetadata(manifest);
   const hasReadme = Object.hasOwn(manifest, "readmeSha256");
-  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasReadme && !SHA.test(manifest.readmeSha256)) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
+  if (!exact(manifest, manifestKeys(manifest, hasReadme)) || (Object.hasOwn(manifest, "evidence") && !evidenceShape(manifest.evidence)) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasReadme && !SHA.test(manifest.readmeSha256)) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
   return Object.freeze({ schema: "pipeline.audit-bundle-signature-request.v1", bundleId: manifest.bundleId, manifestSha256: digest(bytes), candidate: Object.freeze({ ...manifest.candidate }), effectivePolicySha256: manifest.effectivePolicySha256 });
 }
 

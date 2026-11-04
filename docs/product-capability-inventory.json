@@ -2375,7 +2375,9 @@
         "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-command-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-tests"
       ],
       "runners": [
         "host-only"
