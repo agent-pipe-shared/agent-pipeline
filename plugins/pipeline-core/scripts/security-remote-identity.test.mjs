@@ -50,7 +50,9 @@ test("security evidence follows one effective push destination across a remote r
   git("remote", "set-url", "--push", "release", "https://example.invalid/other.git");
   assert.equal((await scan()).repositorySha256, digest("https://example.invalid/other.git"));
   git("remote", "remove", "release");
-  assert.notEqual((await scan()).status, "clean");
+  // No remote and no name: the typed local-only subject (no repository identity); the push gate refuses it, so it can never stand for a destination.
+  const localOnly = await scan();
+  assert.deepEqual([localOnly.status, localOnly.destination, localOnly.repositorySha256], ["clean", "local-only", null]);
   git("remote", "add", "first", "https://example.invalid/one.git");
   git("remote", "add", "second", "https://example.invalid/two.git");
   assert.notEqual((await scan()).status, "clean");
