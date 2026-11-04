@@ -15,6 +15,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { windowsDriveLetterIdentity, windowsNotationCandidate } from "./repository-path-identity.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 import { LEGACY_MANIFEST, LEGACY_STATE, NEUTRAL_MANIFEST, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "./project-authority-read.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
@@ -751,7 +752,9 @@ function activeFeatureState(repoRoot) {
   // into the new folder while activeFeature.planPath still names the old one. The authority PRD
   // path is trusted only when it is a normalized prd_*.md path under specs/; anything else falls
   // back to planPath exactly as before.
-  const authorityPrd = normalizeRepositoryPath(state?.continuity?.authority?.prd?.path);
+  // Late binding: a draft package names its PRD by path alone, so the path comes from the shared seal reader, which gives it
+  // for a sealed package and a draft alike and gives none for an authority without a valid shape.
+  const authorityPrd = normalizeRepositoryPath(readAuthoritySeal(state?.continuity?.authority).paths?.prd);
   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
     ? authorityPrd
     : null;

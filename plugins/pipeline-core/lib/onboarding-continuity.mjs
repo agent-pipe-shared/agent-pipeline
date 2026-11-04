@@ -112,6 +112,7 @@ import {
   validPlanCancellation,
   validPlanMixedStateRecovery,
 } from "./plan-spec-state-v2.mjs";
+import { readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
@@ -1593,6 +1594,16 @@ function operatorConfirmedContinuity(observed, operatorAuthority) {
   };
 }
 
+/**
+ * Late binding: the digests `continuity.authority` binds, read through the shared seal reader. `{}` for a draft or an authority
+ * without a valid shape, so a comparison against a digest is false -- a draft never matches a sealed bind, a replay or a history
+ * entry, and the callers refuse or report "no candidate" exactly as for any other mismatch.
+ */
+function boundAuthorityDigests(continuity) {
+  const seal = readAuthoritySeal(continuity?.authority);
+  return seal.status === "sealed" ? seal.digests : {};
+}
+
 function normalizedContinuity(state, observed) {
   const current = state.continuity;
   if (!isObject(current)
@@ -1605,10 +1616,15 @@ function normalizedContinuity(state, observed) {
   if (!validateContinuityState(next.continuity, next.activeFeature?.id).ok) {
     fail("CONTINUITY-REPAIR-UNSUPPORTED", "damaged continuity has additional invalid fields");
   }
+  // A repair that compares the observed bytes to the bound digests has nothing to compare for a draft: refuse, with the exits.
+  const sealed = requireSealedAuthority(next.continuity.authority);
+  if (!sealed.ok) {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", `${sealed.reason} (typed exits: ${sealed.exits.join(", ")})`);
+  }
   const prd = repairArtifact(observed.root, next.continuity.authority.prd.path, "continuity PRD");
   const spec = repairArtifact(observed.root, next.continuity.authority.spec.path, "continuity specification");
-  if (prd.sha256 !== next.continuity.authority.prd.sha256
-    || spec.sha256 !== next.continuity.authority.spec.sha256) {
+  if (prd.sha256 !== sealed.digests.prd
+    || spec.sha256 !== sealed.digests.spec) {
     fail("CONTINUITY-REPAIR-UNSUPPORTED", "continuity authority bytes do not match state");
   }
   if (observed.historyObservation.status !== "present") {
@@ -5186,9 +5202,9 @@ function validatePlan(plan) {
     || state.activeFeature.phase !== "design"
     || state.planApproved !== false
     || state.continuity.authority.prd.path !== plan.targets.prd.path
-    || state.continuity.authority.prd.sha256 !== plan.targets.prd.afterSha256
+    || boundAuthorityDigests(state.continuity).prd !== plan.targets.prd.afterSha256
     || state.continuity.authority.spec.path !== plan.targets.spec.path
-    || state.continuity.authority.spec.sha256 !== plan.targets.spec.afterSha256
+    || boundAuthorityDigests(state.continuity).spec !== plan.targets.spec.afterSha256
     || state.continuity.authority.prd.path === plan.targets.handover.path
     || state.continuity.authority.spec.path === plan.targets.handover.path
     || !validateContinuityState(state.continuity, state.activeFeature.id).ok) {
@@ -5525,8 +5541,8 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
   if (prd.status !== "present" || spec.status !== "present"
     || entry.calibrationSha256 !== observed.calibrationSha256
     || entry.handoverSha256 !== observed.handoverObservation.sha256
-    || entry.prdSha256 !== continuity.authority.prd.sha256
-    || entry.specSha256 !== continuity.authority.spec.sha256
+    || entry.prdSha256 !== boundAuthorityDigests(continuity).prd
+    || entry.specSha256 !== boundAuthorityDigests(continuity).spec
     || entry.prdSha256 !== prd.sha256
     || entry.specSha256 !== spec.sha256) return null;
 
@@ -5842,9 +5858,9 @@ function validatePromotionPlan(plan) {
     || state.activeFeature.planPath !== input.planPath || state.activeFeature.phase !== "design"
     || state.planApproved !== false || state.continuity.featureId !== input.featureId
     || state.continuity.authority.prd.path !== input.prdPath
-    || state.continuity.authority.prd.sha256 !== plan.authority.prd.sha256
+    || boundAuthorityDigests(state.continuity).prd !== plan.authority.prd.sha256
     || state.continuity.authority.spec.path !== input.specPath
-    || state.continuity.authority.spec.sha256 !== plan.authority.spec.sha256
+    || boundAuthorityDigests(state.continuity).spec !== plan.authority.spec.sha256
     || !(state.bootstrapAcknowledgementRequired === undefined || state.bootstrapAcknowledgementRequired === true)
     || !validateContinuityState(state.continuity, input.featureId).ok) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
@@ -5968,8 +5984,8 @@ function buildCoordinatorSourcedPromotionPlan({
       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
       || observed.state?.continuity?.featureId !== input.featureId
-      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
-      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
+      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
+      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
       fail("KICKOFF-PROMOTION-REPLAY", "coordinator-sourced binding replay does not match the exact completed postimage");
     }
     const binding = {
@@ -6168,8 +6184,8 @@ function buildKickoffPromotionPlan({
       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
       || observed.state?.continuity?.featureId !== input.featureId
-      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
-      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
+      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
+      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
       fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
     }
     const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
@@ -9323,8 +9339,8 @@ function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionClean
     || observed.history.transactions.length !== 2 || !promotedRevisions.includes(state?.continuity?.revision)
     || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
     || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
-    || state.continuity.authority.prd?.sha256 !== entry.prdSha256
-    || state.continuity.authority.spec?.sha256 !== entry.specSha256
+    || boundAuthorityDigests(state.continuity).prd !== entry.prdSha256
+    || boundAuthorityDigests(state.continuity).spec !== entry.specSha256
     || entry.afterStateSha256 !== observed.stateObservation.sha256
     || !isObject(binding.binding.sessionCleanup)) return null;
   let beforeSha256;

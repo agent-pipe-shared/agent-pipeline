@@ -4576,6 +4576,12 @@
       "file": "plugins/pipeline-core/scripts/orchestrator-commit-record.test.mjs",
       "invariantPinned": "The host-commit recover helper reads the dispatch binding from the briefing, refuses a missing briefed check file, a staged foreign file or a moved HEAD with a typed code and the exact next command, commits with only the allowed trailers, and writes the typed orchestrator-attested record (labelled not host-observed) for exactly that commit; the close authorship check counts the record only for a candidate that contains the commit, the writer still refuses an unobserved v4 authored-commit record, and the failure messages name the plan and heal commands (C19c E1, AC-108)",
       "nonOverlapNote": "Unique cases: the record route of scripts/goldfish-host-commit-recover.mjs, the attested-commit binding in lib/close-authorship-record.mjs and the E1 hook messages; goldfish-host-commit-recover-tests keeps the commit-only contract"
+    },
+    {
+      "name": "authority-seal-readers-tests",
+      "file": "plugins/pipeline-core/lib/authority-seal-readers.test.mjs",
+      "invariantPinned": "The continuity state schema accepts the draft authority (sealed false, paths without digests) and rejects every other shape, a state without the marker keeps its exact old verdict, the core readers of the bound authority (continuity-state, plan-spec-state-v2, critical-action authorization, po-gate authority read, onboarding continuity) read through the shared seal reader, the authority-bearing gates refuse an unsealed package with the typed exits prepare-seal and reopen-design, and reopen-design and the ordinary compare-and-swap stay executable on a draft (C19 late-binding build step 2)",
+      "nonOverlapNote": "Unique cases: the draft schema shapes and the per-reader draft verdicts; authority-seal-reader tests pin the shared reader itself, continuity-state and plan-spec-state-v2 tests pin the unchanged sealed verdicts"
     }
   ]
 }

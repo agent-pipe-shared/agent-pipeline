@@ -7,6 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { requireSealedAuthority } from "./authority-seal-reader.mjs";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -147,6 +148,12 @@ export function criticalActionAuthority({ state, kind, candidate, projectDir, gi
  * caller's route-specific object; everything else is uniform.
  */
 export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now, projectDir }) {
+  // Late binding: a critical action is an authority-bearing gate after the approval. A feature whose continuity authority is a
+  // draft (or has no valid shape) binds no digest, so no signature can cover it: refuse with the typed exits before anything else.
+  if (object(state?.continuity) && Object.hasOwn(state.continuity, "authority")) {
+    const sealed = requireSealedAuthority(state.continuity.authority);
+    if (!sealed.ok) return { ok: false, code: sealed.code === "ASR-NOT-SEALED" ? `${prefix}-NOT-SEALED` : `${prefix}-STATE-AUTHORITY`, exits: sealed.exits, reason: sealed.reason };
+  }
   if (!object(recorded) || !object(recorded.proof) || !object(recorded.action)
     || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) {
     return { ok: false, code: `${prefix}-RECORD-INCOMPLETE` };

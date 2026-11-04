@@ -6,6 +6,7 @@
  * filesystem I/O and command routing; this module owns only closed values.
  */
 import { createHash } from "node:crypto";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
 
@@ -1155,11 +1156,12 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
 // shape reopenPlanDesign() already special-cases, and the hostile/malformed
 // fixtures this module's own tests construct) does not, and this predicate
 // deliberately fails closed (false) rather than guess when it cannot tell.
+//
+// Late binding: a draft package (`sealed: false`, paths without digests) is NOT bound and so is not locked -- there is nothing
+// to release, and reopen-design stays executable (it replays as an open design). The shared reader owns the verdict.
 function continuityAuthorityBound(state) {
-  const authority = state.continuity?.authority;
-  if (!isPlainObject(authority)) return false;
-  return isPlainObject(authority.prd) && isRepositoryPath(authority.prd.path) && SHA256.test(authority.prd.sha256 ?? "")
-    && isPlainObject(authority.spec) && isRepositoryPath(authority.spec.path) && SHA256.test(authority.spec.sha256 ?? "");
+  const seal = readAuthoritySeal(state.continuity?.authority);
+  return seal.status === "sealed" && isRepositoryPath(seal.paths.prd) && isRepositoryPath(seal.paths.spec);
 }
 
 export function reopenPlanDesign({
