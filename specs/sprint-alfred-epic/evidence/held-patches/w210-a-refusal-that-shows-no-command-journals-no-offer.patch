@@ -1,0 +1,195 @@
+diff --git a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+index 821f2cdc9..b872089ae 100644
+--- a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
++++ b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+@@ -74,10 +74,52 @@ const EXTERNAL_ROUTES = [
+   ["HGO-EXTERNAL-ADAPTER-BOUNDARY", "Read", { file_path: CANARY }],
+ ];
+ 
+-test("R-AC-08: every external-operator hand-off journals a validated offered command-offer", () => {
++// PO decision 2026-11-04 (a Windows consumer measured 144 s of plugin-identity hashing and journaling under the registry lock for one refusal):
++// an offer is journaled only for a route that really puts a command in front of the human (R-AC-08 is about the offer existing BEFORE a
++// command is handed over). A route that hands over no command -- sensitive input, a file outside the project, a read the adapter cannot
++// attest -- is returned at once with its nextAction and journals nothing. The one Bash input that still reaches a command-carrying
++// external-operator route is a redirect out of the project; it is the journaling fixture of this suite.
++const JOURNALED_COMMAND = "echo hi > ../other/out.txt";
++const JOURNALED_ROUTES = [
++  ["HGO-EXTERNAL-PROJECT-BOUNDARY", "Bash", { command: JOURNALED_COMMAND }],
++];
++const JOURNALED_ROUTE = JOURNALED_ROUTES[0];
++
++test("a route that hands over no command returns its nextAction and journals nothing, even when the journal is unavailable", () => {
+   const root = fixture();
+   try {
+     for (const [code, toolName, toolInput] of EXTERNAL_ROUTES) {
++      const appended = [];
++      const observed = recordHumanGuardDenial({
++        rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials: denial, nowMs: NOW, appendCommandOffer: verifiedAppend(appended),
++      });
++      assert.equal(observed.status, "external-operator-required", code);
++      assert.equal(observed.code, code, code);
++      assert.equal(typeof observed.nextAction, "object", code);
++      // The route may name the keys with an empty value; what matters is that no command string is handed over.
++      assert.notEqual(typeof observed.nextAction.action?.command, "string", code);
++      assert.notEqual(typeof observed.nextAction.action?.copyCommand, "string", code);
++      assert.equal(Object.hasOwn(observed, "journalRefusal"), false, code);
++      assert.deepEqual(appended, [], `${code} journals nothing`);
++      // An unavailable journal cannot refuse a route that never needed it.
++      const unavailable = recordHumanGuardDenial({
++        rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials: denial, nowMs: NOW, appendCommandOffer: () => { throw new Error("journal unavailable"); },
++      });
++      assert.equal(unavailable.code, code, code);
++      assert.equal(typeof unavailable.nextAction, "object", code);
++      assert.equal(Object.hasOwn(unavailable, "journalRefusal"), false, code);
++    }
++    // The production writer is never reached either: no journal file appears.
++    assert.throws(() => readFileSync(journalPath(root), "utf8"), (error) => error.code === "ENOENT");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("R-AC-08: every command-carrying external-operator hand-off journals a validated offered command-offer", () => {
++  const root = fixture();
++  try {
++    for (const [code, toolName, toolInput] of JOURNALED_ROUTES) {
+       const appended = [];
+       const observed = recordHumanGuardDenial({
+         rootDir: root,
+@@ -144,8 +186,8 @@ test("R-AC-08: the offer append happens before the route is returned", () => {
+     const observed = recordHumanGuardDenial({
+       rootDir: root,
+       pluginRoot: PLUGIN_ROOT,
+-      toolName: "Read",
+-      toolInput: { file_path: CANARY },
++      toolName: JOURNALED_ROUTE[1],
++      toolInput: JOURNALED_ROUTE[2],
+       denials: denial,
+       nowMs: NOW,
+       appendCommandOffer: (event) => {
+@@ -167,7 +209,7 @@ test("R-AC-08: the offer append happens before the route is returned", () => {
+ test("R-AC-10: an append that throws suppresses nextAction and returns the typed refusal", () => {
+   const root = fixture();
+   try {
+-    for (const [code, toolName, toolInput] of EXTERNAL_ROUTES) {
++    for (const [code, toolName, toolInput] of JOURNALED_ROUTES) {
+       const observed = recordHumanGuardDenial({
+         rootDir: root,
+         pluginRoot: PLUGIN_ROOT,
+@@ -202,14 +244,14 @@ test("R-AC-10: an unverified append readback suppresses nextAction the same way"
+       const observed = recordHumanGuardDenial({
+         rootDir: root,
+         pluginRoot: PLUGIN_ROOT,
+-        toolName: "Read",
+-        toolInput: { file_path: CANARY },
++        toolName: JOURNALED_ROUTE[1],
++        toolInput: JOURNALED_ROUTE[2],
+         denials: denial,
+         nowMs: NOW,
+         appendCommandOffer,
+       });
+       assert.deepEqual(Object.keys(observed), ["status", "code", "journalRefusal"], label);
+-      assert.equal(observed.code, "HGO-EXTERNAL-ADAPTER-BOUNDARY", label);
++      assert.equal(observed.code, JOURNALED_ROUTE[0], label);
+       assert.equal(observed.journalRefusal, GUARD_HANDOFF_JOURNAL_REFUSAL, label);
+       assert.equal(Object.hasOwn(observed, "nextAction"), false, label);
+     }
+@@ -245,7 +287,7 @@ test("lifecycle-not-ready never creates a signature path or external hand-off of
+ test("R-AC-05/R-AC-06: the journaled offer omits the four mandatory classes and carries no command, path, or tool input", () => {
+   const root = fixture();
+   try {
+-    for (const [code, toolName, toolInput] of EXTERNAL_ROUTES) {
++    for (const [code, toolName, toolInput] of JOURNALED_ROUTES) {
+       const appended = [];
+       recordHumanGuardDenial({
+         rootDir: root,
+@@ -352,12 +394,12 @@ test("R-AC-08: the production writer appends to its own journal file without rew
+     const first = recordHumanGuardDenial({
+       rootDir: root,
+       pluginRoot: PLUGIN_ROOT,
+-      toolName: "Read",
+-      toolInput: { file_path: CANARY },
++      toolName: "Bash",
++      toolInput: { command: JOURNALED_COMMAND },
+       denials: denial,
+       nowMs: NOW,
+     });
+-    assert.equal(first.code, "HGO-EXTERNAL-ADAPTER-BOUNDARY");
++    assert.equal(first.code, "HGO-EXTERNAL-PROJECT-BOUNDARY");
+     assert.equal(typeof first.nextAction, "object");
+     const after = readFileSync(journalPath(root), "utf8").split("\n").filter(Boolean);
+     assert.equal(after.length, 1);
+@@ -365,14 +407,12 @@ test("R-AC-08: the production writer appends to its own journal file without rew
+     assert.deepEqual(validateCommandOfferEvent(event), event);
+     assert.equal(event.state, "offered");
+ 
+-    // Same ADR-0059 Decision 6 rule as EXTERNAL_ROUTES above: only an escape
+-    // whose absolute target itself matches the sensitive-path pattern is
+-    // refused into the external-operator route this test exercises.
++    // A second, different command-carrying denial appends a second line.
+     const second = recordHumanGuardDenial({
+       rootDir: root,
+       pluginRoot: PLUGIN_ROOT,
+-      toolName: "Write",
+-      toolInput: { file_path: "../secrets/outside-canary.txt", content: CANARY },
++      toolName: "Bash",
++      toolInput: { command: "echo hi > ../other/second.txt" },
+       denials: denial,
+       nowMs: NOW + 1000,
+     });
+@@ -389,13 +429,13 @@ test("R-AC-08: the production writer appends to its own journal file without rew
+ test("PF-51: a full journal is moved aside and retained at the next offer, and the new journal holds only that offer", () => {
+   const root = fixture();
+   try {
+-    const record = (nowMs) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read",
+-      toolInput: { file_path: CANARY }, denials: denial, nowMs });
+-    assert.equal(record(NOW).code, "HGO-EXTERNAL-ADAPTER-BOUNDARY");
++    const record = (nowMs) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash",
++      toolInput: { command: JOURNALED_COMMAND }, denials: denial, nowMs });
++    assert.equal(record(NOW).code, "HGO-EXTERNAL-PROJECT-BOUNDARY");
+     const path = journalPath(root), first = readFileSync(path, "utf8");
+     writeFileSync(path, first.repeat(Math.ceil(262144 / first.length) + 1), { mode: 0o600 });
+     const full = readFileSync(path, "utf8");
+-    assert.equal(record(NOW + 1000).code, "HGO-EXTERNAL-ADAPTER-BOUNDARY");
++    assert.equal(record(NOW + 1000).code, "HGO-EXTERNAL-PROJECT-BOUNDARY");
+     const current = readFileSync(path, "utf8").split("\n").filter(Boolean);
+     assert.equal(current.length, 1);
+     assert.equal(JSON.parse(current[0]).occurredAtEpochMs, NOW + 1000);
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index d4cdbd691..42a7580a8 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -3250,6 +3250,18 @@ function commandOfferDigests({ repo, repository, policy, toolName, eligiblePaths
+  * hook, where a throw would replace a typed refusal with an unroutable crash
+  * (the exact defect ADR-0059 Decision 4 already had to close once).
+  */
++/**
++ * True only when the route puts a command in front of the human: a non-empty `command` or `copyCommand` in its action. The route
++ * builders disclose a command only for a non-secret Bash input (recoveryRoute, HGO-EXTERNAL-PROJECT-BOUNDARY); every other
++ * external-operator route carries a tool name and a digest and nothing to run.
++ */
++function routeHandsCommandToHuman(route) {
++  const action = route?.nextAction?.action;
++  if (!object(action)) return false;
++  return (typeof action.command === "string" && action.command.length > 0)
++    || (typeof action.copyCommand === "string" && action.copyCommand.length > 0);
++}
++
+ function journaledExternalOperatorRoute(route, {
+   repo, repository, pluginRoot, toolName, denials, eligiblePaths, nowMs, appendCommandOffer,
+ }) {
+@@ -3850,9 +3862,11 @@ export function recordHumanGuardDenial({
+       pluginRoot,
+       repository,
+     });
+-    // Only the external-operator routes hand a human a copy-only command, so only
+-    // they need a journaled offer first; every other route is returned unchanged.
+-    return route.status === "external-operator-required"
++    // Only a route that really hands a human a command needs a journaled offer first (R-AC-08: the offer exists BEFORE a command is
++    // handed over). A route that carries no command (a read the adapter cannot attest, sensitive input, a file outside the project)
++    // hands over nothing, so it is returned at once: PO decision 2026-11-04 (a Windows consumer measured 144 s of plugin-identity
++    // hashing and journaling under the registry lock for such a refusal). Every other route is returned unchanged.
++    return route.status === "external-operator-required" && routeHandsCommandToHuman(route)
+       ? journaledExternalOperatorRoute(route, {
+         repo,
+         repository,

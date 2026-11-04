@@ -1,0 +1,207 @@
+diff --git a/plugins/pipeline-core/lib/admission-deadline.mjs b/plugins/pipeline-core/lib/admission-deadline.mjs
+new file mode 100644
+index 000000000..9a15abd49
+--- /dev/null
++++ b/plugins/pipeline-core/lib/admission-deadline.mjs
+@@ -0,0 +1,62 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * admission-deadline.mjs -- one process-wide deadline for the dispatch admission, checked inside the registry read loops.
++ *
++ * WHY. The host ends a PreToolUse hook at its timeout (guard-dispatch: 330 s) and then lets the tool call run: a timed-out hook is
++ * not a block. A measured native Windows consumer run (2026-11-04) let the admission read the session-authority registry for the whole
++ * timeout; the host ended it while it held the registry lock and before it wrote the pending host-commit state, and the dispatch
++ * started with no admission result, no pending state, no warning and a lock owned by a dead process. The phase checkpoints
++ * (createAdmissionCheckpoint) cannot see this: none of them lies before the long registry reads.
++ *
++ * SHAPE. The admission sets the deadline (its start plus its budget minus a margin for printing and unwinding) around the preparation
++ * and clears it afterwards. The registry read loops and the read-only native observations call assertAdmissionDeadline(), which throws a
++ * typed GUARD-DISPATCH-SLOW error. The throw unwinds through withSessionAuthorityBoundary, whose finally releases the lock, and the
++ * preparation turns it into a refusal the guard prints. It is deliberately NOT checked on the cleanup path (reading or removing the lock
++ * file in that finally): a deadline that interrupts the release would leave the lock behind, which is the failure this closes.
++ *
++ * Platform-neutral on purpose: the loops run on every platform; only the cost per step differs.
++ */
++
++/** The margin kept for printing the refusal and releasing the lock before the host's own timeout. */
++export const ADMISSION_DEADLINE_MARGIN_MS = 5000;
++
++let deadlineAtMs = null;
++let startedAtMs = null;
++let budgetMs = null;
++let checks = 0;
++
++/**
++ * @param {{startMs: number, budgetMs: number}} deadline the admission start and its budget (milliseconds)
++ * @param {number} [marginMs] time kept free before the budget ends
++ */
++export function setAdmissionDeadline({ startMs, budgetMs: budget } = {}, marginMs = ADMISSION_DEADLINE_MARGIN_MS) {
++  if (!Number.isFinite(startMs) || !Number.isFinite(budget) || budget <= 0) { clearAdmissionDeadline(); return false; }
++  startedAtMs = startMs;
++  budgetMs = budget;
++  deadlineAtMs = startMs + budget - Math.max(0, marginMs);
++  checks = 0;
++  return true;
++}
++
++export function clearAdmissionDeadline() {
++  deadlineAtMs = null;
++  startedAtMs = null;
++  budgetMs = null;
++  checks = 0;
++}
++
++export function admissionDeadlineActive() { return deadlineAtMs !== null; }
++
++/** Throws GUARD-DISPATCH-SLOW once the deadline has passed; does nothing while none is set. */
++export function assertAdmissionDeadline(now = Date.now()) {
++  if (deadlineAtMs === null) return;
++  checks += 1;
++  if (now <= deadlineAtMs) return;
++  const seconds = ((now - startedAtMs) / 1000).toFixed(1);
++  const reason = `GUARD-DISPATCH-SLOW: the admission was still reading the session-authority registry after ${seconds}s (${checks} checks), past its ${(budgetMs / 1000).toFixed(0)}s budget; it refuses now so that the host does not end it while it holds the registry lock and then start the dispatch unguarded`;
++  throw Object.assign(new Error(reason), {
++    code: "GUARD-DISPATCH-SLOW",
++    reason,
++    repair: "retry once; if it repeats, run node <plugin-root>/scripts/session-authority-repair.mjs inspect --root <root> and the routine heal it names (finished dispatches whose pending states and stop-failure records remain slow every later admission)",
++  });
++}
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 33e29f4ac..4c54bbf26 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
++import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
+ import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
+@@ -271,8 +272,15 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
+   };
+   let stored;
+-  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline); }
++  // The process-wide deadline only runs with the real clock (a test that injects `now` keeps its own checkpoint semantics) and is
++  // cleared on every exit, so a later call in the same process is never judged by an old admission's budget.
++  const realClockDeadline = admissionDeadline && typeof admissionDeadline === "object" && typeof admissionDeadline.now !== "function";
++  try {
++    if (realClockDeadline) setAdmissionDeadline(admissionDeadline);
++    stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
++  }
+   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
++  finally { if (realClockDeadline) clearAdmissionDeadline(); }
+   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 7507b6a02..f1f7cb79c 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -18,6 +18,7 @@ import { createSessionAuthorityParticipantPorts } from "./session-authority-obse
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
+ import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
++import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
+ import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
+ import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
+ import { readyAndLive, SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "./slice-queue.mjs";
+@@ -26,7 +27,7 @@ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finaliz
+ import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
+ import { nativeManagedDigest, nativeManagedCurrentOwner } from "./native-managed-authority-support.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner, CLAUDE_HOOK_SESSION_OWNER_SOURCE } from "./claude-hook-session-owner.mjs";
+-import { initializeSessionAuthorityRegistry, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
++import { initializeSessionAuthorityRegistry, inspectSessionAuthorityRegistryRead, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+ 
+@@ -203,6 +204,36 @@ const cases = [
+     assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
+     const repo = inspectSignedDescriptorCustodyRepository(root);
+     assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
++    // The process-wide deadline (real clock): an admission that is already past its budget refuses inside the registry reads, with the same
++    // typed code, the lock released and the deadline cleared; a fresh budget admits as before. Win32 or not, the loops are the same.
++    const stale = [];
++    const slow = d177Item(runtime, root, original, "RIGHT", "second", original.criterionLocators["AC-2"], { admissionDeadline: { startMs: Date.now() - 400000, budgetMs: 300000, write: (line) => stale.push(line) } });
++    assert.equal(slow.prepared.ok, false, JSON.stringify(slow.prepared));
++    assert.equal(slow.prepared.code, "GUARD-DISPATCH-SLOW");
++    assert.match(String(slow.prepared.reason), /GUARD-DISPATCH-SLOW: (admission phase [a-z-]+ reached|the admission was still reading the session-authority registry after)/u, "a phase checkpoint or the registry read loop names the budget");
++    assert.equal(admissionDeadlineActive(), false, "the deadline is cleared after the refusal");
++    // The registry reads on their own (what a phase checkpoint cannot see: the long reads before the first checkpoint): a stale deadline makes
++    // the boundary refuse inside its reads with the repair text, and the finally still releases the lock.
++    setAdmissionDeadline({ startMs: Date.now() - 400000, budgetMs: 300000 });
++    try {
++      // inspectSessionAuthorityRegistryRead reports a refusal as a value, so the typed code and reason are read from that result.
++      const read = runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => inspectSessionAuthorityRegistryRead({ repository: repo })));
++      assert.equal(read.status, "refused", JSON.stringify(read));
++      assert.equal(read.code, "GUARD-DISPATCH-SLOW");
++      assert.match(String(read.reason), /still reading the session-authority registry after/u);
++    } finally { clearAdmissionDeadline(); }
++    assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the deadline refusal released the registry lock");
++    const fresh = d177Item(runtime, root, original, "RIGHT", "second", original.criterionLocators["AC-2"], { admissionDeadline: { startMs: Date.now(), budgetMs: 300000, write: () => {} } });
++    assert.equal(fresh.prepared.ok, true, JSON.stringify(fresh.prepared));
++    assert.equal(admissionDeadlineActive(), false, "the deadline is cleared after the admission");
++    // The module on its own: nothing set means no check; a set deadline throws only after its time; the margin is kept free.
++    setAdmissionDeadline({ startMs: 1000, budgetMs: 10000 });
++    assertAdmissionDeadline(5000);
++    assert.throws(() => assertAdmissionDeadline(1000 + 10000 - ADMISSION_DEADLINE_MARGIN_MS + 1), (error) => error.code === "GUARD-DISPATCH-SLOW" && typeof error.repair === "string");
++    clearAdmissionDeadline();
++    assertAdmissionDeadline(10 ** 12);
++    assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
++    assert.equal(admissionDeadlineActive(), false);
+   }) },
+   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
+     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 6c465ca14..220afbbae 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -8,6 +8,7 @@ import { hostname } from 'node:os';
+ import { canonical } from './po-approval-proof.mjs';
+ import { observeLinuxProcess } from './native-platform-process-observer.mjs';
+ import { observeWindowsProcessIdentity } from './windows-process-identity.mjs';
++import { assertAdmissionDeadline } from './admission-deadline.mjs';
+ import { inspectSignedDescriptorCustodyRepository, withCustodyTopologyScope, withSignedDescriptorCustodyManifestLock } from './worktree-lifecycle.mjs';
+ import { inspectSourceOwnedDescriptorHandle } from './session-requester-bridge.mjs';
+ import * as onboarding from './onboarding-continuity.mjs';
+@@ -139,7 +140,7 @@ function nativeSourceRead(path,maxBytes,privateRecord=false){
+ function owned(stat,directory=false,path=null){if(process.platform==='win32'){if(typeof path!=='string')fail('SDC-PRIVATE-PATH','windows-owned-path-required');const observation=windowsAuthority.inspectWindowsOwnedAuthorityPath({path,directory});return directory?observation:nativeWitness(path,observation);}if(stat.isSymbolicLink()||(directory?!stat.isDirectory():!stat.isFile())||(!directory&&stat.nlink!==1)||(stat.mode&0o077)!==0||(typeof process.getuid==='function'&&stat.uid!==process.getuid()))fail('SDC-PRIVATE-PATH','private-ownership');}
+ function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}const abs=safePath(repo,path);let fd;try{const before=lstatSync(abs);owned(before);if(before.size>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-record');fd=openSync(abs,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);owned(opened);const bytes=readFileSync(fd);const after=lstatSync(abs);if(before.dev!==opened.dev||before.ino!==opened.ino||opened.dev!==after.dev||opened.ino!==after.ino||before.mode!==after.mode||bytes.length!==after.size||!equal(hash(bytes),hash(readFileSync(abs))))fail('SDC-AUTHORITY-CAS','physical-record-drift');return {bytes,ref:{path:`.git/${path}`,sha256:hash(bytes),size:bytes.length}};}finally{if(fd!==undefined)closeSync(fd);}}
+ function readRecord(repo,path){const read=readRaw(repo,path);try{const value=JSON.parse(read.bytes.toString('utf8'));if(canonical(value)!==read.bytes.toString('utf8'))fail('SDC-AUTHORITY-UNAVAILABLE','noncanonical-record-json');return {...read,value};}catch{fail('SDC-AUTHORITY-UNAVAILABLE','invalid-record-json');}}
+-function readRef(repo,value){ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
++function readRef(repo,value){assertAdmissionDeadline();ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
+ function privateDirectories(repo,path){if(process.platform==='win32'){let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))windowsAuthority.createWindowsOwnedAuthorityDirectory({path:cursor});windowsAuthority.inspectWindowsOwnedAuthorityPath({path:cursor,directory:true});}return;}let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))mkdirSync(cursor,{mode:0o700});owned(lstatSync(cursor),true);}}
+ // Directory fsync. On win32 the platform may refuse it (EPERM and siblings); that counts as a succeeded write and is
+ // reported as a bounded warning field instead of being thrown. Platform and fs port are injectable for tests.
+@@ -540,7 +541,7 @@ function migrateSourceUpdatedCatalogue(repo){
+   try{writeFileSync(safePath(repo,`${aside}/migration.json`),canonical({schema:'pipeline.session-authority-source-migration.v1',oldParticipantSetSha256:catalogue.participantSetSha256??null,installedParticipantSetSha256:digest(expected),mode,cause,migratedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
+   return {aside,mode};
+ }
+-function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){const child=`${path}/${name}`,s=lstatSync(safePath(repo,child));if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}owned(s,false,process.platform==='win32'?safePath(repo,child):null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
++function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){assertAdmissionDeadline();const child=`${path}/${name}`,s=lstatSync(safePath(repo,child));if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}owned(s,false,process.platform==='win32'?safePath(repo,child):null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
+ function stateRead(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
+ function saveProducer(repo,state,index,value){const row=state.rows[index];value.generation=generation(row.record.value.generation+1);row.record={value,ref:publish(repo,producerPath(value.producerId),value,row.record.ref)};const c={...state.catalogue.value,generation:generation(state.catalogue.value.generation+1),producers:state.catalogue.value.producers.map((e,i)=>i===index?{producerId:e.producerId,producerRef:row.record.ref,producerGeneration:value.generation}:e)};state.catalogue={value:c,ref:publish(repo,cataloguePath,c,state.catalogue.ref)};}
+ function sortedRefs(values){const map=new Map(values.map(v=>[v.path,v]));if(map.size!==values.length)for(const v of values)if(!equal(map.get(v.path),v))fail('SDC-AUTHORITY-CAS','conflicting-references');return [...map.values()].sort((a,b)=>a.path.localeCompare(b.path));}
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 92f4453bc..ef806d38b 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
+ import {isAbsolute,resolve} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
++import {assertAdmissionDeadline} from './admission-deadline.mjs';
+ 
+ const HELPER_SHA256='77c9f91c1497c0b95bf0f38214a34dc339c4786cea03a939e59a470cbab71242';
+ const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
+@@ -56,6 +57,9 @@ function invoke(request){
+  const entry=authorityMemo.get(key);
+  if(entry!==undefined){if(before!==null&&entry.identity===before){authorityMemoCounters.hits+=1;return entry.value;}authorityMemo.delete(key);}
+  authorityMemoCounters.misses+=1;
++ // A read-only observation is the unit of cost on Windows (one PowerShell start); the admission deadline stops a long run of them. Never on
++ // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
++ assertAdmissionDeadline();
+  const value=invokeNative(request);
+  if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
+  return value;
