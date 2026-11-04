@@ -1,0 +1,389 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index f48877e77..28f354dd2 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -623,6 +623,7 @@
+         "verify-phase:harness/scripts/verify.mjs:model-role-v3-baseline-tests",
+         "verify-phase:harness/scripts/verify.mjs:module-cluster-reachability-tests",
+         "verify-phase:harness/scripts/verify.mjs:module-inventory-tests",
++        "verify-phase:harness/scripts/verify.mjs:module-slice-proposal-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-commit-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 15a9fe2be..8adbb537f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4516,6 +4516,12 @@
+       "file": "plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs",
+       "invariantPinned": "The push-prepare evidence freshness check carries a stable code next to its unchanged message for a missing, failed and stale record, the push gate satisfiability classification prefers the code and falls back to the prose for a result without one, and a code never overrides a green result (C19 D4b/E3 stage 2a, AC-108)",
+       "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
++    },
++    {
++      "name": "module-slice-proposal-tests",
++      "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
++      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
++      "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/module-slice-proposal.mjs b/plugins/pipeline-core/lib/module-slice-proposal.mjs
+new file mode 100644
+index 000000000..10a1f8658
+--- /dev/null
++++ b/plugins/pipeline-core/lib/module-slice-proposal.mjs
+@@ -0,0 +1,147 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Slices follow modules (candidate 19, M1.4). A pure, read-only proposal: given the modules of an approved architecture design
++ * (`id`, `ownedPaths`, `allowedDependencies`), it cuts one implementation slice per module, orders the slices in waves from the
++ * dependency edges and serializes modules whose owned paths overlap, so that every slice of a wave has a write scope that no other
++ * slice of that wave touches. It writes no queue, dispatches nothing and decides nothing: the output is the `slice-queue add`
++ * arguments a human or the Elephant may run. `lib/slice-queue.mjs` stays the only judge of a queue (its `validateSliceQueue` runs
++ * on every `add`).
++ *
++ * Direction of the edges: a module that may depend on another module (`allowedDependencies`) is implemented after it, so its slice
++ * `dependsOn` the slice of the module it depends on.
++ */
++import { DEFAULT_SHARED_SURFACES, normalizeScope, scopesOverlap } from "./slice-queue.mjs";
++
++export const MODULE_SLICE_PROPOSAL_SCHEMA = "pipeline.module-slice-proposal.v1";
++export const MAX_MODULES = 64;
++export const MAX_OWNED_PATHS = 32;
++const MODULE_ID = /^[a-z][a-z0-9-]*$/u;
++
++const refuse = (code, reason, extra = {}) => ({ ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code, reason, ...extra });
++
++function validate(modules) {
++  if (!Array.isArray(modules) || modules.length === 0) return refuse("MSP-INPUT", "modules must be a non-empty array");
++  if (modules.length > MAX_MODULES) return refuse("MSP-INPUT", `at most ${MAX_MODULES} modules are supported`);
++  const ids = new Set();
++  for (const [index, module] of modules.entries()) {
++    const where = `modules[${index}]`;
++    if (module === null || typeof module !== "object" || Array.isArray(module)) return refuse("MSP-INPUT", `${where} must be an object`);
++    if (typeof module.id !== "string" || !MODULE_ID.test(module.id)) return refuse("MSP-INPUT", `${where}.id must match ${MODULE_ID}`);
++    if (ids.has(module.id)) return refuse("MSP-INPUT", `duplicate module id ${module.id}`);
++    ids.add(module.id);
++    if (!Array.isArray(module.ownedPaths) || module.ownedPaths.length === 0 || module.ownedPaths.length > MAX_OWNED_PATHS) {
++      return refuse("MSP-INPUT", `${where}.ownedPaths must hold 1 to ${MAX_OWNED_PATHS} paths`);
++    }
++    for (const scope of module.ownedPaths) {
++      const normalized = normalizeScope(scope);
++      if (!normalized.ok) return refuse("MSP-INPUT", `${where}.ownedPaths: ${normalized.reason}`);
++      // `slice-queue add` splits a repeated flag value on commas; a brace scope would be cut apart there.
++      if (typeof scope !== "string" || scope.includes(",")) return refuse("MSP-INPUT", `${where}.ownedPaths: a scope with a comma cannot be passed to slice-queue add`);
++    }
++    if (module.allowedDependencies !== undefined && !Array.isArray(module.allowedDependencies)) return refuse("MSP-INPUT", `${where}.allowedDependencies must be an array`);
++  }
++  for (const module of modules) {
++    for (const dependency of module.allowedDependencies ?? []) {
++      if (!ids.has(dependency)) return refuse("MSP-INPUT", `module ${module.id} depends on unknown module ${String(dependency).slice(0, 64)}`);
++      if (dependency === module.id) return refuse("MSP-INPUT", `module ${module.id} depends on itself`);
++    }
++  }
++  return null;
++}
++
++/** Transitive reachability over `edges` (module id -> ids it depends on). */
++function reaches(edges, from, to) {
++  const seen = new Set();
++  const stack = [from];
++  while (stack.length > 0) {
++    const current = stack.pop();
++    for (const next of edges.get(current) ?? []) {
++      if (next === to) return true;
++      if (!seen.has(next)) { seen.add(next); stack.push(next); }
++    }
++  }
++  return false;
++}
++
++function findCycle(edges, ids) {
++  const state = new Map();
++  const visit = (id, path) => {
++    state.set(id, 1);
++    for (const next of edges.get(id) ?? []) {
++      if (state.get(next) === 1) return [...path.slice(path.indexOf(next)), id].sort();
++      if (!state.has(next)) { const found = visit(next, [...path, id]); if (found) return found; }
++    }
++    state.set(id, 2);
++    return null;
++  };
++  for (const id of ids) if (!state.has(id)) { const found = visit(id, []); if (found) return found; }
++  return null;
++}
++
++/**
++ * @param {Array<{id: string, ownedPaths: string[], allowedDependencies?: string[]}>} modules
++ * @returns the proposal `{ok: true, waves, slices, serialized, addCommands}` or a refusal `{ok: false, code, reason}`; never throws
++ */
++export function proposeSlicesFromModules(modules) {
++  try {
++    const invalid = validate(modules);
++    if (invalid) return invalid;
++    const ids = modules.map((module) => module.id).sort();
++    const byId = new Map(modules.map((module) => [module.id, module]));
++    const edges = new Map(ids.map((id) => [id, new Set(byId.get(id).allowedDependencies ?? [])]));
++    const cycle = findCycle(edges, ids);
++    if (cycle) return refuse("MSP-CYCLE", `the module dependencies form a cycle (${cycle.join(", ")}); a cycle cannot be ordered into waves`, { members: cycle });
++
++    // Modules whose owned paths overlap must not be written at the same time: the later id waits for the earlier one,
++    // unless the dependency edges already order the two.
++    const serialized = [];
++    for (let i = 0; i < ids.length; i += 1) {
++      for (let j = i + 1; j < ids.length; j += 1) {
++        const [first, second] = [ids[i], ids[j]];
++        if (!scopesOverlap(byId.get(first).ownedPaths, byId.get(second).ownedPaths)) continue;
++        if (reaches(edges, first, second) || reaches(edges, second, first)) continue;
++        edges.get(second).add(first);
++        serialized.push({ after: first, before: second, reason: "owned paths overlap" });
++      }
++    }
++
++    const wave = new Map();
++    const waveOf = (id) => {
++      if (wave.has(id)) return wave.get(id);
++      let depth = 0;
++      for (const dependency of edges.get(id)) depth = Math.max(depth, waveOf(dependency) + 1);
++      wave.set(id, depth);
++      return depth;
++    };
++    ids.forEach(waveOf);
++
++    const sliceId = (id) => `slice-${id}`;
++    const slices = ids.map((id) => ({
++      id: sliceId(id),
++      moduleId: id,
++      title: `Implement module ${id}`,
++      writeScope: [...byId.get(id).ownedPaths],
++      dependsOn: [...edges.get(id)].sort().map(sliceId),
++      wave: wave.get(id),
++    })).sort((a, b) => a.wave - b.wave || a.id.localeCompare(b.id));
++    const waves = [];
++    for (const slice of slices) (waves[slice.wave] ??= []).push(slice.id);
++    const addCommands = slices.map((slice) => ({
++      sliceId: slice.id,
++      argv: ["add", "--id", slice.id, "--title", slice.title,
++        ...slice.writeScope.flatMap((scope) => ["--write-scope", scope]),
++        ...(slice.dependsOn.length > 0 ? ["--depends-on", slice.dependsOn.join(",")] : [])],
++    }));
++    // The queue library refuses a write scope that covers a file only the Elephant writes (a shared surface); say so up front.
++    const warnings = [];
++    for (const slice of slices) {
++      const surface = DEFAULT_SHARED_SURFACES.find((candidate) => scopesOverlap(slice.writeScope, [candidate]));
++      if (surface !== undefined) {
++        warnings.push({ code: "MSP-SHARED-SURFACE", sliceId: slice.id, surface, message: `the queue refuses the write scope of ${slice.id}: it covers ${surface}, which only the Elephant writes; narrow the owned paths of module ${slice.moduleId} or keep that module out of the queue` });
++      }
++    }
++    return { ok: true, schema: MODULE_SLICE_PROPOSAL_SCHEMA, modules: ids.length, waves, slices, serialized, warnings, addCommands };
++  } catch (error) {
++    return refuse("MSP-INTERNAL", `the proposal failed (${error?.name ?? "error"})`);
++  }
++}
+diff --git a/plugins/pipeline-core/lib/module-slice-proposal.test.mjs b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+new file mode 100644
+index 000000000..25918369c
+--- /dev/null
++++ b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+@@ -0,0 +1,122 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "./module-slice-proposal.mjs";
++import { run as runProposal } from "../scripts/module-slice-proposal.mjs";
++import { runCli } from "../scripts/slice-queue.mjs";
++import { scopesOverlap } from "./slice-queue.mjs";
++
++const roots = [];
++test.after(() => { for (const dir of roots) rmSync(dir, { recursive: true, force: true }); });
++const tempDir = () => { const dir = mkdtempSync(join(tmpdir(), "msp-")); roots.push(dir); return dir; };
++
++const mod = (id, ownedPaths, allowedDependencies = []) => ({ id, ownedPaths, allowedDependencies });
++
++test("MSP1: independent modules share wave 0, a dependent module follows the module it depends on", () => {
++  const proposal = proposeSlicesFromModules([mod("api", ["src/api/**"], ["core"]), mod("core", ["src/core/**"]), mod("docs", ["docs/**"])]);
++  assert.equal(proposal.ok, true);
++  assert.equal(proposal.schema, MODULE_SLICE_PROPOSAL_SCHEMA);
++  assert.deepEqual(proposal.waves, [["slice-core", "slice-docs"], ["slice-api"]]);
++  const api = proposal.slices.find((slice) => slice.moduleId === "api");
++  assert.deepEqual(api.dependsOn, ["slice-core"]);
++  assert.deepEqual(api.writeScope, ["src/api/**"]);
++  assert.deepEqual(proposal.serialized, []);
++});
++
++test("MSP2: a long chain gets one wave per link and a diamond joins after both branches", () => {
++  const chain = proposeSlicesFromModules([mod("c", ["src/c/**"], ["b"]), mod("b", ["src/b/**"], ["a"]), mod("a", ["src/a/**"])]);
++  assert.deepEqual(chain.waves, [["slice-a"], ["slice-b"], ["slice-c"]]);
++  const diamond = proposeSlicesFromModules([mod("top", ["src/top/**"], ["left", "right"]), mod("left", ["src/left/**"], ["base"]), mod("right", ["src/right/**"], ["base"]), mod("base", ["src/base/**"])]);
++  assert.deepEqual(diamond.waves, [["slice-base"], ["slice-left", "slice-right"], ["slice-top"]]);
++});
++
++test("MSP3: modules with overlapping owned paths are serialized, unless the dependencies already order them", () => {
++  const overlapping = proposeSlicesFromModules([mod("a", ["src/**"]), mod("b", ["src/b/**"]), mod("c", ["docs/**"])]);
++  assert.equal(overlapping.ok, true);
++  assert.deepEqual(overlapping.serialized, [{ after: "a", before: "b", reason: "owned paths overlap" }]);
++  assert.deepEqual(overlapping.waves, [["slice-a", "slice-c"], ["slice-b"]]);
++  const ordered = proposeSlicesFromModules([mod("a", ["src/**"]), mod("b", ["src/b/**"], ["a"])]);
++  assert.deepEqual(ordered.serialized, [], "an existing dependency already orders the pair");
++  // No slice of one wave may write a path another slice of the same wave writes.
++  for (const proposal of [overlapping, ordered]) {
++    for (const wave of proposal.waves) {
++      const members = proposal.slices.filter((slice) => wave.includes(slice.id));
++      for (let i = 0; i < members.length; i += 1) for (let j = i + 1; j < members.length; j += 1) assert.equal(scopesOverlap(members[i].writeScope, members[j].writeScope), false);
++    }
++  }
++});
++
++test("MSP4: a dependency cycle is refused with its members, and every invalid input is a typed refusal that never throws", () => {
++  const cycle = proposeSlicesFromModules([mod("a", ["src/a/**"], ["b"]), mod("b", ["src/b/**"], ["c"]), mod("c", ["src/c/**"], ["a"]), mod("d", ["src/d/**"])]);
++  assert.equal(cycle.ok, false);
++  assert.equal(cycle.code, "MSP-CYCLE");
++  assert.deepEqual(cycle.members, ["a", "b", "c"]);
++  const invalid = [
++    undefined, null, [], "x", [null], [{}], [mod("Bad_Id", ["src/**"])], [mod("a", [])], [mod("a", ["/abs/**"])], [mod("a", ["../up/**"])],
++    [mod("a", ["src/{x,y}/**"])], [mod("a", ["src/a/**"]), mod("a", ["src/b/**"])], [mod("a", ["src/a/**"], ["ghost"])], [mod("a", ["src/a/**"], ["a"])],
++    [{ id: "a", ownedPaths: ["src/**"], allowedDependencies: "b" }], Array.from({ length: 65 }, (_, index) => mod(`m${index}`, [`src/m${index}/**`])),
++  ];
++  for (const input of invalid) {
++    const proposal = proposeSlicesFromModules(input);
++    assert.equal(proposal.ok, false, JSON.stringify(input)?.slice(0, 60));
++    assert.equal(proposal.code, "MSP-INPUT");
++  }
++});
++
++test("MSP5: the printed add commands build a queue the queue library accepts, with the dependencies and scopes of the proposal", () => {
++  const proposal = proposeSlicesFromModules([mod("api", ["src/api/**", "tests/api/**"], ["core"]), mod("core", ["src/core/**"]), mod("docs", ["docs/guide/**"])]);
++  assert.deepEqual(proposal.warnings, []);
++  const queue = join(tempDir(), "slice-queue.json");
++  let first = true;
++  for (const { argv } of proposal.addCommands) {
++    const result = runCli([...argv, "--queue", queue, ...(first ? ["--init-feature", "demo"] : [])]);
++    assert.equal(result.exit, 0, JSON.stringify(result.output));
++    first = false;
++  }
++  const validated = runCli(["validate", "--queue", queue]);
++  assert.equal(validated.exit, 0, JSON.stringify(validated.output));
++  assert.equal(validated.output.slices, 3);
++});
++
++test("MSP5b: a module that owns a file only the Elephant writes is flagged before the queue refuses it", () => {
++  const proposal = proposeSlicesFromModules([mod("docs", ["docs/**"]), mod("core", ["src/core/**"])]);
++  assert.equal(proposal.ok, true);
++  assert.deepEqual(proposal.warnings.map(({ code, sliceId, surface }) => ({ code, sliceId, surface })), [{ code: "MSP-SHARED-SURFACE", sliceId: "slice-docs", surface: "docs/state.md" }]);
++  const refused = runCli([...proposal.addCommands.find((command) => command.sliceId === "slice-docs").argv, "--queue", join(tempDir(), "q.json"), "--init-feature", "demo"]);
++  assert.equal(refused.exit, 3, "the queue library really refuses what the warning names");
++  assert.equal(refused.output.code, "SQ-SHARED-SURFACE");
++});
++
++test("MSP6: the script reads the design of a PRD, proposes from its modules and refuses a missing, unsafe or invalid input", () => {
++  const dir = tempDir();
++  const design = {
++    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
++    modules: ["core", "api"].map((id) => ({
++      id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [],
++    })),
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
++  };
++  mkdirSync(join(dir, "specs"), { recursive: true });
++  writeFileSync(join(dir, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++  const ok = runProposal(["--prd", "specs/prd.md", "--root", dir]);
++  assert.equal(ok.exit, 0, JSON.stringify(ok.output));
++  assert.deepEqual(ok.output.waves, [["slice-core"], ["slice-api"]]);
++  writeFileSync(join(dir, "specs", "no-design.md"), "# PRD without a design block\n");
++  const missing = runProposal(["--prd", "specs/no-design.md", "--root", dir]);
++  assert.equal(missing.exit, 3);
++  assert.equal(missing.output.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
++  symlinkSync(join(dir, "specs", "prd.md"), join(dir, "specs", "link.md"));
++  for (const argv of [[], ["--prd"], ["--prd", "specs/prd.md", "--prd", "specs/prd.md", "--root", dir], ["--prd", "../outside.md", "--root", dir], ["--prd", join(dir, "specs", "prd.md"), "--root", dir],
++    ["--prd", "specs/absent.md", "--root", dir], ["--prd", "specs/link.md", "--root", dir], ["--other", "x"]]) {
++    const refused = runProposal(argv);
++    assert.equal(refused.exit, 2, JSON.stringify(argv));
++    assert.equal(refused.output.code, "MSP-USAGE");
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/module-slice-proposal.mjs b/plugins/pipeline-core/scripts/module-slice-proposal.mjs
+new file mode 100644
+index 000000000..0c85df500
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/module-slice-proposal.mjs
+@@ -0,0 +1,60 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Slices follow modules (candidate 19, M1.4): print the slice-queue proposal for the modules of an approved architecture design.
++ *
++ *   module-slice-proposal.mjs --prd <repository-relative PRD path> [--root <dir>]
++ *
++ * Read-only: it parses the `pipeline-architecture-design` block of the PRD with the same parser the design approval uses, cuts one
++ * slice per module (lib/module-slice-proposal.mjs) and prints ONE JSON document. It never writes a queue and never dispatches.
++ * Run the printed `addCommands` as `slice-queue.mjs <argv> --queue <path>` (the first with `--init-feature <feature>` when the queue
++ * does not exist yet); the queue library validates every add. Exit 0 proposal, 2 usage, 3 design or proposal refused.
++ */
++import { lstatSync, readFileSync } from "node:fs";
++import { isAbsolute, relative, resolve } from "node:path";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { architectureDesignFailureCode, parseArchitectureDesign } from "../lib/architecture-design.mjs";
++import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "../lib/module-slice-proposal.mjs";
++
++export const EXIT = Object.freeze({ OK: 0, USAGE: 2, REFUSED: 3 });
++const MAX_PRD_BYTES = 4 * 1024 * 1024;
++const USAGE = "usage: module-slice-proposal.mjs --prd <repository-relative path> [--root <dir>]";
++
++function usage(reason) { return { exit: EXIT.USAGE, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: "MSP-USAGE", reason, usage: USAGE } }; }
++
++export function run(argv, cwd = process.cwd()) {
++  const flags = {};
++  for (let index = 0; index < argv.length; index += 2) {
++    const name = argv[index];
++    const value = argv[index + 1];
++    if (!["--prd", "--root"].includes(name)) return usage(`unknown argument ${String(name).slice(0, 40)}`);
++    if (typeof value !== "string" || value.startsWith("--")) return usage(`${name} needs a value`);
++    if (Object.hasOwn(flags, name)) return usage(`${name} given twice`);
++    flags[name] = value;
++  }
++  if (flags["--prd"] === undefined) return usage("--prd is required");
++  const root = resolve(cwd, flags["--root"] ?? ".");
++  const target = resolve(root, flags["--prd"]);
++  const inside = relative(root, target);
++  if (isAbsolute(flags["--prd"]) || inside === "" || inside.startsWith("..") || isAbsolute(inside)) return usage("--prd must name a file inside the root, as a repository-relative path");
++  let text;
++  try {
++    const info = lstatSync(target);
++    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_PRD_BYTES) return usage("--prd must name a regular file of at most 4 MiB");
++    text = readFileSync(target, "utf8");
++  } catch { return usage("--prd could not be read"); }
++  let design;
++  try { design = parseArchitectureDesign(text); }
++  catch (error) {
++    return { exit: EXIT.REFUSED, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: architectureDesignFailureCode(error), reason: "the architecture design of the PRD is not valid; the proposal needs the approved design package", ...(typeof error?.field === "string" ? { field: error.field } : {}) } };
++  }
++  const proposal = proposeSlicesFromModules(design.modules);
++  return { exit: proposal.ok ? EXIT.OK : EXIT.REFUSED, output: proposal };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const { exit, output } = run(process.argv.slice(2));
++  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
++  process.exitCode = exit;
++}
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index c0c1dd7ff..8b4455e3c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -35,6 +35,8 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
+    Cut the dispatches along the modules of the design (`architecture/fitness-model.json`): one dispatch per module, with that module's `ownedPaths` as the
+    `--path` scope, so the write scopes are disjoint and the dispatches can run in parallel. A design with a single module leaves no parallel slice; take
+    that back to the design (the readiness question about decomposition) instead of splitting one module by file.
++   `module-slice-proposal.mjs --prd <plan path>` prints that cut read-only: the waves from the module dependencies, the modules it serializes because
++   their owned paths overlap, and the `slice-queue.mjs add` arguments; it writes no queue.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.

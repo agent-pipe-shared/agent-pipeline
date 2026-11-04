@@ -47,6 +47,7 @@
 #   w159  D4b/E3 order of work step 2a: push-prepare's evidence freshness check carries a stable code next to its unchanged message and push-gate-satisfiability prefers it (prose fallback kept; guard-push, the security completeness gate and the hook template are not moved yet)
 #   w160  the w148 ARA suite gets its case-completion registry row and policy (the checker reported it VULNERABLE-UNREGISTERED on the chain), and the checker test's pins follow the measured counts
 #   w161  D4b/E3 order of work step 2b (first half): push-prepare and guard-push take the freshness verdict (missing, exit code, stale commit, push boundary) from one shared function and keep their own messages; the hook template and the security completeness gate are not moved
+#   w163  M1.4: a read-only proposal (module-slice-proposal.mjs --prd <plan>) cuts one slice per module of the approved design, with waves from the module dependencies, overlaps serialized and the slice-queue add arguments; it writes no queue
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w162  (OPT-IN, APPLY_AUTHORITY_CARRY=1) D4b/E3 step 3: the push guard and push-prepare accept a Verify or Security record bound to an earlier commit when every commit since changed only the closed evidence set (Security additionally needs a clean gitleaks scan of those commits); WIDENS what a push accepts
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
@@ -115,6 +116,7 @@ step2 w158-d4b-stage-2-the-record-only-path-set-lives-in-one-module-the-promotio
 step2 w159-d4b-stage-2a-the-evidence-freshness-check-carries-a-stable-code-and-satisfiability-prefers-it "feat(push): the evidence freshness check carries a stable code next to its message and the satisfiability status prefers it"
 step2 w160-the-ara-suite-gets-its-case-completion-registry-row-and-policy-and-the-registry-pins-follow-the-measured-counts "fix(verify): the ARA suite gets its case-completion registry row and policy and the registry pins follow the measured counts"
 step2 w161-d4b-stage-2b-push-prepare-and-guard-push-take-the-freshness-verdict-from-one-shared-function "refactor(push): push-prepare and guard-push take the freshness verdict from one shared function and keep their own messages"
+step2 w163-m1-4-a-read-only-proposal-cuts-one-slice-per-module-with-waves-from-the-dependencies "feat(slices): propose one slice per module of the approved design with waves from the dependencies and serialized overlaps, read-only"
 # OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then
