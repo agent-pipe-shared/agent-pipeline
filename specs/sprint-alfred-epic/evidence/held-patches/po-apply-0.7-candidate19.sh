@@ -31,6 +31,8 @@
 #   w143  the fitness evaluation reports file and module size against optional sizeBudgets, report-only (M1.3, all three greenfield runs; Goldfish slice, imported by the Elephant)
 #   w144  the readiness reviewer raises a decomposition question for a single module that carries several responsibilities (M1.2, all three greenfield runs)
 #   w145  the happy path creates and commits the push threat model with the draft commit when the push gate requires approval (D4a, AGY greenfield; guidance only, no enforcement)
+#   w146  the analysis-run command runs the registered verify command of a commit in a throwaway clone and records a labelled result (F2a, Codex greenfield; Goldfish slice, imported by the Elephant; the shell-guard admission F2b is NOT built)
+#   w147  register the analysis-run lib and CLI suites (delta on w146)
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
@@ -82,6 +84,8 @@ step2 w142-e7-the-goldfish-task-template-says-the-briefing-is-generated "docs(te
 step2 w143-m13-the-fitness-evaluation-reports-size-budgets-without-blocking "feat(architecture): the fitness evaluation reports file and module size against optional sizeBudgets as a non-blocking advisory"
 step2 w144-m12-the-readiness-reviewer-raises-a-decomposition-question "feat(readiness): the readiness reviewer raises a decomposition question for a single module that carries several responsibilities"
 step2 w145-d4a-the-happy-path-materializes-the-push-threat-model-with-the-draft-commit "docs(happy-path): create and commit the push threat model with the draft commit when the push gate requires approval"
+step2 w146-f2a-the-analysis-run-command-runs-the-registered-verify-command-in-a-throwaway-clone "feat(analysis): the analysis-run command runs the registered verify command of a commit in a throwaway clone and records a labelled result"
+step2 w147-f2a-register-the-analysis-run-suites "chore(verify): register the analysis-run lib and CLI suites"
 # OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then

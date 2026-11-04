@@ -1,0 +1,405 @@
+diff --git a/plugins/pipeline-core/lib/analysis-run.mjs b/plugins/pipeline-core/lib/analysis-run.mjs
+new file mode 100644
+index 000000000..d45e0afea
+--- /dev/null
++++ b/plugins/pipeline-core/lib/analysis-run.mjs
+@@ -0,0 +1,142 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Analysis run (candidate 19, F2a; AC-108): runs the registered `verify` command
++ * of one commit in a throwaway `git clone --no-hardlinks` under
++ * `<git-common-dir>/agent-pipeline/analysis/<run-id>/clone` and records a labelled
++ * `pipeline.analysis-run.v1` result next to it. The result is analysis, never
++ * Verify evidence. The real working tree is only read (HEAD and the digest of
++ * `git status --porcelain=v1 --untracked-files=all`, before and after); a run that
++ * leaves either changed is refused.
++ *
++ * `deps` (all optional): `spawnSync`, `now` (ms clock), `random` (8 hex chars).
++ */
++import { createHash, randomBytes } from 'node:crypto';
++import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
++import { isAbsolute, join, resolve } from 'node:path';
++import { spawnSync as realSpawnSync } from 'node:child_process';
++import { classifyVerifyCommand } from '../scripts/pipeline-state.mjs';
++
++export const ANALYSIS_RESULT_SCHEMA = 'pipeline.analysis-run.v1';
++export const OUTPUT_LIMIT_BYTES = 65536;
++export const DEFAULT_TIMEOUT_SECONDS = 600;
++export const MAX_TIMEOUT_SECONDS = 1800;
++export const KEEP_RUNS = 5;
++export const KEEP_DAYS = 7;
++export const TREE_CHANGED_REPAIR = 'review and revert the change in the working tree';
++
++const RUN_ID = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-[0-9a-f]{8}$/u;
++const CALIBRATION_PATHS = ['project/pipeline.json', '.claude/pipeline.json'];
++
++const refuse = (code, detail) => ({ status: 'refused', code, ...(detail ? { detail } : {}) });
++const sha256 = (text) => createHash('sha256').update(text).digest('hex');
++
++function bounded(buffer) {
++  const bytes = Buffer.from(buffer ?? []);
++  return bytes.length > OUTPUT_LIMIT_BYTES
++    ? { text: bytes.subarray(0, OUTPUT_LIMIT_BYTES).toString('utf8'), truncated: true }
++    : { text: bytes.toString('utf8'), truncated: false };
++}
++
++export function runAnalysis({ root, commit = 'HEAD', timeoutSeconds = DEFAULT_TIMEOUT_SECONDS, deps = {} } = {}) {
++  const spawn = deps.spawnSync ?? realSpawnSync;
++  const now = deps.now ?? (() => Date.now());
++  const random = deps.random ?? (() => randomBytes(4).toString('hex'));
++  if (typeof root !== 'string' || root === '') return refuse('ANALYSIS-USAGE');
++  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > MAX_TIMEOUT_SECONDS) return refuse('ANALYSIS-USAGE');
++  const git = (cwd, args, options = {}) => spawn('git', args, { cwd, encoding: 'utf8', ...options });
++
++  const top = existsSync(root) ? git(resolve(root), ['rev-parse', '--show-toplevel']) : { status: 1 };
++  if (top.status !== 0) return refuse('ANALYSIS-NOT-A-REPOSITORY');
++  const repo = realpathSync(top.stdout.trim());
++  const common = git(repo, ['rev-parse', '--git-common-dir']);
++  if (common.status !== 0) return refuse('ANALYSIS-NOT-A-REPOSITORY');
++  const commonDir = realpathSync(isAbsolute(common.stdout.trim()) ? common.stdout.trim() : resolve(repo, common.stdout.trim()));
++
++  const resolved = git(repo, ['rev-parse', '--verify', '--quiet', `${commit}^{commit}`]);
++  if (resolved.status !== 0) return refuse('ANALYSIS-COMMIT-UNRESOLVED');
++  const sha = resolved.stdout.trim();
++
++  let calibration = null;
++  for (const file of CALIBRATION_PATHS) {
++    const shown = git(repo, ['show', `${sha}:${file}`]);
++    if (shown.status === 0) { calibration = shown.stdout; break; }
++  }
++  let command;
++  try { command = JSON.parse(calibration ?? '').verify; } catch { command = undefined; }
++  if (classifyVerifyCommand(command) !== 'configured') return refuse('ANALYSIS-VERIFY-NOT-CONFIGURED');
++
++  const observe = () => ({
++    head: git(repo, ['rev-parse', 'HEAD']).stdout?.trim() ?? '',
++    status: sha256(git(repo, ['status', '--porcelain=v1', '--untracked-files=all']).stdout ?? ''),
++  });
++  const before = observe();
++
++  const startedMs = now();
++  const stamp = new Date(startedMs).toISOString().replace(/[-:]/gu, '').replace(/\.\d+Z$/u, 'Z');
++  const runId = `${stamp}-${random()}`;
++  const analysisDir = join(commonDir, 'agent-pipeline', 'analysis');
++  const runDir = join(analysisDir, runId);
++  const cloneDir = join(runDir, 'clone');
++  mkdirSync(runDir, { recursive: true });
++  const cloned = git(repo, ['clone', '--quiet', '--no-hardlinks', repo, cloneDir]);
++  const checkedOut = cloned.status === 0 ? git(cloneDir, ['checkout', '--quiet', '--detach', sha]) : cloned;
++  if (checkedOut.status !== 0) { rmSync(runDir, { recursive: true, force: true }); return refuse('ANALYSIS-CLONE-FAILED'); }
++
++  const tmpDir = join(cloneDir, '.analysis-tmp');
++  mkdirSync(tmpDir, { recursive: true });
++  const ran = spawn(command, {
++    cwd: cloneDir,
++    shell: true,
++    encoding: 'buffer',
++    timeout: timeoutSeconds * 1000,
++    killSignal: 'SIGKILL',
++    maxBuffer: 32 * 1024 * 1024,
++    env: { ...process.env, TMPDIR: tmpDir, CLAUDE_PROJECT_DIR: cloneDir },
++  });
++  const timedOut = ran.error?.code === 'ETIMEDOUT';
++  const after = observe();
++  const unchanged = before.head === after.head && before.status === after.status;
++  const out = bounded(ran.stdout);
++  const err = bounded(ran.stderr);
++  const exitCode = typeof ran.status === 'number' ? ran.status : null;
++  const verdict = !unchanged ? 'refused-working-tree-changed' : timedOut ? 'timed-out' : exitCode === 0 ? 'passed' : 'failed';
++  const result = {
++    schema: ANALYSIS_RESULT_SCHEMA,
++    kind: 'analysis',
++    notVerifyEvidence: true,
++    runId,
++    commit: sha,
++    command,
++    exitCode,
++    signal: ran.signal ?? null,
++    timedOut,
++    stdout: out.text,
++    stderr: err.text,
++    truncated: { stdout: out.truncated, stderr: err.truncated },
++    workingTreeUnchanged: unchanged,
++    verdict,
++    ...(unchanged ? {} : { repair: TREE_CHANGED_REPAIR }),
++    startedAt: new Date(startedMs).toISOString(),
++    finishedAt: new Date(now()).toISOString(),
++  };
++  const resultPath = join(runDir, 'result.json');
++  writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
++
++  return { status: unchanged ? 'ok' : 'refused-working-tree-changed', verdict, resultPath, deleted: retain(analysisDir, runId, now()), result };
++}
++
++/** Delete runs beyond the newest KEEP_RUNS and those older than KEEP_DAYS; never `current`. Returns the count. */
++function retain(analysisDir, current, nowMs) {
++  const runs = readdirSync(analysisDir).filter((name) => RUN_ID.test(name)).sort().reverse();
++  let deleted = 0;
++  runs.forEach((name, index) => {
++    if (name === current) return;
++    const [, y, mo, d, h, mi, s] = RUN_ID.exec(name);
++    const ageMs = nowMs - Date.parse(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
++    if (index >= KEEP_RUNS || ageMs > KEEP_DAYS * 86400000) {
++      rmSync(join(analysisDir, name), { recursive: true, force: true });
++      deleted += 1;
++    }
++  });
++  return deleted;
++}
+diff --git a/plugins/pipeline-core/lib/analysis-run.test.mjs b/plugins/pipeline-core/lib/analysis-run.test.mjs
+new file mode 100644
+index 000000000..11d387698
+--- /dev/null
++++ b/plugins/pipeline-core/lib/analysis-run.test.mjs
+@@ -0,0 +1,133 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Pins lib/analysis-run.mjs (candidate 19, F2a; criterion AC-108): the registered
++ * verify command of a commit runs in a throwaway clone under the git common
++ * directory, and a labelled result records whether the real working tree moved.
++ * Every case builds its own temporary git repository with a committed
++ * project/pipeline.json.
++ */
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import fs from 'node:fs';
++import path from 'node:path';
++import { test } from 'node:test';
++import { runAnalysis } from './analysis-run.mjs';
++import { privateMkdtemp } from './test-private-tmp.mjs';
++
++const GIT = ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid'];
++const git = (cwd, ...args) => spawnSync('git', [...GIT, ...args], { cwd, encoding: 'utf8' });
++
++function fixture(verify) {
++  const root = fs.realpathSync(privateMkdtemp('analysis-run-'));
++  git(root, 'init', '-q');
++  fs.mkdirSync(path.join(root, 'project'));
++  const calibration = verify === undefined ? {} : { verify: typeof verify === 'function' ? verify(root) : verify };
++  fs.writeFileSync(path.join(root, 'project', 'pipeline.json'), JSON.stringify(calibration));
++  fs.writeFileSync(path.join(root, 'a.txt'), 'a\n');
++  git(root, 'add', '-A');
++  assert.equal(git(root, 'commit', '-q', '-m', 'init').status, 0);
++  return root;
++}
++const readResult = (outcome) => JSON.parse(fs.readFileSync(outcome.resultPath, 'utf8'));
++
++test('a passing verify command gives verdict passed with a labelled result', () => {
++  const root = fixture('node -e "console.log(\'MARKER\')"');
++  const outcome = runAnalysis({ root });
++  assert.equal(outcome.status, 'ok');
++  const result = readResult(outcome);
++  assert.equal(result.schema, 'pipeline.analysis-run.v1');
++  assert.equal(result.kind, 'analysis');
++  assert.equal(result.notVerifyEvidence, true);
++  assert.equal(result.verdict, 'passed');
++  assert.equal(result.exitCode, 0);
++  assert.equal(result.workingTreeUnchanged, true);
++  assert.match(result.stdout, /MARKER/);
++  assert.equal(result.commit, git(root, 'rev-parse', 'HEAD').stdout.trim());
++});
++
++test('a failing verify command gives verdict failed with its exit code', () => {
++  const root = fixture('node -e "process.exit(1)"');
++  const outcome = runAnalysis({ root });
++  assert.equal(outcome.status, 'ok');
++  const result = readResult(outcome);
++  assert.equal(result.verdict, 'failed');
++  assert.equal(result.exitCode, 1);
++});
++
++test('a verify command past the timeout gives verdict timed-out', () => {
++  const root = fixture('node -e "setTimeout(()=>{},30000)"');
++  const outcome = runAnalysis({ root, timeoutSeconds: 1 });
++  const result = readResult(outcome);
++  assert.equal(result.verdict, 'timed-out');
++  assert.equal(result.timedOut, true);
++});
++
++test('a verify command that writes into the real working tree is refused', () => {
++  const root = fixture((dir) => `node -e "require('fs').writeFileSync('${path.join(dir, 'intruder.txt')}','x')"`);
++  const outcome = runAnalysis({ root });
++  assert.equal(outcome.status, 'refused-working-tree-changed');
++  const result = readResult(outcome);
++  assert.equal(result.verdict, 'refused-working-tree-changed');
++  assert.equal(result.workingTreeUnchanged, false);
++  assert.match(result.repair, /review and revert the change in the working tree/);
++});
++
++test('a missing or placeholder verify value is refused as not configured', () => {
++  for (const verify of [undefined, '', 'the verify contract of this project is not configured']) {
++    const root = fixture(verify);
++    const outcome = runAnalysis({ root });
++    assert.equal(outcome.status, 'refused');
++    assert.equal(outcome.code, 'ANALYSIS-VERIFY-NOT-CONFIGURED');
++  }
++});
++
++test('a root that is not a git repository is refused', () => {
++  const dir = privateMkdtemp('analysis-run-nogit-');
++  const outcome = runAnalysis({ root: dir });
++  assert.equal(outcome.status, 'refused');
++  assert.equal(outcome.code, 'ANALYSIS-NOT-A-REPOSITORY');
++});
++
++test('the clone lives under the git common directory, not the working tree, and is no worktree', () => {
++  const root = fixture('node -e "console.log(1)"');
++  const outcome = runAnalysis({ root });
++  const common = path.join(root, '.git', 'agent-pipeline', 'analysis');
++  assert.ok(outcome.resultPath.startsWith(common + path.sep));
++  const clone = path.join(path.dirname(outcome.resultPath), 'clone');
++  assert.ok(fs.existsSync(path.join(clone, 'a.txt')));
++  const worktrees = git(root, 'worktree', 'list', '--porcelain').stdout;
++  assert.ok(!worktrees.includes('clone'));
++  assert.equal(git(root, 'status', '--porcelain=v1', '--untracked-files=all').stdout, '');
++});
++
++test('the verify command runs in the clone with TMPDIR and CLAUDE_PROJECT_DIR inside it', () => {
++  const root = fixture('node -e "console.log(process.cwd()+\'|\'+process.env.TMPDIR+\'|\'+process.env.CLAUDE_PROJECT_DIR)"');
++  const result = readResult(runAnalysis({ root }));
++  const [cwd, tmp, project] = result.stdout.trim().split('|');
++  assert.ok(cwd.endsWith(`${path.sep}clone`));
++  assert.equal(project, cwd);
++  assert.ok(tmp.startsWith(cwd + path.sep));
++});
++
++test('stdout above 65536 bytes is bounded and flagged truncated', () => {
++  const root = fixture('node -e "process.stdout.write(\'x\'.repeat(100000))"');
++  const result = readResult(runAnalysis({ root }));
++  assert.equal(result.stdout.length, 65536);
++  assert.equal(result.truncated.stdout, true);
++  assert.equal(result.truncated.stderr, false);
++});
++
++test('retention keeps the newest 5 runs and removes runs older than 7 days', () => {
++  const root = fixture('node -e "console.log(1)"');
++  const now = Date.parse('2031-03-15T12:00:00.000Z');
++  const dir = path.join(root, '.git', 'agent-pipeline', 'analysis');
++  const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/gu, '').replace(/\.\d+Z$/u, 'Z');
++  const make = (ms, tag) => fs.mkdirSync(path.join(dir, `${stamp(ms)}-${tag}`), { recursive: true });
++  make(now - 8 * 86400000, '00000000');
++  for (let hour = 1; hour <= 6; hour += 1) make(now - hour * 3600000, `0000000${hour}`);
++  const outcome = runAnalysis({ root, deps: { now: () => now } });
++  assert.equal(outcome.deleted, 3);
++  const left = fs.readdirSync(dir);
++  assert.equal(left.length, 5);
++  assert.ok(left.includes(path.basename(path.dirname(outcome.resultPath))));
++});
+diff --git a/plugins/pipeline-core/scripts/analysis-run.mjs b/plugins/pipeline-core/scripts/analysis-run.mjs
+new file mode 100644
+index 000000000..6be93ef1d
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/analysis-run.mjs
+@@ -0,0 +1,46 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Usage: node analysis-run.mjs --root <dir> [--commit <rev>] [--timeout-seconds <n>]
++ *
++ * Runs the registered verify command of <rev> (default HEAD) in a throwaway clone
++ * under the git common directory and records a labelled analysis result
++ * (never Verify evidence). Nothing else is accepted: any other flag or positional
++ * is refused. Timeout default 600, maximum 1800 seconds.
++ * Prints one JSON line. Exit 0: verdict passed or failed. Exit 2: refusal,
++ * timeout-free refusal codes (ANALYSIS-*), or a changed working tree.
++ */
++import { runAnalysis } from '../lib/analysis-run.mjs';
++
++function parse(argv) {
++  const values = {};
++  for (let i = 0; i < argv.length; i += 2) {
++    const flag = argv[i];
++    const value = argv[i + 1];
++    if (!['--root', '--commit', '--timeout-seconds'].includes(flag) || value === undefined || flag in values) return null;
++    values[flag] = value;
++  }
++  return values;
++}
++
++function main(argv) {
++  const values = parse(argv);
++  const timeout = values?.['--timeout-seconds'];
++  if (values === null || !('--root' in values) || (timeout !== undefined && !/^\d+$/u.test(timeout))) {
++    console.log(JSON.stringify({ status: 'refused', code: 'ANALYSIS-USAGE' }));
++    return 2;
++  }
++  const outcome = runAnalysis({
++    root: values['--root'],
++    ...(values['--commit'] !== undefined ? { commit: values['--commit'] } : {}),
++    ...(timeout !== undefined ? { timeoutSeconds: Number(timeout) } : {}),
++  });
++  if (outcome.status === 'refused') {
++    console.log(JSON.stringify({ status: 'refused', code: outcome.code }));
++    return 2;
++  }
++  console.log(JSON.stringify({ status: outcome.status, verdict: outcome.verdict, resultPath: outcome.resultPath, deleted: outcome.deleted }));
++  return outcome.status === 'ok' ? 0 : 2;
++}
++
++process.exitCode = main(process.argv.slice(2));
+diff --git a/plugins/pipeline-core/scripts/analysis-run.test.mjs b/plugins/pipeline-core/scripts/analysis-run.test.mjs
+new file mode 100644
+index 000000000..d6bfa1aa2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/analysis-run.test.mjs
+@@ -0,0 +1,60 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Pins the CLI scripts/analysis-run.mjs (candidate 19, F2a; AC-108): closed
++ * argument shape --root <dir> [--commit <rev>] [--timeout-seconds <n>], one JSON
++ * line on stdout, exit 0 for passed/failed, exit 2 for a refusal.
++ */
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import fs from 'node:fs';
++import path from 'node:path';
++import { test } from 'node:test';
++import { fileURLToPath } from 'node:url';
++import { privateMkdtemp } from '../lib/test-private-tmp.mjs';
++
++const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'analysis-run.mjs');
++const GIT = ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid'];
++const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
++
++function repo(verify) {
++  const root = fs.realpathSync(privateMkdtemp('analysis-cli-'));
++  spawnSync('git', ['init', '-q'], { cwd: root });
++  fs.mkdirSync(path.join(root, 'project'));
++  fs.writeFileSync(path.join(root, 'project', 'pipeline.json'), JSON.stringify({ verify }));
++  spawnSync('git', [...GIT, 'add', '-A'], { cwd: root });
++  spawnSync('git', [...GIT, 'commit', '-q', '-m', 'init'], { cwd: root });
++  return root;
++}
++
++test('a passing run prints one JSON line with the result path and verdict, exit 0', () => {
++  const root = repo('node -e "process.exit(0)"');
++  const out = run('--root', root, '--commit', 'HEAD', '--timeout-seconds', '60');
++  assert.equal(out.status, 0, out.stderr);
++  const line = JSON.parse(out.stdout.trim());
++  assert.equal(line.verdict, 'passed');
++  assert.equal(line.deleted, 0);
++  assert.ok(fs.existsSync(line.resultPath));
++});
++
++test('a failing run still exits 0 and names the verdict', () => {
++  const root = repo('node -e "process.exit(3)"');
++  const out = run('--root', root);
++  assert.equal(out.status, 0);
++  assert.equal(JSON.parse(out.stdout.trim()).verdict, 'failed');
++});
++
++test('unknown flags, positionals, a missing root and a bad timeout are refused with exit 2', () => {
++  const root = repo('node -e "process.exit(0)"');
++  for (const args of [['--root', root, '--extra', 'x'], ['--root', root, 'positional'], [], ['--root', root, '--timeout-seconds', '99999'], ['--root', root, '--timeout-seconds', 'abc']]) {
++    const out = run(...args);
++    assert.equal(out.status, 2, args.join(' '));
++    assert.equal(JSON.parse(out.stdout.trim()).code, 'ANALYSIS-USAGE');
++  }
++});
++
++test('a placeholder verify value exits 2 with ANALYSIS-VERIFY-NOT-CONFIGURED', () => {
++  const root = repo('the verify contract of this project is not configured');
++  const out = run('--root', root);
++  assert.equal(out.status, 2);
++  assert.equal(JSON.parse(out.stdout.trim()).code, 'ANALYSIS-VERIFY-NOT-CONFIGURED');
++});

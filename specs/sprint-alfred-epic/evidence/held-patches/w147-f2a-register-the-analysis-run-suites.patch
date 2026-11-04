@@ -1,0 +1,36 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 9fa19c1ef..cb26cf9c2 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -231,6 +231,8 @@
+         "verify-phase:harness/scripts/verify.mjs:agy-session-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
++        "verify-phase:harness/scripts/verify.mjs:analysis-run-cli-tests",
++        "verify-phase:harness/scripts/verify.mjs:analysis-run-lib-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c37445a14..2a50c8d0c 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4459,6 +4459,18 @@
+       "file": "scripts/full-verify.test.mjs",
+       "invariantPinned": "The Full Verify wrapper chooses the newest safe run directory for --resume, counts only resumed progress lines and states the resumed count in its summary only when resuming (C19 A5, AC-140)",
+       "nonOverlapNote": "Unique pure-function cases of scripts/full-verify.mjs; the journal behaviour itself is pinned by nova-verify-journal-tests"
++    },
++    {
++      "name": "analysis-run-lib-tests",
++      "file": "plugins/pipeline-core/lib/analysis-run.test.mjs",
++      "invariantPinned": "An analysis run executes only the registered verify command of one commit in a throwaway clone under the git common directory, labels the result kind analysis and not Verify evidence, refuses a run that changed the real working tree, reports timeouts and truncated output, and keeps the newest 5 runs for at most 7 days (C19 F2a, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/analysis-run.mjs (verdicts, postcondition, retention); the CLI suite pins the argument shape and the printed line"
++    },
++    {
++      "name": "analysis-run-cli-tests",
++      "file": "plugins/pipeline-core/scripts/analysis-run.test.mjs",
++      "invariantPinned": "The analysis-run command accepts only --root, --commit and --timeout-seconds, prints one JSON line with the result path and the verdict, and exits 2 for a refusal or a changed working tree (C19 F2a, AC-108)",
++      "nonOverlapNote": "Unique cases: scripts/analysis-run.mjs argument closure and exit codes; the logic is pinned by analysis-run-lib-tests"
+     }
+   ]
+ }
