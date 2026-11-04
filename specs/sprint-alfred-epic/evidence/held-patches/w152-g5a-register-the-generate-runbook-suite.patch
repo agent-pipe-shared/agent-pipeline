@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 9fa19c1ef..531df0e1a 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -470,6 +470,7 @@
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
++        "verify-phase:harness/scripts/verify.mjs:generate-runbook-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-vendored-canon-tests",
+         "verify-phase:harness/scripts/verify.mjs:git-cmd-push-classifier-tests",
+         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c37445a14..4072751c1 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4459,6 +4459,12 @@
+       "file": "scripts/full-verify.test.mjs",
+       "invariantPinned": "The Full Verify wrapper chooses the newest safe run directory for --resume, counts only resumed progress lines and states the resumed count in its summary only when resuming (C19 A5, AC-140)",
+       "nonOverlapNote": "Unique pure-function cases of scripts/full-verify.mjs; the journal behaviour itself is pinned by nova-verify-journal-tests"
++    },
++    {
++      "name": "generate-runbook-tests",
++      "file": "plugins/pipeline-core/scripts/generate-runbook.test.mjs",
++      "invariantPinned": "The committed close-path runbook and its index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the generation is deterministic, and every phase of the close requirement table appears exactly once as a step (C19 G5 stage 1, AC-108)",
++      "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs and the two committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
+     }
+   ]
+ }

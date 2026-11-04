@@ -200,8 +200,8 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 
 | ID | Item | Status | Patch or route |
 |---|---|---|---|
-| E1 | Host commit 0 of 11: name the preparation code, typed orchestrator-commit helper | planned (cause on Windows open) | Goldfish slice; the session "Claude Fam App" is asked for the stop-failure records |
-| E2 | Fail fast at bootstrap when close or push cannot work on the platform; Windows registry lock cause | planned (decided: in 19) | Goldfish slice (probe); lock cause needs the Windows session |
+| E1 | Host commit 0 of 11: name the preparation code, typed orchestrator-commit helper | not built; Windows facts received 2026-11-04 from the Windows session (11 background dispatches, 0 host commits; `NGHF-PENDING-UNAVAILABLE` 8 times, no message for 3; no PreToolUse WARNING found): the cause on Windows stays open and needs a Windows run with the hook state; the helper `goldfish-host-commit-recover.mjs` (plan, then apply by digest) already exists and was not used; on this Linux machine the same stop fails with other codes tied to a moved HEAD or foreign files | Goldfish slice after a Windows run |
+| E2 | Fail fast at bootstrap when close or push cannot work on the platform; Windows registry lock cause | not built; Windows facts 2026-11-04: `SDC-LOCK-HELD` came from a live lock of the session's own just-started heal run (age 141 s and 75 s; assumption, not separately proven), `unknown-registry-entry` with `dead-anchor` once, `WIN-AUTH-OPEN` names no folder (the PowerShell `Refuse("WIN-AUTH-OPEN")` has the path and drops it; untestable on Linux, an open Windows check) | Goldfish slice (probe); lock cause needs a Windows run |
 | E3 | Evidence loop ordered recipe and carry-forward | ADR first | one ADR with D3, D4b, F1; recipe is the generated runbook (G5) |
 | E4 | Parallelism: registry concurrency and slicing hint | planned (decided: in 19) | with M1 and E2 |
 | E5 | Private identifier warned at intake, not only at the commit | built (warning in the intake generate plan; the e-mail category itself is not exercised by a test) | w136 |
@@ -210,7 +210,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Q7 | `ARCHITECTURE-DESIGN-SURFACE-INVALID` names the entry | built | w128 |
 | Q8 | Onboarding's own `.gitattributes` refused by the lifecycle policy | built (exact root path added to the shared scaffold predicate; the onboarding end-to-end suite was not run) | w139 |
 | Q9 | `AR-APPROVAL-UNAVAILABLE` help names a flag that cannot run alone | built (w141, text only; the signed route is not rebuilt) | Elephant (text) |
-| Q10 | `WIN-AUTH-OPEN` names the exact path and offers a preview | planned | with E6 |
+| Q10 | `WIN-AUTH-OPEN` names the exact path and offers a preview | not built (the PowerShell side drops the path; needs a Windows run, see E2); the `CDP-PATH` text part is built in w133 | with E6 |
 
 ### Codex (F)
 
@@ -235,11 +235,11 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 |---|---|
 | GF-10 adoption (w120, w121) | built earlier; the apply script now applies both by default |
 | Late-binding ADR | accepted by the PO; build in candidate 19 planned as a Goldfish chain with its own review |
-| Generated runbook (C19-G5) | planned (decided: in 19); stage 1 is D6 |
+| Generated runbook (C19-G5) | partly built: stage 1 D6 (w132), stage 2 the generated close-path runbook with a drift pin (w151, w152; advisory, nothing reads it at runtime, no `runbook` field in any result, start/design/implement paths not generated); the result-contract stage needs an ADR first (EL-04) |
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a (only guidance built, w145), D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, the live-hook end-to-end run of the analysis lane (F2 is built in code, w146 to w149), M1.4 (only guidance built, w150), G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
+Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a (only guidance built, w145), D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, the live-hook end-to-end run of the analysis lane (F2 is built in code, w146 to w149), M1.4 (only guidance built, w150), G5 runbook (close path generated, w151/w152; other paths and the result field open), the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
 
 Count now: **built 20 items** (the 14 below plus Q8, F1/opt-in, M1.1, M1.2, M1.3 and Q9) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, and again on 2026-11-04 at 633d83eff through w149 plus GF-10, default chain and opt-in variant (w138) both exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 

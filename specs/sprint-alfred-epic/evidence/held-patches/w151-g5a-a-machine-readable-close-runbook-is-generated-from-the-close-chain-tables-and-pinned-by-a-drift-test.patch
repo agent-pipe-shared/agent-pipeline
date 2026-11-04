@@ -1,0 +1,493 @@
+diff --git a/plugins/pipeline-core/runbooks/close-path.v1.json b/plugins/pipeline-core/runbooks/close-path.v1.json
+new file mode 100644
+index 000000000..f9b450c86
+--- /dev/null
++++ b/plugins/pipeline-core/runbooks/close-path.v1.json
+@@ -0,0 +1,241 @@
++{
++  "schema": "pipeline.runbook.v1",
++  "pathId": "close",
++  "generatedFrom": [
++    "plugins/pipeline-core/lib/close-chain-guide.mjs",
++    "plugins/pipeline-core/scripts/publication-close-journal.mjs"
++  ],
++  "notGenerated": [
++    "quality-<id> rows (depend on repository state: closeQualityReadback)",
++    "materialize-push-threat-model (depends on repository state: push threat model required and absent)"
++  ],
++  "steps": [
++    {
++      "id": "checkpointed",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase checkpointed",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "close-feature SKILL, Continuity route step 2",
++      "humanGate": false,
++      "next": [
++        "result-bootstrap-plan"
++      ]
++    },
++    {
++      "id": "result-bootstrap-plan",
++      "who": "agent",
++      "command": "node <plugin-root>/scripts/pipeline-state.mjs continuity-result-bootstrap-plan (run in the project root; read-only)",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "close-feature SKILL, Continuity route step 3",
++      "humanGate": false,
++      "next": [
++        "result-bootstrap-apply"
++      ]
++    },
++    {
++      "id": "result-bootstrap-apply",
++      "who": "agent",
++      "command": "the applyAction the plan returned (continuity-result-bootstrap-apply ... --activate); with a session-authority catalogue: node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- continuity-result-bootstrap-apply <flags from applyAction.argv>",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "close-feature SKILL, Continuity route step 3",
++      "humanGate": false,
++      "next": [
++        "reconcile-signature"
++      ]
++    },
++    {
++      "id": "reconcile-signature",
++      "who": "po-only",
++      "command": "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "close-feature SKILL, Continuity route step 4",
++      "humanGate": true,
++      "next": [
++        "reconcile"
++      ]
++    },
++    {
++      "id": "reconcile",
++      "who": "agent",
++      "command": "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "close-feature SKILL, Continuity route step 5",
++      "humanGate": false,
++      "next": [
++        "feature-close-prepared"
++      ]
++    },
++    {
++      "id": "feature-close-prepared",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase feature-close-prepared <needs>",
++      "needs": [
++        "--architecture-impact <typed impact>",
++        "--continuity-close-request <path> (when the feature has one)",
++        "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"
++      ],
++      "evidenceSchema": "pipeline.feature-close-audit-request.v1",
++      "producer": "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++      "humanGate": false,
++      "next": [
++        "tracked-close-finalized"
++      ]
++    },
++    {
++      "id": "tracked-close-finalized",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase tracked-close-finalized <needs>",
++      "needs": [
++        "--evidence <path>"
++      ],
++      "evidenceSchema": "pipeline.close-tracked-effects.v1",
++      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++      "humanGate": false,
++      "next": [
++        "candidate-frozen"
++      ]
++    },
++    {
++      "id": "candidate-frozen",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase candidate-frozen",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "HEAD becomes the frozen candidate; from candidate-frozen the same phase renews the freeze to a descendant commit",
++      "humanGate": false,
++      "next": [
++        "final-verify-green"
++      ]
++    },
++    {
++      "id": "final-verify-green",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase final-verify-green <needs>",
++      "needs": [
++        "--evidence <path>"
++      ],
++      "evidenceSchema": "pipeline.close-final-verification.v1",
++      "producer": "a green Verify and a green security scan, both for the frozen candidate",
++      "humanGate": false,
++      "next": [
++        "publication-authorized",
++        "cleanup-complete"
++      ]
++    },
++    {
++      "id": "publication-authorized",
++      "who": "po-only",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase publication-authorized <needs>",
++      "needs": [
++        "--evidence <path>",
++        "--authorized"
++      ],
++      "evidenceSchema": "pipeline.close-publication-authorization.v1",
++      "producer": "the human's publication authorization for the frozen candidate",
++      "humanGate": true,
++      "next": [
++        "published"
++      ]
++    },
++    {
++      "id": "published",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase published <needs>",
++      "needs": [
++        "--publication <path>"
++      ],
++      "evidenceSchema": "pipeline.publication-executor-result.v1",
++      "producer": "the fixed publication executor",
++      "humanGate": false,
++      "next": [
++        "readback-confirmed"
++      ]
++    },
++    {
++      "id": "readback-confirmed",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase readback-confirmed <needs>",
++      "needs": [
++        "--publication <path>"
++      ],
++      "evidenceSchema": "pipeline.publication-executor-result.v1",
++      "producer": "the fixed publication executor, read back against the destination",
++      "humanGate": false,
++      "next": [
++        "cleanup-complete"
++      ]
++    },
++    {
++      "id": "cleanup-complete",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase cleanup-complete <needs>",
++      "needs": [
++        "--evidence <path>"
++      ],
++      "evidenceSchema": "pipeline.close-cleanup-receipt.v1",
++      "producer": "close-coordinator.mjs write-cleanup-receipt --root <root> --lifecycle <id> (the drive verb runs it for you)",
++      "humanGate": false,
++      "next": [
++        "closed-local",
++        "delivered"
++      ]
++    },
++    {
++      "id": "closed-local",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase closed-local",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "needs a complete cleanup receipt",
++      "humanGate": false,
++      "next": [
++        "release-eligible"
++      ]
++    },
++    {
++      "id": "release-eligible",
++      "who": "po-only",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase release-eligible <needs>",
++      "needs": [
++        "--evidence <path>",
++        "--authorized"
++      ],
++      "evidenceSchema": "pipeline.close-release-eligible-authorization.v1",
++      "producer": "the human's release-eligibility authorization for the frozen candidate",
++      "humanGate": true,
++      "next": [
++        "promoted"
++      ]
++    },
++    {
++      "id": "promoted",
++      "who": "po-only",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase promoted <needs>",
++      "needs": [
++        "--evidence <path>",
++        "--authorized"
++      ],
++      "evidenceSchema": "pipeline.close-promoted-authorization.v1",
++      "producer": "the human's promotion authorization for the frozen candidate",
++      "humanGate": true,
++      "next": []
++    },
++    {
++      "id": "delivered",
++      "who": "agent",
++      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase delivered",
++      "needs": [],
++      "evidenceSchema": null,
++      "producer": "needs a complete cleanup receipt and the publication readback",
++      "humanGate": false,
++      "next": [
++        "release-eligible"
++      ]
++    }
++  ]
++}
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+new file mode 100644
+index 000000000..35072bd88
+--- /dev/null
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -0,0 +1,11 @@
++{
++  "schema": "pipeline.runbook-index.v1",
++  "paths": [
++    {
++      "pathId": "close",
++      "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
++      "schema": "pipeline.runbook.v1",
++      "sha256": "44c65340ec00f845442b3c483086d48a00a475be4516b584d01f36b8fdc365e9"
++    }
++  ]
++}
+diff --git a/plugins/pipeline-core/scripts/generate-runbook.mjs b/plugins/pipeline-core/scripts/generate-runbook.mjs
+new file mode 100644
+index 000000000..8bf815b9d
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/generate-runbook.mjs
+@@ -0,0 +1,117 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * generate-runbook.mjs -- writes the machine-readable close-path runbook from the close chain tables, and pins the committed copy.
++ *
++ * The runbook is advisory documentation for agents (nothing reads it at runtime). It is built only from the pure functions of
++ * lib/close-chain-guide.mjs and coordinatorNextPhases; the placeholders <root> and <id> stay as they are. The output is canonical
++ * JSON (two-space indent, trailing newline) with no timestamp, no absolute path and no host data, so two runs are byte-equal.
++ * The dynamic quality rows and the push-threat-model action depend on repository state and are NOT generated.
++ *
++ * Usage: node generate-runbook.mjs [--check] [--root <dir>]
++ *   --root   plugin directory that holds runbooks/ (default: this plugin's own directory)
++ *   (none)   writes runbooks/close-path.v1.json and runbooks/index.v1.json under --root
++ *   --check  writes nothing; exit 0 when the committed bytes equal the generated bytes, exit 2 with RUNBOOK-DRIFT naming the file otherwise
++ * Any other argument exits 1.
++ */
++import { createHash } from "node:crypto";
++import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain } from "../lib/close-chain-guide.mjs";
++import { coordinatorNextPhases } from "./publication-close-journal.mjs";
++
++const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
++const PREFIX = "plugins/pipeline-core/";
++const CLOSE_PATH_FILE = `${PREFIX}runbooks/close-path.v1.json`;
++const INDEX_FILE = `${PREFIX}runbooks/index.v1.json`;
++export const RUNBOOK_FILES = Object.freeze([CLOSE_PATH_FILE, INDEX_FILE]);
++
++const canonical = (value) => `${JSON.stringify(value, null, 2)}\n`;
++
++function closeSteps() {
++  const steps = [];
++  const active = describeCloseActions("active").actions;
++  const whoByPhase = new Map(describeCloseActions("checkpointed").actions.map((a) => [a.id, a.who]));
++  // Actions that do not depend on dynamic state: checkpointed and the Continuity Result steps (the chain phases follow below).
++  const lead = active.filter((a) => a.id === "checkpointed" || !(a.id in CLOSE_STEP_REQUIREMENTS));
++  lead.forEach((a, i) => {
++    steps.push({
++      id: a.id, who: a.who, command: a.command, needs: [], evidenceSchema: null, producer: a.source, humanGate: a.who === "po-only",
++      next: i + 1 < lead.length ? [lead[i + 1].id] : coordinatorNextPhases("checkpointed"),
++    });
++  });
++  const chain = describeCloseChain("checkpointed");
++  const toStep = (s) => ({
++    id: s.phase, who: whoByPhase.get(s.phase) ?? (s.humanGate ? "po-only" : "agent"), command: s.plan, needs: s.needs,
++    evidenceSchema: s.evidenceSchema, producer: s.producer, humanGate: s.humanGate, next: coordinatorNextPhases(s.phase),
++  });
++  for (const s of chain.remaining) steps.push(toStep(s));
++  // The walk follows the first branch of each fork; the other branches are steps too, built from the same table row.
++  for (const fork of chain.forks) {
++    const sibling = chain.remaining.find((s) => s.phase === fork.alternatives[0]);
++    for (const alt of fork.alternatives.slice(1)) {
++      if (steps.some((s) => s.id === alt)) continue;
++      const need = CLOSE_STEP_REQUIREMENTS[alt];
++      steps.push(toStep({
++        phase: alt, needs: need.flags, evidenceSchema: need.evidenceSchema, producer: need.producer, humanGate: need.humanGate,
++        plan: `${sibling.plan.replace(/ --phase .*$/, "")} --phase ${alt}${need.flags.length > 0 ? " <needs>" : ""}`,
++      }));
++    }
++  }
++  return steps;
++}
++
++/** The generated files as { repo-relative path: canonical JSON text }. Pure and deterministic. */
++export function buildRunbookFiles() {
++  const closePath = canonical({
++    schema: "pipeline.runbook.v1",
++    pathId: "close",
++    generatedFrom: ["plugins/pipeline-core/lib/close-chain-guide.mjs", "plugins/pipeline-core/scripts/publication-close-journal.mjs"],
++    notGenerated: ["quality-<id> rows (depend on repository state: closeQualityReadback)", "materialize-push-threat-model (depends on repository state: push threat model required and absent)"],
++    steps: closeSteps(),
++  });
++  const index = canonical({
++    schema: "pipeline.runbook-index.v1",
++    paths: [{ pathId: "close", path: CLOSE_PATH_FILE, schema: "pipeline.runbook.v1", sha256: createHash("sha256").update(closePath).digest("hex") }],
++  });
++  return { [CLOSE_PATH_FILE]: closePath, [INDEX_FILE]: index };
++}
++
++const target = (root, rel) => join(root, rel.slice(PREFIX.length));
++
++export function main(argv = process.argv.slice(2)) {
++  let check = false;
++  let root = PLUGIN_ROOT;
++  for (let i = 0; i < argv.length; i++) {
++    if (argv[i] === "--check") check = true;
++    else if (argv[i] === "--root" && i + 1 < argv.length) root = resolve(argv[++i]);
++    else {
++      process.stderr.write(`error: unknown argument: ${argv[i]}\nusage: generate-runbook.mjs [--check] [--root <dir>]\n`);
++      process.exitCode = 1;
++      return;
++    }
++  }
++  const files = buildRunbookFiles();
++  if (check) {
++    for (const [rel, bytes] of Object.entries(files)) {
++      let committed = null;
++      try { committed = readFileSync(target(root, rel), "utf8"); } catch { /* missing counts as drift */ }
++      if (committed !== bytes) {
++        process.stderr.write(`RUNBOOK-DRIFT: ${rel} differs from the generated bytes; run: node plugins/pipeline-core/scripts/generate-runbook.mjs\n`);
++        process.exitCode = 2;
++        return;
++      }
++    }
++    return;
++  }
++  for (const [rel, bytes] of Object.entries(files)) {
++    mkdirSync(dirname(target(root, rel)), { recursive: true });
++    writeFileSync(target(root, rel), bytes);
++  }
++}
++
++if (isDirectInvocation(import.meta.url)) main();
+diff --git a/plugins/pipeline-core/scripts/generate-runbook.test.mjs b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+new file mode 100644
+index 000000000..4fa344b94
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+@@ -0,0 +1,100 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++
++// Drift pin for the generated close-path runbook (C19-G5 stage 1, AC-108): the committed files must equal what the
++// generator produces now from the close chain tables. Model: check-vendored-template-sync.test.mjs.
++import assert from "node:assert/strict";
++import test from "node:test";
++import { createHash } from "node:crypto";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
++
++import { buildRunbookFiles, RUNBOOK_FILES } from "./generate-runbook.mjs";
++import { CLOSE_STEP_REQUIREMENTS } from "../lib/close-chain-guide.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./generate-runbook.mjs", import.meta.url));
++const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
++
++test("committed runbook files equal the regenerated bytes (drift pin)", () => {
++  const generated = buildRunbookFiles();
++  for (const [rel, bytes] of Object.entries(generated)) {
++    const committed = readFileSync(join(PLUGIN_ROOT, rel.replace(/^plugins\/pipeline-core\//, "")), "utf8");
++    assert.equal(committed, bytes, `RUNBOOK-DRIFT ${rel}`);
++  }
++  assert.deepEqual(Object.keys(generated).sort(), [...RUNBOOK_FILES].sort());
++});
++
++test("two generations are byte-equal and carry no timestamp or absolute path", () => {
++  const a = buildRunbookFiles();
++  const b = buildRunbookFiles();
++  assert.deepEqual(a, b);
++  for (const bytes of Object.values(a)) {
++    assert.ok(bytes.endsWith("}\n"));
++    assert.doesNotMatch(bytes, /\/home\/|[A-Za-z]:\\|\d{4}-\d{2}-\d{2}T/);
++  }
++});
++
++test("every phase of CLOSE_STEP_REQUIREMENTS appears exactly once as a step id", () => {
++  const doc = JSON.parse(buildRunbookFiles()["plugins/pipeline-core/runbooks/close-path.v1.json"]);
++  assert.equal(doc.schema, "pipeline.runbook.v1");
++  assert.equal(doc.pathId, "close");
++  const ids = doc.steps.map((s) => s.id);
++  for (const phase of Object.keys(CLOSE_STEP_REQUIREMENTS)) {
++    assert.equal(ids.filter((id) => id === phase).length, 1, phase);
++  }
++  assert.equal(new Set(ids).size, ids.length);
++  for (const s of doc.steps) {
++    for (const k of ["id", "who", "command", "needs", "evidenceSchema", "producer", "humanGate", "next"]) assert.ok(k in s, `${s.id} lacks ${k}`);
++  }
++  assert.deepEqual(doc.notGenerated.length, 2);
++  const forkStep = doc.steps.find((s) => s.id === "final-verify-green");
++  assert.ok(forkStep.next.length > 1, "forks stay visible");
++});
++
++test("index lists the path file with its sha256", () => {
++  const files = buildRunbookFiles();
++  const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
++  assert.equal(idx.schema, "pipeline.runbook-index.v1");
++  assert.equal(idx.paths.length, 1);
++  const e = idx.paths[0];
++  assert.equal(e.pathId, "close");
++  assert.equal(e.path, "plugins/pipeline-core/runbooks/close-path.v1.json");
++  assert.equal(e.schema, "pipeline.runbook.v1");
++  assert.equal(e.sha256, createHash("sha256").update(files[e.path]).digest("hex"));
++});
++
++test("--check exits 0 on equal bytes, 2 with RUNBOOK-DRIFT on a differing file, and writes nothing", () => {
++  const root = mkdtempSync(join(tmpdir(), "generate-runbook-test-"));
++  try {
++    mkdirSync(join(root, "runbooks"), { recursive: true });
++    const files = buildRunbookFiles();
++    for (const [rel, bytes] of Object.entries(files)) writeFileSync(join(root, rel.replace(/^plugins\/pipeline-core\//, "")), bytes);
++    let r = spawnSync(process.execPath, [SCRIPT, "--check", "--root", root], { encoding: "utf8" });
++    assert.equal(r.status, 0, r.stderr);
++    writeFileSync(join(root, "runbooks/close-path.v1.json"), "{}\n");
++    r = spawnSync(process.execPath, [SCRIPT, "--check", "--root", root], { encoding: "utf8" });
++    assert.equal(r.status, 2);
++    assert.match(r.stderr, /RUNBOOK-DRIFT.*close-path\.v1\.json/);
++    assert.equal(readFileSync(join(root, "runbooks/close-path.v1.json"), "utf8"), "{}\n");
++    r = spawnSync(process.execPath, [SCRIPT, "--bogus"], { encoding: "utf8" });
++    assert.notEqual(r.status, 0);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("without --check the generator writes both files under --root", () => {
++  const root = mkdtempSync(join(tmpdir(), "generate-runbook-test-"));
++  try {
++    const r = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
++    assert.equal(r.status, 0, r.stderr);
++    for (const [rel, bytes] of Object.entries(buildRunbookFiles())) {
++      assert.equal(readFileSync(join(root, rel.replace(/^plugins\/pipeline-core\//, "")), "utf8"), bytes);
++    }
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
