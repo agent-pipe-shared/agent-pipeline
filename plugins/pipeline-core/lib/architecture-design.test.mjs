@@ -469,3 +469,51 @@ test("W7 documentation module: kind absent leaves the derived rows byte-identica
   delete doc.fitnessModel.modules[0].kind;
   assert.throws(() => parseArchitectureDesign(prd(doc)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
 });
+
+// ---------- C19-F1: a closed predecessor's receipt is accepted for the next feature when the design and every target digest are equal ----------
+function f1Fixture(stage, { closed = true, edit = receipt => receipt, rawReceipt = null, driftTarget = false } = {}) {
+  const fixture = hf9Fixture(stage, { block: true, scaffold: "none", receipt: true });
+  const input = parseArchitectureDesign(readFileSync(join(fixture.root, HF9_PLAN), "utf8"));
+  const targets = architectureDesignTargets(input);
+  for (const target of targets) hf9Put(fixture.root, target.path, driftTarget ? `${target.bytes}\ndrift\n` : target.bytes);
+  const base = { schema: "pipeline.architecture-design-materialization.v1", featureId: "feat-0", planPath: "specs/old/prd.md",
+    planSha256: "a".repeat(64), specSha256: "b".repeat(64), designSha256: hf9Sha(`${JSON.stringify(input, null, 2)}\n`),
+    targets: targets.map(target => ({ path: target.path, sha256: hf9Sha(target.bytes) })) };
+  hf9Put(fixture.root, "architecture/design-materialization.json", rawReceipt ?? `${JSON.stringify(edit(base, fixture), null, 2)}\n`);
+  const statePath = join(fixture.root, "project/pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.closedFeatures = closed ? [{ id: "feat-0", planPath: "specs/old/prd.md", closedAt: "2026-01-01T00:00:00.000Z", forCommit: null }] : [];
+  writeFileSync(statePath, JSON.stringify(state, null, 2));
+  return { ...fixture, base };
+}
+
+test("C19-F1: a closed predecessor's receipt with an equal design and equal target digests is accepted and names the predecessor", async () => {
+  const { stage, mod } = await hf9Load();
+  const fixture = f1Fixture(stage);
+  const result = mod.inspectArchitectureDesign(fixture.root, null, {});
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.status, "materialized");
+  assert.deepEqual(result.inheritedFrom, { featureId: "feat-0", planPath: "specs/old/prd.md", designSha256: fixture.base.designSha256 });
+  assert.equal(result.receipt.featureId, HF9_FEATURE, "the returned receipt stays the one for the current feature");
+  assert.equal(JSON.parse(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")).featureId, "feat-0", "nothing is rewritten");
+});
+
+test("C19-F1: an open or unknown predecessor, a different design or any target digest difference, or an unparseable receipt keeps ARCHITECTURE-DESIGN-RECEIPT-STALE", async () => {
+  const { stage, mod } = await hf9Load();
+  const stale = (options, label) => assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, options).root, null, {}).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE", label);
+  stale({ closed: false }, "predecessor not closed");
+  stale({ edit: r => ({ ...r, targets: [{ ...r.targets[0], sha256: "c".repeat(64) }, ...r.targets.slice(1)] }) }, "one target digest differs");
+  stale({ edit: r => ({ ...r, designSha256: "d".repeat(64) }) }, "design digest differs");
+  stale({ edit: r => ({ ...r, schema: "pipeline.other.v1" }) }, "schema differs");
+  stale({ edit: r => ({ ...r, featureId: HF9_FEATURE }) }, "the active feature's own receipt must be byte-equal");
+  stale({ rawReceipt: "{not json" }, "not valid JSON");
+});
+
+test("C19-F1: an accepted predecessor receipt does not relax the target drift check, and the exact receipt of the active feature has no inheritedFrom", async () => {
+  const { stage, mod } = await hf9Load();
+  assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, { driftTarget: true }).root, null, {}).code, "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+  const fixture = f1Fixture(stage, { edit: (r, f) => ({ ...r, featureId: HF9_FEATURE, planPath: HF9_PLAN, planSha256: f.prdSha, specSha256: hf9Sha(HF9_SPEC_TEXT) }) });
+  const exact = mod.inspectArchitectureDesign(fixture.root, null, {});
+  assert.equal(exact.status, "materialized");
+  assert.equal(Object.hasOwn(exact, "inheritedFrom"), false);
+});

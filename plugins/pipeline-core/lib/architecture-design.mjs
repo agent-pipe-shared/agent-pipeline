@@ -295,7 +295,21 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       targets: targets.map(target => ({ path: target.path, sha256: hash(target.bytes) })) };
     const receiptPath = "architecture/design-materialization.json";
     if (existsSync(physical(root, receiptPath))) {
-      requireValue(bytes(root, receiptPath) === json(receipt), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+      const stored = bytes(root, receiptPath);
+      let inheritedFrom = null;
+      if (stored !== json(receipt)) {
+        // C19-F1: the receipt of a CLOSED predecessor feature is accepted when the design and every target digest are equal.
+        // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
+        let predecessor = null;
+        try { predecessor = JSON.parse(stored); } catch { /* unparseable: stale below */ }
+        requireValue(predecessor !== null && typeof predecessor === "object"
+          && predecessor.schema === receipt.schema && predecessor.designSha256 === receipt.designSha256
+          && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets)
+          && typeof predecessor.featureId === "string" && predecessor.featureId !== state.activeFeature.id
+          && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === predecessor.featureId),
+        "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+        inheritedFrom = { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 };
+      }
       requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
       const pendingPhysicalSurfaces = [...new Set([
         ...input.implementationSurface,
@@ -303,7 +317,7 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       ])].filter(name => {
         try { return bytes(root, name).trim().length === 0; } catch { return true; }
       });
-      return { ok: true, status: "materialized", input, targets, receipt, scope: input.disposition.scope,
+      return { ok: true, status: "materialized", ...(inheritedFrom ? { inheritedFrom } : {}), input, targets, receipt, scope: input.disposition.scope,
         disposition: "approved-scoped", authority: "approved-design-package", pendingPhysicalSurfaces,
         planningSurface: { planPath: authority.planPath, paths: input.implementationSurface } };
     }
