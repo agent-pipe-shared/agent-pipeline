@@ -494,18 +494,49 @@ function defaultProcessIdentity(pid) {
 
 const TRANSIENT_SHELLS = new Set(["sh", "bash", "dash", "zsh", "ksh", "mksh", "fish", "busybox"]);
 
+const TRANSIENT_WINDOWS_SHELLS = new Set(["bash.exe", "sh.exe", "zsh.exe", "dash.exe", "pwsh.exe", "powershell.exe", "cmd.exe", "conhost.exe"]);
+
+/**
+ * E2 (candidate 19): one Windows process, read through the CIM process table: `{ parentPid, name }`, or a throw when it cannot be read. The
+ * stage 1 Windows probe measured a scratch binding reported `reanchored` by the preflight and `dead-anchor` seconds later: off Linux the anchor
+ * was the one-shot shell that ran the call, which is gone when the call returns.
+ */
+function defaultReadWindowsProcess(pid, spawn = spawnSync) {
+  const script = `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($null -eq $p) { exit 3 }; Write-Output ($p.ParentProcessId.ToString() + ' ' + $p.Name)`;
+  const result = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", timeout: 5000, windowsHide: true });
+  if (result.error || result.status !== 0) throw new Error("windows process unreadable");
+  const match = /^(\d+) (.+)$/u.exec(String(result.stdout).trim());
+  if (!match) throw new Error("windows process unreadable");
+  return { parentPid: Number(match[1]), name: match[2].trim() };
+}
+
 /**
  * The long-lived runner host a scratch binding is anchored to (D54, E37 (b)). A Claude hook or
  * a Bash tool call runs under a shell started for that one call, below the runner host
  * (measured: node -> bash -> claude), so that shell is gone seconds after the bind and the next
  * sweep would retire a live session's binding. On Linux this walks up from `startPid` past
- * shell processes; elsewhere, or when `/proc` cannot be read, it keeps `startPid` as before.
+ * shell processes; on Windows it does the same through the process table (`readWindowsProcess`,
+ * shells by image name); elsewhere, or when the process table cannot be read, it keeps `startPid` as before.
  */
 export function resolveRunnerHostPid({
   startPid = process.ppid,
   platform = process.platform,
   readStat = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8"),
+  spawn = spawnSync,
+  readWindowsProcess = (pid) => defaultReadWindowsProcess(pid, spawn),
 } = {}) {
+  if (platform === "win32") {
+    if (!Number.isSafeInteger(startPid) || startPid < 5) return startPid;
+    let pid = startPid;
+    for (let depth = 0; depth < 8 && pid > 4; depth += 1) {
+      let node;
+      try { node = readWindowsProcess(pid); } catch { return startPid; }
+      if (!node || !Number.isSafeInteger(node.parentPid) || typeof node.name !== "string") return startPid;
+      if (!TRANSIENT_WINDOWS_SHELLS.has(node.name.toLowerCase())) return pid;
+      pid = node.parentPid;
+    }
+    return startPid;
+  }
   if (platform !== "linux" || !Number.isSafeInteger(startPid) || startPid < 2) return startPid;
   let pid = startPid;
   for (let depth = 0; depth < 8 && pid > 1; depth += 1) {

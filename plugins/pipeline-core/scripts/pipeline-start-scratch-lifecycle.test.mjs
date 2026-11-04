@@ -227,7 +227,53 @@ test("D54: the runner host anchor skips one-shot shells, and keeps the start pid
   assert.equal(resolveRunnerHostPid({ startPid: 200, platform: "linux", readStat }), 200, "a runner host as the parent is kept");
   assert.equal(resolveRunnerHostPid({ startPid: 410, platform: "linux", readStat }), 410, "shells all the way up keep the start pid");
   assert.equal(resolveRunnerHostPid({ startPid: 999, platform: "linux", readStat }), 999, "an unreadable /proc keeps the start pid");
-  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "win32", readStat }), 300, "off Linux the start pid is kept");
+  // Restated 2026-11-04 (candidate 19, E2, QG-04, own hunk; intent kept: a platform with no process-table reader keeps the start pid): this case
+  // used platform "win32", which now walks the Windows process table, so the keep-the-start-pid case moves to a platform with no reader.
+  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "darwin", readStat }), 300, "off Linux and Windows the start pid is kept");
+});
+
+test("E2: on Windows the runner host anchor skips one-shot shells by image name, and keeps the start pid when the process table cannot be read", () => {
+  const table = {
+    5300: { parentPid: 5200, name: "bash.exe" },
+    5200: { parentPid: 5100, name: "bash.exe" },
+    5100: { parentPid: 4000, name: "claude.exe" },
+    4000: { parentPid: 4, name: "explorer.exe" },
+    6300: { parentPid: 6200, name: "PowerShell.exe" },
+    6200: { parentPid: 6100, name: "cmd.exe" },
+    6100: { parentPid: 6000, name: "conhost.exe" },
+    6000: { parentPid: 5900, name: "sh.exe" },
+    5900: { parentPid: 5800, name: "bash.exe" },
+    5800: { parentPid: 5700, name: "bash.exe" },
+    5700: { parentPid: 5600, name: "bash.exe" },
+    5600: { parentPid: 5500, name: "bash.exe" },
+    5500: { parentPid: 5400, name: "bash.exe" },
+  };
+  const readWindowsProcess = (pid) => { if (!table[pid]) throw new Error("absent"); return table[pid]; };
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess }), 5100, "the walk passes both shells and stops at the runner host");
+  assert.equal(resolveRunnerHostPid({ startPid: 5100, platform: "win32", readWindowsProcess }), 5100, "a runner host as the parent is kept");
+  assert.equal(resolveRunnerHostPid({ startPid: 6300, platform: "win32", readWindowsProcess }), 6300, "shells beyond the depth bound keep the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 7777, platform: "win32", readWindowsProcess }), 7777, "an unreadable process keeps the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess: () => ({ parentPid: "x", name: 3 }) }), 5300, "a malformed row keeps the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 4, platform: "win32", readWindowsProcess }), 4, "the system process is never walked");
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess: (pid) => ({ ...table[pid], name: table[pid].name.toUpperCase() }) }), 5100, "image names compare case-insensitively");
+});
+
+test("E2: the default Windows process reader asks the CIM process table once per process, parses its line, and fails closed", () => {
+  const calls = [];
+  const rows = { 5300: "5200 bash.exe\r\n", 5200: "5100 bash.exe\r\n", 5100: "4000 claude.exe\r\n" };
+  const spawn = (executable, args, options) => {
+    calls.push({ executable, args, options });
+    const pid = /ProcessId=(\d+)/u.exec(args.at(-1))?.[1];
+    return rows[pid] === undefined ? { status: 3, stdout: "" } : { status: 0, stdout: rows[pid] };
+  };
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn }), 5100);
+  assert.equal(calls.length, 3, "one process-table read per step of the walk");
+  assert.equal(calls[0].executable, "powershell.exe");
+  assert.deepEqual(calls[0].args.slice(0, 3), ["-NoProfile", "-NonInteractive", "-Command"]);
+  assert.equal(calls[0].options.timeout, 5000, "the read is bounded");
+  assert.equal(resolveRunnerHostPid({ startPid: 9999, platform: "win32", spawn }), 9999, "a process that is not in the table keeps the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn: () => ({ status: 0, stdout: "garbage" }) }), 5300, "an unparsable line keeps the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn: () => ({ error: new Error("ENOENT") }) }), 5300, "no PowerShell keeps the start pid");
 });
 
 test("the lifecycle is fail-open: an unusable root is a typed fault, never a throw", () => {
