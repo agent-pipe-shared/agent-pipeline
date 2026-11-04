@@ -1,0 +1,14 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index f668c759b..9fa63ae6d 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -644,7 +644,8 @@
+         "caseIds": [
+           "NGHF05",
+           "NGHF06",
+-          "NGHF07"
++          "NGHF07",
++          "NGHF08"
+         ],
+         "maxBytes": 65536
+       }

@@ -319,7 +319,7 @@ Found only on the full chain, not in any slice clone: the kernel closure suite (
 | native-goldfish-host-commit-execution-tests, native-goldfish-host-finalizer-tests | pins still asserted the pre-w170 recovery text | fixed (pins restated), w197 |
 | pin-catalogue-admit-prescribed-lifecycle-verbs-tests | the duplicate-check mutant mirror hit w180's `prepare-seal` branch first | fixed (pin restated), w197 |
 | product-capability-inventory-tests (PCI24, PCI30) | `analysis-run.mjs` admitted by the guard since w148 but named nowhere; PCI30 follows | fixed, w198 (predates the chain) |
-| native-goldfish-host-finalizer-regression-tests | green alone (76 s); red only under the Full Verify load | environment (load) |
+| native-goldfish-host-finalizer-regression-tests | first classified as load because it is green alone; the excerpt shows `fail 0` and `VERIFY-CASE-COMPLETION-DECLARATION`: w165 added NGHF08, the policy listed NGHF05-07 | fixed, w200 (the "load" classification was wrong) |
 | verify-suite-append-history-check | `VSA-PRIOR-ENTRY-CHANGED` at 7281e012c (a 3 November in-place extension of one `caseIds` list); identical in the main tree. The shape is the K143 exception kind, but `verify-suite-history-recovery.json` admits exactly one `rewrites` entry by design ("not extendable"; `check-verify-suite-append.mjs` lines 175 and 322) | open, PO decision: lifting the one-entry cap in the history check and recording a second entry (commit 7281e012c, its parent, both registry digests) |
 | security-remote-identity-tests (SRI001) | red in the main tree too: the case still asserted "not clean" for a repository without a remote, while the scan returns the typed local-only subject that the push gate refuses | fixed (pin restated), w199; 2/2 on the rehearsal clone |
 | codex-isolated-critic-protected-preimage-tests | `critic-review/SKILL.md` and `roles/critic.md` differ from the pinned preimage; identical in the main tree | known; never re-pinned by the agent |
@@ -337,8 +337,7 @@ Decisions for the PO (each with the repair that is ready or named):
 3. Control-plane script scan: exact-path exemption for the repository's own verify scripts (FV finding 2). Not built: widens what an agent-started script may read.
 4. `codex-isolated-critic-protected-preimage-tests`: the pinned preimage differs from `critic-review/SKILL.md` and `roles/critic.md` (same in the main tree). Re-pin only by the PO.
 
-Only a real run can close: native Windows (E1, E2, E4, E7, Q10), real runner runs, hook activation, the own Critic review of the late-binding chain and D3, the stamp of 19c (on the PO's call), the PO's install and acceptance. `native-goldfish-host-finalizer-regression-tests` is green alone and red only under Full Verify load.
-
+Only a real run can close: native Windows (E1, E2, E4, E7, Q10), real runner runs, hook activation, the own Critic review of the late-binding chain and D3, the stamp of 19c (on the PO's call), the PO's install and acceptance.
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
