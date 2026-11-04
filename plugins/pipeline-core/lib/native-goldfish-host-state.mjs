@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
 import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
@@ -271,8 +272,15 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
   };
   let stored;
-  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline); }
+  // The process-wide deadline only runs with the real clock (a test that injects `now` keeps its own checkpoint semantics) and is
+  // cleared on every exit, so a later call in the same process is never judged by an old admission's budget.
+  const realClockDeadline = admissionDeadline && typeof admissionDeadline === "object" && typeof admissionDeadline.now !== "function";
+  try {
+    if (realClockDeadline) setAdmissionDeadline(admissionDeadline);
+    stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
+  }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+  finally { if (realClockDeadline) clearAdmissionDeadline(); }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
 

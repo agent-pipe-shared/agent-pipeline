@@ -18,6 +18,7 @@ import { createSessionAuthorityParticipantPorts } from "./session-authority-obse
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
 import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
+import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
 import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
 import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
 import { readyAndLive, SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "./slice-queue.mjs";
@@ -26,7 +27,7 @@ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finaliz
 import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
 import { nativeManagedDigest, nativeManagedCurrentOwner } from "./native-managed-authority-support.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner, CLAUDE_HOOK_SESSION_OWNER_SOURCE } from "./claude-hook-session-owner.mjs";
-import { initializeSessionAuthorityRegistry, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
+import { initializeSessionAuthorityRegistry, inspectSessionAuthorityRegistryRead, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
 
@@ -203,6 +204,36 @@ const cases = [
     assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
     const repo = inspectSignedDescriptorCustodyRepository(root);
     assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
+    // The process-wide deadline (real clock): an admission that is already past its budget refuses inside the registry reads, with the same
+    // typed code, the lock released and the deadline cleared; a fresh budget admits as before. Win32 or not, the loops are the same.
+    const stale = [];
+    const slow = d177Item(runtime, root, original, "RIGHT", "second", original.criterionLocators["AC-2"], { admissionDeadline: { startMs: Date.now() - 400000, budgetMs: 300000, write: (line) => stale.push(line) } });
+    assert.equal(slow.prepared.ok, false, JSON.stringify(slow.prepared));
+    assert.equal(slow.prepared.code, "GUARD-DISPATCH-SLOW");
+    assert.match(String(slow.prepared.reason), /GUARD-DISPATCH-SLOW: (admission phase [a-z-]+ reached|the admission was still reading the session-authority registry after)/u, "a phase checkpoint or the registry read loop names the budget");
+    assert.equal(admissionDeadlineActive(), false, "the deadline is cleared after the refusal");
+    // The registry reads on their own (what a phase checkpoint cannot see: the long reads before the first checkpoint): a stale deadline makes
+    // the boundary refuse inside its reads with the repair text, and the finally still releases the lock.
+    setAdmissionDeadline({ startMs: Date.now() - 400000, budgetMs: 300000 });
+    try {
+      // inspectSessionAuthorityRegistryRead reports a refusal as a value, so the typed code and reason are read from that result.
+      const read = runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => inspectSessionAuthorityRegistryRead({ repository: repo })));
+      assert.equal(read.status, "refused", JSON.stringify(read));
+      assert.equal(read.code, "GUARD-DISPATCH-SLOW");
+      assert.match(String(read.reason), /still reading the session-authority registry after/u);
+    } finally { clearAdmissionDeadline(); }
+    assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the deadline refusal released the registry lock");
+    const fresh = d177Item(runtime, root, original, "RIGHT", "second", original.criterionLocators["AC-2"], { admissionDeadline: { startMs: Date.now(), budgetMs: 300000, write: () => {} } });
+    assert.equal(fresh.prepared.ok, true, JSON.stringify(fresh.prepared));
+    assert.equal(admissionDeadlineActive(), false, "the deadline is cleared after the admission");
+    // The module on its own: nothing set means no check; a set deadline throws only after its time; the margin is kept free.
+    setAdmissionDeadline({ startMs: 1000, budgetMs: 10000 });
+    assertAdmissionDeadline(5000);
+    assert.throws(() => assertAdmissionDeadline(1000 + 10000 - ADMISSION_DEADLINE_MARGIN_MS + 1), (error) => error.code === "GUARD-DISPATCH-SLOW" && typeof error.repair === "string");
+    clearAdmissionDeadline();
+    assertAdmissionDeadline(10 ** 12);
+    assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
+    assert.equal(admissionDeadlineActive(), false);
   }) },
   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });

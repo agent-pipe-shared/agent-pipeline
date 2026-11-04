@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
+import {assertAdmissionDeadline} from './admission-deadline.mjs';
 
 const HELPER_SHA256='77c9f91c1497c0b95bf0f38214a34dc339c4786cea03a939e59a470cbab71242';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
@@ -56,6 +57,9 @@ function invoke(request){
  const entry=authorityMemo.get(key);
  if(entry!==undefined){if(before!==null&&entry.identity===before){authorityMemoCounters.hits+=1;return entry.value;}authorityMemo.delete(key);}
  authorityMemoCounters.misses+=1;
+ // A read-only observation is the unit of cost on Windows (one PowerShell start); the admission deadline stops a long run of them. Never on
+ // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
+ assertAdmissionDeadline();
  const value=invokeNative(request);
  if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
  return value;
