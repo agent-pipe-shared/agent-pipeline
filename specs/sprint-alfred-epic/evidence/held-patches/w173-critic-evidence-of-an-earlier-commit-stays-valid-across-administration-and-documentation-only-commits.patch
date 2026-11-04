@@ -1,0 +1,889 @@
+diff --git a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
+index 1aca5bc28..2d8a792c7 100644
+--- a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
++++ b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
+@@ -3,7 +3,7 @@
+   "id": "draft-authority-carry-forward-and-signed-reconcile-commit",
+   "title": "Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files",
+   "status": "accepted",
+-  "digest": "148d81c9d167c661a73c0e3b95f9cda4b904baf0ae8d7ba5b3d78f26e4434a77",
++  "digest": "03a68c65b911dcc90bd714ceec329eef0ecea95830786ffd0df6dd3904ca49bb",
+   "scope": "global",
+   "date": "2026-11-03"
+ }
+diff --git a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
+index d6a55a35c..efca4758a 100644
+--- a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
++++ b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
+@@ -4,7 +4,7 @@ Status: Accepted (PO decision of 2026-11-04 at the sitting: point 2 and the amen
+ 
+ Date: 2026-11-03 (accepted 2026-11-04)
+ 
+-Decision line: the PO decided on 2026-11-04 that a Verify or Security record is carried across evidence-only commits by default, through one shared freshness verdict used by the push guard, `push-prepare`, the security completeness gate and the managed pre-push hook. The closed evidence set, the product tree hash equality, the ancestor check, the clean secret scan of the passed-over commits for Security evidence, fail closed on any doubt and the named list of passed-over commits stay. Critic rounds are not carried by this decision.
++Decision line: the PO decided on 2026-11-04 that a Verify or Security record is carried across evidence-only commits by default, through one shared freshness verdict used by the push guard, `push-prepare`, the security completeness gate and the managed pre-push hook. The closed evidence set, the product tree hash equality, the ancestor check, the clean secret scan of the passed-over commits for Security evidence, fail closed on any doubt and the named list of passed-over commits stay. There is no complete Critic carry-forward; the Critic evidence of an earlier reviewed commit stays valid only across commits that are administration or documentation only (open question 2, decided by the PO on 2026-11-04, see the amendment below).
+ 
+ ## Context
+ 
+@@ -19,7 +19,7 @@ All four are the same design question: what is granted by a signature or an acce
+ ## Decision
+ 
+ 1. **Design inheritance by equality.** A typed, idempotent command re-binds the architecture receipt for a new feature when the design package it would materialize is byte-equal to the one of the accepted predecessor (`designSha256` and every target digest equal). It writes a new receipt that names the predecessor (`inheritedFrom: {featureId, planPath, designSha256}`) and binds the new feature and plan. Any difference, however small, falls back to the full materialization of today. Nobody deletes or edits a receipt by hand; the check at line 287 accepts a receipt that is either exact for this feature or an inheritance receipt whose recorded predecessor is accepted and whose design digest equals the current package. **Accepted predecessor** means: a feature that is closed in the closed-feature audit, whose own receipt is an exact materialization receipt (never itself an inheritance receipt). An inheritance receipt therefore names the materializing feature directly, the chain has depth one, and a successor of a successor re-names the original.
+-2. **Evidence-only commits carry Verify and Security forward.** Define a closed set of evidence paths in plugin source (not project configuration), by record class and not by file type: the feature's `evidence/**`, `audit-bundles/**`, the generated `lifecycle.json` and `result.md` of the feature package, and the single named gate record `project/push-threat-model.md`. Everything else is product-bound and never in the set, in particular the feature spec, plan and PRD under `specs/<feature>/`, `project/guard-config.json` and every other `project/` file, and any source, script or configuration extension. Verify and Security evidence additionally records `productTreeSha256`, the hash over the tree entries outside the set. A commit range whose changed paths all lie inside the set leaves `productTreeSha256` equal, so Verify evidence bound to the earlier candidate is carried forward and names the evidence-only commits it passed over. **Security evidence is carried forward only together with a secret scan of the files changed by the passed-over commits**, run by the reader at the carry-forward moment; when that scan is unavailable or reports a finding, the Security evidence is not carried (fail closed). Anything outside the set, or a changed `productTreeSha256`, invalidates exactly as today. **Critic rounds are not carried forward by this decision:** their rules are bound to the exact previous reviewed candidate and no reader consumes such a carry-forward; it stays an open question.
++2. **Evidence-only commits carry Verify and Security forward.** Define a closed set of evidence paths in plugin source (not project configuration), by record class and not by file type: the feature's `evidence/**`, `audit-bundles/**`, the generated `lifecycle.json` and `result.md` of the feature package, and the single named gate record `project/push-threat-model.md`. Everything else is product-bound and never in the set, in particular the feature spec, plan and PRD under `specs/<feature>/`, `project/guard-config.json` and every other `project/` file, and any source, script or configuration extension. Verify and Security evidence additionally records `productTreeSha256`, the hash over the tree entries outside the set. A commit range whose changed paths all lie inside the set leaves `productTreeSha256` equal, so Verify evidence bound to the earlier candidate is carried forward and names the evidence-only commits it passed over. **Security evidence is carried forward only together with a secret scan of the files changed by the passed-over commits**, run by the reader at the carry-forward moment; when that scan is unavailable or reports a finding, the Security evidence is not carried (fail closed). Anything outside the set, or a changed `productTreeSha256`, invalidates exactly as today. **Critic rounds are not carried forward by this decision:** their rules are bound to the exact previous reviewed candidate and no reader consumes such a carry-forward; the PO decided on 2026-11-04 (open question 2) that only the Critic evidence across administration and documentation only commits stays valid, see the amendment of that date.
+ 3. **A signed reconcile commits its own files.** The reconcile plan writes its proposal to the control directory in the git common directory (which `git status` never counts), never to a tracked path and never to `scratch/` (hosted projects do not ignore `scratch/`, so an untracked proposal there would break the clean-tree precondition it is meant to protect). The signed apply writes the tracked files and deposits one commit capability bound to exactly those paths and their bytes (the proof already binds them); the pre-commit hook consumes it once. The capability covers nothing else and expires with the apply window.
+ 4. **The agent checks before the human is asked.** The prepare step of every signature ceremony runs the checks an agent can run itself: clean tree (with the repair command), the official parser of the design or package, and the schema value checks, and refuses with a repair before any signature is requested. The PO is only asked once everything the agent can verify has passed.
+ 
+@@ -45,7 +45,7 @@ All four are the same design question: what is granted by a signature or an acce
+ ## Open questions for the review
+ 
+ 1. Is the record-class evidence set (point 2) tight enough now, and does a calibration need another named gate record besides `project/push-threat-model.md`?
+-2. Should a Critic carry-forward exist at all, given the exact-previous-candidate rule for correction reviews? It needs a named reader and a rule for the correction base before it can be built.
++2. Should a Critic carry-forward exist at all, given the exact-previous-candidate rule for correction reviews? DECIDED by the PO on 2026-11-04: there is no complete Critic carry-forward, but the gates keep the Critic evidence of an earlier commit valid when every following commit is administration or documentation only (see the amendment "Critic evidence across administration and documentation only commits").
+ 3. Where is the capability of point 3 stored (the existing human-guard-override journal) and how does it interact with the stale-window checks?
+ 
+ (Resolved by the review of 2026-11-03: the predecessor's close state is bound, see point 1.)
+@@ -74,6 +74,15 @@ Found by reading the code after the first build stage (patch w156, which is iner
+ 
+ The independent review of this amendment is not done; the PO accepted the amendment on 2026-11-04 on the strength of the built safeguards and the pinned real-decision cases.
+ 
++## Amendment of 2026-11-04 (PO decision on open question 2): Critic evidence across administration and documentation only commits
++
++Decided by the PO on 2026-11-04: there is no complete Critic carry-forward, but the gates are built so that the Critic evidence of an earlier reviewed commit R stays valid for a candidate C when every commit after R was not content work, only administration or documentation.
++
++- **One closed set, in plugin source.** `lib/administration-documentation-paths.mjs` names the classes: the record-only set of `lib/record-only-paths.mjs` as the base, Markdown files under `docs/` except `docs/adr/**` (a decision is content), README files inside the documentation trees, `backlog/**`, the generated `lifecycle.json` and `result.md` of a feature package, `specs/<feature>/evidence/**` and `audit-bundles/<feature>/**`. Everything else is content: source, scripts, configuration, schemas, tests, ADRs, the PRD, Spec and plan texts of a feature, the repository root README. Two vetoes stand over every class: the tracked Critic export (`specs/<feature>/evidence/critic/**`) and the Critic disposition addenda with the Markdown evidence they digest keep their receipt-bound and record-bound classifiers.
++- **One decision.** `lib/critic-evidence-carry.mjs` decides, for R and C, whether R is an ancestor of C, the range is not empty and every path changed between R and C lies in the set as a regular, non-executable file; the answer names the passed-over commits. A content path anywhere in the range answers no; any fault answers no.
++- **Wired where the exact previous reviewed candidate was demanded.** The private Critic and Verify lifecycle receipt (`lib/critic-verify-lifecycle.mjs`) takes the decision when the registered evidence-only classification does not carry the range; the close gate, the push readiness check behind `hooks/guard-push.mjs` and the Verify evidence producer all read that one receipt. The classification with the carry option passes administration-only commits over (the advisory of the close stays consistent), the correction candidate of the registration delta course skips them, and the course transport accepts them between the correction candidate and the registration commit. The course counters (classification without the option) are unchanged. `scripts/push-prepare.mjs` names the original reviewed commit and the passed-over commits in its readback.
++- **Not decided here:** a Critic round is still required for any content change; a content change anywhere in the range invalidates exactly as before.
++
+ ## Not decided
+ 
+ Point 2 and the amendment are built (see "Built behaviour"). Points 1, 3 and 4 are tracked by their own items; an independent review (fresh context, ADR-0014 contract) of the whole decision is still open and is batched for the Coordinator.
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 3bf363491..4add123be 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -331,6 +331,10 @@ below assumes it holds and is written to catch a change that would break it.
+   also remain protected: `lib/onboarding-initial-answers-state.mjs`,
+   `lib/onboarding-initial-answers-transaction.mjs`,
+   `lib/onboarding-later-language.mjs`, and `lib/critic-course-admission.mjs`.
++  The Critic evidence carry across administration and documentation only commits
++  (PO decision 2026-11-04) is imported by `lib/critic-verify-lifecycle.mjs` and
++  `lib/critic-course-admission.mjs`, so its decision module `lib/critic-evidence-carry.mjs`
++  and its path set `lib/administration-documentation-paths.mjs` are protected too.
+   The pure validation half split out of `lib/critic-review-lineage.mjs`
+   (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
+   unchanged) is protected for the same reason.
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 10e4d01cb..3fda7db7a 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -374,6 +374,7 @@
+         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
++        "verify-phase:harness/scripts/verify.mjs:critic-evidence-carry-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
+         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index fd5b77966..497ad2562 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -245,9 +245,22 @@ passed-over commits is clean; an unavailable scanner or a finding means the reco
+ is not carried. Anything else, including a spec, plan, `project/guard-config.json` or
+ any source change, refuses as before, and the stale message then names the carry
+ reason (`[EF-STALE-COMMIT; carry-forward refused: PRODUCT-PATH-CHANGED]`). The
+-`push-prepare` report and the hook log name the passed-over commits. Critic rounds
+-are not carried: a new correction candidate still needs its own review. This is
+-active by default (PO decision of 2026-11-04; ADR
++`push-prepare` report and the hook log name the passed-over commits. There is no
++complete Critic carry-forward: a new correction candidate still needs its own
++review. The one exception (PO decision of 2026-11-04, open question 2 of the ADR) is
++the Critic evidence of an earlier reviewed commit R: it stays valid for a later
++candidate C when R is an ancestor of C and every path changed between R and C is
++administration or documentation (`lib/administration-documentation-paths.mjs`:
++the record-only set, Markdown under `docs/` except `docs/adr/**`, READMEs inside the
++documentation trees, `backlog/**`, the generated `lifecycle.json` and `result.md`,
++`specs/<feature>/evidence/**`, `audit-bundles/<feature>/**`). Source, scripts,
++configuration, schemas, tests, ADRs and the PRD, Spec and plan texts are content;
++one content path anywhere in the range invalidates the evidence exactly as before.
++The decision is `lib/critic-evidence-carry.mjs`; the private Critic and Verify
++lifecycle receipt takes it, so the close gate and the push gate read the same
++answer, and the `push-prepare` readback names the original reviewed commit and the
++passed-over commits. The carry-forward of Verify and Security is active by default
++(PO decision of 2026-11-04; ADR
+ `docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md`).
+ 
+ ```
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a41a2b3e9..5b0a5e30b 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4523,6 +4523,12 @@
+       "invariantPinned": "A real push decision, through hooks/guard-push.mjs and through the managed pre-push hook template, accepts a Verify and a Security record bound to commit A after evidence-only commits, and refuses with the stable code EF-STALE-COMMIT and the carry reason a product-file commit, a change of a gate-consumed file outside the evidence set, a failed or unavailable secret scan (Security only) and a record bound to a commit that is not an ancestor; the hook log and the push-prepare readback name the passed-over commits (C19 D4b/E3 rest, AC-108)",
+       "nonOverlapNote": "Unique cases: the end-to-end push decision with a carried record on both real consumers; evidence-carry-forward.test.mjs pins the decision and the reader, evidence-freshness-codes.test.mjs the codes and the push-prepare messages, guard-push-v2.test.mjs the exact-commit v2 binding"
+     },
++    {
++      "name": "critic-evidence-carry-tests",
++      "file": "plugins/pipeline-core/lib/critic-evidence-carry.test.mjs",
++      "invariantPinned": "The Critic evidence of a reviewed commit R stays valid for a candidate C exactly when R is an ancestor of C, the range is not empty and every changed path lies in the closed administration and documentation set as a regular non-executable file; every class of the set is pinned by name, ADRs, source, configuration, tests, the Spec texts, the root README, Critic exports and disposition addenda are content, a content path anywhere in the range or any fault answers no, and the answer names the passed-over commits (C19 AC-108, PO decision 2026-11-04)",
++      "nonOverlapNote": "Unique cases: lib/administration-documentation-paths.mjs and lib/critic-evidence-carry.mjs; critic-verify-lifecycle.test.mjs pins the receipt, the readiness check and the advisory that take the decision, record-only-paths.test.mjs the base set"
++    },
+     {
+       "name": "module-slice-proposal-tests",
+       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
+diff --git a/plugins/pipeline-core/lib/administration-documentation-paths.mjs b/plugins/pipeline-core/lib/administration-documentation-paths.mjs
+new file mode 100644
+index 000000000..a8f2ce4a7
+--- /dev/null
++++ b/plugins/pipeline-core/lib/administration-documentation-paths.mjs
+@@ -0,0 +1,73 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * The ONE closed set of administration and documentation paths (candidate 19, PO decision 2026-11-04 on open question 2 of
++ * docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md): a path in this set can change between a Critic-reviewed commit and
++ * a later candidate without making the Critic evidence of the reviewed commit stale. Everything else is content and invalidates it.
++ *
++ * Why these classes, and why only these. A Critic reviews what a product does (source, scripts, configuration, schemas, tests, decisions,
++ * the PRD, the Spec and the plan of a feature). A commit that changes none of that gives the reviewer nothing new to read:
++ *   - record-only: the base set of lib/record-only-paths.mjs (Verify/Security records, dispatch evidence, backlog bookkeeping, the handover
++ *     file, pipeline state files). Reused unchanged, so the push gate's freshness rule and this rule cannot drift apart.
++ *   - documentation-markdown: a Markdown file under docs/, EXCEPT docs/adr/**. An ADR is a decision, and a decision is content.
++ *   - readme: a README file inside a documentation tree (docs/, backlog/, specs/<feature>/, audit-bundles/<feature>/). The README at the
++ *     repository root is deliberately NOT here: it is the product's front page, and the Critic carry-forward of the feature close (16c)
++ *     already refuses it by a pinned case.
++ *   - backlog: anything under backlog/ (items, status, index, transitions, evidence): process administration, no product behavior.
++ *   - feature-package-generated: specs/<feature>/lifecycle.json and result.md, both generated by the feature package tools.
++ *   - feature-evidence: specs/<feature>/evidence/** and
++ *   - audit-bundle: audit-bundles/<feature>/** (evidence and bundles produced about a candidate, not part of it).
++ * Vetoes, checked first and never overridden by a class: docs/adr/**, and specs/<feature>/evidence/critic/** (the tracked export of a
++ * consumed Critic review has its own receipt-bound classifier in lib/critic-course-admission.mjs; a path class must not become a second,
++ * weaker way in for a forged or extended export), and the Critic disposition addenda under evidence/ together with the Markdown evidence
++ * they digest (criticAddendumOnlyCommit binds them to an immutable dispatch record; a path class must not weaken that either).
++ * Content for certain (not listed above, therefore outside the set): source, scripts, configuration (including project/guard-config.json),
++ * schemas, tests, ADRs, agent and skill prompts, templates, the spec/PRD/plan texts of a feature (specs/<feature>/spec.md, prd.md, plan.md
++ * and every other file of the feature directory that is not generated or evidence), the root README and any path not named here.
++ *
++ * Feature-bound paths (specs/<feature>/..., audit-bundles/<feature>/...) can be restricted to the features a caller names, so that the
++ * carry-forward of one feature never admits another feature's directory.
++ *
++ * File modes (a symbolic link or executable file named like a document) are not visible in a path string; the range decision in
++ * lib/critic-evidence-carry.mjs refuses them.
++ */
++import { isRecordOnlyPath } from "./record-only-paths.mjs";
++
++const FEATURE_BOUND = /^(?:specs|audit-bundles)\/([^/]+)\//u;
++const VETO = Object.freeze([
++  /^docs\/adr\//u,
++  /^specs\/[^/]+\/evidence\/critic(?:\/|$)/u,
++  // A Critic disposition addendum and the Markdown evidence it digests are bound to an immutable dispatch record by criticAddendumOnlyCommit.
++  /^(?:backlog\/)?evidence\/dispatch-critic-addendum-[^/]+\.json$/u,
++  /^(?:backlog\/)?evidence\/[^/]+\.md$/u,
++]);
++
++/** Ordered: the first class that matches names the path. `id` values are pinned by tests. */
++export const ADMINISTRATION_DOCUMENTATION_CLASSES = Object.freeze([
++  Object.freeze({ id: "record-only", matches: (path) => isRecordOnlyPath(path) }),
++  Object.freeze({ id: "documentation-markdown", matches: (path) => /^docs\/(?:[^/]+\/)*[^/]+\.md$/u.test(path) }),
++  Object.freeze({ id: "readme", matches: (path) => /^(?:docs|backlog|specs\/[^/]+|audit-bundles\/[^/]+)\/(?:[^/]+\/)*README(?:\.(?:md|txt))?$/u.test(path) }),
++  Object.freeze({ id: "backlog", matches: (path) => /^backlog\/.+$/u.test(path) }),
++  Object.freeze({ id: "feature-package-generated", matches: (path) => /^specs\/[^/]+\/(?:lifecycle\.json|result\.md)$/u.test(path) }),
++  Object.freeze({ id: "feature-evidence", matches: (path) => /^specs\/[^/]+\/evidence\/.+$/u.test(path) }),
++  Object.freeze({ id: "audit-bundle", matches: (path) => /^audit-bundles\/[^/]+\/.+$/u.test(path) }),
++]);
++
++function wellFormed(path) {
++  return typeof path === "string" && path.length > 0 && path.length <= 1024 && !path.includes("\\") && !path.includes("\0")
++    && !path.startsWith("/") && path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
++}
++
++/**
++ * The class id that admits `path`, or null (content, a vetoed path, a malformed path, or a feature outside `featureIds`).
++ * `featureIds` null means feature-bound paths are admitted for any feature.
++ */
++export function administrationDocumentationClassOf(path, { featureIds = null } = {}) {
++  if (!wellFormed(path) || VETO.some((pattern) => pattern.test(path))) return null;
++  const feature = FEATURE_BOUND.exec(path)?.[1];
++  if (feature !== undefined && Array.isArray(featureIds) && !featureIds.includes(feature)) return null;
++  return ADMINISTRATION_DOCUMENTATION_CLASSES.find((entry) => entry.matches(path))?.id ?? null;
++}
++
++export function isAdministrationDocumentationPath(path, options = {}) {
++  return administrationDocumentationClassOf(path, options) !== null;
++}
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index f86562ef0..aaa8fb0db 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -15,6 +15,7 @@ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+ import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
+ import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
++import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MODES = new Set(["full", "delta"]);
+@@ -512,16 +513,21 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
+   const root = realpathSync(repoRoot);
+   const evidenceOnly = [];
+   const correction = [];
++  const administration = [];
+   for (const commit of source.rangeCommits) {
+-    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
++    const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
+-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)))
+-      ? evidenceOnly : correction).push(commit);
++        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)));
++    // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
++    const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
++    if (passedOver && !registered) administration.push(commit);
++    (passedOver ? evidenceOnly : correction).push(commit);
+   }
+   return Object.freeze({
+     ...source,
+     correctionCommits: Object.freeze(correction),
+     evidenceOnlyCommits: Object.freeze(evidenceOnly),
++    administrationDocumentationCommits: Object.freeze(administration),
+   });
+ }
+ 
+@@ -758,7 +764,7 @@ function evidenceCommitV2(root,commit,featureId){
+ function transport(root,from,to,original,aliases){
+  const aliasIds=aliases.map(a=>a.descriptor.aliasFeatureId),ids=[original,...aliasIds];
+  for(const commit of range(root,from,to)){
+-  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids))continue;
++  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids)||administrationDocumentationOnlyCommit(root,commit,{featureIds:ids}))continue;
+   const parents=gitBytes(root,['rev-list','--parents','-n','1',commit],'CCA-RANGE-READ').toString('utf8').trim().split(/\s+/u);if(parents.length!==2)fail('CCA-TRANSPORT');
+   const changed=gitBytes(root,['diff','--name-only','-z',parents[1],commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
+   const allowed=new Set();
+diff --git a/plugins/pipeline-core/lib/critic-evidence-carry.mjs b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+new file mode 100644
+index 000000000..785caae66
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+@@ -0,0 +1,128 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Does the Critic evidence of a reviewed commit R stay valid for a candidate commit C? (candidate 19, PO decision 2026-11-04 on open
++ * question 2 of docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md.)
++ *
++ * Yes exactly when R is an ancestor of C, the range R..C is not empty, and EVERY path changed between R and C lies in the closed set of
++ * lib/administration-documentation-paths.mjs, as a regular, non-executable file (a symbolic link or an executable file named like a
++ * document is content). One content path anywhere in the range answers no, also when later commits are administration only. Any fault
++ * (unreadable repository, unknown commit, too large a range) answers no: this function fails closed and never throws.
++ *
++ * The decision is pure repository state: it consults no registration, no private store and no clock. The callers that bind a Critic
++ * receipt to it are lib/critic-verify-lifecycle.mjs (record and read of the lifecycle receipt, which the close gate and the push gate
++ * both read), lib/critic-course-admission.mjs (the registration delta course) and the readbacks of scripts/push-prepare.mjs.
++ */
++import { spawnSync } from "node:child_process";
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
++
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++const MAX_RANGE_COMMITS = 512;
++const REGULAR = new Set(["000000", "100644"]);
++export const CRITIC_EVIDENCE_CARRY_SCHEMA = "pipeline.critic-evidence-carry-decision.v1";
++
++function git(root, args) {
++  const result = spawnSync("git", ["-C", root, ...args], { shell: false, encoding: "utf8", timeout: 10000, maxBuffer: 8 * 1024 * 1024,
++    env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
++      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" } });
++  return { status: result.error || result.signal ? null : result.status, stdout: result.stdout ?? "" };
++}
++
++function answer(fields) {
++  return Object.freeze({ schema: CRITIC_EVIDENCE_CARRY_SCHEMA, carried: false, code: "CEC-UNREADABLE", reviewedCommit: null, candidateCommit: null,
++    candidateTree: null, passedOverCommits: Object.freeze([]), changedPaths: Object.freeze([]), offendingPaths: Object.freeze([]), ...fields });
++}
++
++/** The changed entries between two commits, or null when unreadable. Each entry: { status, oldMode, newMode, path }. */
++function changedEntries(root, from, to) {
++  const diff = git(root, ["diff", "--raw", "-z", "--no-renames", "--no-abbrev", from, to, "--"]);
++  if (diff.status !== 0) return null;
++  const fields = diff.stdout.split("\0").filter(Boolean);
++  if (fields.length % 2 !== 0) return null;
++  const entries = [];
++  for (let index = 0; index < fields.length; index += 2) {
++    const meta = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([A-Z])$/u.exec(fields[index]);
++    if (!meta) return null;
++    entries.push({ oldMode: meta[1], newMode: meta[2], status: meta[3], path: fields[index + 1] });
++  }
++  return entries;
++}
++
++function offending(entries, featureIds) {
++  return entries.filter((entry) => !["A", "M", "D"].includes(entry.status) || !REGULAR.has(entry.oldMode) || !REGULAR.has(entry.newMode)
++    || administrationDocumentationClassOf(entry.path, { featureIds }) === null).map((entry) => entry.path);
++}
++
++/**
++ * @param {{repoRoot: string, reviewedCommit: string, candidateCommit: string, featureIds?: string[]|null}} input
++ * `featureIds` restricts the feature-bound classes to those features (null: any feature).
++ */
++export function decideCriticEvidenceCarry({ repoRoot, reviewedCommit, candidateCommit, featureIds = null } = {}) {
++  try {
++    if (typeof repoRoot !== "string" || repoRoot === "" || !OID.test(reviewedCommit ?? "") || !OID.test(candidateCommit ?? "")
++      || !(featureIds === null || (Array.isArray(featureIds) && featureIds.every((id) => typeof id === "string")))) return answer({ code: "CEC-INPUT" });
++    const base = { reviewedCommit, candidateCommit };
++    for (const commit of [reviewedCommit, candidateCommit]) {
++      if (git(repoRoot, ["rev-parse", "--verify", "--quiet", `${commit}^{commit}`]).status !== 0) return answer({ ...base, code: "CEC-UNREADABLE" });
++    }
++    if (reviewedCommit === candidateCommit) return answer({ ...base, code: "CEC-EMPTY-RANGE" });
++    const ancestry = git(repoRoot, ["merge-base", "--is-ancestor", reviewedCommit, candidateCommit]).status;
++    if (ancestry === 1) return answer({ ...base, code: "CEC-NOT-ANCESTOR" });
++    if (ancestry !== 0) return answer({ ...base, code: "CEC-UNREADABLE" });
++    const listed = git(repoRoot, ["rev-list", "--reverse", `${reviewedCommit}..${candidateCommit}`]);
++    const commits = listed.stdout.split("\n").filter(Boolean);
++    if (listed.status !== 0 || commits.some((commit) => !OID.test(commit))) return answer({ ...base, code: "CEC-UNREADABLE" });
++    if (commits.length === 0) return answer({ ...base, code: "CEC-EMPTY-RANGE" });
++    if (commits.length > MAX_RANGE_COMMITS) return answer({ ...base, code: "CEC-RANGE-TOO-LARGE" });
++    const entries = changedEntries(repoRoot, reviewedCommit, candidateCommit);
++    const tree = git(repoRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
++    if (entries === null || tree.status !== 0 || !OID.test(tree.stdout.trim())) return answer({ ...base, code: "CEC-UNREADABLE" });
++    const changedPaths = entries.map((entry) => entry.path);
++    const bad = offending(entries, featureIds);
++    if (bad.length > 0) return answer({ ...base, code: "CEC-CONTENT-CHANGED", changedPaths: Object.freeze(changedPaths), offendingPaths: Object.freeze(bad) });
++    return answer({ ...base, carried: true, code: "CEC-CARRIED", candidateTree: tree.stdout.trim(),
++      passedOverCommits: Object.freeze(commits), changedPaths: Object.freeze(changedPaths) });
++  } catch { return answer({ code: "CEC-UNREADABLE" }); }
++}
++
++/**
++ * The per-commit test of the registration delta course: `commit` has exactly one parent, changes at least one path, every change is an
++ * administration or documentation path (regular files only), and the commit does not touch a feature package manifest
++ * (lifecycle.json): a manifest change is classified by the registration tests of the course, never as plain administration here.
++ */
++export function administrationDocumentationOnlyCommit(repoRoot, commit, { featureIds = null } = {}) {
++  try {
++    if (typeof repoRoot !== "string" || repoRoot === "" || !OID.test(commit ?? "")) return false;
++    const parents = git(repoRoot, ["rev-list", "--parents", "-n", "1", commit]);
++    const ids = parents.stdout.trim().split(/\s+/u);
++    if (parents.status !== 0 || ids.length !== 2 || ids[0] !== commit) return false;
++    const entries = changedEntries(repoRoot, ids[1], commit);
++    if (entries === null || entries.length === 0) return false;
++    return entries.every((entry) => !entry.path.endsWith("/lifecycle.json")) && offending(entries, featureIds).length === 0;
++  } catch { return false; }
++}
++
++/**
++ * The carry readback of a private lifecycle receipt, or null (no receipt, not a carry receipt, unreadable). Read-only; the receipt itself
++ * was verified by readCriticVerifyLifecycle before the caller got here.
++ */
++export function readCarriedForwardReadback(gitCommonDir, receiptId) {
++  try {
++    if (typeof gitCommonDir !== "string" || !/^[a-f0-9]{64}$/u.test(receiptId ?? "")) return null;
++    const receipt = JSON.parse(readFileSync(join(gitCommonDir, "agent-pipeline", "critic-verify-lifecycle", `${receiptId}.json`), "utf8"));
++    const proof = receipt?.carryForward?.proof;
++    if (!proof || !OID.test(proof.reviewedCandidate?.commit ?? "") || !Array.isArray(proof.evidenceOnlyCommits)) return null;
++    return { reviewedCommit: proof.reviewedCandidate.commit, passedOverCommits: [...proof.evidenceOnlyCommits], route: proof.route ?? "registered-evidence-only" };
++  } catch { return null; }
++}
++
++const short = (commit) => String(commit).slice(0, 8);
++
++/** One line for a readback: the original reviewed commit and the passed-over commits. Accepts a decision or a carry proof. */
++export function describeCriticCarry(carry) {
++  const reviewed = carry?.reviewedCommit ?? carry?.reviewedCandidate?.commit;
++  const passed = carry?.passedOverCommits ?? carry?.evidenceOnlyCommits ?? [];
++  return `Critic evidence of ${short(reviewed)} carried across administration and documentation only commits; passed over ${passed.map(short).join(", ")}`;
++}
+diff --git a/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs b/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs
+new file mode 100644
+index 000000000..9ab796b05
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs
+@@ -0,0 +1,226 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-108 (closest accepted criterion; PRD and Spec unchanged): the Critic evidence of an earlier reviewed commit R stays valid for a
++// candidate C when every path changed between R and C is administration or documentation, and never otherwise.
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++
++import { ADMINISTRATION_DOCUMENTATION_CLASSES, administrationDocumentationClassOf, isAdministrationDocumentationPath } from "./administration-documentation-paths.mjs";
++import { decideCriticEvidenceCarry, administrationDocumentationOnlyCommit, describeCriticCarry } from "./critic-evidence-carry.mjs";
++import { isRecordOnlyPath } from "./record-only-paths.mjs";
++
++function repo(t) {
++  const root = mkdtempSync(join(tmpdir(), "critic-evidence-carry-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const git = (args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  git(["init", "--quiet"]);
++  const write = (path, text = "x\n") => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
++  const commit = (message) => {
++    git(["add", "-A"]);
++    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "--allow-empty", "-m", message]);
++    return git(["rev-parse", "HEAD"]);
++  };
++  return { root, git, write, commit };
++}
++const decide = (r, reviewedCommit, candidateCommit, extra = {}) => decideCriticEvidenceCarry({ repoRoot: r.root, reviewedCommit, candidateCommit, ...extra });
++
++test("the set names every class and pins what belongs to each", () => {
++  const ids = ADMINISTRATION_DOCUMENTATION_CLASSES.map((entry) => entry.id);
++  assert.deepEqual(ids, ["record-only", "documentation-markdown", "readme", "backlog", "feature-package-generated", "feature-evidence", "audit-bundle"]);
++  const inSet = {
++    "record-only": ["evidence/verify-latest.json", "backlog/evidence/a.json", "docs/state.md", "project/pipeline-state.json", ".claude/pipeline-state.json", "specs/f/evidence/x.log"],
++    "documentation-markdown": ["docs/guide.md", "docs/deep/dir/note.md", "docs/push-release-flow.md"],
++    readme: ["docs/README.md", "docs/sub/README", "backlog/README.md", "specs/f/README.md", "audit-bundles/f/README.txt"],
++    backlog: ["backlog/index.json", "backlog/items/a.md", "backlog/notes/plain.txt", "backlog/transitions.ndjson"],
++    "feature-package-generated": ["specs/f/lifecycle.json", "specs/f/result.md"],
++    "feature-evidence": ["specs/f/evidence/anything.json", "specs/f/evidence/sub/dir/file.bin"],
++    "audit-bundle": ["audit-bundles/f/abc/manifest.json", "audit-bundles/f/x.json"],
++  };
++  for (const [id, paths] of Object.entries(inSet)) {
++    for (const path of paths) assert.ok(isAdministrationDocumentationPath(path), `${path} (${id})`);
++  }
++  assert.equal(administrationDocumentationClassOf("docs/guide.md"), "documentation-markdown");
++  assert.equal(administrationDocumentationClassOf("backlog/index.json"), "record-only", "the first class that matches names the path");
++  assert.equal(administrationDocumentationClassOf("backlog/notes/plain.txt"), "backlog");
++  assert.equal(administrationDocumentationClassOf("docs/adr/0001-x.md"), null);
++  assert.equal(administrationDocumentationClassOf("audit-bundles/f/x.json"), "audit-bundle");
++});
++
++test("the record-only set is the base: every record-only path is in the set", () => {
++  for (const path of ["evidence/a.json", "backlog/STATUS.md", "backlog/index.json", "specs/f/lifecycle.json", "specs/f/result.md", "docs/state.md", "project/pipeline-state.json"]) {
++    assert.equal(isRecordOnlyPath(path), true, path);
++    assert.equal(isAdministrationDocumentationPath(path), true, path);
++  }
++});
++
++test("everything else is content: source, scripts, configuration, schemas, tests, ADRs, PRD, Spec and plan texts, the root README", () => {
++  const content = [
++    "src/app.js", "scripts/run.mjs", "plugins/pipeline-core/lib/x.mjs", "plugins/pipeline-core/lib/x.test.mjs", "package.json", ".gitleaksignore",
++    "project/guard-config.json", "project/pipeline.json", "harness/verify-suites.json", "schemas/x.schema.json", ".claude/agents/reviewer.md", ".claude/settings.json",
++    "docs/adr/0001-x.md", "docs/adr/draft-y.json", "docs/run.sh", "docs/data.json", "docs/image.png",
++    "specs/f/spec.md", "specs/f/prd.md", "specs/f/plan.md", "specs/f/notes.md",
++    "README.md", "CLAUDE.md", "templates/prompts/x.md", "governance/examples/README.md",
++    "audit-bundles", "docs", "docs/", "backlog",
++  ];
++  for (const path of content) assert.equal(isAdministrationDocumentationPath(path), false, path);
++});
++
++test("a Critic export path is never in the set: it has its own receipt classifier, and a forged one must not ride on the evidence class", () => {
++  assert.equal(isAdministrationDocumentationPath(`specs/f/evidence/critic/${"a".repeat(32)}/report.md`), false);
++  assert.equal(isAdministrationDocumentationPath("specs/f/evidence/critic/anything"), false);
++  assert.equal(isAdministrationDocumentationPath("specs/f/evidence/critic-notes.md"), true);
++});
++
++test("a Critic disposition addendum and the Markdown evidence under evidence/ keep their own byte-bound classifier", () => {
++  for (const path of ["evidence/dispatch-critic-addendum-t1.json", "backlog/evidence/dispatch-critic-addendum-t1.json", "evidence/critic-disposition-evidence-t1.md", "backlog/evidence/other.md"]) {
++    assert.equal(isAdministrationDocumentationPath(path), false, path);
++  }
++  assert.equal(isAdministrationDocumentationPath("evidence/dispatch-record-t1.json"), true);
++});
++
++test("feature-bound classes follow the feature list when one is given", () => {
++  assert.equal(isAdministrationDocumentationPath("specs/other/lifecycle.json", { featureIds: ["f"] }), false);
++  assert.equal(isAdministrationDocumentationPath("specs/f/lifecycle.json", { featureIds: ["f"] }), true);
++  assert.equal(isAdministrationDocumentationPath("audit-bundles/other/x.json", { featureIds: ["f"] }), false);
++  assert.equal(isAdministrationDocumentationPath("specs/other/lifecycle.json"), true, "without a feature list the class is feature-agnostic");
++  assert.equal(isAdministrationDocumentationPath("docs/guide.md", { featureIds: ["f"] }), true);
++});
++
++test("malformed paths are never in the set", () => {
++  for (const path of ["docs/../src/a.js", "docs//x.md", "./docs/x.md", "/docs/x.md", "docs\\x.md", "docs/a\0.md", "", null, undefined, 7, "docs/./x.md"]) {
++    assert.equal(isAdministrationDocumentationPath(path), false, String(path));
++  }
++});
++
++test("an administration-only range is carried and names the passed-over commits", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n"); r.write("docs/guide.md", "g\n");
++  const reviewed = r.commit("reviewed");
++  r.write("docs/guide.md", "g2\n");
++  const d1 = r.commit("docs");
++  r.write("evidence/dispatch-record-x.json", "{}\n"); r.write("backlog/index.json", "{}\n");
++  const d2 = r.commit("administration");
++  r.write("specs/f/lifecycle.json", "{}\n"); r.write("specs/f/result.md", "# r\n"); r.write("audit-bundles/f/b/manifest.json", "{}\n");
++  const d3 = r.commit("close artefacts");
++  const decision = decide(r, reviewed, d3);
++  assert.equal(decision.carried, true);
++  assert.equal(decision.code, "CEC-CARRIED");
++  assert.equal(decision.reviewedCommit, reviewed);
++  assert.equal(decision.candidateCommit, d3);
++  assert.deepEqual(decision.passedOverCommits, [d1, d2, d3]);
++  assert.deepEqual(decision.offendingPaths, []);
++  assert.ok(decision.changedPaths.includes("backlog/index.json"));
++  assert.equal(decision.candidateTree, r.git(["rev-parse", `${d3}^{tree}`]));
++  assert.deepEqual(decide(r, reviewed, d3, { featureIds: ["f"] }).passedOverCommits, [d1, d2, d3]);
++  assert.equal(decide(r, reviewed, d3, { featureIds: ["g"] }).carried, false, "the feature-bound paths belong to another feature");
++  const readback = describeCriticCarry(decision);
++  assert.match(readback, new RegExp(reviewed.slice(0, 8), "u"));
++  for (const commit of [d1, d2, d3]) assert.match(readback, new RegExp(commit.slice(0, 8), "u"));
++});
++
++test("one source file anywhere in the range ends the carry, even when later commits are administration only", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n");
++  const reviewed = r.commit("reviewed");
++  r.write("docs/guide.md", "g\n");
++  r.commit("docs");
++  r.write("src/app.js", "2\n"); r.write("docs/guide.md", "g2\n");
++  r.commit("source next to docs");
++  r.write("docs/guide.md", "g3\n");
++  const tail = r.commit("docs again");
++  const decision = decide(r, reviewed, tail);
++  assert.equal(decision.carried, false);
++  assert.equal(decision.code, "CEC-CONTENT-CHANGED");
++  assert.deepEqual(decision.offendingPaths, ["src/app.js"]);
++  assert.deepEqual(decision.passedOverCommits, []);
++});
++
++test("a content change that is reverted before the candidate leaves nothing to review", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n");
++  const reviewed = r.commit("reviewed");
++  r.write("src/app.js", "2\n");
++  r.commit("change");
++  r.write("src/app.js", "1\n");
++  const reverted = r.commit("revert");
++  assert.equal(decide(r, reviewed, reverted).carried, true);
++});
++
++test("a non-ancestor is not carried", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n");
++  const base = r.commit("base");
++  r.git(["checkout", "--quiet", "-b", "side"]);
++  r.write("docs/side.md", "s\n");
++  const side = r.commit("side");
++  r.git(["checkout", "--quiet", "-"]);
++  r.write("docs/main.md", "m\n");
++  const main = r.commit("main");
++  for (const [reviewed, candidate] of [[side, main], [main, side], [main, base]]) {
++    const decision = decide(r, reviewed, candidate);
++    assert.equal(decision.carried, false);
++    assert.equal(decision.code, "CEC-NOT-ANCESTOR");
++    assert.deepEqual(decision.passedOverCommits, []);
++  }
++});
++
++test("an empty range (the same commit) and unreadable input are not carried", (t) => {
++  const r = repo(t);
++  r.write("docs/a.md", "a\n");
++  const only = r.commit("only");
++  assert.equal(decide(r, only, only).carried, false);
++  assert.equal(decide(r, only, only).code, "CEC-EMPTY-RANGE");
++  for (const bad of ["", "zzz", "a".repeat(40), null, undefined, 5]) {
++    const decision = decide(r, bad, only);
++    assert.equal(decision.carried, false, String(bad));
++    assert.match(decision.code, /^CEC-(?:INPUT|UNREADABLE)$/u, String(bad));
++  }
++  assert.equal(decideCriticEvidenceCarry({ repoRoot: join(r.root, "missing"), reviewedCommit: only, candidateCommit: only }).carried, false);
++});
++
++test("a symbolic link or an executable file named like a document is content", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n");
++  const reviewed = r.commit("reviewed");
++  symlinkSync("../src/app.js", join(r.root, "docs-link.md"));
++  mkdirSync(join(r.root, "docs"), { recursive: true });
++  symlinkSync("../src/app.js", join(r.root, "docs/linked.md"));
++  assert.equal(decide(r, reviewed, r.commit("link")).carried, false);
++  r.git(["rm", "--quiet", "-f", "docs-link.md", "docs/linked.md"]);
++  const clean = r.commit("clean");
++  r.write("docs/exec.md", "x\n"); chmodSync(join(r.root, "docs/exec.md"), 0o755);
++  const exec = r.commit("exec");
++  assert.equal(decide(r, clean, exec).carried, false);
++  assert.deepEqual(decide(r, clean, exec).offendingPaths, ["docs/exec.md"]);
++});
++
++test("a removed source file and a removed document: only the document is administration", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n"); r.write("docs/a.md", "a\n");
++  const reviewed = r.commit("reviewed");
++  r.git(["rm", "--quiet", "docs/a.md"]);
++  assert.equal(decide(r, reviewed, r.commit("docs gone")).carried, true);
++  const second = r.git(["rev-parse", "HEAD"]);
++  r.git(["rm", "--quiet", "src/app.js"]);
++  assert.equal(decide(r, second, r.commit("source gone")).carried, false);
++});
++
++test("the per-commit test used by the course: one parent, only administration paths, no manifest change", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n");
++  r.commit("reviewed");
++  r.write("docs/a.md", "a\n");
++  const docs = r.commit("docs");
++  r.write("specs/f/lifecycle.json", "{}\n");
++  const manifest = r.commit("manifest");
++  r.write("src/app.js", "2\n"); r.write("docs/a.md", "b\n");
++  const mixed = r.commit("mixed");
++  assert.equal(administrationDocumentationOnlyCommit(r.root, docs), true);
++  assert.equal(administrationDocumentationOnlyCommit(r.root, manifest), false, "a manifest change is classified by the registration tests, not here");
++  assert.equal(administrationDocumentationOnlyCommit(r.root, mixed), false);
++  assert.equal(administrationDocumentationOnlyCommit(r.root, r.git(["rev-list", "--max-parents=0", "HEAD"])), false, "the root commit has no single parent");
++  assert.equal(administrationDocumentationOnlyCommit(join(r.root, "missing"), docs), false);
++});
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 3bddf2d7d..96928489f 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -19,6 +19,7 @@ import { isAbsolute, join, resolve } from "node:path";
+ import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
+ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
++import { decideCriticEvidenceCarry } from "./critic-evidence-carry.mjs";
+ import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
+ import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
+ export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
+@@ -79,29 +80,40 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
+   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId,
+     candidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree } },
+   { ...deps, readConsumedCandidateReceiptFn: () => consumed });
+-  let range;
++  let range = null;
+   try {
+     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
+       repoRoot, featureId, baseCommit: reviewedCandidate.commit,
+       candidateCommit: targetCandidate.commit, admitCriticExports: true,
+       ...(deps.readConsumedCandidateReceiptFn ? { readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn } : {}),
+     });
+-  } catch { fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified."); }
+-  if (range.candidateTree !== targetCandidate.tree
+-    || !Array.isArray(range.rangeCommits) || range.rangeCommits.length === 0
+-    || !Array.isArray(range.evidenceOnlyCommits)
+-    || range.evidenceOnlyCommits.length !== range.rangeCommits.length
+-    || !range.rangeCommits.every((commit, index) => commit === range.evidenceOnlyCommits[index])
+-    || !Array.isArray(range.correctionCommits) || range.correctionCommits.length !== 0) {
+-    fail("CVL-CARRY-CONTENT-CHANGED", "Critic carry-forward range contains unreviewed content.");
++  } catch { range = null; }
++  const registeredEvidenceOnly = range !== null && range.candidateTree === targetCandidate.tree
++    && Array.isArray(range.rangeCommits) && range.rangeCommits.length > 0
++    && Array.isArray(range.evidenceOnlyCommits)
++    && range.evidenceOnlyCommits.length === range.rangeCommits.length
++    && range.rangeCommits.every((commit, index) => commit === range.evidenceOnlyCommits[index])
++    && Array.isArray(range.correctionCommits) && range.correctionCommits.length === 0;
++  // AC-108 (PO decision 2026-11-04): a range that is not registered evidence only still carries when every path changed between the
++  // reviewed commit and the target lies in the administration and documentation set (lib/critic-evidence-carry.mjs). Anything else
++  // refuses exactly as before: CVL-CARRY-RANGE when the registered classification itself could not be read, otherwise content changed.
++  let administration = null;
++  if (!registeredEvidenceOnly) {
++    administration = (deps.decideCriticEvidenceCarryFn ?? decideCriticEvidenceCarry)({ repoRoot,
++      reviewedCommit: reviewedCandidate.commit, candidateCommit: targetCandidate.commit, featureIds: [featureId] });
++    if (administration.carried !== true || administration.candidateTree !== targetCandidate.tree) {
++      if (range === null) fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified.");
++      fail("CVL-CARRY-CONTENT-CHANGED", "Critic carry-forward range contains unreviewed content.");
++    }
+   }
+   const proof = Object.freeze({
+     schema: "pipeline.critic-evidence-carry-forward.v1", featureId,
+     reviewedCandidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree },
+     targetCandidate: { ...targetCandidate }, criticPacketId,
+     criticReceiptSha256: bound.criticReceiptSha256,
+-    manifestSha256: range.manifestSha256,
+-    evidenceOnlyCommits: [...range.evidenceOnlyCommits],
++    manifestSha256: administration === null ? range.manifestSha256 : (range?.manifestSha256 ?? null),
++    evidenceOnlyCommits: administration === null ? [...range.evidenceOnlyCommits] : [...administration.passedOverCommits],
++    ...(administration !== null || (range?.administrationDocumentationCommits?.length ?? 0) > 0 ? { route: "administration-documentation" } : {}),
+   });
+   return Object.freeze({ proof, proofSha256: sha256(canonicalJson(proof)) });
+ }
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index 8a8dd319e..d669fb169 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -807,6 +807,113 @@ test("D227 the private record carries the class to the lifecycle deps, and the v
+   assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
+ });
+ 
++import { readCarriedForwardReadback } from "./critic-evidence-carry.mjs";
++// AC-108 (PO decision 2026-11-04, carry-forward ADR open question 2): the Critic evidence of an earlier reviewed commit R stays valid across
++// commits that are administration or documentation only. These are real gate decisions on a git fixture: the lifecycle record and read
++// (what the close gate reads), the readiness check (what the push gate calls) and the advisory. A content change anywhere invalidates.
++test("AC-108 a Critic review carries across administration-only commits through the lifecycle, the push readiness check and the advisory", t => {
++  const root = fixture(t);
++  const git = (args) => execFileSync("git", ["-C", root, ...args],
++    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  const commitAll = (message) => {
++    git(["add", "-A"]);
++    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
++    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
++  };
++  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
++  const featureId = "admin-carry-feature";
++  git(["init", "--quiet"]);
++  writeAt("src/app.js", "export const reviewed = 1;\n");
++  writeAt("docs/state.md", "# State\n");
++  writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
++  const reviewed = commitAll("reviewed source");
++  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed }, reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
++  const deps = { readConsumedCandidateReceiptFn: () => read };
++  const gitCommonDir = join(root, ".git");
++  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir, featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
++
++  // Not a close commit, not an export, not a registration: a dispatch record and the backlog index at the root level.
++  writeAt("evidence/dispatch-record-t1.json", "{}\n");
++  writeAt("backlog/index.json", "{}\n");
++  const admin = commitAll("administration: dispatch record and backlog index");
++  writeAt("docs/guide.md", "# Guide\n");
++  const docs = commitAll("documentation");
++  const carried = carry(docs);
++  assert.equal(carried.proof.reviewedCandidate.commit, reviewed.commit, "the original reviewed commit is named");
++  assert.deepEqual(carried.proof.evidenceOnlyCommits, [admin.commit, docs.commit], "the passed-over commits are named");
++  assert.equal(carried.proof.route, "administration-documentation");
++
++  const verify = { schema: "pipeline.verify-evidence.v0", exitCode: 0, commit: docs.commit, tree: docs.tree, candidate: { ...docs },
++    verifyRun: { status: "passed", terminalSha256: sha("c") }, steps: [{ exitCode: 0 }] };
++  const recorded = recordCriticVerifyLifecycle({ repoRoot: root, featureId, gitCommonDir, criticPacketId: read.receipt.packetId,
++    candidate: docs, evidencePath: "evidence/verify-latest.json", evidence: verify }, deps);
++  assert.equal(recorded.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
++  assert.equal(readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: recorded.receipt.id, candidate: docs,
++    evidencePath: "evidence/verify-latest.json", evidence: verify }, deps).receiptSha256, recorded.receiptSha256, "the close gate's reader accepts it");
++
++  const gate = inspectCriticBoundVerify({ repoRoot: root, gitCommonDir, head: docs.commit, tree: docs.tree, worktreeState: "clean",
++    evidencePath: "evidence/verify-latest.json", evidence: verify, readLifecycle: (input) => readCriticVerifyLifecycle(input, deps) });
++  assert.equal(gate.currentCheckoutOk, true, "the push readiness check passes");
++  assert.equal(gate.code, "critic-bound-verify-valid");
++  assert.equal(gate.carriedForward.reviewedCommit, reviewed.commit);
++  assert.deepEqual(gate.carriedForward.passedOverCommits, [admin.commit, docs.commit]);
++  // The push-prepare readback reads the same receipt by its id (the exported check of the exact checkout returns only the id).
++  const readback = readCarriedForwardReadback(gitCommonDir, gate.receiptId);
++  assert.equal(readback.reviewedCommit, reviewed.commit);
++  assert.deepEqual(readback.passedOverCommits, [admin.commit, docs.commit]);
++  assert.equal(readCarriedForwardReadback(gitCommonDir, sha("0")), null, "no receipt, no readback");
++  assert.equal(readCarriedForwardReadback(gitCommonDir, "../x"), null, "a malformed id is never read");
++
++  assert.equal(courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId, candidateCommit: docs.commit,
++    resolveHistoryFn: () => ({ history: [{ candidate: { commit: reviewed.commit } }] }) }), null, "no content commit, no advice");
++
++  // A content change anywhere in the range invalidates exactly as before, also when administration commits follow it.
++  writeAt("src/app.js", "export const reviewed = 2;\n");
++  const source = commitAll("source change");
++  writeAt("docs/guide.md", "# Guide 2\n");
++  const tail = commitAll("documentation after the source change");
++  for (const target of [source, tail]) assert.throws(() => carry(target), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
++  const tailVerify = { ...verify, commit: tail.commit, tree: tail.tree, candidate: { ...tail } };
++  assert.throws(() => recordCriticVerifyLifecycle({ repoRoot: root, featureId, gitCommonDir, criticPacketId: read.receipt.packetId,
++    candidate: tail, evidencePath: "evidence/verify-latest.json", evidence: tailVerify }, deps), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
++  const refusedGate = inspectCriticBoundVerify({ repoRoot: root, gitCommonDir, head: tail.commit, tree: tail.tree, worktreeState: "clean",
++    evidencePath: "evidence/verify-latest.json", evidence: tailVerify, readLifecycle: (input) => readCriticVerifyLifecycle(input, deps) });
++  assert.equal(refusedGate.currentCheckoutOk, false);
++  assert.equal(Object.hasOwn(refusedGate, "carriedForward"), false);
++  assert.equal(courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId, candidateCommit: tail.commit,
++    resolveHistoryFn: () => ({ history: [{ candidate: { commit: reviewed.commit } }] }) }).status, "content-after-last-review");
++
++  // The earlier receipt stays bound to its own candidate: it does not admit the later one.
++  assert.throws(() => readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: recorded.receipt.id, candidate: tail,
++    evidencePath: "evidence/verify-latest.json", evidence: tailVerify }, deps));
++});
++
++test("AC-108 the course classification with the carry option passes administration-only commits over; the course counters stay unchanged", t => {
++  const root = fixture(t);
++  const git = (args) => execFileSync("git", ["-C", root, ...args],
++    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  const commitAll = (message) => {
++    git(["add", "-A"]);
++    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
++    return git(["rev-parse", "HEAD"]);
++  };
++  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
++  const featureId = "admin-course-feature";
++  git(["init", "--quiet"]);
++  writeAt("src/app.js", "1\n");
++  writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
++  const reviewed = commitAll("reviewed");
++  writeAt("evidence/dispatch-record-t1.json", "{}\n");
++  const admin = commitAll("administration");
++  writeAt("src/app.js", "2\n");
++  const content = commitAll("content");
++  const withOption = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed, candidateCommit: content, admitCriticExports: true });
++  assert.deepEqual(withOption.evidenceOnlyCommits, [admin]);
++  assert.deepEqual(withOption.correctionCommits, [content]);
++  const without = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed, candidateCommit: content });
++  assert.deepEqual(without.correctionCommits, [admin, content], "without the option the counters are what they were");
++});
++
+ import { validateCriticDispositionAddendum as validateAddendumForMessage } from "./critic-disposition-addendum.mjs";
+ 
+ // 17 (AGY greenfield): the Critic addendum's evidence binding is a closed object whose schema string and fields the agent had to read
+diff --git a/plugins/pipeline-core/lib/critic-verify-readiness.mjs b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+index 8dd2148eb..7ca1affca 100644
+--- a/plugins/pipeline-core/lib/critic-verify-readiness.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+@@ -87,10 +87,14 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head,
+       const digest = lifecycleReceiptDigest(directory, id);
+       const residualDeps = digest === null ? null : loadResidualAcceptanceDeps({ gitCommonDir, projectDir: repoRoot,
+         criticReceiptSha256: digest, ...(residualAuthorizeFn === undefined ? {} : { authorizeFn: residualAuthorizeFn }) });
+-      if (residualDeps === null) readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
+-      else readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
++      const lifecycle = residualDeps === null ? readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence })
++        : readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
++      // AC-108: a Critic review carried across later commits names the original reviewed commit and the passed-over commits (readback).
++      const proof = lifecycle?.receipt?.carryForward?.proof;
+       return { ...exact, currentCheckoutOk: true, privateLifecycleBound: true,
+-        receiptId: id, code: "critic-bound-verify-valid" };
++        receiptId: id, code: "critic-bound-verify-valid",
++        ...(proof ? { carriedForward: { reviewedCommit: proof.reviewedCandidate?.commit ?? null,
++          passedOverCommits: [...(proof.evidenceOnlyCommits ?? [])], route: proof.route ?? "registered-evidence-only" } } : {}) };
+     } catch { /* Other candidates and invalid private records are not admission. */ }
+   }
+   return { ...exact, code: "private-critic-binding-unavailable" };
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index f9fe2c19e..3c8d7c9a0 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -42,6 +42,7 @@ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
+ import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
++import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+ import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+@@ -836,6 +837,9 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     // check compares), for example a feature-package-reconcile commit, is not evidence-only: it becomes the candidate. An unreadable manifest on either side fails toward the candidate.
+     if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))
+       && (!paths.includes(manifestPath) || manifestCoreUnchanged(root, parents[0], oid, manifestPath))) continue;
++    // AC-108 (PO decision 2026-11-04): a commit that changes only administration and documentation paths is no correction either, so the
++    // correction candidate is the newest commit with content; the course transport passes these commits over as well.
++    if (parents.length === 1 && administrationDocumentationOnlyCommit(root, oid, { featureIds: [featureId] })) continue;
+     candidate = oid; break;
+   }
+   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index c51830967..c67282a95 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -525,6 +525,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+   "plugins/pipeline-core/lib/critic-review-lineage-core.mjs",
+   "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
++  "plugins/pipeline-core/lib/critic-evidence-carry.mjs",
++  "plugins/pipeline-core/lib/administration-documentation-paths.mjs",
+   "plugins/pipeline-core/lib/feature-close-audit-receipt.mjs",
+   "plugins/pipeline-core/lib/governance-review-action.mjs",
+   "plugins/pipeline-core/lib/organization-policy.mjs",
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 6948f7402..6a911ea3b 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -59,6 +59,7 @@ import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
++import { describeCriticCarry, readCarriedForwardReadback } from "../lib/critic-evidence-carry.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+@@ -808,8 +809,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+     if ((deps.requiresPublicationReview ?? requiresPublicationReview)(stateRead?.status === "ok" ? stateRead.state : null,
+       { readSource })) {
+       const review = (deps.checkCriticBoundVerify ?? checkCurrentCriticBoundVerify)(dir);
++      // AC-108: a review carried across later commits is named in the readback (original reviewed commit, passed-over commits).
++      const carriedReview = review.ok === true ? (review.carriedForward ?? readCarriedForwardReadback(resolveGitCommonDirPath(dir, deps), review.receiptId)) : null;
+       checks.push({ id: "critic-bound-verify", ok: review.ok === true,
+-        message: review.ok ? "independent Critic and Verify bind this exact candidate"
++        message: review.ok ? (carriedReview ? `independent Critic and Verify bind this candidate: ${describeCriticCarry(carriedReview)}`
++          : "independent Critic and Verify bind this exact candidate")
+           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
+         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
+           ? criticBoundVerifyRemedy(dir, headCommit)

@@ -1,0 +1,627 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index cad25008c..65340a6d0 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -255,6 +255,7 @@
+         "verify-phase:harness/scripts/verify.mjs:authority-restore-tests",
+         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
+         "verify-phase:harness/scripts/verify.mjs:authority-seal-reader-tests",
++        "verify-phase:harness/scripts/verify.mjs:authority-seal-readers-tests",
+         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
+         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
+         "verify-phase:harness/scripts/verify.mjs:authority-trace-preload-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..11557a34b 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4534,6 +4534,12 @@
+       "file": "plugins/pipeline-core/lib/authority-seal-reader.test.mjs",
+       "invariantPinned": "The one shared reader of the bound authority documents returns sealed and digests, reads a state without the sealed marker as sealed (the identity for every bound project), reads a draft as paths without digests, fails closed on any invalid shape, never throws, and every refusal names a typed exit so that no state is a dead end (C19 late-binding build step 1a, inert)",
+       "nonOverlapNote": "Unique cases: lib/authority-seal-reader.mjs; continuity-state tests pin the persisted authority schema, which does not know the sealed marker yet"
++    },
++    {
++      "name": "authority-seal-readers-tests",
++      "file": "plugins/pipeline-core/lib/authority-seal-readers.test.mjs",
++      "invariantPinned": "The continuity state schema accepts the draft authority (sealed false, paths without digests) and rejects every other shape, a state without the marker keeps its exact old verdict, the core readers of the bound authority (continuity-state, plan-spec-state-v2, critical-action authorization, po-gate authority read, onboarding continuity) read through the shared seal reader, the authority-bearing gates refuse an unsealed package with the typed exits prepare-seal and reopen-design, and reopen-design and the ordinary compare-and-swap stay executable on a draft (C19 late-binding build step 2)",
++      "nonOverlapNote": "Unique cases: the draft schema shapes and the per-reader draft verdicts; authority-seal-reader tests pin the shared reader itself, continuity-state and plan-spec-state-v2 tests pin the unchanged sealed verdicts"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/authority-seal-readers.test.mjs b/plugins/pipeline-core/lib/authority-seal-readers.test.mjs
+new file mode 100644
+index 000000000..b3ea9b88b
+--- /dev/null
++++ b/plugins/pipeline-core/lib/authority-seal-readers.test.mjs
+@@ -0,0 +1,219 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// Late binding of the PRD and the Spec (docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md), build step 2:
++// the continuity schema knows the draft state (`sealed: false`, paths without digests) and the core readers of the bound
++// authority sit on the shared seal reader. Cases are written from the ADR and the PO decisions of 2026-11-04, not from the code.
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import test from "node:test";
++
++import { AUTHORITY_SEAL_EXITS } from "./authority-seal-reader.mjs";
++import {
++  beginCloseTransition,
++  compareAndSwapContinuity,
++  continuityDispatchAllowed,
++  validateContinuityState,
++} from "./continuity-state.mjs";
++import { criticalActionAuthority, verifySignedAction } from "./critical-action-authorization-read.mjs";
++import { derivePlanLifecycle, reopenPlanDesign, sha256CanonicalJson, submitPlan } from "./plan-spec-state-v2.mjs";
++import { assertPushBatchSubject } from "./push-batch-contract.mjs";
++import { validateScopedVerifyRegistration } from "./scoped-verify-registration.mjs";
++
++const A = "a".repeat(64);
++const B = "b".repeat(64);
++const C = "c".repeat(64);
++const FEATURE = "feature";
++const PRD = "specs/feature/prd.md";
++const SPEC = "specs/feature/spec.md";
++const BOTH_EXITS = [AUTHORITY_SEAL_EXITS.prepareSeal, AUTHORITY_SEAL_EXITS.reopenDesign];
++
++const sealedAuthority = () => ({ prd: { path: PRD, sha256: A }, spec: { path: SPEC, sha256: B }, result: null });
++const draftAuthority = (extra = {}) => ({ sealed: false, prd: { path: PRD }, spec: { path: SPEC }, result: null, ...extra });
++
++function continuity(authority, queueHead = {}, extra = {}) {
++  return {
++    schema: "pipeline.continuity.v0",
++    featureId: FEATURE,
++    revision: 0,
++    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
++    authority,
++    queueHead: { packageId: "P1", actionId: "A1", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null, ...queueHead },
++    blocker: null,
++    acknowledgedFinal: null,
++    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
++    recovery: null,
++    decisionTxn: null,
++    closeTransition: null,
++    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
++    ...extra,
++  };
++}
++
++const dispatchIdentity = () => ({
++  featureId: FEATURE, queueRevision: 0, packageId: "P1", actionId: "A1", dispatchId: "dispatch-1", attemptId: "attempt-1",
++  authorityDigests: { prdSha256: A, specSha256: B, resultSha256: null }, routeRequestSha256: C, mayDelegate: false,
++});
++
++test("LB2-1 a draft authority (sealed false, paths only) is a valid continuity state", () => {
++  assert.equal(validateContinuityState(continuity(draftAuthority())).ok, true);
++  const withResultAndPlan = draftAuthority({ result: { path: "specs/feature/result.md" }, plan: { path: "specs/feature/plan.md" } });
++  assert.equal(validateContinuityState(continuity(withResultAndPlan)).ok, true);
++});
++
++test("LB2-2 a state without the marker keeps its exact old verdict", () => {
++  assert.equal(validateContinuityState(continuity(sealedAuthority())).ok, true);
++  const noDigest = { prd: { path: PRD }, spec: { path: SPEC }, result: null };
++  assert.equal(validateContinuityState(continuity(noDigest)).ok, false, "paths without digests need the marker");
++  assert.equal(validateContinuityState(continuity({ ...sealedAuthority(), prd: { path: PRD, sha256: "short" } })).ok, false);
++  assert.equal(validateContinuityState(continuity({ ...sealedAuthority(), plan: null })).ok, false);
++});
++
++test("LB2-3 every other draft shape is rejected", () => {
++  const rejected = {
++    "marker true": { ...sealedAuthority(), sealed: true },
++    "marker as string": draftAuthority({ sealed: "false" }),
++    "marker null": draftAuthority({ sealed: null }),
++    "digest on the PRD": draftAuthority({ prd: { path: PRD, sha256: A } }),
++    "digest on the Spec": draftAuthority({ spec: { path: SPEC, sha256: B } }),
++    "digest on the result": draftAuthority({ result: { path: "specs/feature/result.md", sha256: C } }),
++    "digest on the plan": draftAuthority({ plan: { path: "specs/feature/plan.md", sha256: C } }),
++    "extra key on an artifact": draftAuthority({ prd: { path: PRD, note: "x" } }),
++    "unknown authority key": draftAuthority({ extra: 1 }),
++    "missing Spec": (() => { const value = draftAuthority(); delete value.spec; return value; })(),
++    "missing result key": (() => { const value = draftAuthority(); delete value.result; return value; })(),
++    "absolute path": draftAuthority({ prd: { path: "/etc/prd.md" } }),
++    "parent path": draftAuthority({ spec: { path: "specs/../spec.md" } }),
++    "backslash path": draftAuthority({ spec: { path: "specs\\spec.md" } }),
++    "plan null": draftAuthority({ plan: null }),
++    "authority not an object": "draft",
++  };
++  for (const [name, authority] of Object.entries(rejected)) {
++    assert.equal(validateContinuityState(continuity(authority)).ok, false, name);
++  }
++});
++
++test("LB2-4 a draft binds no digest, so it cannot carry a dispatch identity or a close transition", () => {
++  assert.equal(validateContinuityState(continuity(draftAuthority(), { nextAction: "poll", dispatch: dispatchIdentity() })).ok, false);
++  const closing = { intentId: "intent-1", expectedRevision: 0, authorityDigests: { prdSha256: A, specSha256: B, resultSha256: null } };
++  assert.equal(validateContinuityState(continuity(draftAuthority(), {}, { revision: 1, closeTransition: closing })).ok, false);
++  // the sealed twin of the dispatch case stays valid, so the rejection above is the draft rule and nothing else
++  assert.equal(validateContinuityState(continuity(sealedAuthority(), { nextAction: "poll", dispatch: dispatchIdentity() })).ok, true);
++});
++
++test("LB2-5 dispatch is refused for a draft with a typed exit and allowed for the sealed twin", () => {
++  const draft = continuityDispatchAllowed(continuity(draftAuthority(), { nextAction: "dispatch" }));
++  assert.equal(draft.ok, true);
++  assert.equal(draft.allowed, false);
++  assert.equal(draft.code, "CS-UNSEALED");
++  assert.deepEqual([...draft.exits], BOTH_EXITS);
++  const sealed = continuityDispatchAllowed(continuity(sealedAuthority(), { nextAction: "dispatch" }));
++  assert.equal(sealed.allowed, true);
++  assert.equal(sealed.code, "CS-DISPATCHABLE");
++  assert.equal(continuityDispatchAllowed(continuity(draftAuthority(), { nextAction: "dispatch" }), "other").code, "CS-INVALID");
++});
++
++test("LB2-6 the close gate refuses a draft with the typed exits, an invalid shape fails closed", () => {
++  const request = { expectedRevision: 0, intent: {}, result: {} };
++  const draft = beginCloseTransition(continuity(draftAuthority(), { nextAction: "close" }), request);
++  assert.equal(draft.ok, false);
++  assert.equal(draft.code, "CS-UNSEALED");
++  assert.equal(draft.mutated, false);
++  assert.deepEqual([...draft.exits], BOTH_EXITS);
++  const invalid = beginCloseTransition(continuity({ ...draftAuthority(), prd: { path: PRD, sha256: A } }, { nextAction: "close" }), request);
++  assert.equal(invalid.ok, false);
++  assert.equal(invalid.code, "CS-INVALID");
++});
++
++test("LB2-7 a draft is never a dead end: the ordinary compare-and-swap still moves a draft state", () => {
++  const current = continuity(draftAuthority());
++  const next = { ...structuredClone(current), revision: 1, queueHead: { ...current.queueHead, nextAction: "poll" } };
++  const moved = compareAndSwapContinuity(current, { expectedRevision: 0, next });
++  assert.equal(moved.ok, true, JSON.stringify(moved));
++  // but it can not smuggle a seal in through the ordinary swap: digests do not appear from nowhere
++  const sealedNext = { ...structuredClone(next), authority: sealedAuthority() };
++  assert.equal(compareAndSwapContinuity(current, { expectedRevision: 0, next: sealedNext }).ok, false);
++});
++
++const planState = (authority) => ({
++  schema: "pipeline.state.v0",
++  activeFeature: { id: FEATURE, planPath: PRD, phase: "design" },
++  planApproved: false,
++  continuity: continuity(authority),
++});
++const REOPENED = "2026-07-30T20:10:00.000Z";
++
++test("LB2-8 reopen-design stays executable in a draft state and in a bound unsubmitted state", () => {
++  const draft = planState(draftAuthority());
++  const reopenedDraft = reopenPlanDesign({ state: draft, expectedStateSha256: sha256CanonicalJson(draft), by: "PO", at: REOPENED });
++  assert.equal(reopenedDraft.ok, true, JSON.stringify(reopenedDraft));
++  assert.equal(reopenedDraft.replay, true, "a draft is not locked, so there is nothing to release");
++  assert.equal(reopenedDraft.state, draft);
++  assert.equal(derivePlanLifecycle(draft).status, "draft");
++  const bound = planState(sealedAuthority());
++  const reopenedBound = reopenPlanDesign({ state: bound, expectedStateSha256: sha256CanonicalJson(bound), by: "PO", at: REOPENED });
++  assert.equal(reopenedBound.ok, true, JSON.stringify(reopenedBound));
++  assert.equal(reopenedBound.replay, false);
++  assert.equal(reopenedBound.invalidation.reason, "pipeline.reopen-bound-unsubmitted-prd");
++});
++
++test("LB2-9 submit-plan works against a draft authority, its binding is by path", () => {
++  const authority = {
++    schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "4".repeat(64), runtimeSha256: "5".repeat(64),
++    receiptSha256: "6".repeat(64), repositoryFingerprint: "7".repeat(64),
++    planPath: PRD, planSha256: "1".repeat(64), specPath: SPEC, specSha256: "2".repeat(64),
++  };
++  const draft = planState(draftAuthority());
++  const submitted = submitPlan({
++    state: draft, expectedStateSha256: sha256CanonicalJson(draft), poGateAuthority: authority, profile: "feature",
++    profileSha256: "3".repeat(64), by: "PO", at: "2026-07-30T20:00:00.000Z",
++  });
++  assert.equal(submitted.ok, true, JSON.stringify(submitted));
++  const moved = planState(draftAuthority({ spec: { path: "specs/feature/other-spec.md" } }));
++  const conflict = submitPlan({
++    state: moved, expectedStateSha256: sha256CanonicalJson(moved), poGateAuthority: authority, profile: "feature",
++    profileSha256: "3".repeat(64), by: "PO", at: "2026-07-30T20:00:00.000Z",
++  });
++  assert.equal(conflict.ok, false);
++  assert.equal(conflict.code, "PLAN-SUBMIT-AUTHORITY-SPEC-CONFLICT");
++});
++
++test("LB2-10 the critical-action authority reader refuses an unsealed package with the typed exits", () => {
++  const active = { id: FEATURE, planPath: PRD, phase: "implementation" };
++  const approval = { poGateAuthority: { planSha256: A, specSha256: B } };
++  const sealedState = { activeFeature: active, planApproval: approval, continuity: continuity(sealedAuthority()) };
++  const authority = criticalActionAuthority({ state: sealedState, kind: "push" });
++  assert.deepEqual(authority, { source: "active", featureId: FEATURE, planSha256: A, specSha256: B });
++  const legacyState = { activeFeature: active, planApproval: approval };
++  assert.deepEqual(criticalActionAuthority({ state: legacyState, kind: "push" }), authority);
++  const draftState = { activeFeature: active, planApproval: approval, continuity: continuity(draftAuthority()) };
++  const refused = verifySignedAction({ state: draftState, kind: "push", prefix: "PUSH", candidate: {}, subject: {}, recorded: {}, anchors: [], now: new Date().toISOString() });
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "PUSH-NOT-SEALED");
++  assert.deepEqual([...refused.exits], BOTH_EXITS);
++  const invalidState = { activeFeature: active, planApproval: approval, continuity: continuity({ ...draftAuthority(), prd: { path: PRD, sha256: A } }) };
++  const invalid = verifySignedAction({ state: invalidState, kind: "push", prefix: "PUSH", candidate: {}, subject: {}, recorded: {}, anchors: [], now: new Date().toISOString() });
++  assert.equal(invalid.ok, false);
++  assert.notEqual(invalid.code, "PUSH-RECORD-INCOMPLETE", "an invalid authority shape is refused before anything else is read");
++  const sealedRefusal = verifySignedAction({ state: sealedState, kind: "push", prefix: "PUSH", candidate: {}, subject: {}, recorded: {}, anchors: [], now: new Date().toISOString() });
++  assert.equal(sealedRefusal.code, "PUSH-RECORD-INCOMPLETE", "a sealed state reaches the unchanged old checks");
++});
++
++test("LB2-11 the push subject and the scoped Verify registration need digests, a draft can not form either", () => {
++  const subject = {
++    schema: "pipeline.push-batch-subject.v1", repository: { fingerprint: A, objectFormat: "sha1" }, candidate: { commit: "1".repeat(40), tree: "2".repeat(40) },
++    authority: { featureId: FEATURE, planSha256: undefined, specSha256: undefined },
++  };
++  assert.throws(() => assertPushBatchSubject(subject), TypeError);
++  assert.equal(validateScopedVerifyRegistration({ schema: "x", taskId: "x", authority: { sealed: false, prd: { path: PRD } }, suites: [] }).ok, false);
++});
++
++test("LB2-12 the core readers sit on the shared seal reader and no longer read the digest fields directly", () => {
++  const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
++  for (const name of ["continuity-state.mjs", "onboarding-continuity.mjs", "plan-spec-state-v2.mjs", "po-gate-authority-read.mjs", "critical-action-authorization-read.mjs"]) {
++    const source = read(name);
++    assert.match(source, /from "\.\/authority-seal-reader\.mjs"/u, `${name} imports the shared reader`);
++    assert.doesNotMatch(source, /continuity\??\.authority\??\.(prd|spec)\??\.sha256/u, `${name} reads no raw continuity digest`);
++  }
++  assert.doesNotMatch(read("continuity-state.mjs"), /state\.authority\.(prd|spec)\.sha256/u);
++  assert.doesNotMatch(read("continuity-state.mjs"), /current\.authority\.(prd|spec)\.sha256/u);
++});
+diff --git a/plugins/pipeline-core/lib/continuity-state.mjs b/plugins/pipeline-core/lib/continuity-state.mjs
+index 0f0fe6089..b1ef1f248 100644
+--- a/plugins/pipeline-core/lib/continuity-state.mjs
++++ b/plugins/pipeline-core/lib/continuity-state.mjs
+@@ -12,6 +12,7 @@ import {
+   recordRunnerNativeAdditiveInput,
+   validateRunnerNativeContinuation,
+ } from "./runner-native-continuation.mjs";
++import { readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
+ 
+ const ROOT_KEYS = new Set([
+   "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
+@@ -23,7 +24,10 @@ const ROOT_KEYS = new Set([
+ const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
+ const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
+ const ARTIFACT_KEYS = new Set(["path", "sha256"]);
+-const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan"]);
++const DRAFT_ARTIFACT_KEYS = new Set(["path"]);
++// Late binding (docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md): `sealed: false` marks a draft, whose
++// entries carry a path and no digest. A state without the marker is a sealed package, which is today's behaviour.
++const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan", "sealed"]);
+ const QUEUE_KEYS = new Set([
+   "packageId", "actionId", "nextAction", "productRetryCount",
+   "environmentRerouteCount", "dispatch",
+@@ -161,7 +165,24 @@ function validArtifact(value) {
+   return exactKeys(value, ARTIFACT_KEYS) && safePath(value.path) && digest(value.sha256);
+ }
+ 
++function validDraftArtifact(value) {
++  return exactKeys(value, DRAFT_ARTIFACT_KEYS) && safePath(value.path);
++}
++
++function validDraftAuthority(value) {
++  // Only the exact marker `false` makes a draft; `true`, a string or null are not a shape of this schema. The shared reader
++  // owns the verdict on the paths, the local checks close what it leaves open (extra keys, a null plan).
++  return value.sealed === false
++    && allowedKeys(value, AUTHORITY_KEYS, ["prd", "spec", "result", "sealed"])
++    && readAuthoritySeal(value).status === "draft"
++    && validDraftArtifact(value.prd)
++    && validDraftArtifact(value.spec)
++    && (value.result === null || validDraftArtifact(value.result))
++    && (value.plan === undefined || validDraftArtifact(value.plan));
++}
++
+ function validAuthority(value) {
++  if (isObject(value) && Object.hasOwn(value, "sealed")) return validDraftAuthority(value);
+   return allowedKeys(value, AUTHORITY_KEYS, ["prd", "spec", "result"])
+     && validArtifact(value.prd)
+     && validArtifact(value.spec)
+@@ -169,12 +190,27 @@ function validAuthority(value) {
+     && (value.plan === undefined || validArtifact(value.plan));
+ }
+ 
++/** The digests a state's authority binds, or null for a package that is not sealed. Every digest comparison below goes through it. */
++function sealedDigests(state) {
++  const sealed = requireSealedAuthority(state.authority);
++  return sealed.ok ? sealed.digests : null;
++}
++
++/** The typed refusal of a gate that needs a sealed package: it names the exits so that a draft is never a dead end. */
++function unsealedRefusal(state) {
++  const sealed = requireSealedAuthority(state.authority);
++  if (sealed.ok) return null;
++  return { ok: false, code: "CS-UNSEALED", mutated: false, state: null, exits: sealed.exits, reason: sealed.reason };
++}
++
+ function validNativeContinuationBinding(value, state) {
+   if (value === undefined || value === null) return true;
+-  return validateRunnerNativeContinuation(value).ok
++  const digests = sealedDigests(state);
++  return digests !== null
++    && validateRunnerNativeContinuation(value).ok
+     && value.subject.featureId === state.featureId
+-    && value.subject.planSha256 === state.authority.prd.sha256
+-    && value.subject.specSha256 === state.authority.spec.sha256
++    && value.subject.planSha256 === digests.prd
++    && value.subject.specSha256 === digests.spec
+     && value.subject.queueRevision <= state.revision;
+ }
+ 
+@@ -225,13 +261,15 @@ function validQueueHead(value, state) {
+     || !safeInteger(value.environmentRerouteCount, 0, 1)
+     || (value.dispatch !== null && !validIdentity(value.dispatch))) return false;
+   if (value.dispatch === null) return true;
+-  return value.dispatch.featureId === state.featureId
++  const digests = sealedDigests(state);
++  return digests !== null
++    && value.dispatch.featureId === state.featureId
+     && value.dispatch.packageId === value.packageId
+     && value.dispatch.actionId === value.actionId
+     && value.dispatch.queueRevision === state.revision
+-    && value.dispatch.authorityDigests.prdSha256 === state.authority.prd.sha256
+-    && value.dispatch.authorityDigests.specSha256 === state.authority.spec.sha256
+-    && value.dispatch.authorityDigests.resultSha256 === (state.authority.result?.sha256 ?? null);
++    && value.dispatch.authorityDigests.prdSha256 === digests.prd
++    && value.dispatch.authorityDigests.specSha256 === digests.spec
++    && value.dispatch.authorityDigests.resultSha256 === digests.result;
+ }
+ 
+ function retryBudgetOf(state) {
+@@ -414,13 +452,15 @@ function validCloseDelivery(value) {
+ 
+ function validCloseTransition(value, state) {
+   if (value === undefined || value === null) return true;
+-  if (!exactKeys(value, CLOSE_TRANSITION_KEYS)
++  const digests = sealedDigests(state);
++  if (digests === null
++    || !exactKeys(value, CLOSE_TRANSITION_KEYS)
+     || !validCloseIntentFields(value)
+     || !CLOSE_PHASES.has(value.phase)
+-    || value.authorityDigests.prdSha256 !== state.authority.prd.sha256
+-    || value.authorityDigests.specSha256 !== state.authority.spec.sha256
+-    || state.authority.result === null
+-    || value.resultDigest !== state.authority.result.sha256
++    || value.authorityDigests.prdSha256 !== digests.prd
++    || value.authorityDigests.specSha256 !== digests.spec
++    || digests.result === null
++    || value.resultDigest !== digests.result
+     || value.expectedRevision >= state.revision) return false;
+   if (value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
+   if (!validCloseVerify(value.finalVerify, value)) return false;
+@@ -471,6 +511,10 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
+ export function continuityDispatchAllowed(value, activeFeatureId = undefined) {
+   const valid = validateContinuityState(value, activeFeatureId);
+   if (!valid.ok) return { ok: false, code: valid.code, allowed: false };
++  // A bound but not yet approved package stays locked: no dispatch before the seal, and the refusal names its exits.
++  const unsealed = unsealedRefusal(value);
++  // A valid but not dispatchable state is ok:true, allowed:false (as CS-BLOCKED and CS-DECISION-PENDING): ok:false would read as an invalid state and could swallow the exits.
++  if (unsealed !== null) return { ok: true, code: unsealed.code, allowed: false, exits: unsealed.exits, reason: unsealed.reason };
+   if (value.decisionTxn !== null) return { ok: true, code: "CS-DECISION-PENDING", allowed: false };
+   if (value.blocker !== null) return { ok: true, code: "CS-BLOCKED", allowed: false };
+   return value.queueHead.nextAction === "dispatch" && value.queueHead.dispatch === null
+@@ -837,6 +881,8 @@ export function bindContinuityResultForClose(current, request, activeFeatureId =
+     || !safeInteger(request.expectedRevision) || !validArtifact(request.result)) {
+     return result(false, before.ok ? "CS-RESULT-CLOSE-REQUEST" : before.code);
+   }
++  const unsealed = unsealedRefusal(current);
++  if (unsealed !== null) return unsealed;
+   const idle = current.queueHead !== null
+     && current.queueHead.dispatch === null
+     && current.queueHead.productRetryCount === 0
+@@ -1069,6 +1115,9 @@ export function beginCloseTransition(current, request, activeFeatureId = undefin
+   if (!before.ok || !exactKeys(request, CLOSE_BEGIN_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+     return result(false, before.ok ? "CS-REQUEST" : before.code);
+   }
++  const unsealed = unsealedRefusal(current);
++  if (unsealed !== null) return unsealed;
++  const digests = sealedDigests(current);
+   if (current.closeTransition !== undefined && current.closeTransition !== null) {
+     return closeIntentMatches(current.closeTransition, request.intent, request.result)
+       ? result(true, "CS-CLOSE-REPLAY", structuredClone(current))
+@@ -1079,9 +1128,9 @@ export function beginCloseTransition(current, request, activeFeatureId = undefin
+     || current.queueHead === null || current.queueHead.nextAction !== "close"
+     || request.intent.expectedRevision !== current.revision
+     || !sameAuthorityDigests(request.intent.authorityDigests, {
+-      prdSha256: current.authority.prd.sha256,
+-      specSha256: current.authority.spec.sha256,
+-      resultSha256: current.authority.result?.sha256 ?? null,
++      prdSha256: digests.prd,
++      specSha256: digests.spec,
++      resultSha256: digests.result,
+     })
+   ) return result(false, "CS-CLOSE-INTENT-INVALID");
+   const next = structuredClone(current);
+@@ -1367,11 +1416,13 @@ const LEGACY_ADOPTION = Object.freeze({
+ function legacyPreimage(current) {
+   const normalized = isObject(current) && !Object.hasOwn(current, "closeTransition")
+     ? { ...current, closeTransition: null } : current;
+-  return validateContinuityState(normalized, LEGACY_ADOPTION.featureId).ok
++  if (!validateContinuityState(normalized, LEGACY_ADOPTION.featureId).ok) return false;
++  const digests = sealedDigests(current);
++  return digests !== null
+     && current.featureId === LEGACY_ADOPTION.featureId
+     && current.revision === LEGACY_ADOPTION.revision
+-    && current.authority.prd.sha256 === LEGACY_ADOPTION.prdSha256
+-    && current.authority.spec.sha256 === LEGACY_ADOPTION.specSha256
++    && digests.prd === LEGACY_ADOPTION.prdSha256
++    && digests.spec === LEGACY_ADOPTION.specSha256
+     && current.authority.result === null
+     && current.queueHead.packageId === "continuity-adoption"
+     && current.queueHead.actionId === "review-active-feature"
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+index 97349351b..a5efc710c 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization-read.mjs
+@@ -7,6 +7,7 @@
+  */
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
++import { requireSealedAuthority } from "./authority-seal-reader.mjs";
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
+ import { criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
+ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+@@ -147,6 +148,12 @@ export function criticalActionAuthority({ state, kind, candidate, projectDir, gi
+  * caller's route-specific object; everything else is uniform.
+  */
+ export function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now, projectDir }) {
++  // Late binding: a critical action is an authority-bearing gate after the approval. A feature whose continuity authority is a
++  // draft (or has no valid shape) binds no digest, so no signature can cover it: refuse with the typed exits before anything else.
++  if (object(state?.continuity) && Object.hasOwn(state.continuity, "authority")) {
++    const sealed = requireSealedAuthority(state.continuity.authority);
++    if (!sealed.ok) return { ok: false, code: sealed.code === "ASR-NOT-SEALED" ? `${prefix}-NOT-SEALED` : `${prefix}-STATE-AUTHORITY`, exits: sealed.exits, reason: sealed.reason };
++  }
+   if (!object(recorded) || !object(recorded.proof) || !object(recorded.action)
+     || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) {
+     return { ok: false, code: `${prefix}-RECORD-INCOMPLETE` };
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 410da6d63..b438e94a4 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -112,6 +112,7 @@ import {
+   validPlanCancellation,
+   validPlanMixedStateRecovery,
+ } from "./plan-spec-state-v2.mjs";
++import { readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
+ import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+ import { readMachinePlane } from "./machine-plane.mjs";
+ import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
+@@ -1593,6 +1594,16 @@ function operatorConfirmedContinuity(observed, operatorAuthority) {
+   };
+ }
+ 
++/**
++ * Late binding: the digests `continuity.authority` binds, read through the shared seal reader. `{}` for a draft or an authority
++ * without a valid shape, so a comparison against a digest is false -- a draft never matches a sealed bind, a replay or a history
++ * entry, and the callers refuse or report "no candidate" exactly as for any other mismatch.
++ */
++function boundAuthorityDigests(continuity) {
++  const seal = readAuthoritySeal(continuity?.authority);
++  return seal.status === "sealed" ? seal.digests : {};
++}
++
+ function normalizedContinuity(state, observed) {
+   const current = state.continuity;
+   if (!isObject(current)
+@@ -1605,10 +1616,15 @@ function normalizedContinuity(state, observed) {
+   if (!validateContinuityState(next.continuity, next.activeFeature?.id).ok) {
+     fail("CONTINUITY-REPAIR-UNSUPPORTED", "damaged continuity has additional invalid fields");
+   }
++  // A repair that compares the observed bytes to the bound digests has nothing to compare for a draft: refuse, with the exits.
++  const sealed = requireSealedAuthority(next.continuity.authority);
++  if (!sealed.ok) {
++    fail("CONTINUITY-REPAIR-UNSUPPORTED", `${sealed.reason} (typed exits: ${sealed.exits.join(", ")})`);
++  }
+   const prd = repairArtifact(observed.root, next.continuity.authority.prd.path, "continuity PRD");
+   const spec = repairArtifact(observed.root, next.continuity.authority.spec.path, "continuity specification");
+-  if (prd.sha256 !== next.continuity.authority.prd.sha256
+-    || spec.sha256 !== next.continuity.authority.spec.sha256) {
++  if (prd.sha256 !== sealed.digests.prd
++    || spec.sha256 !== sealed.digests.spec) {
+     fail("CONTINUITY-REPAIR-UNSUPPORTED", "continuity authority bytes do not match state");
+   }
+   if (observed.historyObservation.status !== "present") {
+@@ -5186,9 +5202,9 @@ function validatePlan(plan) {
+     || state.activeFeature.phase !== "design"
+     || state.planApproved !== false
+     || state.continuity.authority.prd.path !== plan.targets.prd.path
+-    || state.continuity.authority.prd.sha256 !== plan.targets.prd.afterSha256
++    || boundAuthorityDigests(state.continuity).prd !== plan.targets.prd.afterSha256
+     || state.continuity.authority.spec.path !== plan.targets.spec.path
+-    || state.continuity.authority.spec.sha256 !== plan.targets.spec.afterSha256
++    || boundAuthorityDigests(state.continuity).spec !== plan.targets.spec.afterSha256
+     || state.continuity.authority.prd.path === plan.targets.handover.path
+     || state.continuity.authority.spec.path === plan.targets.handover.path
+     || !validateContinuityState(state.continuity, state.activeFeature.id).ok) {
+@@ -5525,8 +5541,8 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
+   if (prd.status !== "present" || spec.status !== "present"
+     || entry.calibrationSha256 !== observed.calibrationSha256
+     || entry.handoverSha256 !== observed.handoverObservation.sha256
+-    || entry.prdSha256 !== continuity.authority.prd.sha256
+-    || entry.specSha256 !== continuity.authority.spec.sha256
++    || entry.prdSha256 !== boundAuthorityDigests(continuity).prd
++    || entry.specSha256 !== boundAuthorityDigests(continuity).spec
+     || entry.prdSha256 !== prd.sha256
+     || entry.specSha256 !== spec.sha256) return null;
+ 
+@@ -5842,9 +5858,9 @@ function validatePromotionPlan(plan) {
+     || state.activeFeature.planPath !== input.planPath || state.activeFeature.phase !== "design"
+     || state.planApproved !== false || state.continuity.featureId !== input.featureId
+     || state.continuity.authority.prd.path !== input.prdPath
+-    || state.continuity.authority.prd.sha256 !== plan.authority.prd.sha256
++    || boundAuthorityDigests(state.continuity).prd !== plan.authority.prd.sha256
+     || state.continuity.authority.spec.path !== input.specPath
+-    || state.continuity.authority.spec.sha256 !== plan.authority.spec.sha256
++    || boundAuthorityDigests(state.continuity).spec !== plan.authority.spec.sha256
+     || !(state.bootstrapAcknowledgementRequired === undefined || state.bootstrapAcknowledgementRequired === true)
+     || !validateContinuityState(state.continuity, input.featureId).ok) {
+     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
+@@ -5968,8 +5984,8 @@ function buildCoordinatorSourcedPromotionPlan({
+       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+       || observed.state?.continuity?.featureId !== input.featureId
+-      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
+-      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
++      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
++      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
+       fail("KICKOFF-PROMOTION-REPLAY", "coordinator-sourced binding replay does not match the exact completed postimage");
+     }
+     const binding = {
+@@ -6168,8 +6184,8 @@ function buildKickoffPromotionPlan({
+       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+       || observed.state?.continuity?.featureId !== input.featureId
+-      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
+-      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
++      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
++      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
+       fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
+     }
+     const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
+@@ -9323,8 +9339,8 @@ function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionClean
+     || observed.history.transactions.length !== 2 || !promotedRevisions.includes(state?.continuity?.revision)
+     || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
+     || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
+-    || state.continuity.authority.prd?.sha256 !== entry.prdSha256
+-    || state.continuity.authority.spec?.sha256 !== entry.specSha256
++    || boundAuthorityDigests(state.continuity).prd !== entry.prdSha256
++    || boundAuthorityDigests(state.continuity).spec !== entry.specSha256
+     || entry.afterStateSha256 !== observed.stateObservation.sha256
+     || !isObject(binding.binding.sessionCleanup)) return null;
+   let beforeSha256;
+diff --git a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs b/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
+index 740cc856d..9d48d9501 100644
+--- a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
++++ b/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
+@@ -6,6 +6,7 @@
+  * filesystem I/O and command routing; this module owns only closed values.
+  */
+ import { createHash } from "node:crypto";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ import { validateContinuityState } from "./continuity-state.mjs";
+ import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
+ 
+@@ -1155,11 +1156,12 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
+ // shape reopenPlanDesign() already special-cases, and the hostile/malformed
+ // fixtures this module's own tests construct) does not, and this predicate
+ // deliberately fails closed (false) rather than guess when it cannot tell.
++//
++// Late binding: a draft package (`sealed: false`, paths without digests) is NOT bound and so is not locked -- there is nothing
++// to release, and reopen-design stays executable (it replays as an open design). The shared reader owns the verdict.
+ function continuityAuthorityBound(state) {
+-  const authority = state.continuity?.authority;
+-  if (!isPlainObject(authority)) return false;
+-  return isPlainObject(authority.prd) && isRepositoryPath(authority.prd.path) && SHA256.test(authority.prd.sha256 ?? "")
+-    && isPlainObject(authority.spec) && isRepositoryPath(authority.spec.path) && SHA256.test(authority.spec.sha256 ?? "");
++  const seal = readAuthoritySeal(state.continuity?.authority);
++  return seal.status === "sealed" && isRepositoryPath(seal.paths.prd) && isRepositoryPath(seal.paths.spec);
+ }
+ 
+ export function reopenPlanDesign({
+diff --git a/plugins/pipeline-core/lib/po-gate-authority-read.mjs b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+index 1cadd836c..a7fa7aab1 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority-read.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+@@ -15,6 +15,7 @@ import { parseYaml } from "./yaml-lite.mjs";
+ import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+ import { windowsDriveLetterIdentity, windowsNotationCandidate } from "./repository-path-identity.mjs";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+ import { LEGACY_MANIFEST, LEGACY_STATE, NEUTRAL_MANIFEST, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "./project-authority-read.mjs";
+ 
+ export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
+@@ -751,7 +752,9 @@ function activeFeatureState(repoRoot) {
+   // into the new folder while activeFeature.planPath still names the old one. The authority PRD
+   // path is trusted only when it is a normalized prd_*.md path under specs/; anything else falls
+   // back to planPath exactly as before.
+-  const authorityPrd = normalizeRepositoryPath(state?.continuity?.authority?.prd?.path);
++  // Late binding: a draft package names its PRD by path alone, so the path comes from the shared seal reader, which gives it
++  // for a sealed package and a draft alike and gives none for an authority without a valid shape.
++  const authorityPrd = normalizeRepositoryPath(readAuthoritySeal(state?.continuity?.authority).paths?.prd);
+   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
+     ? authorityPrd
+     : null;
