@@ -139,7 +139,8 @@ function laneEdges(name, source) {
 
 test("GSC01 the module files of lib/guard are exactly the modules of the split map", () => {
   const { moduleNames } = loadMap();
-  assert.equal(moduleNames.length, 23, "the map names 23 modules besides the facade");
+  // QG-04: the control-plane-script-scan module (candidate 19, Q5) is a legitimate 24th module; the count is restated, the exact-set check above stays.
+  assert.equal(moduleNames.length, 24, "the map names 24 modules besides the facade");
   assert.deepEqual(diskModuleNames(), moduleNames);
 });
 

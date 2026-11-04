@@ -492,6 +492,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // push-prepare.mjs imports release-promotion-envelope.mjs.
   "plugins/pipeline-core/scripts/capture-evidence.mjs",
   "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
+  // Candidate 19 (D4b/E3): the record-only path set and the stable freshness codes are imported by the push gate sources above (GMWKC01).
+  "plugins/pipeline-core/lib/record-only-paths.mjs",
+  "plugins/pipeline-core/lib/evidence-freshness-codes.mjs",
   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
   // Its publication-gate evidence dependency must remain protected as well.
   "plugins/pipeline-core/scripts/audit-pack.mjs",
@@ -754,6 +757,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/fs-durability.mjs",
   "plugins/pipeline-core/lib/git-null-device.mjs",
   "plugins/pipeline-core/lib/guard/env-dump-lane.mjs",
+  "plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs",
   "plugins/pipeline-core/lib/hardened-private-directory.mjs",
   "plugins/pipeline-core/lib/hook-currentness.mjs",
   "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",

@@ -531,7 +531,9 @@ the kernel closure test found imported by kernel modules but not yet listed:
 `lib/agy-start-hint.mjs`, `lib/checkpoint-push-approval.mjs`,
 `lib/continuity-authority-drift.mjs`, `lib/critical-action-authorization.mjs`,
 `lib/fs-durability.mjs`, `lib/git-null-device.mjs`,
-`lib/guard/env-dump-lane.mjs`, `lib/hardened-private-directory.mjs`,
+`lib/guard/env-dump-lane.mjs`, `lib/guard/control-plane-script-scan.mjs`,
+`lib/record-only-paths.mjs`, `lib/evidence-freshness-codes.mjs`,
+`lib/hardened-private-directory.mjs`,
 `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
 `scripts/security-readiness/gitleaks-readiness.mjs`,
 `scripts/security-readiness/osv-scanner-readiness.mjs`, and

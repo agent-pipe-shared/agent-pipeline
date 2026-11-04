@@ -37,6 +37,9 @@
     "env-dump-lane": {
       "layer": 2
     },
+    "control-plane-script-scan": {
+      "layer": 2
+    },
     "sanctioned-args-onboarding": {
       "layer": 3
     },
