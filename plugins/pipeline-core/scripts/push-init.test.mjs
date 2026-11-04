@@ -1203,6 +1203,9 @@ function deliveryRepo(label, { codeCommitBetween = false } = {}) {
   mkdirSync(join(root, ".claude"), { recursive: true });
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "fixture", handover: "docs/state.md", verify: "node verify.mjs" }));
+  // QG-04 restatement (C19 D4a): the fixture has an active push approval, so the push threat model must exist before the push gate; it
+  // belongs to the init commit, ahead of the verified candidate, exactly where the gate's repair text asks for it.
+  commitFile("project/push-threat-model.md", "# Push threat model\n\nFixture threat model for the delivery anchor.\n", "docs: push threat model");
   const preMerge = commitFile("README.md", "fixture\n", "init");
   sh(root, "remote", "add", "origin", remote);
   sh(root, "push", "-q", "origin", "main");
