@@ -240,6 +240,9 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/critical-human-proof-policy.mjs",
     "../lib/critical-action-authorization.mjs",
     "../lib/published-tag-push.mjs",
+    // Candidate 19c (D4b/E3, w171): the freshness verdict and the carry-forward reader are loaded the same way; the declaration is restated to the 12 real call sites (QG-04).
+    "../lib/evidence-freshness-codes.mjs",
+    "../lib/evidence-carry-forward-reader.mjs",
   ],
   // CLOSURE-REPAIR (Ruling 86a): the start preflight loads the toolchain/readiness coordinator and
   // the model-role bootstrap lazily, so both are edges of the kernel closure.
