@@ -555,13 +555,37 @@ export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dep
 const ATTESTED_REQUEST_SCHEMA = "pipeline.dispatch-attested-request.v1";
 const BRIEFING_MARKER = /^<!-- pipeline-native-goldfish-host-commit:[^\n]*\n([\s\S]*?)\n-->/mu;
 const ATTESTED_PATH_PREFIXES = ["scratch/", "evidence/", "specs/"];
-function attestedInputPath(value, label) {
+export function attestedInputPath(value, label) {
   if (typeof value !== "string" || value === "" || value.startsWith("/") || /^[A-Za-z]:/u.test(value) || value.includes("\\")
     || value.split("/").some((part) => part === ".." || part === "." || part === "")
     || !ATTESTED_PATH_PREFIXES.some((prefix) => value.startsWith(prefix))) fail("attested-request-path", `${label} must be a repository-relative path under scratch/, evidence/ or specs/`);
   return value;
 }
 function inAllowedScope(path, allowed) { return allowed.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry)); }
+
+/**
+ * The one reader of a generated briefing's `pipeline-native-goldfish-host-commit` block, shared by the attested request and by
+ * the host-commit recover helper (which plans the same record before it commits). Throws a typed `attested-briefing` error.
+ */
+export function readAttestedBriefingBlock(briefingBytes) {
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(briefingBytes); } catch { fail("attested-briefing", "input is not valid UTF-8"); }
+  const marker = BRIEFING_MARKER.exec(text);
+  if (!marker) fail("attested-briefing", "the briefing carries no pipeline-native-goldfish-host-commit block");
+  let block;
+  try { block = JSON.parse(marker[1]); } catch { fail("attested-briefing", "the briefing block is not JSON"); }
+  if (!block || typeof block !== "object" || Array.isArray(block)) fail("attested-briefing", "the briefing block is not an object");
+  // 17: a generated Codex briefing names the agent by `nativeAgentType: "worker"` plus `role` (the host derives the agent type from the
+  // role, lib/native-goldfish-host-return.mjs); every generated Codex briefing used to fail here with "lacks agentType".
+  if ((typeof block.agentType !== "string" || block.agentType === "") && block.runner === "codex" && block.nativeAgentType === "worker"
+    && typeof block.role === "string" && Object.hasOwn(ROLE_TO_AGENT, block.role)) block.agentType = ROLE_TO_AGENT[block.role];
+  for (const key of ["dispatchId", "runner", "agentType", "model", "effort", "rulesetSha", "candidateCommit"]) {
+    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}${key === "agentType" ? " (and no Codex role to derive it from); pass the briefing file that dispatch-briefing.mjs wrote for this dispatch: it holds the pipeline-native-goldfish-host-commit block with role, model, allowedPaths and a required-review criticDecision" : ""}`);
+  }
+  if (!Array.isArray(block.allowedPaths) || block.allowedPaths.length === 0 || !block.allowedPaths.every((entry) => typeof entry === "string" && entry !== "")) fail("attested-briefing", "the briefing block lacks allowedPaths");
+  if (!block.criticDecision || block.criticDecision.schema !== CRITIC_REQUIRED_SCHEMA) fail("attested-briefing", "the briefing criticDecision is not a required-review decision");
+  return block;
+}
 
 /**
  * D56 Elephant-side CLI mode. Reconstructs the full orchestrator-attested v4 record from three inputs only: the generated
@@ -580,20 +604,7 @@ export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependenci
   const briefingBytes = readPhysicalRequest(root, briefingPath, dependencies);
   const handbackBytes = readPhysicalRequest(root, handbackPath, dependencies);
   const decode = (bytes, code) => { try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { fail(code, "input is not valid UTF-8"); } };
-  const marker = BRIEFING_MARKER.exec(decode(briefingBytes, "attested-briefing"));
-  if (!marker) fail("attested-briefing", "the briefing carries no pipeline-native-goldfish-host-commit block");
-  let block;
-  try { block = JSON.parse(marker[1]); } catch { fail("attested-briefing", "the briefing block is not JSON"); }
-  if (!block || typeof block !== "object" || Array.isArray(block)) fail("attested-briefing", "the briefing block is not an object");
-  // 17: a generated Codex briefing names the agent by `nativeAgentType: "worker"` plus `role` (the host derives the agent type from the
-  // role, lib/native-goldfish-host-return.mjs); every generated Codex briefing used to fail here with "lacks agentType".
-  if ((typeof block.agentType !== "string" || block.agentType === "") && block.runner === "codex" && block.nativeAgentType === "worker"
-    && typeof block.role === "string" && Object.hasOwn(ROLE_TO_AGENT, block.role)) block.agentType = ROLE_TO_AGENT[block.role];
-  for (const key of ["dispatchId", "runner", "agentType", "model", "effort", "rulesetSha", "candidateCommit"]) {
-    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}${key === "agentType" ? " (and no Codex role to derive it from); pass the briefing file that dispatch-briefing.mjs wrote for this dispatch: it holds the pipeline-native-goldfish-host-commit block with role, model, allowedPaths and a required-review criticDecision" : ""}`);
-  }
-  if (!Array.isArray(block.allowedPaths) || block.allowedPaths.length === 0 || !block.allowedPaths.every((entry) => typeof entry === "string" && entry !== "")) fail("attested-briefing", "the briefing block lacks allowedPaths");
-  if (!block.criticDecision || block.criticDecision.schema !== CRITIC_REQUIRED_SCHEMA) fail("attested-briefing", "the briefing criticDecision is not a required-review decision");
+  const block = readAttestedBriefingBlock(briefingBytes);
   const handbackText = decode(handbackBytes, "attested-handback");
   let text = handbackText;
   if (handbackText.trimStart().startsWith("{")) {

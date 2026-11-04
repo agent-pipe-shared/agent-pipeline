@@ -677,6 +677,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:orchestrator-commit-record-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-store-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-tests",
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",

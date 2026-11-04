@@ -4570,6 +4570,12 @@
       "file": "plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs",
       "invariantPinned": "The PowerShell dialect of the lifecycle guard gives the Bash grammar's verdict for read-only git observations (mutating git stays refused), folds one literal PIPELINE_PLUGIN_ROOT assignment into the command after it, admits --help and the read-only plan and binding verbs of sanctioned scripts only in a ready session, publishes its admitted forms as one table that every grammar refusal prints and the suite submits, and states the protected roots in the native read refusal; every Bash shape the dialect cannot express is listed as Bash-only with a reason (C19 E7 PowerShell part, W4, W5, AC-108)",
       "nonOverlapNote": "Unique cases: lib/guard/powershell-dialect.mjs and the refusal tables of grammar-denials.mjs; g23-read-help-tests pins the C18-8 working examples, the passive-matrix suites pin the native read lane"
+    },
+    {
+      "name": "orchestrator-commit-record-tests",
+      "file": "plugins/pipeline-core/scripts/orchestrator-commit-record.test.mjs",
+      "invariantPinned": "The host-commit recover helper reads the dispatch binding from the briefing, refuses a missing briefed check file, a staged foreign file or a moved HEAD with a typed code and the exact next command, commits with only the allowed trailers, and writes the typed orchestrator-attested record (labelled not host-observed) for exactly that commit; the close authorship check counts the record only for a candidate that contains the commit, the writer still refuses an unobserved v4 authored-commit record, and the failure messages name the plan and heal commands (C19c E1, AC-108)",
+      "nonOverlapNote": "Unique cases: the record route of scripts/goldfish-host-commit-recover.mjs, the attested-commit binding in lib/close-authorship-record.mjs and the E1 hook messages; goldfish-host-commit-recover-tests keeps the commit-only contract"
     }
   ]
 }

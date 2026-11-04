@@ -477,10 +477,14 @@ function sanctionedHostCommitRecoverArgs(args, root) {
   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-")
     && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "." || part === "..");
-  let dispatchId = false, expect = false;
+  // E1: --briefing / --handback (once each) name the generated briefing and the Goldfish's returned text for the record route; the
+  // script itself restricts them to scratch/, evidence/ or specs/, so the guard only requires a relative path of the same shape.
+  let dispatchId = false, expect = false, briefing = false, handback = false;
   for (let index = 3; index < args.length; index += 2) {
     const flag = args[index], value = args[index + 1];
     if (flag === "--dispatch-id" && !dispatchId && HOST_COMMIT_RECOVER_DISPATCH_ID.test(value ?? "")) dispatchId = true;
+    else if (flag === "--briefing" && !briefing && pathValue(value) && !value.startsWith("/")) briefing = true;
+    else if (flag === "--handback" && !handback && pathValue(value) && !value.startsWith("/")) handback = true;
     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
     else if (!((flag === "--allowed-path" || flag === "--path") && pathValue(value))) return false;
   }

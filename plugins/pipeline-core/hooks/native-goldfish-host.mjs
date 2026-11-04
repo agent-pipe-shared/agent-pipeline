@@ -89,14 +89,32 @@ function describeFailureDetail(detail) {
   return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
 }
 
+/** E1: the one recovery sentence every failed host commit names -- the helper that verifies, commits and records in one step. */
+function recoverySentence(dispatchId) {
+  return `run scripts/goldfish-host-commit-recover.mjs plan --root <root>${dispatchId ? ` --dispatch-id ${dispatchId}` : ""} --briefing <briefing file> --handback <hand-back file> (the briefing is the file dispatch-briefing.mjs wrote for this dispatch, the hand-back file holds the text the Goldfish returned), check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; apply makes one ordinary commit with the dispatch trailer and writes the typed orchestrator-attested dispatch record, which is not host-observed evidence.`;
+}
+/**
+ * The slug reason of a failure, wherever the finalizer put it: a stage failure carries `causeReason`, a commit exception carries it
+ * inside its bounded `detail.reason` (and the persisted stop-failure record, whose own `reason` is then null, keeps that detail).
+ */
+function failureReason(entry) { return entry?.causeReason ?? entry?.reason ?? entry?.detail?.reason ?? null; }
+/** A commit exception whose concurrent-commit ownership proof is missing needs the registry healed before the recovery. */
+function healSentence(reason) {
+  return reason === "native-concurrent-unowned-head"
+    ? ` The cause is native-concurrent-unowned-head: HEAD moved without a genuine return of this launch. Heal first: node <plugin-root>/scripts/routine-repair.mjs run heal --root <root> --reason "<why>" (only while no Goldfish is in flight).`
+    : "";
+}
+
 function stopFailureNotice(failure) {
   if (!failure || typeof failure.code !== "string") return null;
   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
   // E1 (Claude Windows greenfield): a stop failure with no pending state named neither why nor the command that recovers it.
   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
-    ? ` Cause: the launch had no pending host-commit state when its tool call returned, which is the normal case for a background launch. Recovery: run scripts/goldfish-host-commit-recover.mjs plan --root <root>${failure.dispatchId ? ` --dispatch-id ${failure.dispatchId}` : ""}, check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; it makes one ordinary commit with the dispatch trailer.`
-    : "";
+    ? ` Cause: the launch had no pending host-commit state when its tool call returned, which is the normal case for a background launch. Recovery: ${recoverySentence(failure.dispatchId)}`
+    : failure.code === "NGHF-COMMIT-EXCEPTION"
+      ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
+      : "";
   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeFailureDetail(failure.detail)}`;
 }
 
@@ -121,7 +139,10 @@ function nativeGoldfishHookBaseMessage(result) {
       : "no pending host-commit state was prepared for this launch (the PreToolUse WARNING names the preparation code)";
     // PF-26B: when the PreToolUse guard recorded why preparation failed, name that exact code instead of pointing at a warning.
     const prepared = typeof result.preparationCode === "string" ? ` The pre-launch preparation failed with ${result.preparationCode}.` : "";
-    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Interim route: verify the child's diff yourself and commit it as the Elephant with the "Dispatch: <dispatchId> (goldfish)" trailer; that commit is not host-observed evidence. scripts/dispatch-record-write.mjs refuses a v4 authored-commit Claude record without host observation, so do not expect it to accept one for this launch.`;
+    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Recovery: ${recoverySentence(result.dispatchId)} scripts/dispatch-record-write.mjs still refuses a v4 authored-commit Claude record without host observation.`;
+  }
+  if (result.code === "NGHF-COMMIT-EXCEPTION") {
+    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result))} Recovery: ${recoverySentence(result.dispatchId)}${describeFailureDetail(result.detail)}`;
   }
   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
