@@ -71,6 +71,19 @@ function resolveSubagentStopToolUseId(input) {
   return meta.toolUseId;
 }
 
+/**
+ * E1 (candidate 19): why the pending state could not be read at a stop. `readNativeGoldfishPending` answers every read failure with one code and the
+ * underlying error as `reason`; the stop dropped that reason, so a pending state that was never written and one that exists but could not be read (a
+ * private-path check, a Windows ACL fault) looked identical. The reason now travels, scrubbed of every path-like token and bounded, into the stop-failure
+ * record. Diagnostic only; it changes no admission.
+ * @returns {string|null}
+ */
+function pendingReadReason(pending) {
+  const code = typeof pending?.code === "string" && /^[A-Z0-9-]{1,40}$/u.test(pending.code) ? pending.code : "NGHS-PENDING-MISSING";
+  const cause = boundedErrorMessage({ message: typeof pending?.reason === "string" ? pending.reason : "" });
+  return cause ? `${code}: ${cause}` : code;
+}
+
 // Any child that is not a known Goldfish role, has no usable meta file, names no pending dispatch, or belongs to a
 // foreground (PostToolUse-completed) state is simply not this route's: the caller reports a silent not-applicable.
 function readSubagentStopPending({ commonDir, input }) {
@@ -79,7 +92,7 @@ function readSubagentStopPending({ commonDir, input }) {
   const toolUseId = resolveSubagentStopToolUseId(input);
   if (toolUseId === null) return { ok: false, code: "NGHF-STOP-UNRESOLVED" };
   const pending = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: input.session_id, correlationId: toolUseId });
-  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE" };
+  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending) };
   if (pending.state.completionRoute !== NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
     || pending.state.binding?.agentType !== agentType) return { ok: false, code: "NGHF-NOT-SUBAGENT-STOP-ROUTE" };
   return { ok: true, pending };
@@ -171,7 +184,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
       stopMkdir(directory, { recursive: true, mode: 0o700 });
       stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
         dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
-        reason: null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
       return;
     }
     if (result?.status === "authored-commit-recorded") {
@@ -377,7 +390,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
       // AC-164: an unresolvable marked Goldfish stop leaves a code-only record; a foreground state (NOT-SUBAGENT-STOP-ROUTE) is normal and silent.
       if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
         const marked = markedStopContract(input);
-        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId };
+        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId,
+          reason: typeof stop.reason === "string" ? stop.reason : null };
       }
       return fail(stop.code, "not-applicable");
     }

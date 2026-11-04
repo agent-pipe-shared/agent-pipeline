@@ -653,7 +653,7 @@ const cases = [
     assert.deepEqual(read.detail.extraPaths, ["src/extra.mjs"]);
     assert.match(nativeGoldfishHookMessage(null, { stopFailure: read }), /src\/extra\.mjs/u);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
-  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, stopInput }) => {
+  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
     const before = snapshot(commonDir);
     const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
     assert.equal(result.status, "not-applicable");
@@ -667,6 +667,18 @@ const cases = [
     assert.equal(recorded.code, "NGHF-STOP-UNRESOLVED");
     assert.equal(recorded.dispatchId, binding.dispatchId);
     assert.equal(readNativeGoldfishStopFailure({ commonDir }).code, "NGHF-STOP-UNRESOLVED");
+    // E1 (candidate 19): a stop whose meta file resolves but whose pending state cannot be read records WHY, scrubbed of every path, so a
+    // pending state that was never written and one that could not be read no longer look identical.
+    writeMeta("agent-orphan", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
+    const orphan = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding), { agent_id: "agent-orphan" }) }, dependencies);
+    assert.equal(orphan.code, "NGHF-PENDING-UNAVAILABLE");
+    const unavailable = diagEntries(commonDir).map((name) => JSON.parse(readFileSync(join(diagDir(commonDir), name), "utf8"))).find((entry) => entry.code === "NGHF-PENDING-UNAVAILABLE");
+    assert.ok(unavailable, "a record for the unavailable pending state exists");
+    assert.match(String(unavailable.reason), /^NGHS-PENDING-MISSING\b/u, "the read failure code travels");
+    assert.equal(String(unavailable.reason).length <= 200, true, "the reason is bounded");
+    assert.equal(JSON.stringify(unavailable).includes(root), false, "no host path travels");
+    assert.equal(readNativeGoldfishStopFailure({ commonDir }).reason === unavailable.reason || diagEntries(commonDir).length === 2, true);
+    assert.equal(facts.commits, 0);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF30", name: "A stop of an unmarked or non-Goldfish child writes no diagnostic at all", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
     const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);

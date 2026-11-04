@@ -105,7 +105,7 @@ function newestStopFailure(commonDir) {
     if (!/^stop-failure-.+\.json$/u.test(name)) continue;
     try {
       const entry = JSON.parse(readFileSync(join(directory, name), "utf8"));
-      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId };
+      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...(typeof record.reason === "string" ? { reason: record.reason } : {}) };
     } catch { /* skip */ }
   }
   return null;
