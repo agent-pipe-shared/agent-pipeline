@@ -1,0 +1,76 @@
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index f58f69b7a..d214452b8 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -164,6 +164,8 @@ export const POWERSHELL_ADMITTED_SHAPES = [
+   { spelling: "Set-Content or Add-Content for a scratch file", example: POWERSHELL_GRAMMAR_EXAMPLES.contentWrite },
+   { spelling: "a read-only git observation: the same read-only subcommands the Bash grammar admits (status, log, diff, show, rev-parse, ls-files, ...); never commit, push, add, reset or checkout",
+     example: "git status --short" },
++  { spelling: "the version probes `node --version`, `node -v` and `git --version`, and a read-only `rg` search with the same rules as the Bash grammar (no quote, comma, parenthesis or brace in an argument); shell builtins and aliases such as cat, ls and find are not admitted in PowerShell",
++    example: "node --version" },
+   { spelling: "a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it",
+     example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect" },
+   { spelling: "`--help` of a sanctioned Pipeline script, and in a ready session the read-only plan, inspect and binding verbs (continuity-authority-revision-plan, continuity-result-bootstrap-plan, dispatch-briefing binding)",
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index 5140ea2e8..b8eae0de6 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -153,6 +153,10 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+   }
+   const { executable, argv } = parsed.segments[0];
+   const name = basename(executable).toLowerCase();
++  // E7 (candidate 19, PO decision 2026-11-04): the Bash tool admits the version probes of node and git; the PowerShell tool refused them (measured on a
++  // native Windows consumer). Exactly these three spellings, for the literal bare executable only (never a path); no other flag, no other argument.
++  if ((["node", "node.exe"].includes(executable.toLowerCase()) && argv.length === 1 && (argv[0] === "--version" || argv[0] === "-v"))
++    || (["git", "git.exe"].includes(executable.toLowerCase()) && argv.length === 1 && argv[0] === "--version")) return verdict(0);
+   if (name === "new-item") {
+     const named = powerShellNamedArgs(argv, ["-path", "-itemtype"], ["-force"]);
+     const target = named?.values.get("-path");
+@@ -198,6 +202,12 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+   if (["git", "git.exe"].includes(bareExecutable)
+     && !argv.some((arg) => /[(){},]/u.test(arg))
+     && isReadOnlyDiagnosticCommand(["git", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
++  // E7 (candidate 19, PO decision 2026-11-04): `rg` is the same native program in both shells, so a read-only search gets the verdict the Bash grammar gives
++  // the same words, with the same refusal of characters PowerShell reads as syntax. Builtins and aliases (`cat`, `ls`, `find`, `sed`) mean something else
++  // in PowerShell than the Bash grammar validated and stay refused.
++  if (["rg", "rg.exe"].includes(bareExecutable)
++    && !argv.some((arg) => /[(){},]/u.test(arg))
++    && isReadOnlyDiagnosticCommand(["rg", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
+   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
+   if (["git", "git.exe"].includes(bareExecutable)
+     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index cb89af4d5..cb536a2dc 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -155,6 +155,30 @@ test("RCD17: a refused short-flag cluster gets the split spelling only when the
+   assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "the diagnosed command itself stays refused");
+ });
+ 
++async function powershellVerdict(command) {
++  const guard = await import("../hooks/guard-lifecycle-ready.mjs");
++  return guard.evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, {
++    projectDir: root, runner: "claude",
++    inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
++  });
++}
++
++test("RCD18: the PowerShell tool admits the node and git version probes and a read-only rg exactly like the Bash grammar, and nothing wider", async () => {
++  for (const command of ["node --version", "node -v", "git --version", "git status --short", "git log --oneline -n 3", "rg -n needle README.md"]) {
++    assert.equal((await powershellVerdict(command)).exitCode, 0, command);
++  }
++  for (const command of [
++    "node --eval 1", "node --version --help", "git --version --help", "git push origin main", "git checkout main",
++    "rg --hidden needle README.md", "rg -n needle ../outside.txt", "rg -n a,b README.md",
++    "cat README.md", "ls docs", "find docs -maxdepth 1",
++    "C:/tools/git.exe --version", "C:/tools/node.exe --version",
++  ]) {
++    const result = await powershellVerdict(command);
++    assert.equal(result.exitCode, 2, command);
++    assert.match(String(result.stderr), /GUARD-/u, command);
++  }
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
