@@ -4594,6 +4594,12 @@
       "file": "plugins/pipeline-core/scripts/human-approval-trace.test.mjs",
       "invariantPinned": "The operator command human-approval-trace prints the trace table and the typed verdict, exits non-zero on untraceable, is read-only (an output path is create-only) and is admitted by the guard command catalogue only with --repo and the optional --commit and --format (C19 Q3)",
       "nonOverlapNote": "Unique cases: scripts/human-approval-trace.mjs and its guard catalogue admission; the library tests pin the verdict logic"
+    },
+    {
+      "name": "authority-seal-plan-tests",
+      "file": "plugins/pipeline-core/lib/authority-seal-plan.test.mjs",
+      "invariantPinned": "The seal of a draft design package is one agent-prepared, digest-bound plan (every PRD, Spec, design-input and result digest, the capture digest, the digests each review bound, the State revision and the plan digest) that never writes State; it refuses with a typed code and exits on a stale review, a provenance difference, an already sealed package and a package outside the PRD release scope; the plan digest is an additive key of the design approval binding so that the one signature covers it and existing signed approvals verify unchanged; approve-plan applies the seal in the same transaction (digests written, sealed marker removed, one revision) and refuses on a missing, stale, unpresented or drifted plan; reopen-design voids a prepared plan and a sealed package keeps its old approval path (C19 late-binding build step 4)",
+      "nonOverlapNote": "Unique cases: lib/authority-seal-plan.mjs, the prepare-seal command and the seal transaction of approve-plan; design-approval-binding tests pin the binding digest, authority-seal-readers tests pin the draft readers"
     }
   ]
 }

@@ -57,11 +57,23 @@ const DELTA_ROUND = 2;
 const MAX_DELTA_ENTRIES = 2 * (MAX_COMPANIONS + 2);
 
 const BINDING_REQUIRED_KEYS = ["schema", "featureId", "sources", "reviewReceipts", "verdict", "openFindingIds"];
-const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta", "pathRebind"];
+// Late binding of the PRD and the Spec: `sealPlanSha256` is the digest of the prepared seal plan of a draft package. It sits
+// inside the binding, so the binding digest (the intent's subject) and therefore the one PO signature cover it. A package
+// without a seal plan carries no such key and its binding, digest and intent are byte-identical to before.
+const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta", "pathRebind", "sealPlanSha256"];
 const REQUEST_KEYS = ["schema", "binding", "bindingSha256", "approvalIntent"];
 const CREATE_BINDING_KEYS = ["featureId", "receipts", "currentSources"];
+const CREATE_BINDING_OPTIONAL_KEYS = ["sealPlanSha256"];
 const CREATE_REQUEST_KEYS = ["binding", "candidate"];
 const VERIFY_KEYS = ["request", "featureId", "receipts", "currentSources"];
+const VERIFY_OPTIONAL_KEYS = ["sealPlanSha256"];
+
+/** Exact required keys plus any subset of the optional keys (no other key, no undefined value). */
+function hasKeysWithOptional(value, required, optional) {
+  if (!isObject(value)) return false;
+  const keys = Object.keys(value);
+  return required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => required.includes(key) || (optional.includes(key) && value[key] !== undefined));
+}
 
 // ----------------------------------------------------------------------------- primitives
 
@@ -160,6 +172,7 @@ function isValidBinding(binding) {
     if (!isUnreviewedDelta(binding.unreviewedSourceDelta, binding.sources)) return false;
   }
   if (Object.hasOwn(binding, "pathRebind") && !isPathRebind(binding.pathRebind, binding.sources)) return false;
+  if (Object.hasOwn(binding, "sealPlanSha256") && !isSha(binding.sealPlanSha256)) return false;
   return true;
 }
 
@@ -226,8 +239,9 @@ const copySources = (sources) => ({
  * @returns {{ ok: true, binding: object, bindingSha256: string } | { ok: false, code: string, causes: string[] }}
  */
 export function createDesignApprovalBinding(input) {
-  if (!hasExactKeys(input, CREATE_BINDING_KEYS) || !isFeatureId(input.featureId) || !Array.isArray(input.receipts)) return refuse("DAB-SHAPE");
-  const { featureId, receipts, currentSources } = input;
+  if (!hasKeysWithOptional(input, CREATE_BINDING_KEYS, CREATE_BINDING_OPTIONAL_KEYS) || !isFeatureId(input.featureId) || !Array.isArray(input.receipts)) return refuse("DAB-SHAPE");
+  if (Object.hasOwn(input, "sealPlanSha256") && !isSha(input.sealPlanSha256)) return refuse("DAB-SHAPE");
+  const { featureId, receipts, currentSources, sealPlanSha256 } = input;
 
   const summaries = [];
   const receiptCauses = [];
@@ -265,6 +279,7 @@ export function createDesignApprovalBinding(input) {
     const delta = unreviewedSourceDelta(latest.sources, currentSources);
     if (delta.length > 0) binding.unreviewedSourceDelta = delta;
   }
+  if (sealPlanSha256 !== undefined) binding.sealPlanSha256 = sealPlanSha256;
   const validated = validateDesignApprovalBinding(binding);
   if (!validated.ok) return validated;
   return { ok: true, binding, bindingSha256: validated.bindingSha256 };
@@ -329,8 +344,8 @@ export function createDesignApprovalRequest(input) {
  * @returns {{ ok: true, bindingSha256: string, intentSha256: string, candidate: object, verdict: string, openFindingIds: string[] } | { ok: false, code: string, causes: string[] }}
  */
 export function verifyDesignApprovalRequest(input) {
-  if (!hasExactKeys(input, VERIFY_KEYS)) return refuse("DAB-SHAPE");
-  const { request, featureId, receipts, currentSources } = input;
+  if (!hasKeysWithOptional(input, VERIFY_KEYS, VERIFY_OPTIONAL_KEYS)) return refuse("DAB-SHAPE");
+  const { request, featureId, receipts, currentSources, sealPlanSha256 } = input;
 
   // (1) the request is closed and its binding is a valid binding
   if (!hasExactKeys(request, REQUEST_KEYS) || request.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA || !isSha(request.bindingSha256)) return refuse("DAB-SHAPE");
@@ -348,7 +363,7 @@ export function verifyDesignApprovalRequest(input) {
   if (request.binding.featureId !== featureId) return refuse("DAB-REVIEW-CHAIN", [CHAIN_BINDING_CODE]);
 
   // (4) recompute the binding from the receipts and sources as they are now
-  const recomputed = createDesignApprovalBinding({ featureId, receipts, currentSources });
+  const recomputed = createDesignApprovalBinding({ featureId, receipts, currentSources, ...(sealPlanSha256 === undefined ? {} : { sealPlanSha256 }) });
   if (!recomputed.ok) return recomputed;
 
   // (5) the request's binding and digest are exactly the recomputed ones

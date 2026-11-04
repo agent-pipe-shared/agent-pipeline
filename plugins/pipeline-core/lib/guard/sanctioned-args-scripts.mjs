@@ -432,6 +432,17 @@ export function sanctionedPipelineStateArgs(args, root) {
     });
   }
   if (args[0] === "materialize-architecture") return args.length === 1;
+  // Late binding step 4: `prepare-seal` writes only the seal plan file (never State), idempotent. It takes up to two readiness review
+  // receipts (the same closed path rule as present-plan) to check them against the bytes being sealed.
+  if (args[0] === "prepare-seal") {
+    if (args.length !== 1 && args.length !== 3 && args.length !== 5) return false;
+    const receipts = new Set();
+    for (let index = 1; index < args.length; index += 2) {
+      if (args[index] !== "--review-receipt" || receipts.has(args[index + 1]) || !designReviewReceiptPath(args[index + 1], root)) return false;
+      receipts.add(args[index + 1]);
+    }
+    return true;
+  }
   // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
   // file (it refuses when that file exists), the same class as materialize-architecture just above.
   if (args[0] === "materialize-push-threat-model") return args.length === 1;

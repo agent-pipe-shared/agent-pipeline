@@ -508,6 +508,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/evidence-carry-forward.mjs",
   "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
   "plugins/pipeline-core/scripts/security-readiness/probe-retry.mjs",
+  // Candidate 19c (late-binding step 4): the seal plan decides what the plan approval seals; pipeline-state.mjs imports it (GMWKC01).
+  "plugins/pipeline-core/lib/authority-seal-plan.mjs",
   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
   // Its publication-gate evidence dependency must remain protected as well.
   "plugins/pipeline-core/scripts/audit-pack.mjs",

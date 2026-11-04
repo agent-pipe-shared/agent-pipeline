@@ -541,6 +541,7 @@ the kernel closure test found imported by kernel modules but not yet listed:
 `lib/evidence-carry-forward-reader.mjs`, `lib/evidence-carry-forward.mjs`,
 `scripts/security-adapters/gitleaks.mjs`,
 `scripts/security-readiness/probe-retry.mjs`,
+`lib/authority-seal-plan.mjs`,
 `lib/hardened-private-directory.mjs`,
 `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
 `scripts/security-readiness/gitleaks-readiness.mjs`,

@@ -1013,6 +1013,33 @@ function promotedDesignReopened(stateObservation) {
   }
 }
 
+/** Narrow, fail-closed read of the late-binding draft marker (`continuity.authority.sealed === false`); anything unreadable answers "no". */
+function promotedDraftAuthority(stateObservation) {
+  if (stateObservation?.status !== "present") return false;
+  try {
+    const state = JSON.parse(stateObservation.raw.toString("utf8"));
+    return isObject(state) && isObject(state.continuity) && isObject(state.continuity.authority) && state.continuity.authority.sealed === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The design-input capture of the latest promotion/bootstrap binding in the private history, as a typed status:
+ * `{ status: "present", path, sha256 }`, `{ status: "absent" }` (no history or no capture recorded), `{ status: "drift" }` (the
+ * design input no longer matches its capture: KICKOFF-PROMOTION-EVIDENCE-DRIFT) or `{ status: "unavailable", code }`.
+ * Used by the seal plan as provenance (the seal refuses when the bytes differ).
+ */
+export function readPromotionDesignInputCapture(options = {}) {
+  const observed = observeDetailed(options);
+  if (observed.error !== undefined) {
+    return observed.error.code === "KICKOFF-PROMOTION-EVIDENCE-DRIFT" ? { status: "drift" } : { status: "unavailable", code: observed.error.code ?? "KICKOFF-UNAVAILABLE" };
+  }
+  const entries = Array.isArray(observed.history?.transactions) ? observed.history.transactions : [];
+  const latest = [...entries].reverse().find((entry) => typeof entry.designInputPath === "string" && SHA256_RE.test(entry.designInputSha256 ?? ""));
+  return latest === undefined ? { status: "absent" } : { status: "present", path: latest.designInputPath, sha256: latest.designInputSha256 };
+}
+
 function validateHistory(value) {
   const kickoffEntryKeys = new Set([
     "kind", "transactionSha256", "goalSha256", "calibrationSha256",
@@ -1257,7 +1284,9 @@ function observeDetailed({
         // exactly as editing the bound design input does.  Promotions written
         // before the pair existed carry no `specPath`; that older record is
         // read-only history and is left exactly as it was written.
-        if (entry.specPath === undefined || reopened) continue;
+        // A draft package (late binding: `continuity.authority.sealed === false`) admits PRD and Spec edits until the seal, so the
+        // mutual PRD/Spec pair is not enforced for it; the design input check above stays (its capture is provenance).
+        if (entry.specPath === undefined || reopened || promotedDraftAuthority(stateObservation)) continue;
         for (const [path, expected, label] of [
           [entry.planPath, entry.prdSha256, "promotion PRD"],
           [entry.specPath, entry.specSha256, "promotion specification"],

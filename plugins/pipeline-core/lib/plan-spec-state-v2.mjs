@@ -810,6 +810,9 @@ export function submitPlan({
       || state.planInvalidation.invalidatedApprovalSha256 !== sha256CanonicalJson(retainedApproval))) {
     return fail("PLAN-SUBMIT-RETAINED-APPROVAL-UNBOUND");
   }
+  // Late binding: a DRAFT package binds no digest at the submission. The submission itself records the PRD/Spec digests
+  // (`planSubmission`), and the plan approval is the seal (prepare-seal, approve-plan). A sealed or unmarked package re-binds as before.
+  const draft = readAuthoritySeal(continuity.authority).status === "draft";
   const next = {
     ...state,
     planApproved: false,
@@ -817,7 +820,7 @@ export function submitPlan({
     continuity: {
       ...continuity,
       revision: continuity.revision + 1,
-      authority: {
+      authority: draft ? continuity.authority : {
         prd: { path: poGateAuthority.planPath, sha256: poGateAuthority.planSha256 },
         spec: { path: poGateAuthority.specPath, sha256: poGateAuthority.specSha256 },
         result: null,
