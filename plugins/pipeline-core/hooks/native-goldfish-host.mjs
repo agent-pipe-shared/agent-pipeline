@@ -111,7 +111,7 @@ function stopFailureNotice(failure) {
   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
   // E1 (Claude Windows greenfield): a stop failure with no pending state named neither why nor the command that recovers it.
   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
-    ? ` Cause: the launch had no pending host-commit state when its tool call returned, which is the normal case for a background launch. Recovery: ${recoverySentence(failure.dispatchId)}`
+    ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId)}`
     : failure.code === "NGHF-COMMIT-EXCEPTION"
       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
       : "";

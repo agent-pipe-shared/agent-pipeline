@@ -1207,6 +1207,17 @@ manualCheck("GD75 allow  D183: a pointer prompt (marker line + pipeline-briefing
   assert.equal(answer.hookSpecificOutput.updatedInput.model, "sonnet");
 });
 
+manualCheck("GD75b allow  D183 x E1: an admitted pointer prompt leaves the same pending host-commit state as the inline briefing (the child's stop finds it)", () => {
+  const inline = generatedItemFixture();
+  const inlineRun = runAtOut(generatedDispatch(inline, "gd75b-inline", {}), inline.root);
+  assert.equal(inlineRun.code, ALLOW, `inline exit ${inlineRun.code} -- ${inlineRun.stderr.trim().slice(0, 300)}`);
+  const pointed = generatedItemFixture();
+  const pointerRun = runAtOut(pointerDispatch(pointed, pointerFixture(pointed), "gd75b-pointer"), pointed.root);
+  assert.equal(pointerRun.code, ALLOW, `pointer exit ${pointerRun.code} -- ${pointerRun.stderr.trim().slice(0, 300)}`);
+  assert.equal(pendingNativeStates(inline.root).length, 1, `inline leaves one pending state: ${inlineRun.stderr.slice(0, 300)}`);
+  assert.equal(pendingNativeStates(pointed.root).length, 1, `a pointer prompt must leave one pending state too: ${pointerRun.stderr.slice(0, 400)}`);
+});
+
 manualCheck("GD76 block  D183: a pointer with a wrong digest is refused DBG-REF-DIGEST, and a file modified after generation is refused DBG-REF-DIGEST", () => {
   const governed = sharedRefusalFixture();
   const wrong = runAtOut(pointerDispatch(governed, pointerFixture(governed, { digest: "0".repeat(64) }), "gd76a"), governed.root);
@@ -1254,7 +1265,7 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
   }
 });
 
-assert.equal(cases.length, 82, "the complete dispatch guard corpus must register before execution");
+assert.equal(cases.length, 83, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

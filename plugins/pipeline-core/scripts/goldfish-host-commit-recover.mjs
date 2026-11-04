@@ -96,6 +96,17 @@ function readPendingBindings(commonDir) {
   return found;
 }
 
+/** The bounded, already scrubbed cause fields of a stop-failure record: the reason (or the detail's own reason), the stage and the detail; absent fields are left out. */
+export function stopFailureCause(record) {
+  const reason = typeof record?.reason === "string" && record.reason !== "" ? record.reason
+    : typeof record?.detail?.reason === "string" && record.detail.reason !== "" ? record.detail.reason : null;
+  return {
+    ...(reason ? { reason } : {}),
+    ...(typeof record?.stage === "string" && record.stage !== "" ? { stage: record.stage } : {}),
+    ...(record?.detail && typeof record.detail === "object" && !Array.isArray(record.detail) ? { detail: record.detail } : {}),
+  };
+}
+
 /** The newest stop-failure record with its file name (the exported reader gives the content, not the file). */
 function newestStopFailure(commonDir) {
   const record = readNativeGoldfishStopFailure({ commonDir });
@@ -105,7 +116,7 @@ function newestStopFailure(commonDir) {
     if (!/^stop-failure-.+\.json$/u.test(name)) continue;
     try {
       const entry = JSON.parse(readFileSync(join(directory, name), "utf8"));
-      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...(typeof record.reason === "string" ? { reason: record.reason } : {}) };
+      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...stopFailureCause(record) };
     } catch { /* skip */ }
   }
   return null;
@@ -288,7 +299,7 @@ export function plan(options) {
     if (present) refusals.push(refuse("GHCR-RECORD-EXISTS", `${recordTarget} already exists and is never overwritten`, "inspect it; if it already records this delivery there is nothing to land, otherwise remove only your own failed attempt and plan again"));
   }
 
-  const stopFailure = stop && (!dispatchId || stop.dispatchId === dispatchId) ? { file: stop.file, code: stop.code } : null;
+  const stopFailure = stop && (!dispatchId || stop.dispatchId === dispatchId) ? { file: stop.file, code: stop.code, ...stopFailureCause(stop) } : null;
   const result = { schema: PLAN_SCHEMA, status: refusals.length === 0 ? "ready" : "refused", code: refusals[0]?.code ?? "GHCR-READY",
     dispatchId, source, candidateCommit, head: headSha, stopFailure, paths: refusals.length === 0 ? paths : [], refusals,
     ...(stopFailure ? {} : { stopFailureNote: "no stop-failure record for this dispatch; the stop left no diagnostic" }) };

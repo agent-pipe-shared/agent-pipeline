@@ -325,6 +325,19 @@ const STOP_FAILURE_LEGACY_DIR = ["agent-pipeline", "run", "native-goldfish-host-
 const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
 
 /**
+ * E1 (Windows consumer, 2026-11-04): the persisted stop failure carries a stage and a reason (the reason of a commit exception sits in
+ * its bounded detail), and the build warning dropped both. Control characters are removed and the text is bounded; the record was
+ * scrubbed when it was written, this only keeps one warning line one line.
+ */
+function stopFailureCauseText(entry) {
+  const clean = (value) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 160) : "");
+  const reason = clean(entry?.reason) || clean(entry?.detail?.reason);
+  const stage = clean(entry?.stage);
+  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "no reason recorded";
+}
+
+/**
  * PF-61: the persisted stop-failure diagnostics of background Goldfish whose host commit failed at SubagentStop (read-only).
  * At most 20 regular, non-symlink files, each read bounded to 64 KiB; only objects of the stop-failure schema with string
  * dispatchId and code are kept. Any fault yields an empty list. Never deletes, moves or rewrites a file.
@@ -885,7 +898,7 @@ export function generateDispatchBinding(options, deps = {}) {
   }
   for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
-    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}, ${stopFailureCauseText(entry)}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
   }
 
   // Agent definition: effort, model alias and the maxTurns cliff.

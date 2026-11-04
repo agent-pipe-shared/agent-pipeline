@@ -248,7 +248,13 @@ const cases = [
     const stopFailure = { code: "NGHF-PENDING-UNAVAILABLE", dispatchId: "gf-store-backup", observedAt: "2026-11-03T00:23:33.503Z", stage: null, reason: null, detail: null };
     const message = nativeGoldfishHookMessage(null, { stopFailure });
     assert.match(message, /NGHF-PENDING-UNAVAILABLE/u);
-    assert.match(message, /no pending host-commit state when its tool call returned/u);
+    // E1 (Windows run 2026-11-04): this record is written by a SubagentStop, so "no pending state at the launch return" was the wrong
+    // cause. The notice says the stop could not read it, and says when the record names no reason.
+    assert.match(message, /at its stop the child's pending host-commit state could not be read \(this record carries no reason; it may predate the reason field\)/u);
+    assert.doesNotMatch(message, /normal case for a background launch/u);
+    const reasoned = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, reason: "NGHS-PENDING-MISSING" } });
+    assert.match(reasoned, /\(NGHF-PENDING-UNAVAILABLE; reason NGHS-PENDING-MISSING\)/u);
+    assert.match(reasoned, /could not be read\. Recovery:/u, "no 'no reason' remark when the record has one");
     assert.match(message, /scripts\/goldfish-host-commit-recover\.mjs plan --root <root> --dispatch-id gf-store-backup/u);
     assert.match(message, /--expect-sha256/u);
     const other = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, code: "NGHF-STOP-UNRESOLVED" } });

@@ -1565,6 +1565,22 @@ test("PF-61 reader one persisted diagnostic yields exactly one warning naming di
   assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
 });
 
+test("PF-61 reader the warning names the recorded stage and reason, the detail's reason when the record has none, and says so when there is none", async () => {
+  const { runDispatchBriefing } = await lib();
+  const messageOf = async (over) => {
+    const fx = makeFixture();
+    const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure(over)] }));
+    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+    return stopWarnings(result)[0].message;
+  };
+  assert.match(await messageOf({ stage: "pending-read", reason: "NGHS-PENDING-MISSING" }), /observed 2026-10-26T10:00:00\.000Z, stage pending-read, reason NGHS-PENDING-MISSING\); verify/u);
+  assert.match(await messageOf({ code: "SDC-AUTHORITY-UNAVAILABLE", detail: { reason: "registry-lock-held" } }), /reason registry-lock-held\); verify/u);
+  assert.match(await messageOf({}), /no reason recorded\); verify/u);
+  const hostile = await messageOf({ reason: `line one\nline two ${"x".repeat(400)}` });
+  assert.equal(hostile.includes("\n"), false, "one warning stays one line");
+  assert.ok(hostile.length < 700, `the cause text is bounded (${hostile.length})`);
+});
+
 test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

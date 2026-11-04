@@ -26,7 +26,7 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 
-function fixture({ pending = true, stop = true } = {}) {
+function fixture({ pending = true, stop = true, stopOver = {} } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "ghcr-")));
   git(root, "init", "-q");
   git(root, "config", "user.name", "Fixture");
@@ -55,7 +55,7 @@ function fixture({ pending = true, stop = true } = {}) {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, STOP_FILE), `${JSON.stringify({
       schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: DISPATCH, toolUseId: "toolu_1", status: "recovery-required",
-      code: "NGHF-FIXTURE-CODE", stage: null, reason: null, commit: null, observedAt: "2026-11-02T10:00:00.000Z" })}\n`);
+      code: "NGHF-FIXTURE-CODE", stage: null, reason: null, commit: null, observedAt: "2026-11-02T10:00:00.000Z", ...stopOver })}\n`);
   }
   return { root, head };
 }
@@ -104,6 +104,23 @@ test("apply: exactly one commit, three trailers last, pointer to the stop failur
     assert.ok(message.includes(STOP_FILE) && message.includes("NGHF-FIXTURE-CODE"), message);
     assert.equal(readFileSync(join(root, "scratch", "commit-msg", `${DISPATCH}.txt`), "utf8").includes("Commit-Act: orchestrator"), true);
   } finally { cleanup(root); }
+});
+
+test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
+  const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
+  try {
+    assert.deepEqual(run(recorded.root, "plan").json.stopFailure, { file: STOP_FILE, code: "NGHF-FIXTURE-CODE", reason: "NGHS-PENDING-MISSING", stage: "pending-read" });
+  } finally { cleanup(recorded.root); }
+  const detailed = fixture({ stopOver: { reason: null, detail: { reason: "native-concurrent-unowned-head" } } });
+  try {
+    const found = run(detailed.root, "plan").json.stopFailure;
+    assert.equal(found.reason, "native-concurrent-unowned-head");
+    assert.equal(found.file, STOP_FILE);
+  } finally { cleanup(detailed.root); }
+  const bare = fixture();
+  try {
+    assert.deepEqual(Object.keys(run(bare.root, "plan").json.stopFailure).sort(), ["code", "file"], "a record without a cause adds no empty cause fields");
+  } finally { cleanup(bare.root); }
 });
 
 test("plan without a stop-failure record is ready with stopFailure null and says the stop left no diagnostic", () => {
