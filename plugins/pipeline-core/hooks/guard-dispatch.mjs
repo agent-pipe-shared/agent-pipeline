@@ -95,7 +95,8 @@ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchMod
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
-import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
+import { describeWindowsAuthorityRefusal, prepareWithWindowsContentionRetry } from "../lib/windows-authority-readiness.mjs";
+import { lastWindowsAuthorityFailedPath } from "../lib/windows-owned-authority-backend.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
 // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
@@ -1091,10 +1092,23 @@ if (isDirectInvocation(import.meta.url)) {
         process.stderr.write("WARNING (guard-dispatch): marked native host-commit route is not a single direct Claude Task or Codex spawn_agent; child changes will not be host-committed.\n");
       } else {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
-        const prepared = prepareNativeGoldfishHostState({
-          root: rootDir, runner: nativeRunner, input,
-          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
-          subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
+        // E4: a second concurrent launch on Windows meets a registry file the first launch holds; that is contention, not a
+        // permission fault, so the preparation is retried and then refused with the sequential rule (never icacls advice).
+        // Q10: the path the failed native open reported is read right after each preparation, before the readiness probe the
+        // retry wrapper runs can make its own native calls (every native failure replaces the remembered path).
+        let envelopeFailedPath = null;
+        const prepared = prepareWithWindowsContentionRetry({
+          prepare: () => {
+            const attempt = prepareNativeGoldfishHostState({
+              root: rootDir, runner: nativeRunner, input,
+              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
+              subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
+            });
+            envelopeFailedPath = lastWindowsAuthorityFailedPath();
+            return attempt;
+          },
+          projectRoot: resolve(rootDir), pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"),
+          waitCommand: `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} wait --root ${rootDir} --timeout 120`,
         });
         if (prepared.ok) nativePendingPrepared = true;
         if (!prepared.ok) {
@@ -1122,8 +1136,8 @@ if (isDirectInvocation(import.meta.url)) {
             // Q10: a native Windows authority reason (WIN-AUTH-OPEN and siblings) also names the folder, the preview and the apply command.
             let windowsAuthorityText = "";
             try {
-              windowsAuthorityText = describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
-                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") })
+              windowsAuthorityText = prepared.contention === true ? "" : describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
+                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"), failedPath: envelopeFailedPath ?? undefined })
                 .replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 900);
             } catch { windowsAuthorityText = ""; }
             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${windowsAuthorityText}${repairText}\n`);

@@ -63,10 +63,14 @@ function guidance(pathClass, reason, path) {
  * apply command the operator runs, and the rule for a second concurrent launch. The platform and the probe are injected.
  * Returns '' when the platform is not Windows or the reason is not a native authority reason.
  */
-export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness } = {}) {
+export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness, failedPath } = {}) {
   if (platform !== 'win32' || !NATIVE_REASON.test(reason ?? '')) return '';
+  // Q10: the path the native open itself failed on (the failure envelope) wins; the readiness probe names it otherwise.
+  // A path that could break out of a quoted command line is never printed.
+  const fromEnvelope = typeof failedPath === 'string' && failedPath !== '' && !/["\u0000-\u001f\u007f]/u.test(failedPath);
   let causes = [];
-  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; }
+  if (fromEnvelope) causes = [{ path: failedPath, reason }];
+  else { try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; } }
   const located = causes.filter(cause => typeof cause?.path === 'string' && cause.path !== '' && (cause.reason === reason || reason === 'WIN-AUTH-OPEN'));
   const rest = reason === 'WIN-AUTH-OPEN'
     ? ' If another Goldfish launch is still running, start only one Goldfish launch at a time on Windows and wait for it to return before the next.'
@@ -78,6 +82,33 @@ export function describeWindowsAuthorityRefusal({ reason, platform = process.pla
       : `Path: ${cause.path}. Preview (changes nothing): ${commands[0].command} . Apply (you run it): ${commands[1].command} .`;
   });
   return ` ${rows.join(' ')}${rest}`;
+}
+
+const pauseMilliseconds = ms => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
+
+/**
+ * E4: a second concurrent Goldfish launch on Windows must not fail with WIN-AUTH-OPEN merely because the first is running.
+ * `prepare` returns the launch preparation result ({ ok, code, reason, repair? }). A WIN-AUTH-OPEN refusal on Windows while the
+ * readiness probe finds every folder readable is contention on a file the first launch holds: the preparation is retried a bounded
+ * number of times, then fails with the sequential rule and the one command that waits for the first launch. Another platform,
+ * another reason, a folder that really cannot be opened or a probe that cannot judge returns the first result unchanged.
+ * Platform, probe and pause are injected.
+ */
+export function prepareWithWindowsContentionRetry({ prepare, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness, sleep = pauseMilliseconds, attempts = 3, pauseMs = 400, waitCommand } = {}) {
+  const contended = result => platform === 'win32' && result?.ok === false && result.reason === 'WIN-AUTH-OPEN';
+  let result = prepare();
+  if (!contended(result)) return result;
+  let causes = null;
+  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? null; } catch { causes = null; }
+  if (!Array.isArray(causes) || causes.length !== 0) return result;
+  for (let attempt = 1; attempt < attempts; attempt += 1) {
+    sleep(pauseMs);
+    result = prepare();
+    if (!contended(result)) return result;
+  }
+  const wait = typeof waitCommand === 'string' && waitCommand !== '' ? ` Wait for the first launch with: ${waitCommand} ; then launch again.` : '';
+  return { ...result, contention: true,
+    repair: `Another Goldfish launch still holds the session authority registry and every folder opens fine, so this is not a permission fault. On Windows start only one Goldfish launch at a time.${wait}` };
 }
 
 /** The injected probe is called once per distinct path; it must only observe, never repair. */

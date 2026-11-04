@@ -28,6 +28,15 @@ const HASH_RE = /^[a-f0-9]{64}$/u;
 
 export const SLICING_NUDGE = "Slicing default: if the remaining work is >=3 independent work packages with disjoint declared write scopes, no dependency edge, and a safe commit surface (worktree isolation, at most one committing slice, or a sequenced round), consider native parallel subagent dispatch. This is a nudge, never a requirement: sequential work needs no justification.";
 
+// E4: native Windows runs one Goldfish launch at a time (the session authority registry is not proven for concurrent launches
+// there), so the parallel offer appears only on the other platforms and Windows gets the sequential rule instead.
+export const SLICING_SEQUENTIAL_NUDGE = "Slicing default: on this platform run one Goldfish launch at a time and wait for it to return before the next; native parallel subagent dispatch is not supported here, so the remaining work packages are worked sequentially. This is the rule, not a nudge to override.";
+
+/** The slicing hint for a platform: the parallel offer where parallel dispatch is supported, the sequential rule otherwise. */
+export function slicingNudge(platform = process.platform) {
+  return platform === "win32" ? SLICING_SEQUENTIAL_NUDGE : SLICING_NUDGE;
+}
+
 function hash(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -206,7 +215,7 @@ export function observeCodexSlicing(input, eventName = "PreToolUse", options = {
       state.serialRun += 1;
       if (state.serialRun === NATIVE_SLICING_THRESHOLD && !state.serialNudgeDelivered) {
         state.serialNudgeDelivered = true;
-        return { due: true, output: SLICING_NUDGE };
+        return { due: true, output: slicingNudge(options.platform) };
       }
       return { due: false, output: null };
     }
@@ -215,7 +224,7 @@ export function observeCodexSlicing(input, eventName = "PreToolUse", options = {
       if (pending < NATIVE_SLICING_THRESHOLD) return { due: false, output: null };
       const batch = hash(pendingPlanSet(inputValue));
       if (!boundedPush(state.planBatches, batch, MAX_SEEN)) return { due: false, output: null };
-      return { due: true, output: SLICING_NUDGE };
+      return { due: true, output: slicingNudge(options.platform) };
     }
     return { due: false, output: null };
   });
@@ -276,6 +285,6 @@ export function deliverAntigravitySlicing(input, options = {}) {
     // This documented PreInvocation identity is the only group key carried
     // into subsequent PreToolUse events; repeated PreInvocation is harmless.
     state.activeInvocation = invocationNum;
-    return { due, output: due ? SLICING_NUDGE : null };
+    return { due, output: due ? slicingNudge(options.platform) : null };
   });
 }

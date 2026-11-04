@@ -8,13 +8,19 @@ import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 
-const HELPER_SHA256='e53c759fe421781ca45802cf5d96c4a0c2709c8d0490c58972a14b8f68171679';
+const HELPER_SHA256='77c9f91c1497c0b95bf0f38214a34dc339c4786cea03a939e59a470cbab71242';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const exact=(value,keys)=>object(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
 const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[a-f0-9]{64}$/u;
-function fail(reason,committed=false){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;throw error;}
+// Q10: the failure envelope may carry the one path the native open failed on (optional, bounded, no control characters).
+const FAILED_PATH_MAX=4096;
+let lastFailedPath=null;
+/** The failed path of the most recent native failure in this process, or null when that failure carried none. */
+export function lastWindowsAuthorityFailedPath(){return lastFailedPath;}
+const failedPathValue=value=>typeof value==='string'&&value.length>0&&value.length<=FAILED_PATH_MAX&&!/[\u0000-\u001f\u007f]/u.test(value);
+function fail(reason,committed=false,failedPath=undefined){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;lastFailedPath=failedPath??null;if(failedPath!==undefined)error.failedPath=failedPath;throw error;}
 function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
 function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
 // Opt-in authority trace (diagnostics only): plain module-level counters of every native spawn made here.
@@ -64,6 +70,7 @@ function invokeNative(request){
  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
  let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
+ if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);
  if(request.operation==='inspect-source-image'){if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','size','sha256','committed'])||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts)||!Number.isSafeInteger(value.size)||value.size<0||value.size>134217728||! /^[a-f0-9]{64}$/u.test(value.sha256))fail('WIN-AUTH-NATIVE-OUTPUT');const parts=value.facts.split(':');if(parts.length!==12||BigInt(parts[3])<1n||(BigInt(parts[5])<<32n)+BigInt(parts[6])!==BigInt(value.size))fail('WIN-AUTH-NATIVE-OUTPUT');return value;}
  if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','bytes','committed'])||value.ok!==true||typeof value.committed!=='boolean'||typeof value.facts!=='string'||(value.facts!=='removed'&&!factsPattern.test(value.facts)))fail('WIN-AUTH-NATIVE-OUTPUT');
  return value;

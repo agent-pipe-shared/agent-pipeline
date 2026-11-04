@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { buildHandle, executableIdentity, runProbe } from "../tool-identity.mjs";
+import { buildHandle, executableIdentity } from "../tool-identity.mjs";
+import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
 export function probeSemgrep({ executablePath, rootDir, tempDir }, deps = {}) {
   const observed = executableIdentity(executablePath); if (!observed.ok) return observed;
   const scratch = mkdtempSync(join(tempDir, "pipeline-semgrep-preflight-"));

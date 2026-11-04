@@ -4038,6 +4038,12 @@
       "nonOverlapNote": "Unique w168 suite for the Windows native run findings (Q10, E2, W1, W2, W7); the readiness decision suite and the enforcement pins keep their own contracts."
     },
     {
+      "name": "win-authority-rest-tests",
+      "file": "plugins/pipeline-core/scripts/win-authority-rest.test.mjs",
+      "invariantPinned": "The PowerShell failure envelope carries the failed path as an optional bounded key that the backend validates and the refusal text prints; the security readiness probes retry once on EPERM; update-public-handover keeps Current state consistent with Next action and dates the handover; the slicing hint offers parallel dispatch only where it is supported; a second concurrent launch on Windows is retried as contention and then refused with the sequential rule and the wait command.",
+      "nonOverlapNote": "Unique w172 suite for the remaining native Windows findings (Q10 ps1 half, W3, W6, E4); the w168 suite, the readiness decision suite and the helper pins keep their own contracts."
+    },
+    {
       "name": "windows-authority-readiness-tests",
       "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
       "invariantPinned": "Windows authority readiness aggregates closed project, plugin and private path observations, refuses inherited mutation and unknown native causes, and remains read-only.",

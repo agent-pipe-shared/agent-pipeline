@@ -11165,6 +11165,40 @@ function runEnrollmentRetirement(sub,rest){
  }catch(error){console.error(`Enrollment retirement refused: ${error.code??error.message}`);return 2;}
 }
 
+/**
+ * W6: the explicit `update-public-handover` also keeps the handover's "## Current state" section consistent with the "## Next
+ * action" block it just updated, and dates the handover. Two managed lines lead the section: a `**Last updated:** YYYY-MM-DD` date
+ * (the field the bootstrap confirmation line prints) and the same `**Lifecycle phase:**` marker the Next action block carries. The
+ * generated kickoff sentence "Feature `id` is active in <phase>" follows the phase for the same feature. Everything else in the
+ * section stays byte for byte. A handover without that section is not touched. Returns "updated", "current" or "absent".
+ */
+export function syncPublicCurrentState(dir, state, handoverPath, nowIso) {
+  const path = join(dir, handoverPath);
+  let markdown;
+  try { markdown = readFileSync(path, "utf8"); } catch { return "absent"; }
+  const lines = markdown.split("\n");
+  const start = lines.findIndex(line => line.trim() === "## Current state");
+  if (start < 0) return "absent";
+  const following = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+  const end = following < 0 ? lines.length : following;
+  const feature = state?.activeFeature;
+  const active = feature && typeof feature.id === "string" && typeof feature.phase === "string";
+  const marker = active ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\`` : "**Lifecycle phase:** no active feature";
+  const date = String(nowIso ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) return "absent";
+  const body = lines.slice(start + 1, end)
+    .filter(line => !line.startsWith("**Lifecycle phase:**") && !line.startsWith("**Last updated:**"))
+    .map(line => {
+      const match = active ? /^Feature `([^`]+)` is active in [a-z-]+( \(PO profile: `[^`]+`\))?\.$/u.exec(line) : null;
+      return match !== null && match[1] === feature.id ? `Feature \`${feature.id}\` is active in ${feature.phase}${match[2] ?? ""}.` : line;
+    });
+  while (body.length > 0 && body[0] === "") body.shift();
+  const rebuilt = [...lines.slice(0, start + 1), "", `**Last updated:** ${date}`, marker, "", ...body, ...(body.length === 0 ? [""] : []), ...lines.slice(end)].join("\n");
+  if (rebuilt === markdown) return "current";
+  try { writeFileSync(path, rebuilt, "utf8"); } catch { return "absent"; }
+  return "updated";
+}
+
 function runStateSource(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
@@ -13722,7 +13756,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     case "update-public-handover": {
       if (rest.length !== 0) return 2;
       const result = updatePublicHandoverDuty(dir, base);
-      console.log(JSON.stringify(result, null, 2));
+      // W6: the Current state section follows the Next action block it was just kept consistent with (and carries the date).
+      const currentState = result.status === "current" ? syncPublicCurrentState(dir, base, result.path, now()) : "absent";
+      console.log(JSON.stringify({ ...result, currentState }, null, 2));
       return result.status === "current" ? 0 : 2;
     }
     case "inspect": {

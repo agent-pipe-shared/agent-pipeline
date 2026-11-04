@@ -131,15 +131,16 @@ public static class PipelineOwnedAuthorityNative {
  [StructLayout(LayoutKind.Sequential)] struct Disposition { public byte Delete; }
  [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetFileInformationByHandle(SafeFileHandle h,int type,ref Disposition info,uint size);
  public static string CurrentSid { get { return WindowsIdentity.GetCurrent().User.Value; } }
- static Exception Refuse(string code) { return new InvalidOperationException(code); }
+ public static string FailedPath=null;
+ static Exception Refuse(string code,string path=null) { if(path!=null)FailedPath=path;return new InvalidOperationException(code); }
  public static string Hash(byte[] b) { using(var h=SHA256.Create())return String.Concat(h.ComputeHash(b).Select(v=>v.ToString("x2"))); }
  static string Canonical(string p) { if(String.IsNullOrEmpty(p)||p.Length>32768||p.IndexOf('\0')>=0)throw Refuse("WIN-AUTH-PATH"); string full=Path.GetFullPath(p); if(!String.Equals(full,p,StringComparison.OrdinalIgnoreCase)||p.StartsWith(@"\\")||p.Substring(2).Contains(":"))throw Refuse("WIN-AUTH-PATH"); return full.TrimEnd('\\'); }
  static string Final(SafeFileHandle h) { var b=new StringBuilder(32768);uint n=GetFinalPathNameByHandleW(h,b,32768,0);if(n==0||n>=32768)throw Refuse("WIN-AUTH-FINAL-PATH");string p=b.ToString();if(p.StartsWith(@"\\?\"))p=p.Substring(4);return p.TrimEnd('\\'); }
- public static SafeFileHandle Open(string p,bool directory,bool write=false,bool privateOnly=true) { Canonical(p);var h=CreateFileW(p,0x80000000u|0x00020000u|(write?0x40000000u:0u),1,IntPtr.Zero,3,0x00200000u|(directory?0x02000000u:0u),IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,directory,privateOnly);return h;}catch{h.Dispose();throw;} }
+ public static SafeFileHandle Open(string p,bool directory,bool write=false,bool privateOnly=true) { Canonical(p);var h=CreateFileW(p,0x80000000u|0x00020000u|(write?0x40000000u:0u),1,IntPtr.Zero,3,0x00200000u|(directory?0x02000000u:0u),IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}try{Verify(h,p,directory,privateOnly);return h;}catch{h.Dispose();throw;} }
  // Publication keeps one live, write-capable directory custody handle through move and flush.
  // Compatible WRITE sharing is restricted to this parent; DELETE sharing remains refused.
  // Private-file and temp handles retain their original exclusive sharing/custody checks.
- static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
+ static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
  // Non-private paths are ordinary host/project/source integrity observations: owner and ACL bytes stay hashed into the facts, but their owner or write grants do not gate onboarding or source reads. Private Pipeline authority retains the strict current-SID owner and protected-DACL policy.
  static string HardenedRoot(string p) { string[] parts=p.Split('\\');for(int i=1;i+1<parts.Length;i++){if(String.Equals(parts[i],"agent-pipeline",StringComparison.OrdinalIgnoreCase)&&String.Equals(parts[i-1],".git",StringComparison.OrdinalIgnoreCase))return String.Join("\\",parts,0,i+1);}return null; }
  public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false,bool humanControlled=false) {
@@ -170,7 +171,7 @@ public static class PipelineOwnedAuthorityNative {
  }
  public static string InspectSourceImage(string p,out string facts,out long size) {
   Canonical(p);var h=CreateFileW(p,0x80020000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);
-  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
+  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
   using(h){string before=Verify(h,p,false,false,true);long firstSize,secondSize;
    string first=ImagePass(h,out firstSize),middle=Verify(h,p,false,false,true),second=ImagePass(h,out secondSize),after=Verify(h,p,false,false,true);
    if(before!=middle||middle!=after||firstSize!=secondSize||first!=second)throw Refuse("WIN-AUTH-RACE");facts=after;size=secondSize;return second;
@@ -185,14 +186,14 @@ public static class PipelineOwnedAuthorityNative {
  public static string AncestorAboveRoot(string p,string boundary) {
   if(!StrictlyAbove(p,boundary))throw Refuse("WIN-AUTH-INPUT");
   var h=CreateFileW(p,0x80000000u|0x00020000u,1,IntPtr.Zero,3,0x00200000u|0x02000000u,IntPtr.Zero);
-  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
+  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
   using(h)return Verify(h,p,true,false,false,true);
  }
  public static bool Published=false;
  public static string Remove(string p,string expected,string expectedFacts) {
   using(var parent=Open(Path.GetDirectoryName(p),true,true)){
    if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");
-   var h=CreateFileW(p,0x80030000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
+   var h=CreateFileW(p,0x80030000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
    using(h){string facts=Verify(h,p,false,true);if(facts!=expectedFacts||Hash(Pass(h,1048576))!=expected)throw Refuse("WIN-AUTH-CAS");var d=new Disposition{Delete=1};if(!SetFileInformationByHandle(h,4,ref d,1))throw Refuse("WIN-AUTH-REMOVE");Published=true;}
    if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");if(File.Exists(p)||Directory.Exists(p))throw Refuse("WIN-AUTH-REMOVE-READBACK");return "removed";
   }
@@ -258,6 +259,7 @@ try {
 } catch {
   $e=$_.Exception;while($e.InnerException){$e=$e.InnerException}
   $code='WIN-AUTH-NATIVE-UNAVAILABLE';if($e.Message -match '^WIN-AUTH-[A-Z-]{1,64}$'){$code=$e.Message}
-  [pscustomobject]@{ok=$false;code=$code;committed=[PipelineOwnedAuthorityNative]::Published}|ConvertTo-Json -Compress
+  $out=[ordered]@{ok=$false;code=$code;committed=[PipelineOwnedAuthorityNative]::Published};$failed=[PipelineOwnedAuthorityNative]::FailedPath;if($code -eq 'WIN-AUTH-OPEN' -and $null -ne $failed -and $failed.Length -le 4096){$out['path']=$failed}
+  [pscustomobject]$out|ConvertTo-Json -Compress
   exit 1
 }

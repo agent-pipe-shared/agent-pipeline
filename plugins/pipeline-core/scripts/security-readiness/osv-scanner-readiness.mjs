@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
-import { buildHandle, executableIdentity, runProbe } from "../tool-identity.mjs";
+import { buildHandle, executableIdentity } from "../tool-identity.mjs";
+import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
 export function probeOsvScanner({ executablePath, rootDir, tempDir }, deps = {}) {
   const observed = executableIdentity(executablePath); if (!observed.ok) return observed;
   const version = runProbe(observed.identity.realPath, ["--version"], { cwd: rootDir, tempDir, ...deps }); if (!version.ok) return version;

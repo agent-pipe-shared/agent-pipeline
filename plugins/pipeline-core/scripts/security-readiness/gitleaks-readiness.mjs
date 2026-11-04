@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
-import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe } from "../tool-identity.mjs";
+import { buildHandle, executableIdentity, resolveSystemExecutable } from "../tool-identity.mjs";
+import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
 
 const GITLEAKS_MODULE = "github.com/zricethezav/gitleaks/v8";
 
