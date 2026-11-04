@@ -164,6 +164,8 @@ export const POWERSHELL_ADMITTED_SHAPES = [
   { spelling: "Set-Content or Add-Content for a scratch file", example: POWERSHELL_GRAMMAR_EXAMPLES.contentWrite },
   { spelling: "a read-only git observation: the same read-only subcommands the Bash grammar admits (status, log, diff, show, rev-parse, ls-files, ...); never commit, push, add, reset or checkout",
     example: "git status --short" },
+  { spelling: "the version probes `node --version`, `node -v` and `git --version`, and a read-only `rg` search with the same rules as the Bash grammar (no quote, comma, parenthesis or brace in an argument); shell builtins and aliases such as cat, ls and find are not admitted in PowerShell",
+    example: "node --version" },
   { spelling: "a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it",
     example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect" },
   { spelling: "`--help` of a sanctioned Pipeline script, and in a ready session the read-only plan, inspect and binding verbs (continuity-authority-revision-plan, continuity-result-bootstrap-plan, dispatch-briefing binding)",

@@ -153,6 +153,10 @@ export function powerShellScopeVerdict(input, root, dependencies) {
   }
   const { executable, argv } = parsed.segments[0];
   const name = basename(executable).toLowerCase();
+  // E7 (candidate 19, PO decision 2026-11-04): the Bash tool admits the version probes of node and git; the PowerShell tool refused them (measured on a
+  // native Windows consumer). Exactly these three spellings, for the literal bare executable only (never a path); no other flag, no other argument.
+  if ((["node", "node.exe"].includes(executable.toLowerCase()) && argv.length === 1 && (argv[0] === "--version" || argv[0] === "-v"))
+    || (["git", "git.exe"].includes(executable.toLowerCase()) && argv.length === 1 && argv[0] === "--version")) return verdict(0);
   if (name === "new-item") {
     const named = powerShellNamedArgs(argv, ["-path", "-itemtype"], ["-force"]);
     const target = named?.values.get("-path");
@@ -198,6 +202,12 @@ export function powerShellScopeVerdict(input, root, dependencies) {
   if (["git", "git.exe"].includes(bareExecutable)
     && !argv.some((arg) => /[(){},]/u.test(arg))
     && isReadOnlyDiagnosticCommand(["git", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
+  // E7 (candidate 19, PO decision 2026-11-04): `rg` is the same native program in both shells, so a read-only search gets the verdict the Bash grammar gives
+  // the same words, with the same refusal of characters PowerShell reads as syntax. Builtins and aliases (`cat`, `ls`, `find`, `sed`) mean something else
+  // in PowerShell than the Bash grammar validated and stay refused.
+  if (["rg", "rg.exe"].includes(bareExecutable)
+    && !argv.some((arg) => /[(){},]/u.test(arg))
+    && isReadOnlyDiagnosticCommand(["rg", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
   if (["git", "git.exe"].includes(bareExecutable)
     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })

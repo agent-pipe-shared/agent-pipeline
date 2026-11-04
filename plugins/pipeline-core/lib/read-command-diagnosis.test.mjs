@@ -155,6 +155,30 @@ test("RCD17: a refused short-flag cluster gets the split spelling only when the 
   assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "the diagnosed command itself stays refused");
 });
 
+async function powershellVerdict(command) {
+  const guard = await import("../hooks/guard-lifecycle-ready.mjs");
+  return guard.evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, {
+    projectDir: root, runner: "claude",
+    inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
+  });
+}
+
+test("RCD18: the PowerShell tool admits the node and git version probes and a read-only rg exactly like the Bash grammar, and nothing wider", async () => {
+  for (const command of ["node --version", "node -v", "git --version", "git status --short", "git log --oneline -n 3", "rg -n needle README.md"]) {
+    assert.equal((await powershellVerdict(command)).exitCode, 0, command);
+  }
+  for (const command of [
+    "node --eval 1", "node --version --help", "git --version --help", "git push origin main", "git checkout main",
+    "rg --hidden needle README.md", "rg -n needle ../outside.txt", "rg -n a,b README.md",
+    "cat README.md", "ls docs", "find docs -maxdepth 1",
+    "C:/tools/git.exe --version", "C:/tools/node.exe --version",
+  ]) {
+    const result = await powershellVerdict(command);
+    assert.equal(result.exitCode, 2, command);
+    assert.match(String(result.stderr), /GUARD-/u, command);
+  }
+});
+
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
   const command = "rg --hidden needle README.md";
   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
