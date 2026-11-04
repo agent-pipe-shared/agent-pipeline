@@ -3250,6 +3250,18 @@ function commandOfferDigests({ repo, repository, policy, toolName, eligiblePaths
  * hook, where a throw would replace a typed refusal with an unroutable crash
  * (the exact defect ADR-0059 Decision 4 already had to close once).
  */
+/**
+ * True only when the route puts a command in front of the human: a non-empty `command` or `copyCommand` in its action. The route
+ * builders disclose a command only for a non-secret Bash input (recoveryRoute, HGO-EXTERNAL-PROJECT-BOUNDARY); every other
+ * external-operator route carries a tool name and a digest and nothing to run.
+ */
+function routeHandsCommandToHuman(route) {
+  const action = route?.nextAction?.action;
+  if (!object(action)) return false;
+  return (typeof action.command === "string" && action.command.length > 0)
+    || (typeof action.copyCommand === "string" && action.copyCommand.length > 0);
+}
+
 function journaledExternalOperatorRoute(route, {
   repo, repository, pluginRoot, toolName, denials, eligiblePaths, nowMs, appendCommandOffer,
 }) {
@@ -3850,9 +3862,11 @@ export function recordHumanGuardDenial({
       pluginRoot,
       repository,
     });
-    // Only the external-operator routes hand a human a copy-only command, so only
-    // they need a journaled offer first; every other route is returned unchanged.
-    return route.status === "external-operator-required"
+    // Only a route that really hands a human a command needs a journaled offer first (R-AC-08: the offer exists BEFORE a command is
+    // handed over). A route that carries no command (a read the adapter cannot attest, sensitive input, a file outside the project)
+    // hands over nothing, so it is returned at once: PO decision 2026-11-04 (a Windows consumer measured 144 s of plugin-identity
+    // hashing and journaling under the registry lock for such a refusal). Every other route is returned unchanged.
+    return route.status === "external-operator-required" && routeHandsCommandToHuman(route)
       ? journaledExternalOperatorRoute(route, {
         repo,
         repository,
