@@ -337,7 +337,12 @@ Decisions the PO took on 2026-11-04 (evening), all built and rehearsed (c19k), n
 3. Control-plane script scan: no exemption.
 4. Critic preimage: re-pinned as a held patch: w202.
 
-Apply order of the 19c script now ends: ... w199 w200 w201 w202 w203 (stepjs), then the derived-files refresh.
+Apply order of the 19c script now ends: ... w199 w200 w201 w202 w203 (stepjs) w204, then the derived-files refresh.
+
+PO decision 2026-11-04 (late): take Q2 and F9 on, drop the rest of EL-19 for now (the `profile !== "mini"` approximation stays as built in w181; no rigor/risk data source is added).
+- w204 (Q2 control-root half, F9 rest): `ls -la` on the control root is refused because a protected directory is listed as names only (`isNamesOnlyLsArgs`), while the refusal named only the flag; it reproduces against the real repository root (not in a bare clone, which has no protected control root). The refusal now prints the admitted listing spellings for a refused `ls` flag and the split spelling for a short-flag cluster (`rg -ln` to `rg -l -n`), the latter only when the grammar admits it. Appended inside the existing `Rejected element` parenthesis, so no pinned text was reworded and no coordinated test pass was needed. `read-command-diagnosis` 17/17, pinned-text neighbours 57 pass, `guard-lifecycle-ready` 427 pass, 0 fail. Rehearsal c19l of the whole script: exit 0, registration 1174, case-completion 389, gitleaks 0 unsuppressed. Still open in F9: nothing built beyond the glob, attached-value, cluster and listing hints; the generic "not a path" sentence is untouched.
+
+Windows consumer probe, stage 1 (baseline, installed plugin 95d3e8145, `evidence/windows-consumer-probe-stage1-baseline-result.md`): no `WIN-AUTH-*` cause (Q10 untested), `dead-anchor` right after a `reanchored` preflight line (E2), no pending host-commit state with an `NGHF-PENDING-UNAVAILABLE` stop failure on record (supports the E1 hypothesis), the PowerShell tool admits only contained literal reads while Bash admits all eight probe commands (E7 measured). Stage 2 (live dispatches for E1 and E4) needs the consumer owner's explicit go.
 
 Only a real run can close: native Windows (E1, E2, E4, E7, Q10), real runner runs, hook activation, the own Critic review of the late-binding chain and D3, the stamp of 19c (on the PO's call), the PO's install and acceptance.
 ## End note: derived files
