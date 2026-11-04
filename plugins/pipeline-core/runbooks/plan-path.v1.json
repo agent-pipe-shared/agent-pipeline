@@ -1,0 +1,261 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "plan",
+  "generatedFrom": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs (buildInspectNextAction verbs)",
+    "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs"
+  ],
+  "notGenerated": [
+    "which branch applies now (inspect prints the structural nextAction for the current state)"
+  ],
+  "steps": [
+    {
+      "id": "inspect",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs inspect",
+      "needs": [
+        "run from the repository root"
+      ],
+      "evidenceSchema": "pipeline.inspect.v1",
+      "producer": "read-only JSON: lifecycle status, the structural nextAction and the continuity drift",
+      "humanGate": false,
+      "next": [
+        "set-feature",
+        "submit-plan",
+        "present-plan",
+        "approve-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "inspect",
+        "argv": [
+          "inspect"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "set-feature",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs set-feature --id <feature-id> --plan-path <prd-path> --spec-path <spec-path>",
+      "needs": [
+        "the PRD and the Spec are authored in the work tree"
+      ],
+      "evidenceSchema": null,
+      "producer": "activeFeature in pipeline state, lifecycle draft",
+      "humanGate": false,
+      "next": [
+        "submit-plan"
+      ],
+      "commit": "commit the authored PRD and Spec before submitting",
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "set-feature",
+        "argv": [
+          "set-feature",
+          "--id",
+          "<feature-id>",
+          "--plan-path",
+          "<prd-path>",
+          "--spec-path",
+          "<spec-path>"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "submit-plan",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>",
+      "needs": [
+        "a complete PRD and Spec (no framing placeholder text; the architecture design for epic and feature profiles)"
+      ],
+      "evidenceSchema": null,
+      "producer": "plan submission bound to the PRD and Spec digests, lifecycle awaiting-approval",
+      "humanGate": false,
+      "next": [
+        "present-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "submit-plan",
+        "argv": [
+          "submit-plan",
+          "--by",
+          "<name>",
+          "--profile",
+          "<epic|feature|mini>"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "present-plan",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs present-plan --by <name> --review-receipt <review-receipt-path>",
+      "needs": [
+        "a submitted plan",
+        "a tracked design review receipt (at most two --review-receipt)"
+      ],
+      "evidenceSchema": null,
+      "producer": "plan presentation record bound to the exact submission, and the design approval request file under scratch/",
+      "humanGate": false,
+      "next": [
+        "sign-intent",
+        "approve-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "present-plan",
+        "argv": [
+          "present-plan",
+          "--by",
+          "<name>",
+          "--review-receipt",
+          "<review-receipt-path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "sign-intent",
+      "who": "po-only",
+      "command": "node <plugin-root>/scripts/po-human-approval.mjs sign-intent --repo-root <root> --request <design-approval-request-path>",
+      "needs": [
+        "signature mode (gates.push_approval); the presented plan and its approval request file"
+      ],
+      "evidenceSchema": null,
+      "producer": "the PO's detached proof for the exact approval request, run in the PO's own terminal",
+      "humanGate": true,
+      "next": [
+        "approve-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "po-human-approval.mjs",
+        "verb": "sign-intent",
+        "argv": [
+          "sign-intent",
+          "--repo-root",
+          "<root>",
+          "--request",
+          "<design-approval-request-path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "approve-plan",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs approve-plan --design-workflow-approval-request <design-approval-request-path>",
+      "needs": [
+        "the plan is presented",
+        "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"
+      ],
+      "evidenceSchema": null,
+      "producer": "plan approval recorded in pipeline state, lifecycle approved; continue with the implement runbook",
+      "humanGate": false,
+      "next": [],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "approve-plan",
+        "argv": [
+          "approve-plan",
+          "--design-workflow-approval-request",
+          "<design-approval-request-path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "reopen-design",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs reopen-design --by <name>",
+      "needs": [
+        "recovery: the plan or spec authority is stale or unavailable"
+      ],
+      "evidenceSchema": null,
+      "producer": "lifecycle returns to draft",
+      "humanGate": false,
+      "next": [
+        "set-feature",
+        "submit-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "reopen-design",
+        "argv": [
+          "reopen-design",
+          "--by",
+          "<name>"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "cancel-submitted-plan",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs cancel-submitted-plan --by <name> --submission-sha256 <sha256>",
+      "needs": [
+        "recovery: an unsigned submission that must be withdrawn"
+      ],
+      "evidenceSchema": null,
+      "producer": "cancellation receipt, lifecycle draft",
+      "humanGate": false,
+      "next": [
+        "submit-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "cancel-submitted-plan",
+        "argv": [
+          "cancel-submitted-plan",
+          "--by",
+          "<name>",
+          "--submission-sha256",
+          "<sha256>"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "cancel-mixed-plan-state",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs cancel-mixed-plan-state --by <name> --reason <reason> --submission-sha256 <sha256> --approval-sha256 <sha256> --invalidation-sha256 <sha256>",
+      "needs": [
+        "recovery: a current submission next to an invalidated historical approval"
+      ],
+      "evidenceSchema": null,
+      "producer": "recovery record, lifecycle draft",
+      "humanGate": false,
+      "next": [
+        "submit-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "cancel-mixed-plan-state",
+        "argv": [
+          "cancel-mixed-plan-state",
+          "--by",
+          "<name>",
+          "--reason",
+          "<reason>",
+          "--submission-sha256",
+          "<sha256>",
+          "--approval-sha256",
+          "<sha256>",
+          "--invalidation-sha256",
+          "<sha256>"
+        ],
+        "closed": true
+      }
+    }
+  ]
+}

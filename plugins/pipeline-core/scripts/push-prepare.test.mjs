@@ -1650,11 +1650,21 @@ function d161RunCli(root, argv) {
   });
 }
 
+// QG-04 restatement (C19-G5): the close report now carries the additive typed `runbook` link of the push path. Every
+// pre-existing field is still compared exactly; the link is checked for its own shape and stripped before that comparison.
+function d161CloseReportWithoutRunbook(stdout) {
+  const { runbook, ...rest } = JSON.parse(stdout);
+  assert.equal(runbook.path, "runbooks/push-path.v1.json");
+  assert.equal(runbook.step, "layer-5c");
+  assert.match(runbook.digest, /^[0-9a-f]{64}$/u);
+  return rest;
+}
+
 test("D161 (d): push-prepare.mjs --close folds right after a landed push and leaves the tree clean", () => {
   const { root, head } = d161RealRepo({ pushed: true });
   const run = d161RunCli(root, ["--close"]);
   assert.equal(run.status, 0, run.stderr);
-  const printed = JSON.parse(run.stdout);
+  const printed = d161CloseReportWithoutRunbook(run.stdout);
   assert.deepEqual(printed, { schema: "pipeline.push-close-report.v1", folded: true, reason: null });
   assert.equal(run.stdout.trim().split("\n").length, 1, "one JSON result");
   assert.equal(checkWorkingTreeClean(root).ok, true);
@@ -1668,7 +1678,7 @@ test("D161 (d): --close refuses when the push did not land, and with a dirty tre
   const unpushed = d161RealRepo({ pushed: false });
   const refused = d161RunCli(unpushed.root, ["--close"]);
   assert.notEqual(refused.status, 0);
-  assert.deepEqual(JSON.parse(refused.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "landing-unverified" });
+  assert.deepEqual(d161CloseReportWithoutRunbook(refused.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "landing-unverified" });
   assert.equal(checkWorkingTreeClean(unpushed.root).ok, false, "nothing was committed");
 
   const pushed = d161RealRepo({ pushed: true });
@@ -1676,7 +1686,7 @@ test("D161 (d): --close refuses when the push did not land, and with a dirty tre
   gitAtFold(pushed.root, "add", "--", "other.txt");
   const dirty = d161RunCli(pushed.root, ["--close"]);
   assert.notEqual(dirty.status, 0);
-  assert.deepEqual(JSON.parse(dirty.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "other-dirty-paths" });
+  assert.deepEqual(d161CloseReportWithoutRunbook(dirty.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "other-dirty-paths" });
 });
 
 test("D161 (d): the default remoteCommit read is exact-match, hex-checked and fail-closed", () => {

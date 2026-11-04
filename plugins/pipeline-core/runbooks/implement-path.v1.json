@@ -1,0 +1,167 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "implement",
+  "generatedFrom": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "plugins/pipeline-core/scripts/dispatch-briefing.mjs",
+    "plugins/pipeline-core/scripts/dispatch-record-write.mjs"
+  ],
+  "notGenerated": [
+    "the briefing package content and the project's verify command (project calibration)"
+  ],
+  "steps": [
+    {
+      "id": "inspect",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs inspect",
+      "needs": [
+        "run from the repository root"
+      ],
+      "evidenceSchema": "pipeline.inspect.v1",
+      "producer": "read-only JSON: lifecycle status, the structural nextAction and the continuity drift",
+      "humanGate": false,
+      "next": [
+        "set-phase",
+        "materialize-push-threat-model"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "inspect",
+        "argv": [
+          "inspect"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "set-phase",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs set-phase --phase implementation",
+      "needs": [
+        "the plan is approved (inspect status approved)"
+      ],
+      "evidenceSchema": null,
+      "producer": "feature phase implementation; implementation writes are admitted",
+      "humanGate": false,
+      "next": [
+        "dispatch-briefing"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "set-phase",
+        "argv": [
+          "set-phase",
+          "--phase",
+          "implementation"
+        ],
+        "closed": true
+      }
+    },
+    {
+      "id": "dispatch-briefing",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md",
+      "needs": [
+        "a closed pipeline.dispatch-briefing-package.v1 file naming the model, scope and checks"
+      ],
+      "evidenceSchema": "pipeline.dispatch-briefing-package.v1",
+      "producer": "the briefing text under scratch/, built from the goldfish-task template",
+      "humanGate": false,
+      "next": [
+        "dispatch"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "dispatch-briefing.mjs",
+        "verb": "build",
+        "argv": [
+          "build",
+          "--package",
+          "<package.json>",
+          "--out",
+          "scratch/<briefing>.md"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "dispatch",
+      "who": "agent",
+      "command": "dispatch the Goldfish from the built briefing with its pipeline-core agent type (tool-layer model parameter set)",
+      "needs": [
+        "the built briefing"
+      ],
+      "evidenceSchema": null,
+      "producer": "the Goldfish report and its changes in the work tree",
+      "humanGate": false,
+      "next": [
+        "dispatch-record-write"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "dispatch-record-write",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <root> --request <request.json>",
+      "needs": [
+        "the Goldfish report"
+      ],
+      "evidenceSchema": null,
+      "producer": "evidence/dispatch-record-<TASK_ID>.json with a terminal outcome",
+      "humanGate": false,
+      "next": [
+        "verify"
+      ],
+      "commit": "commit the work with the AI-Assisted and Dispatch trailers; the record must cover the committed paths",
+      "catalogue": {
+        "script": "dispatch-record-write.mjs",
+        "verb": "--request",
+        "argv": [
+          "--repo-root",
+          "<root>",
+          "--request",
+          "<request.json>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "verify",
+      "who": "agent",
+      "command": "<the project's verify command from its calibration, e.g. node harness/scripts/verify.mjs>",
+      "needs": [
+        "the work is committed"
+      ],
+      "evidenceSchema": null,
+      "producer": "the Verify evidence file for the candidate commit",
+      "humanGate": false,
+      "next": [],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "materialize-push-threat-model",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model",
+      "needs": [
+        "the push gate needs a push threat model and project/push-threat-model.md is absent (inspect offers this step then)"
+      ],
+      "evidenceSchema": null,
+      "producer": "the governed template file project/push-threat-model.md",
+      "humanGate": false,
+      "next": [],
+      "commit": "commit project/push-threat-model.md with the Close commit",
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "materialize-push-threat-model",
+        "argv": [
+          "materialize-push-threat-model"
+        ],
+        "closed": true
+      }
+    }
+  ]
+}

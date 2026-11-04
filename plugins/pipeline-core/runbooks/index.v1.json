@@ -6,6 +6,30 @@
       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
       "schema": "pipeline.runbook.v1",
       "sha256": "44c65340ec00f845442b3c483086d48a00a475be4516b584d01f36b8fdc365e9"
+    },
+    {
+      "pathId": "start",
+      "path": "plugins/pipeline-core/runbooks/start-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "7d15deded853c1e851cc81fb3898dd7ebc725a429e6d96c1f6c1afd933300e2e"
+    },
+    {
+      "pathId": "plan",
+      "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "1877baa016dd052711cb4419e764030b1f5bd202fa1f760906d3ffebfecb1be8"
+    },
+    {
+      "pathId": "implement",
+      "path": "plugins/pipeline-core/runbooks/implement-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "10c8f23289d1cb086c76cf8adbcd8d359013c3e33d253aebb6fcf71fc6be0dfe"
+    },
+    {
+      "pathId": "push",
+      "path": "plugins/pipeline-core/runbooks/push-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "be09a0fed85c41ab749e3d66a95115455909e4922f435155bf5b46c898c762ef"
     }
   ]
 }

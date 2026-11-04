@@ -495,6 +495,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Candidate 19 (D4b/E3): the record-only path set and the stable freshness codes are imported by the push gate sources above (GMWKC01).
   "plugins/pipeline-core/lib/record-only-paths.mjs",
   "plugins/pipeline-core/lib/evidence-freshness-codes.mjs",
+  // Candidate 19 (G5): the runbook link of the first call of a standard command is imported by pipeline-state, the start preflight, push-prepare and push-init (GMWKC01).
+  "plugins/pipeline-core/lib/runbook-link.mjs",
   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
   // Its publication-gate evidence dependency must remain protected as well.
   "plugins/pipeline-core/scripts/audit-pack.mjs",

@@ -8,6 +8,12 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
 `plugins/pipeline-core` path in a consumer repository. `pipeline-state.mjs` reads the project directory from `CLAUDE_PROJECT_DIR`, else the current directory
 (there is no `--dir` flag). "PO" means a step only the human can run. Scratch files live under `scratch/`.
 
+Runbooks. Each path below also exists as a generated machine-readable runbook (`runbooks/<path>-path.v1.json` in the plugin, listed by
+`runbooks/index.v1.json`): the start, plan, implement, close and push paths, each step with its preconditions, exact command, evidence and next step.
+The first call of a standard command returns a typed `runbook` field `{ path, digest, step }` naming the runbook of its path and its own step (once per
+session and path, and always on a refusal); follow that runbook when this guide and the command's own output differ, because it is regenerated from the
+command tables.
+
 ## 1. Design
 
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.

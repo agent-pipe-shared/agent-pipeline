@@ -385,6 +385,7 @@ import {
 } from "node:fs";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture, inspectSpecCriterionRows } from "../lib/critic-accepted-contract.mjs";
+import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
 import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
 import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
@@ -11657,6 +11658,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "submit-plan": {
+      // C19-G5: the body runs unchanged inside this arrow so every one of its exits can append the typed runbook line below.
+      const submitCode = (() => {
       const by = flags.by;
       const profileName = flags.profile;
       if (isBlank(by) || !new Set(["epic", "feature", "mini"]).has(profileName)) {
@@ -11828,6 +11831,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
       console.log(`Briefing: ${summarizePlanApprovalBriefing(submittedBriefing)}`);
       return 0;
+      })();
+      const submitRunbook = runbookLine({ pathId: "plan", step: "submit-plan", refused: submitCode !== 0, rootDir: dir });
+      if (submitRunbook !== null) (submitCode === 0 ? console.log : console.error)(submitRunbook);
+      return submitCode;
     }
 
 
@@ -13813,7 +13820,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           },
         },
       };
-      console.log(JSON.stringify(payload, null, 2));
+      // C19-G5: the typed runbook link, as the last key. The path follows the lifecycle: plan approval, implementation, else the start path.
+      const inspectPath = payload.phase === "implementation" || payload.status === "approved" ? "implement"
+        : payload.status === "draft" || payload.status === "awaiting-approval" ? "plan" : "start";
+      const inspectRefused = lifecycle.ok === false || payload.nextAction?.kind === "repair-required";
+      console.log(JSON.stringify(attachRunbookLink(payload, { pathId: inspectPath, step: "inspect", refused: inspectRefused, rootDir: dir }), null, 2));
       return 0;
     }
 

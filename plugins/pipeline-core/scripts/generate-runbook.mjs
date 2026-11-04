@@ -22,13 +22,14 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { CLOSE_STEP_REQUIREMENTS, describeCloseActions, describeCloseChain } from "../lib/close-chain-guide.mjs";
+import { lifecycleRunbooks, PUSH_FLOW_DOC, RUNBOOK_SCHEMA, validateRunbook } from "../lib/runbook-paths.mjs";
 import { coordinatorNextPhases } from "./publication-close-journal.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PREFIX = "plugins/pipeline-core/";
 const CLOSE_PATH_FILE = `${PREFIX}runbooks/close-path.v1.json`;
 const INDEX_FILE = `${PREFIX}runbooks/index.v1.json`;
-export const RUNBOOK_FILES = Object.freeze([CLOSE_PATH_FILE, INDEX_FILE]);
+export const RUNBOOK_FILES = Object.freeze([CLOSE_PATH_FILE, ...["start", "plan", "implement", "push"].map((id) => `${PREFIX}runbooks/${id}-path.v1.json`), INDEX_FILE]);
 
 const canonical = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -65,8 +66,12 @@ function closeSteps() {
   return steps;
 }
 
-/** The generated files as { repo-relative path: canonical JSON text }. Pure and deterministic. */
-export function buildRunbookFiles() {
+const NEW_PATH_IDS = Object.freeze(["start", "plan", "implement", "push"]);
+const pathFileOf = (pathId) => `${PREFIX}runbooks/${pathId}-path.v1.json`;
+const readPushFlow = () => readFileSync(resolve(PLUGIN_ROOT, "..", "..", PUSH_FLOW_DOC), "utf8");
+
+/** The generated files as { repo-relative path: canonical JSON text }. Deterministic; `pushFlowText` replaces the push-flow doc (tests). */
+export function buildRunbookFiles({ pushFlowText = readPushFlow() } = {}) {
   const closePath = canonical({
     schema: "pipeline.runbook.v1",
     pathId: "close",
@@ -74,11 +79,20 @@ export function buildRunbookFiles() {
     notGenerated: ["quality-<id> rows (depend on repository state: closeQualityReadback)", "materialize-push-threat-model (depends on repository state: push threat model required and absent)"],
     steps: closeSteps(),
   });
+  const lifecycle = lifecycleRunbooks({ pushFlowText });
+  const files = { [CLOSE_PATH_FILE]: closePath };
+  for (const pathId of NEW_PATH_IDS) {
+    const problems = validateRunbook(lifecycle[pathId]);
+    if (problems.length > 0) throw Object.assign(new Error(`RUNBOOK-INVALID: ${pathId}: ${problems.join("; ")}`), { code: "RUNBOOK-INVALID" });
+    files[pathFileOf(pathId)] = canonical(lifecycle[pathId]);
+  }
   const index = canonical({
     schema: "pipeline.runbook-index.v1",
-    paths: [{ pathId: "close", path: CLOSE_PATH_FILE, schema: "pipeline.runbook.v1", sha256: createHash("sha256").update(closePath).digest("hex") }],
+    paths: ["close", ...NEW_PATH_IDS].map((pathId) => ({
+      pathId, path: pathFileOf(pathId), schema: RUNBOOK_SCHEMA, sha256: createHash("sha256").update(files[pathFileOf(pathId)]).digest("hex"),
+    })),
   });
-  return { [CLOSE_PATH_FILE]: closePath, [INDEX_FILE]: index };
+  return { ...files, [INDEX_FILE]: index };
 }
 
 const target = (root, rel) => join(root, rel.slice(PREFIX.length));
@@ -95,7 +109,12 @@ export function main(argv = process.argv.slice(2)) {
       return;
     }
   }
-  const files = buildRunbookFiles();
+  let files;
+  try { files = buildRunbookFiles(); } catch (error) {
+    process.stderr.write(`error: ${error?.message ?? "the runbooks could not be generated"}\n`);
+    process.exitCode = 2;
+    return;
+  }
   if (check) {
     for (const [rel, bytes] of Object.entries(files)) {
       let committed = null;

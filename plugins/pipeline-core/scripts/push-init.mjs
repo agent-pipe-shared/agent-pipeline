@@ -111,6 +111,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { classifyVerifiedDeliveryTail } from "../lib/critic-course-admission.mjs";
 import { withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
@@ -641,8 +642,10 @@ export function main(args = process.argv.slice(2), {
     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
   });
-  write(`${JSON.stringify(result, null, 2)}\n`);
-  return ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome) ? 0 : 1;
+  const ready = ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome);
+  // C19-G5: the typed runbook link (push path, the driver step) is added last, once per session, and always on a refusal.
+  write(`${JSON.stringify(attachRunbookLink(result, { pathId: "push", step: "driver", refused: !ready, rootDir: options.root }), null, 2)}\n`);
+  return ready ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());

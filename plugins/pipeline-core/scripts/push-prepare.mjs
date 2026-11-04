@@ -43,6 +43,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
@@ -983,18 +984,26 @@ export function pushCloseReport(deps = {}) {
   return { schema: PUSH_CLOSE_SCHEMA, folded: result.folded === true, reason: result.folded === true ? null : (result.reason ?? "unknown") };
 }
 
+/** C19-G5: the report plus the typed runbook link (push path; the driver step unless told otherwise), once per session, always when not ready. */
+export function withPushRunbook(report, { rootDir, step = "driver", refused = report?.ready !== true, env = process.env } = {}) {
+  return attachRunbookLink(report, { pathId: "push", step, refused, rootDir, env });
+}
+
 if (isDirectInvocation(import.meta.url) && process.argv.length === 3 && process.argv[2] === "--close") {
   const report = pushCloseReport();
-  process.stdout.write(`${JSON.stringify(report)}\n`);
+  const finished = report.folded || report.reason === "clean";
+  process.stdout.write(`${JSON.stringify(withPushRunbook(report, { rootDir: projectDir(), step: "layer-5c", refused: !finished }))}\n`);
   // D206: a clean tree after `approve-push` is the normal case now (the approval is private, nothing is
   // left to fold), so "clean" is a finished close, not a failure; every other no-fold reason still exits 1.
-  process.exit(report.folded || report.reason === "clean" ? 0 : 1);
+  process.exit(finished ? 0 : 1);
 } else if (isDirectInvocation(import.meta.url)) {
   const result = pushPrepareReport(process.argv.slice(2));
   if (!result.ok) {
     process.stderr.write(`${result.error}\n`);
+    const line = runbookLine({ pathId: "push", step: "driver", refused: true });
+    if (line !== null) process.stderr.write(`${line}\n`);
     process.exit(2);
   }
-  printReport(result);
+  printReport({ ...result, report: withPushRunbook(result.report, { rootDir: projectDir() }) });
   process.exit(result.report.ready ? 0 : 1);
 }

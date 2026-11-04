@@ -37,6 +37,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
 import { loadMapBundle } from "./module-inventory.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
@@ -1241,12 +1242,19 @@ function auditPackageIndex(root, coordinator) {
 
 // The close driver: one helper step over the existing plan/apply pairs, in the spirit of the onboarding driver. It never invents an input,
 // never applies a human-gate phase, and applies at most one transition per call; every refusal of transitionPlan/applyTransition passes through.
+// The runbook link of a drive call (C19-G5): the close-runbook step the call is about, set as soon as the drive knows it, and the root the
+// once-per-session marker lives under. Module state only because the refusal path of this script's catch block needs both.
+let driveStep = "checkpointed";
+let driveRoot = null;
+const driveRunbook = (result, refused) => attachRunbookLink(result, { pathId: "close", step: driveStep, refused, rootDir: driveRoot });
+
 async function driveClose(values, { apply, dryRun = false }) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "drive identity is invalid");
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
   const phase = stored.coordinator.phase;
+  if (Object.hasOwn(CLOSE_STEP_REQUIREMENTS, phase)) driveStep = phase;
   const chain = describeCloseChain(phase, { root, lifecycle: values.lifecycle });
   const options = coordinatorNextPhases(phase);
   const qualityReadback = readQualityRows(root, stored.coordinator);
@@ -1262,6 +1270,7 @@ async function driveClose(values, { apply, dryRun = false }) {
     fail("CLOSE-ORDER", `from ${phase} the reachable phases are ${options.join(", ")}; --phase ${target} is not one of them`);
   }
   const need = CLOSE_STEP_REQUIREMENTS[target];
+  driveStep = target;
   const step = { phase: target, needs: need.flags, evidenceSchema: need.evidenceSchema, producer: need.producer };
   if (dryRun) {
     // Read-only feasibility of the NEXT step: no receipt, no apply. transitionPlan is the existing read-only plan; its typed refusal is reported, not hidden.
@@ -1341,7 +1350,8 @@ try {
     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor) fail("CLOSE-ARGS", "drive arguments invalid");
     if (parsed.booleans["dry-run"] === true && parsed.booleans.apply === true) fail("CLOSE-ARGS", "drive --dry-run is read-only and cannot be combined with --apply");
     if (parsed.values.phase !== undefined && !COORDINATOR_PHASES.includes(parsed.values.phase)) fail("CLOSE-ARGS", "drive --phase is not a coordinator phase");
-    emit(await driveClose({
+    driveRoot = parsed.values.root;
+    const driven = await driveClose({
       root: parsed.values.root,
       lifecycle: parsed.values.lifecycle,
       actor: parsed.values.actor,
@@ -1352,7 +1362,8 @@ try {
       continuityCloseRequest: parsed.values["continuity-close-request"],
       auditRequest: parsed.values["audit-request"],
       criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
-    }, { apply: parsed.booleans.apply === true, dryRun: parsed.booleans["dry-run"] === true }));
+    }, { apply: parsed.booleans.apply === true, dryRun: parsed.booleans["dry-run"] === true });
+    emit(driveRunbook(driven, driven.status === "inputs-missing" || driven.status === "human-gate"));
   } else if (command === "audit-index") {
     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "audit-index arguments invalid");
@@ -1404,11 +1415,12 @@ try {
     fail("CLOSE-COMMAND", "unsupported close-coordinator command");
   }
 } catch (error) {
-  emit({
+  const refusal = {
     schema: "pipeline.close-coordinator.error.v1",
     status: "refused",
     code: error?.code ?? "CLOSE-FAILED",
     message: error instanceof Error ? error.message : "close coordinator failed",
     ...(error?.criticAddenda === undefined ? {} : { criticAddenda: error.criticAddenda }),
-  }, 2);
+  };
+  emit(command === "drive" ? driveRunbook(refusal, true) : refusal, 2);
 }

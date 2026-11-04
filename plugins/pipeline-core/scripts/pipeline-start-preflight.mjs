@@ -10,6 +10,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
 import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -2465,7 +2466,8 @@ export function main(options = {}) {
     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
     ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
   };
-  process.stdout.write(`${JSON.stringify(envelope)}\n`);
+  // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
+  process.stdout.write(`${JSON.stringify(attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() }))}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
   // Antigravity-only: the structured field above already carries this, but a
   // human watching the terminal reads stderr, not a JSON blob -- so the same

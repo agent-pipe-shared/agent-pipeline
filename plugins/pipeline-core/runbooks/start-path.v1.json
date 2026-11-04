@@ -1,0 +1,58 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "start",
+  "generatedFrom": [
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs"
+  ],
+  "notGenerated": [
+    "the confirmation line text and the role-specific preflight readback fields (the preflight result names them)"
+  ],
+  "steps": [
+    {
+      "id": "preflight",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-start-preflight.mjs --role <elephant|goldfish|critic>",
+      "needs": [
+        "a git work tree"
+      ],
+      "evidenceSchema": "pipeline.start-preflight.v1",
+      "producer": "one JSON envelope: ruleset, plugin identity, mandatory hooks, calibration, handover freshness; the bootstrap confirmation line follows it",
+      "humanGate": false,
+      "next": [
+        "inspect"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-start-preflight.mjs",
+        "verb": "--role",
+        "argv": [
+          "--role",
+          "<elephant|goldfish|critic>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "inspect",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs inspect",
+      "needs": [
+        "run from the repository root"
+      ],
+      "evidenceSchema": "pipeline.inspect.v1",
+      "producer": "read-only JSON: lifecycle status, the structural nextAction and the continuity drift",
+      "humanGate": false,
+      "next": [],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "inspect",
+        "argv": [
+          "inspect"
+        ],
+        "closed": true
+      }
+    }
+  ]
+}

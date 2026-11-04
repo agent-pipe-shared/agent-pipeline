@@ -58,9 +58,9 @@ test("index lists the path file with its sha256", () => {
   const files = buildRunbookFiles();
   const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
   assert.equal(idx.schema, "pipeline.runbook-index.v1");
-  assert.equal(idx.paths.length, 1);
-  const e = idx.paths[0];
-  assert.equal(e.pathId, "close");
+  // G5 rest: the index now lists every lifecycle path; the close entry is still looked up by its id.
+  const e = idx.paths.find((p) => p.pathId === "close");
+  assert.ok(e, "close entry");
   assert.equal(e.path, "plugins/pipeline-core/runbooks/close-path.v1.json");
   assert.equal(e.schema, "pipeline.runbook.v1");
   assert.equal(e.sha256, createHash("sha256").update(files[e.path]).digest("hex"));
@@ -96,5 +96,282 @@ test("without --check the generator writes both files under --root", () => {
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// C19-G5 rest (AC-108): the runbooks of every lifecycle path, generated from the existing tables, and the typed `runbook`
+// link in the first result of each standard command. Cases are written from the goal, not from the implementation.
+// ---------------------------------------------------------------------------------------------------------------------
+const SCRIPTS_DIR = dirname(SCRIPT);
+const REPO_ROOT = resolve(PLUGIN_ROOT, "..", "..");
+const PATH_IDS = ["close", "start", "plan", "implement", "push"];
+const NEW_PATH_IDS = PATH_IDS.filter((id) => id !== "close");
+const STEP_KEYS = ["id", "who", "command", "needs", "evidenceSchema", "producer", "humanGate", "next"];
+const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
+const pathFile = (pathId) => `plugins/pipeline-core/runbooks/${pathId}-path.v1.json`;
+const docOf = (pathId, files = buildRunbookFiles()) => JSON.parse(files[pathFile(pathId)]);
+const PLACEHOLDERS = {
+  "<name>": "Test Name", "<epic|feature|mini>": "feature", "<feature-id>": "widget", "<prd-path>": "specs/widget/prd.md",
+  "<spec-path>": "specs/widget/spec.md", "<sha256>": "a".repeat(64), "<reason>": "test reason",
+};
+const sample = (argv) => argv.map((a) => PLACEHOLDERS[a] ?? a);
+
+test("the index lists the five lifecycle paths, each file with its own sha256", () => {
+  const files = buildRunbookFiles();
+  const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
+  assert.deepEqual(idx.paths.map((p) => p.pathId).sort(), [...PATH_IDS].sort());
+  for (const p of idx.paths) {
+    assert.equal(p.path, pathFile(p.pathId));
+    assert.equal(p.sha256, sha256Hex(files[p.path]));
+  }
+});
+
+test("each generated runbook is valid against the runbook schema, and the validator refuses a broken one", async () => {
+  const { validateRunbook } = await import("../lib/runbook-paths.mjs");
+  for (const id of PATH_IDS) assert.deepEqual(validateRunbook(docOf(id)), [], id);
+  const broken = docOf("start");
+  delete broken.steps[0].command;
+  assert.notDeepEqual(validateRunbook(broken), []);
+  const dangling = docOf("start");
+  dangling.steps[0].next = ["no-such-step"];
+  assert.notDeepEqual(validateRunbook(dangling), []);
+  assert.notDeepEqual(validateRunbook({ ...docOf("start"), schema: "other" }), []);
+});
+
+test("every step of every new path carries the fixed keys, a known actor and only next ids that exist", () => {
+  for (const id of NEW_PATH_IDS) {
+    const doc = docOf(id);
+    assert.equal(doc.pathId, id);
+    assert.ok(doc.steps.length >= 2, id);
+    const ids = doc.steps.map((s) => s.id);
+    assert.equal(new Set(ids).size, ids.length, `${id}: unique step ids`);
+    for (const s of doc.steps) {
+      for (const k of [...STEP_KEYS, "commit", "catalogue"]) assert.ok(k in s, `${id}/${s.id} lacks ${k}`);
+      assert.ok(["agent", "po-only", "n/a"].includes(s.who), `${id}/${s.id} who=${s.who}`);
+      assert.equal(s.humanGate, s.who === "po-only", `${id}/${s.id} humanGate`);
+      for (const n of s.next) assert.ok(ids.includes(n), `${id}/${s.id} next ${n}`);
+    }
+  }
+});
+
+test("every catalogued step names a script that exists, a verb that script knows, and a command composed from its argv", async () => {
+  const { sanctionedPipelineStateArgs } = await import("../lib/guard/sanctioned-args-scripts.mjs");
+  const stateSource = readFileSync(join(SCRIPTS_DIR, "pipeline-state.mjs"), "utf8");
+  const verbList = /const PIPELINE_STATE_COMMANDS = Object\.freeze\(\[([\s\S]*?)\]\)/u.exec(stateSource);
+  assert.ok(verbList, "PIPELINE_STATE_COMMANDS literal");
+  const stateVerbs = [...verbList[1].matchAll(/"([a-z][a-z-]*)"/gu)].map((m) => m[1]);
+  let catalogued = 0;
+  for (const id of NEW_PATH_IDS) {
+    for (const s of docOf(id).steps) {
+      if (s.catalogue === null) continue;
+      catalogued += 1;
+      const { script, verb, argv, closed } = s.catalogue;
+      const source = readFileSync(join(SCRIPTS_DIR, script), "utf8");
+      assert.equal(s.command, `node <plugin-root>/scripts/${script} ${argv.join(" ")}`, `${id}/${s.id} command is composed from its argv`);
+      if (script === "pipeline-state.mjs") assert.ok(stateVerbs.includes(verb), `${id}/${s.id}: ${verb} is a pipeline-state verb`);
+      else assert.ok(source.includes(verb), `${id}/${s.id}: ${script} mentions ${verb}`);
+      assert.equal(argv.includes(verb), true, `${id}/${s.id} argv carries its verb`);
+      if (closed === true) assert.equal(sanctionedPipelineStateArgs(sample(argv), "/not/used"), true, `${id}/${s.id} is a closed catalogue shape`);
+    }
+  }
+  assert.ok(catalogued >= 8, `catalogued steps: ${catalogued}`);
+});
+
+test("the plan and implement paths cover every verb buildInspectNextAction can hand out", () => {
+  const source = readFileSync(join(SCRIPTS_DIR, "pipeline-state.mjs"), "utf8");
+  const from = source.indexOf("function buildInspectNextAction(");
+  assert.ok(from > 0);
+  const to = source.indexOf("\nfunction ", from + 10);
+  const body = source.slice(from, to);
+  const handedOut = new Set([...body.matchAll(/(?:scriptPath|script|import\.meta\.url\)+),\s*["']([a-z][a-z-]+)["']/gu)].map((m) => m[1]));
+  assert.ok(handedOut.has("submit-plan") && handedOut.has("approve-plan") && handedOut.has("present-plan"), [...handedOut].join(","));
+  // inspect hands out the whole approval-to-implementation course, so both paths together must hold every verb.
+  const covered = new Set(["plan", "implement"].flatMap((id) => docOf(id).steps.filter((s) => s.catalogue !== null).map((s) => s.catalogue.verb)));
+  for (const verb of handedOut) assert.ok(covered.has(verb), `plan and implement runbooks lack ${verb}`);
+});
+
+test("the start, plan and implement paths hold their lifecycle steps in order", () => {
+  assert.deepEqual(docOf("start").steps.map((s) => s.id), ["preflight", "inspect"]);
+  const plan = docOf("plan").steps.map((s) => s.id);
+  for (const id of ["set-feature", "submit-plan", "present-plan", "sign-intent", "approve-plan"]) assert.ok(plan.includes(id), id);
+  assert.ok(plan.indexOf("submit-plan") < plan.indexOf("present-plan") && plan.indexOf("present-plan") < plan.indexOf("approve-plan"));
+  assert.equal(docOf("plan").steps.find((s) => s.id === "sign-intent").who, "po-only");
+  const impl = docOf("implement").steps.map((s) => s.id);
+  assert.deepEqual(impl.filter((id) => ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"].includes(id)), ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"]);
+});
+
+test("the push path is derived from the quick-reference table of docs/push-release-flow.md", () => {
+  const flow = readFileSync(join(REPO_ROOT, "docs/push-release-flow.md"), "utf8");
+  const table = flow.slice(flow.indexOf("## Quick reference"));
+  const rows = table.split("\n").filter((l) => /^\| (—|\d)/u.test(l));
+  const steps = docOf("push").steps;
+  assert.equal(steps.length, rows.length);
+  rows.forEach((row, i) => {
+    const span = /`([^`]+)`/u.exec(row.split("|")[2]);
+    if (span) assert.ok(steps[i].command.includes(span[1].split(" ")[0]), `${steps[i].id}: ${steps[i].command}`);
+    assert.equal(steps[i].humanGate, /\*\*PO only\*\*|Repo admin/u.test(row.split("|")[3]), steps[i].id);
+  });
+  assert.equal(steps.find((s) => s.id === "layer-2-3").who, "po-only");
+});
+
+test("drift: a changed command table changes the regenerated runbook, a table row without annotation is refused", () => {
+  const flow = readFileSync(join(REPO_ROOT, "docs/push-release-flow.md"), "utf8");
+  const committed = readFileSync(join(PLUGIN_ROOT, "runbooks/push-path.v1.json"), "utf8");
+  const changed = buildRunbookFiles({ pushFlowText: flow.replace("| 4 | `pipeline-state.mjs approve-push` |", "| 4 | `pipeline-state.mjs approve-pushed` |") });
+  assert.notEqual(changed[pathFile("push")], committed);
+  assert.throws(() => buildRunbookFiles({ pushFlowText: flow.replace("| 6 | GitHub repository ruleset", "| 6x | GitHub repository ruleset") }), /RUNBOOK-SOURCE/u);
+  const root = mkdtempSync(join(tmpdir(), "generate-runbook-test-"));
+  try {
+    mkdirSync(join(root, "runbooks"), { recursive: true });
+    for (const [rel, bytes] of Object.entries(buildRunbookFiles())) writeFileSync(join(root, rel.replace(/^plugins\/pipeline-core\//, "")), bytes);
+    writeFileSync(join(root, "runbooks/plan-path.v1.json"), `${JSON.stringify({ ...docOf("plan"), steps: [] }, null, 2)}\n`);
+    const r = spawnSync(process.execPath, [SCRIPT, "--check", "--root", root], { encoding: "utf8" });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /RUNBOOK-DRIFT.*plan-path\.v1\.json/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const gitRepo = () => {
+  const dir = mkdtempSync(join(tmpdir(), "runbook-link-test-"));
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: dir }).status, 0);
+  return dir;
+};
+const SESSION_A = { CLAUDE_CODE_SESSION_ID: "session-a" };
+
+test("runbookLink names path, digest and step of a runbook that exists", async () => {
+  const { runbookLink } = await import("../lib/runbook-link.mjs");
+  const link = runbookLink("push", "layer-4");
+  assert.deepEqual(Object.keys(link), ["path", "digest", "step"]);
+  assert.equal(link.path, "runbooks/push-path.v1.json");
+  assert.equal(link.digest, sha256Hex(readFileSync(join(PLUGIN_ROOT, link.path), "utf8")));
+  assert.equal(link.step, "layer-4");
+  assert.equal(runbookLink("no-such-path", "x"), null);
+});
+
+test("the runbook field appears once per session and path, always on a refusal, and never alters an existing field", async () => {
+  const { attachRunbookLink } = await import("../lib/runbook-link.mjs");
+  const repo = gitRepo();
+  try {
+    const result = { schema: "x.v1", status: "ok", nested: { a: 1 } };
+    const first = attachRunbookLink(result, { pathId: "plan", step: "inspect", rootDir: repo, env: SESSION_A });
+    assert.deepEqual(Object.keys(first), ["schema", "status", "nested", "runbook"]);
+    assert.equal(first.runbook.step, "inspect");
+    assert.equal(JSON.stringify(first).startsWith(JSON.stringify(result).slice(0, -1)), true, "existing fields byte-identical");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "plan", step: "submit-plan", rootDir: repo, env: SESSION_A }), false, "same session and path: once");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "push", step: "driver", rootDir: repo, env: SESSION_A }), true, "another path: again");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "plan", step: "inspect", rootDir: repo, env: { CLAUDE_CODE_SESSION_ID: "session-b" } }), true, "another session: again");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "plan", step: "inspect", refused: true, rootDir: repo, env: SESSION_A }), true, "a refusal always carries it");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "plan", step: "inspect", refused: true, rootDir: repo, env: SESSION_A }), true, "and again");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "start", step: "preflight", rootDir: repo, env: {} }), true, "no session id: shown every time");
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "start", step: "preflight", rootDir: repo, env: {} }), true);
+    assert.equal("runbook" in attachRunbookLink(result, { pathId: "start", step: "preflight", rootDir: join(repo, "missing"), env: SESSION_A }), true, "unusable control directory: shown");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("close-coordinator drive carries the runbook link on a refusal, with a step of the close runbook", () => {
+  const closeSteps = docOf("close").steps.map((s) => s.id);
+  for (let i = 0; i < 2; i += 1) {
+    const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "close-coordinator.mjs"), "drive", "--root", join(tmpdir(), "no-such-root-for-runbook"), "--lifecycle", "abc", "--actor", "t"],
+      { encoding: "utf8", env: { ...process.env, ...SESSION_A } });
+    assert.equal(r.status, 2, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.status, "refused");
+    assert.equal(out.runbook.path, "runbooks/close-path.v1.json");
+    assert.ok(closeSteps.includes(out.runbook.step), out.runbook.step);
+    assert.equal(out.runbook.digest, sha256Hex(readFileSync(join(PLUGIN_ROOT, out.runbook.path), "utf8")));
+  }
+});
+
+test("push-init and push-prepare results carry the link additively; push-init stays byte-identical otherwise", async () => {
+  const pushInit = await import("./push-init.mjs");
+  const pushPrepare = await import("./push-prepare.mjs");
+  const repo = gitRepo();
+  const before = process.env.CLAUDE_CODE_SESSION_ID;
+  process.env.CLAUDE_CODE_SESSION_ID = "session-push-test";
+  try {
+    const run = (outcome) => {
+      let out = "";
+      const code = pushInit.main(["--root", repo, "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+        { write: (v) => { out += v; }, writeError: () => {}, drive: () => ({ schema: "pipeline.push-init.v1", outcome }) });
+      return { code, out: JSON.parse(out), raw: out };
+    };
+    const refused = run("blocked");
+    assert.equal(refused.code, 1);
+    assert.equal(refused.out.runbook.path, "runbooks/push-path.v1.json");
+    assert.equal(refused.out.runbook.step, "driver");
+    assert.deepEqual(Object.keys(refused.out).slice(0, 2), ["schema", "outcome"]);
+    assert.equal(run("blocked").out.runbook.step, "driver", "a refusal carries it every time");
+    assert.equal(run("signature-required").out.runbook.step, "driver", "first non-refusal in the session: the marker was not consumed by refusals");
+    assert.equal("runbook" in run("signature-required").out, false, "second non-refusal: once per session and path");
+    const notReady = pushPrepare.withPushRunbook({ schema: "pipeline.push-prepare.v1", ready: false }, { rootDir: repo });
+    assert.equal(notReady.runbook.path, "runbooks/push-path.v1.json");
+    assert.deepEqual(Object.keys(notReady), ["schema", "ready", "runbook"]);
+    assert.equal("runbook" in pushPrepare.withPushRunbook({ schema: "s", ready: true }, { rootDir: repo }), false, "ready and already shown this session");
+    const closed = pushPrepare.withPushRunbook({ schema: "pipeline.push-close-report.v1", folded: false }, { rootDir: repo, step: "layer-5c", refused: true });
+    assert.equal(closed.runbook.step, "layer-5c");
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_CODE_SESSION_ID; else process.env.CLAUDE_CODE_SESSION_ID = before;
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("pipeline-state inspect carries the link as its last key and submit-plan prints it as a typed line", async () => {
+  const { run } = await import("./pipeline-state.mjs");
+  const { mkdtempTestScratch } = await import("../lib/test-tmpdir.mjs");
+  const root = mkdtempTestScratch("runbook-inspect-");
+  const before = process.env.CLAUDE_CODE_SESSION_ID;
+  process.env.CLAUDE_CODE_SESSION_ID = `session-inspect-test-${process.pid}`;
+  const invoke = (argv) => {
+    const out = []; const err = []; const log = console.log; const error = console.error;
+    console.log = (...v) => out.push(v.join(" ")); console.error = (...v) => err.push(v.join(" "));
+    try { return { status: run(argv, { dir: root, now: () => "2026-08-18T12:00:00.000Z", poGateProfile: () => ({ ok: true }) }), out: out.join("\n"), err: err.join("\n") }; }
+    finally { console.log = log; console.error = error; }
+  };
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    const first = invoke(["inspect"]);
+    assert.equal(first.status, 0, first.err);
+    const payload = JSON.parse(first.out);
+    assert.equal(payload.schema, "pipeline.inspect.v1");
+    assert.equal(Object.keys(payload).at(-1), "runbook");
+    assert.equal(payload.runbook.step, "inspect");
+    assert.equal(payload.runbook.path, "runbooks/start-path.v1.json", "no active feature: the start path");
+    assert.equal(payload.runbook.digest, sha256Hex(readFileSync(join(PLUGIN_ROOT, payload.runbook.path), "utf8")));
+    const refused = invoke(["submit-plan"]);
+    assert.equal(refused.status, 2);
+    const line = refused.err.split("\n").find((l) => l.startsWith("runbook: "));
+    assert.ok(line, refused.err);
+    const link = JSON.parse(line.slice("runbook: ".length));
+    assert.deepEqual([link.path, link.step], ["runbooks/plan-path.v1.json", "submit-plan"]);
+    assert.equal(invoke(["submit-plan"]).err.includes("runbook: "), true, "a refusal carries it every time");
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_CODE_SESSION_ID; else process.env.CLAUDE_CODE_SESSION_ID = before;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the start preflight envelope carries the link when the preflight is not ready", () => {
+  const repo = gitRepo();
+  try {
+    const env = { ...process.env, CLAUDE_CODE_SESSION_ID: "session-preflight-test" };
+    const call = () => {
+      const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, "pipeline-start-preflight.mjs")], { cwd: repo, encoding: "utf8", env });
+      return { status: r.status, out: JSON.parse(r.stdout.split("\n").find((l) => l.startsWith("{"))) };
+    };
+    const first = call();
+    assert.equal(first.out.schema, "pipeline.start-preflight.v1");
+    assert.equal(first.out.runbook.step, "preflight");
+    assert.equal(first.out.runbook.path, "runbooks/start-path.v1.json");
+    const second = call();
+    if (second.status === 0) assert.equal("runbook" in second.out, false, "ready and shown already: not repeated");
+    else assert.equal(second.out.runbook.step, "preflight", "not ready: always carried");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
   }
 });

@@ -573,7 +573,13 @@ test("push-init CLI exit status accepts chat-ready and signature-required, but r
       drive: () => ({ schema: "pipeline.push-init.v1", outcome }),
     });
     assert.equal(status, expectedStatus, `${outcome}: ${stdout}`);
-    assert.deepEqual(JSON.parse(stdout), { schema: "pipeline.push-init.v1", outcome });
+    // QG-04 restatement (C19-G5): the result now carries the additive typed `runbook` link of the push path. Every
+    // pre-existing field is still compared exactly; the link is checked for its own shape and stripped before that.
+    const { runbook, ...printed } = JSON.parse(stdout);
+    assert.equal(runbook.path, "runbooks/push-path.v1.json");
+    assert.equal(runbook.step, "driver");
+    assert.match(runbook.digest, /^[0-9a-f]{64}$/u);
+    assert.deepEqual(printed, { schema: "pipeline.push-init.v1", outcome });
   }
 });
 

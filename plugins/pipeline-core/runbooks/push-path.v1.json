@@ -1,0 +1,235 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "push",
+  "generatedFrom": [
+    "docs/push-release-flow.md"
+  ],
+  "notGenerated": [
+    "the filled-in authorize-critical command (push-init prints it with the computed subject digest)"
+  ],
+  "steps": [
+    {
+      "id": "driver",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/push-init.mjs --root … --by … --remote … --destination … [--base … --candidate … [--record-ref …]]",
+      "needs": [
+        "a clean tree",
+        "the candidate commit exists"
+      ],
+      "evidenceSchema": "pipeline.push-init.v1",
+      "producer": "readiness report that stops at the signature and prints the authorize-critical command filled in",
+      "humanGate": false,
+      "next": [
+        "layer-2-3"
+      ],
+      "commit": "the reconciliation record sits on top of the candidate (--record-ref)",
+      "catalogue": {
+        "script": "push-init.mjs",
+        "verb": "--remote",
+        "argv": [
+          "--root",
+          "…",
+          "--by",
+          "…",
+          "--remote",
+          "…",
+          "--destination",
+          "…",
+          "[--base",
+          "…",
+          "--candidate",
+          "…",
+          "[--record-ref",
+          "…]]"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "layer-1",
+      "who": "n/a",
+      "command": "Policy already set in pipeline.user.yaml",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "gates.push_approval resolved from pipeline.user.yaml (signature or chat)",
+      "humanGate": false,
+      "next": [
+        "layer-1b"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "layer-1b",
+      "who": "agent",
+      "command": "node harness/scripts/check-doc-reconciliation.mjs --base … --candidate …",
+      "needs": [
+        "--base and --candidate named by the caller"
+      ],
+      "evidenceSchema": null,
+      "producer": "doc-reconciliation check result for the range",
+      "humanGate": false,
+      "next": [
+        "layer-2-3"
+      ],
+      "commit": "commit the reconciliation record before signing",
+      "catalogue": null
+    },
+    {
+      "id": "layer-2-3",
+      "who": "po-only",
+      "command": "node <plugin-root>/scripts/po-human-approval.mjs authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind push --subject-sha256 <sha256> --expires-at <ISO-8601>",
+      "needs": [
+        "signature mode",
+        "readiness green (push-init)"
+      ],
+      "evidenceSchema": null,
+      "producer": "the PO's detached proof for the exact push subject",
+      "humanGate": true,
+      "next": [
+        "layer-4"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "po-human-approval.mjs",
+        "verb": "authorize-critical",
+        "argv": [
+          "authorize-critical",
+          "--repo-root",
+          "<repo>",
+          "--directory",
+          "<external-dir>",
+          "--feature-id",
+          "<id>",
+          "--plan",
+          "<repo-path>",
+          "--spec",
+          "<repo-path>",
+          "--kind",
+          "push",
+          "--subject-sha256",
+          "<sha256>",
+          "--expires-at",
+          "<ISO-8601>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "layer-4",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination refs/heads/<branch>",
+      "needs": [
+        "the proof for the exact candidate (signature mode) or the attended chat decision"
+      ],
+      "evidenceSchema": null,
+      "producer": "push approval bound to the candidate commit, in the private store",
+      "humanGate": false,
+      "next": [
+        "layer-5a",
+        "layer-5b"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "approve-push",
+        "argv": [
+          "approve-push",
+          "--by",
+          "<name>",
+          "--remote",
+          "<remote>",
+          "--destination",
+          "refs/heads/<branch>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "layer-5a",
+      "who": "agent",
+      "command": "git push",
+      "needs": [
+        "a valid approval for HEAD"
+      ],
+      "evidenceSchema": null,
+      "producer": "the pushed ref; the attempted-delivery record",
+      "humanGate": false,
+      "next": [
+        "layer-5c"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "layer-5b",
+      "who": "agent",
+      "command": "git push",
+      "needs": [
+        "a valid approval for HEAD"
+      ],
+      "evidenceSchema": null,
+      "producer": "the pushed main or protected ref",
+      "humanGate": false,
+      "next": [
+        "layer-5c",
+        "layer-6"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "layer-5c",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/push-prepare.mjs --close",
+      "needs": [
+        "the remote holds the signed commit"
+      ],
+      "evidenceSchema": "pipeline.push-close-report.v1",
+      "producer": "folds a legacy tracked push-approval record into one local commit (nothing to fold for a current record)",
+      "humanGate": false,
+      "next": [
+        "layer-7"
+      ],
+      "commit": "the fold is one local commit made by the script",
+      "catalogue": {
+        "script": "push-prepare.mjs",
+        "verb": "--close",
+        "argv": [
+          "--close"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "layer-6",
+      "who": "po-only",
+      "command": "GitHub repository ruleset on the target ref",
+      "needs": [
+        "a ruleset on the target ref"
+      ],
+      "evidenceSchema": null,
+      "producer": "the repository admin's ruleset decision (the agent can read it)",
+      "humanGate": true,
+      "next": [
+        "layer-7"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "layer-7",
+      "who": "agent",
+      "command": "gh release create",
+      "needs": [
+        "the pushed release commit"
+      ],
+      "evidenceSchema": null,
+      "producer": "tag and GitHub release",
+      "humanGate": false,
+      "next": [],
+      "commit": null,
+      "catalogue": null
+    }
+  ]
+}
