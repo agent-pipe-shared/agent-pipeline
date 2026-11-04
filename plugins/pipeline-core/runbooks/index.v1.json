@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.runbook-index.v1",
+  "paths": [
+    {
+      "pathId": "close",
+      "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "44c65340ec00f845442b3c483086d48a00a475be4516b584d01f36b8fdc365e9"
+    }
+  ]
+}

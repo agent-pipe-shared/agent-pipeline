@@ -1,0 +1,241 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "close",
+  "generatedFrom": [
+    "plugins/pipeline-core/lib/close-chain-guide.mjs",
+    "plugins/pipeline-core/scripts/publication-close-journal.mjs"
+  ],
+  "notGenerated": [
+    "quality-<id> rows (depend on repository state: closeQualityReadback)",
+    "materialize-push-threat-model (depends on repository state: push threat model required and absent)"
+  ],
+  "steps": [
+    {
+      "id": "checkpointed",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase checkpointed",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "close-feature SKILL, Continuity route step 2",
+      "humanGate": false,
+      "next": [
+        "result-bootstrap-plan"
+      ]
+    },
+    {
+      "id": "result-bootstrap-plan",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs continuity-result-bootstrap-plan (run in the project root; read-only)",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "close-feature SKILL, Continuity route step 3",
+      "humanGate": false,
+      "next": [
+        "result-bootstrap-apply"
+      ]
+    },
+    {
+      "id": "result-bootstrap-apply",
+      "who": "agent",
+      "command": "the applyAction the plan returned (continuity-result-bootstrap-apply ... --activate); with a session-authority catalogue: node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- continuity-result-bootstrap-apply <flags from applyAction.argv>",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "close-feature SKILL, Continuity route step 3",
+      "humanGate": false,
+      "next": [
+        "reconcile-signature"
+      ]
+    },
+    {
+      "id": "reconcile-signature",
+      "who": "po-only",
+      "command": "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "close-feature SKILL, Continuity route step 4",
+      "humanGate": true,
+      "next": [
+        "reconcile"
+      ]
+    },
+    {
+      "id": "reconcile",
+      "who": "agent",
+      "command": "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "close-feature SKILL, Continuity route step 5",
+      "humanGate": false,
+      "next": [
+        "feature-close-prepared"
+      ]
+    },
+    {
+      "id": "feature-close-prepared",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase feature-close-prepared <needs>",
+      "needs": [
+        "--architecture-impact <typed impact>",
+        "--continuity-close-request <path> (when the feature has one)",
+        "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"
+      ],
+      "evidenceSchema": "pipeline.feature-close-audit-request.v1",
+      "producer": "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
+      "humanGate": false,
+      "next": [
+        "tracked-close-finalized"
+      ]
+    },
+    {
+      "id": "tracked-close-finalized",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase tracked-close-finalized <needs>",
+      "needs": [
+        "--evidence <path>"
+      ],
+      "evidenceSchema": "pipeline.close-tracked-effects.v1",
+      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
+      "humanGate": false,
+      "next": [
+        "candidate-frozen"
+      ]
+    },
+    {
+      "id": "candidate-frozen",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase candidate-frozen",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "HEAD becomes the frozen candidate; from candidate-frozen the same phase renews the freeze to a descendant commit",
+      "humanGate": false,
+      "next": [
+        "final-verify-green"
+      ]
+    },
+    {
+      "id": "final-verify-green",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase final-verify-green <needs>",
+      "needs": [
+        "--evidence <path>"
+      ],
+      "evidenceSchema": "pipeline.close-final-verification.v1",
+      "producer": "a green Verify and a green security scan, both for the frozen candidate",
+      "humanGate": false,
+      "next": [
+        "publication-authorized",
+        "cleanup-complete"
+      ]
+    },
+    {
+      "id": "publication-authorized",
+      "who": "po-only",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase publication-authorized <needs>",
+      "needs": [
+        "--evidence <path>",
+        "--authorized"
+      ],
+      "evidenceSchema": "pipeline.close-publication-authorization.v1",
+      "producer": "the human's publication authorization for the frozen candidate",
+      "humanGate": true,
+      "next": [
+        "published"
+      ]
+    },
+    {
+      "id": "published",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase published <needs>",
+      "needs": [
+        "--publication <path>"
+      ],
+      "evidenceSchema": "pipeline.publication-executor-result.v1",
+      "producer": "the fixed publication executor",
+      "humanGate": false,
+      "next": [
+        "readback-confirmed"
+      ]
+    },
+    {
+      "id": "readback-confirmed",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase readback-confirmed <needs>",
+      "needs": [
+        "--publication <path>"
+      ],
+      "evidenceSchema": "pipeline.publication-executor-result.v1",
+      "producer": "the fixed publication executor, read back against the destination",
+      "humanGate": false,
+      "next": [
+        "cleanup-complete"
+      ]
+    },
+    {
+      "id": "cleanup-complete",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase cleanup-complete <needs>",
+      "needs": [
+        "--evidence <path>"
+      ],
+      "evidenceSchema": "pipeline.close-cleanup-receipt.v1",
+      "producer": "close-coordinator.mjs write-cleanup-receipt --root <root> --lifecycle <id> (the drive verb runs it for you)",
+      "humanGate": false,
+      "next": [
+        "closed-local",
+        "delivered"
+      ]
+    },
+    {
+      "id": "closed-local",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase closed-local",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "needs a complete cleanup receipt",
+      "humanGate": false,
+      "next": [
+        "release-eligible"
+      ]
+    },
+    {
+      "id": "release-eligible",
+      "who": "po-only",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase release-eligible <needs>",
+      "needs": [
+        "--evidence <path>",
+        "--authorized"
+      ],
+      "evidenceSchema": "pipeline.close-release-eligible-authorization.v1",
+      "producer": "the human's release-eligibility authorization for the frozen candidate",
+      "humanGate": true,
+      "next": [
+        "promoted"
+      ]
+    },
+    {
+      "id": "promoted",
+      "who": "po-only",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase promoted <needs>",
+      "needs": [
+        "--evidence <path>",
+        "--authorized"
+      ],
+      "evidenceSchema": "pipeline.close-promoted-authorization.v1",
+      "producer": "the human's promotion authorization for the frozen candidate",
+      "humanGate": true,
+      "next": []
+    },
+    {
+      "id": "delivered",
+      "who": "agent",
+      "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase delivered",
+      "needs": [],
+      "evidenceSchema": null,
+      "producer": "needs a complete cleanup receipt and the publication readback",
+      "humanGate": false,
+      "next": [
+        "release-eligible"
+      ]
+    }
+  ]
+}
