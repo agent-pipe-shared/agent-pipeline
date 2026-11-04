@@ -41,6 +41,26 @@
       "owner": "Elephant",
       "signed": false,
       "reason": "Historical, unsigned exception recorded by the Elephant (Full Verify finding V3): this one commit extended the caseCompletion case-ID lists of four existing registry rows in place and inserted one row. Narrow and not extendable: it is bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
+    },
+    {
+      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
+      "commit": "7281e012cd6a791e54d3931034b457730cc3f720",
+      "parent": "896bae494ee424777a5477d297a2fca8f8dc02be",
+      "preimageSha256": "8d999db3d3f7e308fc8024152dd3a63e67affe8d5b5dbc846cc02bfacb4d03f5",
+      "postimageSha256": "9e92bfb5148da894e875cbe6c0161362cbe5df9317bd008df399517b3d5934fa",
+      "owner": "Elephant",
+      "signed": false,
+      "reason": "Historical, unsigned exception recorded by the Elephant (PO decision of 2026-11-04, second entry of this kind): this one commit listed G23C004 in the caseCompletion case-ID list of the existing g23 read-help registry row in place. Narrow and not extendable by pattern: every entry is bound to its own commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
+    },
+    {
+      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
+      "commit": "4ec6622a27033775279b0d5e62a5efa087727395",
+      "parent": "c5e7af3a099a3f70e9b11ecb2cd0f8271154f57f",
+      "preimageSha256": "16dee97b2fd84d271b4790acb67a38ab79e62d0ba9c44f79d852745f5da58183",
+      "postimageSha256": "bb82cc67253f2d1505916554d1a840a01399922b8c6e02d34a65d47e9399259f",
+      "owner": "Elephant",
+      "signed": false,
+      "reason": "Historical, unsigned exception recorded by the Elephant (third entry of this kind, under the PO decision of 2026-11-04): this one commit gave the existing analysis-run command admission registry row its first caseCompletion policy in place, so gate coverage only grew. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the row is otherwise unchanged."
     }
   ]
 }

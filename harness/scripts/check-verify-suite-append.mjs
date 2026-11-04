@@ -98,7 +98,8 @@ function exactDuplicateRepairShape(entry) {
 // registry digests; the witness derives the rest from bytes: every prior row survives in order,
 // byte-identical except that its caseCompletion.caseIds strictly extend (same order, same maxBytes).
 const REWRITE_ENTRY_SCHEMA = "pipeline.verify-suite-case-list-extension-entry.v1";
-const REWRITE_ENTRY_KEYS = ["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
+const REWRITES_MAX = 8;
+const REWRITE_ENTRY_KEYS =["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
   .sort().join("\0");
 
 function exactRewriteShape(entry) {
@@ -128,7 +129,21 @@ function extendsCaseList(before, after) {
   return canonical(beforeRest) === canonical(afterRest);
 }
 
-/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions and insertions only. */
+/**
+ * A row that had NO case-completion policy gains its first one and is byte-identical otherwise: gate coverage only grows
+ * (the same direction as extending a case list). Decision of the Elephant under the PO's 2026-11-04 K143 decision,
+ * named as such in the held patch notes; it is still only admitted through an entry bound to one commit and its bytes.
+ */
+function addsFirstCasePolicy(before, after) {
+  if (Object.hasOwn(before ?? {}, "caseCompletion")) return false;
+  const next = after?.caseCompletion;
+  if (next === null || typeof next !== "object" || !Array.isArray(next.caseIds) || next.caseIds.length === 0
+    || !Number.isSafeInteger(next.maxBytes) || next.maxBytes <= 0) return false;
+  const { caseCompletion: _policy, ...rest } = after;
+  return canonical(rest) === canonical(before);
+}
+
+/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions (or a first case-completion policy) and insertions only. */
 export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, afterBytes } = {}) {
   if (!exactRewriteShape(entry)) return fail("VSA-REWRITE-SHAPE");
   if (commit !== entry.commit || parent !== entry.parent
@@ -147,6 +162,7 @@ export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, 
       if (canonical(row) === key) break;
       if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
         && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
+      if (row?.name === prior.name && row?.file === prior.file && addsFirstCasePolicy(prior, row)) { extended += 1; break; }
       at += 1;
     }
     if (at === after.suites.length) return fail("VSA-REWRITE-PRIOR-ENTRY-CHANGED");
@@ -171,8 +187,11 @@ function exactRecoveryShape(value) {
   if (Object.hasOwn(value, "duplicateRepairs")
     && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
       && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
+  // PO decision 2026-11-04: several recorded in-place case-list extensions are admitted, each bound to its OWN commit,
+  // parent and both registry digests (a bounded list of distinct commits, never a pattern), listed oldest first.
   if (Object.hasOwn(value, "rewrites")
-    && !(Array.isArray(value.rewrites) && value.rewrites.length === 1 && exactRewriteShape(value.rewrites[0]))) return false;
+    && !(Array.isArray(value.rewrites) && value.rewrites.length >= 1 && value.rewrites.length <= REWRITES_MAX
+      && value.rewrites.every(exactRewriteShape) && new Set(value.rewrites.map((item) => item.commit)).size === value.rewrites.length)) return false;
   return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
 }
@@ -316,11 +335,11 @@ export function evaluateDuplicateRepair({
   return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
 }
 
-function readRewrite(root, read) {
+function readRewrites(root, read) {
   try {
     const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
-    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites[0] : null;
-  } catch { return null; }
+    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites : [];
+  } catch { return []; }
 }
 
 function bindRewrite({ root, run, read, entry }) {
@@ -414,10 +433,10 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
     if (!OID.test(head)) return fail("VSA-HEAD");
     const worktree = read(resolve(root, REGISTRY), "utf8");
     const entry = readRecovery(root, read);
-    const rewrite = bindRewrite({ root, run, read, entry: readRewrite(root, read) });
-    // The b7 restoration is proven against the registry state just before the recorded in-place
+    const rewrites = readRewrites(root, read).map((item) => bindRewrite({ root, run, read, entry: item })).filter(Boolean);
+    // The b7 restoration is proven against the registry state just before the FIRST (oldest) recorded in-place
     // case-list extension when one is recorded; every commit after it is checked by the walk below.
-    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrite ? rewrite.beforeBytes : worktree, entry });
+    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrites.length > 0 ? rewrites[0].beforeBytes : worktree, entry });
     const configCommits = run(["log", "--first-parent", "--reverse", "--format=%H", "--", CONFIG])
       .trim().split("\n").filter(Boolean);
     let introduction = null;
@@ -458,9 +477,9 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
           && before === recovery.defectBytes && after === recovery.restoredBytes) {
           // This is the one exact defect-to-restoration transition. Any other
           // historical failure remains subject to the original prefix policy.
-        } else if (rewrite && commit === rewrite.entry.commit
-          && sha256Hex(before) === rewrite.entry.preimageSha256 && sha256Hex(after) === rewrite.entry.postimageSha256) {
-          // The one recorded in-place case-list extension (bound to this commit and its bytes).
+        } else if (rewrites.some((item) => commit === item.entry.commit
+          && sha256Hex(before) === item.entry.preimageSha256 && sha256Hex(after) === item.entry.postimageSha256)) {
+          // A recorded in-place case-list extension (bound to this commit and its bytes).
         } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
           && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
           dupAddSeen = true;

@@ -369,3 +369,78 @@ test("full history traversal refuses a rewrite when recovery is missing or inval
     assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
   });
 });
+
+const kPlain = (name) => ({ name, file: `${name}.test.mjs` });
+const kPolicy = (ids) => ({ schema: "pipeline.verify-case-completion-policy.v1", caseIds: ids, maxBytes: 65536 });
+const kCased = (name, ids) => ({ ...kPlain(name), caseCompletion: kPolicy(ids) });
+const kEntry = (commit, parent, before, after) => ({
+  schema: "pipeline.verify-suite-case-list-extension-entry.v1", commit, parent,
+  preimageSha256: sha256(before), postimageSha256: sha256(after), owner: "Elephant", signed: false,
+  reason: "Historical, unsigned exception recorded by the Elephant for a test of several recorded entries.",
+});
+
+test("evaluateCaseListExtension also admits a first case-completion policy on a row that had none, and nothing else", () => {
+  const before = registryText([kPlain("a"), kPlain("b")]);
+  const after = registryText([kPlain("a"), kCased("b", ["B1"])]);
+  const run = (b, a) => evaluateCaseListExtension({ entry: kEntry("b".repeat(40), "a".repeat(40), b, a), commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a });
+  assert.equal(run(before, after).ok, true);
+  const reworded = registryText([kPlain("a"), { ...kCased("b", ["B1"]), invariantPinned: "reworded" }]);
+  assert.equal(run(before, reworded).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a first policy next to another change is refused");
+  const emptyPolicy = registryText([kPlain("a"), kCased("b", [])]);
+  assert.equal(run(before, emptyPolicy).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "an empty policy adds no coverage");
+  const noChange = registryText([kPlain("a"), kPlain("b")]);
+  assert.equal(run(before, noChange).code, "VSA-REWRITE-NO-EXTENSION");
+});
+
+/** Three registry commits after TP-13: an append, a first policy on a row (R1), a case-list extension (R2); returns the entries of R1 and R2. */
+function twoRewriteHistory(f, recordedFrom) {
+  f.writeConfig([f.tp13]);
+  const registry = join(f.root, "harness", "verify-suites.json");
+  const states = [
+    registryText([kPlain("a"), kCased("b", ["B1"])]),
+    registryText([kCased("a", ["A1"]), kCased("b", ["B1"])]),
+    registryText([kCased("a", ["A1"]), kCased("b", ["B1", "B2"])]),
+  ];
+  const commits = [];
+  for (const [index, text] of states.entries()) {
+    writeFileSync(registry, text);
+    f.commit(`registry state ${index}`);
+    commits.push(f.git("rev-parse", "HEAD").trim());
+  }
+  const entries = [kEntry(commits[1], commits[0], states[0], states[1]), kEntry(commits[2], commits[1], states[1], states[2])];
+  writeFileSync(join(f.root, "harness", "verify-suite-history-recovery.json"),
+    JSON.stringify({ schema: "pipeline.verify-suite-history-recovery.v1", entries: [entry], rewrites: recordedFrom(entries) }));
+  f.commit("record the exceptions");
+  return entries;
+}
+
+test("full history traversal admits several recorded case-list extensions, each bound to its own commit, and refuses a recording that misses one", () => {
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => entries);
+    const result = checkVerifySuiteAppend({ rootDir: f.root });
+    assert.equal(result.ok, true, JSON.stringify(result));
+  });
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => [entries[0]]);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
+  });
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => [entries[1]]);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
+  });
+});
+
+test("the recovery file admits at most eight rewrites, each commit once, and a recording that is not exact binds nothing", () => {
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => [...entries, entries[1]]);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "the same commit twice voids the list");
+  });
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => [...entries, ...Array.from({ length: 7 }, (_, i) => kEntry(String(i).repeat(40), "f".repeat(40), "x", "y"))]);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "nine entries void the list");
+  });
+  fixture((f) => {
+    twoRewriteHistory(f, (entries) => [{ ...entries[0], signed: true }, entries[1]]);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "a signed-looking entry voids the list");
+  });
+});
