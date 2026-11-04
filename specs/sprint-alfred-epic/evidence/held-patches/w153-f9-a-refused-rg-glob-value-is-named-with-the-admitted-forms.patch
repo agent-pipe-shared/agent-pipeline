@@ -1,0 +1,120 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index dddeac044..bf26ed2ca 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -522,10 +522,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+     } else {
+       // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
+       let flag = null;
++      let glob = null;
+       if (!outsideRoot) {
+-        try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
++        const readCommand = input.tool_input.command ?? input.tool_input.CommandLine;
++        // F9: a rejected rg glob value is named first, with the forms that are admitted (the value, not the -g flag, is the fault).
++        try { glob = firstUnadmittedGlobValue(readCommand, root); } catch { glob = null; }
++        if (glob === null) {
++          try { flag = firstUnadmittedFlag(readCommand, root); } catch { flag = null; }
++        }
+       }
+-      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
++      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"`;
++      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+     }
+   }
+   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index a0baf56a0..81ec663e1 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -15,6 +15,40 @@ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+ const quote = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
+ 
++/**
++ * F9 (candidate 19): the filename-filter forms the grammar admits for `rg -g`/`--glob`, as one sentence the refusal prints. It is
++ * prose only; the grammar (`isBoundedFilenameFilter`) stays the single authority, and the helper below asks it rather than copying it.
++ */
++export const GLOB_FORM_HINT = "a filename filter admits only `*.ext`, `*.test.ext`, `**/*.ext` or a multi-dot extension such as `*.d.ts`; "
++  + "to select files by name, list them with `rg --files <dir>` and narrow with `| rg <name>`";
++
++/**
++ * Names an `rg` glob value that is the whole reason a single read command falls outside the grammar: the command is refused as written
++ * and admitted once that one value is replaced by an admitted form. Same contract as firstUnadmittedFlag: one segment, no pipeline,
++ * no redirect, nothing granted, null whenever the diagnosis could be wrong.
++ * @returns {string|null} the glob value (as written), else null.
++ */
++export function firstUnadmittedGlobValue(command, root) {
++  if (typeof command !== "string" || command.trim() === "") return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
++  const { executable, argv } = parsed.segments[0];
++  if (String(executable).split("/").pop() !== "rg") return null;
++  if (isReadOnlyDiagnosticCommand(command, root)) return null;
++  const endOfOptions = argv.indexOf("--");
++  const limit = endOfOptions === -1 ? argv.length : endOfOptions;
++  for (let index = 0; index < limit - 1; index += 1) {
++    if (argv[index] !== "-g" && argv[index] !== "--glob") continue;
++    const value = argv[index + 1];
++    if (typeof value !== "string" || value === "") continue;
++    const swapped = argv.map((token, position) => (position === index + 1 ? "*.md" : token));
++    if (isReadOnlyDiagnosticCommand([executable, ...swapped.map(quote)].join(" "), root)) return value;
++  }
++  return null;
++}
++
+ /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
+ export function firstUnadmittedFlag(command, root) {
+   if (typeof command !== "string" || command.trim() === "") return null;
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index 763455eaa..dd3c894ff 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { firstUnadmittedFlag } from "./read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+@@ -65,6 +65,28 @@ test("RCD9: the refusal names the flag it objects to",
+     assert.match(String(result.stderr), /Rejected element: the flag "--hidden"\./u);
+   });
+ 
++test("RCD10: a glob value outside the admitted forms is named, the admitted ones are not", () => {
++  assert.equal(isReadOnlyDiagnosticCommand("rg --files plugins -g 'w130*'", root), false, "fixture must be refused");
++  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g 'w130*'", root), "w130*");
++  assert.equal(firstUnadmittedGlobValue("rg -n needle README.md --glob 'scratch/*.md'", root), "scratch/*.md");
++  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g '*.mjs'", root), null, "admitted command");
++  assert.equal(firstUnadmittedGlobValue("rg --hidden -n needle README.md", root), null, "a flag fault is not a glob fault");
++  assert.equal(firstUnadmittedGlobValue("rg -n needle ../outside.txt -g '*.md'", root), null, "the operand is the problem");
++  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g 'w130*' | head -n 3", root), null, "pipelines are not diagnosed");
++  assert.equal(firstUnadmittedGlobValue("cat README.md", root), null);
++  assert.equal(firstUnadmittedGlobValue(undefined, root), null);
++});
++
++test("RCD11: the refusal names the glob value and the admitted forms, and still grants nothing", async () => {
++  const command = "rg --files plugins -g 'w130*'";
++  const result = await refusal(command);
++  assert.equal(result.exitCode, 2);
++  assert.match(String(result.stderr), /GUARD-READ-COMMAND-UNSUPPORTED/u);
++  assert.match(String(result.stderr), /Rejected element: the glob value "w130\*"/u);
++  assert.ok(String(result.stderr).includes(GLOB_FORM_HINT), "the hint sentence is printed");
++  assert.equal(isReadOnlyDiagnosticCommand(command, root), false);
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
