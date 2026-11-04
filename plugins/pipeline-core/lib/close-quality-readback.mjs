@@ -7,6 +7,7 @@
 //                         any other typed impact is not-applicable, and no impact signal is unknown.
 //   architecture-fitness  present when the Pipeline State rigorHistory holds an observation for the feature that carries a fitness projection; missing when history is readable without one.
 //   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
+//                         When the receipts are readable the row names a PASSING review's report (the last in listing order) and is missing when every report records a fail.
 //   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
 // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer. A reader that throws or is not supplied yields "unknown".
@@ -66,13 +67,28 @@ function criticRow(readers, featureId) {
   const dir = `specs/${featureId}/evidence/critic`;
   const packets = call(readers.listDir, dir);
   if (!packets.ok || !Array.isArray(packets.value)) return unknown(id, remedy);
+  // Codex greenfield F6: with three review rounds the row named the first report in listing order, an old FAIL, although a later round passed.
+  // A packet whose receipt records a pass is preferred (the last such one in listing order); reports that all record a fail are "missing" a
+  // passing review; a receipt that cannot be read leaves the legacy answer (a report exists) because the readback never claims what it cannot read.
+  const reports = [];
   for (const packet of packets.value) {
     const path = `${dir}/${packet}/report.md`;
     const found = call(readers.exists, path);
     if (!found.ok) return unknown(id, remedy);
-    if (found.value === true) return row(id, "present", path);
+    if (found.value === true) reports.push({ path, receipt: `${dir}/${packet}/receipt.json` });
   }
-  return row(id, "missing", null, remedy);
+  if (reports.length === 0) return row(id, "missing", null, remedy);
+  const verdicts = reports.map((report) => {
+    const bytes = call(readers.readBytes, report.receipt);
+    if (!bytes.ok) return null;
+    try { const pass = JSON.parse(Buffer.from(bytes.value).toString("utf8"))?.reviewPass; return typeof pass === "boolean" ? pass : null; } catch { return null; }
+  });
+  const passing = reports.filter((_, index) => verdicts[index] === true);
+  if (passing.length > 0) return row(id, "present", passing[passing.length - 1].path);
+  if (verdicts.every((verdict) => verdict === false)) {
+    return row(id, "missing", null, "the exported Critic reports record no passing review of this feature; run a fresh review of the final candidate and export it: " + remedy);
+  }
+  return row(id, "present", reports[0].path);
 }
 
 function handoverRow(readers, handoverPath) {

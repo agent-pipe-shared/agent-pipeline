@@ -68,6 +68,34 @@ test("AC-239 critic-report-file: present with the report path, missing with the 
   assert.equal(rows(full({ listDir: (p) => { if (p === CRITIC_DIR) throw new Error("x"); return []; } }))["critic-report-file"].status, "unknown");
 });
 
+// Candidate 19 (Codex greenfield F6): three rounds, the first FAIL, the last PASS. The row names the passing round, never the old FAIL.
+test("AC-239 critic-report-file: names the passing round when receipts are readable, missing when every round failed, legacy answer when a receipt is unreadable", () => {
+  const three = (verdicts, over = {}) => {
+    const dirs = ["pk-1", "pk-2", "pk-3"];
+    const reports = new Set(dirs.map((d) => `${CRITIC_DIR}/${d}/report.md`));
+    return full({
+      exists: (p) => reports.has(p) || [SEC, SEC_VERDICT, "docs/state.md"].includes(p),
+      listDir: (p) => (p === CRITIC_DIR ? dirs : p === "docs/adr" ? ["0001-x.md"] : []),
+      readBytes: (p) => {
+        const index = dirs.findIndex((d) => p === `${CRITIC_DIR}/${d}/receipt.json`);
+        if (index < 0 || verdicts[index] === undefined) throw new Error("no receipt");
+        return Buffer.from(JSON.stringify({ reviewPass: verdicts[index] }));
+      },
+      ...over,
+    });
+  };
+  const passing = rows(three([false, false, true]))["critic-report-file"];
+  assert.equal(passing.status, "present");
+  assert.equal(passing.evidence, `${CRITIC_DIR}/pk-3/report.md`);
+  assert.equal(rows(three([true, false, false]))["critic-report-file"].evidence, `${CRITIC_DIR}/pk-1/report.md`, "a later fail does not hide the earlier pass");
+  const failed = rows(three([false, false, false]))["critic-report-file"];
+  assert.equal(failed.status, "missing");
+  assert.match(failed.remedy, /no passing review/u);
+  const unreadable = rows(three([]))["critic-report-file"];
+  assert.equal(unreadable.status, "present");
+  assert.equal(unreadable.evidence, `${CRITIC_DIR}/pk-1/report.md`, "an unreadable receipt keeps the legacy answer");
+});
+
 test("AC-239 handover-freshness: within the bound present, older than the bound missing, unreadable unknown", () => {
   assert.equal(rows(full())["handover-freshness"].evidence, "docs/state.md");
   const stale = rows(full({ headCommitMs: () => 1_000_000 + HANDOVER_FRESHNESS_BOUND_MS + 1 }))["handover-freshness"];
