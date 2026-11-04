@@ -40,6 +40,8 @@
 #   w152  register the generate-runbook suite (delta on w151)
 #   w153  F9 rest: a refused rg glob value is named in the refusal with the admitted filename-filter forms (no grammar change; Elephant-built)
 #   w154  Q2 first half: the outside-root read refusal says it is intended and names the native Read tool as the alternative (delta on w153; Elephant-built)
+#   w155  chain defect: w131's control-plane-script-scan-tests suite was registered but not categorized in the capability inventory (the registration checker failed after the whole chain)
+#   w156  D4b/E3 stage 1: a pure, read-only decision whether a Verify or Security record may be carried across evidence-only commits (closed evidence set, product tree hash, secret scan for Security); NO reader calls it yet
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
@@ -100,6 +102,8 @@ step2 w151-g5a-a-machine-readable-close-runbook-is-generated-from-the-close-chai
 step2 w152-g5a-register-the-generate-runbook-suite "chore(verify): register the generate-runbook suite"
 step2 w153-f9-a-refused-rg-glob-value-is-named-with-the-admitted-forms "fix(guard): a refused rg glob value is named with the admitted filename-filter forms"
 step2 w154-q2-the-outside-root-read-refusal-says-it-is-intended-and-names-the-alternative "fix(guard): the outside-root read refusal says it is intended and names the native Read alternative"
+step2 w155-fix-categorize-the-control-plane-script-scan-suite-under-a-capability "fix(inventory): categorize the control-plane script scan suite under a capability"
+step2 w156-d4b-a-pure-decision-whether-evidence-only-commits-carry-verify-and-security-forward "feat(evidence): decide whether a Verify or Security record may be carried across evidence-only commits"
 # OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then

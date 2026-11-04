@@ -1,0 +1,287 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index c4dc690d2..a20a5c111 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -448,6 +448,7 @@
+         "verify-phase:harness/scripts/verify.mjs:entry-gates-greenfield-pending-tests",
+         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
+         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
++        "verify-phase:harness/scripts/verify.mjs:evidence-carry-forward-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
+         "verify-phase:harness/scripts/verify.mjs:execution-lane-credential-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 672070746..5b67698fd 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4489,6 +4489,12 @@
+       "file": "plugins/pipeline-core/scripts/generate-runbook.test.mjs",
+       "invariantPinned": "The committed close-path runbook and its index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the generation is deterministic, and every phase of the close requirement table appears exactly once as a step (C19 G5 stage 1, AC-108)",
+       "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs and the two committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
++    },
++    {
++      "name": "evidence-carry-forward-tests",
++      "file": "plugins/pipeline-core/lib/evidence-carry-forward.test.mjs",
++      "invariantPinned": "A Verify or Security record is carried from an earlier commit to a later one only when every changed path lies in the closed evidence set, the product tree hash is equal, the earlier commit is an ancestor and, for Security, a secret scan of the changed files is clean; every other outcome fails closed and the decision never changes the repository (C19 D4b/E3 stage 1, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/evidence-carry-forward.mjs only; no reader calls it yet, so no other suite pins a carry-forward"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+new file mode 100644
+index 000000000..859d9b3c8
+--- /dev/null
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+@@ -0,0 +1,92 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Evidence-only carry-forward (candidate 19, D4b/E3; docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md, point 2).
++ *
++ * A Verify or Security record is bound to one candidate commit. A commit that changes only evidence records (the registration commit,
++ * the evidence commit, the generated lifecycle files, the audit bundle) moves HEAD although no product line changed, which makes the
++ * record stale for HEAD. This module answers one question and grants nothing: "may the record bound to `evidenceCommit` be carried to
++ * `candidateCommit`?" It is a pure, read-only decision. NO reader calls it yet: wiring it into the push guard and the close coordinator
++ * is the next stage and sits behind its own opt-in (the ADR has had one review and no second one).
++ *
++ * The evidence set is closed, defined here in plugin source, and by record class (never by file type): data files are consumed by gates,
++ * guards and code, so the feature spec, plan and PRD, `project/guard-config.json`, every other `project/` file and any source, script or
++ * configuration extension are product-bound and are never in the set. Security evidence is carried only together with a clean secret scan
++ * of the files the passed-over commits changed (SEC-01); an unavailable scan or a finding fails closed.
++ */
++import { createHash } from "node:crypto";
++import { execFileSync } from "node:child_process";
++
++export const CARRY_FORWARD_SCHEMA = "pipeline.evidence-carry-forward.v1";
++
++/** The closed evidence path classes. Each pattern must match the whole repository-relative path. */
++export const EVIDENCE_PATH_PATTERNS = Object.freeze([
++  /^specs\/[^/]+\/evidence\/.+$/u,
++  /^specs\/[^/]+\/audit-bundles\/.+$/u,
++  /^specs\/[^/]+\/lifecycle\.json$/u,
++  /^specs\/[^/]+\/result\.md$/u,
++  /^project\/push-threat-model\.md$/u,
++]);
++
++const FULL_SHA = /^[0-9a-f]{40}$/u;
++
++export function isEvidencePath(path) {
++  if (typeof path !== "string" || path === "" || path.startsWith("/") || path.split("/").some((part) => part === ".." || part === "." || part === "")) return false;
++  return EVIDENCE_PATH_PATTERNS.some((pattern) => pattern.test(path));
++}
++
++function git(root, args) {
++  return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] });
++}
++
++function requireCommit(name, value) {
++  if (typeof value !== "string" || !FULL_SHA.test(value)) throw new Error(`${name} must be a full 40-hex commit id`);
++  return value;
++}
++
++/** Hash over the tree entries of `commit` that lie OUTSIDE the evidence set (mode, type, object id and path of each). */
++export function productTreeSha256(root, commit) {
++  requireCommit("commit", commit);
++  const entries = git(root, ["ls-tree", "-r", "-z", "--full-tree", commit]).split("\0").filter(Boolean);
++  const kept = [];
++  for (const entry of entries) {
++    const tab = entry.indexOf("\t");
++    const path = entry.slice(tab + 1);
++    if (!isEvidencePath(path)) kept.push(entry);
++  }
++  kept.sort();
++  return createHash("sha256").update(kept.join("\n")).digest("hex");
++}
++
++/**
++ * @param {object} input
++ * @param {string} input.root repository root
++ * @param {string} input.evidenceCommit the full commit id the record is bound to
++ * @param {string} input.candidateCommit the full commit id the record would be carried to
++ * @param {"verify"|"security"} input.kind
++ * @param {(files: string[], context: {root: string, commit: string}) => {status: "clean"|"finding"|"unavailable"}} [input.secretScan] required for kind "security"
++ * @returns {{carried: boolean, reason: string, ...}} `carried: true` only when every changed path lies in the evidence set (and, for security, the scan is clean)
++ */
++export function evaluateEvidenceCarryForward({ root, evidenceCommit, candidateCommit, kind, secretScan } = {}) {
++  if (kind !== "verify" && kind !== "security") throw new Error('kind must be "verify" or "security"');
++  requireCommit("evidenceCommit", evidenceCommit);
++  requireCommit("candidateCommit", candidateCommit);
++  const result = (carried, reason, extra = {}) => ({ schema: CARRY_FORWARD_SCHEMA, kind, carried, reason, evidenceCommit, candidateCommit, ...extra });
++  if (evidenceCommit === candidateCommit) {
++    return result(true, "SAME-COMMIT", { passedOverCommits: [], changedEvidencePaths: [], productTreeSha256: productTreeSha256(root, candidateCommit) });
++  }
++  try { git(root, ["merge-base", "--is-ancestor", evidenceCommit, candidateCommit]); } catch { return result(false, "NOT-AN-ANCESTOR"); }
++  const passedOverCommits = git(root, ["rev-list", "--reverse", `${evidenceCommit}..${candidateCommit}`]).split("\n").filter(Boolean);
++  const changedPaths = [...new Set(git(root, ["diff", "--name-only", "-z", "--no-renames", evidenceCommit, candidateCommit]).split("\0").filter(Boolean))].sort();
++  const productPath = changedPaths.find((path) => !isEvidencePath(path));
++  if (productPath !== undefined) return result(false, "PRODUCT-PATH-CHANGED", { path: productPath });
++  const before = productTreeSha256(root, evidenceCommit);
++  const after = productTreeSha256(root, candidateCommit);
++  if (before !== after) return result(false, "PRODUCT-TREE-CHANGED");
++  if (kind === "security") {
++    if (typeof secretScan !== "function") return result(false, "SECRET-SCAN-UNAVAILABLE");
++    let scan;
++    try { scan = secretScan(changedPaths, { root, commit: candidateCommit }); } catch { scan = null; }
++    if (scan?.status !== "clean") return result(false, scan?.status === "finding" ? "SECRET-SCAN-FINDING" : "SECRET-SCAN-UNAVAILABLE");
++  }
++  return result(true, "EVIDENCE-ONLY", { passedOverCommits, changedEvidencePaths: changedPaths, productTreeSha256: after });
++}
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+new file mode 100644
+index 000000000..700dc8abf
+--- /dev/null
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+@@ -0,0 +1,154 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++
++import { CARRY_FORWARD_SCHEMA, EVIDENCE_PATH_PATTERNS, evaluateEvidenceCarryForward, isEvidencePath, productTreeSha256 } from "./evidence-carry-forward.mjs";
++
++const scratchRoots = [];
++test.after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, force: true }); });
++
++function git(root, ...args) {
++  return execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).trim();
++}
++
++function fixture() {
++  const root = mkdtempSync(join(tmpdir(), "ecf-"));
++  scratchRoots.push(root);
++  git(root, "init", "-q");
++  return root;
++}
++
++function commit(root, files, message) {
++  for (const [path, content] of Object.entries(files)) {
++    mkdirSync(dirname(join(root, path)), { recursive: true });
++    writeFileSync(join(root, path), content);
++  }
++  git(root, "add", "--all");
++  git(root, "commit", "-q", "-m", message);
++  return git(root, "rev-parse", "HEAD");
++}
++
++function baseRepo() {
++  const root = fixture();
++  const base = commit(root, {
++    "src/app.mjs": "export const a = 1;\n",
++    "specs/f/plan.md": "plan\n",
++    "specs/f/evidence/verify.json": "{}\n",
++    "project/guard-config.json": "{}\n",
++  }, "base");
++  return { root, base };
++}
++
++test("ECF1: the evidence set is closed by record class, everything else is product-bound", () => {
++  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
++    assert.equal(isEvidencePath(path), true, path);
++  }
++  for (const path of ["specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
++    "specs/f/evidenceX/a.json", "specs/f/lifecycle.json.bak", "specs/evidence/x.json", "scripts/evidence/x.json", "", "/specs/f/evidence/x.json", "specs/f/evidence/../plan.md"]) {
++    assert.equal(isEvidencePath(path), false, path);
++  }
++  assert.ok(Object.isFrozen(EVIDENCE_PATH_PATTERNS));
++  assert.equal(isEvidencePath(undefined), false);
++});
++
++test("ECF2: an evidence-only range carries Verify forward and names the passed-over commits", () => {
++  const { root, base } = baseRepo();
++  const first = commit(root, { "specs/f/evidence/new.json": "{\"n\":1}\n", "specs/f/lifecycle.json": "{}\n" }, "evidence one");
++  const head = commit(root, { "specs/f/result.md": "r\n", "project/push-threat-model.md": "t\n" }, "evidence two");
++  const decision = evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "verify" });
++  assert.equal(decision.schema, CARRY_FORWARD_SCHEMA);
++  assert.equal(decision.carried, true);
++  assert.equal(decision.reason, "EVIDENCE-ONLY");
++  assert.deepEqual(decision.passedOverCommits, [first, head]);
++  assert.deepEqual(decision.changedEvidencePaths, ["project/push-threat-model.md", "specs/f/evidence/new.json", "specs/f/lifecycle.json", "specs/f/result.md"]);
++  assert.equal(decision.productTreeSha256, productTreeSha256(root, base));
++});
++
++test("ECF3: any product path in the range stops the carry-forward and names the path", () => {
++  for (const [path, content] of [["src/app.mjs", "export const a = 2;\n"], ["specs/f/plan.md", "changed\n"], ["project/guard-config.json", "{\"x\":1}\n"], ["specs/f/sub/evidence/x.json", "{}\n"]]) {
++    const { root, base } = baseRepo();
++    commit(root, { "specs/f/evidence/new.json": "{}\n" }, "evidence");
++    const head = commit(root, { [path]: content }, "product");
++    const decision = evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "verify" });
++    assert.equal(decision.carried, false, path);
++    assert.equal(decision.reason, "PRODUCT-PATH-CHANGED", path);
++    assert.equal(decision.path, path);
++  }
++});
++
++test("ECF4: a deletion of a product file and a rename out of the evidence set are product changes", () => {
++  const { root, base } = baseRepo();
++  git(root, "rm", "-q", "src/app.mjs");
++  git(root, "commit", "-q", "-m", "delete product");
++  const deleted = git(root, "rev-parse", "HEAD");
++  assert.equal(evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: deleted, kind: "verify" }).reason, "PRODUCT-PATH-CHANGED");
++  const second = baseRepo();
++  git(second.root, "mv", "specs/f/evidence/verify.json", "src/verify.json");
++  git(second.root, "commit", "-q", "-m", "rename out");
++  const renamed = git(second.root, "rev-parse", "HEAD");
++  const decision = evaluateEvidenceCarryForward({ root: second.root, evidenceCommit: second.base, candidateCommit: renamed, kind: "verify" });
++  assert.equal(decision.carried, false);
++  assert.equal(decision.path, "src/verify.json");
++});
++
++test("ECF5: the same commit is trivially carried; a commit that is not a descendant is not", () => {
++  const { root, base } = baseRepo();
++  assert.equal(evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: base, kind: "verify" }).reason, "SAME-COMMIT");
++  const head = commit(root, { "specs/f/evidence/a.json": "{}\n" }, "evidence");
++  const backwards = evaluateEvidenceCarryForward({ root, evidenceCommit: head, candidateCommit: base, kind: "verify" });
++  assert.equal(backwards.carried, false);
++  assert.equal(backwards.reason, "NOT-AN-ANCESTOR");
++  git(root, "checkout", "-q", "--detach", base);
++  const side = commit(root, { "specs/f/evidence/b.json": "{}\n" }, "side evidence");
++  assert.equal(evaluateEvidenceCarryForward({ root, evidenceCommit: head, candidateCommit: side, kind: "verify" }).reason, "NOT-AN-ANCESTOR");
++});
++
++test("ECF6: Security evidence is carried only with a clean scan of the changed files, and every other outcome fails closed", () => {
++  const { root, base } = baseRepo();
++  const head = commit(root, { "specs/f/evidence/new.json": "{}\n", "specs/f/result.md": "r\n" }, "evidence");
++  const seen = [];
++  const clean = (files, context) => { seen.push({ files, commit: context.commit, root: context.root }); return { status: "clean" }; };
++  const carried = evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "security", secretScan: clean });
++  assert.equal(carried.carried, true);
++  assert.deepEqual(seen, [{ files: ["specs/f/evidence/new.json", "specs/f/result.md"], commit: head, root }]);
++  const failures = [
++    [undefined, "SECRET-SCAN-UNAVAILABLE"],
++    [() => ({ status: "finding" }), "SECRET-SCAN-FINDING"],
++    [() => ({ status: "unavailable" }), "SECRET-SCAN-UNAVAILABLE"],
++    [() => { throw new Error("scanner crashed"); }, "SECRET-SCAN-UNAVAILABLE"],
++    [() => ({}), "SECRET-SCAN-UNAVAILABLE"],
++    [() => null, "SECRET-SCAN-UNAVAILABLE"],
++  ];
++  for (const [secretScan, reason] of failures) {
++    const decision = evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "security", secretScan });
++    assert.equal(decision.carried, false);
++    assert.equal(decision.reason, reason);
++  }
++  assert.equal(evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "verify" }).carried, true, "Verify needs no scan");
++});
++
++test("ECF7: the product tree hash ignores evidence files only", () => {
++  const { root, base } = baseRepo();
++  const evidenceOnly = commit(root, { "specs/f/evidence/other.json": "{\"o\":1}\n", "specs/f/lifecycle.json": "{}\n" }, "evidence");
++  const product = commit(root, { "src/app.mjs": "export const a = 3;\n" }, "product");
++  assert.equal(productTreeSha256(root, base), productTreeSha256(root, evidenceOnly));
++  assert.notEqual(productTreeSha256(root, evidenceOnly), productTreeSha256(root, product));
++  assert.match(productTreeSha256(root, base), /^[0-9a-f]{64}$/u);
++});
++
++test("ECF8: arguments are validated and the decision never changes the repository", () => {
++  const { root, base } = baseRepo();
++  const head = commit(root, { "specs/f/evidence/a.json": "{}\n" }, "evidence");
++  assert.throws(() => evaluateEvidenceCarryForward({ root, evidenceCommit: "HEAD", candidateCommit: head, kind: "verify" }), /full 40-hex/u);
++  assert.throws(() => evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: "--output=x", kind: "verify" }), /full 40-hex/u);
++  assert.throws(() => evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "critic" }), /kind must be/u);
++  assert.throws(() => productTreeSha256(root, "main"), /full 40-hex/u);
++  const before = git(root, "status", "--porcelain=v1");
++  evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "verify" });
++  assert.equal(git(root, "status", "--porcelain=v1"), before);
++  assert.equal(git(root, "rev-parse", "HEAD"), head);
++});
