@@ -1,0 +1,142 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 92331f335..2cca3f4ce 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "../read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -523,15 +523,20 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
+       let flag = null;
+       let glob = null;
++      let listing = null;
+       if (!outsideRoot) {
+         const readCommand = input.tool_input.command ?? input.tool_input.CommandLine;
+         // F9: a rejected rg glob value is named first, with the forms that are admitted (the value, not the -g flag, is the fault).
+         try { glob = firstUnadmittedGlobValue(readCommand, root); } catch { glob = null; }
+         if (glob === null) {
+           try { flag = firstUnadmittedFlag(readCommand, root); } catch { flag = null; }
++          // Q2: a rejected `ls` flag on a protected directory says which listing spellings are admitted.
++          if (flag !== null) {
++            try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root); } catch { listing = null; }
++          }
+         }
+       }
+-      const spelling = flag === null ? null : flagSpellingHint(flag);
++      const spelling = flag === null ? null : (flagSpellingHint(flag) ?? listing);
+       const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
+       return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+     }
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index 25c25f2ac..dc739d71d 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -63,6 +63,43 @@ export function flagSpellingHint(flag) {
+   return null;
+ }
+ 
++/**
++ * F9 (candidate 19): a short-flag cluster such as `rg -ln` is refused where the same flags given one by one (`rg -l -n`) are admitted. The hint is
++ * printed only when the grammar itself admits the split spelling, so it is never a guess; it grants nothing.
++ * @returns {string|null}
++ */
++export function clusterSpellingHint(command, flag, root) {
++  if (typeof command !== "string" || typeof flag !== "string" || !/^-[A-Za-z]{2,}$/u.test(flag)) return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
++  const { executable, argv } = parsed.segments[0];
++  const split = [...flag.slice(1)].map((letter) => `-${letter}`);
++  const expanded = argv.flatMap((token) => (token === flag ? split : [token]));
++  if (!isReadOnlyDiagnosticCommand([executable, ...expanded.map(quote)].join(" "), root)) return null;
++  return `a combined short-flag cluster is not admitted here; give each flag on its own: ${split.join(" ")}`;
++}
++
++const NAMES_ONLY_LS_FLAGS = new Set(["-1", "-a", "-A"]);
++
++/**
++ * Q2 (candidate 19): a listing of a protected directory (the control root among them) is admitted as a names-only listing, so `ls -la <dir>` is
++ * refused there while `ls -la docs` is not. The refusal names the flag, and the flag alone reads as an unsafe spelling; this adds the part the
++ * flag cannot say: which spellings ARE admitted and how to list the same names another way. Returns one sentence for an `ls` command, else null.
++ * Prose only; it grants nothing, the grammar (`isNamesOnlyLsArgs`) stays the single authority.
++ * @returns {string|null}
++ */
++export function lsListingHint(command, flag, root) {
++  if (typeof command !== "string" || typeof flag !== "string" || NAMES_ONLY_LS_FLAGS.has(flag)) return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
++  if (String(parsed.segments[0].executable).split("/").pop() !== "ls") return null;
++  return "a protected directory, such as the control root, is listed as names only: `ls <dir>`, `ls -1 <dir>`, `ls -a <dir>` or `ls -A <dir>`; "
++    + "`find <dir> -maxdepth 1` lists the same names; this is an intended read limit, not a fault of the directory";
++}
++
+ /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
+ export function firstUnadmittedFlag(command, root) {
+   if (typeof command !== "string" || command.trim() === "") return null;
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index 9269139c6..cb89af4d5 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
++import { readFileSync } from "node:fs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+@@ -116,6 +117,44 @@ test("RCD14: the refusal of an attached value prints the spelling to use, and bo
+   assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
+ });
+ 
++test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {
++  const hint = String(lsListingHint("ls -la .git/agent-pipeline", "-la", root));
++  assert.match(hint, /listed as names only/u);
++  assert.match(hint, /`ls -1 <dir>`/u);
++  assert.match(hint, /`find <dir> -maxdepth 1`/u);
++  assert.match(hint, /intended read limit/u);
++  assert.equal(lsListingHint("ls -l .git", "-l", root) === null, false);
++  assert.equal(lsListingHint("ls -1 .git/agent-pipeline", "-1", root), null, "an admitted flag needs no hint");
++  assert.equal(lsListingHint("ls -a .git/agent-pipeline", "-a", root), null);
++  assert.equal(lsListingHint("rg --hidden needle README.md", "--hidden", root), null, "only ls gets the listing hint");
++  assert.equal(lsListingHint("ls -la a | head -n 2", "-la", root), null, "pipelines are not diagnosed");
++  assert.equal(lsListingHint(undefined, "-la", root), null);
++  assert.equal(lsListingHint("ls -la docs", undefined, root), null);
++});
++
++test("RCD16: the unsupported-read refusal prints the ls listing hint after the flag it names (wiring pin; the control root itself is not protected in a bare checkout)", () => {
++  const source = readFileSync(join(root, "plugins", "pipeline-core", "lib", "guard", "evaluate.mjs"), "utf8");
++  assert.match(source, /lsListingHint\(readCommand, flag, root\)/u);
++  assert.match(source, /clusterSpellingHint\(readCommand, flag, root\) \?\? lsListingHint\(readCommand, flag, root\)/u);
++  assert.match(source, /flagSpellingHint\(flag\) \?\? listing/u);
++  assert.match(source, /import \{[^}]*lsListingHint[^}]*\} from "\.\.\/read-command-diagnosis\.mjs"/u);
++});
++
++test("RCD17: a refused short-flag cluster gets the split spelling only when the grammar admits it, and the refusal prints it", async () => {
++  assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "fixture must be refused");
++  assert.equal(isReadOnlyDiagnosticCommand("rg -l -n needle README.md", root), true, "the split spelling is admitted");
++  assert.equal(clusterSpellingHint("rg -ln needle README.md", "-ln", root), "a combined short-flag cluster is not admitted here; give each flag on its own: -l -n");
++  assert.equal(clusterSpellingHint("rg -n needle README.md", "-n", root), null, "a single flag is no cluster");
++  assert.equal(clusterSpellingHint("rg --hidden needle README.md", "--hidden", root), null, "a long flag is no cluster");
++  assert.equal(clusterSpellingHint("rg -ln needle README.md | head -n 2", "-ln", root), null, "pipelines are not diagnosed");
++  assert.equal(clusterSpellingHint("rg -zz needle README.md", "-zz", root), null, "no hint when the split spelling is refused too");
++  assert.equal(clusterSpellingHint(undefined, "-ln", root), null);
++  const result = await refusal("rg -ln needle README.md");
++  assert.equal(result.exitCode, 2);
++  assert.match(String(result.stderr), /Rejected element: the flag "-ln" \(a combined short-flag cluster is not admitted here; give each flag on its own: -l -n\)\./u);
++  assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "the diagnosed command itself stays refused");
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");

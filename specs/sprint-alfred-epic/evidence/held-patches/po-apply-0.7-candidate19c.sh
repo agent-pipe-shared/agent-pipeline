@@ -33,6 +33,7 @@
 #   w201  the suite history check admits several recorded case-list extensions (PO decision 2026-11-04), records 7281e012c and w160's 4ec6622a2, and w175/w176 no longer rewrite registry rows
 #   w202  the protected Critic preimage is re-pinned to the current critic-review skill and roles/critic.md (explicit one-time PO decision 2026-11-04)
 #   w203  the key-shaped fixtures and the PEM armor markers are built at run time, so the Security scan has no unsuppressed finding (the review gate cannot take these values; the two archive patches w43 and w45 are edited in place)
+#   w204  Q2 and F9: the unsupported-read refusal names the admitted spelling for a refused ls flag (a protected directory is listed as names only), and for a short-flag cluster such as rg -ln (given flag by flag), each only when the grammar itself admits it
 #   w192  the never-liftable kernel paths list the modules that the whole chain adds (seal reader, carry-forward reader and decision, gitleaks adapter, probe retry) and the pre-push hook import table is restated (found by the kernel closure suite on the whole chain)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -94,6 +95,7 @@ step2 w200-finalizer-regression-case-completion-policy "fix(candidate-19c): exte
 step2 w201-the-suite-history-check-admits-several-recorded-extensions "fix(verify): admit several recorded case-list extensions (and a first case-completion policy) in the suite history check; record 7281e012c and 4ec6622a2"
 step2 w202-critic-preimage-repin "fix(critic): re-pin the protected Critic preimage to the current critic-review skill and roles/critic.md (PO decision 2026-11-04)"
 stepjs w203-key-shaped-fixtures-and-pem-markers-built-at-run-time "fix(security): build the key-shaped fixtures and the PEM armor markers at run time so the secret scan sees no literal"
+step2 w204-refusal-texts-name-the-admitted-listing-and-flag-spelling "fix(guard): a refused ls flag, a combined short-flag cluster and a protected-directory listing name the admitted spelling in the refusal (Q2, F9)"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
