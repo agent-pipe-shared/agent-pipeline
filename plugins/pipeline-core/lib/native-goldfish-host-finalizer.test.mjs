@@ -225,7 +225,8 @@ const cases = [
     const backgroundMessage = nativeGoldfishHookMessage(background);
     assert.match(backgroundMessage, /\(NGHF-PENDING-UNAVAILABLE\)/u);
     assert.match(backgroundMessage, /background/u);
-    assert.match(backgroundMessage, /Dispatch: <dispatchId> \(goldfish\)/u);
+    assert.match(backgroundMessage, /goldfish-host-commit-recover\.mjs plan/u);
+    assert.match(backgroundMessage, /one ordinary commit with the dispatch trailer/u);
     assert.match(backgroundMessage, /dispatch-record-write\.mjs/u);
     const unprepared = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: launch({ status: "completed" }, false) }, dependencies);
     assert.equal(unprepared.code, "NGHF-PENDING-UNAVAILABLE");

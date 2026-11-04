@@ -189,7 +189,8 @@ test("AC-123 present-plan RED: a scratch mirror without the duplicate check admi
   return withFixture("feature", f => {
     const r1 = receipt(f, "red-dup");
     const argv = ["present-plan", "--by", "F", "--review-receipt", r1, "--review-receipt", r1];
-    const mirror = mirrorSanctionedArgs(s => s.replace("|| receipts.has(args[index + 1])", ""));
+    // The duplicate check is spelled the same in the `prepare-seal` branch (which precedes `present-plan`), so every occurrence is removed.
+    const mirror = mirrorSanctionedArgs(s => s.replaceAll("|| receipts.has(args[index + 1])", ""));
     return import(pathToFileURL(mirror.file).href).then(mod => {
       try {
         assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true);

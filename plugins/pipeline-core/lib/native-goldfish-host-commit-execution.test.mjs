@@ -76,9 +76,10 @@ const cases = [
     for (const reason of ["async-launch", "no-pending"]) {
       const message = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-PENDING-UNAVAILABLE",
         reason, commit: null, record: null });
-      assert.match(message, /Dispatch: <dispatchId> \(goldfish\)/u, reason);
+      assert.match(message, /goldfish-host-commit-recover\.mjs plan/u, reason);
+      assert.match(message, /typed orchestrator-attested dispatch record/u, reason);
       assert.doesNotMatch(message, /write the dispatch record via/u, reason);
-      assert.match(message, /dispatch-record-write\.mjs refuses/u, reason);
+      assert.match(message, /dispatch-record-write\.mjs still refuses/u, reason);
       assert.match(message, /not host-observed evidence/u, reason);
       assert.doesNotMatch(message, /NGHS-/u, reason);
     }
