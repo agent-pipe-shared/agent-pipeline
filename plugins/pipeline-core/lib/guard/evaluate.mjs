@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
 import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
-import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
 import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
@@ -522,10 +522,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     } else {
       // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
       let flag = null;
+      let glob = null;
       if (!outsideRoot) {
-        try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
+        const readCommand = input.tool_input.command ?? input.tool_input.CommandLine;
+        // F9: a rejected rg glob value is named first, with the forms that are admitted (the value, not the -g flag, is the fault).
+        try { glob = firstUnadmittedGlobValue(readCommand, root); } catch { glob = null; }
+        if (glob === null) {
+          try { flag = firstUnadmittedFlag(readCommand, root); } catch { flag = null; }
+        }
       }
-      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
+      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"`;
+      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
     }
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {

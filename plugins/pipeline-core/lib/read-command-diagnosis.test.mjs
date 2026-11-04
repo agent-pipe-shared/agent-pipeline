@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { firstUnadmittedFlag } from "./read-command-diagnosis.mjs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -64,6 +64,28 @@ test("RCD9: the refusal names the flag it objects to",
     const result = await refusal("rg --hidden needle README.md");
     assert.match(String(result.stderr), /Rejected element: the flag "--hidden"\./u);
   });
+
+test("RCD10: a glob value outside the admitted forms is named, the admitted ones are not", () => {
+  assert.equal(isReadOnlyDiagnosticCommand("rg --files plugins -g 'w130*'", root), false, "fixture must be refused");
+  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g 'w130*'", root), "w130*");
+  assert.equal(firstUnadmittedGlobValue("rg -n needle README.md --glob 'scratch/*.md'", root), "scratch/*.md");
+  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g '*.mjs'", root), null, "admitted command");
+  assert.equal(firstUnadmittedGlobValue("rg --hidden -n needle README.md", root), null, "a flag fault is not a glob fault");
+  assert.equal(firstUnadmittedGlobValue("rg -n needle ../outside.txt -g '*.md'", root), null, "the operand is the problem");
+  assert.equal(firstUnadmittedGlobValue("rg --files plugins -g 'w130*' | head -n 3", root), null, "pipelines are not diagnosed");
+  assert.equal(firstUnadmittedGlobValue("cat README.md", root), null);
+  assert.equal(firstUnadmittedGlobValue(undefined, root), null);
+});
+
+test("RCD11: the refusal names the glob value and the admitted forms, and still grants nothing", async () => {
+  const command = "rg --files plugins -g 'w130*'";
+  const result = await refusal(command);
+  assert.equal(result.exitCode, 2);
+  assert.match(String(result.stderr), /GUARD-READ-COMMAND-UNSUPPORTED/u);
+  assert.match(String(result.stderr), /Rejected element: the glob value "w130\*"/u);
+  assert.ok(String(result.stderr).includes(GLOB_FORM_HINT), "the hint sentence is printed");
+  assert.equal(isReadOnlyDiagnosticCommand(command, root), false);
+});
 
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
   const command = "rg --hidden needle README.md";

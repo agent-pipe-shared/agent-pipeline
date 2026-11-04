@@ -15,6 +15,40 @@ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
 const quote = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
 
+/**
+ * F9 (candidate 19): the filename-filter forms the grammar admits for `rg -g`/`--glob`, as one sentence the refusal prints. It is
+ * prose only; the grammar (`isBoundedFilenameFilter`) stays the single authority, and the helper below asks it rather than copying it.
+ */
+export const GLOB_FORM_HINT = "a filename filter admits only `*.ext`, `*.test.ext`, `**/*.ext` or a multi-dot extension such as `*.d.ts`; "
+  + "to select files by name, list them with `rg --files <dir>` and narrow with `| rg <name>`";
+
+/**
+ * Names an `rg` glob value that is the whole reason a single read command falls outside the grammar: the command is refused as written
+ * and admitted once that one value is replaced by an admitted form. Same contract as firstUnadmittedFlag: one segment, no pipeline,
+ * no redirect, nothing granted, null whenever the diagnosis could be wrong.
+ * @returns {string|null} the glob value (as written), else null.
+ */
+export function firstUnadmittedGlobValue(command, root) {
+  if (typeof command !== "string" || command.trim() === "") return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+  const { executable, argv } = parsed.segments[0];
+  if (String(executable).split("/").pop() !== "rg") return null;
+  if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  const endOfOptions = argv.indexOf("--");
+  const limit = endOfOptions === -1 ? argv.length : endOfOptions;
+  for (let index = 0; index < limit - 1; index += 1) {
+    if (argv[index] !== "-g" && argv[index] !== "--glob") continue;
+    const value = argv[index + 1];
+    if (typeof value !== "string" || value === "") continue;
+    const swapped = argv.map((token, position) => (position === index + 1 ? "*.md" : token));
+    if (isReadOnlyDiagnosticCommand([executable, ...swapped.map(quote)].join(" "), root)) return value;
+  }
+  return null;
+}
+
 /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
 export function firstUnadmittedFlag(command, root) {
   if (typeof command !== "string" || command.trim() === "") return null;
