@@ -1,0 +1,210 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index a20a5c111..05b427d10 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1003,6 +1003,7 @@
+         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
++        "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
+         "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 5b67698fd..74a2a8c46 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4495,6 +4495,12 @@
+       "file": "plugins/pipeline-core/lib/evidence-carry-forward.test.mjs",
+       "invariantPinned": "A Verify or Security record is carried from an earlier commit to a later one only when every changed path lies in the closed evidence set, the product tree hash is equal, the earlier commit is an ancestor and, for Security, a secret scan of the changed files is clean; every other outcome fails closed and the decision never changes the repository (C19 D4b/E3 stage 1, AC-108)",
+       "nonOverlapNote": "Unique cases: lib/evidence-carry-forward.mjs only; no reader calls it yet, so no other suite pins a carry-forward"
++    },
++    {
++      "name": "record-only-paths-tests",
++      "file": "plugins/pipeline-core/lib/record-only-paths.test.mjs",
++      "invariantPinned": "The record-only path set that the production push gate accepts through the release-promotion envelope is byte-identical to the one it had before it moved into its own module and is re-exported unchanged; the two classes the authority carry-forward draft adds are separate and not record-only; the narrower carry-forward decision never accepts a path outside the shared set plus the extension (C19 D4b/E3 stage 2, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/record-only-paths.mjs and the identity of its re-exports; release-promotion-envelope.test.mjs, guard-push-promotion.test.mjs and push-prepare.test.mjs pin the envelope and the push behaviour that use the set"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/record-only-paths.mjs b/plugins/pipeline-core/lib/record-only-paths.mjs
+new file mode 100644
+index 000000000..d9319297d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/record-only-paths.mjs
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * The one module that owns "which repository paths may change without invalidating a Verify or Security record"
++ * (candidate 19, stage 1 of the order of work in docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md,
++ * "Proposed amendment of 2026-11-04").
++ *
++ * RECORD_ONLY_PATH_PATTERNS moved here unchanged from lib/release-promotion-envelope.mjs, which re-exports it and
++ * isRecordOnlyPath under the same names; the production push gate (hooks/guard-push.mjs, scripts/push-prepare.mjs) therefore
++ * accepts exactly what it accepted before. Nothing is widened by this module.
++ *
++ * AUTHORITY_CARRY_EXTENSION_PATTERNS names the two classes the authority carry-forward draft needs in addition. They are
++ * NOT part of the record-only set: the release-promotion envelope does not accept them, and nothing consumes the extension yet.
++ */
++
++export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
++  /^evidence\/.*$/u,
++  /^backlog\/evidence\/.*$/u,
++  /^specs\/[^/]+\/evidence\/.*$/u,
++  /^specs\/[^/]+\/lifecycle\.json$/u,
++  /^specs\/[^/]+\/result\.md$/u,
++  /^backlog\/STATUS\.md$/u,
++  /^backlog\/index\.json$/u,
++  /^backlog\/transitions\.ndjson$/u,
++  /^backlog\/items\/.*$/u,
++  /^backlog\/PO-TOPICS\.md$/u,
++  /^docs\/state\.md$/u,
++  /^\.claude\/pipeline-state\.json$/u,
++  /^project\/pipeline-state\.json$/u,
++]);
++
++export const AUTHORITY_CARRY_EXTENSION_PATTERNS = Object.freeze([
++  /^specs\/[^/]+\/audit-bundles\/.+$/u,
++  /^project\/push-threat-model\.md$/u,
++]);
++
++function normalizePath(path) {
++  return typeof path === "string" ? path.replaceAll("\\", "/").replace(/^\.\//u, "") : null;
++}
++
++export function isRecordOnlyPath(path) {
++  const normalized = normalizePath(path);
++  if (normalized === null) return false;
++  return RECORD_ONLY_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
++}
++
++/** True for the two classes only the authority carry-forward draft adds. Not accepted by the promotion envelope. */
++export function isAuthorityCarryExtensionPath(path) {
++  const normalized = normalizePath(path);
++  if (normalized === null) return false;
++  return AUTHORITY_CARRY_EXTENSION_PATTERNS.some((pattern) => pattern.test(normalized));
++}
+diff --git a/plugins/pipeline-core/lib/record-only-paths.test.mjs b/plugins/pipeline-core/lib/record-only-paths.test.mjs
+new file mode 100644
+index 000000000..31fadc395
+--- /dev/null
++++ b/plugins/pipeline-core/lib/record-only-paths.test.mjs
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import test from "node:test";
++
++import { isEvidencePath } from "./evidence-carry-forward.mjs";
++import * as envelope from "./release-promotion-envelope.mjs";
++import { AUTHORITY_CARRY_EXTENSION_PATTERNS, RECORD_ONLY_PATH_PATTERNS, isAuthorityCarryExtensionPath, isRecordOnlyPath } from "./record-only-paths.mjs";
++
++// The sources the production push gate accepted before the set moved into its own module. Any change here widens or narrows
++// what hooks/guard-push.mjs and scripts/push-prepare.mjs accept, so it must be a deliberate, reviewed edit of this list.
++const PRE_MOVE_SOURCES = [
++  "^evidence\\/.*$",
++  "^backlog\\/evidence\\/.*$",
++  "^specs\\/[^/]+\\/evidence\\/.*$",
++  "^specs\\/[^/]+\\/lifecycle\\.json$",
++  "^specs\\/[^/]+\\/result\\.md$",
++  "^backlog\\/STATUS\\.md$",
++  "^backlog\\/index\\.json$",
++  "^backlog\\/transitions\\.ndjson$",
++  "^backlog\\/items\\/.*$",
++  "^backlog\\/PO-TOPICS\\.md$",
++  "^docs\\/state\\.md$",
++  "^\\.claude\\/pipeline-state\\.json$",
++  "^project\\/pipeline-state\\.json$",
++];
++
++test("ROP1: the record-only set is byte-identical to the one the promotion envelope had, in the same order", () => {
++  assert.deepEqual(RECORD_ONLY_PATH_PATTERNS.map((pattern) => pattern.source), PRE_MOVE_SOURCES);
++  assert.ok(RECORD_ONLY_PATH_PATTERNS.every((pattern) => pattern.flags === "u"));
++  assert.ok(Object.isFrozen(RECORD_ONLY_PATH_PATTERNS));
++});
++
++test("ROP2: the promotion envelope re-exports the very same objects, so every existing importer is unchanged", () => {
++  assert.equal(envelope.RECORD_ONLY_PATH_PATTERNS, RECORD_ONLY_PATH_PATTERNS);
++  assert.equal(envelope.isRecordOnlyPath, isRecordOnlyPath);
++});
++
++test("ROP3: membership and normalisation behave as before", () => {
++  for (const path of ["evidence/verify-latest.json", "backlog/items/x.md", "specs/f/evidence/a/b.json", "specs/f/lifecycle.json", "specs/f/result.md",
++    "docs/state.md", ".claude/pipeline-state.json", "project/pipeline-state.json", "./docs/state.md", "specs\\f\\result.md"]) {
++    assert.equal(isRecordOnlyPath(path), true, path);
++  }
++  for (const path of ["src/app.mjs", "specs/f/plan.md", "specs/f/spec.md", "project/guard-config.json", "docs/other.md", "specs/f/sub/result.md",
++    "specs/f/audit-bundles/b.json", "project/push-threat-model.md", "", undefined, null, 7]) {
++    assert.equal(isRecordOnlyPath(path), false, String(path));
++  }
++});
++
++test("ROP4: the two extension classes are separate from the record-only set and accepted by the extension predicate only", () => {
++  assert.equal(AUTHORITY_CARRY_EXTENSION_PATTERNS.length, 2);
++  assert.ok(Object.isFrozen(AUTHORITY_CARRY_EXTENSION_PATTERNS));
++  for (const path of ["specs/f/audit-bundles/b.json", "specs/f/audit-bundles/deep/c.json", "project/push-threat-model.md", "./project/push-threat-model.md"]) {
++    assert.equal(isAuthorityCarryExtensionPath(path), true, path);
++    assert.equal(isRecordOnlyPath(path), false, `${path} must not be record-only`);
++  }
++  for (const path of ["specs/f/evidence/a.json", "docs/state.md", "specs/f/audit-bundles", "project/other.md", "", undefined]) {
++    assert.equal(isAuthorityCarryExtensionPath(path), false, String(path));
++  }
++});
++
++test("ROP5: the narrower carry-forward decision of w156 never accepts a path outside the record-only set plus the extension", () => {
++  const samples = ["specs/f/evidence/new.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md",
++    "project/push-threat-model.md", "docs/state.md", "backlog/items/x.md", "backlog/STATUS.md", ".claude/pipeline-state.json", "evidence/verify-latest.json",
++    "src/app.mjs", "specs/f/plan.md", "project/guard-config.json", "specs/f/sub/evidence/x.json"];
++  for (const path of samples) {
++    if (isEvidencePath(path)) {
++      assert.ok(isRecordOnlyPath(path) || isAuthorityCarryExtensionPath(path), `${path} is accepted by w156 but by neither shared definition`);
++    }
++  }
++  // The deliberate differences, pinned so they cannot drift unnoticed: the shared record-only set is wider than the w156 set in these members.
++  for (const wider of ["docs/state.md", "backlog/items/x.md", "backlog/STATUS.md", ".claude/pipeline-state.json", "evidence/verify-latest.json"]) {
++    assert.equal(isRecordOnlyPath(wider), true, wider);
++    assert.equal(isEvidencePath(wider), false, `${wider} stays refused by the w156 decision until the reviewed amendment says otherwise`);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/release-promotion-envelope.mjs b/plugins/pipeline-core/lib/release-promotion-envelope.mjs
+index 836f4317a..369a94b3e 100644
+--- a/plugins/pipeline-core/lib/release-promotion-envelope.mjs
++++ b/plugins/pipeline-core/lib/release-promotion-envelope.mjs
+@@ -19,6 +19,7 @@
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { validateVerifySelection } from "./verify-selection.mjs";
++import { RECORD_ONLY_PATH_PATTERNS, isRecordOnlyPath } from "./record-only-paths.mjs";
+ 
+ // v2 closes the last promotion substitution seam: both records a consumer
+ // relies on are now supplied explicitly and security is byte-bound.
+@@ -73,27 +74,9 @@ export function securityEvidenceBindingFromInput(input, { sourceCommit, sourceTr
+   };
+ }
+ 
+-export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
+-  /^evidence\/.*$/u,
+-  /^backlog\/evidence\/.*$/u,
+-  /^specs\/[^/]+\/evidence\/.*$/u,
+-  /^specs\/[^/]+\/lifecycle\.json$/u,
+-  /^specs\/[^/]+\/result\.md$/u,
+-  /^backlog\/STATUS\.md$/u,
+-  /^backlog\/index\.json$/u,
+-  /^backlog\/transitions\.ndjson$/u,
+-  /^backlog\/items\/.*$/u,
+-  /^backlog\/PO-TOPICS\.md$/u,
+-  /^docs\/state\.md$/u,
+-  /^\.claude\/pipeline-state\.json$/u,
+-  /^project\/pipeline-state\.json$/u,
+-]);
+-
+-export function isRecordOnlyPath(path) {
+-  if (typeof path !== "string") return false;
+-  const normalized = path.replaceAll("\\", "/").replace(/^\.\//u, "");
+-  return RECORD_ONLY_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
+-}
++// The record-only path set lives in lib/record-only-paths.mjs (candidate 19: one owner for the definition); the
++// names stay exported from here so every existing importer keeps working unchanged.
++export { RECORD_ONLY_PATH_PATTERNS, isRecordOnlyPath };
+ 
+ function canonicalJson(value) {
+   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
