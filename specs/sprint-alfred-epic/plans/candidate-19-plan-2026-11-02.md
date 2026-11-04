@@ -329,6 +329,16 @@ FV finding 2 (open, PO decision): the control-plane script scan (w131, Q5) refus
 
 Still to build: Q2 control-root half (not reproduced in a clone; recorded as non-reproducible, the refusal texts are pinned), F9 rest (reworded pinned refusal texts, not sliced). Then an own Critic review of the late-binding chain and of D3 (the PO lifted the suspension for these only), the stamp of 19c by the Elephant and the PO's install. Nothing in this section is accepted by the PO.
 
+## Open after the first Full Verify (2026-11-04): what only the PO or a real run can close
+
+Decisions for the PO (each with the repair that is ready or named):
+1. History exception K143: `verify-suite-append-history-check` is red at 7281e012c; `verify-suite-history-recovery.json` admits exactly one `rewrites` entry by design. Repair: lift the cap in `check-verify-suite-append.mjs` (lines 175, 322) and record a second entry (commit, parent, both registry digests). Not built: it loosens a deliberately closed gate.
+2. Security scan: 14 unsuppressed gitleaks findings (list in the Full Verify table above) make the verdict BLOCKING. Repair: the reviewed-value gate of `gitleaks-repair-ignore.mjs` per value, or change the fixture text; the two held patches w43 and w45 cannot be edited without changing the code they carry.
+3. Control-plane script scan: exact-path exemption for the repository's own verify scripts (FV finding 2). Not built: widens what an agent-started script may read.
+4. `codex-isolated-critic-protected-preimage-tests`: the pinned preimage differs from `critic-review/SKILL.md` and `roles/critic.md` (same in the main tree). Re-pin only by the PO.
+
+Only a real run can close: native Windows (E1, E2, E4, E7, Q10), real runner runs, hook activation, the own Critic review of the late-binding chain and D3, the stamp of 19c (on the PO's call), the PO's install and acceptance. `native-goldfish-host-finalizer-regression-tests` is green alone and red only under Full Verify load.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
