@@ -11625,7 +11625,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
           planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
         if (!designDraft.ok) {
-          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+          // Candidate 19 (Q7): the inspection already carries the invalid field and what it expects; the message dropped them.
+          const designDraftDetail = typeof designDraft.field === "string"
+            ? ` (field ${designDraft.field}: ${designDraft.expected}${typeof designDraft.rejectedValue === "string" ? `; rejected value ${designDraft.rejectedValue}` : ""})` : "";
+          console.error(`Error: submit-plan blocked by ${designDraft.code}${designDraftDetail}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
           return 2;
         }
         submitDesignDraft = designDraft;

@@ -94,6 +94,9 @@ test("field-local diagnostics identify the single invalid architecture input", (
     [input => { input.modules[0].ownedPaths[0] = "../escape/**"; }, "modules[0].ownedPaths[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
     [input => { input.modules[0].publicContracts[0] = "docs/*"; }, "modules[0].publicContracts[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
     [input => { input.modules[0].verificationEntryPoints[0] = "tests/*"; }, "modules[0].verificationEntryPoints[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+    // Candidate 19 (Q7): the surface refusal names the entry that is invalid, not only the code.
+    [input => { input.implementationSurface = ["src/application.mjs", "src/icons/"]; }, "implementationSurface[1]", "ARCHITECTURE-DESIGN-SURFACE-INVALID"],
+    [input => { input.implementationSurface = ["unowned.mjs"]; }, "implementationSurface[0]", "ARCHITECTURE-DESIGN-SURFACE-INVALID"],
   ]) {
     const input = design(); mutate(input);
     assert.throws(() => parseArchitectureDesign(prd(input)), error =>

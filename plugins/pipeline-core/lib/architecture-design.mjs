@@ -120,8 +120,15 @@ export function parseArchitectureDesign(prd) {
     }
   }
   requireValue(input.modules.every(module => module.allowedDependencies.every(id => ids.has(id))), "ARCHITECTURE-DESIGN-DEPENDENCY-INVALID");
-  requireValue(Array.isArray(input.implementationSurface) && input.implementationSurface.length > 0
-    && input.implementationSurface.every(p => bounded(p) && resolveModuleForPath(p, input.modules)), "ARCHITECTURE-DESIGN-SURFACE-INVALID");
+  requireValue(Array.isArray(input.implementationSurface) && input.implementationSurface.length > 0, "ARCHITECTURE-DESIGN-SURFACE-INVALID");
+  // Candidate 19 (Q7, Claude greenfield report): the refusal named neither the field nor the entry, so a trailing slash in one of 29 entries
+  // was found only by reading this source. The field and the rule are named now, one entry at a time.
+  input.implementationSurface.forEach((path, index) => {
+    requireField(bounded(path), "ARCHITECTURE-DESIGN-SURFACE-INVALID", `implementationSurface[${index}]`,
+      "a bounded repository-relative file path: no trailing slash (a directory is not an entry; name its files), no glob, no `..`", path);
+    requireField(resolveModuleForPath(path, input.modules), "ARCHITECTURE-DESIGN-SURFACE-INVALID", `implementationSurface[${index}]`,
+      "a path owned by exactly one declared module (a module's ownedPaths must cover it)", path);
+  });
   const model = input.fitnessModel;
   requireValue(model?.schema === "pipeline.fitness-model.v1" && model.profileId?.trim() && model.revision === 1
     && Array.isArray(model.allowedBoundaryCrossings) && model.antiFragmentationPolicy
