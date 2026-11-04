@@ -154,6 +154,24 @@ export const POWERSHELL_GRAMMAR_EXAMPLES = {
   read: "Get-Content -LiteralPath docs/a.md",
 };
 
+// C19C-W169 (E7 PowerShell part): the forms the PowerShell dialect admits, as ONE table. Every GUARD-POWERSHELL-GRAMMAR refusal renders it (the refused
+// shape's alternative is always on the page) and powershell-bash-guard-parity.test.mjs submits every example, so the printed text cannot drift from what is
+// admitted. `<plugin-root>` is replaced by the guard's own plugin root when the text is rendered. The git row is the read-only subcommand set of the Bash
+// grammar (isReadOnlyDiagnosticCommand answers for it), not a second list.
+export const POWERSHELL_ADMITTED_SHAPES = [
+  { spelling: "one literal read of one contained path (Get-Content, Get-ChildItem, Get-Item, Test-Path)", example: POWERSHELL_GRAMMAR_EXAMPLES.literal },
+  { spelling: "New-Item for a scratch file or directory", example: POWERSHELL_GRAMMAR_EXAMPLES.newItem },
+  { spelling: "Set-Content or Add-Content for a scratch file", example: POWERSHELL_GRAMMAR_EXAMPLES.contentWrite },
+  { spelling: "a read-only git observation: the same read-only subcommands the Bash grammar admits (status, log, diff, show, rev-parse, ls-files, ...); never commit, push, add, reset or checkout",
+    example: "git status --short" },
+  { spelling: "a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it",
+    example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect" },
+  { spelling: "`--help` of a sanctioned Pipeline script, and in a ready session the read-only plan, inspect and binding verbs (continuity-authority-revision-plan, continuity-result-bootstrap-plan, dispatch-briefing binding)",
+    example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" continuity-authority-revision-plan --help" },
+  { spelling: "one literal `$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"` assignment (this plugin's root only), folded into the single command after the `;`",
+    example: "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\"" },
+];
+
 // C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
 export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
   + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "

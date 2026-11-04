@@ -739,7 +739,20 @@ export function readToolScopeVerdict(input, root, dependencies) {
   // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
   if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
-    + `${READ_TARGET_EXACT_FILE_ADVICE}\n`);
+    + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
+    + (toolName === "Glob"
+      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or is <directory>/*; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+      : ""));
+}
+
+// C19C-W169 (W5): a project directory that is not a credential root was refused with a text that spoke only of plugin files and named no protected
+// root. The refusal itself is unchanged (SEC-11: native Grep names one exact file); the text now says which roots are protected, that a plain project
+// directory is not one of them, and which spelling is admitted instead. Also printed by the PowerShell dialect's read refusal.
+export function readTargetProtectedRootsAdvice() {
+  const stores = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 6).join(", ");
+  return `Protected roots: credential stores under the home directory (${stores}, ...), the machine and repository PO key-directory pointers, system pseudo-files, and secret-named files (id_*, credentials, *.pem, *.key, ...). `
+    + "A project directory that is not a protected root is not what was refused: native Grep searches one exact file (guardrail SEC-11), so list the directory with Glob "
+    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project.";
 }
 
 // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal

@@ -9,8 +9,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
-import { nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
+import { readTargetProtectedRootsAdvice, readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
+import { READ_TARGET_EXACT_FILE_ADVICE, nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
 import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
@@ -420,7 +420,9 @@ function isNativeImplementationSubagent(entry) {
 // verdict bottoms out in, with its single PASSIVE_READ_CREDENTIAL_ROOTS list) for directory and search
 // operands. Both resolve a relative operand against the project root and check the lexical AND the
 // physical (symlink-resolved) identity.
-const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.";
+// C19C-W169 (W5): the same alternative and protected-roots statement the Claude native lane prints (read-scope.mjs), on the first line's code unchanged.
+const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+  + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}`;
 
 /** Path operands of one native read-only tool call. kind: "file" (contents of one file), "content"
  * (a search that reads file contents), "listing" (entry names only). A present-but-unusable operand,

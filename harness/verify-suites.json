@@ -4564,6 +4564,12 @@
       "file": "plugins/pipeline-core/lib/authority-seal-reader.test.mjs",
       "invariantPinned": "The one shared reader of the bound authority documents returns sealed and digests, reads a state without the sealed marker as sealed (the identity for every bound project), reads a draft as paths without digests, fails closed on any invalid shape, never throws, and every refusal names a typed exit so that no state is a dead end (C19 late-binding build step 1a, inert)",
       "nonOverlapNote": "Unique cases: lib/authority-seal-reader.mjs; continuity-state tests pin the persisted authority schema, which does not know the sealed marker yet"
+    },
+    {
+      "name": "powershell-bash-guard-parity-tests",
+      "file": "plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs",
+      "invariantPinned": "The PowerShell dialect of the lifecycle guard gives the Bash grammar's verdict for read-only git observations (mutating git stays refused), folds one literal PIPELINE_PLUGIN_ROOT assignment into the command after it, admits --help and the read-only plan and binding verbs of sanctioned scripts only in a ready session, publishes its admitted forms as one table that every grammar refusal prints and the suite submits, and states the protected roots in the native read refusal; every Bash shape the dialect cannot express is listed as Bash-only with a reason (C19 E7 PowerShell part, W4, W5, AC-108)",
+      "nonOverlapNote": "Unique cases: lib/guard/powershell-dialect.mjs and the refusal tables of grammar-denials.mjs; g23-read-help-tests pins the C18-8 working examples, the passive-matrix suites pin the native read lane"
     }
   ]
 }

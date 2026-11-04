@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "powershell-dialect" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
-import { basename, win32 } from "node:path";
+import { realpathSync } from "node:fs";
+import { basename, dirname, join, win32 } from "node:path";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
-import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
-import { verdict } from "./verdict.mjs";
-import { POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
+import { isReadOnlyDiagnosticCommand, isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
+import { exactReadyReceipt, verdict } from "./verdict.mjs";
+import * as constants from "./constants.mjs";
+import { PIPELINE_STATE_SCRIPT } from "./constants.mjs";
+import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
 import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
 import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
 
@@ -20,7 +24,7 @@ function invalidSessionObservation(root, dependencies) {
     return error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION" && error.intent === "session";
   }
 }
-import { containedLiteralReadPath, sessionReadScopeRoots } from "./read-scope.mjs";
+import { containedLiteralReadPath, readTargetProtectedRootsAdvice, sessionReadScopeRoots } from "./read-scope.mjs";
 import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 
 function powerShellNamedArgs(argv, valueFlags, bareFlags = []) {
@@ -64,8 +68,79 @@ export function sanctionedPowerShellNodeCall(command, root) {
   return isSanctionedLifecycleCommand(body, root, { platform: "win32", processExecPath: process.execPath });
 }
 
+// C19C-W169 (E7 PowerShell part): the pieces of the Bash grammar the dialect shares instead of re-listing.
+const PLUGIN_ROOT = dirname(dirname(PIPELINE_STATE_SCRIPT));
+const DISPATCH_BRIEFING_SCRIPT = join(PLUGIN_ROOT, "scripts", "dispatch-briefing.mjs");
+const FOLDABLE_ENV_NAME = "PIPELINE_PLUGIN_ROOT";
+// A literal `$env:NAME = "literal"` followed by `;` and ONE command. Value: no expansion, no composition character, no control character.
+const ENV_ASSIGNMENT = /^\s*\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:"([^"$`;|&<>\r\n]*)"|'([^'$`;|&<>\r\n]*)')\s*;\s*([^\r\n]*?)\s*$/u;
+// Read-only verbs of the sanctioned scripts (they print or plan, they do not apply); the apply/approve/configure verbs of the same scripts are not here.
+const READY_READ_ONLY_VERBS = new Map([
+  [PIPELINE_STATE_SCRIPT, ["continuity-authority-revision-plan", "continuity-result-bootstrap-plan"]],
+  [DISPATCH_BRIEFING_SCRIPT, ["binding"]],
+]);
+
+const samePhysicalPath = (left, right) => {
+  try {
+    const a = realpathSync(left);
+    const b = realpathSync(right);
+    return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch { return false; }
+};
+
+// `$env:PIPELINE_PLUGIN_ROOT = "<this plugin's root>"; <one command>` -> the one command with the variable replaced by that literal. Anything else
+// that starts with `$env:` is not folded (null) and meets the composition refusal below.
+function foldPluginRootAssignment(command) {
+  const match = ENV_ASSIGNMENT.exec(command);
+  if (match === null || match[1].toUpperCase() !== FOLDABLE_ENV_NAME) return null;
+  const value = match[2] ?? match[3];
+  if (value === "" || !samePhysicalPath(value, PLUGIN_ROOT)) return null;
+  const folded = match[4].replace(/\$env:PIPELINE_PLUGIN_ROOT\b/giu, () => value);
+  return /[$`]/u.test(folded) || folded === "" ? null : folded;
+}
+
+// Every sanctioned script constant of the Bash grammar (constants.mjs, `*_SCRIPT`) plus dispatch-briefing, matched by physical identity.
+const SANCTIONED_SCRIPTS = [...Object.entries(constants).filter(([name, value]) => name.endsWith("_SCRIPT") && typeof value === "string").map(([, value]) => value), DISPATCH_BRIEFING_SCRIPT];
+
+function scriptIsSanctioned(script) {
+  return SANCTIONED_SCRIPTS.some((candidate) => candidate === script || samePhysicalPath(candidate, script));
+}
+
+function sessionIsReady(root, dependencies) {
+  try {
+    return exactReadyReceipt((dependencies?.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({ rootDir: root, intent: "session", runner: dependencies?.runner }));
+  } catch { return false; }
+}
+
+// `--help` of a sanctioned script, and its read-only plan/inspect/binding verbs, in a READY session. The Bash lane reaches the same commands through
+// the ready lifecycle tail; a not-ready session keeps exactly the shapes isSanctionedLifecycleCommand lists.
+function isReadyReadOnlyScriptRoute(command, root, dependencies) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, {});
+  if (resolved === null || !scriptIsSanctioned(resolved.script)) return false;
+  const { script, args } = resolved;
+  if (args.some((arg) => typeof arg !== "string" || arg === "" || /[\0$`*?\[\]{}]/u.test(arg) || arg.startsWith("@"))) return false;
+  const helpOnly = args.length === 1 && ["--help", "-h"].includes(args[0]);
+  const verbs = [...READY_READ_ONLY_VERBS].find(([path]) => path === script || samePhysicalPath(path, script))?.[1] ?? [];
+  return (helpOnly || verbs.includes(args[0])) && sessionIsReady(root, dependencies);
+}
+
+// The refusal for a shape the dialect does not admit: the sentence, the alternative for THAT shape, and the whole admitted table.
+function powerShellRefusal(sentence, shape, alternative = POWERSHELL_GRAMMAR_EXAMPLES[shape]) {
+  const render = (text) => text.replaceAll("<plugin-root>", PLUGIN_ROOT);
+  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
+    + `Working example: ${render(alternative)}\n`
+    + "The complete admitted PowerShell forms, with exact spellings:\n"
+    + POWERSHELL_ADMITTED_SHAPES.map((entry) => `- ${render(entry.spelling)}\n  e.g. ${render(entry.example)}\n`).join("");
+}
+
 export function powerShellScopeVerdict(input, root, dependencies) {
-  const command = input.tool_input.command ?? input.tool_input.CommandLine;
+  const original = input.tool_input.command ?? input.tool_input.CommandLine;
+  const folded = typeof original === "string" && /^\s*\$env:/iu.test(original) ? foldPluginRootAssignment(original) : null;
+  const command = folded ?? original;
+  if (folded === null && typeof original === "string" && /^\s*\$env:/iu.test(original)) {
+    return verdict(2, powerShellRefusal("an $env: assignment is admitted only as one literal PIPELINE_PLUGIN_ROOT assignment naming this plugin's root, followed by `;` and one literal command.", "literal",
+      "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\""));
+  }
   if (sanctionedPowerShellNodeCall(command, root)) return verdict(0);
   // PowerShell interpolation and composition must never be interpreted as a literal path.
   if (/[\r\n;$`@|&<>]/u.test(command)) {
@@ -111,19 +186,38 @@ export function powerShellScopeVerdict(input, root, dependencies) {
       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
       ? verdict(0)
       : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
-        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`);
+        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`
+        + `${readTargetProtectedRootsAdvice()}\n`);
   }
-  if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
+  if (["node", "node.exe"].includes(name)
+    && (isSanctionedLifecycleCommand(command, root) || isReadyReadOnlyScriptRoute(command, root, dependencies))) return verdict(0);
+  const bareExecutable = executable.toLowerCase();
+  // Only the literal executable `git` / `git.exe` (never a path). A read-only observation gets the verdict the Bash grammar gives the same words
+  // (isReadOnlyDiagnosticCommand is the table; the dialect keeps no list of its own). Characters PowerShell reads as syntax inside an argument
+  // (a comma makes an array, parentheses a sub-expression, braces a script block) are refused before the words are handed to the POSIX reader.
+  if (["git", "git.exe"].includes(bareExecutable)
+    && !argv.some((arg) => /[(){},]/u.test(arg))
+    && isReadOnlyDiagnosticCommand(["git", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
-  if (["git", "git.exe"].includes(executable.toLowerCase())
+  if (["git", "git.exe"].includes(bareExecutable)
     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
     && invalidSessionObservation(root, dependencies)) return verdict(0);
+  if (["git", "git.exe"].includes(bareExecutable)) {
+    return verdict(2, powerShellRefusal("git is admitted from PowerShell for read-only observations only (the same read-only subcommands the Bash grammar admits); this command is not one.", "literal", "git status --short"));
+  }
+  if (["node", "node.exe"].includes(name) && argv.length > 0) {
+    const script = argv[0];
+    const own = typeof script === "string" && scriptIsSanctioned(script);
+    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither.",
+      "literal", own ? `node "${script}" --help` : "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect"));
+  }
   return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
 }
 
+const posixWord = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
+
 // C18-8 (AC-239): every GUARD-POWERSHELL-GRAMMAR refusal ends with one working example for the shape it refused (examples pinned as admitted
-// by g23-read-help.test.mjs); the code and its first sentence are unchanged.
+// by g23-read-help.test.mjs); the code and its first sentence are unchanged. C19C-W169: it also prints the table of admitted forms.
 function powerShellGrammarDenial(sentence, shape) {
-  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
-    + `Working example: ${POWERSHELL_GRAMMAR_EXAMPLES[shape]}\n`;
+  return powerShellRefusal(sentence, shape);
 }

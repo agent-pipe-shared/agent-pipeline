@@ -943,6 +943,7 @@
         "verify-phase:harness/scripts/verify.mjs:portable-critic-export-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-fanout-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+        "verify-phase:harness/scripts/verify.mjs:powershell-bash-guard-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
