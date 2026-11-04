@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 
 import { createThreatModelApprovalRequest, readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+import { cleanTreeRemedy } from "../lib/pipeline-owned-files.mjs";
 
 const usage = "Usage: po-approval-request.mjs prepare --feature-id cyb-4 --plan <repo-path> --spec <repo-path> --model <repo-path> [--repo-root <path>] | verify --request <external-public-json> --authority <external-public-json> --proof <external-public-json> [--repo-root <path>]";
 
@@ -39,7 +39,7 @@ export function observeCleanCandidate(repoRoot) {
   const dirty = execFileSync("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" });
   // PF-36: when only the Pipeline's own files are dirty, the refusal names the command that commits exactly them.
   if (dirty !== "") {
-    const remedy = pipelineOwnedRemedy(dirty, root);
+    const remedy = cleanTreeRemedy(dirty, root);
     throw new Error(`repository must be clean before preparing a PO approval request${remedy ? `; ${remedy}` : ""}`);
   }
   const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();

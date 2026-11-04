@@ -44,6 +44,7 @@ import {
   verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 import { isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
+import { loadProtectedTestPathRules, protectedTestPathRuleFor } from "./protected-test-paths.mjs";
 // Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
 // the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
 // importing it to reuse one function would run a guard as a side effect of loading this
@@ -6616,6 +6617,123 @@ function hgoPublishBriefedAuthority({repo, paths, record}, publish) {
 }
 export function consumeHumanGuardOverride(input = {}) {
   return consumeHumanGuardOverrideCore(input);
+}
+
+// ---------------------------------------------------------------------------------
+// D3: the commit capability of a signed feature-package reconcile (ADR point 3)
+// ---------------------------------------------------------------------------------
+// The signed apply writes the package manifest (and the Result file a reconcile ratifies); the pre-commit hook then
+// refuses to commit a closed feature's `PB-CONTINUITY-*` files without a second override signature. The reconcile's own
+// signature already binds those paths and bytes, so the apply deposits ONE capability, in the existing override
+// journal (capabilities directory, audit ledger, HMAC), shaped to the hook's own commit-scope consumption
+// (toolName Bash, `git commit`, pipelineCommitScope = { schema, head, indexTree, protectedPaths }, denial text
+// "PB-GUARD-HOOKS: ... scope <sha>"; scripts/pre-commit-hook-install.mjs commitOverrideCourse). Nothing here is
+// new binding logic: head and index tree bind HEAD and the exact staged paths and bytes, so any other path, any
+// changed byte, a HEAD move or a tree change finds a different toolInputSha256 and is not admitted; the hook marks
+// the capability consumed on first use (once); the window below bounds it in time.
+export const RECONCILE_COMMIT_SCOPE_SCHEMA = "pipeline.pre-commit-protected-scope.v1";
+export const RECONCILE_COMMIT_WINDOW_MS = 3_600_000;
+const RECONCILE_COMMIT_CLASS = "reconcile-commit-scope";
+const RECONCILE_COMMIT_HEAL_REPLAN = "run `pipeline-state.mjs continuity-result-bootstrap-plan` for a fresh signing command (a HEAD or tree change needs a fresh signature)";
+
+function reconcileCommitFail(code, message, heal) {
+  const error = new HumanGuardOverrideError(code, `${message}; heal: ${heal}`);
+  error.heal = heal;
+  throw error;
+}
+
+/**
+ * Arms the commit capability for the files a signed reconcile wrote (`files`: `{ path, sha256 }`, the exact paths and
+ * bytes). `dryRun: true` is the read-only precheck the apply runs BEFORE it consumes the proof: it only refuses what
+ * would later make arming impossible (HGO-RC-FOREIGN-STAGED) and stages nothing. Returns `{ status: "armed" | "ready" |
+ * "not-needed", ... }`; throws HumanGuardOverrideError with `.heal` (the one command that clears it) otherwise.
+ */
+export function armReconcileCommitCapability({
+  rootDir, pluginRoot, files, reconcilePlanSha256 = null, approval = {}, dryRun = false,
+  nowMs = Date.now(), windowMs = RECONCILE_COMMIT_WINDOW_MS, spawn = spawnSync,
+} = {}) {
+  if (!Array.isArray(files) || files.length === 0
+    || files.some((file) => !object(file) || typeof file.path !== "string" || file.path === "" || !(dryRun ? file.sha256 === null || SHA256.test(file.sha256 ?? "") : SHA256.test(file.sha256 ?? "")))
+    || !(dryRun || SHA256.test(reconcilePlanSha256 ?? ""))) {
+    fail("HGO-RC-INPUT", "the reconcile commit capability needs the exact paths and sha256 digests of the files the signed apply wrote");
+  }
+  const repo = topology(rootDir, spawn);
+  const run = (args) => spawn("git", args, { cwd: repo.root, encoding: "utf8", shell: false, timeout: 20000 });
+  if (run(["rev-parse", "--verify", "-q", "HEAD"]).status !== 0) return { status: "not-needed", reason: "unborn-head" };
+  const head = git(repo.root, ["rev-parse", "HEAD"], spawn);
+  const paths = [];
+  for (const file of files) {
+    const absolute = resolve(repo.root, file.path);
+    const rel = relative(repo.root, absolute).replace(/\\/gu, "/");
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) fail("HGO-RC-INPUT", `path ${file.path} is outside the repository`);
+    if (!dryRun) {
+      let onDisk;
+      try { onDisk = sha(readFileSync(absolute)); } catch { onDisk = null; }
+      if (onDisk !== file.sha256) {
+        reconcileCommitFail("HGO-RC-BYTES", `${rel} no longer holds the bytes the signed apply wrote`, RECONCILE_COMMIT_HEAL_REPLAN);
+      }
+    }
+    paths.push(rel);
+  }
+  // Only a file that differs from HEAD is part of the commit; one committed before the ceremony is not staged again.
+  const changed = paths.filter((rel) => run(["cat-file", "-e", `HEAD:${rel}`]).status !== 0 || run(["diff", "--quiet", "HEAD", "--", rel]).status !== 0).sort();
+  const staged = String(run(["diff", "--cached", "--name-only", "-z"]).stdout ?? "").split("\0").filter(Boolean);
+  const foreign = staged.filter((rel) => !changed.includes(rel));
+  if (foreign.length > 0) {
+    reconcileCommitFail("HGO-RC-FOREIGN-STAGED", `the index already stages ${foreign.join(", ")}, which the signed reconcile does not own`,
+      `git restore --staged -- ${foreign.join(" ")}`);
+  }
+  // The hook's own finding rule: a changed path with a protected-path rule that already has history (the first appearance
+  // of a path is exempt in the hook). Gate-strength paths are not predicted here; they would carry another rule id.
+  const { rules } = loadProtectedTestPathRules({ rootDir: repo.root });
+  const findings = changed.map((rel) => ({ rel, rule: protectedTestPathRuleFor(rules, rel) }))
+    .filter((row) => row.rule && String(run(["log", "--format=%H", "-1", "--", row.rel]).stdout ?? "").trim() !== "");
+  if (findings.length === 0) return { status: "not-needed", reason: "no-protected-path", paths: changed };
+  if (dryRun) return { status: "ready", paths: changed };
+  if (run(["add", "--", ...changed]).status !== 0) reconcileCommitFail("HGO-RC-STAGE", "git add of the reconcile files failed", `git add -- ${changed.join(" ")}`);
+  for (const rel of changed) {
+    const indexed = String(run(["rev-parse", `:${rel}`]).stdout ?? "").trim();
+    if (indexed === "" || indexed !== String(run(["hash-object", "--", rel]).stdout ?? "").trim()) {
+      reconcileCommitFail("HGO-RC-BYTES", `${rel} changed while it was staged`, RECONCILE_COMMIT_HEAL_REPLAN);
+    }
+  }
+  const protectedPaths = [...new Set(findings.map((row) => row.rel))].sort();
+  const ruleIds = [...new Set(findings.map((row) => row.rule.id))].sort();
+  const indexTree = git(repo.root, ["write-tree"], spawn);
+  const scope = { schema: RECONCILE_COMMIT_SCOPE_SCHEMA, head, indexTree, protectedPaths };
+  const scopeSha256 = createHash("sha256").update(JSON.stringify(scope)).digest("hex");
+  const toolName = "Bash";
+  const toolInput = { command: "git commit", pipelineCommitScope: scope };
+  const denials = [{ guard: "pre-commit-hook", reason: `PB-GUARD-HOOKS: protected path(s) staged for commit; head ${head}; index tree ${indexTree}; paths ${protectedPaths.join(", ")}; rules ${ruleIds.join(", ")}; scope ${scopeSha256}` }];
+  const store = storage(repo.common);
+  const authorizedAt = new Date(nowMs).toISOString();
+  const humanApproval = approval.mode === "signature" ? { mode: "signature-verified" } : chatAttributionRecord({ kind: "human-guard-override" });
+  const reason = `signed feature-package reconcile ${reconcilePlanSha256}: commit exactly ${changed.join(", ")}`;
+  const requestSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, scopeSha256 });
+  const selectionSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, requestSha256, reconcilePlanSha256, proofSha256: approval.proofSha256 ?? null });
+  const planSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, selectionSha256, authorizedAt });
+  const reasonSha256 = sha(Buffer.from(reason, "utf8"));
+  const capabilityCore = {
+    schema: CAPABILITY_SCHEMA, status: "armed", root: repo.root, requestSha256, planSha256, selectionSha256, reasonSha256,
+    humanApproval, plugin: pluginIdentity(pluginRoot), repository: repositoryObservation(repo.root, spawn),
+    signedCandidate: { commit: head, tree: git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn) },
+    toolName, toolInputSha256: toolInputIdentitySha256(toolName, toolInput), commandClass: RECONCILE_COMMIT_CLASS, externalReadOnly: false,
+    denials: denialDigests(denials), policy: policyIdentity(repo.root, pluginRoot, denials),
+    preview: { guardRationale: denialRationale(denials) }, eligiblePaths: protectedPaths, mode: "standard", authorSourceRoot: null,
+    authorizedAt, expiresAt: new Date(nowMs + windowMs).toISOString(), consumedAt: null,
+  };
+  // A fresh store has no key until its first audit append creates it.
+  if (!existsSync(store.audit)) appendAudit(store, { type: "store-opened", at: authorizedAt });
+  const capability = { ...capabilityCore, mac: capabilityMac(key(store), capabilityCore) };
+  const path = capabilityPath(store, planSha256);
+  writeExclusive(path, Buffer.from(`${JSON.stringify(capability)}\n`, "utf8"));
+  try {
+    appendAudit(store, {
+      type: "authorized", at: authorizedAt, requestSha256, planSha256, reasonSha256, selectionSha256, humanApproval,
+      mode: capability.mode, authorSourceRoot: null, kind: RECONCILE_COMMIT_CLASS, reconcilePlanSha256, proofSha256: approval.proofSha256 ?? null,
+    });
+  } catch (error) { try { unlinkSync(path); } catch {} throw error; }
+  return { status: "armed", planSha256, scopeSha256, paths: changed, protectedPaths, ruleIds, head, indexTree, expiresAt: capability.expiresAt };
 }
 function hgoConsumptionBoundary(repo, consume) {
   const legacy = hgoLegacyControlOperation(repo, consume);

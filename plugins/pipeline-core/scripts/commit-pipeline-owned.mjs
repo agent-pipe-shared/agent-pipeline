@@ -64,7 +64,7 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const git = (args) => spawn("git", ["-C", root, ...args], { encoding: "utf8" });
   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
-  const { owned, others } = classifyDirtyTree(status.stdout);
+  const { owned, others } = classifyDirtyTree(status.stdout, root);
   if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
   if (!owned.length) return { status: "nothing-to-commit", owned: [] };
   if (parsed.dryRun) return { status: "dry-run", owned };

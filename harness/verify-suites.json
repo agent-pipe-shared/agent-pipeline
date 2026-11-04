@@ -3876,6 +3876,12 @@
       "nonOverlapNote": "Unique cases: the pipeline-owned commit refusal reasons for foreign files"
     },
     {
+      "name": "d3-signed-reconcile-commit-tests",
+      "file": "plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs",
+      "invariantPinned": "A signed feature-package reconcile deposits one commit capability bound to exactly its own paths and bytes that the hook-shaped commit consumes once and that expires with its window and with a HEAD or tree change, and the close steps before the ceremony leave a tree the clean-tree check passes, with every refusal naming a typed code and its command (D3, AC-108)",
+      "nonOverlapNote": "Unique cases: the reconcile commit capability and the pre-ceremony clean-tree commit of the feature package files"
+    },
+    {
       "name": "gitleaks-scratch-clones-exclusion-tests",
       "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
       "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",

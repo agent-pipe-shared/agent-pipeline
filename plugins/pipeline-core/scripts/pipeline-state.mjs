@@ -494,6 +494,8 @@ import {
   planFeaturePackageTransition,
   validateFeaturePackage,
 } from "../lib/feature-package-topology.mjs";
+import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
+import { COMMIT_PIPELINE_OWNED_SCRIPT } from "../lib/pipeline-owned-files.mjs";
 import {
   clearGateEstimateForMutation,
   prepareGateEstimateMutation,
@@ -9186,6 +9188,18 @@ function runFeaturePackageReconcileCommand(argv, deps) {
       return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
     }
 
+    // D3: the files the signed apply owns, so the one commit capability can be bound to exactly them. The read-only
+    // precheck runs BEFORE the proof is consumed: a condition that would later make arming impossible (a foreign staged
+    // path) refuses here with zero mutation and the command that clears it, instead of after the signature is spent.
+    const commitFiles = (sha256For) => [{ path: manifest, sha256: sha256For(null) }, ...plan.changes.map((change) => ({ path: change.path, sha256: sha256For(change) }))];
+    try {
+      armReconcileCommitCapability({ rootDir: root, pluginRoot: PLUGIN_ROOT, files: commitFiles(() => null), dryRun: true });
+    } catch (error) {
+      if (typeof error?.code === "string" && error.code.startsWith("HGO-RC-")) {
+        return refuseFeaturePackageRead(sub, `${error.code}: ${error.message}; zero mutation, the signed proof is not consumed`);
+      }
+    }
+
     if (typeof deps.featurePackageReconcileApproval !== "function") {
       return refuseFeaturePackageRead(sub, "PO-bound approval is unavailable (FTP-RECONCILE-APPROVAL-UNAVAILABLE); zero mutation");
     }
@@ -9270,6 +9284,28 @@ function runFeaturePackageReconcileCommand(argv, deps) {
       return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
     }
 
+    // D3: deposit the ONE commit capability for exactly the files this signed apply owns (manifest and any Result bytes
+    // it ratifies), so their commit needs no second signature. A refusal keeps the reconcile applied and exits 3 with the
+    // typed code and the heal command; any other fault only means the hook falls back to its own commit-scoped course.
+    // The writer lock file is untracked dirt while it is held; the capability binds the repository observation (status
+    // included) that the later commit will see, so the lock is released first (the release in `finally` is idempotent).
+    releaseContinuityLock(lock);
+    let commitCapability; let exit = 0;
+    try {
+      const armed = armReconcileCommitCapability({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, reconcilePlanSha256: planSha256,
+        approval: { mode: approvalCheck.mode, proofSha256: approvalCheck.proofSha256 },
+        files: commitFiles((change) => change === null ? postimage.postSha256 : change.to),
+      });
+      commitCapability = armed.status === "armed"
+        ? { status: "armed", paths: armed.paths, protectedPaths: armed.protectedPaths, expiresAt: armed.expiresAt, nextAction: `commit exactly these files now, with no other change in between: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (one commit; it expires at ${armed.expiresAt} and with any HEAD or tree change)` }
+        : { status: "not-needed", reason: armed.reason, nextAction: `commit the reconcile files with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent` };
+    } catch (error) {
+      const typed = typeof error?.code === "string" && error.code.startsWith("HGO-RC-");
+      const heal = typeof error?.heal === "string" ? error.heal : `commit with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (the pre-commit hook then names its own commit-scoped signing course)`;
+      commitCapability = { status: typed ? "refused" : "unavailable", code: typed ? error.code : (error?.code ?? "HGO-RC-UNAVAILABLE"), heal };
+      if (typed) { exit = 3; console.error(`Error: ${sub} applied, but the commit capability was not armed (${commitCapability.code}); heal: ${heal}.`); }
+    }
     console.log(JSON.stringify({
       schema: FEATURE_PACKAGE_RECONCILE_SCHEMA,
       status: "applied",
@@ -9278,8 +9314,9 @@ function runFeaturePackageReconcileCommand(argv, deps) {
       changes: postimage.changes,
       planSha256,
       manifestSha256: postimage.postSha256,
+      commitCapability,
     }, null, 2));
-    return 0;
+    return exit;
   } finally { releaseContinuityLock(lock); }
 }
 
@@ -9433,7 +9470,8 @@ export function defaultFeaturePackageReconcileApproval(argv, deps) {
     void holderLock; void holderRoot;
     const stored = writeCriticalApproval({ gitCommonDir: reconcileCommon, kind, approval: approvalRecord, consumedAt: now });
     if (!stored.ok) return { ok: false, code: stored.code };
-    return { ok: true };
+    // D3: what backed the approval travels to the commit capability's audit event (signature proof or chat attribution).
+    return { ok: true, mode: verified.proof === null ? "chat" : "signature", proofSha256: verified.proof?.proofSha256 ?? null };
   };
 }
 
