@@ -66,6 +66,24 @@ Risk: `lib/human-guard-override.mjs` is a protected guard module (operator commi
 
 Order: Direction 5 and Direction 0 first (together they remove the unguarded launch and the long lock), then the measurement of what remains decides Directions 1 and 3.
 
+## 2e. Measurement 1 of a normal dispatch (Windows, installed 19c, empty registry, 2026-11-04)
+
+One ordinary dispatch (`gf-probe-7`, pointer prompt, a single-file task, no refusal) after `session-authority-repair.mjs move-aside` had emptied the registry. The transcript record: `hook_cancelled`, `PreToolUse:Agent`, `durationMs 330105`, `timedOut true`, `timeoutMs 330000`; the Agent call then returned "Async agent launched successfully" and the Goldfish ran for 156 s and succeeded, so the dispatch ran unguarded. Reading:
+
+- **The 330 s are not stale registry members.** The registry was empty (two pending files of earlier probes remained outside it). The cost is inside the `guard-dispatch` process itself.
+- **The other three PreToolUse Agent hooks are cheap.** `worktree-isolation`, `dispatch-budget` and `lifecycle-ready` each ran in 0.2 to 8 s (at most 5 native observations). Only `guard-dispatch` is slow.
+- **No trace line exists for `guard-dispatch`.** It is ended by the host and never reaches the exit writer; the trace therefore cannot say where the time went. This is the measurement gap, not evidence about the cause.
+- **What lies before the first phase mark of 19c.** Everything up to `integrated-slice-read` ran unmarked and, in 19c and 19d as first built, outside any deadline: the queue and integration-readiness reads, two `git rev-parse`, the baseline capture, the repository inspection, the registry migration/presence check, and, because the registry was empty, `initializeSessionAuthorityRegistry` (the first governed dispatch creates the registry), the pre-boundary prescan and the lock wait. Process module loading is also outside `HOOK_ENTRY_MS` in 19c.
+- **A second problem seen in the same run.** The stale reservations of probes 1 and 2 could not be removed: `slice-queue.mjs cancel` says `SQ-NOT-FOUND` (the queue rows were discarded), `routine-repair.mjs run heal` defers every settled pending state while a bound member counts as armed or running, and only `move-aside` helped, which leaves the pending files behind. A cycle of three repairs that each need another one to have run first (open defect, not yet fixed, to be taken after the latency work).
+
+## 2f. What 19d adds because of measurement 1 (w211)
+
+1. The deadline now covers the whole preparation, not only the registry publish, and starts at the process start (`performance.timeOrigin`), so module loading counts.
+2. New phase marks before the old first one: `prepare-start`, `queue-resolve`, `integration-readiness`, `candidate-git`, `agy-baseline`, `publish-start`, `repository-inspect`, `registry-migrate`, `registry-init`, `owner`, `prescan`, `lock-wait`, `lock-held`; the hook adds `hook-entry`, `dispatch-checks-done`, `prepare-attempt`, `prepare-done`.
+3. With `PIPELINE_AUTHORITY_TRACE=1` each mark appends a `pipeline.hook-authority-progress.v1` line (phase, epoch ms, process ms, native observation count and ms) to the trace file at once, so a hook the host ends leaves the phases it reached. Without the trace nothing is written.
+
+The next Windows run of a normal dispatch on 19d therefore shows which phase the 330 s belong to (or refuses with `GUARD-DISPATCH-SLOW` before the host ends the hook). Directions 1 and 3 are decided on that line, not on the registry size.
+
 ## 3. Measurement needed first
 
 The opt-in authority trace already counts native spawns (`nativeAuthorityStats`: count, ms, maxMs, byOperation, memo hits and misses). The Windows session starts the runner from a shell with `PIPELINE_AUTHORITY_TRACE=1` and `PIPELINE_AUTHORITY_TRACE_FILE` set (PO yes in that chat), runs ONE dispatch, and reports the `pipeline.hook-authority-trace.v1` lines, the number of reservations (`session-authority-repair.mjs inspect`), and the per-phase times. Decision rule:

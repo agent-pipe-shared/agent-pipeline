@@ -1,0 +1,117 @@
+diff --git a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+index b872089ae..e43fc4a31 100644
+--- a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
++++ b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+@@ -448,6 +448,34 @@ test("PF-51: a full journal is moved aside and retained at the next offer, and t
+   }
+ });
+ 
++test("the denial path leaves closed phase marks for the authority trace: tool and reason codes only, never a command or a path", () => {
++  const root = fixture();
++  const writerKey = Symbol.for("pipeline.authority-trace-progress");
++  const prior = globalThis[writerKey];
++  try {
++    const marks = [];
++    globalThis[writerKey] = (phase) => marks.push(phase);
++    // An eligible denial builds and publishes a request: every expensive step is marked in order.
++    const planned = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
++      toolInput: { file_path: ".claude/pipeline-state.json", content: "secret-canary-not-a-secret" }, denials: denial, nowMs: NOW });
++    assert.equal(planned.status, "planned");
++    assert.deepEqual(marks, [
++      "hgo-start:Write:GUARD-DEVPLAN-NOT-READY", "hgo-eligibility:eligible", "hgo-observed", "hgo-policy", "hgo-policy-done",
++      "hgo-plugin-identity", "hgo-publish-wait", "hgo-publish-held",
++    ]);
++    // A denial that is not eligible stops after the observation and names its code.
++    marks.length = 0;
++    recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials: denial, nowMs: NOW });
++    assert.equal(marks[0], "hgo-start:Read:GUARD-DEVPLAN-NOT-READY", JSON.stringify(marks));
++    assert.match(marks[1], /^hgo-eligibility:HGO-[A-Z-]+$/u, JSON.stringify(marks));
++    assert.equal(marks.includes("hgo-plugin-identity"), false, "a denial that is not eligible builds no request");
++    for (const mark of marks) assert.equal(/canary|\/|\\|\.mjs|secret/u.test(mark), false, mark);
++  } finally {
++    if (prior === undefined) delete globalThis[writerKey]; else globalThis[writerKey] = prior;
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("the producer refuses anything but an external-operator route and any unverified append", () => {
+   const context = {
+     toolName: "Bash",
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 42a7580a8..a2b484b5f 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -67,6 +67,7 @@ import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-pro
+ // this function named by backlog/items/2026-08-28-po-facing-commands-are-not-
+ // uniformly-rendered-break-safe.md's 2026-09-01 re-verification note.
+ import { boundedOpaqueCopyCommand } from "./copy-safe-command.mjs";
++import { admissionProgress } from "./admission-progress.mjs";
+ import {
+   LEGACY_STATE,
+   NEUTRAL_STATE,
+@@ -3255,6 +3256,11 @@ function commandOfferDigests({ repo, repository, policy, toolName, eligiblePaths
+  * builders disclose a command only for a non-secret Bash input (recoveryRoute, HGO-EXTERNAL-PROJECT-BOUNDARY); every other
+  * external-operator route carries a tool name and a digest and nothing to run.
+  */
++/** A closed-text phase mark for the opt-in authority trace; only characters of a code or a tool name pass, everything else becomes "_". */
++function hgoProgress(label, detail = "") {
++  admissionProgress(detail === "" ? label : `${label}:${String(detail).replace(/[^A-Za-z0-9_.,:-]/gu, "_")}`);
++}
++
+ function routeHandsCommandToHuman(route) {
+   const action = route?.nextAction?.action;
+   if (!object(action)) return false;
+@@ -3805,12 +3811,17 @@ export function recordHumanGuardDenial({
+   appendCommandOffer = appendCommandOfferJournal,
+ } = {}) {
+   assertRawDenials(denials);
++  // Phase marks for the opt-in authority trace (a no-op without it): a native Windows consumer spent 126 to 144 s in ONE refusal and the
++  // trace line could not say which step or which denial. The marks carry the tool name and the guard reason codes only (closed text,
++  // no command, path or input).
++  hgoProgress("hgo-start", `${toolName}:${denials.slice(0, 2).map((row) => String(row?.reason ?? "").split(":")[0]).join(",")}`);
+   const pureRecovery = classifyNonLiftableGuardDenials(denials);
+   if (pureRecovery !== null) return pureRecovery;
+   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
+   if (lifecycleRecovery !== null) return lifecycleRecovery;
+   const physicalRootDir = physicalRoot(rootDir);
+   let eligible = eligibility(physicalRootDir, toolName, toolInput);
++  hgoProgress("hgo-eligibility", eligible.eligible ? "eligible" : (eligible.authorCandidate ? "author-candidate" : (eligible.code ?? "not-eligible")));
+   const isLocalPluginInstall = eligible.eligible && eligible.mode === "global-plugin-install";
+   // NVA-CROSSREPOLEDGER-1: bind command evaluation and ledger append to the guarded
+   // command's actual cross-repository target repository, not this coordinating
+@@ -3838,6 +3849,7 @@ export function recordHumanGuardDenial({
+   const repository = isLocalPluginInstall
+     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
+     : repositoryObservation(repo.root, spawn);
++  hgoProgress("hgo-observed");
+   if (denials.some(({ guard }) => String(guard) === "guard-push.mjs")) {
+     return recoveryRoute("HGO-PUBLICATION-REQUIRED", toolName, toolInput, [], {
+       root: repo.root,
+@@ -3880,7 +3892,9 @@ export function recordHumanGuardDenial({
+       : route;
+   }
+   const paths = storage(repo.common);
++  hgoProgress("hgo-policy");
+   const policy = policyIdentity(repo.root, pluginRoot, denials);
++  hgoProgress("hgo-policy-done");
+   const commandClass = eligible.commandClass
+     ?? (eligible.authorCandidate ? "pipeline-author-repair" : "exact-project-action");
+   const preview = decisionPreview({
+@@ -3900,6 +3914,7 @@ export function recordHumanGuardDenial({
+     && (!object(toolInput) || typeof toolInput.command !== "string" || toolInput.command.length > NATIVE_TARGET_MAX_BYTES)) {
+     fail("HGO-PATCH-BOUND", "patch input is outside its closed bound");
+   }
++  hgoProgress("hgo-plugin-identity");
+   const request = {
+     schema: nativeTargets === null ? REQUEST_SCHEMA : NATIVE_REQUEST_SCHEMA,
+     ...(nativeTargets === null ? {} : { nativeTargets, patchInput: toolName === "apply_patch" ? toolInput : null }),
+@@ -3931,7 +3946,9 @@ export function recordHumanGuardDenial({
+   if (held >= HGO_REQUEST_SOFT_CAP) {
+     fail("HGO-REQUEST-NAMESPACE-FULL", `the override request namespace holds ${held} requests (cap ${HGO_REQUEST_SOFT_CAP}); ${HGO_SWEEP_REPAIR}`);
+   }
++  hgoProgress("hgo-publish-wait");
+   return hgoPlanningPublication({repo, paths, entry: "record-denial", intendedPath: path, inputSha256: requestSha256}, () => {
++  hgoProgress("hgo-publish-held");
+   if (!existsSync(path)) writeExclusive(path, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
+   else if (sha(readJson(path)) !== requestSha256) fail("HGO-REQUEST", "request replay conflicts");
+   appendAudit(paths, {

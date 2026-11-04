@@ -1,0 +1,406 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 05b7b4294..d7b33946c 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -590,6 +590,8 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/agy-host-commit-execution.mjs`,
+ `plugins/pipeline-core/lib/agy-item-delivery.mjs`,
+ `plugins/pipeline-core/lib/architecture-prospective-materialization.mjs`,
++`plugins/pipeline-core/lib/admission-deadline.mjs`,
++`plugins/pipeline-core/lib/admission-progress.mjs`,
+ `plugins/pipeline-core/lib/backlog-state.mjs`,
+ `plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs`,
+ `plugins/pipeline-core/lib/claude-hook-session-owner.mjs`,
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 9a073f72b..af351da53 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -86,8 +86,10 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
+ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+-// D177: hook entry time (module evaluation is the hook's start); the admission deadline measures from here.
+-const HOOK_ENTRY_MS = Date.now();
++// D177: the admission deadline measures from the start of this PROCESS, not from module evaluation: the imports above are hoisted and
++// run first, and on Windows loading them is part of the time the host's hook timeout counts. performance.timeOrigin is the epoch
++// millisecond at which the process started.
++const HOOK_ENTRY_MS = Math.round(performance.timeOrigin);
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+ import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
+@@ -97,10 +99,12 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { describeWindowsAuthorityRefusal, prepareWithWindowsContentionRetry } from "../lib/windows-authority-readiness.mjs";
+ import { lastWindowsAuthorityFailedPath } from "../lib/windows-owned-authority-backend.mjs";
++import { admissionProgress } from "../lib/admission-progress.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+ if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
++admissionProgress("hook-entry");
+ 
+ // W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
+ const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
+@@ -1097,8 +1101,10 @@ if (isDirectInvocation(import.meta.url)) {
+         // Q10: the path the failed native open reported is read right after each preparation, before the readiness probe the
+         // retry wrapper runs can make its own native calls (every native failure replaces the remembered path).
+         let envelopeFailedPath = null;
++        admissionProgress("dispatch-checks-done");
+         const prepared = prepareWithWindowsContentionRetry({
+           prepare: () => {
++            admissionProgress("prepare-attempt");
+             const attempt = prepareNativeGoldfishHostState({
+               root: rootDir, runner: nativeRunner, input,
+               admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
+@@ -1110,6 +1116,7 @@ if (isDirectInvocation(import.meta.url)) {
+           projectRoot: resolve(rootDir), pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"),
+           waitCommand: `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} wait --root ${rootDir} --timeout 120`,
+         });
++        admissionProgress("prepare-done");
+         if (prepared.ok) nativePendingPrepared = true;
+         if (!prepared.ok) {
+           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
+diff --git a/plugins/pipeline-core/lib/admission-progress.mjs b/plugins/pipeline-core/lib/admission-progress.mjs
+new file mode 100644
+index 000000000..680e2b5a6
+--- /dev/null
++++ b/plugins/pipeline-core/lib/admission-progress.mjs
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * admission-progress.mjs -- a phase mark that survives a hook the host ends.
++ *
++ * The authority trace (authority-trace-hook.mjs) is written when the process exits. A PreToolUse hook the host ends at its timeout
++ * (guard-dispatch: 330 s) never exits normally, so the trace of exactly the run that matters is missing. When the opt-in trace is
++ * installed it registers a writer on a well-known global; this module only calls it. Without the trace nothing is registered, so the
++ * call is a no-op: no import, no file, no output. It never throws.
++ */
++const PROGRESS = Symbol.for("pipeline.authority-trace-progress");
++
++/** Appends one `pipeline.hook-authority-progress.v1` line to the authority trace file, right now, when the trace is installed. */
++export function admissionProgress(phase) {
++  try {
++    const write = globalThis[PROGRESS];
++    if (typeof write === "function") write(String(phase));
++  } catch { /* a diagnostic never changes the admission it observes */ }
++}
++
++export const ADMISSION_PROGRESS_SYMBOL = PROGRESS;
+diff --git a/plugins/pipeline-core/lib/authority-trace-hook.mjs b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+index dd8461e91..33688bc04 100644
+--- a/plugins/pipeline-core/lib/authority-trace-hook.mjs
++++ b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+@@ -32,6 +32,28 @@ export async function installHookAuthorityTrace(options = {}) {
+     const observed = await load("lib/windows-private-state.mjs", "nativeObservationStats");
+     const authority = await load("lib/windows-owned-authority-backend.mjs", "nativeAuthorityStats");
+     const hook = options.hook ?? (basename(process.argv[1] ?? "") || "(stdin)");
++    // A hook the host ends at its timeout never reaches the exit writer below. admissionProgress(phase) (lib/admission-progress.mjs)
++    // calls this writer at each admission phase, so the lines up to the point where the process died are already in the file.
++    globalThis[Symbol.for("pipeline.authority-trace-progress")] = (phase) => {
++      try {
++        const c = custody?.() ?? { count: 0 };
++        const o = observed?.() ?? { count: 0, ms: 0 };
++        const a = authority?.() ?? { count: 0, ms: 0 };
++        const line = `${JSON.stringify({
++          schema: "pipeline.hook-authority-progress.v1",
++          hook,
++          pid: process.pid,
++          phase: String(phase).slice(0, 120),
++          atMs: Date.now(),
++          processMs: Math.round(performance.now()),
++          custodyInspections: c.count ?? 0,
++          nativeObservations: { count: (o.count ?? 0) + (a.count ?? 0), ms: (o.ms ?? 0) + (a.ms ?? 0) },
++        })}\n`;
++        const file = process.env.PIPELINE_AUTHORITY_TRACE_FILE;
++        if (typeof file === "string" && file !== "") appendFileSync(file, line);
++        else process.stderr.write(`AUTHORITY-TRACE ${line}`);
++      } catch { /* a diagnostic never changes the exit of the process it observes */ }
++    };
+     let written = false;
+     process.on("exit", (code) => {
+       if (written) return;
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index aa84568ee..bd4592a41 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -803,6 +803,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+   "plugins/pipeline-core/lib/agy-item-delivery.mjs",
+   "plugins/pipeline-core/lib/architecture-prospective-materialization.mjs",
++  "plugins/pipeline-core/lib/admission-deadline.mjs",
++  "plugins/pipeline-core/lib/admission-progress.mjs",
+   "plugins/pipeline-core/lib/backlog-state.mjs",
+   "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+   "plugins/pipeline-core/lib/claude-hook-session-owner.mjs",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 4c54bbf26..b3ace3645 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -2,6 +2,7 @@
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+ import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
++import { admissionProgress } from './admission-progress.mjs';
+ import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
+@@ -201,7 +202,21 @@ export const NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE = "subagent-stop";
+ /** PF-55: a preparation that refuses after it wrote the queue row restores the queue as it was. */
+ export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
+   const written = [];
+-  const result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
++  // The process-wide deadline covers the WHOLE preparation, not only the registry publish: the queue and integration reads, the git
++  // reads and the baseline capture before it ran unbounded in a measured Windows run. It only runs with the real clock (a test that
++  // injects `now` keeps its own checkpoint semantics) and is cleared on every exit, so a later call in the same process is never
++  // judged by an old admission's budget. An overrun before the publish becomes the same typed refusal as one inside it, and the
++  // queue row it wrote is restored below like for any other refusal.
++  const deadline = args?.admissionDeadline;
++  const realClockDeadline = deadline && typeof deadline === "object" && typeof deadline.now !== "function";
++  let result;
++  try {
++    if (realClockDeadline) setAdmissionDeadline(deadline);
++    result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
++  } catch (error) {
++    if (error?.code !== "GUARD-DISPATCH-SLOW") throw error;
++    result = { ok: false, code: error.code, reason: error.reason ?? error.message ?? null, ...(typeof error.repair === "string" ? { repair: error.repair } : {}) };
++  } finally { if (realClockDeadline) clearAdmissionDeadline(); }
+   if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
+   return result;
+ }
+@@ -213,6 +228,10 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   if (typeof fields.prompt !== "string" || !hostMarkers.some((marker) => fields.prompt.includes(marker))) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
+   const parsed = parseNativeGoldfishBriefing(fields.prompt);
+   if (!parsed.ok) return fail(parsed.code);
++  // Phase marks of the whole preparation (each reaches the opt-in authority trace file at once and judges the budget): a measured
++  // Windows run spent its whole hook timeout before the first mark that used to exist.
++  const checkpoint = createAdmissionCheckpoint(admissionDeadline);
++  checkpoint("prepare-start");
+   // A background launch is admitted only when the caller states the SubagentStop completion route is registered, so a
+   // pending state is never written for a dispatch nothing would complete. D19 (PF-26): the Claude host launches every
+   // Agent-tool subagent asynchronously and its tool input may carry NO run_in_background key, so an ABSENT key takes the
+@@ -224,6 +243,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   const backgroundCompletion = runner === "claude" && backgroundCapable && subagentStopCompletionRegistered === true;
+   if (runner === "claude" && fields.runInBackground !== false && !backgroundCompletion) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
+   const binding = parsed.binding;
++  checkpoint("queue-resolve");
+   const deliveryQueue = binding.itemDelivery
+     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
+       candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
+@@ -236,7 +256,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
+     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
+     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
+-    if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
++    if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
+       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
+@@ -252,13 +272,15 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   const nativeTypeMatches = binding.adapterVersion === 2 && runner === "codex"
+     ? fields.role === binding.nativeAgentType : role === binding.role;
+   if (!nativeTypeMatches) return fail("NGHS-ROLE-MISMATCH");
++  checkpoint("candidate-git");
+   const physicalRoot = realpathSync(resolve(root ?? input.cwd ?? process.cwd()));
+   const readGit = dependencies.git ?? git;
+   const head = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{commit}"]);
+   const tree = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{tree}"]);
+   if (head !== binding.candidateCommit || tree !== binding.candidateTree) return fail("NGHS-CANDIDATE-MISMATCH");
+   const resultPath = `scratch/.native-host-return-${binding.dispatchId}.json`;
+-  const captured = (dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
++  checkpoint("agy-baseline");
++  const captured =(dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
+     candidateCommit: head, resultPath });
+   if (!captured?.ok && !binding.itemDelivery) return fail(captured?.code ?? "NGHS-BASELINE");
+   const commonDir = (dependencies.resolveCommonDir ?? resolveGitCommonDir)(physicalRoot);
+@@ -272,15 +294,11 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
+   };
+   let stored;
+-  // The process-wide deadline only runs with the real clock (a test that injects `now` keeps its own checkpoint semantics) and is
+-  // cleared on every exit, so a later call in the same process is never judged by an old admission's budget.
+-  const realClockDeadline = admissionDeadline && typeof admissionDeadline === "object" && typeof admissionDeadline.now !== "function";
++  checkpoint("publish-start");
+   try {
+-    if (realClockDeadline) setAdmissionDeadline(admissionDeadline);
+     stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
+   }
+   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+-  finally { if (realClockDeadline) clearAdmissionDeadline(); }
+   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+ }
+ 
+@@ -736,9 +754,12 @@ export function inspectSourceOwnedNativeConfiguredObservation({root,sessionId,to
+ // GUARD-DISPATCH-SLOW refusal when the elapsed time already exceeds the budget. withSessionAuthorityBoundary releases the
+ // registry lock on the throw. Without a deadline argument it does nothing (no line, no throw).
+ export function createAdmissionCheckpoint(deadline){
+-  if(!deadline||typeof deadline!=='object')return ()=>{};
++  // Every phase mark also reaches the opt-in authority trace file at once (admissionProgress; a no-op without the trace), so a hook
++  // the host ends at its timeout still leaves the phases it reached.
++  if(!deadline||typeof deadline!=='object')return phase=>admissionProgress(phase);
+   const now=typeof deadline.now==='function'?deadline.now:Date.now,write=typeof deadline.write==='function'?deadline.write:line=>process.stderr.write(line);
+   return phase=>{
++    admissionProgress(phase);
+     const elapsed=now()-deadline.startMs,seconds=(elapsed/1000).toFixed(1);
+     write(`guard-dispatch: phase ${phase} at ${seconds}s\n`);
+     if(elapsed>deadline.budgetMs){
+@@ -749,17 +770,21 @@ export function createAdmissionCheckpoint(deadline){
+ }
+ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
+   const checkpoint=createAdmissionCheckpoint(admissionDeadline);
++  checkpoint('repository-inspect');
+   const repository=inspectSignedDescriptorCustodyRepository(state.root);
+   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
+   // PF-52: a catalogue left by another plugin version is moved aside before presence is decided.
++  checkpoint('registry-migrate');
+   if(nativeManagedRegistryPresent(repository))migrateSourceUpdatedSessionAuthorityRegistry({repository});
+   if(!nativeManagedRegistryPresent(repository)) {
+     if(!state.delivery)return writeExclusive(commonDir,name,state);
+     // D44: no production route created the session-authority registry, so the first governed item
+     // dispatch in a real repository creates it here (idempotent), then continues on the registry path.
++    checkpoint('registry-init');
+     const initialized=initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+     if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault(`item-delivery-registry-initialization-failed (${initialized.reason??initialized.status})`);
+   }
++  checkpoint('owner');
+   const owner=nativeAuthorityOwner(repository),current=nativeManagedCurrentOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
+   const handle=Object.freeze({}),operation={handle,name,association:current.association,
+     bindingSha256:nativeManagedDigest({repository:{primaryRoot:repository.primaryRoot,commonDir:repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit}),phase:'reserved',sourceFacts:[],pendingSha256:null};
+@@ -768,8 +793,11 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+   // PF-86: the boundary-independent git read runs before the registry lock; a fault falls back to the in-boundary read.
+   let prescan=null;
+   let facts=null;
++  checkpoint('prescan');
+   if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
++  checkpoint('lock-wait');
+   return withSessionAuthorityBoundary({repository},boundary=>{
++    checkpoint('lock-held');
+     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
+     if(state.delivery){
+       const governed=resolveGovernedItemQueue({root:state.root});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index f1f7cb79c..c8e8c1e70 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -200,7 +200,9 @@ const cases = [
+     const item = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator, { admissionDeadline });
+     assert.equal(item.prepared.ok, false);
+     assert.equal(item.prepared.code, "GUARD-DISPATCH-SLOW");
+-    assert.match(String(item.prepared.reason), /integrated-slice-read|collision-check/u);
++    // The first mark of the whole preparation is read at clock 0, the next one is already past the budget; which mark names the overrun
++    // is not the point (marks cover the queue, git and baseline reads before the registry publish too), that a phase is named is.
++    assert.match(String(item.prepared.reason), /^GUARD-DISPATCH-SLOW: admission phase [a-z-]+ reached 200\.0s, over the 100\.0s budget$/u);
+     assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
+     const repo = inspectSignedDescriptorCustodyRepository(root);
+     assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
+@@ -235,6 +237,52 @@ const cases = [
+     assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
+     assert.equal(admissionDeadlineActive(), false);
+   }) },
++  { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
++    const backend = await import("./windows-owned-authority-backend.mjs");
++    const writerKey = Symbol.for("pipeline.authority-trace-progress");
++    const prior = globalThis[writerKey];
++    try {
++      const marks = [];
++      delete globalThis[writerKey];
++      backend.recordNativeAuthoritySpawn("read", 7, true);
++      assert.deepEqual(marks, [], "no writer, no mark");
++      globalThis[writerKey] = (phase) => marks.push(phase);
++      backend.recordNativeAuthoritySpawn("read-source", 520, true);
++      assert.equal(marks.length, 1);
++      assert.match(marks[0], /^native:read-source:520ms:native-goldfish-host-state\.test\.mjs:\d+/u, marks[0]);
++      assert.equal(/[\\/]|file:/u.test(marks[0]), false, "a file name and a line, never a path");
++      // A throwing writer never changes the observation it describes.
++      globalThis[writerKey] = () => { throw new Error("writer down"); };
++      assert.doesNotThrow(() => backend.recordNativeAuthoritySpawn("inspect", 3, true));
++    } finally {
++      if (prior === undefined) delete globalThis[writerKey]; else globalThis[writerKey] = prior;
++    }
++  } },
++  { id: "D177-trace-progress-survives-a-killed-hook", name: "D177 with the authority trace on, every admission phase mark reaches the trace file at once, so a hook the host ends leaves its phases; without the trace nothing is written", run: () => {
++    const dir = mkdtempSync(join(nativeContractFixtureParent(), "admission-progress-"));
++    try {
++      const trace = join(dir, "trace.jsonl");
++      const script = `const {installHookAuthorityTrace}=await import(${JSON.stringify(new URL("./authority-trace-hook.mjs", import.meta.url).href)});`
++        + `const {admissionProgress}=await import(${JSON.stringify(new URL("./admission-progress.mjs", import.meta.url).href)});`
++        + `await installHookAuthorityTrace({hook:"guard-dispatch.mjs"});admissionProgress("hook-entry");admissionProgress("lock-wait");process.kill(process.pid,"SIGKILL");`;
++      const env = { ...process.env, PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: trace };
++      const killed = spawnSync(process.execPath, ["--input-type=module", "-e", script], { env, encoding: "utf8" });
++      assert.notEqual(killed.status, 0, "the child ends by a signal, like a hook the host ends");
++      const rows = readFileSync(trace, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
++      assert.deepEqual(rows.map((row) => [row.schema, row.hook, row.phase]), [
++        ["pipeline.hook-authority-progress.v1", "guard-dispatch.mjs", "hook-entry"],
++        ["pipeline.hook-authority-progress.v1", "guard-dispatch.mjs", "lock-wait"],
++      ], "the phases reached before the kill are in the file and no exit trace line was written");
++      assert.ok(rows.every((row) => Number.isFinite(row.atMs) && Number.isFinite(row.processMs) && Number.isInteger(row.nativeObservations.count)), JSON.stringify(rows));
++      // Off by default: no trace variable, no file, no output.
++      const quiet = join(dir, "quiet.jsonl");
++      const off = spawnSync(process.execPath, ["--input-type=module", "-e", `const {admissionProgress}=await import(${JSON.stringify(new URL("./admission-progress.mjs", import.meta.url).href)});admissionProgress("hook-entry");`],
++        { env: { ...process.env, PIPELINE_AUTHORITY_TRACE: "", PIPELINE_AUTHORITY_TRACE_FILE: quiet }, encoding: "utf8" });
++      assert.equal(off.status, 0);
++      assert.equal(existsSync(quiet), false);
++      assert.equal(off.stdout + off.stderr, "");
++    } finally { rmSync(dir, { recursive: true, force: true }); }
++  } },
+   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
+     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
+     input.tool_input.prompt = "ordinary Goldfish briefing";
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index ef806d38b..a285099fc 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -32,6 +32,30 @@ export function recordNativeAuthoritySpawn(operation,ms,ok){
+  if(ms>nativeAuthorityCounters.maxMs)nativeAuthorityCounters.maxMs=ms;
+  if(!ok)nativeAuthorityCounters.failed+=1;
+  const name=String(operation);nativeAuthorityByOperation.set(name,(nativeAuthorityByOperation.get(name)??0)+1);
++ nativeSpawnMark(name,ms);
++}
++// With the opt-in authority trace installed (a writer on a well-known global, lib/admission-progress.mjs), every native observation also
++// appends one line naming the operation, its duration and the two nearest callers outside the native modules (file:line only, no path,
++// no input). A process the host ends leaves no exit line, and one counter line cannot say which caller made 220 observations; this can.
++// Nothing runs without the trace: the stack is only read when a writer exists.
++const NATIVE_SITE_SKIP=/windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
++function nativeCallSites(){
++ const limit=Error.stackTraceLimit;Error.stackTraceLimit=40;let stack='';
++ try{stack=String(new Error().stack??'');}finally{Error.stackTraceLimit=limit;}
++ const sites=[];
++ for(const line of stack.split('\n').slice(1)){
++  const match=/([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
++  if(match===null||NATIVE_SITE_SKIP.test(line))continue;
++  sites.push(`${match[1]}:${match[2]}`);if(sites.length===2)break;
++ }
++ return sites.join('<');
++}
++function nativeSpawnMark(name,ms){
++ try{
++  const progress=globalThis[Symbol.for('pipeline.authority-trace-progress')];
++  if(typeof progress!=='function')return;
++  progress(`native:${name}:${ms}ms:${nativeCallSites()}`);
++ }catch{/* a diagnostic never changes the observation it describes */}
+ }
+ // Process-local memo of READ-ONLY native observations, keyed on the observed object's lstat identity (see invoke below).
+ const MEMO_MAX=512;
+diff --git a/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs b/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
+index 1d6efba12..b1d1ba66d 100644
+--- a/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
++++ b/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
+@@ -129,9 +129,16 @@ test("APT8 each Agent PreToolUse hook script appends a trace line when the varia
+         env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file, CLAUDE_PROJECT_DIR: project }),
+       });
+       assert.equal(existsSync(file), true, `${name} wrote no trace`);
+-      const lines = readFileSync(file, "utf8").trim().split("\n");
+-      assert.equal(lines.length, 1, `${name} wrote ${lines.length} lines`);
+-      assert.equal(JSON.parse(lines[0]).hook, `${name}.mjs`);
++      // One exit trace line per process; a hook that marks its phases (guard-dispatch: hook-entry) also appended progress lines, which
++      // reach the file at once instead of at exit (lib/admission-progress.mjs). Restated, not weakened: the exit line is still exactly one.
++      const rows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
++      const lines = rows.filter((row) => row.schema === "pipeline.hook-authority-trace.v1");
++      const progress = rows.filter((row) => row.schema === "pipeline.hook-authority-progress.v1");
++      assert.equal(lines.length, 1, `${name} wrote ${lines.length} trace lines`);
++      assert.equal(lines.length + progress.length, rows.length, `${name} wrote a line of an unknown schema`);
++      assert.equal(lines[0].hook, `${name}.mjs`);
++      assert.ok(progress.every((row) => row.hook === `${name}.mjs`), `${name} progress lines name another hook`);
++      if (name === "guard-dispatch") assert.deepEqual(progress.map((row) => row.phase), ["hook-entry"]);
+       const off = join(dir, `hook-off-${name}.jsonl`);
+       const res = spawnSync(process.execPath, [join(hooksDir, `${name}.mjs`)], { encoding: "utf8", input: "", cwd: project, env: envFor({ PIPELINE_AUTHORITY_TRACE_FILE: off, CLAUDE_PROJECT_DIR: project }) });
+       assert.equal(existsSync(off), false, `${name} wrote with the variable unset`);
