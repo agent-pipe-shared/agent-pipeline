@@ -304,11 +304,30 @@ Second apply script `specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7
 | w179 | late-binding step 3: the guard admits PRD and Spec edits in the draft, the remaining authority readers follow the draft, the Critic preflight binds the digest it read | late-binding ADR | slice suites | own Critic review |
 | w180 | late-binding step 4: `prepare-seal` writes one digest-bound seal plan, the plan digest is an additive key of the design approval binding, `approve-plan` seals in the same transaction (rebased variant ordered after w192) | late-binding ADR | on the chain clone: kernel closure, seal plan 21, design approval binding 49, seal readers 12, plan-spec-state-v2 27, guard lifecycle 427, onboarding continuity 324; registration 1174, case completion 389 | Critic preflight binding is an injection point only; no live `approve-plan` run with the session authority catalogue |
 | w194 | the SECGATE-2 installed-plugin fixture copies the shared freshness module | D4b/E3 | SECGATE-2 1/1, file exit 0 in the chain clone | |
-| w181 (running) | late-binding step 5: bind trigger by EL-19 scope, migration of bound projects (reader and exits only), repair for every new state, happy path and runbooks | late-binding ADR | not yet delivered | |
+| w181 | late-binding step 5: onboarding leaves an unsealed draft in the EL-19 scope (approximated by `profile !== "mini"`), `sealSituation` readback, a repair for every seal state, the verifiers of a signed design approval accept the seal plan digest | late-binding ADR | slice suites on the chain clone, rehearsal exit 0 (registration 1174, case completion 389) | scope predicate is an approximation of EL-19 (rigor and risk data source open); inspect nextAction for a draft is guidance text, not a `prepare-seal` action |
+| w195 to w198 | findings of the first Full Verify: case-completion policy of the onboarding continuity suite (OBC325-327), runbooks without source-only paths and the vendored push-release-flow copy, three pins restated after w170 and w180, the analysis-run command named in the implementation reference | FV | each by its own suites on a work clone (see the notes) | no second Full Verify on a clone (PO decision 2026-11-04) |
 
 Found only on the full chain, not in any slice clone: the kernel closure suite (five modules, one stale dynamic-import table, w192), the capability inventory (w191) and the push-init delivery anchor (w193). Environment finding, not ours: `human-guard-override.test.mjs` case Q9 is red in the unchanged base clone (`domain-ancestor-unsafe`).
 
-Still to build: late-binding step 5 (dispatched as w181), Q2 control-root half (not reproduced in a clone; recorded as non-reproducible, the refusal texts are pinned), F9 rest (reworded pinned refusal texts, not sliced). Then a Full Verify on a rehearsal clone, an own Critic review of the late-binding chain and of D3 (the PO lifted the suspension for these only), the stamp of 19c by the Elephant and the PO's install. Nothing in this section is accepted by the PO.
+**First Full Verify of the whole 19c chain (clone, HEAD 177d64082, 2026-11-04):** 1176 steps, 12 red after 3536 s. Triage (single-suite rerun, comparison with the main tree, failure excerpts):
+
+| Red step | Cause | Disposition |
+|---|---|---|
+| onboarding-continuity-tests | all 327 cases green; `VERIFY-CASE-COMPLETION-DECLARATION`, the policy listed 324 ids (w181 added three) | fixed, w195 |
+| consumer-safe-paths-tests | runbooks named `harness/` paths (w175) | fixed, w196 |
+| generate-vendored-canon-tests | vendored `push-release-flow.md` stale after the chain's doc edits | fixed, w196 |
+| native-goldfish-host-commit-execution-tests, native-goldfish-host-finalizer-tests | pins still asserted the pre-w170 recovery text | fixed (pins restated), w197 |
+| pin-catalogue-admit-prescribed-lifecycle-verbs-tests | the duplicate-check mutant mirror hit w180's `prepare-seal` branch first | fixed (pin restated), w197 |
+| product-capability-inventory-tests (PCI24, PCI30) | `analysis-run.mjs` admitted by the guard since w148 but named nowhere; PCI30 follows | fixed, w198 (predates the chain) |
+| native-goldfish-host-finalizer-regression-tests | green alone (76 s); red only under the Full Verify load | environment (load) |
+| verify-suite-append-history-check | `VSA-PRIOR-ENTRY-CHANGED` at 7281e012c (a 3 November edit of an existing registry entry); identical in the main tree | pre-existing, open (needs a recovery record or a PO decision on the registry history) |
+| security-remote-identity-tests (SRI001) | red in the main tree with the same assertion | pre-existing, open |
+| codex-isolated-critic-protected-preimage-tests | `critic-review/SKILL.md` and `roles/critic.md` differ from the pinned preimage; identical in the main tree | known; never re-pinned by the agent |
+| security-scan | needs `--remote upstream` in the clone | environment |
+
+FV finding 2 (open, PO decision): the control-plane script scan (w131, Q5) refuses the agent starting `node harness/scripts/verify.mjs`, `check-license-contract.mjs`, `print-verify-failures.mjs`, `check-product-capability-inventory.mjs` and `check-product-capability-inventory.test.mjs` directly, because each names the control directory. `scripts/full-verify.mjs` was changed to take `--runs-root` (d0e3d0cdc). An exact-path exemption in `lib/guard/control-plane-script-scan.mjs` would widen what a script run by the agent may read; it is not built.
+
+Still to build: Q2 control-root half (not reproduced in a clone; recorded as non-reproducible, the refusal texts are pinned), F9 rest (reworded pinned refusal texts, not sliced). Then an own Critic review of the late-binding chain and of D3 (the PO lifted the suspension for these only), the stamp of 19c by the Elephant and the PO's install. Nothing in this section is accepted by the PO.
 
 ## End note: derived files
 
