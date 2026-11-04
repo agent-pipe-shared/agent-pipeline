@@ -1,0 +1,81 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index b3ace3645..40aa2edd6 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -34,6 +34,12 @@ import { fileURLToPath } from "node:url";
+ 
+ // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
+ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
++const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
++/** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
++ * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
++function orphanReservationRepair(sliceId) {
++  return `a native dispatch state still names slice ${sliceId} although the queue has no row for it (the queue file was restored or replaced after the dispatch started), so a cancel has nothing to change. If no Goldfish runs for it: node ${ROUTINE_REPAIR_SCRIPT} run heal --root <root> --reason "<why>"; when heal defers because a member is still armed, node ${ROUTINE_REPAIR_SCRIPT} run move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted)`;
++}
+ // D75: every cancel names why the slice ends. The argument and the one-line teaching of each class are shared by all cancel repairs.
+ // Lazy on purpose: slice-queue.mjs and this module import each other, so the vocabulary is read at call time, never at load time.
+ const cancelClassArg = () => `--class <${CANCEL_CLASSES.join('|')}>`;
+@@ -1279,7 +1285,12 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+       const preimage=readFileSync(path),raw=parseStrictJson(preimage);
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
+       const row=raw.slices.find(entry=>entry.id===sliceId);
+-      if(!row)return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`};
++      if(!row){
++        let named=false;
++        try{named=readNativeManagedInventory(repository,'native-goldfish')[0].entries.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId);}
++        catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
++        return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`,...(named?{repair:orphanReservationRepair(sliceId)}:{})};
++      }
+       if(row.state==='cancelled')return {status:'refused',code:'SQ-ITEM-CANCEL-ALREADY',reason:`slice ${sliceId} is already cancelled`};
+       if(row.tier==='critic')return {status:'refused',code:'SQ-ITEM-CANCEL-CRITIC',reason:`slice ${sliceId} is the shared critic slice; it is not cancelled with this verb`};
+       let native=[];
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index c8e8c1e70..5724623af 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1214,6 +1214,14 @@ const cases = [
+     assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
+     const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
+     assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
++    // The queue file is restored or replaced after the dispatch started: its row is gone, the dispatch state remains. A cancel has nothing
++    // to change, and the refusal must name a repair that can really be run (heal, then move-aside when heal defers), not only "not found".
++    const queueRaw=JSON.parse(readFileSync(queuePath,'utf8'));queueRaw.slices=queueRaw.slices.filter(entry=>entry.id!=='ITEM-AC-3');
++    writeFileSync(queuePath,`${JSON.stringify(queueRaw,null,2)}\n`);
++    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
++    assert.equal(orphan.code,'SQ-NOT-FOUND',JSON.stringify(orphan));
++    assert.match(orphan.repair,/routine-repair\.mjs run heal --root <root>/u);assert.match(orphan.repair,/routine-repair\.mjs run move-aside --no-goldfish-running --root <root>/u);
++    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).repair,undefined,'a slice no dispatch state names gets no repair text');
+   })},
+ 
+   { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index 1301ccbea..99cd0959f 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -373,7 +373,10 @@ function deferredSettledPending(commonDir, inspect) {
+   const pendingDir = pendingDirOf(commonDir);
+   const preview = previewSettledPending(commonDir, inspect);
+   const count = preview.settledCount + planOrphanAuthority({ pendingDir }).retire.length + preview.leavingDispatchIds.length;
+-  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed" } };
++  // A member whose dispatch ended without releasing it (the hook that admitted it was ended by the host, or the child never reported) stays
++  // armed for ever, and heal never un-arms a member: "run heal again when nothing is armed" would then never come true. The text therefore
++  // also names the one way out for the case that no Goldfish runs, so a refusal always carries a repair that can really be run.
++  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), the way out is: " + moveAsideNext(), next: moveAsideNext() } };
+ }
+ 
+ /** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 887323db6..286159dc2 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -363,6 +363,10 @@ test("C19: heal with a member armed leaves the settled pending states and stop-f
+   assert.equal(first.result.settledPending.deferred.count, 2);
+   assert.match(first.result.settledPending.deferred.reason, /armed or running/u);
+   assert.match(first.result.settledPending.deferred.reason, /run heal again/u);
++  // Never fully blocking: a member whose dispatch ended without a release stays armed for ever and heal never un-arms it, so "run heal again
++  // when nothing is armed" alone would never come true. The deferral also names the one way out for the case that no Goldfish runs.
++  assert.match(first.result.settledPending.deferred.reason, /the way out is: node .*routine-repair\.mjs run move-aside --no-goldfish-running --root <root> --reason "<why>"/u);
++  assert.match(first.result.settledPending.deferred.next, /routine-repair\.mjs run move-aside --no-goldfish-running/u);
+   const idle = stub(withProducer(idleProducer, rowOf(settled, "integrated-by-commit")));
+   const second = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: idle.spawn, ...SETTLED_DEPS });
+   assert.equal(second.exit, 0, JSON.stringify(second.result));
