@@ -3914,6 +3914,15 @@ function runAuthorityRevisionTests() {
   ok("AR03d State is untouched after the TOCTOU refusal", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
 }
 {
+  // AR03d2 -- Q9: without an injected PO proof check the refusal says what is missing and where the request comes from.
+  const { fx, request } = preparedRevision("ar03-no-approval-dep");
+  const preBytes = stateBytes(fx.dir);
+  const applied = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", { ...fx.deps, authorityRevisionApproval: undefined });
+  ok("AR03d2 an apply without a wired PO proof check is refused (AR-APPROVAL-UNAVAILABLE) with the missing piece and the plan command named, zero mutation",
+    applied.value === 2 && /AR-APPROVAL-UNAVAILABLE/.test(applied.err) && /no PO proof check/.test(applied.err)
+    && /continuity-authority-revision-plan --proposal-file/.test(applied.err) && stateBytes(fx.dir).equals(preBytes), applied.err);
+}
+{
   // AR03e-g -- apply RECHECKS the State preimage itself at apply time (not just the next-authority
   // artifact AR03c already covers): a legitimate OTHER continuity mutation landing between plan and
   // apply (revision advances, authority untouched) is caught by apply's OWN fresh rebuild against

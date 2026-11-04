@@ -5684,7 +5684,10 @@ function runAuthorityRevisionApplyCommand(dir, rest, deps) {
   const intentValue = requestDoc.intent;
 
   if (typeof deps.authorityRevisionApproval !== "function") {
-    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation.");
+    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation."
+      + " This command run alone has no PO proof check wired in: --request-file, --request-sha256 and --lock-token are not enough."
+      + " Get the request and its digest from continuity-authority-revision-plan --proposal-file <repo-relative-json>,"
+      + " then apply through the signed authority-revision route that supplies the PO proof, not by repeating this call.");
     return 2;
   }
   const approvalCheck = deps.authorityRevisionApproval({
