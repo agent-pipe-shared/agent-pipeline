@@ -17,7 +17,7 @@ import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mj
 import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+import { requiresPublicationReview, resolvePublicationReviewRequirement } from "../lib/publication-review-requirement.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
@@ -313,7 +313,34 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
   } catch (error) {
     fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", `feature close requires the exact private Critic/Verify lifecycle receipt (${error?.message ?? "unavailable"})`);
   }
+  assertCriticIndependenceForClose({ root, common, lifecycle });
   return { evidence, lifecycle };
+}
+/**
+ * C19-D2b (PO 2026-11-03): a Critic verdict the calling agent authored itself (finalizer fallback) satisfies the close gate only at
+ * rigor 0 and low risk. The label is read from the consumed session-critic receipt; a receipt without the key is legacy, not caller-authored.
+ * Rigor: the publication review requirement (REVIEW-LOW-RIGOR is rigor 0), else the feature package's rigor; unreadable refuses.
+ * Risk is high when any authored dispatch record says riskClass "high" or riskFlag true; no record counts as low.
+ */
+function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+  const packetId = lifecycle.receipt?.critic?.packetId;
+  let independence;
+  try { independence = readConsumedCandidateReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt?.independence; }
+  catch (error) { fail("CLOSE-CRITIC-CALLER-AUTHORED", `the consumed Critic receipt of packet ${packetId} could not be read to classify its independence (${error?.code ?? "unreadable"}); repair: restore the consumed receipt or run the Critic review as a fresh native session and finalize without the fallback`); }
+  if (independence !== "caller-authored-fallback") return;
+  let rigor = null;
+  try {
+    const state = stateSnapshot(root).state;
+    if (resolvePublicationReviewRequirement(state, { rootDir: root }).code === "REVIEW-LOW-RIGOR") rigor = 0;
+    else {
+      const id = state.activeFeature?.id ?? state.closedFeatures?.at(-1)?.id;
+      const value = readJsonFile(root, `specs/${id}/lifecycle.json`, "feature package").value?.feature?.rigor;
+      if (Number.isInteger(value) && value >= 0) rigor = value;
+    }
+  } catch { /* unreadable rigor refuses below */ }
+  const highRisk = walkDispatchRecords(root).records.some(({ record }) => record?.criticRequired?.trigger?.riskClass === "high" || record?.criticRequired?.trigger?.riskFlag === true);
+  if (rigor === 0 && !highRisk) return;
+  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: run the Critic review as a fresh native session and finalize WITHOUT the fallback`);
 }
 function startPlan(values) {
   const root = physicalRoot(values.root);

@@ -12,6 +12,7 @@ import { canonicalSha256 } from "../lib/governance-event.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { finishFeature } from "./finish-feature.mjs";
+import { readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
 
 const ROOT = process.cwd();
 const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
@@ -39,7 +40,12 @@ function put(root, path, text) { mkdirSync(join(root, path, ".."), { recursive: 
 // The audit request's `packs` default is today's full pack object; a case may substitute its own array
 // (D229: the request may NAME the shipped core baseline pack instead of carrying a pack object).
 const FIXTURE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] };
-function fixture(t, { packs = [FIXTURE_PACK] } = {}) {
+// C19-D2b: the Critic round is finalized with a Source-issued return by default; origin "fallback" asks for the
+// caller-authored classification (the finalizer's own opt-in), which the close gate accepts only at rigor 0 and low risk.
+const sourceReturn = (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId,
+  packetDigest: query.packetDigest, claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256,
+  issuedAtMs: 1, expiresAtMs: Date.now() + 3_600_000 });
+function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -108,9 +114,8 @@ function fixture(t, { packs = [FIXTURE_PACK] } = {}) {
     specPath: "specs/audit-feature/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
   admitSessionCriticReview(review);
-  // No runner issues a Source return record yet (SCF-ORIGINAL-SOURCE-UNAVAILABLE); this fixture asks for the
-  // visibly weaker caller-authored classification explicitly, as the finalizer's own option allows.
-  finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+  if (origin === "fallback") finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+  else finalizeSessionCriticReview(review, { readOriginalSourceReturnFn: sourceReturn });
   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
   const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs, criticVerifyLifecycleId: lifecycle.receipt.id };
@@ -139,6 +144,20 @@ const requestPath = (f) => join(f.root, "evidence/audit-request.json");
 const auditReceipt = (f) => JSON.parse(readFileSync(join(f.root, ".git", "agent-pipeline", "publication-close", "close-audit", "evidence", "feature-close-audit.json"), "utf8"));
 // D229 (2026-11-01), written from the decision before the implementation: a consumer without an organization
 // policy names the shipped core baseline pack in its audit request and closes on the audit route.
+// C19-D2b (PO 2026-11-03), written from the decision before the implementation (AC-108 closest accepted criterion).
+test("D2b a caller-authored Critic verdict is refused CLOSE-CRITIC-CALLER-AUTHORED at rigor 1, naming the packet, the rigor and the repair", t => {
+  const f = fixture(t, { origin: "fallback" });
+  const refused = planPrepared(f, 2);
+  assert.equal(refused.code, "CLOSE-CRITIC-CALLER-AUTHORED");
+  assert.match(refused.message ?? JSON.stringify(refused), new RegExp(`${"1".repeat(32)}[\\s\\S]*rigor 1[\\s\\S]*without the fallback`, "iu"));
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+});
+test("D2b a Source-issued Critic verdict closes at rigor 1 and its consumed receipt says so", t => {
+  const f = prepare(t);
+  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
+  assert.equal(receipt.independence, "source-issued-origin");
+  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+});
 test("D229 an audit request that names the shipped core baseline pack plans, builds the README audit bundle with that pack in the effective policy and closes", t => {
   const f = prepare(t, { packs: ["pipeline-core-baseline"] });
   // The request bytes keep the NAME; only the plan and its stored options carry the resolved pack object.
