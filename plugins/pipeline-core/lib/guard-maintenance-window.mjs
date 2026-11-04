@@ -497,6 +497,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/evidence-freshness-codes.mjs",
   // Candidate 19 (G5): the runbook link of the first call of a standard command is imported by pipeline-state, the start preflight, push-prepare and push-init (GMWKC01).
   "plugins/pipeline-core/lib/runbook-link.mjs",
+  // Candidate 19 (D4a): the push threat model decision is imported by pipeline-state.mjs and push-prepare.mjs (kernel above) and by the close coordinator.
+  "plugins/pipeline-core/lib/push-threat-model-gate.mjs",
   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
   // Its publication-gate evidence dependency must remain protected as well.
   "plugins/pipeline-core/scripts/audit-pack.mjs",

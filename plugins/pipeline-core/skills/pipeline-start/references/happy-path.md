@@ -31,6 +31,8 @@ command tables.
    if the file exists) and commit `project/push-threat-model.md` with the draft commit. A threat model first created at the Close moves the candidate
    after the Critic and Verify already ran, which forces a second round for no product change (Antigravity greenfield finding D4a).
    The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
+   This is enforced, not advice: while the push approval is active, `pipeline-state.mjs submit-plan`, `push-prepare.mjs` and the feature close
+   (`feature-close-prepared`) refuse with `PUSH-THREAT-MODEL-MISSING`, `-EMPTY` or `-INVALID` (no markdown heading) and print the repair command and the commit rule.
 7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
 
 ## 2. Implementation (one dispatch per task, from the template)
@@ -44,6 +46,9 @@ command tables.
    that back to the design (the readiness question about decomposition) instead of splitting one module by file.
    `module-slice-proposal.mjs --prd <plan path>` prints that cut read-only: the waves from the module dependencies, the modules it serializes because
    their owned paths overlap, and the `slice-queue.mjs add` arguments; it writes no queue.
+   The cut is enforced by `dispatch-briefing.mjs build` and `probe`: a briefing package that names `module` and `modulePlan` (the PRD with the design) takes its
+   write scope from the module (the exact files its owned paths hold now, warning `DBG-MODULE-SCOPE-DERIVED`), is refused with `DBG-MODULE-SCOPE-CROSSES` when a
+   declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
 3. Dispatch by runner:
    - **Claude**: `Agent` / `Task` with the functional `agentType`.
    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.

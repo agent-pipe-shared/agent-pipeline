@@ -945,6 +945,43 @@ test("process: AC-264 drive and --dry-run list materialize-push-threat-model bef
   assert.equal(seen.materialized, false, "drive materializes nothing");
 });
 
+// D4a (candidate 19): the close refuses to start the Critic/audit step (feature-close-prepared) while an active push approval has no usable threat model.
+const D4A_MANIFEST = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
+for (const [name, content, code] of [["missing", null, "PUSH-THREAT-MODEL-MISSING"], ["empty", "", "PUSH-THREAT-MODEL-EMPTY"]]) {
+  test(`process: D4a feature-close-prepared is refused with ${code} while the push approval is active and the threat model is ${name}, and the refusal leaves no coordinator change`, () => {
+    const seen = {};
+    const result = processFixture(`d4a${name}`, {
+      expectPreparedRefusal: code,
+      beforePrepared({ root, lifecycle }) {
+        writeFileSync(join(root, ".claude", "pipeline.yaml"), D4A_MANIFEST);
+        if (content !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), content); }
+        seen.phaseBefore = invoke(["drive", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--dry-run"]).phase;
+      },
+    });
+    assert.match(JSON.stringify(result.refused), /materialize-push-threat-model|default-push-threat-model/u, "the refusal names the repair");
+    assert.match(JSON.stringify(result.refused), /project\/push-threat-model\.md/u);
+    const after = invoke(["drive", "--root", result.root, "--lifecycle", result.lifecycle, "--actor", "PO", "--dry-run"]).phase;
+    assert.equal(after, seen.phaseBefore, "a refused plan changes nothing");
+    rmSync(result.root, { recursive: true, force: true });
+  });
+}
+
+test("process: D4a a usable threat model, or no active push approval, lets the close reach feature-close-prepared exactly as before", () => {
+  processFixture("d4aok", {
+    beforePrepared({ root }) {
+      writeFileSync(join(root, ".claude", "pipeline.yaml"), D4A_MANIFEST);
+      mkdirSync(join(root, "project"), { recursive: true });
+      writeFileSync(join(root, "project", "push-threat-model.md"), "# Threat model\n\nwhat the signature binds\n");
+    },
+    afterPrepared({ prepared, root }) {
+      assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms"));
+      rmSync(join(root, "project"), { recursive: true, force: true });
+      rmSync(join(root, ".claude", "pipeline.yaml"), { force: true });
+    },
+  });
+  processFixture("d4anogate", { afterPrepared({ prepared }) { assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms")); } });
+});
+
 test("process: AC-239 drive and --dry-run print qualityReadback, a missing row is an agent action before the freeze, and audit-index prints the index and writes nothing", () => {
   const seen = {};
   const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;

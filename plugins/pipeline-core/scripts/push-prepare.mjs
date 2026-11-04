@@ -50,6 +50,7 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
@@ -325,6 +326,12 @@ export function checkCheckpointDestination(dir, { remote, destination, sourceRef
 
 const PUSH_THREAT_MODEL_REMEDY = "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it";
 export function checkPushThreatModel(dir, deps = {}) {
+  // D4a (candidate 19): while a push approval is active the model must also be usable (non-empty, a document), not merely present.
+  // No active push approval: the check below runs exactly as before.
+  const verdict = pushThreatModelVerdict(dir, { loadManifest: deps.loadManifestSafe });
+  if (verdict.active && !verdict.ok) {
+    return { id: "push-threat-model", ok: false, code: verdict.code, message: verdict.message, remedy: `${verdict.repair.command}  # ${verdict.repair.commitRule}` };
+  }
   const exists = (deps.exists ?? existsSync)(join(dir, PUSH_THREAT_MODEL_PATH));
   if (!exists) {
     return {

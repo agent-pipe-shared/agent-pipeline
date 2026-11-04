@@ -10,15 +10,13 @@
  * Run the printed `addCommands` as `slice-queue.mjs <argv> --queue <path>` (the first with `--init-feature <feature>` when the queue
  * does not exist yet); the queue library validates every add. Exit 0 proposal, 2 usage, 3 design or proposal refused.
  */
-import { lstatSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { architectureDesignFailureCode, parseArchitectureDesign } from "../lib/architecture-design.mjs";
+import { readPrdModules } from "../lib/module-dispatch-scope.mjs";
 import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "../lib/module-slice-proposal.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, USAGE: 2, REFUSED: 3 });
-const MAX_PRD_BYTES = 4 * 1024 * 1024;
 const USAGE = "usage: module-slice-proposal.mjs --prd <repository-relative path> [--root <dir>]";
 
 function usage(reason) { return { exit: EXIT.USAGE, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: "MSP-USAGE", reason, usage: USAGE } }; }
@@ -35,21 +33,13 @@ export function run(argv, cwd = process.cwd()) {
   }
   if (flags["--prd"] === undefined) return usage("--prd is required");
   const root = resolve(cwd, flags["--root"] ?? ".");
-  const target = resolve(root, flags["--prd"]);
-  const inside = relative(root, target);
-  if (isAbsolute(flags["--prd"]) || inside === "" || inside.startsWith("..") || isAbsolute(inside)) return usage("--prd must name a file inside the root, as a repository-relative path");
-  let text;
-  try {
-    const info = lstatSync(target);
-    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_PRD_BYTES) return usage("--prd must name a regular file of at most 4 MiB");
-    text = readFileSync(target, "utf8");
-  } catch { return usage("--prd could not be read"); }
-  let design;
-  try { design = parseArchitectureDesign(text); }
-  catch (error) {
-    return { exit: EXIT.REFUSED, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: architectureDesignFailureCode(error), reason: "the architecture design of the PRD is not valid; the proposal needs the approved design package", ...(typeof error?.field === "string" ? { field: error.field } : {}) } };
+  // M1.4: the briefing tool reads the modules through this same function (lib/module-dispatch-scope.mjs), so both tools see one cut.
+  const read = readPrdModules(root, flags["--prd"]);
+  if (!read.ok) {
+    if (read.code === "DBG-MODULE-PLAN-UNREADABLE") return usage(`--prd: ${read.message}`);
+    return { exit: EXIT.REFUSED, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: read.code, reason: "the architecture design of the PRD is not valid; the proposal needs the approved design package", ...(typeof read.field === "string" ? { field: read.field } : {}) } };
   }
-  const proposal = proposeSlicesFromModules(design.modules);
+  const proposal = proposeSlicesFromModules(read.modules);
   return { exit: proposal.ok ? EXIT.OK : EXIT.REFUSED, output: proposal };
 }
 

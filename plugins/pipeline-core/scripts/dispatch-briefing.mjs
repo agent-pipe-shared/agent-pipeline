@@ -74,8 +74,10 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
 
 build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
   Required strings: id, item, agentType, modelId, check, title, ac, goal.
-  Required non-empty string arrays: paths, context, targeted.
+  Required non-empty string arrays: paths (optional when module is given), context, targeted.
   Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation (MP-05|MP-07, as the flag).
+  module + modulePlan (both or neither): the module id and the repository-relative PRD with the approved architecture design; the write scope is
+    derived from the module cut (listed as the exact files the module owns today), a path of another module is refused (DBG-MODULE-SCOPE-CROSSES).
   Optional string arrays: newFiles (files the dispatch creates: exempt from the must-exist check AND added to the write scope), forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
   Unknown keys are refused. --package is repository-relative. Only --out writes,
   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
@@ -134,6 +136,7 @@ const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHe
 const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
 const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
 const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
+const { moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
 const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
 const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
 
@@ -208,7 +211,7 @@ const MAX_ALLOWED_PATHS = 64;
  * is not an existing directory (a file, or a file the dispatch will create). Links are never followed and never listed; `.git` is skipped;
  * a name that would not be a valid exact path is skipped, so the result can always be bound.
  */
-function listDirectoryFiles(root, path) {
+function listDirectoryFiles(root, path, limit = MAX_ALLOWED_PATHS) {
   const start = resolve(root, path);
   const within = relative(root, start);
   if (within.startsWith("..") || within === "") return null;
@@ -221,7 +224,7 @@ function listDirectoryFiles(root, path) {
       if (entry.name === ".git") continue;
       const next = `${prefix}/${entry.name}`;
       if (entry.isSymbolicLink()) continue;
-      if (entry.isDirectory()) { if (files.length <= MAX_ALLOWED_PATHS) walk(resolve(directory, entry.name), next); continue; }
+      if (entry.isDirectory()) { if (files.length <= limit) walk(resolve(directory, entry.name), next); continue; }
       if (entry.isFile() && validRepoPath(next)) files.push(next);
     }
   };
@@ -1150,6 +1153,54 @@ export function parseBuildArgv(argv) {
   return values;
 }
 
+// M1.4 (candidate 19): the exact files an owned-path scope holds today. A scope is a pattern (`src/core/**`), a binding lists EXACT files,
+// so the fixed directory prefix of each pattern is listed and the files are kept that the same matcher the cut uses (scopesOverlap) accepts.
+const SCOPE_META = /[*?[\]{}()|^$\\+!]/u;
+const MODULE_EXPANSION_LIMIT = 4096;
+function expandModuleScope(root, writeScope) {
+  const found = new Set();
+  for (const pattern of writeScope) {
+    const fixed = [];
+    for (const part of pattern.split("/")) { if (SCOPE_META.test(part)) break; fixed.push(part); }
+    const prefix = fixed.join("/");
+    if (prefix === "" || !validRepoPath(prefix)) continue;
+    const listed = listDirectoryFiles(root, prefix, MODULE_EXPANSION_LIMIT);
+    if (listed !== null) { for (const file of listed) found.add(file); continue; }
+    try { if (lstatSync(resolve(root, prefix)).isFile()) found.add(prefix); } catch { /* a scope with no file today contributes nothing */ }
+  }
+  return [...found].filter((file) => scopesOverlap([file], writeScope)).sort();
+}
+
+/**
+ * M1.4: a package that names a module of the approved architecture design gets its write scope from the module cut and the cut is enforced
+ * at dispatch time (lib/module-dispatch-scope.mjs; no second implementation). Returns the package with `paths` filled and the warnings; a
+ * package without a module reference is returned untouched. Throws BriefingPackageRefusal with the typed code and the repair.
+ */
+function resolveModulePackage(root, pkg, deps) {
+  if (pkg.module === undefined) return { pkg, warnings: [] };
+  const read = readPrdModules(root, pkg.modulePlan);
+  if (!read.ok) throw new BriefingPackageRefusal(read.code, read.message);
+  let integrated = [];
+  try {
+    const ids = (deps.integratedSliceIds ?? defaultIntegratedSliceIds)(root);
+    if (Array.isArray(ids) || ids instanceof Set) integrated = [...ids];
+  } catch { integrated = []; }
+  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [pkg.check])];
+  const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
+  const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
+  if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
+  if (pkg.paths !== undefined) return { pkg, warnings: [] };
+  const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
+  const files = expandModuleScope(root, derived.writeScope);
+  if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
+    throw new BriefingPackageRefusal("DBG-MODULE-SCOPE-EMPTY", `module ${pkg.module} owns ${derived.writeScope.join(", ")}, which holds no file today, so the derived write scope is empty and a write scope is a list of exact files; repair: list the files the dispatch creates under "newFiles", or declare "paths"`);
+  }
+  return {
+    pkg: { ...pkg, paths: files },
+    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
+  };
+}
+
 /** The binding options one closed package yields for an agent type (shared by build and probe). */
 function packageBindingOptions(root, pkg, agentType) {
   return {
@@ -1186,6 +1237,8 @@ export function buildDispatchBriefing(options, deps = {}) {
   let pkg;
   try { pkg = JSON.parse(bytes.toString("utf8")); } catch { refuse("DBG-PACKAGE-UNREADABLE", `package ${options.package} is not valid JSON; repair: fix its JSON`); }
   validateBriefingPackage(pkg);
+  const moduleScope = resolveModulePackage(root, pkg, deps);
+  pkg = moduleScope.pkg;
   assertPackagePathsExist(root, pkg, deps.pathExists);
   const calibration = resolveBriefingCalibration(root, deps.calibration);
   const bind = (agentType) => generateDispatchBinding(packageBindingOptions(root, pkg, agentType), deps);
@@ -1213,7 +1266,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...moduleScope.warnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 
@@ -1270,12 +1323,18 @@ export function probeDispatchReadiness(options, deps = {}) {
       return null;
     }
   })();
-  const pkg = fieldsOk;
+  let pkg = fieldsOk;
   let calibration = null;
   let generated = null;
   let decision = null;
   let warnings = [];
-  if (pkg === null) skipped.push("package-paths", "calibration", "binding", "tool-budget", "render");
+  // M1.4: a refused module reference is one finding and the checks that need the write scope are named under `skipped`.
+  let moduleWarnings = [];
+  let moduleRefused = false;
+  if (pkg !== null) {
+    try { const resolved = resolveModulePackage(root, pkg, deps); pkg = resolved.pkg; moduleWarnings = resolved.warnings; } catch (error) { failWith("module-scope", error); moduleRefused = true; }
+  }
+  if (pkg === null || moduleRefused) skipped.push("package-paths", "calibration", "binding", "tool-budget", "render");
   else {
     try { assertPackagePathsExist(root, pkg, deps.pathExists); } catch (error) { failWith("package-paths", error); }
     try { calibration = resolveBriefingCalibration(root, deps.calibration); } catch (error) { failWith("calibration", error); }
@@ -1286,7 +1345,7 @@ export function probeDispatchReadiness(options, deps = {}) {
     else {
       const budget = skeletonToolBudget(generated.skeleton);
       try { decision = budgetDecision(pkg, budget); } catch (error) { failWith("tool-budget", error); }
-      warnings = [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
+      warnings = [...moduleWarnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
       if (decision !== null && calibration !== null && findings.length === 0) {
         try { renderGoldfishBriefing(pkg, generated, calibration, decision); } catch (error) { failWith("render", error); }
       } else if (findings.length > 0 || decision === null || calibration === null) skipped.push("render");

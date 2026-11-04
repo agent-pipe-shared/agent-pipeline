@@ -28,7 +28,8 @@ const GENERATOR_MARKER_ANY = /<!-- pipeline-briefing-generator:/gu;
 const REQUIRED_STRINGS = Object.freeze(["id", "item", "agentType", "modelId", "check", "title", "ac", "goal"]);
 // effortEscalation: the model-policy act (MP-05 or MP-07) that authorises an agent definition effort above its route effort; the
 // binding validates the closed value exactly as for the --effort-escalation flag (DBG-EFFORT-ESCALATION-UNKNOWN).
-const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation"]);
+// M1.4: `module` + `modulePlan` (a PRD holding the approved architecture design) name the module the dispatch belongs to; both or neither.
+const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation", "module", "modulePlan"]);
 // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
 export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
 const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
@@ -107,9 +108,15 @@ export function validateBriefingPackage(pkg) {
   if (pkg.visualCheck !== undefined && !isVisualCheck(pkg.visualCheck)) {
     note("DBG-PACKAGE-FIELD-TYPE", `package field "visualCheck" must be exactly { "question": <one line, at most ${VISUAL_QUESTION_MAX} characters>, "evidencePath": <repository-relative file under specs/<feature>/evidence/> } when present; repair: fix both members or remove the field`);
   }
+  const hasModule = pkg.module !== undefined;
+  if (hasModule !== (pkg.modulePlan !== undefined)) {
+    note("DBG-PACKAGE-FIELD-MISSING", `package fields "module" and "modulePlan" come together; repair: give both (the module id and the repository-relative PRD that holds the approved architecture design) or neither`);
+  }
   for (const key of [...REQUIRED_LISTS, ...OPTIONAL_LISTS]) {
     const value = pkg[key];
     if (value === undefined && OPTIONAL_LISTS.includes(key)) continue;
+    // M1.4: a package that names a module may omit the write list; the scope is then derived from the module cut.
+    if (key === "paths" && value === undefined && hasModule && pkg.modulePlan !== undefined) continue;
     if (!Array.isArray(value) || value.length === 0 && REQUIRED_LISTS.includes(key) || !value.every(nonEmpty)) {
       note(REQUIRED_LISTS.includes(key) && value === undefined ? "DBG-PACKAGE-FIELD-MISSING" : "DBG-PACKAGE-FIELD-TYPE",
         `package field "${key}" must be ${REQUIRED_LISTS.includes(key) ? "a non-empty" : "an"} array of non-empty strings; repair: fill it in the package`);

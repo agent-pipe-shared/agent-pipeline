@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
 import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "./module-slice-proposal.mjs";
 import { run as runProposal } from "../scripts/module-slice-proposal.mjs";
 import { runCli } from "../scripts/slice-queue.mjs";
@@ -119,4 +120,82 @@ test("MSP6: the script reads the design of a PRD, proposes from its modules and 
     assert.equal(refused.exit, 2, JSON.stringify(argv));
     assert.equal(refused.output.code, "MSP-USAGE");
   }
+});
+
+// M1.4 enforcement (candidate 19): the briefing tool derives a dispatch's write scope from the same cut and refuses a scope that crosses it.
+const SCOPE_MODULES = [mod("core", ["src/core/**"]), mod("api", ["src/api/**"], ["core"]), mod("docs", ["docs/guide/**"])];
+
+function prdRoot() {
+  const dir = tempDir();
+  const design = {
+    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
+    modules: ["core", "api"].map((id) => ({
+      id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
+      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [],
+    })),
+    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
+  };
+  mkdirSync(join(dir, "specs"), { recursive: true });
+  writeFileSync(join(dir, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+  return dir;
+}
+
+test("MDS1: without paths the scope is the module's owned paths, exactly the write scope the proposal gives that module", () => {
+  const derived = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", integratedSliceIds: [] });
+  assert.equal(derived.ok, true, JSON.stringify(derived));
+  const proposed = proposeSlicesFromModules(SCOPE_MODULES).slices.find((slice) => slice.moduleId === "core");
+  assert.deepEqual(derived.writeScope, proposed.writeScope);
+  assert.equal(derived.sliceId, "slice-core");
+  assert.equal(derived.wave, 0);
+});
+
+test("MDS2: a declared path owned by a different module is refused with the typed code, the owner and a repair", () => {
+  const crossing = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/core/a.mjs", "src/api/handler.mjs"], integratedSliceIds: [] });
+  assert.equal(crossing.ok, false);
+  assert.equal(crossing.code, "DBG-MODULE-SCOPE-CROSSES");
+  assert.match(crossing.message, /src\/api\/handler\.mjs/u);
+  assert.match(crossing.message, /module api/u);
+  assert.match(crossing.message, /repair:/u);
+  const broad = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/**"], integratedSliceIds: [] });
+  assert.equal(broad.code, "DBG-MODULE-SCOPE-CROSSES", "a glob that reaches into another module is a crossing too");
+  const inside = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/core/a.mjs", "tests/core.test.mjs"], integratedSliceIds: [] });
+  assert.equal(inside.ok, true, "a path inside the module and a path no module owns are not crossings");
+  assert.deepEqual(inside.writeScope, ["src/core/a.mjs", "tests/core.test.mjs"]);
+});
+
+test("MDS3: a module whose dependency module has no accepted result is not runnable; the accepted result releases it", () => {
+  const blocked = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: [] });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.code, "DBG-MODULE-NOT-RUNNABLE");
+  assert.match(blocked.message, /slice-core/u);
+  assert.match(blocked.message, /repair:/u);
+  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-core"] }).ok, true);
+  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "docs", integratedSliceIds: [] }).ok, true, "a wave-0 module needs no result");
+});
+
+test("MDS4: an unknown module, an invalid cut and a malformed call are typed refusals that never throw", () => {
+  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "nope", integratedSliceIds: [] }).code, "DBG-MODULE-UNKNOWN");
+  const cycle = [mod("a", ["src/a/**"], ["b"]), mod("b", ["src/b/**"], ["a"])];
+  assert.equal(moduleDispatchScope({ modules: cycle, moduleId: "a", integratedSliceIds: [] }).code, "DBG-MODULE-CUT-INVALID");
+  assert.equal(moduleDispatchScope({ modules: "nope", moduleId: "a" }).ok, false);
+  assert.equal(moduleDispatchScope({}).ok, false);
+});
+
+test("MDS5: the proposal tool and the briefing reader agree on the cut and on the scope of every module of one PRD", () => {
+  const dir = prdRoot();
+  const read = readPrdModules(dir, "specs/prd.md");
+  assert.equal(read.ok, true, JSON.stringify(read));
+  const proposal = runProposal(["--prd", "specs/prd.md", "--root", dir]).output;
+  for (const slice of proposal.slices) {
+    const derived = moduleDispatchScope({ modules: read.modules, moduleId: slice.moduleId, integratedSliceIds: proposal.slices.map((entry) => entry.id) });
+    assert.equal(derived.ok, true, JSON.stringify(derived));
+    assert.deepEqual(derived.writeScope, slice.writeScope, `module ${slice.moduleId}`);
+    assert.equal(derived.wave, slice.wave);
+  }
+  writeFileSync(join(dir, "specs", "no-design.md"), "# PRD without a design block\n");
+  assert.equal(readPrdModules(dir, "specs/no-design.md").code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
+  assert.equal(readPrdModules(dir, "../outside.md").code, "DBG-MODULE-PLAN-UNREADABLE");
+  assert.equal(readPrdModules(dir, "specs/absent.md").code, "DBG-MODULE-PLAN-UNREADABLE");
 });

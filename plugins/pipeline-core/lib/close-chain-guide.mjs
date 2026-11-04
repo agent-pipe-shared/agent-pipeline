@@ -5,6 +5,7 @@
 // is pinned to it by close-chain-guide.test.mjs, so a changed requirement there turns the pin red instead of leaving this guide stale.
 
 import { coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
+import { PUSH_THREAT_MODEL_FILE } from "./push-threat-model-gate.mjs";
 
 export const CLOSE_CHAIN_SCHEMA = "pipeline.close-coordinator.chain.v1";
 
@@ -146,7 +147,8 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
 
 // Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
 // the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
-export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
+// The path lives with the D4a decision (lib/push-threat-model-gate.mjs); re-exported so every existing import keeps working.
+export { PUSH_THREAT_MODEL_FILE };
 
 // The Close commit carries the push threat model when the push gate needs one: prepare-push-subject binds the approval to that file, so a file
 // materialized after the close would leave the tree dirty. `pushThreatModel` is { required, present } as read by the caller (this module stays

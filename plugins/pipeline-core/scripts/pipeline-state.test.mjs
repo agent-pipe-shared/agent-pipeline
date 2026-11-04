@@ -1771,6 +1771,32 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
   assert.ok(state.planSubmission, "a genuinely authored PRD must submit successfully");
 }
 
+// D4a (candidate 19): with an active push approval, submit-plan (the plan approval request) refuses while the push threat model is missing
+// or empty, names the code and the repair command, and records nothing; a usable model lets the submission through.
+for (const [name, model, code] of [["missing", null, "PUSH-THREAT-MODEL-MISSING"], ["empty", "", "PUSH-THREAT-MODEL-EMPTY"], ["present", "# Threat model\n\nwhat the signature binds\n", null]]) {
+  const featureId = `ptm-${name}`;
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  // the fixture's authority tier is the neutral one, so the manifest sits next to the calibration (a `.claude/` directory would select the legacy tier)
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
+  if (model !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), model); }
+  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  // QG-04: a refused submission writes nothing, so the state file may not exist at all; absence is the strongest form of "not recorded".
+  const state = existsSync(statePath(root)) ? JSON.parse(readFileSync(statePath(root), "utf8")) : {};
+  if (code === null) {
+    assert.equal(attempt.result, 0, `a usable threat model must not block the submission: ${attempt.lines.join(" ")}`);
+    assert.ok(state.planSubmission, "the submission is recorded");
+  } else {
+    assert.equal(attempt.result, 2, attempt.lines.join(" "));
+    const text = attempt.lines.join(" ");
+    assert.ok(text.includes(code), `the refusal names ${code}: ${text}`);
+    assert.ok(text.includes("project/push-threat-model.md"), text);
+    assert.ok(/materialize-push-threat-model|default-push-threat-model/u.test(text), `the refusal names the repair: ${text}`);
+    assert.equal(state.planSubmission, undefined, "a refused submission must not be recorded");
+  }
+}
+
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
 // NEVER called -- the exact gap the item names (a plan approved without a
 // mechanical record it was shown first). Proves the DoD's core refusal case,

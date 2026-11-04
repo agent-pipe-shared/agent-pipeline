@@ -397,6 +397,7 @@ import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindin
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { fileURLToPath } from "node:url";
 import {
   applyCourseDecisionIntent,
@@ -11709,6 +11710,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       });
       if (!framingRefusal.ok) {
         console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
+        return 2;
+      }
+      // D4a (candidate 19): with an active push approval the push threat model has to be usable before the plan is submitted for approval,
+      // so it is in the same draft commit as the feature package; created later it moves the candidate after the Critic and Verify ran.
+      const threatModelRefusal = pushThreatModelRefusalText(pushThreatModelVerdict(dir), "submit-plan");
+      if (threatModelRefusal !== null) {
+        console.error(`Error: ${threatModelRefusal} No submission or signature request was recorded.`);
         return 2;
       }
       let submitDesignDraft = null;

@@ -2300,3 +2300,77 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names 
   assert.deepEqual(codesOf(probed), codesOf(claudeProbed));
   assert.equal(codesOf(probed).some((code) => /^(DBG-SELFCHECK|DBG-MODEL|NGHR)/u.test(code)), false);
 });
+
+// --- M1.4 (candidate 19): a package may name a module of the approved architecture design; the write scope is derived from the cut and the cut is enforced ---
+
+function modulePackage(over = {}) {
+  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", ...over });
+  const design = {
+    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
+    modules: ["core", "api"].map((id) => ({
+      id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
+      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [],
+    })),
+    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
+  };
+  mkdirSync(join(made.fx.root, "specs"), { recursive: true });
+  writeFileSync(join(made.fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+  // the files the modules own today: a binding lists EXACT files, so the owned paths are resolved to these
+  for (const rel of ["src/core/index.mjs", "src/core/util/helper.mjs", "src/api/index.mjs"]) {
+    mkdirSync(dirname(join(made.fx.root, rel)), { recursive: true });
+    writeFileSync(join(made.fx.root, rel), "export const v = 1;\n");
+  }
+  return made;
+}
+
+test("module package: without a hand-written write list the scope is derived from the module, the same scope the proposal tool prints", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { run: runProposal } = await import("./module-slice-proposal.mjs");
+  const { fx, argv } = modulePackage();
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const parsed = parseNativeGoldfishBriefing(result.text);
+  assert.equal(parsed.ok, true, parsed.code);
+  const proposed = runProposal(["--prd", "specs/prd.md", "--root", fx.root]).output.slices.find((slice) => slice.moduleId === "core");
+  // the exact files the module owns today (a binding lists exact files): every one lies in the proposal's scope for that module, none of another module's
+  assert.deepEqual(parsed.binding.allowedPaths, [CHECK, "src/core/index.mjs", "src/core/util/helper.mjs"].sort());
+  const { scopesOverlap } = await import("../lib/slice-queue.mjs");
+  for (const path of parsed.binding.allowedPaths.filter((entry) => entry !== CHECK)) assert.equal(scopesOverlap([path], proposed.writeScope), true, path);
+  assert.ok(result.warnings.some((warning) => warning.code === "DBG-MODULE-SCOPE-DERIVED"), "the briefing says the scope is a snapshot of the module's files");
+});
+
+test("module package: a path owned by another module is refused with the typed code and the repair, on build and as a probe finding", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = modulePackage({ paths: ["src/core/a.mjs", "src/api/handler.mjs"], newFiles: ["src/core/a.mjs", "src/api/handler.mjs"] });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, false);
+  assert.equal(built.code, "DBG-MODULE-SCOPE-CROSSES");
+  assert.match(built.message, /repair: /u);
+  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  const finding = probed.findings.find((entry) => entry.check === "module-scope");
+  assert.equal(finding?.code, "DBG-MODULE-SCOPE-CROSSES", JSON.stringify(probed.findings));
+  assert.match(finding.repair, /repair: /u);
+});
+
+test("module package: a module whose dependency has no accepted result is refused as not runnable until the result exists", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = modulePackage({ module: "api" });
+  const refused = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => [] }));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-MODULE-NOT-RUNNABLE");
+  assert.match(refused.message, /slice-core/u);
+  const released = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-core"] }));
+  assert.equal(released.ok, true, JSON.stringify(released));
+});
+
+test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {
+  const { runDispatchBriefing } = await lib();
+  const half = packageFixture({ module: "core" });
+  assert.equal(runDispatchBriefing(half.argv, depsOf(half.fx)).code, "DBG-PACKAGE-FIELD-MISSING");
+  const noPaths = packageFixture({ paths: undefined });
+  assert.equal(runDispatchBriefing(noPaths.argv, depsOf(noPaths.fx)).code, "DBG-PACKAGE-FIELD-MISSING", "without a module reference paths stay required");
+  const legacy = packageFixture();
+  assert.equal(runDispatchBriefing(legacy.argv, depsOf(legacy.fx)).ok, true);
+});

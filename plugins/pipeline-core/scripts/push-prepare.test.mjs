@@ -1735,3 +1735,29 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and 
     for (const argv of [[], ["--root", root], ["--root", root, "--agent", "--human"], ["--root", root, "--agent", "--agent"]]) assert.equal(run(...argv).code, "CPO-ARGS", `neither flag, both or a repeat is refused: ${argv.length}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// D4a (candidate 19): with an active push approval the threat model must be present AND usable before a push candidate is issued.
+test("D4a: checkPushThreatModel on a real project refuses a missing or empty model when the push approval is active, with the code and the repair", () => {
+  const manifest = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
+  const make = (withManifest, model) => {
+    const root = mkdtempSync(join(tmpdir(), "d4a-pp-"));
+    if (withManifest) { mkdirSync(join(root, ".claude"), { recursive: true }); writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest); }
+    if (model !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), model); }
+    return root;
+  };
+  const roots = [make(true, null), make(true, ""), make(true, "# Threat model\n\nbound\n"), make(false, ""), make(false, null)];
+  try {
+    const [missing, empty, present, inactiveEmpty, inactiveMissing] = roots.map((root) => checkPushThreatModel(root));
+    assert.equal(missing.ok, false);
+    assert.equal(missing.code, "PUSH-THREAT-MODEL-MISSING");
+    assert.match(missing.remedy, /materialize-push-threat-model/u);
+    assert.equal(empty.ok, false);
+    assert.equal(empty.code, "PUSH-THREAT-MODEL-EMPTY");
+    assert.match(empty.message, /empty/u);
+    assert.equal(present.ok, true);
+    assert.equal(inactiveEmpty.ok, true, "no active push approval: an existing file passes exactly as before");
+    assert.equal(inactiveMissing.ok, false, "no active push approval: a missing file still fails exactly as before");
+    assert.equal(inactiveMissing.code, undefined);
+    assert.match(inactiveMissing.remedy, /materialize-push-threat-model/u);
+  } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
+});

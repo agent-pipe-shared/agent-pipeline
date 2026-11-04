@@ -551,6 +551,15 @@ security-scanner readiness probes. Each is imported by a kernel module and
 executes in that module's process, so it is protected through both the project
 and the installed-plugin anchors for the same reason as the dependencies above.
 
+The Candidate 19 push threat model gate additionally protects
+`lib/push-threat-model-gate.mjs`, the one decision (a push approval is active
+and `project/push-threat-model.md` is missing, empty or not a document) that
+`scripts/pipeline-state.mjs` (plan approval request) and `scripts/push-prepare.mjs`
+(push preparation) import, and the close coordinator reads at the feature close.
+It is imported by kernel modules and executes in their process, so a corrupted
+copy could report a missing model as usable; it is protected through both anchors
+like the modules above.
+
 The approved design-flow closure additionally protects, in kernel-array order,
 `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
 `lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`

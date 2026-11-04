@@ -40,7 +40,7 @@ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STE
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
 import { loadMapBundle } from "./module-inventory.mjs";
-import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+import { pushApprovalActive, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
@@ -647,6 +647,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
   if (values.phase !== "feature-close-prepared" && values.criticVerifyLifecycle !== undefined) {
     fail("CLOSE-CRITIC-VERIFY-ARGS", "--critic-verify-lifecycle is accepted only for feature-close-prepared");
   }
+  // D4a (candidate 19): with an active push approval the push threat model must be usable before the Critic/audit step starts; a refusal reads nothing else and changes nothing.
+  if (values.phase === "feature-close-prepared") {
+    const threatModel = pushThreatModelVerdict(root);
+    if (threatModel.active && !threatModel.ok) fail(threatModel.code, pushThreatModelRefusalText(threatModel, "feature close"));
+  }
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
   if (!coordinatorNextPhases(stored.coordinator.phase).includes(values.phase)
@@ -1190,7 +1195,7 @@ async function applyTransition(values, suppliedDigest) {
 
 // Read-only: does the push gate require approval (the same manifest reader push-prepare uses) and is the threat model file there? Currency is not checked.
 function readPushThreatModelState(root) {
-  const required = gateConfig(loadManifestSafe(root), "push")?.approval === "required";
+  const required = pushApprovalActive(root);
   return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
 }
 
