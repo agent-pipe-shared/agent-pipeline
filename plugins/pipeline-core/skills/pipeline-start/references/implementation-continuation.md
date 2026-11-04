@@ -66,6 +66,14 @@ alternatives materially change accepted scope, criteria, priority, risk,
 cost, an external or irreversible consequence, or configured decision gate.
 Never turn routine uncertainty into serial PO approvals.
 
+To read the result of the registered verify command while a feature is approved
+without touching the live work tree, run the installed
+`scripts/analysis-run.mjs --root <absolute-repo> [--commit <rev>] [--timeout-seconds <n>]`.
+It runs that command for the commit (default HEAD) in a throwaway clone under
+the git common directory and prints one JSON line with a labelled analysis
+result. That result is never Verify evidence and satisfies no gate; the shell
+guard admits exactly this argument shape and no other script run.
+
 ## First dispatch of an item-governed course
 
 Register the approved plan before the first binding. `approve-plan` writes the
