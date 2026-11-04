@@ -1,0 +1,431 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index cad25008c..d4def3a03 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -941,6 +941,7 @@
+         "verify-phase:harness/scripts/verify.mjs:portable-critic-export-tests",
+         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-fanout-tests",
+         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
++        "verify-phase:harness/scripts/verify.mjs:powershell-bash-guard-parity-tests",
+         "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
+         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",
+         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..963af9fb5 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4534,6 +4534,12 @@
+       "file": "plugins/pipeline-core/lib/authority-seal-reader.test.mjs",
+       "invariantPinned": "The one shared reader of the bound authority documents returns sealed and digests, reads a state without the sealed marker as sealed (the identity for every bound project), reads a draft as paths without digests, fails closed on any invalid shape, never throws, and every refusal names a typed exit so that no state is a dead end (C19 late-binding build step 1a, inert)",
+       "nonOverlapNote": "Unique cases: lib/authority-seal-reader.mjs; continuity-state tests pin the persisted authority schema, which does not know the sealed marker yet"
++    },
++    {
++      "name": "powershell-bash-guard-parity-tests",
++      "file": "plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs",
++      "invariantPinned": "The PowerShell dialect of the lifecycle guard gives the Bash grammar's verdict for read-only git observations (mutating git stays refused), folds one literal PIPELINE_PLUGIN_ROOT assignment into the command after it, admits --help and the read-only plan and binding verbs of sanctioned scripts only in a ready session, publishes its admitted forms as one table that every grammar refusal prints and the suite submits, and states the protected roots in the native read refusal; every Bash shape the dialect cannot express is listed as Bash-only with a reason (C19 E7 PowerShell part, W4, W5, AC-108)",
++      "nonOverlapNote": "Unique cases: lib/guard/powershell-dialect.mjs and the refusal tables of grammar-denials.mjs; g23-read-help-tests pins the C18-8 working examples, the passive-matrix suites pin the native read lane"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 3944f3f1c..bb0086c3e 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -9,8 +9,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
+-import { nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
++import { readTargetProtectedRootsAdvice, readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
++import { READ_TARGET_EXACT_FILE_ADVICE, nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
+ import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+ import {
+@@ -420,7 +420,9 @@ function isNativeImplementationSubagent(entry) {
+ // verdict bottoms out in, with its single PASSIVE_READ_CREDENTIAL_ROOTS list) for directory and search
+ // operands. Both resolve a relative operand against the project root and check the lexical AND the
+ // physical (symlink-resolved) identity.
+-const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.";
++// C19C-W169 (W5): the same alternative and protected-roots statement the Claude native lane prints (read-scope.mjs), on the first line's code unchanged.
++const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++  + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}`;
+ 
+ /** Path operands of one native read-only tool call. kind: "file" (contents of one file), "content"
+  * (a search that reads file contents), "listing" (entry names only). A present-but-unusable operand,
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index eebd0fc7d..f58f69b7a 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -154,6 +154,24 @@ export const POWERSHELL_GRAMMAR_EXAMPLES = {
+   read: "Get-Content -LiteralPath docs/a.md",
+ };
+ 
++// C19C-W169 (E7 PowerShell part): the forms the PowerShell dialect admits, as ONE table. Every GUARD-POWERSHELL-GRAMMAR refusal renders it (the refused
++// shape's alternative is always on the page) and powershell-bash-guard-parity.test.mjs submits every example, so the printed text cannot drift from what is
++// admitted. `<plugin-root>` is replaced by the guard's own plugin root when the text is rendered. The git row is the read-only subcommand set of the Bash
++// grammar (isReadOnlyDiagnosticCommand answers for it), not a second list.
++export const POWERSHELL_ADMITTED_SHAPES = [
++  { spelling: "one literal read of one contained path (Get-Content, Get-ChildItem, Get-Item, Test-Path)", example: POWERSHELL_GRAMMAR_EXAMPLES.literal },
++  { spelling: "New-Item for a scratch file or directory", example: POWERSHELL_GRAMMAR_EXAMPLES.newItem },
++  { spelling: "Set-Content or Add-Content for a scratch file", example: POWERSHELL_GRAMMAR_EXAMPLES.contentWrite },
++  { spelling: "a read-only git observation: the same read-only subcommands the Bash grammar admits (status, log, diff, show, rev-parse, ls-files, ...); never commit, push, add, reset or checkout",
++    example: "git status --short" },
++  { spelling: "a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it",
++    example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect" },
++  { spelling: "`--help` of a sanctioned Pipeline script, and in a ready session the read-only plan, inspect and binding verbs (continuity-authority-revision-plan, continuity-result-bootstrap-plan, dispatch-briefing binding)",
++    example: "node \"<plugin-root>/scripts/pipeline-state.mjs\" continuity-authority-revision-plan --help" },
++  { spelling: "one literal `$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"` assignment (this plugin's root only), folded into the single command after the `;`",
++    example: "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\"" },
++];
++
+ // C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
+ export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
+   + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index 0f606bff4..5140ea2e8 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -1,11 +1,15 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Guard module "powershell-dialect" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
+-import { basename, win32 } from "node:path";
++import { realpathSync } from "node:fs";
++import { basename, dirname, join, win32 } from "node:path";
+ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+-import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
+-import { verdict } from "./verdict.mjs";
+-import { POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
++import { isReadOnlyDiagnosticCommand, isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
++import { exactReadyReceipt, verdict } from "./verdict.mjs";
++import * as constants from "./constants.mjs";
++import { PIPELINE_STATE_SCRIPT } from "./constants.mjs";
++import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
++import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
+ import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
+ import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
+ 
+@@ -20,7 +24,7 @@ function invalidSessionObservation(root, dependencies) {
+     return error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION" && error.intent === "session";
+   }
+ }
+-import { containedLiteralReadPath, sessionReadScopeRoots } from "./read-scope.mjs";
++import { containedLiteralReadPath, readTargetProtectedRootsAdvice, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ 
+ function powerShellNamedArgs(argv, valueFlags, bareFlags = []) {
+@@ -64,8 +68,79 @@ export function sanctionedPowerShellNodeCall(command, root) {
+   return isSanctionedLifecycleCommand(body, root, { platform: "win32", processExecPath: process.execPath });
+ }
+ 
++// C19C-W169 (E7 PowerShell part): the pieces of the Bash grammar the dialect shares instead of re-listing.
++const PLUGIN_ROOT = dirname(dirname(PIPELINE_STATE_SCRIPT));
++const DISPATCH_BRIEFING_SCRIPT = join(PLUGIN_ROOT, "scripts", "dispatch-briefing.mjs");
++const FOLDABLE_ENV_NAME = "PIPELINE_PLUGIN_ROOT";
++// A literal `$env:NAME = "literal"` followed by `;` and ONE command. Value: no expansion, no composition character, no control character.
++const ENV_ASSIGNMENT = /^\s*\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:"([^"$`;|&<>\r\n]*)"|'([^'$`;|&<>\r\n]*)')\s*;\s*([^\r\n]*?)\s*$/u;
++// Read-only verbs of the sanctioned scripts (they print or plan, they do not apply); the apply/approve/configure verbs of the same scripts are not here.
++const READY_READ_ONLY_VERBS = new Map([
++  [PIPELINE_STATE_SCRIPT, ["continuity-authority-revision-plan", "continuity-result-bootstrap-plan"]],
++  [DISPATCH_BRIEFING_SCRIPT, ["binding"]],
++]);
++
++const samePhysicalPath = (left, right) => {
++  try {
++    const a = realpathSync(left);
++    const b = realpathSync(right);
++    return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
++  } catch { return false; }
++};
++
++// `$env:PIPELINE_PLUGIN_ROOT = "<this plugin's root>"; <one command>` -> the one command with the variable replaced by that literal. Anything else
++// that starts with `$env:` is not folded (null) and meets the composition refusal below.
++function foldPluginRootAssignment(command) {
++  const match = ENV_ASSIGNMENT.exec(command);
++  if (match === null || match[1].toUpperCase() !== FOLDABLE_ENV_NAME) return null;
++  const value = match[2] ?? match[3];
++  if (value === "" || !samePhysicalPath(value, PLUGIN_ROOT)) return null;
++  const folded = match[4].replace(/\$env:PIPELINE_PLUGIN_ROOT\b/giu, () => value);
++  return /[$`]/u.test(folded) || folded === "" ? null : folded;
++}
++
++// Every sanctioned script constant of the Bash grammar (constants.mjs, `*_SCRIPT`) plus dispatch-briefing, matched by physical identity.
++const SANCTIONED_SCRIPTS = [...Object.entries(constants).filter(([name, value]) => name.endsWith("_SCRIPT") && typeof value === "string").map(([, value]) => value), DISPATCH_BRIEFING_SCRIPT];
++
++function scriptIsSanctioned(script) {
++  return SANCTIONED_SCRIPTS.some((candidate) => candidate === script || samePhysicalPath(candidate, script));
++}
++
++function sessionIsReady(root, dependencies) {
++  try {
++    return exactReadyReceipt((dependencies?.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({ rootDir: root, intent: "session", runner: dependencies?.runner }));
++  } catch { return false; }
++}
++
++// `--help` of a sanctioned script, and its read-only plan/inspect/binding verbs, in a READY session. The Bash lane reaches the same commands through
++// the ready lifecycle tail; a not-ready session keeps exactly the shapes isSanctionedLifecycleCommand lists.
++function isReadyReadOnlyScriptRoute(command, root, dependencies) {
++  const resolved = resolveSanctionedScriptInvocation(command, root, {});
++  if (resolved === null || !scriptIsSanctioned(resolved.script)) return false;
++  const { script, args } = resolved;
++  if (args.some((arg) => typeof arg !== "string" || arg === "" || /[\0$`*?\[\]{}]/u.test(arg) || arg.startsWith("@"))) return false;
++  const helpOnly = args.length === 1 && ["--help", "-h"].includes(args[0]);
++  const verbs = [...READY_READ_ONLY_VERBS].find(([path]) => path === script || samePhysicalPath(path, script))?.[1] ?? [];
++  return (helpOnly || verbs.includes(args[0])) && sessionIsReady(root, dependencies);
++}
++
++// The refusal for a shape the dialect does not admit: the sentence, the alternative for THAT shape, and the whole admitted table.
++function powerShellRefusal(sentence, shape, alternative = POWERSHELL_GRAMMAR_EXAMPLES[shape]) {
++  const render = (text) => text.replaceAll("<plugin-root>", PLUGIN_ROOT);
++  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
++    + `Working example: ${render(alternative)}\n`
++    + "The complete admitted PowerShell forms, with exact spellings:\n"
++    + POWERSHELL_ADMITTED_SHAPES.map((entry) => `- ${render(entry.spelling)}\n  e.g. ${render(entry.example)}\n`).join("");
++}
++
+ export function powerShellScopeVerdict(input, root, dependencies) {
+-  const command = input.tool_input.command ?? input.tool_input.CommandLine;
++  const original = input.tool_input.command ?? input.tool_input.CommandLine;
++  const folded = typeof original === "string" && /^\s*\$env:/iu.test(original) ? foldPluginRootAssignment(original) : null;
++  const command = folded ?? original;
++  if (folded === null && typeof original === "string" && /^\s*\$env:/iu.test(original)) {
++    return verdict(2, powerShellRefusal("an $env: assignment is admitted only as one literal PIPELINE_PLUGIN_ROOT assignment naming this plugin's root, followed by `;` and one literal command.", "literal",
++      "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\""));
++  }
+   if (sanctionedPowerShellNodeCall(command, root)) return verdict(0);
+   // PowerShell interpolation and composition must never be interpreted as a literal path.
+   if (/[\r\n;$`@|&<>]/u.test(command)) {
+@@ -111,19 +186,38 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
+       ? verdict(0)
+       : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+-        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`);
++        + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`
++        + `${readTargetProtectedRootsAdvice()}\n`);
+   }
+-  if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
++  if (["node", "node.exe"].includes(name)
++    && (isSanctionedLifecycleCommand(command, root) || isReadyReadOnlyScriptRoute(command, root, dependencies))) return verdict(0);
++  const bareExecutable = executable.toLowerCase();
++  // Only the literal executable `git` / `git.exe` (never a path). A read-only observation gets the verdict the Bash grammar gives the same words
++  // (isReadOnlyDiagnosticCommand is the table; the dialect keeps no list of its own). Characters PowerShell reads as syntax inside an argument
++  // (a comma makes an array, parentheses a sub-expression, braces a script block) are refused before the words are handed to the POSIX reader.
++  if (["git", "git.exe"].includes(bareExecutable)
++    && !argv.some((arg) => /[(){},]/u.test(arg))
++    && isReadOnlyDiagnosticCommand(["git", ...argv].map(posixWord).join(" "), root, sessionReadScopeRoots(input, dependencies))) return verdict(0);
+   // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
+-  if (["git", "git.exe"].includes(executable.toLowerCase())
++  if (["git", "git.exe"].includes(bareExecutable)
+     && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
+     && invalidSessionObservation(root, dependencies)) return verdict(0);
++  if (["git", "git.exe"].includes(bareExecutable)) {
++    return verdict(2, powerShellRefusal("git is admitted from PowerShell for read-only observations only (the same read-only subcommands the Bash grammar admits); this command is not one.", "literal", "git status --short"));
++  }
++  if (["node", "node.exe"].includes(name) && argv.length > 0) {
++    const script = argv[0];
++    const own = typeof script === "string" && scriptIsSanctioned(script);
++    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither.",
++      "literal", own ? `node "${script}" --help` : "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect"));
++  }
+   return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
+ }
+ 
++const posixWord = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
++
+ // C18-8 (AC-239): every GUARD-POWERSHELL-GRAMMAR refusal ends with one working example for the shape it refused (examples pinned as admitted
+-// by g23-read-help.test.mjs); the code and its first sentence are unchanged.
++// by g23-read-help.test.mjs); the code and its first sentence are unchanged. C19C-W169: it also prints the table of admitted forms.
+ function powerShellGrammarDenial(sentence, shape) {
+-  return `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: ${sentence}\n`
+-    + `Working example: ${POWERSHELL_GRAMMAR_EXAMPLES[shape]}\n`;
++  return powerShellRefusal(sentence, shape);
+ }
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index c7a64e2c2..b816ce6ce 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -739,7 +739,20 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
+   if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+-    + `${READ_TARGET_EXACT_FILE_ADVICE}\n`);
++    + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
++    + (toolName === "Glob"
++      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or is <directory>/*; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
++      : ""));
++}
++
++// C19C-W169 (W5): a project directory that is not a credential root was refused with a text that spoke only of plugin files and named no protected
++// root. The refusal itself is unchanged (SEC-11: native Grep names one exact file); the text now says which roots are protected, that a plain project
++// directory is not one of them, and which spelling is admitted instead. Also printed by the PowerShell dialect's read refusal.
++export function readTargetProtectedRootsAdvice() {
++  const stores = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 6).join(", ");
++  return `Protected roots: credential stores under the home directory (${stores}, ...), the machine and repository PO key-directory pointers, system pseudo-files, and secret-named files (id_*, credentials, *.pem, *.key, ...). `
++    + "A project directory that is not a protected root is not what was refused: native Grep searches one exact file (guardrail SEC-11), so list the directory with Glob "
++    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project.";
+ }
+ 
+ // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal
+diff --git a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+new file mode 100644
+index 000000000..f4a1daa26
+--- /dev/null
++++ b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+@@ -0,0 +1,156 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19C-W169 (E7 PowerShell part, W4, W5 of the native Windows runs; AC-108 binding): the PowerShell dialect of guard-lifecycle-ready gives the same
++// verdict as the Bash grammar for every command shape both dialects can express, every PowerShell refusal names an admitted alternative, and the
++// native read refusal states which roots are protected. Fixtures are the exact commands the Windows run reported.
++import assert from "node:assert/strict";
++import test from "node:test";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join, resolve } from "node:path";
++import { evaluateLifecycleReadyGuard } from "./guard/evaluate.mjs";
++import { ADMITTED_GRAMMAR_SHAPES } from "./guard/grammar-denials.mjs";
++import * as denials from "./guard/grammar-denials.mjs";
++import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
++import { HUMAN_OVERRIDE_SCRIPT, PIPELINE_STATE_SCRIPT } from "./guard/constants.mjs";
++import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
++
++const pluginRoot = dirname(dirname(PIPELINE_STATE_SCRIPT));
++const scripts = (name) => join(pluginRoot, "scripts", name);
++const READY = () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" });
++const NOT_READY = () => { throw new ProjectOnboardingReadyError("PORG-NOT-READY", "not ready", { intent: "session", lifecycleStatus: "partial" }); };
++
++function withRoot(body) {
++  mkdirSync(resolve("scratch"), { recursive: true });
++  const root = mkdtempSync(join(resolve("scratch"), "w169-"));
++  try {
++    mkdirSync(join(root, "docs"));
++    mkdirSync(join(root, "project"));
++    writeFileSync(join(root, "docs", "a.md"), "safe\n");
++    writeFileSync(join(root, "probe.txt"), "needle\n");
++    writeFileSync(join(root, "project", "pipeline.json"), "{}\n");
++    const run = (tool_name, tool_input, ready = READY) => evaluateLifecycleReadyGuard(
++      { tool_name, tool_input }, { projectDir: root, requireProjectOnboardingReadyFn: ready });
++    const ps = (command, ready) => run("PowerShell", { command }, ready);
++    return body({ root, run, ps });
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++// One row per shape of ADMITTED_GRAMMAR_SHAPES (same order). A shape the PowerShell dialect must refuse says why; the walk fails when a shape is added
++// to the Bash table without a row here, so the two dialects cannot drift apart silently.
++const SHAPE_DISPOSITION = [
++  { bashOnly: "rg, cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands; reads there are Get-Content, Get-ChildItem or the native Read, Glob and Grep tools. The git part of this shape is walked by the git cases below" },
++  { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
++  { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
++  { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
++  { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
++  { bashOnly: "the dialect admits one literal command per call (the one literal $env: assignment folded into it is the single exception)" },
++];
++
++test("every shape of the Bash grammar table has a disposition, and a Bash-only shape is refused by the PowerShell dialect", () => withRoot(({ root, ps }) => {
++  assert.equal(SHAPE_DISPOSITION.length, ADMITTED_GRAMMAR_SHAPES.length, "a shape was added to or removed from ADMITTED_GRAMMAR_SHAPES without a row here");
++  ADMITTED_GRAMMAR_SHAPES.forEach((shape, index) => {
++    assert.equal(isReadOnlyDiagnosticCommand(shape.example, root), true, `Bash admits its own example: ${shape.example}`);
++    assert.equal(typeof SHAPE_DISPOSITION[index].bashOnly, "string");
++    assert.equal(ps(shape.example).exitCode, 2, `Bash-only shape stays refused: ${shape.example}`);
++  });
++}));
++
++test("read-only git observations get the Bash verdict in the PowerShell dialect, mutating git stays refused", () => withRoot(({ root, ps }) => {
++  const mustBeAdmitted = ["git status", "git status --short", "git log", "git log -n 5 --oneline", "git diff --stat", "git diff", "git show HEAD",
++    "git rev-parse HEAD", "git ls-files", "git describe", "git for-each-ref", "git branch --show-current", "git tag --list", "git remote -v", "git stash list"];
++  const mustBeRefused = ["git commit -m x", "git push", "git add -A", "git reset --hard", "git checkout main", "git fetch", "git stash drop",
++    "git branch -D x", "git config user.name x", "git diff --output=out.txt", "git -C .. status", "git status; git log", "git log | head -5"];
++  for (const command of [...mustBeAdmitted, ...mustBeRefused]) {
++    const expected = mustBeAdmitted.includes(command);
++    if (!command.includes(";") && !command.includes("|")) assert.equal(isReadOnlyDiagnosticCommand(command, root), expected, `the Bash grammar verdict this case relies on: ${command}`);
++    assert.equal(ps(command).exitCode, expected ? 0 : 2, command);
++  }
++}));
++
++test("one literal $env: assignment is folded into the one command after it, nothing else is", () => withRoot(({ ps }) => {
++  const preflight = "node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\"";
++  assert.equal(ps(`$env:PIPELINE_PLUGIN_ROOT = "${pluginRoot}"; ${preflight}`).exitCode, 0);
++  assert.equal(ps(`$env:PIPELINE_PLUGIN_ROOT = '${pluginRoot}'; ${preflight}`).exitCode, 0);
++  assert.equal(ps(`$env:PIPELINE_PLUGIN_ROOT="${pluginRoot}";${preflight}`).exitCode, 0);
++  for (const refused of [
++    `$env:PATH = "${pluginRoot}"; node "${scripts("pipeline-start-preflight.mjs")}"`,
++    `$env:PIPELINE_PLUGIN_ROOT = "${join(pluginRoot, "..")}"; ${preflight}`,
++    `$env:PIPELINE_PLUGIN_ROOT = "$env:HOME"; ${preflight}`,
++    `$env:PIPELINE_PLUGIN_ROOT = "${pluginRoot}"; ${preflight}; Remove-Item docs/a.md`,
++    `$env:PIPELINE_PLUGIN_ROOT = "${pluginRoot}"; Remove-Item docs/a.md`,
++    `$env:PIPELINE_PLUGIN_ROOT = "${pluginRoot}"; $env:OTHER = "x"; ${preflight}`,
++    `$env:PIPELINE_PLUGIN_ROOT = "${pluginRoot}"`,
++  ]) assert.equal(ps(refused).exitCode, 2, refused);
++}));
++
++test("sanctioned scripts: --help and the plan, inspect and binding verbs are admitted in a ready session, mutating verbs never", () => withRoot(({ ps }) => {
++  const state = (...args) => `node ${PIPELINE_STATE_SCRIPT} ${args.join(" ")}`.trim();
++  const admittedWhenReady = [
++    state("inspect"), state("--help"), state("continuity-authority-revision-plan", "--help"), state("continuity-result-bootstrap-plan"),
++    state("continuity-authority-revision-plan", "--proposal-file", "scratch/p.json"),
++    `node ${scripts("dispatch-briefing.mjs")} binding --dispatch-id C19C-X --item some-item --agent-type goldfish-deep --model-id claude-sonnet-5-5 --check lib/x.test.mjs`,
++    `node ${scripts("dispatch-briefing.mjs")} --help`, `node ${HUMAN_OVERRIDE_SCRIPT} --help`,
++  ];
++  for (const command of admittedWhenReady) assert.equal(ps(command).exitCode, 0, command);
++  // readiness is what differs: the Bash grammar table admits `pipeline-state inspect` and `pipeline-state --help` before readiness too (and so does the
++  // dialect, through the same isSanctionedLifecycleCommand); every other route above exists only in a ready session
++  const beforeReadiness = [state("inspect"), state("--help")];
++  for (const command of beforeReadiness) assert.equal(ps(command, NOT_READY).exitCode, 0, `not ready: ${command}`);
++  for (const command of admittedWhenReady.filter((entry) => !beforeReadiness.includes(entry))) assert.equal(ps(command, NOT_READY).exitCode, 2, `not ready: ${command}`);
++  for (const refused of [
++    state("configure-verify", "--verify-command", "\"node --test\""), state("approve-push", "--commit", "abc"), state("approve-plan", "--help"),
++    state("continuity-authority-revision-apply"), state("continuity-result-bootstrap-apply"),
++    `node ${scripts("foreign.mjs")} --help`, `node ${join("docs", "a.md")} --help`, `node ${scripts("dispatch-briefing.mjs")} build --dispatch-id x`,
++    `node ${PIPELINE_STATE_SCRIPT} inspect | Out-String`, `node ${PIPELINE_STATE_SCRIPT} --help $env:HOME`,
++  ]) assert.equal(ps(refused).exitCode, 2, refused);
++}));
++
++test("every PowerShell grammar refusal names the admitted alternative for the shape it refused, and every printed alternative is admitted", () => withRoot(({ ps }) => {
++  const shapes = denials.POWERSHELL_ADMITTED_SHAPES ?? [];
++  assert.ok(shapes.length >= 7, "the dialect publishes its admitted forms as one table");
++  const rendered = (text) => text.replaceAll("<plugin-root>", pluginRoot);
++  for (const shape of shapes) assert.equal(ps(rendered(shape.example)).exitCode, 0, `the table example is admitted: ${shape.example}`);
++  const fixtures = [
++    [`$env:PIPELINE_PLUGIN_ROOT = "${join(pluginRoot, "..")}"; node "$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs"`, /\$env:PIPELINE_PLUGIN_ROOT = ".*"; node "\$env:PIPELINE_PLUGIN_ROOT\/scripts\/pipeline-start-preflight\.mjs"/u],
++    [`node ${PIPELINE_STATE_SCRIPT} configure-verify --verify-command "node --test"`, /Working example: node "[^"]*pipeline-state\.mjs" --help/u],
++    [`node ${scripts("dispatch-briefing.mjs")} build --dispatch-id x`, /Working example: node "[^"]*dispatch-briefing\.mjs" --help/u],
++    ["git commit -m x", /git status --short/u],
++    ["git push", /git status --short/u],
++    ["Remove-Item docs/a.md", /Get-Content docs\/a\.md/u],
++  ];
++  for (const [command, expected] of fixtures) {
++    const result = ps(command);
++    assert.equal(result.exitCode, 2, command);
++    assert.match(result.stderr, /GUARD-POWERSHELL-GRAMMAR/u, command);
++    assert.match(result.stderr, expected, `${command}\n${result.stderr}`);
++    const printed = result.stderr.split("\n").map((line) => /^Working example: (.*)$/u.exec(line)?.[1] ?? /^\s+e\.g\. (.*)$/u.exec(line)?.[1]).filter(Boolean);
++    assert.ok(printed.length >= shapes.length + 1, `the refusal prints its working example and the whole table\n${result.stderr}`);
++    for (const example of printed) assert.equal(ps(example).exitCode, 0, `the alternative printed for ${command} is admitted: ${example}`);
++  }
++}));
++
++test("a native read of a project directory that is not a protected root states what is protected and which spelling is admitted", () => withRoot(({ root, run, ps }) => {
++  const grep = run("Grep", { pattern: "x", path: join(root, "project") });
++  assert.equal(grep.exitCode, 2);
++  assert.match(grep.stderr, /GUARD-READ-TARGET:/u);
++  assert.match(grep.stderr, /Protected roots:/u, grep.stderr);
++  assert.match(grep.stderr, /\.ssh/u);
++  assert.match(grep.stderr, /secret-named/u);
++  assert.match(grep.stderr, /not a protected root/u, grep.stderr);
++  assert.match(grep.stderr, /Glob/u);
++  assert.match(grep.stderr, /exact file/u);
++  const glob = run("Glob", { pattern: "**/*", path: join(root, "project") });
++  assert.equal(glob.exitCode, 2);
++  assert.match(glob.stderr, /GUARD-READ-TARGET:/u);
++  assert.match(glob.stderr, /literal non-credential extension/u, glob.stderr);
++  assert.match(glob.stderr, /Protected roots:/u);
++  assert.equal(run("Grep", { pattern: "x", path: join(root, "project", "pipeline.json") }).exitCode, 0);
++  assert.equal(run("Glob", { pattern: "*.json", path: join(root, "project") }).exitCode, 0);
++  // the PowerShell read refusal says the same, and the project-relative directory read itself is admitted
++  assert.equal(ps("Get-ChildItem project").exitCode, 0);
++  assert.equal(ps("Get-ChildItem -Name project").exitCode, 0);
++  const refused = ps("Get-Content ~/.ssh/id_rsa");
++  assert.equal(refused.exitCode, 2);
++  assert.match(refused.stderr, /GUARD-READ-TARGET/u);
++  assert.match(refused.stderr, /Protected roots:/u, refused.stderr);
++  assert.match(refused.stderr, /Get-Content docs\/a\.md|Get-Content -LiteralPath docs\/a\.md/u);
++}));

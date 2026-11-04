@@ -1,0 +1,65 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 3bf363491..5112f0cb0 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -531,7 +531,9 @@ the kernel closure test found imported by kernel modules but not yet listed:
+ `lib/agy-start-hint.mjs`, `lib/checkpoint-push-approval.mjs`,
+ `lib/continuity-authority-drift.mjs`, `lib/critical-action-authorization.mjs`,
+ `lib/fs-durability.mjs`, `lib/git-null-device.mjs`,
+-`lib/guard/env-dump-lane.mjs`, `lib/hardened-private-directory.mjs`,
++`lib/guard/env-dump-lane.mjs`, `lib/guard/control-plane-script-scan.mjs`,
++`lib/record-only-paths.mjs`, `lib/evidence-freshness-codes.mjs`,
++`lib/hardened-private-directory.mjs`,
+ `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
+ `scripts/security-readiness/gitleaks-readiness.mjs`,
+ `scripts/security-readiness/osv-scanner-readiness.mjs`, and
+diff --git a/harness/guard-split-map.json b/harness/guard-split-map.json
+index 707385dea..80bcb3943 100644
+--- a/harness/guard-split-map.json
++++ b/harness/guard-split-map.json
+@@ -37,6 +37,9 @@
+     "env-dump-lane": {
+       "layer": 2
+     },
++    "control-plane-script-scan": {
++      "layer": 2
++    },
+     "sanctioned-args-onboarding": {
+       "layer": 3
+     },
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index c51830967..7f0b315f5 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -492,6 +492,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // push-prepare.mjs imports release-promotion-envelope.mjs.
+   "plugins/pipeline-core/scripts/capture-evidence.mjs",
+   "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
++  // Candidate 19 (D4b/E3): the record-only path set and the stable freshness codes are imported by the push gate sources above (GMWKC01).
++  "plugins/pipeline-core/lib/record-only-paths.mjs",
++  "plugins/pipeline-core/lib/evidence-freshness-codes.mjs",
+   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
+   // Its publication-gate evidence dependency must remain protected as well.
+   "plugins/pipeline-core/scripts/audit-pack.mjs",
+@@ -754,6 +757,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/fs-durability.mjs",
+   "plugins/pipeline-core/lib/git-null-device.mjs",
+   "plugins/pipeline-core/lib/guard/env-dump-lane.mjs",
++  "plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs",
+   "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+   "plugins/pipeline-core/lib/hook-currentness.mjs",
+   "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs b/plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+index 80f7dc15a..7350dee33 100644
+--- a/plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
++++ b/plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+@@ -139,7 +139,8 @@ function laneEdges(name, source) {
+ 
+ test("GSC01 the module files of lib/guard are exactly the modules of the split map", () => {
+   const { moduleNames } = loadMap();
+-  assert.equal(moduleNames.length, 23, "the map names 23 modules besides the facade");
++  // QG-04: the control-plane-script-scan module (candidate 19, Q5) is a legitimate 24th module; the count is restated, the exact-set check above stays.
++  assert.equal(moduleNames.length, 24, "the map names 24 modules besides the facade");
+   assert.deepEqual(diskModuleNames(), moduleNames);
+ });
+ 

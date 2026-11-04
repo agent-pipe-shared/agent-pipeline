@@ -1,0 +1,662 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index cad25008c..549c90aa7 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1162,6 +1162,8 @@
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
++        "verify-phase:harness/scripts/verify.mjs:win-authority-readiness-and-preflight-tests",
++        "verify-phase:harness/scripts/verify.mjs:win-authority-rest-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-native-type-cache-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 100de796d..63d8c607b 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4031,6 +4031,12 @@
+       "invariantPinned": "A Windows native authority refusal names the folder, a preview that changes nothing and the apply command; the owner-route process status and the registry lock repair text are decided from injected observations; the preflight carries one JSON document with the close and push capability probe, the four bootstrap facts and the housekeeping receipts.",
+       "nonOverlapNote": "Unique w168 suite for the Windows native run findings (Q10, E2, W1, W2, W7); the readiness decision suite and the enforcement pins keep their own contracts."
+     },
++    {
++      "name": "win-authority-rest-tests",
++      "file": "plugins/pipeline-core/scripts/win-authority-rest.test.mjs",
++      "invariantPinned": "The PowerShell failure envelope carries the failed path as an optional bounded key that the backend validates and the refusal text prints; the security readiness probes retry once on EPERM; update-public-handover keeps Current state consistent with Next action and dates the handover; the slicing hint offers parallel dispatch only where it is supported; a second concurrent launch on Windows is retried as contention and then refused with the sequential rule and the wait command.",
++      "nonOverlapNote": "Unique w172 suite for the remaining native Windows findings (Q10 ps1 half, W3, W6, E4); the w168 suite, the readiness decision suite and the helper pins keep their own contracts."
++    },
+     {
+       "name": "windows-authority-readiness-tests",
+       "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index eb1f9ad12..c53571c14 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -95,7 +95,8 @@ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchMod
+ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+-import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
++import { describeWindowsAuthorityRefusal, prepareWithWindowsContentionRetry } from "../lib/windows-authority-readiness.mjs";
++import { lastWindowsAuthorityFailedPath } from "../lib/windows-owned-authority-backend.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+@@ -1091,11 +1092,19 @@ if (isDirectInvocation(import.meta.url)) {
+         process.stderr.write("WARNING (guard-dispatch): marked native host-commit route is not a single direct Claude Task or Codex spawn_agent; child changes will not be host-committed.\n");
+       } else {
+         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
+-        const prepared = prepareNativeGoldfishHostState({
+-          root: rootDir, runner: nativeRunner, input,
+-          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
+-          subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
++        // E4: a second concurrent launch on Windows meets a registry file the first launch holds; that is contention, not a
++        // permission fault, so the preparation is retried and then refused with the sequential rule (never icacls advice).
++        const prepared = prepareWithWindowsContentionRetry({
++          prepare: () => prepareNativeGoldfishHostState({
++            root: rootDir, runner: nativeRunner, input,
++            admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
++            subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
++          }),
++          projectRoot: resolve(rootDir), pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"),
++          waitCommand: `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} wait --root ${rootDir} --timeout 120`,
+         });
++        // Q10: read the path the failed native open reported before the readiness probe below can run its own native calls.
++        const envelopeFailedPath = lastWindowsAuthorityFailedPath();
+         if (prepared.ok) nativePendingPrepared = true;
+         if (!prepared.ok) {
+           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
+@@ -1122,8 +1131,8 @@ if (isDirectInvocation(import.meta.url)) {
+             // Q10: a native Windows authority reason (WIN-AUTH-OPEN and siblings) also names the folder, the preview and the apply command.
+             let windowsAuthorityText = "";
+             try {
+-              windowsAuthorityText = describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
+-                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") })
++              windowsAuthorityText = prepared.contention === true ? "" : describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
++                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"), failedPath: envelopeFailedPath ?? undefined })
+                 .replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 900);
+             } catch { windowsAuthorityText = ""; }
+             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${windowsAuthorityText}${repairText}\n`);
+diff --git a/plugins/pipeline-core/hooks/native-slicing.mjs b/plugins/pipeline-core/hooks/native-slicing.mjs
+index 402d08b48..533464c1b 100644
+--- a/plugins/pipeline-core/hooks/native-slicing.mjs
++++ b/plugins/pipeline-core/hooks/native-slicing.mjs
+@@ -28,6 +28,15 @@ const HASH_RE = /^[a-f0-9]{64}$/u;
+ 
+ export const SLICING_NUDGE = "Slicing default: if the remaining work is >=3 independent work packages with disjoint declared write scopes, no dependency edge, and a safe commit surface (worktree isolation, at most one committing slice, or a sequenced round), consider native parallel subagent dispatch. This is a nudge, never a requirement: sequential work needs no justification.";
+ 
++// E4: native Windows runs one Goldfish launch at a time (the session authority registry is not proven for concurrent launches
++// there), so the parallel offer appears only on the other platforms and Windows gets the sequential rule instead.
++export const SLICING_SEQUENTIAL_NUDGE = "Slicing default: on this platform run one Goldfish launch at a time and wait for it to return before the next; native parallel subagent dispatch is not supported here, so the remaining work packages are worked sequentially. This is the rule, not a nudge to override.";
++
++/** The slicing hint for a platform: the parallel offer where parallel dispatch is supported, the sequential rule otherwise. */
++export function slicingNudge(platform = process.platform) {
++  return platform === "win32" ? SLICING_SEQUENTIAL_NUDGE : SLICING_NUDGE;
++}
++
+ function hash(value) {
+   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+ }
+@@ -206,7 +215,7 @@ export function observeCodexSlicing(input, eventName = "PreToolUse", options = {
+       state.serialRun += 1;
+       if (state.serialRun === NATIVE_SLICING_THRESHOLD && !state.serialNudgeDelivered) {
+         state.serialNudgeDelivered = true;
+-        return { due: true, output: SLICING_NUDGE };
++        return { due: true, output: slicingNudge(options.platform) };
+       }
+       return { due: false, output: null };
+     }
+@@ -215,7 +224,7 @@ export function observeCodexSlicing(input, eventName = "PreToolUse", options = {
+       if (pending < NATIVE_SLICING_THRESHOLD) return { due: false, output: null };
+       const batch = hash(pendingPlanSet(inputValue));
+       if (!boundedPush(state.planBatches, batch, MAX_SEEN)) return { due: false, output: null };
+-      return { due: true, output: SLICING_NUDGE };
++      return { due: true, output: slicingNudge(options.platform) };
+     }
+     return { due: false, output: null };
+   });
+@@ -276,6 +285,6 @@ export function deliverAntigravitySlicing(input, options = {}) {
+     // This documented PreInvocation identity is the only group key carried
+     // into subsequent PreToolUse events; repeated PreInvocation is harmless.
+     state.activeInvocation = invocationNum;
+-    return { due, output: due ? SLICING_NUDGE : null };
++    return { due, output: due ? slicingNudge(options.platform) : null };
+   });
+ }
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index e5359c04f..b98bb1ebf 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -63,10 +63,14 @@ function guidance(pathClass, reason, path) {
+  * apply command the operator runs, and the rule for a second concurrent launch. The platform and the probe are injected.
+  * Returns '' when the platform is not Windows or the reason is not a native authority reason.
+  */
+-export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness } = {}) {
++export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness, failedPath } = {}) {
+   if (platform !== 'win32' || !NATIVE_REASON.test(reason ?? '')) return '';
++  // Q10: the path the native open itself failed on (the failure envelope) wins; the readiness probe names it otherwise.
++  // A path that could break out of a quoted command line is never printed.
++  const fromEnvelope = typeof failedPath === 'string' && failedPath !== '' && !/["\u0000-\u001f\u007f]/u.test(failedPath);
+   let causes = [];
+-  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; }
++  if (fromEnvelope) causes = [{ path: failedPath, reason }];
++  else { try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; } }
+   const located = causes.filter(cause => typeof cause?.path === 'string' && cause.path !== '' && (cause.reason === reason || reason === 'WIN-AUTH-OPEN'));
+   const rest = reason === 'WIN-AUTH-OPEN'
+     ? ' If another Goldfish launch is still running, start only one Goldfish launch at a time on Windows and wait for it to return before the next.'
+@@ -80,6 +84,33 @@ export function describeWindowsAuthorityRefusal({ reason, platform = process.pla
+   return ` ${rows.join(' ')}${rest}`;
+ }
+ 
++const pauseMilliseconds = ms => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
++
++/**
++ * E4: a second concurrent Goldfish launch on Windows must not fail with WIN-AUTH-OPEN merely because the first is running.
++ * `prepare` returns the launch preparation result ({ ok, code, reason, repair? }). A WIN-AUTH-OPEN refusal on Windows while the
++ * readiness probe finds every folder readable is contention on a file the first launch holds: the preparation is retried a bounded
++ * number of times, then fails with the sequential rule and the one command that waits for the first launch. Another platform,
++ * another reason, a folder that really cannot be opened or a probe that cannot judge returns the first result unchanged.
++ * Platform, probe and pause are injected.
++ */
++export function prepareWithWindowsContentionRetry({ prepare, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness, sleep = pauseMilliseconds, attempts = 3, pauseMs = 400, waitCommand } = {}) {
++  const contended = result => platform === 'win32' && result?.ok === false && result.reason === 'WIN-AUTH-OPEN';
++  let result = prepare();
++  if (!contended(result)) return result;
++  let causes = null;
++  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? null; } catch { causes = null; }
++  if (!Array.isArray(causes) || causes.length !== 0) return result;
++  for (let attempt = 1; attempt < attempts; attempt += 1) {
++    sleep(pauseMs);
++    result = prepare();
++    if (!contended(result)) return result;
++  }
++  const wait = typeof waitCommand === 'string' && waitCommand !== '' ? ` Wait for the first launch with: ${waitCommand} ; then launch again.` : '';
++  return { ...result, contention: true,
++    repair: `Another Goldfish launch still holds the session authority registry and every folder opens fine, so this is not a permission fault. On Windows start only one Goldfish launch at a time.${wait}` };
++}
++
+ /** The injected probe is called once per distinct path; it must only observe, never repair. */
+ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, privateRoot,
+   exists = existsSync,
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 260735a02..92f4453bc 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -8,13 +8,19 @@ import {isAbsolute,resolve} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ 
+-const HELPER_SHA256='e53c759fe421781ca45802cf5d96c4a0c2709c8d0490c58972a14b8f68171679';
++const HELPER_SHA256='77c9f91c1497c0b95bf0f38214a34dc339c4786cea03a939e59a470cbab71242';
+ const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
+ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+ const exact=(value,keys)=>object(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
+ const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[a-f0-9]{64}$/u;
+-function fail(reason,committed=false){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;throw error;}
++// Q10: the failure envelope may carry the one path the native open failed on (optional, bounded, no control characters).
++const FAILED_PATH_MAX=4096;
++let lastFailedPath=null;
++/** The failed path of the most recent native failure in this process, or null when that failure carried none. */
++export function lastWindowsAuthorityFailedPath(){return lastFailedPath;}
++const failedPathValue=value=>typeof value==='string'&&value.length>0&&value.length<=FAILED_PATH_MAX&&!/[\u0000-\u001f\u007f]/u.test(value);
++function fail(reason,committed=false,failedPath=undefined){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;lastFailedPath=failedPath??null;if(failedPath!==undefined)error.failedPath=failedPath;throw error;}
+ function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
+ function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
+ // Opt-in authority trace (diagnostics only): plain module-level counters of every native spawn made here.
+@@ -64,6 +70,7 @@ function invokeNative(request){
+  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
+  let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
++ if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);
+  if(request.operation==='inspect-source-image'){if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','size','sha256','committed'])||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts)||!Number.isSafeInteger(value.size)||value.size<0||value.size>134217728||! /^[a-f0-9]{64}$/u.test(value.sha256))fail('WIN-AUTH-NATIVE-OUTPUT');const parts=value.facts.split(':');if(parts.length!==12||BigInt(parts[3])<1n||(BigInt(parts[5])<<32n)+BigInt(parts[6])!==BigInt(value.size))fail('WIN-AUTH-NATIVE-OUTPUT');return value;}
+  if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','bytes','committed'])||value.ok!==true||typeof value.committed!=='boolean'||typeof value.facts!=='string'||(value.facts!=='removed'&&!factsPattern.test(value.facts)))fail('WIN-AUTH-NATIVE-OUTPUT');
+  return value;
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1 b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+index 44047f898..efc824063 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
++++ b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+@@ -131,15 +131,16 @@ public static class PipelineOwnedAuthorityNative {
+  [StructLayout(LayoutKind.Sequential)] struct Disposition { public byte Delete; }
+  [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetFileInformationByHandle(SafeFileHandle h,int type,ref Disposition info,uint size);
+  public static string CurrentSid { get { return WindowsIdentity.GetCurrent().User.Value; } }
+- static Exception Refuse(string code) { return new InvalidOperationException(code); }
++ public static string FailedPath=null;
++ static Exception Refuse(string code,string path=null) { if(path!=null)FailedPath=path;return new InvalidOperationException(code); }
+  public static string Hash(byte[] b) { using(var h=SHA256.Create())return String.Concat(h.ComputeHash(b).Select(v=>v.ToString("x2"))); }
+  static string Canonical(string p) { if(String.IsNullOrEmpty(p)||p.Length>32768||p.IndexOf('\0')>=0)throw Refuse("WIN-AUTH-PATH"); string full=Path.GetFullPath(p); if(!String.Equals(full,p,StringComparison.OrdinalIgnoreCase)||p.StartsWith(@"\\")||p.Substring(2).Contains(":"))throw Refuse("WIN-AUTH-PATH"); return full.TrimEnd('\\'); }
+  static string Final(SafeFileHandle h) { var b=new StringBuilder(32768);uint n=GetFinalPathNameByHandleW(h,b,32768,0);if(n==0||n>=32768)throw Refuse("WIN-AUTH-FINAL-PATH");string p=b.ToString();if(p.StartsWith(@"\\?\"))p=p.Substring(4);return p.TrimEnd('\\'); }
+- public static SafeFileHandle Open(string p,bool directory,bool write=false,bool privateOnly=true) { Canonical(p);var h=CreateFileW(p,0x80000000u|0x00020000u|(write?0x40000000u:0u),1,IntPtr.Zero,3,0x00200000u|(directory?0x02000000u:0u),IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,directory,privateOnly);return h;}catch{h.Dispose();throw;} }
++ public static SafeFileHandle Open(string p,bool directory,bool write=false,bool privateOnly=true) { Canonical(p);var h=CreateFileW(p,0x80000000u|0x00020000u|(write?0x40000000u:0u),1,IntPtr.Zero,3,0x00200000u|(directory?0x02000000u:0u),IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}try{Verify(h,p,directory,privateOnly);return h;}catch{h.Dispose();throw;} }
+  // Publication keeps one live, write-capable directory custody handle through move and flush.
+  // Compatible WRITE sharing is restricted to this parent; DELETE sharing remains refused.
+  // Private-file and temp handles retain their original exclusive sharing/custody checks.
+- static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
++ static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
+  // Non-private paths are ordinary host/project/source integrity observations: owner and ACL bytes stay hashed into the facts, but their owner or write grants do not gate onboarding or source reads. Private Pipeline authority retains the strict current-SID owner and protected-DACL policy.
+  static string HardenedRoot(string p) { string[] parts=p.Split('\\');for(int i=1;i+1<parts.Length;i++){if(String.Equals(parts[i],"agent-pipeline",StringComparison.OrdinalIgnoreCase)&&String.Equals(parts[i-1],".git",StringComparison.OrdinalIgnoreCase))return String.Join("\\",parts,0,i+1);}return null; }
+  public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false,bool humanControlled=false) {
+@@ -170,7 +171,7 @@ public static class PipelineOwnedAuthorityNative {
+  }
+  public static string InspectSourceImage(string p,out string facts,out long size) {
+   Canonical(p);var h=CreateFileW(p,0x80020000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);
+-  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
++  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
+   using(h){string before=Verify(h,p,false,false,true);long firstSize,secondSize;
+    string first=ImagePass(h,out firstSize),middle=Verify(h,p,false,false,true),second=ImagePass(h,out secondSize),after=Verify(h,p,false,false,true);
+    if(before!=middle||middle!=after||firstSize!=secondSize||first!=second)throw Refuse("WIN-AUTH-RACE");facts=after;size=secondSize;return second;
+@@ -185,14 +186,14 @@ public static class PipelineOwnedAuthorityNative {
+  public static string AncestorAboveRoot(string p,string boundary) {
+   if(!StrictlyAbove(p,boundary))throw Refuse("WIN-AUTH-INPUT");
+   var h=CreateFileW(p,0x80000000u|0x00020000u,1,IntPtr.Zero,3,0x00200000u|0x02000000u,IntPtr.Zero);
+-  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
++  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
+   using(h)return Verify(h,p,true,false,false,true);
+  }
+  public static bool Published=false;
+  public static string Remove(string p,string expected,string expectedFacts) {
+   using(var parent=Open(Path.GetDirectoryName(p),true,true)){
+    if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");
+-   var h=CreateFileW(p,0x80030000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
++   var h=CreateFileW(p,0x80030000u,1,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN",p);}
+    using(h){string facts=Verify(h,p,false,true);if(facts!=expectedFacts||Hash(Pass(h,1048576))!=expected)throw Refuse("WIN-AUTH-CAS");var d=new Disposition{Delete=1};if(!SetFileInformationByHandle(h,4,ref d,1))throw Refuse("WIN-AUTH-REMOVE");Published=true;}
+    if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");if(File.Exists(p)||Directory.Exists(p))throw Refuse("WIN-AUTH-REMOVE-READBACK");return "removed";
+   }
+@@ -258,6 +259,7 @@ try {
+ } catch {
+   $e=$_.Exception;while($e.InnerException){$e=$e.InnerException}
+   $code='WIN-AUTH-NATIVE-UNAVAILABLE';if($e.Message -match '^WIN-AUTH-[A-Z-]{1,64}$'){$code=$e.Message}
+-  [pscustomobject]@{ok=$false;code=$code;committed=[PipelineOwnedAuthorityNative]::Published}|ConvertTo-Json -Compress
++  $out=[ordered]@{ok=$false;code=$code;committed=[PipelineOwnedAuthorityNative]::Published};$failed=[PipelineOwnedAuthorityNative]::FailedPath;if($code -eq 'WIN-AUTH-OPEN' -and $null -ne $failed -and $failed.Length -le 4096){$out['path']=$failed}
++  [pscustomobject]$out|ConvertTo-Json -Compress
+   exit 1
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c3165e1a7..3d2108322 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11127,6 +11127,40 @@ function runEnrollmentRetirement(sub,rest){
+  }catch(error){console.error(`Enrollment retirement refused: ${error.code??error.message}`);return 2;}
+ }
+ 
++/**
++ * W6: the explicit `update-public-handover` also keeps the handover's "## Current state" section consistent with the "## Next
++ * action" block it just updated, and dates the handover. Two managed lines lead the section: a `**Last updated:** YYYY-MM-DD` date
++ * (the field the bootstrap confirmation line prints) and the same `**Lifecycle phase:**` marker the Next action block carries. The
++ * generated kickoff sentence "Feature `id` is active in <phase>" follows the phase for the same feature. Everything else in the
++ * section stays byte for byte. A handover without that section is not touched. Returns "updated", "current" or "absent".
++ */
++export function syncPublicCurrentState(dir, state, handoverPath, nowIso) {
++  const path = join(dir, handoverPath);
++  let markdown;
++  try { markdown = readFileSync(path, "utf8"); } catch { return "absent"; }
++  const lines = markdown.split("\n");
++  const start = lines.findIndex(line => line.trim() === "## Current state");
++  if (start < 0) return "absent";
++  const following = lines.findIndex((line, index) => index > start && line.startsWith("## "));
++  const end = following < 0 ? lines.length : following;
++  const feature = state?.activeFeature;
++  const active = feature && typeof feature.id === "string" && typeof feature.phase === "string";
++  const marker = active ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\`` : "**Lifecycle phase:** no active feature";
++  const date = String(nowIso ?? "").slice(0, 10);
++  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) return "absent";
++  const body = lines.slice(start + 1, end)
++    .filter(line => !line.startsWith("**Lifecycle phase:**") && !line.startsWith("**Last updated:**"))
++    .map(line => {
++      const match = active ? /^Feature `([^`]+)` is active in [a-z-]+( \(PO profile: `[^`]+`\))?\.$/u.exec(line) : null;
++      return match !== null && match[1] === feature.id ? `Feature \`${feature.id}\` is active in ${feature.phase}${match[2] ?? ""}.` : line;
++    });
++  while (body.length > 0 && body[0] === "") body.shift();
++  const rebuilt = [...lines.slice(0, start + 1), "", `**Last updated:** ${date}`, marker, "", ...body, ...(body.length === 0 ? [""] : []), ...lines.slice(end)].join("\n");
++  if (rebuilt === markdown) return "current";
++  try { writeFileSync(path, rebuilt, "utf8"); } catch { return "absent"; }
++  return "updated";
++}
++
+ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+   const dir = deps.dir ?? projectDir();
+   const now = deps.now ?? (() => new Date().toISOString());
+@@ -13684,7 +13718,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     case "update-public-handover": {
+       if (rest.length !== 0) return 2;
+       const result = updatePublicHandoverDuty(dir, base);
+-      console.log(JSON.stringify(result, null, 2));
++      // W6: the Current state section follows the Next action block it was just kept consistent with (and carries the date).
++      const currentState = result.status === "current" ? syncPublicCurrentState(dir, base, result.path, now()) : "absent";
++      console.log(JSON.stringify({ ...result, currentState }, null, 2));
+       return result.status === "current" ? 0 : 2;
+     }
+     case "inspect": {
+diff --git a/plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs b/plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs
+index c9b5dff9c..ff62365f9 100644
+--- a/plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs
++++ b/plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+-import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe } from "../tool-identity.mjs";
++import { buildHandle, executableIdentity, resolveSystemExecutable } from "../tool-identity.mjs";
++import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
+ 
+ const GITLEAKS_MODULE = "github.com/zricethezav/gitleaks/v8";
+ 
+diff --git a/plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs b/plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs
+index 1599a2c6b..024a71f4d 100644
+--- a/plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs
++++ b/plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+-import { buildHandle, executableIdentity, runProbe } from "../tool-identity.mjs";
++import { buildHandle, executableIdentity } from "../tool-identity.mjs";
++import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
+ export function probeOsvScanner({ executablePath, rootDir, tempDir }, deps = {}) {
+   const observed = executableIdentity(executablePath); if (!observed.ok) return observed;
+   const version = runProbe(observed.identity.realPath, ["--version"], { cwd: rootDir, tempDir, ...deps }); if (!version.ok) return version;
+diff --git a/plugins/pipeline-core/scripts/security-readiness/probe-retry.mjs b/plugins/pipeline-core/scripts/security-readiness/probe-retry.mjs
+new file mode 100644
+index 000000000..3c97a6c5b
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-readiness/probe-retry.mjs
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: SUL-1.0
++// W3: a readiness probe that fails with EPERM is retried ONCE before the tool is reported as not ready. A native Windows run saw
++// gitleaks fail with EPERM and pass two minutes later (antivirus or indexer holding the freshly installed binary), so one pause and
++// one repeat of the same probe is the whole policy; a second failure is reported exactly as before. The pause is injected.
++import { runProbe } from "../tool-identity.mjs";
++
++const RETRY_PAUSE_MS = 750;
++const pauseMs = (ms) => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
++
++/** runProbe with one retry when the probe failed because the execution environment refused the spawn (EPERM or EACCES). */
++export function runProbeRetryingEperm(executable, args, options = {}) {
++  const { sleepFn = pauseMs, ...probeOptions } = options;
++  const first = runProbe(executable, args, probeOptions);
++  if (first.ok || first.status !== "execution_environment") return first;
++  sleepFn(RETRY_PAUSE_MS);
++  return runProbe(executable, args, probeOptions);
++}
+diff --git a/plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs b/plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs
+index 8dba0f5a9..951052fce 100644
+--- a/plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs
++++ b/plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs
+@@ -1,7 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { mkdtempSync, rmSync } from "node:fs";
+ import { join } from "node:path";
+-import { buildHandle, executableIdentity, runProbe } from "../tool-identity.mjs";
++import { buildHandle, executableIdentity } from "../tool-identity.mjs";
++import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
+ export function probeSemgrep({ executablePath, rootDir, tempDir }, deps = {}) {
+   const observed = executableIdentity(executablePath); if (!observed.ok) return observed;
+   const scratch = mkdtempSync(join(tempDir, "pipeline-semgrep-preflight-"));
+diff --git a/plugins/pipeline-core/scripts/win-authority-rest.test.mjs b/plugins/pipeline-core/scripts/win-authority-rest.test.mjs
+new file mode 100644
+index 000000000..dbe55147f
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/win-authority-rest.test.mjs
+@@ -0,0 +1,266 @@
++// SPDX-License-Identifier: SUL-1.0
++// Candidate 19c, w172 (AC-108, the Windows native runs Q10 PowerShell half, W3, W6, E4): the failed path rides in the PowerShell
++// failure envelope, the security readiness probes retry once on EPERM, the public handover update keeps the Current state
++// section consistent with the Next action it updates and carries a date, the slicing hint appears only where parallel dispatch
++// is supported, and a second concurrent Goldfish launch is not refused merely because the first is running.
++// Every platform-dependent decision takes an injected platform, probe, spawn or sleep, so this runs on any machine.
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import * as backend from "../lib/windows-owned-authority-backend.mjs";
++import * as readiness from "../lib/windows-authority-readiness.mjs";
++import * as slicing from "../hooks/native-slicing.mjs";
++import * as preflight from "./pipeline-start-preflight.mjs";
++import { run as runState } from "./pipeline-state.mjs";
++import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
++import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
++import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
++
++const here = (relative) => fileURLToPath(new URL(relative, import.meta.url));
++const REPO = here("../../..");
++const FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
++const SCHEMA = "pipeline.windows-authority-readiness.v1";
++const roots = { projectRoot: "C:\\proj", pluginRoot: "C:\\plug", privateRoot: "C:\\proj\\.git\\agent-pipeline" };
++
++// --- Q10 (PowerShell half): the failed path is an optional, bounded key of the failure envelope -----------------------------------
++
++function withSeam(body, run) {
++  backend.setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn: () => ({ status: 1, signal: null, stderr: "", stdout: JSON.stringify(body) }) });
++  backend.resetWindowsOwnedAuthorityBackendMemo();
++  try { return run(); }
++  finally { backend.setWindowsOwnedAuthorityBackendTestSeam(undefined); backend.resetWindowsOwnedAuthorityBackendMemo(); }
++}
++const inspectAt = (path) => () => backend.inspectWindowsOwnedAuthorityPath({ path, directory: true });
++
++test("Q10 ps1: a failure envelope that carries the failed path surfaces it on the error", () => {
++  const path = join(tmpdir(), "proj-evidence");
++  withSeam({ ok: false, code: "WIN-AUTH-OPEN", committed: false, path }, () => {
++    assert.throws(inspectAt(path), (error) => {
++      assert.equal(error.reason, "WIN-AUTH-OPEN");
++      assert.equal(error.failedPath, path);
++      return true;
++    });
++    assert.equal(backend.lastWindowsAuthorityFailedPath(), path, "the same process can read the path back for the refusal text");
++  });
++});
++
++test("Q10 ps1: the old three-key envelope is still accepted and carries no path", () => {
++  const path = join(tmpdir(), "proj-evidence");
++  withSeam({ ok: false, code: "WIN-AUTH-OPEN", committed: false }, () => {
++    assert.throws(inspectAt(path), (error) => {
++      assert.equal(error.reason, "WIN-AUTH-OPEN");
++      assert.equal(error.failedPath, undefined);
++      return true;
++    });
++    assert.equal(backend.lastWindowsAuthorityFailedPath(), null);
++  });
++});
++
++test("Q10 ps1: an envelope with an unknown key, a non-string path, a control character or an oversized path is refused as bad output", () => {
++  const path = join(tmpdir(), "proj-evidence");
++  for (const body of [
++    { ok: false, code: "WIN-AUTH-OPEN", committed: false, path, extra: 1 },
++    { ok: false, code: "WIN-AUTH-OPEN", committed: false, path: 7 },
++    { ok: false, code: "WIN-AUTH-OPEN", committed: false, path: `${path}\u0007` },
++    { ok: false, code: "WIN-AUTH-OPEN", committed: false, path: "x".repeat(40000) },
++  ]) {
++    withSeam(body, () => assert.throws(inspectAt(path), (error) => error.reason === "WIN-AUTH-NATIVE-OUTPUT" && error.failedPath === undefined, JSON.stringify(body).slice(0, 80)));
++  }
++});
++
++test("Q10 ps1: the pinned helper digest still matches the helper bytes and the helper emits the path key on failure", () => {
++  const helperPath = here("../lib/windows-owned-authority-native.ps1");
++  const bytes = readFileSync(helperPath);
++  const pinned = /const HELPER_SHA256='([a-f0-9]{64})'/u.exec(readFileSync(here("../lib/windows-owned-authority-backend.mjs"), "utf8"))?.[1];
++  assert.equal(pinned, createHash("sha256").update(bytes).digest("hex"), "re-pinned after the helper change");
++  assert.ok(!bytes.includes(0x0d), "the helper keeps LF line endings (the digest is of the LF bytes)");
++  assert.ok(/ok=\$false;code=\$code;committed=[^\n]*path/u.test(bytes.toString("utf8")), "the failure envelope names a path key");
++});
++
++test("Q10 ps1: the refusal text prints the path from the envelope when present and from the readiness probe otherwise", () => {
++  const probe = () => ({ schema: SCHEMA, status: "unavailable", causes: [{ pathClass: "project", reason: "WIN-AUTH-OPEN", path: "C:\\proj\\from-probe" }] });
++  const none = () => ({ schema: SCHEMA, status: "unavailable", causes: [] });
++  const fromEnvelope = readiness.describeWindowsAuthorityRefusal({ reason: "WIN-AUTH-OPEN", platform: "win32", ...roots, assess: none, failedPath: "C:\\proj\\from-envelope" });
++  assert.match(fromEnvelope, /C:\\proj\\from-envelope/u);
++  assert.match(fromEnvelope, /icacls "C:\\proj\\from-envelope" \/grant /u);
++  const preferred = readiness.describeWindowsAuthorityRefusal({ reason: "WIN-AUTH-OPEN", platform: "win32", ...roots, assess: probe, failedPath: "C:\\proj\\from-envelope" });
++  assert.match(preferred, /from-envelope/u);
++  assert.doesNotMatch(preferred, /from-probe/u, "the envelope path is the one the native open actually failed on");
++  const fromProbe = readiness.describeWindowsAuthorityRefusal({ reason: "WIN-AUTH-OPEN", platform: "win32", ...roots, assess: probe });
++  assert.match(fromProbe, /from-probe/u);
++  const unsafe = readiness.describeWindowsAuthorityRefusal({ reason: "WIN-AUTH-OPEN", platform: "win32", ...roots, assess: none, failedPath: 'C:\\a" & echo x' });
++  assert.doesNotMatch(unsafe, /echo x/u, "a path that could break out of the quoted command is never printed as a command");
++});
++
++test("Q10 ps1: the dispatch guard hands the envelope path to the shared description", () => {
++  assert.ok(/lastWindowsAuthorityFailedPath/u.test(readFileSync(here("../hooks/guard-dispatch.mjs"), "utf8")), "guard-dispatch reads the envelope path");
++});
++
++// --- W3: the readiness probes retry once on EPERM before they report the tool as not ready --------------------------------------
++
++function sequenceSpawn(outcomes) {
++  const calls = [];
++  const spawnFn = (_exe, args) => {
++    calls.push(args.join(" "));
++    const outcome = outcomes[Math.min(calls.length - 1, outcomes.length - 1)];
++    return outcome === "EPERM" ? { error: Object.assign(new Error("spawnSync EPERM"), { code: "EPERM" }), status: null, stdout: "", stderr: "" }
++      : { status: 0, stdout: "8.18.0 --source --report-format --report-path --no-banner --exit-code --format --recursive --json --config", stderr: "" };
++  };
++  return { calls, spawnFn };
++}
++const probes = [
++  ["gitleaks", (deps, dir) => probeGitleaks({ executablePath: process.execPath, rootDir: dir, tempDir: dir }, deps)],
++  ["osv-scanner", (deps, dir) => probeOsvScanner({ executablePath: process.execPath, rootDir: dir, tempDir: dir }, deps)],
++  ["semgrep", (deps, dir) => probeSemgrep({ executablePath: process.execPath, rootDir: dir, tempDir: dir }, deps)],
++];
++for (const [name, probe] of probes) {
++  test(`W3: the ${name} readiness probe retries once on EPERM and passes when the retry succeeds`, () => {
++    const dir = mkdtempSync(join(tmpdir(), "win-rest-probe-"));
++    try {
++      const { calls, spawnFn } = sequenceSpawn(["EPERM", "ok"]);
++      let slept = 0;
++      const result = probe({ spawnFn, sleepFn: () => { slept += 1; } }, dir);
++      assert.equal(result.ok, true, `${name}: ${JSON.stringify(result)}`);
++      assert.equal(result.status, "ready");
++      assert.equal(slept, 1, "one injected pause before the one retry");
++      assert.equal(calls[0], calls[1], "the retry repeats the same probe command");
++    } finally { rmSync(dir, { recursive: true, force: true }); }
++  });
++  test(`W3: the ${name} readiness probe retries only once; a second EPERM is reported, never retried again`, () => {
++    const dir = mkdtempSync(join(tmpdir(), "win-rest-probe-"));
++    try {
++      const { calls, spawnFn } = sequenceSpawn(["EPERM"]);
++      const result = probe({ spawnFn, sleepFn: () => {} }, dir);
++      assert.equal(result.ok, false);
++      assert.equal(result.status, "execution_environment");
++      assert.equal(calls.length, 2, "exactly one first attempt and one retry");
++    } finally { rmSync(dir, { recursive: true, force: true }); }
++  });
++}
++
++// --- W6: update-public-handover keeps Current state consistent with Next action and carries a date --------------------------------
++
++const handoverState = (phase) => ({ schema: "pipeline.state.v0", activeFeature: { id: "demo", planPath: "specs/demo/plan.md", phase }, planApproved: false });
++function handoverFixture(markdown, state, body) {
++  mkdirSync(join(REPO, "scratch"), { recursive: true });
++  const root = mkdtempSync(join(REPO, "scratch", "win-rest-handover-"));
++  try {
++    mkdirSync(join(root, "docs")); mkdirSync(join(root, "project"));
++    writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(state));
++    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "demo", handover: "docs/state.md", verify: "node verify.mjs" }));
++    writeFileSync(join(root, "docs", "state.md"), markdown);
++    return body(root, join(root, "docs", "state.md"));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++function updateHandover(root) {
++  const original = console.log;
++  let payload = null;
++  try { console.log = (text) => { payload = JSON.parse(text); }; const code = runState(["update-public-handover"], { dir: root, now: () => "2026-11-04T10:00:00.000Z" }); return { code, payload }; }
++  finally { console.log = original; }
++}
++const OLD = "# Project state\n\n## Goal\n\nG.\n\n## Current state\n\nFeature `demo` is active in design.\nInitial PRD: `specs/demo/prd.md`.\n\n## Next action\n\nOld text.\n\n## Decisions\n\nKeep.\n";
++
++test("W6: the update writes the phase and a date into Current state and rewrites the generated phase sentence", () => handoverFixture(OLD, handoverState("implementation"), (root, path) => {
++  const result = updateHandover(root);
++  assert.equal(result.code, 0);
++  const text = readFileSync(path, "utf8");
++  const current = text.slice(text.indexOf("## Current state"), text.indexOf("## Next action"));
++  assert.match(current, /\*\*Last updated:\*\* 2026-11-04/u, "a date field the bootstrap line can print");
++  assert.match(current, /\*\*Lifecycle phase:\*\* feature `demo` · phase `implementation`/u);
++  assert.match(current, /Feature `demo` is active in implementation\./u);
++  assert.doesNotMatch(current, /active in design/u);
++  assert.ok(text.includes("Initial PRD: `specs/demo/prd.md`."), "other Current state prose stays");
++  assert.ok(text.includes("## Goal\n\nG.\n"), "sections outside Current state and Next action stay");
++  assert.ok(text.endsWith("## Decisions\n\nKeep.\n"));
++  assert.equal(result.payload.currentState, "updated");
++}));
++
++test("W6: a second update on the same day changes nothing, and a phase change rewrites only the managed lines", () => handoverFixture(OLD, handoverState("design"), (root, path) => {
++  updateHandover(root);
++  const first = readFileSync(path, "utf8");
++  assert.equal(updateHandover(root).payload.currentState, "current");
++  assert.equal(readFileSync(path, "utf8"), first);
++  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(handoverState("implementation")));
++  updateHandover(root);
++  const second = readFileSync(path, "utf8");
++  assert.equal(second.split("**Lifecycle phase:**").length - 1, 2, "one marker in Current state, one in Next action, no duplicates");
++  assert.equal(second.split("**Last updated:**").length - 1, 1);
++  assert.match(second, /active in implementation/u);
++}));
++
++test("W6: a handover with no Current state section is updated exactly as before", () => handoverFixture("# State\n\n## Next action\n\nOld.\n", handoverState("design"), (root, path) => {
++  const result = updateHandover(root);
++  assert.equal(result.code, 0);
++  assert.equal(result.payload.currentState, "absent");
++  assert.doesNotMatch(readFileSync(path, "utf8"), /Last updated/u);
++}));
++
++test("W6: the bootstrap facts read the date the update wrote", () => handoverFixture(OLD, handoverState("design"), (root) => {
++  updateHandover(root);
++  const facts = preflight.observeBootstrapFacts({ rootDir: root });
++  assert.equal(facts.calibration.handoverDate, "2026-11-04");
++}));
++
++// --- E4: the slicing hint appears only where parallel dispatch is supported ---------------------------------------------------------
++
++const planInput = { cwd: REPO, session_id: "win-rest", tool_name: "update_plan", tool_input: { plan: [{ status: "pending", step: "a" }, { status: "pending", step: "b" }, { status: "pending", step: "c" }] } };
++const slicingDeps = (platform) => ({ platform, resolveGitCommonDirFn: () => "/fixture/.git", existsSyncFn: () => false, mkdirSyncFn: () => {}, writeFileSyncFn: () => {} });
++
++test("E4: where parallel dispatch is supported the hint offers it; on Windows it states the sequential rule instead", () => {
++  const linux = slicing.observeCodexSlicing(planInput, "PreToolUse", slicingDeps("linux"));
++  assert.equal(linux.due, true);
++  assert.match(linux.output, /Slicing default:.*parallel/su);
++  const windows = slicing.observeCodexSlicing({ ...planInput, session_id: "win-rest-2" }, "PreToolUse", slicingDeps("win32"));
++  assert.equal(windows.due, true);
++  assert.match(windows.output, /Slicing default:/u);
++  assert.match(windows.output, /one (?:Goldfish )?(?:launch|dispatch) at a time/iu, "the sequential rule");
++  assert.doesNotMatch(windows.output, /consider native parallel subagent dispatch/u);
++  assert.equal(typeof slicing.slicingNudge, "function");
++  assert.equal(slicing.slicingNudge("linux"), slicing.SLICING_NUDGE);
++});
++
++// --- E4: a second concurrent launch is not refused merely because the first is running -----------------------------------------
++
++const WAIT = "node plugin/scripts/session-authority-repair.mjs wait --root C:\\proj --timeout 120";
++const open = () => ({ ok: false, code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-OPEN" });
++const folderFine = () => ({ schema: SCHEMA, status: "ready", causes: [] });
++const folderBroken = () => ({ schema: SCHEMA, status: "unavailable", causes: [{ pathClass: "project", reason: "WIN-AUTH-OPEN", path: "C:\\proj\\evidence" }] });
++
++test("E4: a WIN-AUTH-OPEN refusal on Windows with every folder readable is contention; the launch preparation retries and then succeeds", () => {
++  assert.equal(typeof readiness.prepareWithWindowsContentionRetry, "function");
++  let calls = 0, slept = 0;
++  const result = readiness.prepareWithWindowsContentionRetry({ prepare: () => (++calls < 3 ? open() : { ok: true }), platform: "win32", ...roots, assess: folderFine, sleep: () => { slept += 1; }, waitCommand: WAIT });
++  assert.equal(result.ok, true);
++  assert.equal(calls, 3);
++  assert.equal(slept, 2);
++});
++
++test("E4: persistent contention fails with the sequential rule and the one command that waits for the first launch", () => {
++  let calls = 0;
++  const result = readiness.prepareWithWindowsContentionRetry({ prepare: () => { calls += 1; return open(); }, platform: "win32", ...roots, assess: folderFine, sleep: () => {}, waitCommand: WAIT, attempts: 3 });
++  assert.equal(result.ok, false);
++  assert.equal(result.reason, "WIN-AUTH-OPEN");
++  assert.equal(calls, 3, "bounded");
++  assert.match(result.repair, /one Goldfish launch at a time/iu);
++  assert.ok(result.repair.includes(WAIT), "names the wait command");
++  assert.doesNotMatch(result.repair, /icacls/u, "contention is not a folder fault, so no permission change is offered");
++});
++
++test("E4: a folder that really cannot be opened, another platform or another reason is never retried", () => {
++  for (const [platform, assess, prepare] of [["win32", folderBroken, open], ["linux", folderFine, open], ["win32", folderFine, () => ({ ok: false, code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-ACL" })]]) {
++    let calls = 0;
++    const result = readiness.prepareWithWindowsContentionRetry({ prepare: () => { calls += 1; return prepare(); }, platform, ...roots, assess, sleep: () => {}, waitCommand: WAIT });
++    assert.equal(calls, 1, `${platform}/${prepare === open ? "open" : "other"}`);
++    assert.equal(result.ok, false);
++    assert.equal(result.repair, undefined);
++  }
++});
++
++test("E4: the dispatch guard routes the native host preparation through the contention retry", () => {
++  assert.ok(/prepareWithWindowsContentionRetry/u.test(readFileSync(here("../hooks/guard-dispatch.mjs"), "utf8")), "guard-dispatch uses the retry");
++});

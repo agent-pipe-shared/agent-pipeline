@@ -2,6 +2,9 @@
 # Candidate 19c apply script (grows while the rest of candidate 19 is built on top of the stamped interim candidate 19a, commit 6193380d0; each held patch is one commit, in this
 # order, then the derived files in ONE follow-up commit through scripts/refresh-derived-files.mjs). PO terminal, repository root.
 # Plan: specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md, section "PO decisions of the 2026-11-04 sitting".
+#   w138  (PO decision 2026-11-04: now default, no opt-in) a closed predecessor's design receipt is accepted when the design is equal (F1)
+#   w162  (PO decision 2026-11-04: now default, no opt-in) a Verify or Security record is carried across evidence-only commits (D4b/E3 step 3)
+#   w190  the control-plane scan module and the push gate path modules are registered in the guard split map, the never-liftable kernel paths and the threat model (found by the regression suites)
 #   w165  a pending-unavailable Goldfish stop failure names its cause and the recover helper plan and apply command (E1 text part; Windows greenfield)
 #   w166  one shared reader of the bound authority documents returns sealed and digests (late-binding build step 1a; inert, no reader moves onto it yet)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
@@ -21,8 +24,11 @@ step2() {
   git commit --no-verify -m "$2" -m $'AI-Assisted: true\nDispatch: stage-0 (elephant)'
   echo "applied $1"
 }
+step2 w138-f1-a-closed-predecessors-design-receipt-is-accepted-for-the-next-feature-when-the-design-is-equal "feat(architecture): accept the design receipt of a closed predecessor feature when the design package and every target digest are equal"
+step2 w162-d4b-stage-3-a-verify-or-security-record-is-carried-across-evidence-only-commits-opt-in "feat(push): a Verify or Security record is carried across evidence-only commits by the push guard and push-prepare, behind the opt-in block"
 step2 w165-e1-a-pending-unavailable-stop-failure-names-its-cause-and-the-recover-helper "fix(hook): a pending-unavailable Goldfish stop failure names its cause and the recover helper plan and apply command"
 step2 w166-late-binding-step-1a-one-shared-reader-of-the-bound-authority-returns-sealed-and-digests "feat(authority): one shared reader of the bound authority documents returns sealed and digests, inert until the readers move onto it"
+step2 w190-fix-the-control-plane-scan-module-and-the-push-gate-path-modules-are-registered-in-the-guard-pins "fix(guard): the control-plane script scan module and the push gate path modules are listed in the split map, the never-liftable kernel paths and the threat model"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

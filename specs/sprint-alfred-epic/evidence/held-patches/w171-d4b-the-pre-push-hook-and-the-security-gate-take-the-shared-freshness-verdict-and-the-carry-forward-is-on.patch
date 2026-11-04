@@ -1,0 +1,790 @@
+diff --git a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
+index 74218696a..1aca5bc28 100644
+--- a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
++++ b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.json
+@@ -2,8 +2,8 @@
+   "schema": "pipeline.architecture-decision.v1",
+   "id": "draft-authority-carry-forward-and-signed-reconcile-commit",
+   "title": "Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files",
+-  "status": "proposed",
+-  "digest": "50556bd22439b0491b0323cff05765b439a31fe17c38182d8e2c92c0a3747078",
++  "status": "accepted",
++  "digest": "148d81c9d167c661a73c0e3b95f9cda4b904baf0ae8d7ba5b3d78f26e4434a77",
+   "scope": "global",
+   "date": "2026-11-03"
+ }
+diff --git a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
+index 1c5e748f0..d6a55a35c 100644
+--- a/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
++++ b/docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md
+@@ -1,8 +1,10 @@
+ # ADR: Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files
+ 
+-Status: Proposed (draft for an independent review; the PO decided on 2026-11-03 to build it in candidate 19 as an opt-in block of the apply script, so the PO's act of applying or leaving out the patches is the final gate; EL-04)
++Status: Accepted (PO decision of 2026-11-04 at the sitting: point 2 and the amendment of 2026-11-04 are built and ACTIVE by default; the safeguards of point 2 stay; the order of work of the amendment is kept; EL-04). Points 1, 3 and 4 are decided as written; their build is tracked by their own items.
+ 
+-Date: 2026-11-03
++Date: 2026-11-03 (accepted 2026-11-04)
++
++Decision line: the PO decided on 2026-11-04 that a Verify or Security record is carried across evidence-only commits by default, through one shared freshness verdict used by the push guard, `push-prepare`, the security completeness gate and the managed pre-push hook. The closed evidence set, the product tree hash equality, the ancestor check, the clean secret scan of the passed-over commits for Security evidence, fail closed on any doubt and the named list of passed-over commits stay. Critic rounds are not carried by this decision.
+ 
+ ## Context
+ 
+@@ -14,7 +16,7 @@ Three greenfield runs of candidate 18 met the same defect family: authority that
+ 
+ All four are the same design question: what is granted by a signature or an accepted receipt, and when does it stay valid.
+ 
+-## Decision (proposed)
++## Decision
+ 
+ 1. **Design inheritance by equality.** A typed, idempotent command re-binds the architecture receipt for a new feature when the design package it would materialize is byte-equal to the one of the accepted predecessor (`designSha256` and every target digest equal). It writes a new receipt that names the predecessor (`inheritedFrom: {featureId, planPath, designSha256}`) and binds the new feature and plan. Any difference, however small, falls back to the full materialization of today. Nobody deletes or edits a receipt by hand; the check at line 287 accepts a receipt that is either exact for this feature or an inheritance receipt whose recorded predecessor is accepted and whose design digest equals the current package. **Accepted predecessor** means: a feature that is closed in the closed-feature audit, whose own receipt is an exact materialization receipt (never itself an inheritance receipt). An inheritance receipt therefore names the materializing feature directly, the chain has depth one, and a successor of a successor re-names the original.
+ 2. **Evidence-only commits carry Verify and Security forward.** Define a closed set of evidence paths in plugin source (not project configuration), by record class and not by file type: the feature's `evidence/**`, `audit-bundles/**`, the generated `lifecycle.json` and `result.md` of the feature package, and the single named gate record `project/push-threat-model.md`. Everything else is product-bound and never in the set, in particular the feature spec, plan and PRD under `specs/<feature>/`, `project/guard-config.json` and every other `project/` file, and any source, script or configuration extension. Verify and Security evidence additionally records `productTreeSha256`, the hash over the tree entries outside the set. A commit range whose changed paths all lie inside the set leaves `productTreeSha256` equal, so Verify evidence bound to the earlier candidate is carried forward and names the evidence-only commits it passed over. **Security evidence is carried forward only together with a secret scan of the files changed by the passed-over commits**, run by the reader at the carry-forward moment; when that scan is unavailable or reports a finding, the Security evidence is not carried (fail closed). Anything outside the set, or a changed `productTreeSha256`, invalidates exactly as today. **Critic rounds are not carried forward by this decision:** their rules are bound to the exact previous reviewed candidate and no reader consumes such a carry-forward; it stays an open question.
+@@ -59,17 +61,19 @@ All four are the same design question: what is granted by a signature or an acce
+ 
+ The revised text has not had a second review; the review budget is spent on a working local candidate first (PO decision 2026-11-03).
+ 
+-## Proposed amendment of 2026-11-04: one definition of "evidence-only", one shared freshness function
++## Amendment of 2026-11-04 (accepted): one definition of "evidence-only", one shared freshness function
+ 
+ Found by reading the code after the first build stage (patch w156, which is inert): the push boundary already carries Verify and Security across record-only commits through the release-promotion envelope (`lib/release-promotion-envelope.mjs`, `RECORD_ONLY_PATH_PATTERNS`, used by `hooks/guard-push.mjs` and `scripts/push-prepare.mjs`), and the Critic delta course has a third, narrower test (`lib/feature-package-registration.mjs`). Three definitions of "may change without invalidating a record" is itself a trust-boundary hazard, so point 2 is amended before any reader is wired:
+ 
+ - **One path set, owned by one module.** The base is the set the production envelope already uses (reviewed and in force). The two classes this ADR needs and the envelope lacks, `specs/<feature>/audit-bundles/**` and `project/push-threat-model.md`, are added as a named extension that the envelope does not accept until it has been reviewed for them. The Critic delta course keeps its own narrower test on purpose (it answers a different question: whether a commit is a correction candidate); it is not widened.
+ - **The wider members of the envelope set are acknowledged, not silently adopted:** `backlog/**`, `docs/state.md` and the two pipeline-state files are not product code, but they are consumed by gates. Carrying a Security record across them needs the secret scan of point 2 like any other path; Verify may be carried across them only if the independent review of this amendment confirms that no Verify suite reads them as input. Until then the carry-forward decision of w156 keeps its narrower set and refuses these paths.
+ - **One shared freshness function** replaces the four hand-written comparisons (`hooks/guard-push.mjs`, `lib/security-completeness-gate.mjs`, `scripts/push-prepare.mjs`, and the template of the managed pre-push hook in `scripts/pre-push-hook-install.mjs`), returns a stable code next to the message (today `scripts/push-gate-satisfiability.mjs` classifies by the substring `is stale (HEAD is`), and the hook template loads it by dynamic import as it already does for the security completeness gate. The envelope stays one input of that function, not a second path next to it.
+-- **Order of work:** (1) the shared module with the single path set and no behaviour change, pinned by the existing push suites; (2) the shared freshness function with stable codes, still exact-commit only; (3) the carry-forward branch behind its own opt-in. No stage widens what a push accepts before the independent review of this amendment.
++- **Order of work:** (1) the shared module with the single path set and no behaviour change, pinned by the existing push suites; (2) the shared freshness function with stable codes, still exact-commit only; (3) the carry-forward branch, then moved onto all four comparison sites. Built in that order (stages 1 to 3 as inert or opt-in patches, then the rest: the hook template and the security completeness gate take the shared verdict, and the carry-forward is active by default).
++- **Built behaviour (2026-11-04):** the four comparison sites give the same verdict for the same input and keep their own message text with the stable code next to it (`EF-STALE-COMMIT` and its siblings; a refused carry adds the reason, for example `carry-forward refused: PRODUCT-PATH-CHANGED`). A Security record that binds a commit and a tree (the v1 candidate, the v2 envelope) is checked against the commit and tree it was produced for once it is carried; the secret scan covers the range from that commit to the pushed one. The `push-prepare` report and the pre-push hook log name the passed-over commits. A real push through the guard and through the hook template is pinned by `lib/push-gate-real-decision-carry.test.mjs`.
++- **Wider members of the envelope set:** `backlog/**`, `docs/state.md` and the two pipeline-state files stay outside the carry-forward set; only the envelope accepts them, as before.
+ 
+-This amendment has had no review. It changes nothing in code.
++The independent review of this amendment is not done; the PO accepted the amendment on 2026-11-04 on the strength of the built safeguards and the pinned real-decision cases.
+ 
+ ## Not decided
+ 
+-Nothing is built by this draft. It needs an independent review (fresh context, ADR-0014 contract); the patches follow in the apply script behind their own opt-in block.
++Point 2 and the amendment are built (see "Built behaviour"). Points 1, 3 and 4 are tracked by their own items; an independent review (fresh context, ADR-0014 contract) of the whole decision is still open and is batched for the Coordinator.
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index cad25008c..10e4d01cb 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -998,6 +998,7 @@
+         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-destination-policy-tests",
++        "verify-phase:harness/scripts/verify.mjs:push-gate-real-decision-carry-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-gate-satisfiability-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-init-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 46ab49996..fd5b77966 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -228,6 +228,28 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" \
+ A red check names its own remedy; nothing below this line needs running
+ until the report is fully green.
+ 
++**Freshness of the Verify and Security records, one verdict everywhere.** A record
++is fresh when it is green and bound to the pushed commit. The same shared verdict
++(`lib/evidence-freshness-codes.mjs`) is used by `push-prepare`, the push guard
++(`hooks/guard-push.mjs`), the security completeness gate and the managed pre-push
++hook, and each refusal carries a stable code next to its own message
++(`EF-MISSING`, `EF-EXIT-NOT-ZERO`, `EF-STALE-COMMIT`, `EF-NOT-PUSH-BOUNDARY`). A
++record bound to an EARLIER commit stays fresh across **evidence-only commits**:
++`lib/evidence-carry-forward-reader.mjs` carries it when (1) every path changed
++since the record's commit lies in the closed evidence set
++(`specs/<feature>/evidence/**`, `audit-bundles/**`, `lifecycle.json`,
++`result.md`, `project/push-threat-model.md`), (2) the hash of the tree outside the
++set is equal at both commits, (3) the record's commit is an ancestor of the
++pushed commit, and (4) for a Security record, a secret scan (gitleaks) of the
++passed-over commits is clean; an unavailable scanner or a finding means the record
++is not carried. Anything else, including a spec, plan, `project/guard-config.json` or
++any source change, refuses as before, and the stale message then names the carry
++reason (`[EF-STALE-COMMIT; carry-forward refused: PRODUCT-PATH-CHANGED]`). The
++`push-prepare` report and the hook log name the passed-over commits. Critic rounds
++are not carried: a new correction candidate still needs its own review. This is
++active by default (PO decision of 2026-11-04; ADR
++`docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md`).
++
+ ```
+ node "${PIPELINE_PLUGIN_ROOT}/scripts/po-human-approval.mjs" authorize-critical \
+   --repo-root <repo> --directory <external-po-dir> \
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..a41a2b3e9 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4517,6 +4517,12 @@
+       "invariantPinned": "The push-prepare evidence freshness check carries a stable code next to its unchanged message for a missing, failed and stale record, the push gate satisfiability classification prefers the code and falls back to the prose for a result without one, and a code never overrides a green result (C19 D4b/E3 stage 2a, AC-108)",
+       "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
+     },
++    {
++      "name": "push-gate-real-decision-carry-tests",
++      "file": "plugins/pipeline-core/lib/push-gate-real-decision-carry.test.mjs",
++      "invariantPinned": "A real push decision, through hooks/guard-push.mjs and through the managed pre-push hook template, accepts a Verify and a Security record bound to commit A after evidence-only commits, and refuses with the stable code EF-STALE-COMMIT and the carry reason a product-file commit, a change of a gate-consumed file outside the evidence set, a failed or unavailable secret scan (Security only) and a record bound to a commit that is not an ancestor; the hook log and the push-prepare readback name the passed-over commits (C19 D4b/E3 rest, AC-108)",
++      "nonOverlapNote": "Unique cases: the end-to-end push decision with a carried record on both real consumers; evidence-carry-forward.test.mjs pins the decision and the reader, evidence-freshness-codes.test.mjs the codes and the push-prepare messages, guard-push-v2.test.mjs the exact-commit v2 binding"
++    },
+     {
+       "name": "module-slice-proposal-tests",
+       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index c675f4911..3999edea0 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -181,7 +181,7 @@ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+-import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
++import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "../lib/evidence-freshness-codes.mjs";
+ import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
+ import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+@@ -2345,6 +2345,16 @@ function checkIndependentPublicationReview() {
+   return review.currentCheckoutOk ? [] : [`candidate-bound independent review and Verify are unavailable (${review.code})`];
+ }
+ 
++/** The record class a carry-forward is decided for, or null for a path that is neither the Verify nor the Security record. */
++function carryKindFor(relPath) {
++  return relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
++}
++
++/** The carry-forward decision for `record` at the pushed source commit; the reader never throws and answers each question once. */
++function carryDecisionFor(kind, record) {
++  return evidenceCarriedForward({ root: evidenceProjectDir, record, kind, candidateCommit: sourceCommit });
++}
++
+ /** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
+ function checkEvidenceFreshness(relPath) {
+   const failures = [];
+@@ -2375,25 +2385,30 @@ function checkEvidenceFreshness(relPath) {
+     });
+     return validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit;
+   };
+-  // OPT-IN (candidate 19, step 3): the evidence-only carry-forward is the second way a record bound to an earlier commit stays fresh.
++  // The evidence-only carry-forward (candidate 19, D4b/E3; active by default) is the second way a record bound to an earlier commit stays
++  // fresh. Its refusal reason is shown next to the stable code, so a refused push says why the carry did not apply.
++  let carryRefusal = null;
+   const promoted = () => {
+     if (promotedByEnvelope()) return true;
+-    const kind = relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
++    const kind = carryKindFor(relPath);
+     if (kind === null) return false;
+-    return evidenceCarriedForward({ root: evidenceProjectDir, record: data, kind, candidateCommit: sourceCommit }).carried === true;
++    const decision = carryDecisionFor(kind, data);
++    if (decision.carried === true) return true;
++    carryRefusal = decision.reason;
++    return false;
+   };
+   const codes = evidenceFreshnessFailureCodes({
+     data: data ?? {}, expectedCommit: sourceCommit, promoted, isVerify: relPath === VERIFY_EVIDENCE_DEFAULT_PATH,
+     satisfiesPushBoundary: () => verifyEvidenceSatisfiesBoundary(data, "push"),
+   });
+   if (codes.includes(EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)) {
+-    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
++    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)}`);
+   }
+   if (codes.includes(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT)) {
+-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
++    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal)}`);
+   }
+   if (codes.includes(EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY)) {
+-    failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);
++    failures.push(`${relPath}: Verify evidence was not produced for the push boundary${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY)}`);
+   }
+   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && data?.selection?.execution === "impacted") {
+     const base = data.selection.baseCommit;
+@@ -2441,10 +2456,14 @@ function checkSecurityEvidenceBinding() {
+   const { data } = read;
+   const sourceTree = resolveSourceTree();
+   const candidate = data?.candidate;
++  // A record carried across evidence-only commits (the same decision checkEvidenceFreshness took) is bound to the commit and the tree it
++  // was produced for: the candidate must name exactly that commit and that tree, never the later commit. Anything else is exact as before.
++  const carried = data?.commit !== sourceCommit ? carryDecisionFor("security", data) : null;
++  const carriedBinding = carried?.carried === true ? carried : null;
+   if (data?.schema !== "pipeline.security-evidence.v1") failures.push("evidence/security-latest.json: exact-candidate security evidence v1 is required");
+   if (!candidate || candidate.status !== "clean") failures.push("evidence/security-latest.json: candidate binding is unavailable or dirty");
+-  if (candidate?.commit !== sourceCommit) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
+-  if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
++  if (candidate?.commit !== (carriedBinding?.evidenceCommit ?? sourceCommit)) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
++  if (!sourceTree || candidate?.tree !== (carriedBinding?.evidenceTree ?? sourceTree)) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
+   if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
+   if (candidate?.destination === "local-only") failures.push("evidence/security-latest.json: the security evidence was produced for a local-only repository without a remote and cannot be used for a push; configure a remote and rerun security-scan.mjs --remote <push remote> before pushing");
+   if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
+@@ -2565,7 +2584,11 @@ try {
+     // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
+     // have triggered (Finding 5) -- never a second independent `git rev-parse`.
+     securityFailures.push(
+-      ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
++      ...checkSecurityCompleteness({
++        projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree(), withCodes: true,
++        // The same reader decision as for the v1 record (answered once per process); a refusal keeps the exact-commit meaning.
++        carryForward: (evidenceCommit) => carryDecisionFor("security", { commit: evidenceCommit }),
++      }),
+     );
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs b/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs
+index 8f36086a9..a6e832458 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs
+@@ -1,14 +1,16 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /**
+- * Reader of the evidence-only carry-forward decision (candidate 19, D4b/E3 order of work, step 3; OPT-IN block of the apply script,
+- * docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md point 2 and the amendment of 2026-11-04).
++ * Reader of the evidence-only carry-forward decision (candidate 19, D4b/E3 order of work, step 3; ACTIVE by default since the PO
++ * decision of 2026-11-04, docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md point 2 and the amendment of 2026-11-04).
+  *
+  * `lib/evidence-carry-forward.mjs` answers "may the record bound to commit A be carried to commit B?" and grants nothing. This module is
+  * the one place a push-gate reader asks it: it never throws, it returns the decision (or a refusal with a reason), and it supplies the
+  * secret scan that a Security record needs (SEC-01). A Verify record needs no scan. An unavailable scanner, a finding, an invalid commit
+- * or any error is a refusal: the record stays stale for HEAD, exactly as without this patch.
++ * or any error is a refusal: the record stays stale for HEAD, exactly as without a carry-forward. A carried decision also names the tree
++ * of the evidence commit (`evidenceTree`), because a record that binds a tree (the Security records) must be checked against the tree of
++ * the commit it was produced for, not against the tree of the commit it is carried to.
+  */
+-import { spawnSync } from "node:child_process";
++import { execFileSync, spawnSync } from "node:child_process";
+ import { isInstalled, resolveGitleaksConfigPath } from "../scripts/security-adapters/gitleaks.mjs";
+ import { evaluateEvidenceCarryForward } from "./evidence-carry-forward.mjs";
+ 
+@@ -41,18 +43,35 @@ export function gitleaksRangeSecretScan(_files, { root, commit, evidenceCommit }
+   }
+ }
+ 
++// One push decision asks the same question up to three times (the freshness verdict, the v1 candidate binding, the v2 completeness
++// gate); the scan is the expensive part. Commit ids are immutable, so the answer for one (repository, kind, pair) is kept for the life of
++// the process. Only the default decision and scan are kept: an injected double is never cached.
++const decisions = new Map();
++
+ /**
+  * @param {object} input
+  * @param {string} input.root repository root
+  * @param {{commit?: string}} input.record the parsed Verify or Security record
+  * @param {"verify"|"security"} input.kind
+  * @param {string} input.candidateCommit the full commit id the record would be carried to
+- * @returns {{carried: boolean, reason: string}} never throws
++ * @returns {{carried: boolean, reason: string, evidenceTree?: string}} never throws; a carried decision names `passedOverCommits` and `evidenceTree`
+  */
+ export function evidenceCarriedForward({ root, record, kind, candidateCommit, secretScan = gitleaksRangeSecretScan, evaluate = evaluateEvidenceCarryForward } = {}) {
++  const key = secretScan === gitleaksRangeSecretScan && evaluate === evaluateEvidenceCarryForward
++    ? JSON.stringify([root, kind, record?.commit, candidateCommit]) : null;
++  if (key !== null && decisions.has(key)) return decisions.get(key);
++  const decision = decide({ root, record, kind, candidateCommit, secretScan, evaluate });
++  if (key !== null) decisions.set(key, decision);
++  return decision;
++}
++
++function decide({ root, record, kind, candidateCommit, secretScan, evaluate }) {
+   try {
+     const decision = evaluate({ root, evidenceCommit: record?.commit, candidateCommit, kind, secretScan });
+-    return decision?.carried === true ? decision : { carried: false, reason: typeof decision?.reason === "string" ? decision.reason : "NOT-CARRIED" };
++    if (decision?.carried !== true) return { carried: false, reason: typeof decision?.reason === "string" ? decision.reason : "NOT-CARRIED" };
++    const evidenceTree = execFileSync("git", ["-C", root, "rev-parse", `${record.commit}^{tree}`], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++    if (!/^[0-9a-f]{40}$/u.test(evidenceTree)) return { carried: false, reason: "CARRY-FORWARD-INPUT-INVALID" };
++    return { ...decision, evidenceTree };
+   } catch {
+     return { carried: false, reason: "CARRY-FORWARD-INPUT-INVALID" };
+   }
+diff --git a/plugins/pipeline-core/lib/evidence-freshness-codes.mjs b/plugins/pipeline-core/lib/evidence-freshness-codes.mjs
+index 068fe5a46..5a5ec8844 100644
+--- a/plugins/pipeline-core/lib/evidence-freshness-codes.mjs
++++ b/plugins/pipeline-core/lib/evidence-freshness-codes.mjs
+@@ -50,6 +50,14 @@ export function evidenceFreshnessFailureCodes({ data, expectedCommit, promoted =
+   return codes;
+ }
+ 
++/**
++ * The text a message-only consumer (the push guard, the managed pre-push hook, the security completeness gate) appends next to its own,
++ * unchanged message: the stable code and, for a stale record, why the evidence-only carry-forward did not apply.
++ */
++export function freshnessCodeSuffix(code, carryRefusal) {
++  return ` [${code}${typeof carryRefusal === "string" && carryRefusal !== "" ? `; carry-forward refused: ${carryRefusal}` : ""}]`;
++}
++
+ /** The satisfiability status a code stands for, or null when the code is absent, unknown or has no dedicated status. */
+ export function satisfiabilityStatusForFreshnessCode(code) {
+   return typeof code === "string" && Object.hasOwn(STATUS_BY_CODE, code) ? STATUS_BY_CODE[code] : null;
+diff --git a/plugins/pipeline-core/lib/push-gate-real-decision-carry.test.mjs b/plugins/pipeline-core/lib/push-gate-real-decision-carry.test.mjs
+new file mode 100644
+index 000000000..d85b93353
+--- /dev/null
++++ b/plugins/pipeline-core/lib/push-gate-real-decision-carry.test.mjs
+@@ -0,0 +1,263 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * A REAL push decision with a carried Verify and Security record (candidate 19, D4b/E3 rest, AC-108;
++ * docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md point 2 and the amendment of 2026-11-04).
++ *
++ * A git fixture holds a Verify and a Security record (v1 and v2) bound to commit A. Evidence-only commits follow. The same
++ * question is put to the two real consumers that stand between an agent and a remote: `hooks/guard-push.mjs` (a spawned process fed
++ * the tool call) and the managed pre-push hook template rendered by `scripts/pre-push-hook-install.mjs` (a spawned process fed the
++ * ref update on stdin). Nothing is stubbed except the secret scanner binary, which is a shell script that exits 0, 2 or is absent.
++ *
++ * Accepted: evidence-only commits only. Refused with the stable code EF-STALE-COMMIT and the carry reason: a product-file commit, a
++ * change of a gate-consumed file outside the evidence set, a secret scan finding or unavailable scanner (Security only), and a record
++ * bound to a commit that is not an ancestor of the pushed one.
++ */
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { renderImpl } from "../scripts/pre-push-hook-install.mjs";
++import { checkEvidenceFreshness as prepareFreshness } from "../scripts/push-prepare.mjs";
++import { commitApprovedMiniFixtureState, verifyEvidenceFixture } from "./verify-selection-fixture.mjs";
++import { createGovernanceScopeController } from "./governance-scope.mjs";
++
++const LIB_DIR = dirname(fileURLToPath(import.meta.url));
++const GUARD = join(LIB_DIR, "..", "hooks", "guard-push.mjs");
++const PUSH_COMMAND = "git push origin HEAD:refs/heads/fixture";
++const ZERO40 = "0".repeat(40);
++const VERIFY_PATH = "evidence/verify-latest.json";
++const SECURITY_PATH = "evidence/security-latest.json";
++
++const roots = [];
++test.after(() => { for (const dir of roots) rmSync(dir, { recursive: true, force: true, maxRetries: 3 }); });
++
++function tempDir(prefix) {
++  const dir = mkdtempSync(join(tmpdir(), `carry-real-${prefix}-`));
++  roots.push(dir);
++  return dir;
++}
++
++function canonicalJson(value) {
++  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
++  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
++  return JSON.stringify(value);
++}
++
++function writeJson(dir, relPath, value) {
++  mkdirSync(dirname(join(dir, relPath)), { recursive: true });
++  writeFileSync(join(dir, relPath), JSON.stringify(value));
++}
++
++function securityEvidenceV1({ commit, tree, repositorySha256 }) {
++  const payload = {
++    schema: "pipeline.security-evidence.v1", exitCode: 0, commit,
++    candidate: {
++      status: "clean", commit, tree, inputSha256: "a".repeat(64), repositorySha256,
++      inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
++      snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
++    },
++    policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) },
++  };
++  return { ...payload, payloadSha256: createHash("sha256").update(canonicalJson(payload)).digest("hex") };
++}
++
++function securityEnvelopeV2({ commit, tree }) {
++  return {
++    schema: "pipeline.security-evidence.v2",
++    policy: { configurationSha256: "e".repeat(64) },
++    input: { commit, tree, inputSha256: "f".repeat(64) },
++    environment: { platform: process.platform, nodeVersion: process.version },
++    capabilities: [{
++      capabilityId: "cap.secrets", tool: { name: "gitleaks", version: null }, rulePack: { ref: "gitleaks-default", digest: null },
++      status: "PASS", classification: "clean", findings: [],
++      coverage: { subject: "candidate-tree", exclusions: [], ignored: [], unsupportedScope: [], truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null }, dataAge: { ageSeconds: 0, snapshotAt: null } },
++      reason: null,
++    }],
++  };
++}
++
++function securityVerdictV2() {
++  return {
++    schema: "pipeline.security-verdict.v2", producedFrom: "pipeline.security-evidence.v2", exitAuthority: "v1-blocking-logic", note: "fixture", v1ExitCode: 0,
++    plan: { required: ["cap.secrets"], optional: [], planDigest: "g".repeat(64), source: "fixture", resolvedPolicyDigest: "h".repeat(64) },
++    capabilityOutcomes: { "cap.secrets": "pass" }, verdict: { blocking: false, offendingCapabilities: [] }, controls: [],
++  };
++}
++
++/** A repository whose commit A is an approved low-rigor state, with the push gate and the security gate configured. */
++function buildRepo(name) {
++  const dir = tempDir(name);
++  const git = (...args) => {
++    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
++    if (result.status !== 0) throw new Error(`fixture git ${args[0]} failed: ${result.stderr}`);
++    return result.stdout.trim();
++  };
++  git("init", "-q", "-b", "main");
++  git("config", "user.email", "goldfish@example.invalid");
++  git("config", "user.name", "Goldfish");
++  writeFileSync(join(dir, "README.md"), "fixture\n");
++  git("add", "README.md");
++  git("commit", "-q", "-m", "init");
++  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
++  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-carry-fixture" });
++  governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
++  const commitA = commitApprovedMiniFixtureState(dir);
++  const pushUrl = `https://example.invalid/${name}.git`;
++  git("remote", "add", "origin", pushUrl);
++  mkdirSync(join(dir, ".claude"), { recursive: true });
++  writeFileSync(join(dir, ".claude", "pipeline.yaml"),
++    "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n  security:\n    mode: blocking\n    type: automated\n");
++  const repo = { dir, git, commitA, repositorySha256: createHash("sha256").update(pushUrl).digest("hex") };
++  bindEvidence(repo, commitA);
++  return repo;
++}
++
++/** Writes the Verify record and the Security records (v1, v2) bound to `commit` and its tree. */
++function bindEvidence(repo, commit) {
++  const tree = repo.git("rev-parse", `${commit}^{tree}`);
++  writeJson(repo.dir, VERIFY_PATH, verifyEvidenceFixture(commit));
++  writeJson(repo.dir, SECURITY_PATH, securityEvidenceV1({ commit, tree, repositorySha256: repo.repositorySha256 }));
++  writeJson(repo.dir, "evidence/security-latest.v2.json", securityEnvelopeV2({ commit, tree }));
++  writeJson(repo.dir, "evidence/security-latest.v2.verdict.json", securityVerdictV2());
++}
++
++function commitFile(repo, relPath, text, message) {
++  mkdirSync(dirname(join(repo.dir, relPath)), { recursive: true });
++  writeFileSync(join(repo.dir, relPath), text);
++  repo.git("add", "--", relPath);
++  repo.git("commit", "-q", "-m", message);
++  return repo.git("rev-parse", "HEAD");
++}
++
++/**
++ * The passed-over commits of an accepted carry: an exported-evidence commit and an audit-bundle commit. A generated lifecycle.json is
++ * deliberately not used: a registered package makes the independent publication review a separate duty (REVIEW-PACKAGE-REQUIRED),
++ * and the Critic round is not carried by this decision.
++ */
++function addEvidenceOnlyCommits(repo) {
++  return [
++    commitFile(repo, "specs/fixture-feature/evidence/critic-round-1.md", "review\n", "docs(evidence): exported critic evidence"),
++    commitFile(repo, "specs/fixture-feature/audit-bundles/bundle-1.json", "{}\n", "chore(audit): audit bundle"),
++  ];
++}
++
++function fakeScanner(mode) {
++  if (mode === "unavailable") return join(tempDir("no-scanner"), "gitleaks-not-here");
++  const file = join(tempDir("scanner"), "gitleaks");
++  writeFileSync(file, `#!/bin/sh\nexit ${mode === "finding" ? 2 : 0}\n`);
++  chmodSync(file, 0o755);
++  return file;
++}
++
++function runGuard(repo, scan) {
++  const result = spawnSync(process.execPath, [GUARD], {
++    input: JSON.stringify({ tool_name: "Bash", tool_input: { command: PUSH_COMMAND } }),
++    encoding: "utf8", cwd: repo.dir, timeout: 60000,
++    env: { ...process.env, CLAUDE_PROJECT_DIR: repo.dir, PIPELINE_GITLEAKS_PATH: fakeScanner(scan) },
++  });
++  return { code: result.status, stderr: result.stderr ?? "" };
++}
++
++function runHook(repo, scan) {
++  const impl = join(tempDir("hook"), "impl.mjs");
++  writeFileSync(impl, renderImpl(LIB_DIR));
++  const head = repo.git("rev-parse", "HEAD");
++  const result = spawnSync(process.execPath, [impl, "origin", "https://example.invalid/fixture.git"], {
++    input: `refs/heads/fixture ${head} refs/heads/fixture ${ZERO40}\n`,
++    encoding: "utf8", cwd: repo.dir, timeout: 60000,
++    env: { ...process.env, PIPELINE_GITLEAKS_PATH: fakeScanner(scan) },
++  });
++  return { code: result.status, stderr: result.stderr ?? "" };
++}
++
++function hookLog(repo) {
++  const path = join(repo.dir, ".git", "agent-pipeline", "pre-push-hook", "log.jsonl");
++  return existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
++}
++
++const CONSUMERS = [
++  { name: "guard-push", run: runGuard, refused: 2 },
++  { name: "pre-push hook template", run: runHook, refused: 1 },
++];
++
++for (const consumer of CONSUMERS) {
++  test(`RDC1 ${consumer.name}: Verify and Security bound to A are accepted after evidence-only commits`, () => {
++    const repo = buildRepo(`accept-${consumer.name.split(" ")[0]}`);
++    addEvidenceOnlyCommits(repo);
++    const outcome = consumer.run(repo, "clean");
++    assert.equal(outcome.code, 0, outcome.stderr);
++  });
++
++  test(`RDC2 ${consumer.name}: one product-file commit is refused with the stable code and the reason`, () => {
++    const repo = buildRepo(`product-${consumer.name.split(" ")[0]}`);
++    addEvidenceOnlyCommits(repo);
++    commitFile(repo, "src/app.mjs", "export const changed = true;\n", "feat: product line");
++    const outcome = consumer.run(repo, "clean");
++    assert.equal(outcome.code, consumer.refused, outcome.stderr);
++    assert.match(outcome.stderr, /verify-latest\.json: commit=.*is stale.*EF-STALE-COMMIT.*PRODUCT-PATH-CHANGED/);
++    assert.match(outcome.stderr, /security-latest\.json: commit=.*is stale.*EF-STALE-COMMIT.*PRODUCT-PATH-CHANGED/);
++  });
++
++  test(`RDC3 ${consumer.name}: a change of a gate-consumed file outside the evidence set is refused`, () => {
++    const repo = buildRepo(`gatefile-${consumer.name.split(" ")[0]}`);
++    commitFile(repo, "project/guard-config.json", "{}\n", "chore: guard configuration");
++    const outcome = consumer.run(repo, "clean");
++    assert.equal(outcome.code, consumer.refused, outcome.stderr);
++    assert.match(outcome.stderr, /verify-latest\.json: commit=.*is stale.*EF-STALE-COMMIT.*PRODUCT-PATH-CHANGED/);
++  });
++
++  test(`RDC4 ${consumer.name}: a failed or unavailable secret scan refuses Security and still carries Verify`, () => {
++    for (const [scan, reason] of [["finding", "SECRET-SCAN-FINDING"], ["unavailable", "SECRET-SCAN-UNAVAILABLE"]]) {
++      const repo = buildRepo(`scan-${scan}-${consumer.name.split(" ")[0]}`);
++      addEvidenceOnlyCommits(repo);
++      const outcome = consumer.run(repo, scan);
++      assert.equal(outcome.code, consumer.refused, outcome.stderr);
++      assert.match(outcome.stderr, new RegExp(`security-latest\\.json: commit=.*is stale.*EF-STALE-COMMIT.*${reason}`), scan);
++      assert.doesNotMatch(outcome.stderr, /verify-latest\.json: commit=/, `${scan}: a Verify record needs no scan and stays carried`);
++    }
++  });
++
++  test(`RDC5 ${consumer.name}: a record bound to a commit that is not an ancestor is refused`, () => {
++    const repo = buildRepo(`ancestor-${consumer.name.split(" ")[0]}`);
++    repo.git("checkout", "-q", "-b", "side");
++    const side = commitFile(repo, "specs/fixture-feature/evidence/side.md", "side\n", "docs(evidence): a side evidence commit");
++    repo.git("checkout", "-q", "main");
++    addEvidenceOnlyCommits(repo);
++    bindEvidence(repo, side);
++    const outcome = consumer.run(repo, "clean");
++    assert.equal(outcome.code, consumer.refused, outcome.stderr);
++    assert.match(outcome.stderr, /verify-latest\.json: commit=.*is stale.*EF-STALE-COMMIT.*NOT-AN-ANCESTOR/);
++  });
++}
++
++test("RDC6 the hook log names the passed-over commits of an accepted carry", () => {
++  const repo = buildRepo("hook-log");
++  const passedOver = addEvidenceOnlyCommits(repo);
++  assert.equal(runHook(repo, "clean").code, 0);
++  const entry = hookLog(repo).at(-1);
++  assert.equal(entry.verdict, "allowed");
++  const verify = entry.carriedForward.find((row) => row.record === VERIFY_PATH);
++  assert.equal(verify.evidenceCommit, repo.commitA);
++  assert.deepEqual(verify.passedOverCommits, passedOver);
++});
++
++test("RDC7 the push-prepare readback names the passed-over commits", () => {
++  const repo = buildRepo("prepare-readback");
++  const passedOver = addEvidenceOnlyCommits(repo);
++  const head = repo.git("rev-parse", "HEAD");
++  const previous = process.env.PIPELINE_GITLEAKS_PATH;
++  process.env.PIPELINE_GITLEAKS_PATH = fakeScanner("clean");
++  try {
++    const verify = prepareFreshness("verify-evidence", VERIFY_PATH, repo.dir, head);
++    assert.equal(verify.ok, true, verify.message);
++    for (const commit of passedOver) assert.ok(verify.message.includes(commit.slice(0, 8)), `names ${commit.slice(0, 8)}: ${verify.message}`);
++    assert.match(verify.message, /evidence-only carry-forward/);
++  } finally {
++    if (previous === undefined) delete process.env.PIPELINE_GITLEAKS_PATH; else process.env.PIPELINE_GITLEAKS_PATH = previous;
++  }
++});
+diff --git a/plugins/pipeline-core/lib/security-completeness-gate.mjs b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+index 5049ac308..7c3e821b6 100644
+--- a/plugins/pipeline-core/lib/security-completeness-gate.mjs
++++ b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+@@ -81,6 +81,7 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ 
+ import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
++import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
+ 
+ const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
+ const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
+@@ -179,6 +180,13 @@ function outcomeMatches(recomputedOutcome, persistedOutcome) {
+  *   assertions stay byte-identical. Every OTHER call site (Close, PR, Release) binds against a
+  *   commit/tree that was never pushed, so "the pushed source" is inaccurate there and each passes
+  *   its own accurate label instead (F7, CYB-2I-4R).
++ * @param {(evidenceCommit: unknown) => {carried?: boolean, evidenceTree?: string, reason?: string}|null} [params.carryForward] - optional
++ *   (candidate 19, D4b/E3): asked only when the envelope's `input.commit` differs from `commit`. A carried answer that names the tree of
++ *   the evidence commit makes the envelope fresh for `commit` and its `input.tree` is then compared with that tree instead of `tree`
++ *   (the tree of a later evidence-only commit differs by construction; the carry decision's product tree hash equality is the substitute).
++ *   Absent for every caller that does not read the carry-forward, which keeps the exact-commit meaning.
++ * @param {boolean} [params.withCodes] - append the stable freshness code (and the carry refusal) to the commit-mismatch failure. Off by
++ *   default so the failure text of every other caller stays byte-identical.
+  * @returns {string[]} failure reasons; empty = pass.
+  */
+ export function checkSecurityCompleteness({
+@@ -188,6 +196,8 @@ export function checkSecurityCompleteness({
+   envelopePath = DEFAULT_ENVELOPE_PATH,
+   verdictPath = DEFAULT_VERDICT_PATH,
+   subjectLabel = "the pushed source",
++  carryForward = null,
++  withCodes = false,
+ }) {
+   const failures = [];
+   const envelopeRead = readEvidence(projectDir, envelopePath);
+@@ -214,10 +224,26 @@ export function checkSecurityCompleteness({
+       `${envelopePath}: envelope schema is invalid (${envelopeValidation.errors.map((e) => e.message).join("; ")})`,
+     );
+   }
+-  if (envelope?.input?.commit !== commit) {
+-    failures.push(`${envelopePath}: input commit does not match ${subjectLabel}`);
++  // The verdict (is the envelope fresh for `commit`?) comes from the shared freshness function; the message stays here.
++  let carriedTree = null;
++  let carryRefusal = null;
++  const stale = evidenceFreshnessFailureCodes({
++    data: { exitCode: 0, commit: envelope?.input?.commit },
++    expectedCommit: commit,
++    promoted: () => {
++      const answer = typeof carryForward === "function" ? carryForward(envelope?.input?.commit) : null;
++      if (answer?.carried === true && typeof answer.evidenceTree === "string" && answer.evidenceTree !== "") {
++        carriedTree = answer.evidenceTree;
++        return true;
++      }
++      carryRefusal = answer?.reason ?? null;
++      return false;
++    },
++  }).includes(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT);
++  if (stale) {
++    failures.push(`${envelopePath}: input commit does not match ${subjectLabel}${withCodes ? freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal) : ""}`);
+   }
+-  if (!tree || envelope?.input?.tree !== tree) {
++  if (!tree || envelope?.input?.tree !== (carriedTree ?? tree)) {
+     failures.push(`${envelopePath}: input tree does not match ${subjectLabel}`);
+   }
+   if (verdictDoc?.schema !== "pipeline.security-verdict.v2") {
+diff --git a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+index fd303e872..e076bd2c2 100644
+--- a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+@@ -327,6 +327,18 @@ const PLUGIN_LIB_DIR = ${lib};
+ const HOOK_LOG_SCHEMA = "pipeline.pre-push-hook-log.v1";
+ const ZERO_OID = /^0{40}$|^0{64}$/;
+ 
++// The ONE evidence freshness verdict and the evidence-only carry-forward reader, shared with guard-push.mjs and push-prepare.mjs (never
++// copied here). Loaded once, so the pure helper below stays synchronous. A load fault leaves SHARED null and the helper then fails
++// closed with a message of its own, exactly like any other missing module.
++let SHARED = null;
++try {
++  const codes = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "evidence-freshness-codes.mjs")).href);
++  const reader = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "evidence-carry-forward-reader.mjs")).href);
++  SHARED = { ...codes, ...reader };
++} catch {
++  SHARED = null;
++}
++
+ function git(args, cwd) {
+   return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 10000 });
+ }
+@@ -428,8 +440,17 @@ function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, cla
+   return audit.ok ? null : audit.reason;
+ }
+ 
+-export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
++/**
++ * \`options.kind\` ("verify" or "security") asks the evidence-only carry-forward whether a record bound to an earlier commit is still
++ * fresh; without it the record is exact-commit only. \`options.carried\` collects the readback of a carried record. The verdict (which
++ * failure, in which order) comes from the shared function; the messages stay here, with the stable code next to them.
++ */
++export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit, options = {}) {
+   const failures = [];
++  if (SHARED === null) {
++    failures.push(\`\${relPath}: the shared evidence freshness verdict could not be loaded; cannot evaluate.\`);
++    return failures;
++  }
+   let raw;
+   try {
+     raw = readFileSync(join(projectRoot, relPath), "utf8");
+@@ -444,8 +465,26 @@ export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
+     failures.push(\`\${relPath} is corrupted (invalid JSON: \${error.message}).\`);
+     return failures;
+   }
+-  if (data?.exitCode !== 0) failures.push(\`\${relPath}: exitCode=\${JSON.stringify(data?.exitCode)} (expected 0).\`);
+-  if (data?.commit !== sourceCommit) failures.push(\`\${relPath}: commit=\${JSON.stringify(data?.commit)} is stale (pushed source commit: \${sourceCommit}).\`);
++  let carried = null;
++  let carryRefusal = null;
++  const codes = SHARED.evidenceFreshnessFailureCodes({
++    data: data ?? {}, expectedCommit: sourceCommit,
++    promoted: () => {
++      if (options.kind !== "verify" && options.kind !== "security") return false;
++      const decision = SHARED.evidenceCarriedForward({ root: projectRoot, record: data, kind: options.kind, candidateCommit: sourceCommit });
++      if (decision.carried === true) {
++        carried = decision;
++        return true;
++      }
++      carryRefusal = decision.reason;
++      return false;
++    },
++  });
++  if (codes.includes(SHARED.EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)) failures.push(\`\${relPath}: exitCode=\${JSON.stringify(data?.exitCode)} (expected 0).\${SHARED.freshnessCodeSuffix(SHARED.EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)}\`);
++  if (codes.includes(SHARED.EVIDENCE_FRESHNESS_CODES.STALE_COMMIT)) failures.push(\`\${relPath}: commit=\${JSON.stringify(data?.commit)} is stale (pushed source commit: \${sourceCommit}).\${SHARED.freshnessCodeSuffix(SHARED.EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal)}\`);
++  if (carried !== null && Array.isArray(options.carried)) {
++    options.carried.push({ record: relPath, evidenceCommit: data.commit, passedOverCommits: carried.passedOverCommits ?? [] });
++  }
+   return failures;
+ }
+ 
+@@ -541,15 +580,19 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+   const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
+   const sourceTree =treeResult.status === 0 ? treeResult.stdout.trim() : null;
+ 
+-  // (a) verify evidence.
+-  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
++  // (a) verify evidence. A record bound to an earlier commit stays fresh across evidence-only commits (the shared carry-forward reader).
++  const carried = [];
++  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit, { kind: "verify", carried }));
+ 
+   // (b)/(b.2) security evidence, only when configured and not "off".
+   const securityGate = gateConfig(manifest, "security");
+   if (securityGate && securityGate.mode !== "off") {
+     securityGateMode = securityGate.mode === "warn" ? "warn" : "blocking";
+-    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit));
+-    securityFailures.push(...checkSecurityCompleteness({ projectDir: evidenceProjectRoot, commit, tree: sourceTree }));
++    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit, { kind: "security", carried }));
++    securityFailures.push(...checkSecurityCompleteness({
++      projectDir: evidenceProjectRoot, commit, tree: sourceTree, withCodes: true,
++      carryForward: (evidenceCommit) => SHARED?.evidenceCarriedForward({ root: evidenceProjectRoot, record: { commit: evidenceCommit }, kind: "security", candidateCommit: commit }),
++    }));
+   }
+ 
+   // (c) approval -- general mode only, see file header SCOPE.
+@@ -575,7 +618,7 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+     }
+   }
+ 
+-  return { hardBlock: null, failures, securityFailures, pushGateMode, securityGateMode, skipped: false };
++  return { hardBlock: null, failures, securityFailures, pushGateMode, securityGateMode, skipped: false, carried };
+ }
+ 
+ function block(lines) {
+@@ -648,6 +691,8 @@ async function main() {
+       verdict: blocking ? "blocked" : (all.length > 0 ? "allowed-with-warnings" : "allowed"),
+       commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef,
+       reasons: all,
++      // The named list of the commits a carried record passed over, so an auditor can re-check them (additive field).
++      ...(result.carried?.length > 0 ? { carriedForward: result.carried } : {}),
+     });
+   }
+ 
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index bae86b4d8..6948f7402 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -245,8 +245,10 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+     }) : { ok: false, reason: "promotion-input-missing" };
+     return validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit;
+   };
+-  // OPT-IN (candidate 19, step 3): a record bound to an earlier commit is also carried across evidence-only commits when the closed
+-  // evidence set, the unchanged product tree and (for Security) a clean secret scan of the passed-over commits all hold.
++  // Candidate 19 (active by default): a record bound to an earlier commit is also carried across evidence-only commits when the closed
++  // evidence set, the unchanged product tree, the ancestor check and (for Security) a clean secret scan of the passed-over commits all
++  // hold. The readback names the passed-over commits so a reader can re-check them.
++  let passedOver = [];
+   const promoted = () => {
+     if (id !== "verify-evidence" && id !== "security-evidence") return false;
+     if (promotedByEnvelope()) {
+@@ -259,6 +261,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+     if (carried.carried === true) {
+       promotedFrom = data.commit;
+       promotedVia = "evidence-only carry-forward";
++      passedOver = Array.isArray(carried.passedOverCommits) ? carried.passedOverCommits : [];
+       return true;
+     }
+     return false;
+@@ -271,7 +274,10 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+   if (code === EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO) return { id, ok: false, code, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
+   if (code === EVIDENCE_FRESHNESS_CODES.STALE_COMMIT) return { id, ok: false, code, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
+   if (code === EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY) return { id, ok: false, code, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+-  if (promotedFrom !== null) return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via ${promotedVia}).` };
++  if (promotedFrom !== null) {
++    const passed = passedOver.length > 0 ? `; passed over ${passedOver.map((commit) => String(commit).slice(0, 8)).join(", ")}` : "";
++    return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via ${promotedVia}${passed}).` };
++  }
+   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
+ }
+ 

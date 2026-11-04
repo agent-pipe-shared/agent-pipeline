@@ -1,0 +1,678 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..100de796d 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4025,6 +4025,12 @@
+         "maxBytes": 65536
+       }
+     },
++    {
++      "name": "win-authority-readiness-and-preflight-tests",
++      "file": "plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs",
++      "invariantPinned": "A Windows native authority refusal names the folder, a preview that changes nothing and the apply command; the owner-route process status and the registry lock repair text are decided from injected observations; the preflight carries one JSON document with the close and push capability probe, the four bootstrap facts and the housekeeping receipts.",
++      "nonOverlapNote": "Unique w168 suite for the Windows native run findings (Q10, E2, W1, W2, W7); the readiness decision suite and the enforcement pins keep their own contracts."
++    },
+     {
+       "name": "windows-authority-readiness-tests",
+       "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 9b0bf16ce..eb1f9ad12 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -95,6 +95,7 @@ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchMod
+ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
++import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
+ // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+@@ -1118,7 +1119,14 @@ if (isDirectInvocation(import.meta.url)) {
+               : "";
+             const repair = typeof prepared.repair === "string" && prepared.repair.trim() !== "" ? prepared.repair : sessionAuthorityRepair(prepared.code, rootDir);
+             const repairText = repair ? ` Repair: ${repair.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 800)}` : "";
+-            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${repairText}\n`);
++            // Q10: a native Windows authority reason (WIN-AUTH-OPEN and siblings) also names the folder, the preview and the apply command.
++            let windowsAuthorityText = "";
++            try {
++              windowsAuthorityText = describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
++                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") })
++                .replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 900);
++            } catch { windowsAuthorityText = ""; }
++            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${windowsAuthorityText}${repairText}\n`);
+             process.exit(2);
+           }
+           // The dispatch continues with no pending state: leave the typed code where this launch's PostToolUse can name it
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index d1e6eb61d..6c465ca14 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -281,14 +281,22 @@ function retireLock(repo,observed,cause,io={},report={}){
+   sweepRetiredLocks(repo);
+   return dir;
+ }
++/** E2: the repair a held registry lock prints: the existing wait or release-lock sentence, then the one route that clears it (inspect, heal, last resort move-aside). */
++export function registryLockRepairText(observed,root){
++  const who=observed.pid===null||observed.pid===undefined?'an owner it does not record':`pid ${observed.pid}`;
++  const waitedMs=observed.waitedMs??0;
++  const routine=fileURLToPath(new URL('../scripts/routine-repair.mjs',import.meta.url));
++  const head=observed.owner==='live'
++    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
++    :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
++  return `${head}. If it stays held although its owner has finished (for example the repair run that was just started): node ${REPAIR_SCRIPT} inspect --root ${root}, then node ${routine} run heal --root ${root} --reason "<why>", and as the last resort when no Goldfish runs node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root ${root} --reason "<why>"`;
++}
+ function lockHeldFault(repo,observed,reason){
+-  const root=repo.primaryRoot,who=observed.pid===null?'an owner it does not record':`pid ${observed.pid}`;
++  const root=repo.primaryRoot;
+   const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
+   const waitedMs=observed.waitedMs??0;
+   error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds,waitedMs,waitBoundMs:SESSION_AUTHORITY_LOCK_WAIT_MS});
+-  error.repair=observed.owner==='live'
+-    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
+-    :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
++  error.repair=registryLockRepairText(observed,root);
+   throw error;
+ }
+ /** Takes the registry lock, retiring a lock whose owner is provably gone; otherwise refuses naming owner, age and repair. */
+diff --git a/plugins/pipeline-core/lib/session-requester-bridge.mjs b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+index 0db632462..8f9e7a8b2 100644
+--- a/plugins/pipeline-core/lib/session-requester-bridge.mjs
++++ b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+@@ -1767,9 +1767,20 @@ export function isSourceOwnedContinuityOwnerRouteRequester(input){
+   const entry=requesters.get(context.requesterHandle),invocation=entry?.currentInvocationHandle?invocations.get(entry.currentInvocationHandle):null;
+   return Boolean(invocation&&invocation.producerId===OWNER_ROUTE_PRODUCER&&invocation.assurance==='physical-readback');
+ }
+-function ownerRouteProcessStatus(recorded){
++/**
++ * dead only on proof, live only on a matching identity, unknown otherwise. E2: on Windows the answer used to be
++ * unconditionally unknown, so a lock whose owner (this session's own finished child) was gone never classified as stale.
++ * The platform, the observer and the identity comparison are injected so the Windows branch runs on any machine.
++ */
++export function ownerRouteProcessStatus(recorded,{platform=process.platform,observeWindows=observeNativeWindowsProcess,same=sameNativeWindowsProcess}={}){
+   try{
+-    if(process.platform==='win32')return 'unknown';
++    if(platform==='win32'){
++      if(recorded?.platform!=='win32'||!Number.isSafeInteger(recorded.pid))return 'unknown';
++      const found=observeWindows({pid:recorded.pid});
++      if(found?.status==='absent')return 'dead';
++      if(found?.status!=='present'||!found.process)return 'unknown';
++      return same({...recorded,cwd:null},{...found.process,cwd:null})?'live':'dead';
++    }
+     const observed=observePosixProcess(recorded.pid);
+     if(observed===null||['Z','X'].includes(observed.state))return 'dead';
+     if(observed.start!==recorded.start||observed.bootSha256!==recorded.bootSha256)return 'dead';
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index c7fd03c7d..e5359c04f 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -38,14 +38,48 @@ export function windowsAuthorityDetail(error) {
+   return error?.reason === 'WIN-AUTH-DACL' && DACL_DETAIL.test(error?.detail) ? error.detail : null;
+ }
+ 
+-function guidance(pathClass, reason) {
++/** Q10: the two commands that repair a folder the native open could not use. The first only lists the access list. */
++function openRepairCommands(path) {
++  if (typeof path !== 'string' || path === '' || path.includes('"')) return [];
++  return [
++    { shell: 'cmd', purpose: 'preview', changesNothing: true, command: `icacls "${path}"` },
++    { shell: 'cmd', purpose: 'apply', changesNothing: false, command: `icacls "${path}" /grant "%USERNAME%:(OI)(CI)F"` },
++  ];
++}
++
++function guidance(pathClass, reason, path) {
++  const commands = reason === 'WIN-AUTH-OPEN' ? openRepairCommands(path) : [];
+   return { kind: 'operator-review', mutation: false,
+-    summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
++    summary: `Inspect the ${pathClass} path${path ? ` ${path}` : ''} for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
+     inspection: ['Confirm the exact path exists and is a physical non-reparse directory.', 'For private Pipeline authority, inspect its owner and protected DACL.'],
+-    repairPreview: null,
++    repairPreview: commands.length === 0 ? null : { folder: path, commands,
++      reason: 'the first command only lists the folder access list; the second grants the current user full control and is run by the operator',
++      afterwards: 'Rerun the preflight; it reads the folder back and continues only when it opens.' },
+   };
+ }
+ 
++/**
++ * Q10: the text a refusal prints after the bare WIN-AUTH-* code: the exact folder, a preview that changes nothing, the
++ * apply command the operator runs, and the rule for a second concurrent launch. The platform and the probe are injected.
++ * Returns '' when the platform is not Windows or the reason is not a native authority reason.
++ */
++export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness } = {}) {
++  if (platform !== 'win32' || !NATIVE_REASON.test(reason ?? '')) return '';
++  let causes = [];
++  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; }
++  const located = causes.filter(cause => typeof cause?.path === 'string' && cause.path !== '' && (cause.reason === reason || reason === 'WIN-AUTH-OPEN'));
++  const rest = reason === 'WIN-AUTH-OPEN'
++    ? ' If another Goldfish launch is still running, start only one Goldfish launch at a time on Windows and wait for it to return before the next.'
++    : '';
++  if (located.length === 0) return ` The folder was not located; read windowsAuthorityReadiness.causes in the preflight output (node scripts/pipeline-start-preflight.mjs), which names each path.${rest}`;
++  const rows = located.slice(0, 3).map(cause => {
++    const commands = reason === 'WIN-AUTH-OPEN' ? openRepairCommands(cause.path) : [];
++    return commands.length === 0 ? `Path: ${cause.path}.`
++      : `Path: ${cause.path}. Preview (changes nothing): ${commands[0].command} . Apply (you run it): ${commands[1].command} .`;
++  });
++  return ` ${rows.join(' ')}${rest}`;
++}
++
+ /** The injected probe is called once per distinct path; it must only observe, never repair. */
+ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, privateRoot,
+   exists = existsSync,
+@@ -73,7 +107,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+       // can be skipped until onboarding creates them.
+       if (!exists(path)) {
+         if (pathClass === 'private' && path.toLowerCase().startsWith(projectRoot.toLowerCase())) continue;
+-        causes.push({ pathClass, reason: 'WIN-AUTH-OPEN', path, nextAction: guidance(pathClass, 'WIN-AUTH-OPEN') });
++        causes.push({ pathClass, reason: 'WIN-AUTH-OPEN', path, nextAction: guidance(pathClass, 'WIN-AUTH-OPEN', path) });
+         continue;
+       }
+       const key = `${path.toLowerCase()}|${privatePath ? 'private' : 'ancestor'}|${boundaryRoot?.toLowerCase() ?? 'strict'}`;
+@@ -92,7 +126,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+       }
+       if (reason) {
+         const detail = details.get(key);
+-        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason) });
++        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason, path) });
+       }
+     }
+   }
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index d297c6d19..39d306b5a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -38,6 +38,7 @@ import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
+ import { writeHostSkillCatalog } from "../lib/host-skill-catalog.mjs";
+ import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
++import { inspectSessionAuthorityLock } from "../lib/session-authority-registry.mjs";
+ import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
+ import {
+   evaluateSelfApplicationAttestation,
+@@ -2046,13 +2047,114 @@ const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE"
+ const MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES = new Set(["ready", "confirmation-required", "admission-pending"]);
+ 
+ /** The readback field: only the bootstrap's own `status` and `code`, folded to a closed shape. */
+-function modelRoleBootstrapField(value) {
++export function modelRoleBootstrapField(value) {
++  const code = typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE;
+   return {
+     status: MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES.has(value?.status) ? value.status : "unavailable",
+-    code: typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE,
++    code,
++    // W2: a policy-required refusal states how to fix it instead of leaving the session to guess.
++    ...(code === "MODEL-ROLE-BOOTSTRAP-POLICY-REQUIRED"
++      ? { nextAction: "Set the model and effort for this role in pipeline.user.yaml (model routing), or run node scripts/model-role-bootstrap.mjs in the plugin root to see the policy it requires, then rerun the preflight." }
++      : {}),
+   };
+ }
+ 
++export const BOOTSTRAP_FACTS_SCHEMA = "pipeline.bootstrap-facts.v1";
++const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
++
++/**
++ * W2: the four facts the skill asks for before the confirmation line, read by the preflight itself so that no session
++ * has to read `project/pipeline.json` and the handover by hand: runtime status, role with the model-role readback,
++ * calibration file with the handover date, and whether Verify is configured. Each file read carries its sha256 (digest-bound);
++ * an unreadable file is reported as nulls, never invented. Read-only; the Verify command is not executed.
++ */
++export function observeBootstrapFacts({ rootDir = process.cwd(), status = null, role, modelRoleBootstrap, read = readFileSync } = {}) {
++  const root = resolve(rootDir);
++  const modelRole = modelRoleBootstrap === undefined ? { status: "unavailable", code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE } : modelRoleBootstrapField(modelRoleBootstrap);
++  const facts = {
++    schema: BOOTSTRAP_FACTS_SCHEMA,
++    runtime: { status },
++    modelRole: { role: role ?? "elephant", status: modelRole.status, code: modelRole.code },
++    calibration: { file: null, sha256: null, project: null, handover: null, handoverSha256: null, handoverDate: null },
++    verify: { available: false },
++  };
++  let calibration = null;
++  try {
++    const bytes = read(resolve(root, "project/pipeline.json"));
++    calibration = JSON.parse(bytes.toString("utf8"));
++    facts.calibration.file = "project/pipeline.json";
++    facts.calibration.sha256 = sha256Hex(bytes);
++  } catch { calibration = null; }
++  if (calibration === null || typeof calibration !== "object") return facts;
++  facts.calibration.project = typeof calibration.project === "string" ? calibration.project : null;
++  facts.verify = { available: typeof calibration.verify === "string" && calibration.verify.trim() !== "" };
++  const handover = typeof calibration.handover === "string" && !isAbsolute(calibration.handover) && !calibration.handover.split(/[\\/]/u).includes("..") ? calibration.handover : null;
++  if (handover === null) return facts;
++  try {
++    const bytes = read(resolve(root, handover));
++    const head = bytes.toString("utf8").split("\n").slice(0, 60).join("\n");
++    const labelled = /^\W*(?:last updated|updated|stand|date)\b[^0-9\n]*(\d{4}-\d{2}-\d{2})/imu.exec(head);
++    const dates = head.match(/\d{4}-\d{2}-\d{2}/gu) ?? [];
++    facts.calibration.handover = handover;
++    facts.calibration.handoverSha256 = sha256Hex(bytes);
++    facts.calibration.handoverDate = labelled ? labelled[1] : dates.length > 0 ? dates.sort().at(-1) : null;
++  } catch { /* the handover path stays null: unreadable is reported, not guessed */ }
++  return facts;
++}
++
++export const CLOSE_PUSH_CAPABILITY_SCHEMA = "pipeline.close-push-capability.v1";
++const READY_ROW = (id) => ({ id, status: "ready", nextAction: null });
++
++/**
++ * E2: a fail-fast probe at bootstrap: can close and push work on THIS platform. Four checks (node reachable, Windows ACL
++ * readiness, registry lock, owner route), each a typed row naming the repair when it is not ready. Every probe and the
++ * platform are injected, so the Windows branch is exercised on any machine. A probe that throws degrades the row; it is
++ * never read as ready. `unavailable` is reserved for a fault only an operator action can clear; a lock held by a live,
++ * stale or unjudgeable owner is `degraded` (the next acquisition retires a provably dead owner by itself).
++ */
++export function observeCloseAndPushCapability({
++  platform = process.platform, nodePath = process.execPath, exists = existsSync, windowsAuthorityReadiness = null,
++  lockProbe = () => ({ status: "unknown" }), ownerRouteProbe = () => ({ status: "unavailable" }),
++  repairScript = "scripts/session-authority-repair.mjs",
++} = {}) {
++  const rows = [];
++  let nodeOk = false;
++  try { nodeOk = typeof nodePath === "string" && nodePath !== "" && exists(nodePath) === true; } catch { nodeOk = false; }
++  rows.push(nodeOk ? READY_ROW("node") : { id: "node", status: "unavailable", nextAction: "Node is not reachable from this session: install Node or put it on PATH, then rerun the preflight." });
++  if (platform !== "win32") rows.push({ id: "acl", status: "not-applicable", nextAction: null });
++  else if (windowsAuthorityReadiness?.status === "ready") rows.push(READY_ROW("acl"));
++  else {
++    const causes = Array.isArray(windowsAuthorityReadiness?.causes) ? windowsAuthorityReadiness.causes : [];
++    const paths = causes.filter((cause) => typeof cause?.path === "string").slice(0, 3).map((cause) => `${cause.reason} at ${cause.path}`);
++    rows.push({ id: "acl", status: "unavailable", nextAction: paths.length > 0
++      ? `Repair the access list of: ${paths.join("; ")} (each cause in windowsAuthorityReadiness carries a preview command that changes nothing and the apply command).`
++      : "Read windowsAuthorityReadiness in this output; it names each path and the repair." });
++  }
++  let lock;
++  try { lock = lockProbe(); } catch { lock = { status: "unknown" }; }
++  const lockRepair = `node ${repairScript} inspect, then the routine heal it names; last resort move-aside when no Goldfish runs.`;
++  if (lock?.status === "absent") rows.push(READY_ROW("lock"));
++  else if (lock?.status === "held") rows.push({ id: "lock", status: "degraded", nextAction: lock.owner === "live"
++    ? `The registry lock is held by a running process (${lock.ageSeconds ?? "?"}s): wait for it, then ${lockRepair}`
++    : lock.owner === "dead" ? `The registry lock is stale (owner gone, ${lock.ageSeconds ?? "?"}s); the next operation retires it. If it persists: ${lockRepair}`
++    : `The registry lock owner cannot be confirmed alive or gone (${lock.ageSeconds ?? "?"}s): ${lockRepair}` });
++  else rows.push({ id: "lock", status: "degraded", nextAction: `The registry lock state could not be observed: ${lockRepair}` });
++  let route;
++  try { route = ownerRouteProbe(); } catch { route = { status: "unavailable" }; }
++  rows.push(route?.status === "ready" ? READY_ROW("ownerRoute")
++    : { id: "ownerRoute", status: "unavailable", nextAction: "The runner host process could not be identified, so close and push cannot be owned by this session: restart the session from the runner's normal entry, then rerun the preflight." });
++  const status = rows.some((row) => row.status === "unavailable") ? "unavailable" : rows.some((row) => row.status === "degraded") ? "degraded" : "ready";
++  return { schema: CLOSE_PUSH_CAPABILITY_SCHEMA, status, platform, checks: rows };
++}
++
++/** W1: the plain sentence for a `hook-refresh-required` status. The exit code stays 2 (enforcement tests pin it), so a runner that shows exit 2 as a tool error also shows why and what to run. */
++export function hookRefreshNotice(result) {
++  if (result?.status !== "hook-refresh-required") return "";
++  const action = result.nextAction;
++  const command = action && typeof action === "object" && Array.isArray(action.argv) ? [action.executable ?? "node", ...action.argv].join(" ") : null;
++  return `pipeline-start-preflight: status hook-refresh-required (valid JSON on stdout; exit code 2 is intentional: it enforces the refresh, it is not a crash).${command ? ` Run: ${command}` : ""}`;
++}
++
+ /**
+  * Conditional thenable (Ruling 69): a plain bootstrap value attaches synchronously; a thenable makes the
+  * return a Promise of the same envelope. A throw or a rejection becomes a present `unavailable` field --
+@@ -2332,8 +2434,31 @@ export function main(options = {}) {
+     ...(role === undefined ? {} : { role }),
+     ...(modelRoleBootstrap === undefined ? {} : { runModelRoleBootstrapFn: () => modelRoleBootstrap }),
+   });
++  // W7: the two housekeeping receipts used to be written to stderr as two more JSON objects, so a runner that merges
++  // stderr into the tool result showed three objects. They now ride under one named key of the single stdout document.
++  // Housekeeping never decides the exit code and a fault in it only shrinks the key.
++  const bootstrapHousekeeping = {};
++  // Exactly as before, an ungoverned project (governance-activation scope) ran no housekeeping at all.
++  if (result.statusScope !== "pipeline-governance-activation") {
++    try { bootstrapHousekeeping.scratchLifecycle = runBootstrapScratchLifecycle(); } catch { /* housekeeping never decides a bootstrap's exit code */ }
++    try { bootstrapHousekeeping.worktreeSweep = runBootstrapWorktreeSweep(); } catch { /* same */ }
++  }
++  let closeAndPushCapability;
++  try {
++    closeAndPushCapability = observeCloseAndPushCapability({
++      windowsAuthorityReadiness: result.windowsAuthorityReadiness ?? null,
++      lockProbe: defaultRegistryLockProbe,
++      ownerRouteProbe: () => ({ status: resolveRunnerHostPid() ? "ready" : "unavailable" }),
++      repairScript: resolve(result.pluginRoot ?? ".", "scripts/session-authority-repair.mjs"),
++    });
++  } catch { closeAndPushCapability = undefined; }
++  let bootstrapFacts;
++  try { bootstrapFacts = observeBootstrapFacts({ rootDir: process.cwd(), status: result.status, role, modelRoleBootstrap }); } catch { bootstrapFacts = undefined; }
+   const envelope = {
+     ...result,
++    ...(Object.keys(bootstrapHousekeeping).length === 0 ? {} : { bootstrapHousekeeping }),
++    ...(closeAndPushCapability === undefined ? {} : { closeAndPushCapability }),
++    ...(bootstrapFacts === undefined ? {} : { bootstrapFacts }),
+     ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
+     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
+@@ -2355,25 +2480,21 @@ export function main(options = {}) {
+       // stderr unavailable; the JSON field on stdout still carries the warning.
+     }
+   }
+-  // Deliberately on stderr and deliberately NOT a field of the typed preflight result:
+-  // stdout is a parsed `pipeline.start-preflight.v1` envelope under a measured payload
+-  // budget, so the housekeeping receipt travels beside it rather than inside it.
+-  try {
+-    process.stderr.write(`${JSON.stringify(runBootstrapScratchLifecycle())}\n`);
+-  } catch {
+-    // Housekeeping never decides a bootstrap's exit code.
+-  }
+-  // A second, independent housekeeping event (see runBootstrapWorktreeSweep's own doc
+-  // comment for why this is deliberately not folded into the scratch lifecycle above).
+-  // Wrapped the same way: never allowed to affect this function's return value.
+-  try {
+-    process.stderr.write(`${JSON.stringify(runBootstrapWorktreeSweep())}\n`);
+-  } catch {
+-    // Housekeeping never decides a bootstrap's exit code.
++  // W7: the housekeeping receipts moved into `bootstrapHousekeeping` above (still beside the typed result, not inside it).
++  // W1: one plain sentence for a status whose exit code is intentionally non-zero, so a runner's tool-error banner says why.
++  const refreshNotice = hookRefreshNotice(result);
++  if (refreshNotice !== "") {
++    try { process.stderr.write(`${refreshNotice}\n`); } catch { /* stderr unavailable; stdout still carries the status */ }
+   }
+   return pipelineStartPreflightExitCode(result);
+ }
+ 
++/** E2: the registry lock as the capability probe sees it; any fault is `unknown`, which degrades the row and never reads as ready. */
++function defaultRegistryLockProbe() {
++  try { return inspectSessionAuthorityLock({ repository: discoverRepository(resolve(process.cwd())) }); }
++  catch { return { status: "unknown" }; }
++}
++
+ /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
+ async function runEntry(argv = process.argv.slice(2)) {
+   const environmentReadiness = await observeEnvironmentReadiness();
+diff --git a/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs b/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
+index bf03b6c3a..af401cd20 100644
+--- a/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
++++ b/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
+@@ -16,7 +16,9 @@
+  *
+  * Prints one JSON line (`pipeline.mandatory-hook-refresh.v1`); exits 0 only when the mandatory hooks are ready.
+  */
++import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
+ import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "./pre-commit-hook-install.mjs";
+@@ -46,6 +48,14 @@ function refreshOne(hook, rootDir, dependencies) {
+   }
+ }
+ 
++/** W1: the version of the plugin copy this refresh binds the hooks to (null when its manifest cannot be read). */
++function readBoundPluginVersion() {
++  try {
++    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../.claude-plugin/plugin.json", import.meta.url)), "utf8"));
++    return typeof manifest?.version === "string" ? manifest.version : null;
++  } catch { return null; }
++}
++
+ export function refreshMandatoryHooks(rootDir = process.cwd(), dependencies = {}) {
+   const root = resolve(rootDir);
+   const results = HOOKS.map((hook) => refreshOne(hook, root, dependencies));
+@@ -54,6 +64,8 @@ export function refreshMandatoryHooks(rootDir = process.cwd(), dependencies = {}
+   return {
+     schema: MANDATORY_HOOK_REFRESH_SCHEMA,
+     root,
++    // W1: the plugin version the refreshed hooks are bound to now. The hook marker records no earlier version, so the old one is not reported.
++    pluginVersion: (dependencies.pluginVersion ?? readBoundPluginVersion)(),
+     status: failed ? "failed" : readiness.status === "ready" ? "ready" : "pending",
+     results,
+     readiness: { status: readiness.status, code: readiness.code, required: readiness.required },
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 33182d91e..e4bf8866b 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -67,12 +67,14 @@
+  */
+ import { randomBytes, createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
+ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ 
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
+ import { porcelainPaths } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+@@ -685,8 +687,22 @@ if (isDirectInvocation(import.meta.url)) {
+     if (result.status === "dirty") process.exitCode = 1;
+     if (["failed", "source-complete/event-unavailable"].includes(result.status)) process.exitCode = 2;
+   } catch (error) {
+-    const code = error instanceof VerifyEvidenceError ? error.code : "VEP-ERROR";
+-    process.stderr.write(`verify-evidence-producer: ${code}: ${error.message}\n`);
++    process.stderr.write(formatVerifyEvidenceFailure(error));
+     process.exitCode = 2;
+   }
+ }
++
++/**
++ * Q10: the one-line failure text. A native Windows authority refusal (WIN-AUTH-OPEN and its siblings) used to print only
++ * the bare code; it now also names the exact folder, the preview that changes nothing and the apply command the operator runs.
++ * The platform and the description are injected; a failing description never changes the line.
++ */
++export function formatVerifyEvidenceFailure(error, { platform = process.platform, describe = describeWindowsAuthorityRefusal, rootDir = process.cwd() } = {}) {
++  const code = error instanceof VerifyEvidenceError ? error.code : "VEP-ERROR";
++  const reason = typeof error?.reason === "string" ? error.reason : error?.message;
++  let extra = "";
++  try {
++    extra = String(describe({ reason, platform, projectRoot: resolve(rootDir), pluginRoot: resolve(dirname(fileURLToPath(import.meta.url)), ".."), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") }) ?? "").trim();
++  } catch { extra = ""; }
++  return `verify-evidence-producer: ${code}: ${error?.message}${extra === "" ? "" : ` ${extra}`}\n`;
++}
+diff --git a/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs b/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs
+new file mode 100644
+index 000000000..40ebf67f6
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs
+@@ -0,0 +1,215 @@
++// SPDX-License-Identifier: SUL-1.0
++// Candidate 19c, w168 (AC-108, the Windows native runs E2, E4, Q10, W1, W2, W7): Windows authority refusals name the path,
++// the cause and the repair; the preflight probes whether close and push can work on the platform and reports the bootstrap
++// facts itself. Every platform-dependent decision takes an injected platform or probe, so this runs on any machine.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import * as readiness from "../lib/windows-authority-readiness.mjs";
++import * as bridge from "../lib/session-requester-bridge.mjs";
++import * as registry from "../lib/session-authority-registry.mjs";
++import * as preflight from "./pipeline-start-preflight.mjs";
++import * as refresh from "./refresh-mandatory-hooks.mjs";
++import * as producer from "./verify-evidence-producer.mjs";
++
++const here = (relative) => fileURLToPath(new URL(relative, import.meta.url));
++const SCHEMA = "pipeline.windows-authority-readiness.v1";
++const roots = { projectRoot: "C:\\proj", pluginRoot: "C:\\plug", privateRoot: "C:\\proj\\.git\\agent-pipeline" };
++const unavailableAt = (path, reason = "WIN-AUTH-OPEN") => () => ({ schema: SCHEMA, status: "unavailable", causes: [{ pathClass: "project", reason, path }] });
++
++// --- Q10: WIN-AUTH-OPEN names the exact path and offers a preview of the repair ------------------------------------------------
++
++test("Q10: a WIN-AUTH-OPEN refusal names the exact folder, a preview that changes nothing, and the apply command", () => {
++  assert.equal(typeof readiness.describeWindowsAuthorityRefusal, "function");
++  const text = readiness.describeWindowsAuthorityRefusal({ reason: "WIN-AUTH-OPEN", platform: "win32", ...roots, assess: unavailableAt("C:\\proj\\evidence") });
++  assert.match(text, /C:\\proj\\evidence/u);
++  assert.match(text, /icacls "C:\\proj\\evidence"(?! \/)/u, "the preview is icacls with the path only: it lists the access list and changes nothing");
++  assert.match(text, /icacls "C:\\proj\\evidence" \/grant /u, "the apply command is named separately");
++  assert.match(text, /preview/iu);
++  assert.match(text, /only one Goldfish launch at a time|one at a time/iu, "the concurrent-launch rule is stated where the second launch was refused");
++});
++
++test("Q10: off Windows, for a non-authority reason, or when the probe throws, no text is invented", () => {
++  const args = { reason: "WIN-AUTH-OPEN", ...roots, assess: unavailableAt("C:\\proj\\evidence") };
++  assert.equal(readiness.describeWindowsAuthorityRefusal({ ...args, platform: "linux" }), "");
++  assert.equal(readiness.describeWindowsAuthorityRefusal({ ...args, platform: "win32", reason: "SDC-LOCK-HELD" }), "");
++  const thrown = readiness.describeWindowsAuthorityRefusal({ ...args, platform: "win32", assess: () => { throw new Error("probe"); } });
++  assert.match(thrown, /windowsAuthorityReadiness/u, "an unlocated path points at the preflight field that carries it");
++  assert.doesNotMatch(thrown, /icacls/u);
++});
++
++test("Q10: the readiness cause for WIN-AUTH-OPEN carries the same preview and apply commands", () => {
++  const result = readiness.assessWindowsAuthorityReadiness({ ...roots, exists: () => false, assessPrivateRoot: () => ({ status: "secure" }), probe: () => { throw new Error("unused"); } });
++  const open = result.causes.find((cause) => cause.reason === "WIN-AUTH-OPEN");
++  assert.ok(open, "an absent ancestor yields WIN-AUTH-OPEN");
++  const commands = open.nextAction.repairPreview?.commands ?? [];
++  assert.ok(commands.some((entry) => entry.command === `icacls "${open.path}"`), "preview command present");
++  assert.ok(commands.some((entry) => /\/grant /u.test(entry.command)), "apply command present");
++});
++
++test("Q10: the dispatch guard and the Verify producer call the shared description", () => {
++  assert.ok(/describeWindowsAuthorityRefusal/u.test(readFileSync(here("../hooks/guard-dispatch.mjs"), "utf8")), "guard-dispatch calls the shared description");
++  assert.equal(typeof producer.formatVerifyEvidenceFailure, "function");
++  const line = producer.formatVerifyEvidenceFailure(Object.assign(new Error("WIN-AUTH-OPEN"), { reason: "WIN-AUTH-OPEN" }), { platform: "win32", describe: () => "Path: C:\\proj\\evidence." });
++  assert.equal(line, "verify-evidence-producer: VEP-ERROR: WIN-AUTH-OPEN Path: C:\\proj\\evidence.\n");
++  // The description owns the platform gate (see the Q10 off-Windows case); an empty description leaves the old line byte for byte.
++  assert.equal(producer.formatVerifyEvidenceFailure(new Error("boom"), { platform: "linux", describe: () => "" }), "verify-evidence-producer: VEP-ERROR: boom\n");
++  assert.equal(producer.formatVerifyEvidenceFailure(new Error("boom"), { describe: () => { throw new Error("x"); } }), "verify-evidence-producer: VEP-ERROR: boom\n");
++});
++
++// --- E2: lock owner classification and the repair text ---------------------------------------------------------------------------
++
++const nativeRecord = { platform: "win32", pid: 4242, start: "win32-1", cwd: null };
++test("E2: a Windows owner route process is dead when it vanished or was replaced, live only on a matching identity", () => {
++  assert.equal(typeof bridge.ownerRouteProcessStatus, "function");
++  const same = (a, b) => a.start === b.start;
++  const status = (observed) => bridge.ownerRouteProcessStatus(nativeRecord, { platform: "win32", observeWindows: () => observed, same });
++  assert.equal(status({ status: "absent" }), "dead");
++  assert.equal(status({ status: "present", process: { ...nativeRecord } }), "live");
++  assert.equal(status({ status: "present", process: { ...nativeRecord, start: "win32-2" } }), "dead");
++  assert.equal(status({ status: "unavailable" }), "unknown");
++  assert.equal(bridge.ownerRouteProcessStatus({ pid: 1 }, { platform: "win32", observeWindows: () => ({ status: "absent" }), same }), "unknown", "a record without a Windows identity proves nothing");
++  assert.equal(bridge.ownerRouteProcessStatus(nativeRecord, { platform: "win32", observeWindows: () => { throw new Error("x"); }, same }), "unknown");
++});
++
++test("E2: the lock repair text names inspect, then heal, last resort move-aside", () => {
++  assert.equal(typeof registry.registryLockRepairText, "function");
++  for (const owner of ["live", "unknown", "dead"]) {
++    const text = registry.registryLockRepairText({ owner, pid: 7, ageSeconds: 141, waitedMs: 0 }, "/repo");
++    assert.match(text, /session-authority-repair\.mjs inspect --root \/repo/u);
++    assert.match(text, /heal/u);
++    assert.match(text, /move-aside/u);
++    assert.ok(text.indexOf("inspect") < text.indexOf("heal") && text.indexOf("heal") < text.indexOf("move-aside"));
++  }
++});
++
++// --- E2: the fail-fast capability probe -------------------------------------------------------------------------------------------
++
++const okProbes = { nodePath: "/node", exists: () => true, lockProbe: () => ({ status: "absent" }), ownerRouteProbe: () => ({ status: "ready" }) };
++test("E2: capability probe is ready when every check passes and carries one typed row per check", () => {
++  assert.equal(typeof preflight.observeCloseAndPushCapability, "function");
++  const cap = preflight.observeCloseAndPushCapability({ platform: "win32", windowsAuthorityReadiness: { schema: SCHEMA, status: "ready", causes: [] }, ...okProbes });
++  assert.equal(cap.schema, "pipeline.close-push-capability.v1");
++  assert.equal(cap.status, "ready");
++  assert.deepEqual(cap.checks.map((row) => row.id), ["node", "acl", "lock", "ownerRoute"]);
++  assert.ok(cap.checks.every((row) => row.status === "ready" && row.nextAction === null));
++});
++
++test("E2: capability probe names the repair per failing check", () => {
++  const cap = preflight.observeCloseAndPushCapability({
++    platform: "win32", ...okProbes, exists: () => false,
++    windowsAuthorityReadiness: { schema: SCHEMA, status: "unavailable", causes: [{ reason: "WIN-AUTH-OPEN", path: "C:\\proj\\evidence" }] },
++    lockProbe: () => ({ status: "held", owner: "dead", ageSeconds: 141 }),
++    ownerRouteProbe: () => ({ status: "unavailable" }),
++  });
++  assert.equal(cap.status, "unavailable");
++  const byId = Object.fromEntries(cap.checks.map((row) => [row.id, row]));
++  assert.equal(byId.node.status, "unavailable");
++  assert.match(byId.acl.nextAction, /C:\\proj\\evidence/u);
++  assert.match(byId.lock.nextAction, /session-authority-repair\.mjs inspect/u);
++  assert.match(byId.ownerRoute.nextAction, /\S/u);
++});
++
++test("E2: off Windows the ACL check is not applicable and a lock of unknown state degrades instead of blocking", () => {
++  const cap = preflight.observeCloseAndPushCapability({ platform: "linux", ...okProbes, lockProbe: () => ({ status: "held", owner: "unknown", ageSeconds: 5 }) });
++  assert.equal(cap.checks.find((row) => row.id === "acl").status, "not-applicable");
++  assert.equal(cap.checks.find((row) => row.id === "lock").status, "degraded");
++  assert.equal(cap.status, "degraded");
++});
++
++test("E2: a probe that throws is reported as unknown, never swallowed into ready", () => {
++  const cap = preflight.observeCloseAndPushCapability({ platform: "linux", ...okProbes, lockProbe: () => { throw new Error("x"); } });
++  assert.equal(cap.checks.find((row) => row.id === "lock").status, "degraded");
++  assert.notEqual(cap.status, "ready");
++});
++
++// --- W2: the four digest-bound bootstrap facts -----------------------------------------------------------------------------------
++
++function projectWith(files) {
++  const root = mkdtempSync(join(tmpdir(), "w168-facts-"));
++  for (const [name, content] of Object.entries(files)) { mkdirSync(join(root, name, ".."), { recursive: true }); writeFileSync(join(root, name), content); }
++  return root;
++}
++
++test("W2: the facts carry runtime status, role and model readback, calibration with handover date, and Verify availability", () => {
++  assert.equal(typeof preflight.observeBootstrapFacts, "function");
++  const root = projectWith({ "project/pipeline.json": JSON.stringify({ project: "demo", verify: "node verify.mjs", handover: "docs/state.md" }), "docs/state.md": "# State\n\nLast updated: 2026-11-04\n" });
++  try {
++    const facts = preflight.observeBootstrapFacts({ rootDir: root, status: "ready", role: "goldfish", modelRoleBootstrap: { status: "ready", code: "MODEL-ROLE-BOOTSTRAP-READY" } });
++    assert.equal(facts.schema, "pipeline.bootstrap-facts.v1");
++    assert.deepEqual(facts.runtime, { status: "ready" });
++    assert.deepEqual(facts.modelRole, { role: "goldfish", status: "ready", code: "MODEL-ROLE-BOOTSTRAP-READY" });
++    assert.equal(facts.calibration.file, "project/pipeline.json");
++    assert.equal(facts.calibration.project, "demo");
++    assert.equal(facts.calibration.handover, "docs/state.md");
++    assert.equal(facts.calibration.handoverDate, "2026-11-04");
++    assert.match(facts.calibration.sha256, /^[a-f0-9]{64}$/u);
++    assert.match(facts.calibration.handoverSha256, /^[a-f0-9]{64}$/u);
++    assert.deepEqual(facts.verify, { available: true });
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("W2: an unreadable calibration is reported as nulls with Verify unavailable, never invented", () => {
++  const root = projectWith({});
++  try {
++    const facts = preflight.observeBootstrapFacts({ rootDir: root, status: "ready" });
++    assert.equal(facts.calibration.file, null);
++    assert.equal(facts.calibration.handoverDate, null);
++    assert.deepEqual(facts.verify, { available: false });
++    assert.equal(facts.modelRole.role, "elephant");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("W2: a policy-required model-role bootstrap carries a nextAction", () => {
++  assert.equal(typeof preflight.modelRoleBootstrapField, "function");
++  const field = preflight.modelRoleBootstrapField({ status: "refused", code: "MODEL-ROLE-BOOTSTRAP-POLICY-REQUIRED" });
++  assert.equal(field.status, "unavailable");
++  assert.equal(field.code, "MODEL-ROLE-BOOTSTRAP-POLICY-REQUIRED");
++  assert.match(field.nextAction, /\S{10}/u);
++  assert.equal(Object.hasOwn(preflight.modelRoleBootstrapField({ status: "ready", code: "X" }), "nextAction"), false);
++});
++
++// --- W1: hook refresh output and status text -------------------------------------------------------------------------------------
++
++test("W1: the refresh output names the plugin version it bound to", () => {
++  const plan = () => ({ status: "ready" }); // never ready-to-upgrade, so nothing is applied
++  const out = refresh.refreshMandatoryHooks(process.cwd(), { checkCloneProvisioning: () => ({ checks: [] }), plans: { "pre-commit-hook": plan, "commit-msg-hook": plan, "pre-push-hook": plan }, pluginVersion: () => "9.9.9" });
++  assert.equal(out.pluginVersion, "9.9.9");
++});
++
++test("W1: a hook-refresh-required status prints a plain sentence with the runnable command; the machine status and exit code stay", () => {
++  assert.equal(typeof preflight.hookRefreshNotice, "function");
++  const result = { status: "hook-refresh-required", nextAction: { kind: "command", executable: "node", argv: ["/p/scripts/refresh-mandatory-hooks.mjs", "--root", "/r"] } };
++  const text = preflight.hookRefreshNotice(result);
++  assert.match(text, /hook-refresh-required/u);
++  assert.match(text, /exit code 2 is intentional/u);
++  assert.match(text, /refresh-mandatory-hooks\.mjs/u);
++  assert.equal(preflight.hookRefreshNotice({ status: "ready" }), "");
++  assert.equal(preflight.pipelineStartPreflightExitCode(result), 2, "the exit code is pinned by the enforcement tests");
++});
++
++// --- W7: one JSON document on stdout, nothing structured on stderr ---------------------------------------------------------------
++
++test("W7: the process prints one JSON document on stdout and no housekeeping object on stderr; the receipts ride under named keys", () => {
++  const cwd = mkdtempSync(join(tmpdir(), "w168-w7-"));
++  try {
++    const run = spawnSync(process.execPath, [here("./pipeline-start-preflight.mjs")], { cwd, env: { PATH: process.env.PATH ?? "", HOME: cwd }, encoding: "utf8", timeout: 120000 });
++    const lines = run.stdout.split("\n").filter((line) => line !== "");
++    assert.equal(lines.length, 1);
++    const envelope = JSON.parse(lines[0]);
++    if (envelope.statusScope === "pipeline-governance-activation") {
++      assert.equal(Object.hasOwn(envelope, "bootstrapHousekeeping"), false, "an ungoverned project ran no housekeeping before, and still runs none");
++    } else {
++      assert.equal(envelope.bootstrapHousekeeping?.scratchLifecycle?.schema, "pipeline.bootstrap-scratch-lifecycle.v1");
++      assert.equal(envelope.bootstrapHousekeeping?.worktreeSweep?.schema, "pipeline.bootstrap-worktree-sweep.v1");
++    }
++    assert.equal(envelope.closeAndPushCapability?.schema, "pipeline.close-push-capability.v1");
++    assert.equal(envelope.bootstrapFacts?.schema, "pipeline.bootstrap-facts.v1");
++    for (const line of run.stderr.split("\n")) assert.doesNotMatch(line, /^\{.*"schema":"pipeline\.bootstrap-/u, "stderr carries no JSON housekeeping object");
++  } finally { rmSync(cwd, { recursive: true, force: true }); }
++});

@@ -1,0 +1,615 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..b973e8112 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3875,6 +3875,12 @@
+       "invariantPinned": "The push-approval record refusal names the fold and the admitted trailer form, and a refusal for any other foreign file keeps the plain reason (K98 row 7/7)",
+       "nonOverlapNote": "Unique cases: the pipeline-owned commit refusal reasons for foreign files"
+     },
++    {
++      "name": "d3-signed-reconcile-commit-tests",
++      "file": "plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs",
++      "invariantPinned": "A signed feature-package reconcile deposits one commit capability bound to exactly its own paths and bytes that the hook-shaped commit consumes once and that expires with its window and with a HEAD or tree change, and the close steps before the ceremony leave a tree the clean-tree check passes, with every refusal naming a typed code and its command (D3, AC-108)",
++      "nonOverlapNote": "Unique cases: the reconcile commit capability and the pre-ceremony clean-tree commit of the feature package files"
++    },
+     {
+       "name": "gitleaks-scratch-clones-exclusion-tests",
+       "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index eff500767..d4cdbd691 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -44,6 +44,7 @@ import {
+   verifyAgainstTrustAnchors,
+ } from "./critical-human-proof-policy.mjs";
+ import { isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
++import { loadProtectedTestPathRules, protectedTestPathRuleFor } from "./protected-test-paths.mjs";
+ // Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
+ // the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
+ // importing it to reuse one function would run a guard as a side effect of loading this
+@@ -6617,6 +6618,123 @@ function hgoPublishBriefedAuthority({repo, paths, record}, publish) {
+ export function consumeHumanGuardOverride(input = {}) {
+   return consumeHumanGuardOverrideCore(input);
+ }
++
++// ---------------------------------------------------------------------------------
++// D3: the commit capability of a signed feature-package reconcile (ADR point 3)
++// ---------------------------------------------------------------------------------
++// The signed apply writes the package manifest (and the Result file a reconcile ratifies); the pre-commit hook then
++// refuses to commit a closed feature's `PB-CONTINUITY-*` files without a second override signature. The reconcile's own
++// signature already binds those paths and bytes, so the apply deposits ONE capability, in the existing override
++// journal (capabilities directory, audit ledger, HMAC), shaped to the hook's own commit-scope consumption
++// (toolName Bash, `git commit`, pipelineCommitScope = { schema, head, indexTree, protectedPaths }, denial text
++// "PB-GUARD-HOOKS: ... scope <sha>"; scripts/pre-commit-hook-install.mjs commitOverrideCourse). Nothing here is
++// new binding logic: head and index tree bind HEAD and the exact staged paths and bytes, so any other path, any
++// changed byte, a HEAD move or a tree change finds a different toolInputSha256 and is not admitted; the hook marks
++// the capability consumed on first use (once); the window below bounds it in time.
++export const RECONCILE_COMMIT_SCOPE_SCHEMA = "pipeline.pre-commit-protected-scope.v1";
++export const RECONCILE_COMMIT_WINDOW_MS = 3_600_000;
++const RECONCILE_COMMIT_CLASS = "reconcile-commit-scope";
++const RECONCILE_COMMIT_HEAL_REPLAN = "run `pipeline-state.mjs continuity-result-bootstrap-plan` for a fresh signing command (a HEAD or tree change needs a fresh signature)";
++
++function reconcileCommitFail(code, message, heal) {
++  const error = new HumanGuardOverrideError(code, `${message}; heal: ${heal}`);
++  error.heal = heal;
++  throw error;
++}
++
++/**
++ * Arms the commit capability for the files a signed reconcile wrote (`files`: `{ path, sha256 }`, the exact paths and
++ * bytes). `dryRun: true` is the read-only precheck the apply runs BEFORE it consumes the proof: it only refuses what
++ * would later make arming impossible (HGO-RC-FOREIGN-STAGED) and stages nothing. Returns `{ status: "armed" | "ready" |
++ * "not-needed", ... }`; throws HumanGuardOverrideError with `.heal` (the one command that clears it) otherwise.
++ */
++export function armReconcileCommitCapability({
++  rootDir, pluginRoot, files, reconcilePlanSha256 = null, approval = {}, dryRun = false,
++  nowMs = Date.now(), windowMs = RECONCILE_COMMIT_WINDOW_MS, spawn = spawnSync,
++} = {}) {
++  if (!Array.isArray(files) || files.length === 0
++    || files.some((file) => !object(file) || typeof file.path !== "string" || file.path === "" || !(dryRun ? file.sha256 === null || SHA256.test(file.sha256 ?? "") : SHA256.test(file.sha256 ?? "")))
++    || !(dryRun || SHA256.test(reconcilePlanSha256 ?? ""))) {
++    fail("HGO-RC-INPUT", "the reconcile commit capability needs the exact paths and sha256 digests of the files the signed apply wrote");
++  }
++  const repo = topology(rootDir, spawn);
++  const run = (args) => spawn("git", args, { cwd: repo.root, encoding: "utf8", shell: false, timeout: 20000 });
++  if (run(["rev-parse", "--verify", "-q", "HEAD"]).status !== 0) return { status: "not-needed", reason: "unborn-head" };
++  const head = git(repo.root, ["rev-parse", "HEAD"], spawn);
++  const paths = [];
++  for (const file of files) {
++    const absolute = resolve(repo.root, file.path);
++    const rel = relative(repo.root, absolute).replace(/\\/gu, "/");
++    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) fail("HGO-RC-INPUT", `path ${file.path} is outside the repository`);
++    if (!dryRun) {
++      let onDisk;
++      try { onDisk = sha(readFileSync(absolute)); } catch { onDisk = null; }
++      if (onDisk !== file.sha256) {
++        reconcileCommitFail("HGO-RC-BYTES", `${rel} no longer holds the bytes the signed apply wrote`, RECONCILE_COMMIT_HEAL_REPLAN);
++      }
++    }
++    paths.push(rel);
++  }
++  // Only a file that differs from HEAD is part of the commit; one committed before the ceremony is not staged again.
++  const changed = paths.filter((rel) => run(["cat-file", "-e", `HEAD:${rel}`]).status !== 0 || run(["diff", "--quiet", "HEAD", "--", rel]).status !== 0).sort();
++  const staged = String(run(["diff", "--cached", "--name-only", "-z"]).stdout ?? "").split("\0").filter(Boolean);
++  const foreign = staged.filter((rel) => !changed.includes(rel));
++  if (foreign.length > 0) {
++    reconcileCommitFail("HGO-RC-FOREIGN-STAGED", `the index already stages ${foreign.join(", ")}, which the signed reconcile does not own`,
++      `git restore --staged -- ${foreign.join(" ")}`);
++  }
++  // The hook's own finding rule: a changed path with a protected-path rule that already has history (the first appearance
++  // of a path is exempt in the hook). Gate-strength paths are not predicted here; they would carry another rule id.
++  const { rules } = loadProtectedTestPathRules({ rootDir: repo.root });
++  const findings = changed.map((rel) => ({ rel, rule: protectedTestPathRuleFor(rules, rel) }))
++    .filter((row) => row.rule && String(run(["log", "--format=%H", "-1", "--", row.rel]).stdout ?? "").trim() !== "");
++  if (findings.length === 0) return { status: "not-needed", reason: "no-protected-path", paths: changed };
++  if (dryRun) return { status: "ready", paths: changed };
++  if (run(["add", "--", ...changed]).status !== 0) reconcileCommitFail("HGO-RC-STAGE", "git add of the reconcile files failed", `git add -- ${changed.join(" ")}`);
++  for (const rel of changed) {
++    const indexed = String(run(["rev-parse", `:${rel}`]).stdout ?? "").trim();
++    if (indexed === "" || indexed !== String(run(["hash-object", "--", rel]).stdout ?? "").trim()) {
++      reconcileCommitFail("HGO-RC-BYTES", `${rel} changed while it was staged`, RECONCILE_COMMIT_HEAL_REPLAN);
++    }
++  }
++  const protectedPaths = [...new Set(findings.map((row) => row.rel))].sort();
++  const ruleIds = [...new Set(findings.map((row) => row.rule.id))].sort();
++  const indexTree = git(repo.root, ["write-tree"], spawn);
++  const scope = { schema: RECONCILE_COMMIT_SCOPE_SCHEMA, head, indexTree, protectedPaths };
++  const scopeSha256 = createHash("sha256").update(JSON.stringify(scope)).digest("hex");
++  const toolName = "Bash";
++  const toolInput = { command: "git commit", pipelineCommitScope: scope };
++  const denials = [{ guard: "pre-commit-hook", reason: `PB-GUARD-HOOKS: protected path(s) staged for commit; head ${head}; index tree ${indexTree}; paths ${protectedPaths.join(", ")}; rules ${ruleIds.join(", ")}; scope ${scopeSha256}` }];
++  const store = storage(repo.common);
++  const authorizedAt = new Date(nowMs).toISOString();
++  const humanApproval = approval.mode === "signature" ? { mode: "signature-verified" } : chatAttributionRecord({ kind: "human-guard-override" });
++  const reason = `signed feature-package reconcile ${reconcilePlanSha256}: commit exactly ${changed.join(", ")}`;
++  const requestSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, scopeSha256 });
++  const selectionSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, requestSha256, reconcilePlanSha256, proofSha256: approval.proofSha256 ?? null });
++  const planSha256 = sha({ kind: RECONCILE_COMMIT_CLASS, selectionSha256, authorizedAt });
++  const reasonSha256 = sha(Buffer.from(reason, "utf8"));
++  const capabilityCore = {
++    schema: CAPABILITY_SCHEMA, status: "armed", root: repo.root, requestSha256, planSha256, selectionSha256, reasonSha256,
++    humanApproval, plugin: pluginIdentity(pluginRoot), repository: repositoryObservation(repo.root, spawn),
++    signedCandidate: { commit: head, tree: git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn) },
++    toolName, toolInputSha256: toolInputIdentitySha256(toolName, toolInput), commandClass: RECONCILE_COMMIT_CLASS, externalReadOnly: false,
++    denials: denialDigests(denials), policy: policyIdentity(repo.root, pluginRoot, denials),
++    preview: { guardRationale: denialRationale(denials) }, eligiblePaths: protectedPaths, mode: "standard", authorSourceRoot: null,
++    authorizedAt, expiresAt: new Date(nowMs + windowMs).toISOString(), consumedAt: null,
++  };
++  // A fresh store has no key until its first audit append creates it.
++  if (!existsSync(store.audit)) appendAudit(store, { type: "store-opened", at: authorizedAt });
++  const capability = { ...capabilityCore, mac: capabilityMac(key(store), capabilityCore) };
++  const path = capabilityPath(store, planSha256);
++  writeExclusive(path, Buffer.from(`${JSON.stringify(capability)}\n`, "utf8"));
++  try {
++    appendAudit(store, {
++      type: "authorized", at: authorizedAt, requestSha256, planSha256, reasonSha256, selectionSha256, humanApproval,
++      mode: capability.mode, authorSourceRoot: null, kind: RECONCILE_COMMIT_CLASS, reconcilePlanSha256, proofSha256: approval.proofSha256 ?? null,
++    });
++  } catch (error) { try { unlinkSync(path); } catch {} throw error; }
++  return { status: "armed", planSha256, scopeSha256, paths: changed, protectedPaths, ruleIds, head, indexTree, expiresAt: capability.expiresAt };
++}
+ function hgoConsumptionBoundary(repo, consume) {
+   const legacy = hgoLegacyControlOperation(repo, consume);
+   if (legacy.status === "legacy-completed") return legacy.result;
+diff --git a/plugins/pipeline-core/lib/pipeline-owned-files.mjs b/plugins/pipeline-core/lib/pipeline-owned-files.mjs
+index 33af3d093..e3ef046d3 100644
+--- a/plugins/pipeline-core/lib/pipeline-owned-files.mjs
++++ b/plugins/pipeline-core/lib/pipeline-owned-files.mjs
+@@ -10,8 +10,11 @@
+  * push candidate still binds every file; a refusal now recognizes these files and names the one
+  * sanctioned command that commits exactly them, `scripts/commit-pipeline-owned.mjs`.
+  */
++import { createHash } from "node:crypto";
++import { readFileSync } from "node:fs";
++import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { LEGACY_GUARD_AUDIT, NEUTRAL_GUARD_AUDIT } from "./project-authority.mjs";
++import { LEGACY_GUARD_AUDIT, NEUTRAL_GUARD_AUDIT, resolveAuthorityArtifactPath } from "./project-authority.mjs";
+ 
+ export const COMMIT_PIPELINE_OWNED_SCRIPT = fileURLToPath(new URL("../scripts/commit-pipeline-owned.mjs", import.meta.url));
+ const QUEUE = /^specs\/[A-Za-z0-9][A-Za-z0-9._-]*\/slice-queue\.json$/u;
+@@ -21,6 +24,29 @@ export function isPipelineOwnedPath(path) {
+   return typeof path === "string" && (QUEUE.test(path) || AUDIT.has(path));
+ }
+ 
++// D3: the feature package's own files, written by the close route before the signing ceremony. They are owned
++// only when the caller supplies the repository root and the dirty bytes are exactly what State already binds:
++// the Result file with the digest `continuity.authority.result` carries (the result bootstrap's canonical
++// fence), the package manifest when it is a valid-shaped manifest of the feature State is closing (the signed
++// reconcile's postimage). Any other edit of those paths is a person's work and stays foreign.
++const FEATURE_FILE = /^(specs\/[A-Za-z0-9][A-Za-z0-9._-]*)\/(lifecycle\.json|result\.md)$/u;
++
++function featurePackageFileOwned(root, path) {
++  const match = FEATURE_FILE.exec(path);
++  if (!match) return false;
++  try {
++    const state = JSON.parse(readFileSync(resolveAuthorityArtifactPath("state", { rootDir: root }).path, "utf8"));
++    const authority = state?.continuity?.authority;
++    const bytes = readFileSync(join(root, path));
++    if (match[2] === "result.md") {
++      return authority?.result?.path === path && authority.result.sha256 === createHash("sha256").update(bytes).digest("hex");
++    }
++    const manifest = JSON.parse(bytes.toString("utf8"));
++    return manifest?.schema === "pipeline.feature-package.v1" && typeof authority?.prd?.path === "string"
++      && dirname(authority.prd.path) === match[1] && manifest.feature?.id === state.continuity.featureId;
++  } catch { return false; }
++}
++
+ /** The paths of `git status --porcelain` (v1) output; a rename yields both its sides. A caller may have trimmed
+  * the output, which drops the first line's leading blank status column, so one or two status columns are read. */
+ export function porcelainPaths(status) {
+@@ -34,14 +60,26 @@ export function porcelainPaths(status) {
+ }
+ 
+ /** owned: the Pipeline's own dirty files; others: everything else that is dirty. */
+-export function classifyDirtyTree(status) {
++export function classifyDirtyTree(status, root = null) {
+   const paths = porcelainPaths(status);
+-  return { owned: paths.filter(isPipelineOwnedPath), others: paths.filter((path) => !isPipelineOwnedPath(path)) };
++  const owned = (path) => isPipelineOwnedPath(path) || (typeof root === "string" && featurePackageFileOwned(root, path));
++  return { owned: paths.filter(owned), others: paths.filter((path) => !owned(path)) };
+ }
+ 
+ /** The remedy a clean-tree refusal names, or null when the dirt is not only the Pipeline's own. */
+ export function pipelineOwnedRemedy(status, root) {
+-  const { owned, others } = classifyDirtyTree(status);
++  const { owned, others } = classifyDirtyTree(status, root);
+   if (!owned.length || others.length) return null;
+   return `only the Pipeline's own state files are uncommitted (${owned.join(", ")}); commit exactly them with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (an agent session: records the AI-Assisted provenance; a PO terminal commit uses --human instead)`;
+ }
++
++/** D3: the remedy of a clean-tree refusal, never null for a dirty tree: the one command that commits the Pipeline's
++ * own files, or, when other files are dirty, the command that lists them and the order to follow. */
++export function cleanTreeRemedy(status, root) {
++  const owned = pipelineOwnedRemedy(status, root);
++  if (owned !== null) return owned;
++  const { owned: own, others } = classifyDirtyTree(status, root);
++  if (!others.length) return null;
++  return `these uncommitted files are not the Pipeline's own (${others.join(", ")}): list them with \`git status --short\`, then commit or stash them`
++    + (own.length ? `; afterwards commit the Pipeline's own files (${own.join(", ")}) with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent` : "");
++}
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+index 7b088059a..842bcfee4 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+@@ -64,7 +64,7 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
+   const git = (args) => spawn("git", ["-C", root, ...args], { encoding: "utf8" });
+   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
+-  const { owned, others } = classifyDirtyTree(status.stdout);
++  const { owned, others } = classifyDirtyTree(status.stdout, root);
+   if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
+   if (!owned.length) return { status: "nothing-to-commit", owned: [] };
+   if (parsed.dryRun) return { status: "dry-run", owned };
+diff --git a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+new file mode 100644
+index 000000000..284112633
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+@@ -0,0 +1,262 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// D3 (Antigravity and Codex greenfield, ADR draft-authority-carry-forward-and-signed-reconcile-commit point 3):
++// the close steps before the signing ceremony leave a clean tree, and a signed feature-package reconcile deposits
++// ONE commit capability bound to exactly its own files and bytes, consumed once by the pre-commit hook's existing
++// commit-scope consumption (toolName Bash, `git commit`, pipelineCommitScope), expiring with the apply window and
++// with a HEAD or tree change. The hook-shaped consume below mirrors scripts/pre-commit-hook-install.mjs
++// (commitOverrideCourse): the scope object, the denial text and the finding rule are the hook's, not new inventions.
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { afterEach, test } from "node:test";
++import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { run } from "./pipeline-state.mjs";
++import { observeCleanCandidate } from "./po-approval-request.mjs";
++import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { loadProtectedTestPathRules, protectedTestPathRuleFor } from "../lib/protected-test-paths.mjs";
++import * as hgo from "../lib/human-guard-override.mjs";
++
++const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
++const NOW = "2026-07-31T12:00:00.000Z";
++const hash = (value) => createHash("sha256").update(value).digest("hex");
++const h = (c) => c.repeat(64);
++const canonical = (value) => value === null || typeof value !== "object" ? JSON.stringify(value) : Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
++const roots = [];
++afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
++
++const MANIFEST = "specs/feature/lifecycle.json";
++const RESULT = "specs/feature/result.md";
++
++function stateValue() {
++  const submission = { schema: "pipeline.plan-submission.v1", featureId: "feature", planPath: "specs/feature/prd_feature.md", planSha256: "", specPath: "specs/feature/spec.md", specSha256: "", profile: "feature", profileSha256: h("5"), submittedBy: "Coordinator", submittedAt: "2026-07-31T10:00:00.000Z" };
++  return { submission };
++}
++
++function fixture(name) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), `d3-reconcile-commit-${name}-`))); roots.push(root);
++  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
++  git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
++  mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs", "feature"), { recursive: true });
++  writeFileSync(join(root, ".gitignore"), ".claude/pipeline-state.json\n.git-common/\n");
++  writeFileSync(join(root, "specs/feature/prd_feature.md"), "prd\n"); writeFileSync(join(root, "specs/feature/spec.md"), "spec\n");
++  const historical = Buffer.from("# Feature result\n\nExisting canonical Markdown must survive intact.\n", "utf8");
++  writeFileSync(join(root, RESULT), historical);
++  mkdirSync(join(root, ".git-common"), { mode: 0o700 });
++  const prdSha = hash(readFileSync(join(root, "specs/feature/prd_feature.md"))), specSha = hash(readFileSync(join(root, "specs/feature/spec.md")));
++  const value = {
++    schema: "pipeline.state.v0", activeFeature: { id: "feature", planPath: "specs/feature/prd_feature.md", phase: "implementation" }, planApproved: true,
++    continuity: {
++      schema: "pipeline.continuity.v0", featureId: "feature", revision: 7,
++      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
++      authority: { prd: { path: "specs/feature/prd_feature.md", sha256: prdSha }, spec: { path: "specs/feature/spec.md", sha256: specSha }, result: null },
++      queueHead: { packageId: "pkg", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
++      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 7, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
++      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
++    }, updatedAt: "2026-07-31T11:00:00.000Z",
++  };
++  const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: h("1"), runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4"), planPath: value.continuity.authority.prd.path, planSha256: prdSha, specPath: value.continuity.authority.spec.path, specSha256: specSha };
++  const submission = { ...stateValue().submission, planSha256: prdSha, specSha256: specSha };
++  value.planSubmission = submission;
++  value.planApproval = { schema: "pipeline.plan-approval.v4", approvedBy: "PO", approvedAt: "2026-07-31T10:05:00.000Z", submissionSha256: hash(canonical(submission)), profileSha256: submission.profileSha256, poGateAuthority: authority, priorInvalidationSha256: null };
++  const statePath = join(root, ".claude", "pipeline-state.json"); writeFileSync(statePath, JSON.stringify(value, null, 2) + "\n");
++  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(root, "specs/feature", name), `${name}\n`);
++  const artifact = (kind, path, auth, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(root, path))), authority: auth, mutability, retention: "active" });
++  const manifest = {
++    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++    artifacts: [
++      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"), artifact("spec", "specs/feature/spec.md", true, "immutable"),
++      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"), artifact("result", RESULT, false, "immutable"),
++      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++    ], candidate: null, supersedes: null,
++  };
++  writeFileSync(join(root, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
++  assert.equal(validateFeaturePackage(root, MANIFEST).ok, true);
++  git("add", "-A"); git("commit", "-q", "-m", "baseline");
++  return { root, git, statePath };
++}
++
++function invoke(root, argv, extra = {}) {
++  const out = []; const err = []; const log = console.log; const error = console.error;
++  console.log = (...v) => out.push(v.join(" ")); console.error = (...v) => err.push(v.join(" "));
++  try { return { status: run(argv, { dir: root, now: () => NOW, gitCommonDir: () => ({ ok: true, path: join(root, ".git-common") }), ...extra }), out: out.join("\n"), err: err.join("\n") }; }
++  finally { console.log = log; console.error = error; }
++}
++const reconcileDeps = { featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) };
++const status = (f) => f.git("status", "--porcelain=v1", "--untracked-files=all");
++
++/** Steps 1 to 3 of the close route, up to the pending reconcile: returns the reconcile plan digest. */
++function bootstrapped(f) {
++  const before = status(f);
++  const planned = invoke(f.root, ["continuity-result-bootstrap-plan"]); assert.equal(planned.status, 0, planned.err);
++  const p = JSON.parse(planned.out);
++  assert.equal(status(f), before, "the read-only bootstrap plan leaves the tracked and the untracked tree as it was");
++  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
++  return JSON.parse(applied.out).completion;
++}
++
++/** Marks the feature closed in State so the dynamic PB-CONTINUITY class protects its result and package files. */
++function closeInState(f) {
++  const value = JSON.parse(readFileSync(f.statePath, "utf8"));
++  value.closedFeatures = [{ id: "feature", continuityClose: { result: { path: RESULT }, package: { path: MANIFEST } } }];
++  writeFileSync(f.statePath, JSON.stringify(value, null, 2) + "\n");
++}
++
++/** The pre-commit hook's own scope for the currently staged index (scripts/pre-commit-hook-install.mjs commitOverrideCourse). */
++function hookCall(f) {
++  const head = f.git("rev-parse", "HEAD").trim();
++  const staged = f.git("diff", "--cached", "--name-only", "-z").split("\0").filter(Boolean);
++  const { rules } = loadProtectedTestPathRules({ rootDir: f.root });
++  const findings = staged.map((path) => ({ path, rule: protectedTestPathRuleFor(rules, path) })).filter((row) => row.rule && f.git("log", "--format=%H", "-1", "--", row.path).trim() !== "");
++  const protectedPaths = [...new Set(findings.map((row) => row.path))].sort();
++  const ruleIds = [...new Set(findings.map((row) => row.rule.id))].sort();
++  const indexTree = f.git("write-tree").trim();
++  const scope = { schema: "pipeline.pre-commit-protected-scope.v1", head, indexTree, protectedPaths };
++  const scopeSha256 = createHash("sha256").update(JSON.stringify(scope)).digest("hex");
++  return {
++    protectedPaths, ruleIds,
++    toolName: "Bash", toolInput: { command: "git commit", pipelineCommitScope: scope },
++    denials: [{ guard: "pre-commit-hook", reason: `PB-GUARD-HOOKS: protected path(s) staged for commit; head ${head}; index tree ${indexTree}; paths ${protectedPaths.join(", ")}; rules ${ruleIds.join(", ")}; scope ${scopeSha256}` }],
++  };
++}
++const consume = (f, extra = {}) => { const { toolName, toolInput, denials } = hookCall(f); return hgo.consumeHumanGuardOverride({ rootDir: f.root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials, ...extra }); };
++
++/** The signed apply of the whole close route: everything up to and including feature-package-reconcile. */
++function signedApply(f, { committedBefore = true } = {}) {
++  const completion = bootstrapped(f);
++  if (committedBefore) assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
++  closeInState(f);
++  const applied = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", MANIFEST, "--plan-sha256", completion.planSha256], reconcileDeps);
++  return { completion, applied, receipt: JSON.parse(applied.out) };
++}
++
++test("D3 (1): the read-only reconcile plan leaves the tracked and the untracked tree clean, and the clean-tree check passes right after it", () => {
++  const f = fixture("plan-clean");
++  const planned = invoke(f.root, ["continuity-result-bootstrap-plan"]); assert.equal(planned.status, 0, planned.err);
++  assert.equal(status(f), "");
++  const candidate = observeCleanCandidate(f.root);
++  assert.equal(candidate.commit, f.git("rev-parse", "HEAD").trim());
++});
++
++test("D3 (1): after the result bootstrap the refusal names the one command that commits the Pipeline's own result file, and that command makes the check pass", () => {
++  const f = fixture("owned-result");
++  bootstrapped(f);
++  assert.match(status(f), /M specs\/feature\/result\.md/);
++  assert.throws(() => observeCleanCandidate(f.root), (error) => {
++    assert.match(error.message, /repository must be clean before preparing a PO approval request/);
++    assert.match(error.message, /commit-pipeline-owned\.mjs/);
++    assert.match(error.message, /--agent/);
++    return true;
++  });
++  const committed = commitPipelineOwned(["--root", f.root, "--agent"]);
++  assert.equal(committed.status, "committed"); assert.deepEqual(committed.owned, [RESULT]);
++  assert.equal(status(f), "");
++  assert.equal(observeCleanCandidate(f.root).commit, f.git("rev-parse", "HEAD").trim());
++});
++
++test("D3 (1): a dirty result file whose bytes State does not bind is not the Pipeline's own; the refusal still names a command, not a dead end", () => {
++  const f = fixture("foreign-result");
++  bootstrapped(f);
++  writeFileSync(join(f.root, RESULT), `${readFileSync(join(f.root, RESULT), "utf8")}\nhand edit\n`);
++  assert.throws(() => observeCleanCandidate(f.root), (error) => {
++    assert.doesNotMatch(error.message, /commit-pipeline-owned\.mjs/);
++    assert.match(error.message, /git status --short/);
++    assert.match(error.message, /specs\/feature\/result\.md/);
++    return true;
++  });
++  assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "refused");
++});
++
++test("D3 (2): the signed apply deposits one commit capability bound to exactly its own file and bytes; the hook-shaped commit consumes it once", () => {
++  const f = fixture("arm-consume");
++  const { receipt, applied } = signedApply(f);
++  assert.equal(applied.status, 0, applied.err);
++  assert.equal(receipt.status, "applied");
++  assert.equal(receipt.commitCapability.status, "armed");
++  assert.deepEqual(receipt.commitCapability.paths, [MANIFEST]);
++  assert.deepEqual(f.git("diff", "--cached", "--name-only").trim().split("\n"), [MANIFEST], "only the reconcile's own file is staged");
++  const call = hookCall(f);
++  assert.deepEqual(call.protectedPaths, [MANIFEST]);
++  assert.match(call.ruleIds[0], /^PB-CONTINUITY-feature-package$/);
++  const first = consume(f);
++  assert.equal(first.status, "consumed", JSON.stringify(first));
++  const capDir = join(f.root, ".git/agent-pipeline/human-guard-overrides/capabilities");
++  const stored = readdirSync(capDir).map((name) => JSON.parse(readFileSync(join(capDir, name), "utf8")));
++  assert.equal(stored.length, 1, "exactly ONE capability is deposited");
++  assert.equal(stored[0].status, "consumed"); assert.deepEqual(stored[0].eligiblePaths, [MANIFEST]);
++  const second = consume(f);
++  assert.equal(second.status, "absent", "a second presentation of the same commit finds nothing to consume");
++});
++
++test("D3 (2): arming refuses bytes other than the ones the signed apply wrote, with the typed code and the re-plan command", () => {
++  const f = fixture("arm-bytes");
++  const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
++  closeInState(f);
++  writeFileSync(join(f.root, MANIFEST), `${readFileSync(join(f.root, MANIFEST), "utf8")}\n`);
++  assert.throws(() => hgo.armReconcileCommitCapability({ rootDir: f.root, pluginRoot: PLUGIN_ROOT, reconcilePlanSha256: completion.planSha256, files: [{ path: MANIFEST, sha256: h("9") }] }),
++    (error) => error.code === "HGO-RC-BYTES" && /continuity-result-bootstrap-plan/.test(error.heal));
++  assert.equal(f.git("diff", "--cached", "--name-only").trim(), "", "a refusal stages nothing");
++});
++
++/** A presentation that is not the capability's exact scope is not admitted, and the capability stays armed and unspent
++ * (the hook then falls back to its own commit-scoped course, which is the pre-existing second signature route). */
++function notAdmitted(f, result, why) {
++  assert.notEqual(result.status, "consumed", why);
++  const dir = join(f.root, ".git/agent-pipeline/human-guard-overrides/capabilities");
++  assert.deepEqual(readdirSync(dir).map((name) => JSON.parse(readFileSync(join(dir, name), "utf8")).status), ["armed"], "the capability is not spent by a non-matching presentation");
++}
++
++test("D3 (2): a path outside the capability, or a changed byte of its own file, is not admitted", () => {
++  const extra = fixture("arm-extra-path");
++  signedApply(extra);
++  writeFileSync(join(extra.root, "specs/feature/spec.md"), "spec changed\n"); extra.git("add", "specs/feature/spec.md");
++  notAdmitted(extra, consume(extra), "an additional staged path changes the scope");
++  const bytes = fixture("arm-changed-byte");
++  signedApply(bytes);
++  writeFileSync(join(bytes.root, MANIFEST), `${readFileSync(join(bytes.root, MANIFEST), "utf8")}\n`); bytes.git("add", MANIFEST);
++  notAdmitted(bytes, consume(bytes), "a changed byte changes the staged tree");
++});
++
++test("D3 (2): the capability expires with the apply window and with a HEAD change", () => {
++  const late = fixture("arm-expired");
++  signedApply(late);
++  const expired = consume(late, { nowMs: Date.now() + 2 * 60 * 60 * 1000 });
++  assert.equal(expired.status, "replan"); assert.equal(expired.code, "HGO-EXPIRED");
++  const moved = fixture("arm-head-moved");
++  signedApply(moved);
++  writeFileSync(join(moved.root, "unrelated.txt"), "x\n"); moved.git("add", "unrelated.txt");
++  moved.git("commit", "-q", "-m", "unrelated commit that moves HEAD", "--", "unrelated.txt");
++  notAdmitted(moved, consume(moved), "a HEAD move changes the scope");
++});
++
++test("D3 (3): a staged foreign path refuses the apply BEFORE the proof is consumed, with a typed code and the command that clears it; the retry then arms", () => {
++  const f = fixture("foreign-staged");
++  const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
++  closeInState(f);
++  writeFileSync(join(f.root, "unrelated.txt"), "x\n"); f.git("add", "unrelated.txt");
++  const manifestBefore = readFileSync(join(f.root, MANIFEST));
++  let approvals = 0;
++  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", MANIFEST, "--plan-sha256", completion.planSha256];
++  const refused = invoke(f.root, args, { ...reconcileDeps, featurePackageReconcileApproval: () => { approvals += 1; return { ok: true }; } });
++  assert.equal(refused.status, 2);
++  assert.match(refused.err, /HGO-RC-FOREIGN-STAGED/); assert.match(refused.err, /git restore --staged -- unrelated\.txt/);
++  assert.equal(approvals, 0, "the signed proof is not consumed by a refusal the precheck can see");
++  assert.deepEqual(readFileSync(join(f.root, MANIFEST)), manifestBefore, "zero mutation");
++  f.git("restore", "--staged", "--", "unrelated.txt");
++  const retried = invoke(f.root, args, reconcileDeps);
++  assert.equal(retried.status, 0, retried.err); assert.equal(JSON.parse(retried.out).commitCapability.status, "armed");
++});
++
++test("D3 (3): with no protected path in the reconcile commit nothing is armed and nothing is staged (exit 0)", () => {
++  const f = fixture("not-needed");
++  const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
++  const applied = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", MANIFEST, "--plan-sha256", completion.planSha256], reconcileDeps);
++  assert.equal(applied.status, 0, applied.err);
++  assert.equal(JSON.parse(applied.out).commitCapability.status, "not-needed");
++  assert.equal(f.git("diff", "--cached", "--name-only").trim(), "");
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c3165e1a7..8f6f77e16 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -494,6 +494,8 @@ import {
+   planFeaturePackageTransition,
+   validateFeaturePackage,
+ } from "../lib/feature-package-topology.mjs";
++import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
++import { COMMIT_PIPELINE_OWNED_SCRIPT } from "../lib/pipeline-owned-files.mjs";
+ import {
+   clearGateEstimateForMutation,
+   prepareGateEstimateMutation,
+@@ -9186,6 +9188,18 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
+     }
+ 
++    // D3: the files the signed apply owns, so the one commit capability can be bound to exactly them. The read-only
++    // precheck runs BEFORE the proof is consumed: a condition that would later make arming impossible (a foreign staged
++    // path) refuses here with zero mutation and the command that clears it, instead of after the signature is spent.
++    const commitFiles = (sha256For) => [{ path: manifest, sha256: sha256For(null) }, ...plan.changes.map((change) => ({ path: change.path, sha256: sha256For(change) }))];
++    try {
++      armReconcileCommitCapability({ rootDir: root, pluginRoot: PLUGIN_ROOT, files: commitFiles(() => null), dryRun: true });
++    } catch (error) {
++      if (typeof error?.code === "string" && error.code.startsWith("HGO-RC-")) {
++        return refuseFeaturePackageRead(sub, `${error.code}: ${error.message}; zero mutation, the signed proof is not consumed`);
++      }
++    }
++
+     if (typeof deps.featurePackageReconcileApproval !== "function") {
+       return refuseFeaturePackageRead(sub, "PO-bound approval is unavailable (FTP-RECONCILE-APPROVAL-UNAVAILABLE); zero mutation");
+     }
+@@ -9270,6 +9284,28 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
+     }
+ 
++    // D3: deposit the ONE commit capability for exactly the files this signed apply owns (manifest and any Result bytes
++    // it ratifies), so their commit needs no second signature. A refusal keeps the reconcile applied and exits 3 with the
++    // typed code and the heal command; any other fault only means the hook falls back to its own commit-scoped course.
++    // The writer lock file is untracked dirt while it is held; the capability binds the repository observation (status
++    // included) that the later commit will see, so the lock is released first (the release in `finally` is idempotent).
++    releaseContinuityLock(lock);
++    let commitCapability; let exit = 0;
++    try {
++      const armed = armReconcileCommitCapability({
++        rootDir: root, pluginRoot: PLUGIN_ROOT, reconcilePlanSha256: planSha256,
++        approval: { mode: approvalCheck.mode, proofSha256: approvalCheck.proofSha256 },
++        files: commitFiles((change) => change === null ? postimage.postSha256 : change.to),
++      });
++      commitCapability = armed.status === "armed"
++        ? { status: "armed", paths: armed.paths, protectedPaths: armed.protectedPaths, expiresAt: armed.expiresAt, nextAction: `commit exactly these files now, with no other change in between: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (one commit; it expires at ${armed.expiresAt} and with any HEAD or tree change)` }
++        : { status: "not-needed", reason: armed.reason, nextAction: `commit the reconcile files with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent` };
++    } catch (error) {
++      const typed = typeof error?.code === "string" && error.code.startsWith("HGO-RC-");
++      const heal = typeof error?.heal === "string" ? error.heal : `commit with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (the pre-commit hook then names its own commit-scoped signing course)`;
++      commitCapability = { status: typed ? "refused" : "unavailable", code: typed ? error.code : (error?.code ?? "HGO-RC-UNAVAILABLE"), heal };
++      if (typed) { exit = 3; console.error(`Error: ${sub} applied, but the commit capability was not armed (${commitCapability.code}); heal: ${heal}.`); }
++    }
+     console.log(JSON.stringify({
+       schema: FEATURE_PACKAGE_RECONCILE_SCHEMA,
+       status: "applied",
+@@ -9278,8 +9314,9 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       changes: postimage.changes,
+       planSha256,
+       manifestSha256: postimage.postSha256,
++      commitCapability,
+     }, null, 2));
+-    return 0;
++    return exit;
+   } finally { releaseContinuityLock(lock); }
+ }
+ 
+@@ -9433,7 +9470,8 @@ export function defaultFeaturePackageReconcileApproval(argv, deps) {
+     void holderLock; void holderRoot;
+     const stored = writeCriticalApproval({ gitCommonDir: reconcileCommon, kind, approval: approvalRecord, consumedAt: now });
+     if (!stored.ok) return { ok: false, code: stored.code };
+-    return { ok: true };
++    // D3: what backed the approval travels to the commit capability's audit event (signature proof or chat attribution).
++    return { ok: true, mode: verified.proof === null ? "chat" : "signature", proofSha256: verified.proof?.proofSha256 ?? null };
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/po-approval-request.mjs b/plugins/pipeline-core/scripts/po-approval-request.mjs
+index 88119845d..7a55df71f 100644
+--- a/plugins/pipeline-core/scripts/po-approval-request.mjs
++++ b/plugins/pipeline-core/scripts/po-approval-request.mjs
+@@ -13,7 +13,7 @@ import { resolve } from "node:path";
+ 
+ import { createThreatModelApprovalRequest, readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
++import { cleanTreeRemedy } from "../lib/pipeline-owned-files.mjs";
+ 
+ const usage = "Usage: po-approval-request.mjs prepare --feature-id cyb-4 --plan <repo-path> --spec <repo-path> --model <repo-path> [--repo-root <path>] | verify --request <external-public-json> --authority <external-public-json> --proof <external-public-json> [--repo-root <path>]";
+ 
+@@ -39,7 +39,7 @@ export function observeCleanCandidate(repoRoot) {
+   const dirty = execFileSync("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" });
+   // PF-36: when only the Pipeline's own files are dirty, the refusal names the command that commits exactly them.
+   if (dirty !== "") {
+-    const remedy = pipelineOwnedRemedy(dirty, root);
++    const remedy = cleanTreeRemedy(dirty, root);
+     throw new Error(`repository must be clean before preparing a PO approval request${remedy ? `; ${remedy}` : ""}`);
+   }
+   const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
