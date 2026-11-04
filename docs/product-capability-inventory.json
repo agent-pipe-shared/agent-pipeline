@@ -231,6 +231,8 @@
         "verify-phase:harness/scripts/verify.mjs:agy-session-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
         "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:analysis-run-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:analysis-run-lib-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
