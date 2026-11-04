@@ -99,6 +99,28 @@ test("EFC7: push-prepare reports a promoted record as fresh and a boundary failu
   assert.equal(unknownId.code, "EF-STALE-COMMIT", "only the two known evidence ids can be promoted");
 });
 
+test("EFC8: push-prepare accepts a record carried across evidence-only commits, says so, and keeps every other refusal", () => {
+  const dir = evidenceDir({ "evidence/verify-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }), "evidence/security-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }) });
+  const seen = [];
+  const carrying = (carried) => ({ evidenceCarriedForward: (input) => { seen.push(input); return { carried }; } });
+  const security = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, HEAD, carrying(true));
+  assert.equal(security.ok, true);
+  assert.equal(security.message, `evidence/security-latest.json is fresh and green at HEAD (promoted from ${OTHER.slice(0, 8)} via evidence-only carry-forward).`);
+  assert.deepEqual(seen.map(({ root, kind, candidateCommit, record }) => ({ root, kind, candidateCommit, commit: record.commit })), [{ root: dir, kind: "security", candidateCommit: HEAD, commit: OTHER }]);
+  const refused = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, HEAD, carrying(false));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "EF-STALE-COMMIT");
+  const unknownId = checkEvidenceFreshness("other-evidence", "evidence/security-latest.json", dir, HEAD, carrying(true));
+  assert.equal(unknownId.code, "EF-STALE-COMMIT", "only the two known evidence ids can be carried");
+  const sameCommit = evidenceDir({ "evidence/security-latest.json": JSON.stringify({ exitCode: 0, commit: HEAD }) });
+  seen.length = 0;
+  assert.equal(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", sameCommit, HEAD, carrying(true)).message, "evidence/security-latest.json is fresh and green at HEAD.");
+  assert.deepEqual(seen, [], "an exact-commit record never asks the reader");
+  const failed = evidenceDir({ "evidence/security-latest.json": JSON.stringify({ exitCode: 1, commit: OTHER }) });
+  assert.equal(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", failed, HEAD, carrying(true)).code, "EF-EXIT-NOT-ZERO", "a failed record is never carried");
+  assert.deepEqual(seen, []);
+});
+
 test("EFC4: a wrong code never overrides a green result, and an unknown code falls back to the prose", () => {
   const dir = evidenceDir({});
   const ok = checkVerifyEvidenceBound(dir, HEAD, { checkEvidenceFreshness: () => ({ ok: true, code: "EF-STALE-COMMIT", message: "fresh" }), resolveEvidenceProjectDir: () => dir });

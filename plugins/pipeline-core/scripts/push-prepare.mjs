@@ -55,6 +55,7 @@ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHu
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
+import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
@@ -222,8 +223,8 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
   // The verdict (which failure, in which order) comes from the shared function; this function keeps its messages, remedies and I/O.
   let promotedFrom = null;
-  const promoted = () => {
-    if (id !== "verify-evidence" && id !== "security-evidence") return false;
+  let promotedVia = "release-promotion-envelope";
+  const promotedByEnvelope = () => {
     const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
     if (promotionEnvelope === null) return false;
@@ -242,8 +243,22 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
       securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data },
       deps,
     }) : { ok: false, reason: "promotion-input-missing" };
-    if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
+    return validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit;
+  };
+  // OPT-IN (candidate 19, step 3): a record bound to an earlier commit is also carried across evidence-only commits when the closed
+  // evidence set, the unchanged product tree and (for Security) a clean secret scan of the passed-over commits all hold.
+  const promoted = () => {
+    if (id !== "verify-evidence" && id !== "security-evidence") return false;
+    if (promotedByEnvelope()) {
       promotedFrom = data.commit;
+      return true;
+    }
+    const carried = (deps.evidenceCarriedForward ?? evidenceCarriedForward)({
+      root: dir, record: data, kind: id === "verify-evidence" ? "verify" : "security", candidateCommit: headCommit,
+    });
+    if (carried.carried === true) {
+      promotedFrom = data.commit;
+      promotedVia = "evidence-only carry-forward";
       return true;
     }
     return false;
@@ -256,7 +271,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   if (code === EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO) return { id, ok: false, code, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
   if (code === EVIDENCE_FRESHNESS_CODES.STALE_COMMIT) return { id, ok: false, code, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
   if (code === EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY) return { id, ok: false, code, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
-  if (promotedFrom !== null) return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via release-promotion-envelope).` };
+  if (promotedFrom !== null) return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via ${promotedVia}).` };
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
 

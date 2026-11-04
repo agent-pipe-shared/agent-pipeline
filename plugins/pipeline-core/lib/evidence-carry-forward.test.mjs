@@ -6,7 +6,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
+import { randomBytes } from "node:crypto";
+
 import { CARRY_FORWARD_SCHEMA, EVIDENCE_PATH_PATTERNS, evaluateEvidenceCarryForward, isEvidencePath, productTreeSha256 } from "./evidence-carry-forward.mjs";
+import { evidenceCarriedForward, gitleaksRangeSecretScan } from "./evidence-carry-forward-reader.mjs";
+import { isInstalled as isGitleaksInstalled } from "../scripts/security-adapters/gitleaks.mjs";
 
 const scratchRoots = [];
 test.after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, force: true }); });
@@ -151,4 +155,62 @@ test("ECF8: arguments are validated and the decision never changes the repositor
   evaluateEvidenceCarryForward({ root, evidenceCommit: base, candidateCommit: head, kind: "verify" });
   assert.equal(git(root, "status", "--porcelain=v1"), before);
   assert.equal(git(root, "rev-parse", "HEAD"), head);
+});
+
+test("ECF9: the reader never throws, carries Verify and Security with a scan, and refuses everything else", () => {
+  const { root, base } = baseRepo();
+  const head = commit(root, { "specs/f/evidence/a.json": "{}\n" }, "evidence");
+  const product = commit(root, { "src/app.mjs": "export const a = 9;\n" }, "product");
+  const clean = () => ({ status: "clean" });
+  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "verify", candidateCommit: head }).carried, true, "Verify needs no scan");
+  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: head, secretScan: clean }).carried, true);
+  const refusals = [
+    [{ record: { commit: base }, kind: "security", candidateCommit: head, secretScan: () => ({ status: "finding" }) }, "SECRET-SCAN-FINDING"],
+    [{ record: { commit: base }, kind: "security", candidateCommit: head, secretScan: () => ({ status: "unavailable" }) }, "SECRET-SCAN-UNAVAILABLE"],
+    [{ record: { commit: base }, kind: "verify", candidateCommit: product }, "PRODUCT-PATH-CHANGED"],
+    [{ record: { commit: head }, kind: "verify", candidateCommit: base }, "NOT-AN-ANCESTOR"],
+    [{ record: { commit: "main" }, kind: "verify", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
+    [{ record: null, kind: "verify", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
+    [{ record: { commit: base }, kind: "critic", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
+  ];
+  for (const [input, reason] of refusals) {
+    const decision = evidenceCarriedForward({ root, ...input });
+    assert.equal(decision.carried, false, reason);
+    assert.equal(decision.reason, reason);
+  }
+  assert.equal(evidenceCarriedForward({ root: join(root, "missing"), record: { commit: base }, kind: "verify", candidateCommit: head }).carried, false, "a root that is not a repository is a refusal, not a throw");
+});
+
+test("ECF10: the range scan asks gitleaks for exactly the passed-over commits and maps every outcome closed", () => {
+  const calls = [];
+  const deps = (status, extra = {}) => ({
+    isInstalled: () => ({ installed: true, path: "/bin/gitleaks-fixture" }),
+    resolveConfig: () => "/cfg/gitleaks.toml",
+    spawn: (path, args, options) => { calls.push({ path, args, options }); return { status, ...extra }; },
+  });
+  const context = { root: "/repo", commit: "c".repeat(40), evidenceCommit: "a".repeat(40) };
+  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(0)), { status: "clean" });
+  assert.deepEqual(calls[0].args, ["git", "/repo", "--log-opts", `${"a".repeat(40)}..${"c".repeat(40)}`, "--config", "/cfg/gitleaks.toml", "--no-banner", "--redact", "--exit-code", "2"]);
+  assert.equal(calls[0].options.shell, false);
+  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(2)), { status: "finding" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(1)), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(null)), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(0, { error: new Error("ETIMEDOUT") })), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), isInstalled: () => ({ installed: false }) }), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), resolveConfig: () => null }), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), spawn: () => { throw new Error("spawn failed"); } }), { status: "unavailable" });
+  assert.deepEqual(gitleaksRangeSecretScan([], { root: "/repo", commit: "c".repeat(40) }, deps(0)), { status: "unavailable" }, "no evidence commit, no range");
+  assert.deepEqual(gitleaksRangeSecretScan(), { status: "unavailable" });
+});
+
+test("ECF11: with the real gitleaks, a clean range is clean and a planted token is a finding (skipped when gitleaks is not installed)", { skip: !isGitleaksInstalled(process.env).installed }, () => {
+  const { root, base } = baseRepo();
+  const cleanHead = commit(root, { "specs/f/evidence/a.json": "{\"ok\":true}\n" }, "clean evidence");
+  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: cleanHead }).carried, true);
+  // Built at run time so this source file never contains a token-shaped literal.
+  const token = ["gh", "p_", randomBytes(27).toString("base64").replace(/[^A-Za-z0-9]/gu, "A").padEnd(36, "x").slice(0, 36)].join("");
+  const leakyHead = commit(root, { "specs/f/evidence/leak.json": JSON.stringify({ token }) + "\n" }, "evidence with a token");
+  const decision = evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: leakyHead });
+  assert.equal(decision.carried, false);
+  assert.equal(decision.reason, "SECRET-SCAN-FINDING");
 });

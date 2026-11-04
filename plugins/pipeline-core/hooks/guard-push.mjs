@@ -182,6 +182,7 @@ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.m
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
+import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
 import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
@@ -2354,7 +2355,7 @@ function checkEvidenceFreshness(relPath) {
   }
   const { data } = read;
   // The verdict (which failure, in which order) comes from the shared function; the messages stay here.
-  const promoted = () => {
+  const promotedByEnvelope = () => {
     const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
     if (!promoRead.ok) return false;
     const verifyRead = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
@@ -2373,6 +2374,13 @@ function checkEvidenceFreshness(relPath) {
       securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityRead.raw, data: securityRead.data },
     });
     return validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit;
+  };
+  // OPT-IN (candidate 19, step 3): the evidence-only carry-forward is the second way a record bound to an earlier commit stays fresh.
+  const promoted = () => {
+    if (promotedByEnvelope()) return true;
+    const kind = relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
+    if (kind === null) return false;
+    return evidenceCarriedForward({ root: evidenceProjectDir, record: data, kind, candidateCommit: sourceCommit }).carried === true;
   };
   const codes = evidenceFreshnessFailureCodes({
     data: data ?? {}, expectedCommit: sourceCommit, promoted, isVerify: relPath === VERIFY_EVIDENCE_DEFAULT_PATH,

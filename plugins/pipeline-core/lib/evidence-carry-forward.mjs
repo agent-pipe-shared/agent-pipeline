@@ -63,7 +63,7 @@ export function productTreeSha256(root, commit) {
  * @param {string} input.evidenceCommit the full commit id the record is bound to
  * @param {string} input.candidateCommit the full commit id the record would be carried to
  * @param {"verify"|"security"} input.kind
- * @param {(files: string[], context: {root: string, commit: string}) => {status: "clean"|"finding"|"unavailable"}} [input.secretScan] required for kind "security"
+ * @param {(files: string[], context: {root: string, commit: string, evidenceCommit: string}) => {status: "clean"|"finding"|"unavailable"}} [input.secretScan] required for kind "security"
  * @returns {{carried: boolean, reason: string, ...}} `carried: true` only when every changed path lies in the evidence set (and, for security, the scan is clean)
  */
 export function evaluateEvidenceCarryForward({ root, evidenceCommit, candidateCommit, kind, secretScan } = {}) {
@@ -85,7 +85,7 @@ export function evaluateEvidenceCarryForward({ root, evidenceCommit, candidateCo
   if (kind === "security") {
     if (typeof secretScan !== "function") return result(false, "SECRET-SCAN-UNAVAILABLE");
     let scan;
-    try { scan = secretScan(changedPaths, { root, commit: candidateCommit }); } catch { scan = null; }
+    try { scan = secretScan(changedPaths, { root, commit: candidateCommit, evidenceCommit }); } catch { scan = null; }
     if (scan?.status !== "clean") return result(false, scan?.status === "finding" ? "SECRET-SCAN-FINDING" : "SECRET-SCAN-UNAVAILABLE");
   }
   return result(true, "EVIDENCE-ONLY", { passedOverCommits, changedEvidencePaths: changedPaths, productTreeSha256: after });
