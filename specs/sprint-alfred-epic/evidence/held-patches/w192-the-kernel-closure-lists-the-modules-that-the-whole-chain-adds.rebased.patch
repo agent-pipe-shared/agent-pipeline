@@ -1,0 +1,50 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 07f034ca5..b7b2729ed 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -537,7 +537,10 @@ the kernel closure test found imported by kernel modules but not yet listed:
+ `lib/fs-durability.mjs`, `lib/git-null-device.mjs`,
+ `lib/guard/env-dump-lane.mjs`, `lib/guard/control-plane-script-scan.mjs`,
+ `lib/record-only-paths.mjs`, `lib/evidence-freshness-codes.mjs`,
+-`lib/runbook-link.mjs`,
++`lib/runbook-link.mjs`, `lib/authority-seal-reader.mjs`,
++`lib/evidence-carry-forward-reader.mjs`, `lib/evidence-carry-forward.mjs`,
++`scripts/security-adapters/gitleaks.mjs`,
++`scripts/security-readiness/probe-retry.mjs`,
+ `lib/hardened-private-directory.mjs`,
+ `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
+ `scripts/security-readiness/gitleaks-readiness.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index af705cb93..b6fe3b34d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -240,6 +240,9 @@ const DYNAMIC_IMPORT_EDGES = {
+     "../lib/critical-human-proof-policy.mjs",
+     "../lib/critical-action-authorization.mjs",
+     "../lib/published-tag-push.mjs",
++    // Candidate 19c (D4b/E3, w171): the freshness verdict and the carry-forward reader are loaded the same way; the declaration is restated to the 12 real call sites (QG-04).
++    "../lib/evidence-freshness-codes.mjs",
++    "../lib/evidence-carry-forward-reader.mjs",
+   ],
+   // CLOSURE-REPAIR (Ruling 86a): the start preflight loads the toolchain/readiness coordinator and
+   // the model-role bootstrap lazily, so both are edges of the kernel closure.
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 78248bfa5..2d87be0a2 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -499,6 +499,15 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/runbook-link.mjs",
+   // Candidate 19 (D4a): the push threat model decision is imported by pipeline-state.mjs and push-prepare.mjs (kernel above) and by the close coordinator.
+   "plugins/pipeline-core/lib/push-threat-model-gate.mjs",
++  // Candidate 19c closure repair (found by the kernel closure suite on the whole chain): the shared seal reader that continuity-state,
++  // onboarding-continuity, plan-spec-state-v2, po-gate-authority-read and critical-action-authorization-read import; the carry-forward
++  // reader (and the decision and gitleaks adapter it imports) that push-prepare and the pre-push hook load; the EPERM retry that the three
++  // security readiness probes import (GMWKC01).
++  "plugins/pipeline-core/lib/authority-seal-reader.mjs",
++  "plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs",
++  "plugins/pipeline-core/lib/evidence-carry-forward.mjs",
++  "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
++  "plugins/pipeline-core/scripts/security-readiness/probe-retry.mjs",
+   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
+   // Its publication-gate evidence dependency must remain protected as well.
+   "plugins/pipeline-core/scripts/audit-pack.mjs",
