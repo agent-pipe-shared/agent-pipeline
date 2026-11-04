@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -95,6 +95,25 @@ test("RCD12: the outside-root read refusal says it is intended and names the nat
   assert.match(String(result.stderr), /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   assert.match(String(result.stderr), /This refusal is intended, not a fault of the command/u);
   assert.match(String(result.stderr), /native Read tool/u);
+});
+
+test("RCD13: an attached flag value gets the separate-argument spelling, other flags get none", () => {
+  assert.equal(flagSpellingHint("-A8"), "an attached value is not admitted; give it as a separate argument: -A 8");
+  assert.equal(flagSpellingHint("-m25"), "an attached value is not admitted; give it as a separate argument: -m 25");
+  assert.match(String(flagSpellingHint("--max-count=5")), /--max-count <value>/u);
+  assert.equal(flagSpellingHint("--hidden"), null);
+  assert.equal(flagSpellingHint("-n"), null);
+  assert.equal(flagSpellingHint("-la"), null);
+  assert.equal(flagSpellingHint(undefined), null);
+});
+
+test("RCD14: the refusal of an attached value prints the spelling to use, and both spellings stay judged by the grammar", async () => {
+  const attached = "rg -n -A8 needle README.md";
+  assert.equal(isReadOnlyDiagnosticCommand(attached, root), false, "fixture must be refused");
+  assert.equal(isReadOnlyDiagnosticCommand("rg -n -A 8 needle README.md", root), true, "the suggested spelling is admitted");
+  const result = await refusal(attached);
+  assert.equal(result.exitCode, 2);
+  assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
 });
 
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {

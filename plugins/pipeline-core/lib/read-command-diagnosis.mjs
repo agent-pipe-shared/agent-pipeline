@@ -49,6 +49,20 @@ export function firstUnadmittedGlobValue(command, root) {
   return null;
 }
 
+/**
+ * F9 (candidate 19): a flag written with its value attached (`-A8`, `-m5`, `--max-count=5`) is refused by the grammar, which takes the value as a
+ * separate argument. Returns one sentence naming the spelling to use, or null for any other flag. Prose only; it grants nothing.
+ * @returns {string|null}
+ */
+export function flagSpellingHint(flag) {
+  if (typeof flag !== "string") return null;
+  const short = /^-([ABCm])(\d{1,4})$/u.exec(flag);
+  if (short) return `an attached value is not admitted; give it as a separate argument: -${short[1]} ${short[2]}`;
+  const long = /^(--[a-z][a-z-]*)=(.+)$/u.exec(flag);
+  if (long) return `the "--flag=value" spelling is not admitted; give the value as a separate argument: ${long[1]} <value>`;
+  return null;
+}
+
 /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
 export function firstUnadmittedFlag(command, root) {
   if (typeof command !== "string" || command.trim() === "") return null;
