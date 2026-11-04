@@ -10,6 +10,7 @@
 #   w171  the managed pre-push hook and the security completeness gate take the shared freshness verdict; the carry-forward is active (D4b/E3 rest)
 #   w173  the Critic evidence of an earlier reviewed commit stays valid across administration and documentation only commits (PO decision 2026-11-04, carry-forward open question 2)
 #   w167  a signed feature-package reconcile commits exactly its own files with one commit capability; the close steps before the ceremony leave a clean tree (D3)
+#   w191  the d3 signed reconcile suite is categorized in the product capability inventory (found by the registration checker)
 #   w168  Windows authority failures name path and cause and repair; the preflight probes close and push and reports the bootstrap facts (E2, Q10 node half, W1, W2, W7)
 #   w172  the failed path travels in the PowerShell failure envelope (helper re-pinned), the security probes retry once on EPERM, the handover stays consistent, a launch retries on contention (Q10 ps1 half, W3, W6, E4)
 #   w169  the PowerShell guard admits what the Bash guard admits and its refusals name the way out (E7 PowerShell part, W4, W5)
@@ -42,6 +43,7 @@ step2 w190-fix-the-control-plane-scan-module-and-the-push-gate-path-modules-are-
 step2 w171-d4b-the-pre-push-hook-and-the-security-gate-take-the-shared-freshness-verdict-and-the-carry-forward-is-on "feat(push): the managed pre-push hook and the security completeness gate take the shared freshness verdict and the carry-forward of Verify and Security across evidence-only commits is active"
 step2 w173-critic-evidence-of-an-earlier-commit-stays-valid-across-administration-and-documentation-only-commits "feat(push): the Critic evidence of an earlier reviewed commit stays valid across administration and documentation only commits in the close gate, the registration delta course and the push-prepare readback"
 step2 w167-d3-a-signed-reconcile-commits-its-own-files-and-the-close-chain-leaves-a-clean-tree-before-the-ceremony "feat(close): a signed feature-package reconcile commits exactly its own files with one commit capability and the close steps before the ceremony leave a clean tree"
+step2 w191-register-the-d3-signed-reconcile-suite-in-the-capability-inventory "fix(inventory): register the d3 signed reconcile commit suite in the product capability inventory"
 step2 w168-win-authority-failures-name-path-and-cause-and-the-preflight-probes-the-platform "feat(windows): authority failures name the path, the cause and the repair, and the preflight probes close and push and reports the bootstrap facts"
 step2 w172-win-rest-the-failed-path-in-the-powershell-envelope-eperm-retry-the-handover-consistency-and-the-slicing-hint "feat(windows): the failed path travels in the PowerShell failure envelope, the security probes retry once on EPERM, the handover stays consistent and a launch retries on contention"
 step2 w169-ps-the-powershell-guard-admits-what-the-bash-guard-admits-and-its-refusals-name-the-way-out "feat(guard): the PowerShell guard admits what the Bash guard admits and its refusals name the way out"

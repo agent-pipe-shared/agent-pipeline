@@ -1,0 +1,12 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 7b6a6e537..fe59ecc7b 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -395,6 +395,7 @@
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
+         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests",
+         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests",
++        "verify-phase:harness/scripts/verify.mjs:d3-signed-reconcile-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
