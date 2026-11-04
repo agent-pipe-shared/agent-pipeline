@@ -18,6 +18,7 @@
 #   w177  the continuity schema accepts the draft authority and the core readers move onto the shared seal reader (late-binding build step 2)
 #   w174  the audit bundle binds proofs, release Verify and Security scan to the candidate; a read-only trace proves every human approval back to the human (Q3)
 #   w175  generated runbooks for the start, plan, implement, close and push paths and a typed runbook link in the first call of each standard command (G5)
+#   w176  the push threat model gate refuses at plan approval, push preparation and feature close when a push approval is active; the briefing tool derives each module slice's write scope and refuses a scope that crosses the module cut (D4a, M1.4)
 #   w192  the never-liftable kernel paths list the modules that the whole chain adds (seal reader, carry-forward reader and decision, gitleaks adapter, probe retry) and the pre-push hook import table is restated (found by the kernel closure suite on the whole chain)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -52,6 +53,7 @@ step2 w170-e1-one-typed-orchestrator-commit-helper-checks-commits-with-the-trail
 step2 w177-lb2-the-continuity-schema-knows-the-draft-state-and-the-core-readers-move-onto-the-shared-seal-reader "feat(authority): the continuity schema accepts the draft authority and the core readers of the bound authority move onto the shared seal reader"
 step2 w174-q3-the-audit-bundle-binds-the-signature-proofs-and-every-human-approval-traces-back-to-the-human "feat(audit): the audit bundle binds the signature proofs, the release Verify and the Security scan to the candidate and a read-only trace proves every human approval back to the human"
 step2 w175-g5-runbooks-of-every-lifecycle-path-and-the-runbook-link-in-the-first-call "feat(runbook): generated runbooks for the start, plan, implement, close and push paths and a typed runbook link in the first call of each standard command"
+step2 w176-d4a-push-threat-model-gate-and-m14-module-scopes-derived-and-enforced "feat(gates): the push threat model gate refuses at plan approval, push preparation and feature close when a push approval is active and the briefing tool derives and enforces the write scope of a module slice"
 step2 w192-the-kernel-closure-lists-the-modules-that-the-whole-chain-adds "fix(guard): list the seal reader, the carry-forward reader and decision, the gitleaks adapter and the probe retry in the never-liftable kernel paths and restate the pre-push hook dynamic import table to its twelve call sites"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs

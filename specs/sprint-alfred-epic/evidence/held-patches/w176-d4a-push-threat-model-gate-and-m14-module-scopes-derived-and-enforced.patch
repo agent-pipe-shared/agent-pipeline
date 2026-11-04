@@ -1,0 +1,962 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 5112f0cb0..545b5f686 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -546,6 +546,15 @@ security-scanner readiness probes. Each is imported by a kernel module and
+ executes in that module's process, so it is protected through both the project
+ and the installed-plugin anchors for the same reason as the dependencies above.
+ 
++The Candidate 19 push threat model gate additionally protects
++`lib/push-threat-model-gate.mjs`, the one decision (a push approval is active
++and `project/push-threat-model.md` is missing, empty or not a document) that
++`scripts/pipeline-state.mjs` (plan approval request) and `scripts/push-prepare.mjs`
++(push preparation) import, and the close coordinator reads at the feature close.
++It is imported by kernel modules and executes in their process, so a corrupted
++copy could report a missing model as usable; it is protected through both anchors
++like the modules above.
++
+ The approved design-flow closure additionally protects, in kernel-array order,
+ `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
+ `lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index b3ced4f18..90046231f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4520,13 +4520,13 @@
+     {
+       "name": "module-slice-proposal-tests",
+       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
+-      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
++      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing; the dispatch briefing tool derives a module's write scope from this cut and refuses a path that crosses into another module or a module whose dependencies have no accepted result, with no second implementation of the cut (C19 M1.4)",
+       "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
+     },
+     {
+       "name": "register-feature-package-readback-tests",
+       "file": "plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs",
+-      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback is advice only and writes nothing (C19 D4a)",
++      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback writes nothing, and the rule itself is enforced where the model is needed: with an active push approval the plan approval request, push preparation and the feature close refuse a missing, empty or invalid model with a typed code and the repair (C19 D4a)",
+       "nonOverlapNote": "Unique cases: the pushThreatModelReadback helper of scripts/register-feature-package.mjs; the pins that run the registration end to end pin the rest of its output"
+     },
+     {
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index 63a7ab1ae..a2e274c4a 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -5,6 +5,7 @@
+ // is pinned to it by close-chain-guide.test.mjs, so a changed requirement there turns the pin red instead of leaving this guide stale.
+ 
+ import { coordinatorNextPhases } from "../scripts/publication-close-journal.mjs";
++import { PUSH_THREAT_MODEL_FILE } from "./push-threat-model-gate.mjs";
+ 
+ export const CLOSE_CHAIN_SCHEMA = "pipeline.close-coordinator.chain.v1";
+ 
+@@ -146,7 +147,8 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
+ 
+ // Everything the close still needs from `phase` as ONE ordered list: who does each step (agent | po-only | unclassified) and the command, ending in
+ // the next human gate and the one-line resume command. Pure and read-only. A step whose classification no source states is "unclassified".
+-export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
++// The path lives with the D4a decision (lib/push-threat-model-gate.mjs); re-exported so every existing import keeps working.
++export { PUSH_THREAT_MODEL_FILE };
+ 
+ // The Close commit carries the push threat model when the push gate needs one: prepare-push-subject binds the approval to that file, so a file
+ // materialized after the close would leave the tree dirty. `pushThreatModel` is { required, present } as read by the caller (this module stays
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index b46a9dbd1..7d46ecdc2 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -28,7 +28,8 @@ const GENERATOR_MARKER_ANY = /<!-- pipeline-briefing-generator:/gu;
+ const REQUIRED_STRINGS = Object.freeze(["id", "item", "agentType", "modelId", "check", "title", "ac", "goal"]);
+ // effortEscalation: the model-policy act (MP-05 or MP-07) that authorises an agent definition effort above its route effort; the
+ // binding validates the closed value exactly as for the --effort-escalation flag (DBG-EFFORT-ESCALATION-UNKNOWN).
+-const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation"]);
++// M1.4: `module` + `modulePlan` (a PRD holding the approved architecture design) name the module the dispatch belongs to; both or neither.
++const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote", "runner", "effortEscalation", "module", "modulePlan"]);
+ // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
+ export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
+ const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
+@@ -107,9 +108,15 @@ export function validateBriefingPackage(pkg) {
+   if (pkg.visualCheck !== undefined && !isVisualCheck(pkg.visualCheck)) {
+     note("DBG-PACKAGE-FIELD-TYPE", `package field "visualCheck" must be exactly { "question": <one line, at most ${VISUAL_QUESTION_MAX} characters>, "evidencePath": <repository-relative file under specs/<feature>/evidence/> } when present; repair: fix both members or remove the field`);
+   }
++  const hasModule = pkg.module !== undefined;
++  if (hasModule !== (pkg.modulePlan !== undefined)) {
++    note("DBG-PACKAGE-FIELD-MISSING", `package fields "module" and "modulePlan" come together; repair: give both (the module id and the repository-relative PRD that holds the approved architecture design) or neither`);
++  }
+   for (const key of [...REQUIRED_LISTS, ...OPTIONAL_LISTS]) {
+     const value = pkg[key];
+     if (value === undefined && OPTIONAL_LISTS.includes(key)) continue;
++    // M1.4: a package that names a module may omit the write list; the scope is then derived from the module cut.
++    if (key === "paths" && value === undefined && hasModule && pkg.modulePlan !== undefined) continue;
+     if (!Array.isArray(value) || value.length === 0 && REQUIRED_LISTS.includes(key) || !value.every(nonEmpty)) {
+       note(REQUIRED_LISTS.includes(key) && value === undefined ? "DBG-PACKAGE-FIELD-MISSING" : "DBG-PACKAGE-FIELD-TYPE",
+         `package field "${key}" must be ${REQUIRED_LISTS.includes(key) ? "a non-empty" : "an"} array of non-empty strings; repair: fill it in the package`);
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 7f0b315f5..46c5f870f 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -495,6 +495,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // Candidate 19 (D4b/E3): the record-only path set and the stable freshness codes are imported by the push gate sources above (GMWKC01).
+   "plugins/pipeline-core/lib/record-only-paths.mjs",
+   "plugins/pipeline-core/lib/evidence-freshness-codes.mjs",
++  // Candidate 19 (D4a): the push threat model decision is imported by pipeline-state.mjs and push-prepare.mjs (kernel above) and by the close coordinator.
++  "plugins/pipeline-core/lib/push-threat-model-gate.mjs",
+   // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
+   // Its publication-gate evidence dependency must remain protected as well.
+   "plugins/pipeline-core/scripts/audit-pack.mjs",
+diff --git a/plugins/pipeline-core/lib/module-dispatch-scope.mjs b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+new file mode 100644
+index 000000000..bf27be472
+--- /dev/null
++++ b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+@@ -0,0 +1,76 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * M1.4 (candidate 19): a dispatch's write scope follows the module cut, and the cut is enforced at dispatch time.
++ *
++ * `moduleDispatchScope` asks the SAME cut the read-only proposal tool prints (`proposeSlicesFromModules`, no second implementation) for the
++ * slice of one module and answers: the module's write scope (its owned paths, or the declared paths when they stay inside the cut), or a typed
++ * refusal with the repair. Pure. `readPrdModules` reads the modules from a PRD with the parser the design approval uses, for the proposal
++ * script and the briefing tool alike.
++ *
++ * A declared path crosses the cut when it reaches the owned paths of another module that is not an overlap partner of this one (modules whose
++ * owned paths overlap are serialized by the proposal, so a path in that shared zone is not a crossing). A path no module owns is not a crossing.
++ * A module is runnable when every slice it depends on (its dependencies and the modules serialized before it) has an accepted result.
++ */
++import { lstatSync, readFileSync } from "node:fs";
++import { isAbsolute, relative, resolve } from "node:path";
++
++import { architectureDesignFailureCode, parseArchitectureDesign } from "./architecture-design.mjs";
++import { proposeSlicesFromModules } from "./module-slice-proposal.mjs";
++import { scopesOverlap } from "./slice-queue.mjs";
++
++export const MODULE_DISPATCH_SCOPE_SCHEMA = "pipeline.module-dispatch-scope.v1";
++const MAX_PRD_BYTES = 4 * 1024 * 1024;
++
++const refuse = (code, message, extra = {}) => ({ ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code, message, ...extra });
++
++/** The modules of an approved architecture design in a PRD under `root` (repository-relative path); never throws. */
++export function readPrdModules(root, prd) {
++  if (typeof prd !== "string" || prd === "" || isAbsolute(prd)) return refuse("DBG-MODULE-PLAN-UNREADABLE", "the module plan must be a repository-relative PRD path; repair: name the PRD that holds the approved architecture design");
++  const target = resolve(root, prd);
++  const inside = relative(root, target);
++  if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) return refuse("DBG-MODULE-PLAN-UNREADABLE", "the module plan must name a file inside the root; repair: name the PRD that holds the approved architecture design");
++  let text;
++  try {
++    const info = lstatSync(target);
++    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_PRD_BYTES) return refuse("DBG-MODULE-PLAN-UNREADABLE", `${prd} must be a regular file of at most 4 MiB; repair: name the PRD that holds the approved architecture design`);
++    text = readFileSync(target, "utf8");
++  } catch { return refuse("DBG-MODULE-PLAN-UNREADABLE", `${prd} could not be read; repair: name the PRD that holds the approved architecture design`); }
++  try { return { ok: true, modules: parseArchitectureDesign(text).modules }; }
++  catch (error) {
++    return { ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code: architectureDesignFailureCode(error), message: "the architecture design of the PRD is not valid; the module cut needs the approved design package", ...(typeof error?.field === "string" ? { field: error.field } : {}) };
++  }
++}
++
++/**
++ * @param {{modules: Array<{id: string, ownedPaths: string[], allowedDependencies?: string[]}>, moduleId: string, paths?: string[], integratedSliceIds?: Iterable<string>}} input
++ *   `paths` are the declared write paths of the dispatch (omit to derive the scope); `integratedSliceIds` the slices with an accepted result.
++ * @returns `{ok: true, moduleId, sliceId, wave, writeScope}` or a typed refusal `{ok: false, code, message}`; never throws
++ */
++export function moduleDispatchScope(input) {
++  try {
++    const { modules, moduleId, paths, integratedSliceIds } = input ?? {};
++    const proposal = proposeSlicesFromModules(modules);
++    if (!proposal.ok) return refuse("DBG-MODULE-CUT-INVALID", `the module cut cannot be proposed (${proposal.code}: ${proposal.reason}); repair: fix the architecture design of the plan`);
++    const slice = proposal.slices.find((entry) => entry.moduleId === moduleId);
++    if (slice === undefined) return refuse("DBG-MODULE-UNKNOWN", `module ${JSON.stringify(String(moduleId).slice(0, 64))} is not a module of the plan; repair: use one of ${proposal.slices.map((entry) => entry.moduleId).sort().join(", ")}`);
++    const own = modules.find((module) => module.id === moduleId);
++    if (paths !== undefined) {
++      if (!Array.isArray(paths) || paths.length === 0 || !paths.every((path) => typeof path === "string" && path !== "")) return refuse("DBG-MODULE-SCOPE-CROSSES", "the declared paths must be a non-empty list of paths; repair: omit them to derive the scope from the module");
++      for (const path of paths) {
++        for (const other of modules) {
++          if (other.id === moduleId || !scopesOverlap([path], other.ownedPaths)) continue;
++          if (scopesOverlap([path], own.ownedPaths) && scopesOverlap(own.ownedPaths, other.ownedPaths)) continue;
++          return refuse("DBG-MODULE-SCOPE-CROSSES", `${path} reaches the owned paths of module ${other.id}, not of module ${moduleId}; repair: narrow the path to ${own.ownedPaths.join(", ")}, or dispatch the change to module ${other.id} as its own slice (one module per dispatch)`, { moduleId, path, ownerModule: other.id });
++        }
++      }
++    }
++    const accepted = new Set(integratedSliceIds ?? []);
++    const waiting = slice.dependsOn.filter((sliceId) => !accepted.has(sliceId));
++    if (waiting.length > 0) {
++      return refuse("DBG-MODULE-NOT-RUNNABLE", `module ${moduleId} is in wave ${slice.wave} and waits for ${waiting.join(", ")}, which ${waiting.length === 1 ? "has" : "have"} no accepted result yet; repair: deliver and integrate ${waiting.join(", ")} first (wave order: ${proposal.waves.map((wave, index) => `${index}: ${wave.join(", ")}`).join("; ")}), then build this briefing again`, { moduleId, wave: slice.wave, waitingFor: waiting });
++    }
++    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
++  } catch (error) {
++    return refuse("DBG-MODULE-CUT-INVALID", `the module scope could not be derived (${error?.name ?? "error"}); repair: check the module list of the plan`);
++  }
++}
+diff --git a/plugins/pipeline-core/lib/module-slice-proposal.test.mjs b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+index 25918369c..e690eed18 100644
+--- a/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
++++ b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
++import { moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
+ import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "./module-slice-proposal.mjs";
+ import { run as runProposal } from "../scripts/module-slice-proposal.mjs";
+ import { runCli } from "../scripts/slice-queue.mjs";
+@@ -120,3 +121,81 @@ test("MSP6: the script reads the design of a PRD, proposes from its modules and
+     assert.equal(refused.output.code, "MSP-USAGE");
+   }
+ });
++
++// M1.4 enforcement (candidate 19): the briefing tool derives a dispatch's write scope from the same cut and refuses a scope that crosses it.
++const SCOPE_MODULES = [mod("core", ["src/core/**"]), mod("api", ["src/api/**"], ["core"]), mod("docs", ["docs/guide/**"])];
++
++function prdRoot() {
++  const dir = tempDir();
++  const design = {
++    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
++    modules: ["core", "api"].map((id) => ({
++      id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [],
++    })),
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
++  };
++  mkdirSync(join(dir, "specs"), { recursive: true });
++  writeFileSync(join(dir, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++  return dir;
++}
++
++test("MDS1: without paths the scope is the module's owned paths, exactly the write scope the proposal gives that module", () => {
++  const derived = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", integratedSliceIds: [] });
++  assert.equal(derived.ok, true, JSON.stringify(derived));
++  const proposed = proposeSlicesFromModules(SCOPE_MODULES).slices.find((slice) => slice.moduleId === "core");
++  assert.deepEqual(derived.writeScope, proposed.writeScope);
++  assert.equal(derived.sliceId, "slice-core");
++  assert.equal(derived.wave, 0);
++});
++
++test("MDS2: a declared path owned by a different module is refused with the typed code, the owner and a repair", () => {
++  const crossing = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/core/a.mjs", "src/api/handler.mjs"], integratedSliceIds: [] });
++  assert.equal(crossing.ok, false);
++  assert.equal(crossing.code, "DBG-MODULE-SCOPE-CROSSES");
++  assert.match(crossing.message, /src\/api\/handler\.mjs/u);
++  assert.match(crossing.message, /module api/u);
++  assert.match(crossing.message, /repair:/u);
++  const broad = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/**"], integratedSliceIds: [] });
++  assert.equal(broad.code, "DBG-MODULE-SCOPE-CROSSES", "a glob that reaches into another module is a crossing too");
++  const inside = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "core", paths: ["src/core/a.mjs", "tests/core.test.mjs"], integratedSliceIds: [] });
++  assert.equal(inside.ok, true, "a path inside the module and a path no module owns are not crossings");
++  assert.deepEqual(inside.writeScope, ["src/core/a.mjs", "tests/core.test.mjs"]);
++});
++
++test("MDS3: a module whose dependency module has no accepted result is not runnable; the accepted result releases it", () => {
++  const blocked = moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: [] });
++  assert.equal(blocked.ok, false);
++  assert.equal(blocked.code, "DBG-MODULE-NOT-RUNNABLE");
++  assert.match(blocked.message, /slice-core/u);
++  assert.match(blocked.message, /repair:/u);
++  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-core"] }).ok, true);
++  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "docs", integratedSliceIds: [] }).ok, true, "a wave-0 module needs no result");
++});
++
++test("MDS4: an unknown module, an invalid cut and a malformed call are typed refusals that never throw", () => {
++  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "nope", integratedSliceIds: [] }).code, "DBG-MODULE-UNKNOWN");
++  const cycle = [mod("a", ["src/a/**"], ["b"]), mod("b", ["src/b/**"], ["a"])];
++  assert.equal(moduleDispatchScope({ modules: cycle, moduleId: "a", integratedSliceIds: [] }).code, "DBG-MODULE-CUT-INVALID");
++  assert.equal(moduleDispatchScope({ modules: "nope", moduleId: "a" }).ok, false);
++  assert.equal(moduleDispatchScope({}).ok, false);
++});
++
++test("MDS5: the proposal tool and the briefing reader agree on the cut and on the scope of every module of one PRD", () => {
++  const dir = prdRoot();
++  const read = readPrdModules(dir, "specs/prd.md");
++  assert.equal(read.ok, true, JSON.stringify(read));
++  const proposal = runProposal(["--prd", "specs/prd.md", "--root", dir]).output;
++  for (const slice of proposal.slices) {
++    const derived = moduleDispatchScope({ modules: read.modules, moduleId: slice.moduleId, integratedSliceIds: proposal.slices.map((entry) => entry.id) });
++    assert.equal(derived.ok, true, JSON.stringify(derived));
++    assert.deepEqual(derived.writeScope, slice.writeScope, `module ${slice.moduleId}`);
++    assert.equal(derived.wave, slice.wave);
++  }
++  writeFileSync(join(dir, "specs", "no-design.md"), "# PRD without a design block\n");
++  assert.equal(readPrdModules(dir, "specs/no-design.md").code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
++  assert.equal(readPrdModules(dir, "../outside.md").code, "DBG-MODULE-PLAN-UNREADABLE");
++  assert.equal(readPrdModules(dir, "specs/absent.md").code, "DBG-MODULE-PLAN-UNREADABLE");
++});
+diff --git a/plugins/pipeline-core/lib/push-threat-model-gate.mjs b/plugins/pipeline-core/lib/push-threat-model-gate.mjs
+new file mode 100644
+index 000000000..4fad357d8
+--- /dev/null
++++ b/plugins/pipeline-core/lib/push-threat-model-gate.mjs
+@@ -0,0 +1,63 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * D4a (candidate 19): the push threat model must exist before the push gate when a push approval is active.
++ *
++ * One pure-reading decision for a project root, shared by the three places that need the model first: the plan approval request
++ * (`pipeline-state.mjs submit-plan`), `push-prepare.mjs` before it issues a push candidate and the close coordinator before the Critic/audit
++ * step (`feature-close-prepared`). It reads the manifest and the model file and writes nothing.
++ *
++ * "A push approval is active" means the manifest's push gate asks for approval (`gates.push.approval: required`): the reader the close
++ * coordinator already used. The `gates.push_approval` key of `pipeline.user.yaml` only chooses HOW a human clears the gate (signature or
++ * chat) and always has a value, so it cannot say whether an approval is active.
++ *
++ * A project without an active push approval is never refused here. When it is active the file must exist as a regular file, hold more than
++ * whitespace and carry at least one markdown heading (the shipped template does; a handwritten model is free in its words).
++ */
++import { lstatSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++
++import { gateConfig, loadManifestSafe } from "./manifest.mjs";
++
++export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
++export const PUSH_THREAT_MODEL_GATE_SCHEMA = "pipeline.push-threat-model-gate.v1";
++export const MATERIALIZE_PUSH_THREAT_MODEL_COMMAND = "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model";
++export const PUSH_THREAT_MODEL_COMMIT_RULE = `commit ${PUSH_THREAT_MODEL_FILE} in the same draft commit as the feature package registration, before the item binding is generated; created later it moves the candidate after the Critic and Verify ran and forces a second round`;
++const MAX_MODEL_BYTES = 1024 * 1024;
++const HEADING = /^#{1,6}[ \t]+\S/mu;
++
++/** Does the manifest of `root` ask for a push approval? Never throws; an absent or invalid manifest means no. */
++export function pushApprovalActive(root, deps = {}) {
++  try {
++    return gateConfig((deps.loadManifest ?? loadManifestSafe)(root), "push")?.approval === "required";
++  } catch { return false; }
++}
++
++const refused = (code, message, repairCommand) => ({
++  schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: false, code, path: PUSH_THREAT_MODEL_FILE, message,
++  repair: { command: repairCommand, commitRule: PUSH_THREAT_MODEL_COMMIT_RULE },
++});
++const REPLACE_COMMAND = `write the reviewed threat model into ${PUSH_THREAT_MODEL_FILE} (start from the shipped template plugins/pipeline-core/docs/default-push-threat-model.md; the command that creates the file from that template refuses while a file exists)`;
++
++/** @returns {{schema: string, active: boolean, ok: boolean, code: string|null, path: string, message: string|null, repair: {command: string, commitRule: string}|null}} */
++export function pushThreatModelVerdict(root, deps = {}) {
++  if (!pushApprovalActive(root, deps)) return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: false, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null };
++  const target = join(root, PUSH_THREAT_MODEL_FILE);
++  let info;
++  try { info = lstatSync(target); } catch (error) {
++    if (error?.code === "ENOENT") return refused("PUSH-THREAT-MODEL-MISSING", `${PUSH_THREAT_MODEL_FILE} does not exist and the push approval is active`, MATERIALIZE_PUSH_THREAT_MODEL_COMMAND);
++    return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} cannot be read (${error?.code ?? "error"})`, REPLACE_COMMAND);
++  }
++  if (!info.isFile() || info.isSymbolicLink()) return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} is not a regular file`, REPLACE_COMMAND);
++  if (info.size > MAX_MODEL_BYTES) return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} is larger than ${MAX_MODEL_BYTES} bytes`, REPLACE_COMMAND);
++  let text;
++  try { text = readFileSync(target, "utf8"); } catch (error) { return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} cannot be read (${error?.code ?? "error"})`, REPLACE_COMMAND); }
++  if (text.trim() === "") return refused("PUSH-THREAT-MODEL-EMPTY", `${PUSH_THREAT_MODEL_FILE} is empty and the push approval is active`, REPLACE_COMMAND);
++  if (!HEADING.test(text)) return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} has no markdown heading, so it is not a threat model document`, REPLACE_COMMAND);
++  return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null };
++}
++
++/** The one-sentence refusal every enforcement point prints (code, file, repair command, commit rule); null for a passing verdict. */
++export function pushThreatModelRefusalText(verdict, where = "this step") {
++  if (verdict === null || typeof verdict !== "object" || verdict.ok !== false) return null;
++  return `${where} refused (${verdict.code}): ${verdict.message}. Repair: ${verdict.repair.command}. Commit rule: ${verdict.repair.commitRule}.`;
++}
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index b0523a738..c55fa3626 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -39,7 +39,7 @@ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+ import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
+ import { loadMapBundle } from "./module-inventory.mjs";
+-import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
++import { pushApprovalActive, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+@@ -644,6 +644,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+   if (values.phase !== "feature-close-prepared" && values.criticVerifyLifecycle !== undefined) {
+     fail("CLOSE-CRITIC-VERIFY-ARGS", "--critic-verify-lifecycle is accepted only for feature-close-prepared");
+   }
++  // D4a (candidate 19): with an active push approval the push threat model must be usable before the Critic/audit step starts; a refusal reads nothing else and changes nothing.
++  if (values.phase === "feature-close-prepared") {
++    const threatModel = pushThreatModelVerdict(root);
++    if (threatModel.active && !threatModel.ok) fail(threatModel.code, pushThreatModelRefusalText(threatModel, "feature close"));
++  }
+   const common = gitCommonDir(root);
+   const stored = readCloseCoordinator(common, values.lifecycle);
+   if (!coordinatorNextPhases(stored.coordinator.phase).includes(values.phase)
+@@ -1186,7 +1191,7 @@ async function applyTransition(values, suppliedDigest) {
+ 
+ // Read-only: does the push gate require approval (the same manifest reader push-prepare uses) and is the threat model file there? Currency is not checked.
+ function readPushThreatModelState(root) {
+-  const required = gateConfig(loadManifestSafe(root), "push")?.approval === "required";
++  const required = pushApprovalActive(root);
+   return { required, present: existsSync(join(root, PUSH_THREAT_MODEL_FILE)) };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 6adb3a65c..08036c5e8 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -945,6 +945,43 @@ test("process: AC-264 drive and --dry-run list materialize-push-threat-model bef
+   assert.equal(seen.materialized, false, "drive materializes nothing");
+ });
+ 
++// D4a (candidate 19): the close refuses to start the Critic/audit step (feature-close-prepared) while an active push approval has no usable threat model.
++const D4A_MANIFEST = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
++for (const [name, content, code] of [["missing", null, "PUSH-THREAT-MODEL-MISSING"], ["empty", "", "PUSH-THREAT-MODEL-EMPTY"]]) {
++  test(`process: D4a feature-close-prepared is refused with ${code} while the push approval is active and the threat model is ${name}, and the refusal leaves no coordinator change`, () => {
++    const seen = {};
++    const result = processFixture(`d4a${name}`, {
++      expectPreparedRefusal: code,
++      beforePrepared({ root, lifecycle }) {
++        writeFileSync(join(root, ".claude", "pipeline.yaml"), D4A_MANIFEST);
++        if (content !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), content); }
++        seen.phaseBefore = invoke(["drive", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--dry-run"]).phase;
++      },
++    });
++    assert.match(JSON.stringify(result.refused), /materialize-push-threat-model|default-push-threat-model/u, "the refusal names the repair");
++    assert.match(JSON.stringify(result.refused), /project\/push-threat-model\.md/u);
++    const after = invoke(["drive", "--root", result.root, "--lifecycle", result.lifecycle, "--actor", "PO", "--dry-run"]).phase;
++    assert.equal(after, seen.phaseBefore, "a refused plan changes nothing");
++    rmSync(result.root, { recursive: true, force: true });
++  });
++}
++
++test("process: D4a a usable threat model, or no active push approval, lets the close reach feature-close-prepared exactly as before", () => {
++  processFixture("d4aok", {
++    beforePrepared({ root }) {
++      writeFileSync(join(root, ".claude", "pipeline.yaml"), D4A_MANIFEST);
++      mkdirSync(join(root, "project"), { recursive: true });
++      writeFileSync(join(root, "project", "push-threat-model.md"), "# Threat model\n\nwhat the signature binds\n");
++    },
++    afterPrepared({ prepared, root }) {
++      assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms"));
++      rmSync(join(root, "project"), { recursive: true, force: true });
++      rmSync(join(root, ".claude", "pipeline.yaml"), { force: true });
++    },
++  });
++  processFixture("d4anogate", { afterPrepared({ prepared }) { assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms")); } });
++});
++
+ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row is an agent action before the freeze, and audit-index prints the index and writes nothing", () => {
+   const seen = {};
+   const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 32d7230be..5b01d2782 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -74,8 +74,10 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+ 
+ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+   Required strings: id, item, agentType, modelId, check, title, ac, goal.
+-  Required non-empty string arrays: paths, context, targeted.
++  Required non-empty string arrays: paths (optional when module is given), context, targeted.
+   Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation (MP-05|MP-07, as the flag).
++  module + modulePlan (both or neither): the module id and the repository-relative PRD with the approved architecture design; the write scope is
++    derived from the module cut (listed as the exact files the module owns today), a path of another module is refused (DBG-MODULE-SCOPE-CROSSES).
+   Optional string arrays: newFiles (files the dispatch creates: exempt from the must-exist check AND added to the write scope), forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
+   Unknown keys are refused. --package is repository-relative. Only --out writes,
+   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
+@@ -134,6 +136,7 @@ const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHe
+ const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
+ const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
+ const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
++const { moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
+ const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+ const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
+ 
+@@ -208,7 +211,7 @@ const MAX_ALLOWED_PATHS = 64;
+  * is not an existing directory (a file, or a file the dispatch will create). Links are never followed and never listed; `.git` is skipped;
+  * a name that would not be a valid exact path is skipped, so the result can always be bound.
+  */
+-function listDirectoryFiles(root, path) {
++function listDirectoryFiles(root, path, limit = MAX_ALLOWED_PATHS) {
+   const start = resolve(root, path);
+   const within = relative(root, start);
+   if (within.startsWith("..") || within === "") return null;
+@@ -221,7 +224,7 @@ function listDirectoryFiles(root, path) {
+       if (entry.name === ".git") continue;
+       const next = `${prefix}/${entry.name}`;
+       if (entry.isSymbolicLink()) continue;
+-      if (entry.isDirectory()) { if (files.length <= MAX_ALLOWED_PATHS) walk(resolve(directory, entry.name), next); continue; }
++      if (entry.isDirectory()) { if (files.length <= limit) walk(resolve(directory, entry.name), next); continue; }
+       if (entry.isFile() && validRepoPath(next)) files.push(next);
+     }
+   };
+@@ -1150,6 +1153,54 @@ export function parseBuildArgv(argv) {
+   return values;
+ }
+ 
++// M1.4 (candidate 19): the exact files an owned-path scope holds today. A scope is a pattern (`src/core/**`), a binding lists EXACT files,
++// so the fixed directory prefix of each pattern is listed and the files are kept that the same matcher the cut uses (scopesOverlap) accepts.
++const SCOPE_META = /[*?[\]{}()|^$\\+!]/u;
++const MODULE_EXPANSION_LIMIT = 4096;
++function expandModuleScope(root, writeScope) {
++  const found = new Set();
++  for (const pattern of writeScope) {
++    const fixed = [];
++    for (const part of pattern.split("/")) { if (SCOPE_META.test(part)) break; fixed.push(part); }
++    const prefix = fixed.join("/");
++    if (prefix === "" || !validRepoPath(prefix)) continue;
++    const listed = listDirectoryFiles(root, prefix, MODULE_EXPANSION_LIMIT);
++    if (listed !== null) { for (const file of listed) found.add(file); continue; }
++    try { if (lstatSync(resolve(root, prefix)).isFile()) found.add(prefix); } catch { /* a scope with no file today contributes nothing */ }
++  }
++  return [...found].filter((file) => scopesOverlap([file], writeScope)).sort();
++}
++
++/**
++ * M1.4: a package that names a module of the approved architecture design gets its write scope from the module cut and the cut is enforced
++ * at dispatch time (lib/module-dispatch-scope.mjs; no second implementation). Returns the package with `paths` filled and the warnings; a
++ * package without a module reference is returned untouched. Throws BriefingPackageRefusal with the typed code and the repair.
++ */
++function resolveModulePackage(root, pkg, deps) {
++  if (pkg.module === undefined) return { pkg, warnings: [] };
++  const read = readPrdModules(root, pkg.modulePlan);
++  if (!read.ok) throw new BriefingPackageRefusal(read.code, read.message);
++  let integrated = [];
++  try {
++    const ids = (deps.integratedSliceIds ?? defaultIntegratedSliceIds)(root);
++    if (Array.isArray(ids) || ids instanceof Set) integrated = [...ids];
++  } catch { integrated = []; }
++  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [pkg.check])];
++  const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
++  const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
++  if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
++  if (pkg.paths !== undefined) return { pkg, warnings: [] };
++  const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
++  const files = expandModuleScope(root, derived.writeScope);
++  if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
++    throw new BriefingPackageRefusal("DBG-MODULE-SCOPE-EMPTY", `module ${pkg.module} owns ${derived.writeScope.join(", ")}, which holds no file today, so the derived write scope is empty and a write scope is a list of exact files; repair: list the files the dispatch creates under "newFiles", or declare "paths"`);
++  }
++  return {
++    pkg: { ...pkg, paths: files },
++    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
++  };
++}
++
+ /** The binding options one closed package yields for an agent type (shared by build and probe). */
+ function packageBindingOptions(root, pkg, agentType) {
+   return {
+@@ -1186,6 +1237,8 @@ export function buildDispatchBriefing(options, deps = {}) {
+   let pkg;
+   try { pkg = JSON.parse(bytes.toString("utf8")); } catch { refuse("DBG-PACKAGE-UNREADABLE", `package ${options.package} is not valid JSON; repair: fix its JSON`); }
+   validateBriefingPackage(pkg);
++  const moduleScope = resolveModulePackage(root, pkg, deps);
++  pkg = moduleScope.pkg;
+   assertPackagePathsExist(root, pkg, deps.pathExists);
+   const calibration = resolveBriefingCalibration(root, deps.calibration);
+   const bind = (agentType) => generateDispatchBinding(packageBindingOptions(root, pkg, agentType), deps);
+@@ -1213,7 +1266,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   };
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+-    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
++    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...moduleScope.warnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+   };
+ }
+ 
+@@ -1270,12 +1323,18 @@ export function probeDispatchReadiness(options, deps = {}) {
+       return null;
+     }
+   })();
+-  const pkg = fieldsOk;
++  let pkg = fieldsOk;
+   let calibration = null;
+   let generated = null;
+   let decision = null;
+   let warnings = [];
+-  if (pkg === null) skipped.push("package-paths", "calibration", "binding", "tool-budget", "render");
++  // M1.4: a refused module reference is one finding and the checks that need the write scope are named under `skipped`.
++  let moduleWarnings = [];
++  let moduleRefused = false;
++  if (pkg !== null) {
++    try { const resolved = resolveModulePackage(root, pkg, deps); pkg = resolved.pkg; moduleWarnings = resolved.warnings; } catch (error) { failWith("module-scope", error); moduleRefused = true; }
++  }
++  if (pkg === null || moduleRefused) skipped.push("package-paths", "calibration", "binding", "tool-budget", "render");
+   else {
+     try { assertPackagePathsExist(root, pkg, deps.pathExists); } catch (error) { failWith("package-paths", error); }
+     try { calibration = resolveBriefingCalibration(root, deps.calibration); } catch (error) { failWith("calibration", error); }
+@@ -1286,7 +1345,7 @@ export function probeDispatchReadiness(options, deps = {}) {
+     else {
+       const budget = skeletonToolBudget(generated.skeleton);
+       try { decision = budgetDecision(pkg, budget); } catch (error) { failWith("tool-budget", error); }
+-      warnings = [...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
++      warnings = [...moduleWarnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
+       if (decision !== null && calibration !== null && findings.length === 0) {
+         try { renderGoldfishBriefing(pkg, generated, calibration, decision); } catch (error) { failWith("render", error); }
+       } else if (findings.length > 0 || decision === null || calibration === null) skipped.push("render");
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index d76f49ed6..072968e3e 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2300,3 +2300,77 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names
+   assert.deepEqual(codesOf(probed), codesOf(claudeProbed));
+   assert.equal(codesOf(probed).some((code) => /^(DBG-SELFCHECK|DBG-MODEL|NGHR)/u.test(code)), false);
+ });
++
++// --- M1.4 (candidate 19): a package may name a module of the approved architecture design; the write scope is derived from the cut and the cut is enforced ---
++
++function modulePackage(over = {}) {
++  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", ...over });
++  const design = {
++    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
++    modules: ["core", "api"].map((id) => ({
++      id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [],
++    })),
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
++  };
++  mkdirSync(join(made.fx.root, "specs"), { recursive: true });
++  writeFileSync(join(made.fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++  // the files the modules own today: a binding lists EXACT files, so the owned paths are resolved to these
++  for (const rel of ["src/core/index.mjs", "src/core/util/helper.mjs", "src/api/index.mjs"]) {
++    mkdirSync(dirname(join(made.fx.root, rel)), { recursive: true });
++    writeFileSync(join(made.fx.root, rel), "export const v = 1;\n");
++  }
++  return made;
++}
++
++test("module package: without a hand-written write list the scope is derived from the module, the same scope the proposal tool prints", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { run: runProposal } = await import("./module-slice-proposal.mjs");
++  const { fx, argv } = modulePackage();
++  const result = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const parsed = parseNativeGoldfishBriefing(result.text);
++  assert.equal(parsed.ok, true, parsed.code);
++  const proposed = runProposal(["--prd", "specs/prd.md", "--root", fx.root]).output.slices.find((slice) => slice.moduleId === "core");
++  // the exact files the module owns today (a binding lists exact files): every one lies in the proposal's scope for that module, none of another module's
++  assert.deepEqual(parsed.binding.allowedPaths, [CHECK, "src/core/index.mjs", "src/core/util/helper.mjs"].sort());
++  const { scopesOverlap } = await import("../lib/slice-queue.mjs");
++  for (const path of parsed.binding.allowedPaths.filter((entry) => entry !== CHECK)) assert.equal(scopesOverlap([path], proposed.writeScope), true, path);
++  assert.ok(result.warnings.some((warning) => warning.code === "DBG-MODULE-SCOPE-DERIVED"), "the briefing says the scope is a snapshot of the module's files");
++});
++
++test("module package: a path owned by another module is refused with the typed code and the repair, on build and as a probe finding", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = modulePackage({ paths: ["src/core/a.mjs", "src/api/handler.mjs"], newFiles: ["src/core/a.mjs", "src/api/handler.mjs"] });
++  const built = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(built.ok, false);
++  assert.equal(built.code, "DBG-MODULE-SCOPE-CROSSES");
++  assert.match(built.message, /repair: /u);
++  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
++  const finding = probed.findings.find((entry) => entry.check === "module-scope");
++  assert.equal(finding?.code, "DBG-MODULE-SCOPE-CROSSES", JSON.stringify(probed.findings));
++  assert.match(finding.repair, /repair: /u);
++});
++
++test("module package: a module whose dependency has no accepted result is refused as not runnable until the result exists", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = modulePackage({ module: "api" });
++  const refused = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => [] }));
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "DBG-MODULE-NOT-RUNNABLE");
++  assert.match(refused.message, /slice-core/u);
++  const released = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-core"] }));
++  assert.equal(released.ok, true, JSON.stringify(released));
++});
++
++test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {
++  const { runDispatchBriefing } = await lib();
++  const half = packageFixture({ module: "core" });
++  assert.equal(runDispatchBriefing(half.argv, depsOf(half.fx)).code, "DBG-PACKAGE-FIELD-MISSING");
++  const noPaths = packageFixture({ paths: undefined });
++  assert.equal(runDispatchBriefing(noPaths.argv, depsOf(noPaths.fx)).code, "DBG-PACKAGE-FIELD-MISSING", "without a module reference paths stay required");
++  const legacy = packageFixture();
++  assert.equal(runDispatchBriefing(legacy.argv, depsOf(legacy.fx)).ok, true);
++});
+diff --git a/plugins/pipeline-core/scripts/module-slice-proposal.mjs b/plugins/pipeline-core/scripts/module-slice-proposal.mjs
+index 0c85df500..260f562a2 100644
+--- a/plugins/pipeline-core/scripts/module-slice-proposal.mjs
++++ b/plugins/pipeline-core/scripts/module-slice-proposal.mjs
+@@ -10,15 +10,13 @@
+  * Run the printed `addCommands` as `slice-queue.mjs <argv> --queue <path>` (the first with `--init-feature <feature>` when the queue
+  * does not exist yet); the queue library validates every add. Exit 0 proposal, 2 usage, 3 design or proposal refused.
+  */
+-import { lstatSync, readFileSync } from "node:fs";
+-import { isAbsolute, relative, resolve } from "node:path";
++import { resolve } from "node:path";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { architectureDesignFailureCode, parseArchitectureDesign } from "../lib/architecture-design.mjs";
++import { readPrdModules } from "../lib/module-dispatch-scope.mjs";
+ import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "../lib/module-slice-proposal.mjs";
+ 
+ export const EXIT = Object.freeze({ OK: 0, USAGE: 2, REFUSED: 3 });
+-const MAX_PRD_BYTES = 4 * 1024 * 1024;
+ const USAGE = "usage: module-slice-proposal.mjs --prd <repository-relative path> [--root <dir>]";
+ 
+ function usage(reason) { return { exit: EXIT.USAGE, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: "MSP-USAGE", reason, usage: USAGE } }; }
+@@ -35,21 +33,13 @@ export function run(argv, cwd = process.cwd()) {
+   }
+   if (flags["--prd"] === undefined) return usage("--prd is required");
+   const root = resolve(cwd, flags["--root"] ?? ".");
+-  const target = resolve(root, flags["--prd"]);
+-  const inside = relative(root, target);
+-  if (isAbsolute(flags["--prd"]) || inside === "" || inside.startsWith("..") || isAbsolute(inside)) return usage("--prd must name a file inside the root, as a repository-relative path");
+-  let text;
+-  try {
+-    const info = lstatSync(target);
+-    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_PRD_BYTES) return usage("--prd must name a regular file of at most 4 MiB");
+-    text = readFileSync(target, "utf8");
+-  } catch { return usage("--prd could not be read"); }
+-  let design;
+-  try { design = parseArchitectureDesign(text); }
+-  catch (error) {
+-    return { exit: EXIT.REFUSED, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: architectureDesignFailureCode(error), reason: "the architecture design of the PRD is not valid; the proposal needs the approved design package", ...(typeof error?.field === "string" ? { field: error.field } : {}) } };
++  // M1.4: the briefing tool reads the modules through this same function (lib/module-dispatch-scope.mjs), so both tools see one cut.
++  const read = readPrdModules(root, flags["--prd"]);
++  if (!read.ok) {
++    if (read.code === "DBG-MODULE-PLAN-UNREADABLE") return usage(`--prd: ${read.message}`);
++    return { exit: EXIT.REFUSED, output: { ok: false, schema: MODULE_SLICE_PROPOSAL_SCHEMA, code: read.code, reason: "the architecture design of the PRD is not valid; the proposal needs the approved design package", ...(typeof read.field === "string" ? { field: read.field } : {}) } };
+   }
+-  const proposal = proposeSlicesFromModules(design.modules);
++  const proposal = proposeSlicesFromModules(read.modules);
+   return { exit: proposal.ok ? EXIT.OK : EXIT.REFUSED, output: proposal };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c3165e1a7..650975847 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -396,6 +396,7 @@ import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindin
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { fileURLToPath } from "node:url";
+ import {
+   applyCourseDecisionIntent,
+@@ -11623,6 +11624,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
+         return 2;
+       }
++      // D4a (candidate 19): with an active push approval the push threat model has to be usable before the plan is submitted for approval,
++      // so it is in the same draft commit as the feature package; created later it moves the candidate after the Critic and Verify ran.
++      const threatModelRefusal = pushThreatModelRefusalText(pushThreatModelVerdict(dir), "submit-plan");
++      if (threatModelRefusal !== null) {
++        console.error(`Error: ${threatModelRefusal} No submission or signature request was recorded.`);
++        return 2;
++      }
+       let submitDesignDraft = null;
+       if (["epic", "feature"].includes(profileName)) {
+         const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index feb8b1068..8f40daa90 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1771,6 +1771,32 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
+   assert.ok(state.planSubmission, "a genuinely authored PRD must submit successfully");
+ }
+ 
++// D4a (candidate 19): with an active push approval, submit-plan (the plan approval request) refuses while the push threat model is missing
++// or empty, names the code and the repair command, and records nothing; a usable model lets the submission through.
++for (const [name, model, code] of [["missing", null, "PUSH-THREAT-MODEL-MISSING"], ["empty", "", "PUSH-THREAT-MODEL-EMPTY"], ["present", "# Threat model\n\nwhat the signature binds\n", null]]) {
++  const featureId = `ptm-${name}`;
++  const planPath = `specs/${featureId}/prd_${featureId}.md`;
++  const specPath = `specs/${featureId}/spec.md`;
++  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
++  // the fixture's authority tier is the neutral one, so the manifest sits next to the calibration (a `.claude/` directory would select the legacy tier)
++  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
++  if (model !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), model); }
++  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
++  // QG-04: a refused submission writes nothing, so the state file may not exist at all; absence is the strongest form of "not recorded".
++  const state = existsSync(statePath(root)) ? JSON.parse(readFileSync(statePath(root), "utf8")) : {};
++  if (code === null) {
++    assert.equal(attempt.result, 0, `a usable threat model must not block the submission: ${attempt.lines.join(" ")}`);
++    assert.ok(state.planSubmission, "the submission is recorded");
++  } else {
++    assert.equal(attempt.result, 2, attempt.lines.join(" "));
++    const text = attempt.lines.join(" ");
++    assert.ok(text.includes(code), `the refusal names ${code}: ${text}`);
++    assert.ok(text.includes("project/push-threat-model.md"), text);
++    assert.ok(/materialize-push-threat-model|default-push-threat-model/u.test(text), `the refusal names the repair: ${text}`);
++    assert.equal(state.planSubmission, undefined, "a refused submission must not be recorded");
++  }
++}
++
+ // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
+ // NEVER called -- the exact gap the item names (a plan approved without a
+ // mechanical record it was shown first). Proves the DoD's core refusal case,
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 8f48bf889..5bd99e5c8 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -49,6 +49,7 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
++import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+@@ -302,6 +303,12 @@ export function checkCheckpointDestination(dir, { remote, destination, sourceRef
+ 
+ const PUSH_THREAT_MODEL_REMEDY = "node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model  # then review, commit it";
+ export function checkPushThreatModel(dir, deps = {}) {
++  // D4a (candidate 19): while a push approval is active the model must also be usable (non-empty, a document), not merely present.
++  // No active push approval: the check below runs exactly as before.
++  const verdict = pushThreatModelVerdict(dir, { loadManifest: deps.loadManifestSafe });
++  if (verdict.active && !verdict.ok) {
++    return { id: "push-threat-model", ok: false, code: verdict.code, message: verdict.message, remedy: `${verdict.repair.command}  # ${verdict.repair.commitRule}` };
++  }
+   const exists = (deps.exists ?? existsSync)(join(dir, PUSH_THREAT_MODEL_PATH));
+   if (!exists) {
+     return {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 2adf8104c..5f30c50e8 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -1725,3 +1725,29 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and
+     for (const argv of [[], ["--root", root], ["--root", root, "--agent", "--human"], ["--root", root, "--agent", "--agent"]]) assert.equal(run(...argv).code, "CPO-ARGS", `neither flag, both or a repeat is refused: ${argv.length}`);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// D4a (candidate 19): with an active push approval the threat model must be present AND usable before a push candidate is issued.
++test("D4a: checkPushThreatModel on a real project refuses a missing or empty model when the push approval is active, with the code and the repair", () => {
++  const manifest = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
++  const make = (withManifest, model) => {
++    const root = mkdtempSync(join(tmpdir(), "d4a-pp-"));
++    if (withManifest) { mkdirSync(join(root, ".claude"), { recursive: true }); writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest); }
++    if (model !== null) { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "push-threat-model.md"), model); }
++    return root;
++  };
++  const roots = [make(true, null), make(true, ""), make(true, "# Threat model\n\nbound\n"), make(false, ""), make(false, null)];
++  try {
++    const [missing, empty, present, inactiveEmpty, inactiveMissing] = roots.map((root) => checkPushThreatModel(root));
++    assert.equal(missing.ok, false);
++    assert.equal(missing.code, "PUSH-THREAT-MODEL-MISSING");
++    assert.match(missing.remedy, /materialize-push-threat-model/u);
++    assert.equal(empty.ok, false);
++    assert.equal(empty.code, "PUSH-THREAT-MODEL-EMPTY");
++    assert.match(empty.message, /empty/u);
++    assert.equal(present.ok, true);
++    assert.equal(inactiveEmpty.ok, true, "no active push approval: an existing file passes exactly as before");
++    assert.equal(inactiveMissing.ok, false, "no active push approval: a missing file still fails exactly as before");
++    assert.equal(inactiveMissing.code, undefined);
++    assert.match(inactiveMissing.remedy, /materialize-push-threat-model/u);
++  } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+index 1509bc29e..347d4b2f7 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -1,13 +1,17 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { dirname, join } from "node:path";
+ import test from "node:test";
++import { fileURLToPath } from "node:url";
+ 
+ import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
++import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { pushThreatModelReadback } from "./register-feature-package.mjs";
+ 
++const SHIPPED_TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "default-push-threat-model.md");
++
+ const roots = [];
+ test.after(() => { for (const dir of roots) rmSync(dir, { recursive: true, force: true }); });
+ const tempRoot = () => { const dir = mkdtempSync(join(tmpdir(), "rfp-")); roots.push(dir); return dir; };
+@@ -36,3 +40,83 @@ test("RFPR3: the readback is advice only and writes nothing", () => {
+   pushThreatModelReadback(root);
+   assert.throws(() => writeFileSync(join(root, "project", "x"), "x"), /ENOENT/u, "no project directory was created by the readback");
+ });
++
++// D4a enforcement (candidate 19): the decision the plan approval request, push-prepare and the close coordinator share. Real project directories.
++const manifest = (approval) => `schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: ${approval}\n`;
++function project({ approval = null, model = null } = {}) {
++  const root = tempRoot();
++  if (approval !== null) {
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest(approval));
++  }
++  if (model !== null) {
++    mkdirSync(join(root, "project"), { recursive: true });
++    writeFileSync(join(root, PUSH_THREAT_MODEL_FILE), model);
++  }
++  return root;
++}
++
++test("PTG1: a project without an active push approval is never refused, whatever the threat model file looks like", () => {
++  for (const root of [project(), project({ approval: "none" }), project({ model: "" })]) {
++    const verdict = pushThreatModelVerdict(root);
++    assert.equal(verdict.schema, PUSH_THREAT_MODEL_GATE_SCHEMA);
++    assert.equal(verdict.active, false);
++    assert.equal(verdict.ok, true);
++    assert.equal(verdict.code, null);
++  }
++});
++
++test("PTG2: an active push approval with no threat model file is refused with a typed code, the creating command and the commit rule", () => {
++  const verdict = pushThreatModelVerdict(project({ approval: "required" }));
++  assert.equal(verdict.active, true);
++  assert.equal(verdict.ok, false);
++  assert.equal(verdict.code, "PUSH-THREAT-MODEL-MISSING");
++  assert.equal(verdict.path, "project/push-threat-model.md");
++  assert.equal(verdict.repair.command, "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model");
++  assert.match(verdict.repair.commitRule, /same draft commit/u);
++  assert.match(verdict.repair.commitRule, /before the item binding/u);
++});
++
++test("PTG3: an empty or blank threat model file is refused as empty, and the repair does not offer the command that refuses an existing file", () => {
++  for (const content of ["", "   \n\t\n"]) {
++    const verdict = pushThreatModelVerdict(project({ approval: "required", model: content }));
++    assert.equal(verdict.ok, false);
++    assert.equal(verdict.code, "PUSH-THREAT-MODEL-EMPTY");
++    assert.ok(!verdict.repair.command.includes("materialize-push-threat-model"), "materialize refuses while the file exists");
++    assert.match(verdict.repair.command, /default-push-threat-model\.md/u);
++  }
++});
++
++test("PTG4: a threat model without any markdown heading, and a directory at the path, are refused as invalid", () => {
++  assert.equal(pushThreatModelVerdict(project({ approval: "required", model: "just one line of prose, no heading\n" })).code, "PUSH-THREAT-MODEL-INVALID");
++  const directory = project({ approval: "required" });
++  mkdirSync(join(directory, PUSH_THREAT_MODEL_FILE), { recursive: true });
++  assert.equal(pushThreatModelVerdict(directory).code, "PUSH-THREAT-MODEL-INVALID");
++});
++
++test("PTG5: a present threat model passes: a handwritten one and the shipped template copy", () => {
++  const written = pushThreatModelVerdict(project({ approval: "required", model: "# Threat model\n\nwhat a signature binds\n" }));
++  assert.deepEqual({ ok: written.ok, code: written.code, active: written.active }, { ok: true, code: null, active: true });
++  const copied = project({ approval: "required" });
++  mkdirSync(join(copied, "project"), { recursive: true });
++  copyFileSync(SHIPPED_TEMPLATE, join(copied, PUSH_THREAT_MODEL_FILE));
++  assert.equal(pushThreatModelVerdict(copied).ok, true);
++});
++
++test("PTG6: the refusal text carries the code, the path, the repair command and the commit rule; a passing verdict has no text", () => {
++  const text = pushThreatModelRefusalText(pushThreatModelVerdict(project({ approval: "required" })), "the close");
++  assert.match(text, /PUSH-THREAT-MODEL-MISSING/u);
++  assert.match(text, /project\/push-threat-model\.md/u);
++  assert.match(text, /pipeline-state\.mjs materialize-push-threat-model/u);
++  assert.match(text, /same draft commit/u);
++  assert.match(text, /the close/u);
++  assert.equal(pushThreatModelRefusalText(pushThreatModelVerdict(project())), null);
++});
++
++test("PTG7: the verdict reads the file system only: it creates nothing and never throws", () => {
++  const root = project({ approval: "required" });
++  pushThreatModelVerdict(root);
++  assert.equal(pushThreatModelVerdict(root).code, "PUSH-THREAT-MODEL-MISSING", "still missing after two reads");
++  assert.equal(existsSync(join(root, "project")), false, "no directory was created");
++  assert.equal(pushThreatModelVerdict(join(root, "no-such-directory")).ok, true, "an unreadable root has no active push approval");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index add838851..edc0be767 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -25,6 +25,8 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
+    if the file exists) and commit `project/push-threat-model.md` with the draft commit. A threat model first created at the Close moves the candidate
+    after the Critic and Verify already ran, which forces a second round for no product change (Antigravity greenfield finding D4a).
+    The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
++   This is enforced, not advice: while the push approval is active, `pipeline-state.mjs submit-plan`, `push-prepare.mjs` and the feature close
++   (`feature-close-prepared`) refuse with `PUSH-THREAT-MODEL-MISSING`, `-EMPTY` or `-INVALID` (no markdown heading) and print the repair command and the commit rule.
+ 7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
+ 
+ ## 2. Implementation (one dispatch per task, from the template)
+@@ -38,6 +40,9 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
+    that back to the design (the readiness question about decomposition) instead of splitting one module by file.
+    `module-slice-proposal.mjs --prd <plan path>` prints that cut read-only: the waves from the module dependencies, the modules it serializes because
+    their owned paths overlap, and the `slice-queue.mjs add` arguments; it writes no queue.
++   The cut is enforced by `dispatch-briefing.mjs build` and `probe`: a briefing package that names `module` and `modulePlan` (the PRD with the design) takes its
++   write scope from the module (the exact files its owned paths hold now, warning `DBG-MODULE-SCOPE-DERIVED`), is refused with `DBG-MODULE-SCOPE-CROSSES` when a
++   declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
