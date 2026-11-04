@@ -2128,6 +2128,29 @@ test("C18-19: a criterion package with no test among its paths and check renders
   assert.match(testFirstEvidenceParagraph({ criterion: "AC-1", paths: ["plugins/x/y.mjs"], check: "plugins/x/y.test.mjs" }), /testFirst/u);
 });
 
+// --- Candidate 19, B1 (role rule GF-10): the smallest-complete-change paragraph ---
+
+test("B1: the smallest-complete-change paragraph renders for a criterion package except the mechanical tier, in at most 130 words", async () => {
+  const { smallestChangeParagraph } = await buildLib();
+  assert.equal(smallestChangeParagraph({ paths: ["plugins/x/y.mjs"] }), "", "no criterion, no paragraph");
+  assert.equal(smallestChangeParagraph({ criterion: "AC-1", agentType: "goldfish-mechanic" }), "", "the mechanical tier gets none");
+  for (const agentType of ["goldfish-implementor", "goldfish-deep", undefined]) {
+    const text = smallestChangeParagraph({ criterion: "AC-1", agentType });
+    assert.match(text, /GF-10/u);
+    assert.match(text, /Deliberately not changed/u);
+    assert.ok(text.trim().split(/\s+/u).length <= 130, `paragraph too long: ${text.trim().split(/\s+/u).length} words`);
+  }
+});
+
+test("B1: a generated briefing carries the paragraph exactly once and it states no test-first exception", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ criterion: "AC-1" });
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.text.split("Smallest complete change (role rule GF-10)").length, 2);
+  assert.doesNotMatch(result.text, /skip (the )?test/iu);
+});
+
 // --- C18-15 (AC-239): an optional visual check in the generated briefing ---
 
 const VISUAL = { question: "Does the camera show the stair block fully lit from the front?", evidencePath: "specs/sample-feature/evidence/stair-block.png" };
