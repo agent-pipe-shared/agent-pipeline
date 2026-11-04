@@ -81,6 +81,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
+import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
 
 const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
 const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
@@ -179,6 +180,13 @@ function outcomeMatches(recomputedOutcome, persistedOutcome) {
  *   assertions stay byte-identical. Every OTHER call site (Close, PR, Release) binds against a
  *   commit/tree that was never pushed, so "the pushed source" is inaccurate there and each passes
  *   its own accurate label instead (F7, CYB-2I-4R).
+ * @param {(evidenceCommit: unknown) => {carried?: boolean, evidenceTree?: string, reason?: string}|null} [params.carryForward] - optional
+ *   (candidate 19, D4b/E3): asked only when the envelope's `input.commit` differs from `commit`. A carried answer that names the tree of
+ *   the evidence commit makes the envelope fresh for `commit` and its `input.tree` is then compared with that tree instead of `tree`
+ *   (the tree of a later evidence-only commit differs by construction; the carry decision's product tree hash equality is the substitute).
+ *   Absent for every caller that does not read the carry-forward, which keeps the exact-commit meaning.
+ * @param {boolean} [params.withCodes] - append the stable freshness code (and the carry refusal) to the commit-mismatch failure. Off by
+ *   default so the failure text of every other caller stays byte-identical.
  * @returns {string[]} failure reasons; empty = pass.
  */
 export function checkSecurityCompleteness({
@@ -188,6 +196,8 @@ export function checkSecurityCompleteness({
   envelopePath = DEFAULT_ENVELOPE_PATH,
   verdictPath = DEFAULT_VERDICT_PATH,
   subjectLabel = "the pushed source",
+  carryForward = null,
+  withCodes = false,
 }) {
   const failures = [];
   const envelopeRead = readEvidence(projectDir, envelopePath);
@@ -214,10 +224,26 @@ export function checkSecurityCompleteness({
       `${envelopePath}: envelope schema is invalid (${envelopeValidation.errors.map((e) => e.message).join("; ")})`,
     );
   }
-  if (envelope?.input?.commit !== commit) {
-    failures.push(`${envelopePath}: input commit does not match ${subjectLabel}`);
+  // The verdict (is the envelope fresh for `commit`?) comes from the shared freshness function; the message stays here.
+  let carriedTree = null;
+  let carryRefusal = null;
+  const stale = evidenceFreshnessFailureCodes({
+    data: { exitCode: 0, commit: envelope?.input?.commit },
+    expectedCommit: commit,
+    promoted: () => {
+      const answer = typeof carryForward === "function" ? carryForward(envelope?.input?.commit) : null;
+      if (answer?.carried === true && typeof answer.evidenceTree === "string" && answer.evidenceTree !== "") {
+        carriedTree = answer.evidenceTree;
+        return true;
+      }
+      carryRefusal = answer?.reason ?? null;
+      return false;
+    },
+  }).includes(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT);
+  if (stale) {
+    failures.push(`${envelopePath}: input commit does not match ${subjectLabel}${withCodes ? freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal) : ""}`);
   }
-  if (!tree || envelope?.input?.tree !== tree) {
+  if (!tree || envelope?.input?.tree !== (carriedTree ?? tree)) {
     failures.push(`${envelopePath}: input tree does not match ${subjectLabel}`);
   }
   if (verdictDoc?.schema !== "pipeline.security-verdict.v2") {

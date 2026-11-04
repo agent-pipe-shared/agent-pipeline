@@ -998,6 +998,7 @@
         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
         "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
         "verify-phase:harness/scripts/verify.mjs:push-destination-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-gate-real-decision-carry-tests",
         "verify-phase:harness/scripts/verify.mjs:push-gate-satisfiability-tests",
         "verify-phase:harness/scripts/verify.mjs:push-init-tests",
         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",

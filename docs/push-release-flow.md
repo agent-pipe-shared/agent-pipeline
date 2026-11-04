@@ -228,6 +228,28 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" \
 A red check names its own remedy; nothing below this line needs running
 until the report is fully green.
 
+**Freshness of the Verify and Security records, one verdict everywhere.** A record
+is fresh when it is green and bound to the pushed commit. The same shared verdict
+(`lib/evidence-freshness-codes.mjs`) is used by `push-prepare`, the push guard
+(`hooks/guard-push.mjs`), the security completeness gate and the managed pre-push
+hook, and each refusal carries a stable code next to its own message
+(`EF-MISSING`, `EF-EXIT-NOT-ZERO`, `EF-STALE-COMMIT`, `EF-NOT-PUSH-BOUNDARY`). A
+record bound to an EARLIER commit stays fresh across **evidence-only commits**:
+`lib/evidence-carry-forward-reader.mjs` carries it when (1) every path changed
+since the record's commit lies in the closed evidence set
+(`specs/<feature>/evidence/**`, `audit-bundles/**`, `lifecycle.json`,
+`result.md`, `project/push-threat-model.md`), (2) the hash of the tree outside the
+set is equal at both commits, (3) the record's commit is an ancestor of the
+pushed commit, and (4) for a Security record, a secret scan (gitleaks) of the
+passed-over commits is clean; an unavailable scanner or a finding means the record
+is not carried. Anything else, including a spec, plan, `project/guard-config.json` or
+any source change, refuses as before, and the stale message then names the carry
+reason (`[EF-STALE-COMMIT; carry-forward refused: PRODUCT-PATH-CHANGED]`). The
+`push-prepare` report and the hook log name the passed-over commits. Critic rounds
+are not carried: a new correction candidate still needs its own review. This is
+active by default (PO decision of 2026-11-04; ADR
+`docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md`).
+
 ```
 node "${PIPELINE_PLUGIN_ROOT}/scripts/po-human-approval.mjs" authorize-critical \
   --repo-root <repo> --directory <external-po-dir> \

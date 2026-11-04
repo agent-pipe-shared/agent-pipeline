@@ -327,6 +327,18 @@ const PLUGIN_LIB_DIR = ${lib};
 const HOOK_LOG_SCHEMA = "pipeline.pre-push-hook-log.v1";
 const ZERO_OID = /^0{40}$|^0{64}$/;
 
+// The ONE evidence freshness verdict and the evidence-only carry-forward reader, shared with guard-push.mjs and push-prepare.mjs (never
+// copied here). Loaded once, so the pure helper below stays synchronous. A load fault leaves SHARED null and the helper then fails
+// closed with a message of its own, exactly like any other missing module.
+let SHARED = null;
+try {
+  const codes = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "evidence-freshness-codes.mjs")).href);
+  const reader = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "evidence-carry-forward-reader.mjs")).href);
+  SHARED = { ...codes, ...reader };
+} catch {
+  SHARED = null;
+}
+
 function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 10000 });
 }
@@ -428,8 +440,17 @@ function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, cla
   return audit.ok ? null : audit.reason;
 }
 
-export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
+/**
+ * \`options.kind\` ("verify" or "security") asks the evidence-only carry-forward whether a record bound to an earlier commit is still
+ * fresh; without it the record is exact-commit only. \`options.carried\` collects the readback of a carried record. The verdict (which
+ * failure, in which order) comes from the shared function; the messages stay here, with the stable code next to them.
+ */
+export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit, options = {}) {
   const failures = [];
+  if (SHARED === null) {
+    failures.push(\`\${relPath}: the shared evidence freshness verdict could not be loaded; cannot evaluate.\`);
+    return failures;
+  }
   let raw;
   try {
     raw = readFileSync(join(projectRoot, relPath), "utf8");
@@ -444,8 +465,26 @@ export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
     failures.push(\`\${relPath} is corrupted (invalid JSON: \${error.message}).\`);
     return failures;
   }
-  if (data?.exitCode !== 0) failures.push(\`\${relPath}: exitCode=\${JSON.stringify(data?.exitCode)} (expected 0).\`);
-  if (data?.commit !== sourceCommit) failures.push(\`\${relPath}: commit=\${JSON.stringify(data?.commit)} is stale (pushed source commit: \${sourceCommit}).\`);
+  let carried = null;
+  let carryRefusal = null;
+  const codes = SHARED.evidenceFreshnessFailureCodes({
+    data: data ?? {}, expectedCommit: sourceCommit,
+    promoted: () => {
+      if (options.kind !== "verify" && options.kind !== "security") return false;
+      const decision = SHARED.evidenceCarriedForward({ root: projectRoot, record: data, kind: options.kind, candidateCommit: sourceCommit });
+      if (decision.carried === true) {
+        carried = decision;
+        return true;
+      }
+      carryRefusal = decision.reason;
+      return false;
+    },
+  });
+  if (codes.includes(SHARED.EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)) failures.push(\`\${relPath}: exitCode=\${JSON.stringify(data?.exitCode)} (expected 0).\${SHARED.freshnessCodeSuffix(SHARED.EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)}\`);
+  if (codes.includes(SHARED.EVIDENCE_FRESHNESS_CODES.STALE_COMMIT)) failures.push(\`\${relPath}: commit=\${JSON.stringify(data?.commit)} is stale (pushed source commit: \${sourceCommit}).\${SHARED.freshnessCodeSuffix(SHARED.EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal)}\`);
+  if (carried !== null && Array.isArray(options.carried)) {
+    options.carried.push({ record: relPath, evidenceCommit: data.commit, passedOverCommits: carried.passedOverCommits ?? [] });
+  }
   return failures;
 }
 
@@ -541,15 +580,19 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
   const sourceTree =treeResult.status === 0 ? treeResult.stdout.trim() : null;
 
-  // (a) verify evidence.
-  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
+  // (a) verify evidence. A record bound to an earlier commit stays fresh across evidence-only commits (the shared carry-forward reader).
+  const carried = [];
+  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit, { kind: "verify", carried }));
 
   // (b)/(b.2) security evidence, only when configured and not "off".
   const securityGate = gateConfig(manifest, "security");
   if (securityGate && securityGate.mode !== "off") {
     securityGateMode = securityGate.mode === "warn" ? "warn" : "blocking";
-    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit));
-    securityFailures.push(...checkSecurityCompleteness({ projectDir: evidenceProjectRoot, commit, tree: sourceTree }));
+    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit, { kind: "security", carried }));
+    securityFailures.push(...checkSecurityCompleteness({
+      projectDir: evidenceProjectRoot, commit, tree: sourceTree, withCodes: true,
+      carryForward: (evidenceCommit) => SHARED?.evidenceCarriedForward({ root: evidenceProjectRoot, record: { commit: evidenceCommit }, kind: "security", candidateCommit: commit }),
+    }));
   }
 
   // (c) approval -- general mode only, see file header SCOPE.
@@ -575,7 +618,7 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
     }
   }
 
-  return { hardBlock: null, failures, securityFailures, pushGateMode, securityGateMode, skipped: false };
+  return { hardBlock: null, failures, securityFailures, pushGateMode, securityGateMode, skipped: false, carried };
 }
 
 function block(lines) {
@@ -648,6 +691,8 @@ async function main() {
       verdict: blocking ? "blocked" : (all.length > 0 ? "allowed-with-warnings" : "allowed"),
       commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef,
       reasons: all,
+      // The named list of the commits a carried record passed over, so an auditor can re-check them (additive field).
+      ...(result.carried?.length > 0 ? { carriedForward: result.carried } : {}),
     });
   }
 

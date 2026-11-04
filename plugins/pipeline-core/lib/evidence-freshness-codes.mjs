@@ -50,6 +50,14 @@ export function evidenceFreshnessFailureCodes({ data, expectedCommit, promoted =
   return codes;
 }
 
+/**
+ * The text a message-only consumer (the push guard, the managed pre-push hook, the security completeness gate) appends next to its own,
+ * unchanged message: the stable code and, for a stale record, why the evidence-only carry-forward did not apply.
+ */
+export function freshnessCodeSuffix(code, carryRefusal) {
+  return ` [${code}${typeof carryRefusal === "string" && carryRefusal !== "" ? `; carry-forward refused: ${carryRefusal}` : ""}]`;
+}
+
 /** The satisfiability status a code stands for, or null when the code is absent, unknown or has no dedicated status. */
 export function satisfiabilityStatusForFreshnessCode(code) {
   return typeof code === "string" && Object.hasOwn(STATUS_BY_CODE, code) ? STATUS_BY_CODE[code] : null;

@@ -1,8 +1,10 @@
 # ADR: Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files
 
-Status: Proposed (draft for an independent review; the PO decided on 2026-11-03 to build it in candidate 19 as an opt-in block of the apply script, so the PO's act of applying or leaving out the patches is the final gate; EL-04)
+Status: Accepted (PO decision of 2026-11-04 at the sitting: point 2 and the amendment of 2026-11-04 are built and ACTIVE by default; the safeguards of point 2 stay; the order of work of the amendment is kept; EL-04). Points 1, 3 and 4 are decided as written; their build is tracked by their own items.
 
-Date: 2026-11-03
+Date: 2026-11-03 (accepted 2026-11-04)
+
+Decision line: the PO decided on 2026-11-04 that a Verify or Security record is carried across evidence-only commits by default, through one shared freshness verdict used by the push guard, `push-prepare`, the security completeness gate and the managed pre-push hook. The closed evidence set, the product tree hash equality, the ancestor check, the clean secret scan of the passed-over commits for Security evidence, fail closed on any doubt and the named list of passed-over commits stay. Critic rounds are not carried by this decision.
 
 ## Context
 
@@ -14,7 +16,7 @@ Three greenfield runs of candidate 18 met the same defect family: authority that
 
 All four are the same design question: what is granted by a signature or an accepted receipt, and when does it stay valid.
 
-## Decision (proposed)
+## Decision
 
 1. **Design inheritance by equality.** A typed, idempotent command re-binds the architecture receipt for a new feature when the design package it would materialize is byte-equal to the one of the accepted predecessor (`designSha256` and every target digest equal). It writes a new receipt that names the predecessor (`inheritedFrom: {featureId, planPath, designSha256}`) and binds the new feature and plan. Any difference, however small, falls back to the full materialization of today. Nobody deletes or edits a receipt by hand; the check at line 287 accepts a receipt that is either exact for this feature or an inheritance receipt whose recorded predecessor is accepted and whose design digest equals the current package. **Accepted predecessor** means: a feature that is closed in the closed-feature audit, whose own receipt is an exact materialization receipt (never itself an inheritance receipt). An inheritance receipt therefore names the materializing feature directly, the chain has depth one, and a successor of a successor re-names the original.
 2. **Evidence-only commits carry Verify and Security forward.** Define a closed set of evidence paths in plugin source (not project configuration), by record class and not by file type: the feature's `evidence/**`, `audit-bundles/**`, the generated `lifecycle.json` and `result.md` of the feature package, and the single named gate record `project/push-threat-model.md`. Everything else is product-bound and never in the set, in particular the feature spec, plan and PRD under `specs/<feature>/`, `project/guard-config.json` and every other `project/` file, and any source, script or configuration extension. Verify and Security evidence additionally records `productTreeSha256`, the hash over the tree entries outside the set. A commit range whose changed paths all lie inside the set leaves `productTreeSha256` equal, so Verify evidence bound to the earlier candidate is carried forward and names the evidence-only commits it passed over. **Security evidence is carried forward only together with a secret scan of the files changed by the passed-over commits**, run by the reader at the carry-forward moment; when that scan is unavailable or reports a finding, the Security evidence is not carried (fail closed). Anything outside the set, or a changed `productTreeSha256`, invalidates exactly as today. **Critic rounds are not carried forward by this decision:** their rules are bound to the exact previous reviewed candidate and no reader consumes such a carry-forward; it stays an open question.
@@ -59,17 +61,19 @@ All four are the same design question: what is granted by a signature or an acce
 
 The revised text has not had a second review; the review budget is spent on a working local candidate first (PO decision 2026-11-03).
 
-## Proposed amendment of 2026-11-04: one definition of "evidence-only", one shared freshness function
+## Amendment of 2026-11-04 (accepted): one definition of "evidence-only", one shared freshness function
 
 Found by reading the code after the first build stage (patch w156, which is inert): the push boundary already carries Verify and Security across record-only commits through the release-promotion envelope (`lib/release-promotion-envelope.mjs`, `RECORD_ONLY_PATH_PATTERNS`, used by `hooks/guard-push.mjs` and `scripts/push-prepare.mjs`), and the Critic delta course has a third, narrower test (`lib/feature-package-registration.mjs`). Three definitions of "may change without invalidating a record" is itself a trust-boundary hazard, so point 2 is amended before any reader is wired:
 
 - **One path set, owned by one module.** The base is the set the production envelope already uses (reviewed and in force). The two classes this ADR needs and the envelope lacks, `specs/<feature>/audit-bundles/**` and `project/push-threat-model.md`, are added as a named extension that the envelope does not accept until it has been reviewed for them. The Critic delta course keeps its own narrower test on purpose (it answers a different question: whether a commit is a correction candidate); it is not widened.
 - **The wider members of the envelope set are acknowledged, not silently adopted:** `backlog/**`, `docs/state.md` and the two pipeline-state files are not product code, but they are consumed by gates. Carrying a Security record across them needs the secret scan of point 2 like any other path; Verify may be carried across them only if the independent review of this amendment confirms that no Verify suite reads them as input. Until then the carry-forward decision of w156 keeps its narrower set and refuses these paths.
 - **One shared freshness function** replaces the four hand-written comparisons (`hooks/guard-push.mjs`, `lib/security-completeness-gate.mjs`, `scripts/push-prepare.mjs`, and the template of the managed pre-push hook in `scripts/pre-push-hook-install.mjs`), returns a stable code next to the message (today `scripts/push-gate-satisfiability.mjs` classifies by the substring `is stale (HEAD is`), and the hook template loads it by dynamic import as it already does for the security completeness gate. The envelope stays one input of that function, not a second path next to it.
-- **Order of work:** (1) the shared module with the single path set and no behaviour change, pinned by the existing push suites; (2) the shared freshness function with stable codes, still exact-commit only; (3) the carry-forward branch behind its own opt-in. No stage widens what a push accepts before the independent review of this amendment.
+- **Order of work:** (1) the shared module with the single path set and no behaviour change, pinned by the existing push suites; (2) the shared freshness function with stable codes, still exact-commit only; (3) the carry-forward branch, then moved onto all four comparison sites. Built in that order (stages 1 to 3 as inert or opt-in patches, then the rest: the hook template and the security completeness gate take the shared verdict, and the carry-forward is active by default).
+- **Built behaviour (2026-11-04):** the four comparison sites give the same verdict for the same input and keep their own message text with the stable code next to it (`EF-STALE-COMMIT` and its siblings; a refused carry adds the reason, for example `carry-forward refused: PRODUCT-PATH-CHANGED`). A Security record that binds a commit and a tree (the v1 candidate, the v2 envelope) is checked against the commit and tree it was produced for once it is carried; the secret scan covers the range from that commit to the pushed one. The `push-prepare` report and the pre-push hook log name the passed-over commits. A real push through the guard and through the hook template is pinned by `lib/push-gate-real-decision-carry.test.mjs`.
+- **Wider members of the envelope set:** `backlog/**`, `docs/state.md` and the two pipeline-state files stay outside the carry-forward set; only the envelope accepts them, as before.
 
-This amendment has had no review. It changes nothing in code.
+The independent review of this amendment is not done; the PO accepted the amendment on 2026-11-04 on the strength of the built safeguards and the pinned real-decision cases.
 
 ## Not decided
 
-Nothing is built by this draft. It needs an independent review (fresh context, ADR-0014 contract); the patches follow in the apply script behind their own opt-in block.
+Point 2 and the amendment are built (see "Built behaviour"). Points 1, 3 and 4 are tracked by their own items; an independent review (fresh context, ADR-0014 contract) of the whole decision is still open and is batched for the Coordinator.

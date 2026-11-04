@@ -2,8 +2,8 @@
   "schema": "pipeline.architecture-decision.v1",
   "id": "draft-authority-carry-forward-and-signed-reconcile-commit",
   "title": "Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files",
-  "status": "proposed",
-  "digest": "50556bd22439b0491b0323cff05765b439a31fe17c38182d8e2c92c0a3747078",
+  "status": "accepted",
+  "digest": "148d81c9d167c661a73c0e3b95f9cda4b904baf0ae8d7ba5b3d78f26e4434a77",
   "scope": "global",
   "date": "2026-11-03"
 }

@@ -181,7 +181,7 @@ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
-import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
+import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "../lib/evidence-freshness-codes.mjs";
 import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
 import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
@@ -2345,6 +2345,16 @@ function checkIndependentPublicationReview() {
   return review.currentCheckoutOk ? [] : [`candidate-bound independent review and Verify are unavailable (${review.code})`];
 }
 
+/** The record class a carry-forward is decided for, or null for a path that is neither the Verify nor the Security record. */
+function carryKindFor(relPath) {
+  return relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
+}
+
+/** The carry-forward decision for `record` at the pushed source commit; the reader never throws and answers each question once. */
+function carryDecisionFor(kind, record) {
+  return evidenceCarriedForward({ root: evidenceProjectDir, record, kind, candidateCommit: sourceCommit });
+}
+
 /** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
 function checkEvidenceFreshness(relPath) {
   const failures = [];
@@ -2375,25 +2385,30 @@ function checkEvidenceFreshness(relPath) {
     });
     return validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit;
   };
-  // OPT-IN (candidate 19, step 3): the evidence-only carry-forward is the second way a record bound to an earlier commit stays fresh.
+  // The evidence-only carry-forward (candidate 19, D4b/E3; active by default) is the second way a record bound to an earlier commit stays
+  // fresh. Its refusal reason is shown next to the stable code, so a refused push says why the carry did not apply.
+  let carryRefusal = null;
   const promoted = () => {
     if (promotedByEnvelope()) return true;
-    const kind = relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
+    const kind = carryKindFor(relPath);
     if (kind === null) return false;
-    return evidenceCarriedForward({ root: evidenceProjectDir, record: data, kind, candidateCommit: sourceCommit }).carried === true;
+    const decision = carryDecisionFor(kind, data);
+    if (decision.carried === true) return true;
+    carryRefusal = decision.reason;
+    return false;
   };
   const codes = evidenceFreshnessFailureCodes({
     data: data ?? {}, expectedCommit: sourceCommit, promoted, isVerify: relPath === VERIFY_EVIDENCE_DEFAULT_PATH,
     satisfiesPushBoundary: () => verifyEvidenceSatisfiesBoundary(data, "push"),
   });
   if (codes.includes(EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)) {
-    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
+    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)}`);
   }
   if (codes.includes(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT)) {
-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, carryRefusal)}`);
   }
   if (codes.includes(EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY)) {
-    failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);
+    failures.push(`${relPath}: Verify evidence was not produced for the push boundary${freshnessCodeSuffix(EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY)}`);
   }
   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && data?.selection?.execution === "impacted") {
     const base = data.selection.baseCommit;
@@ -2441,10 +2456,14 @@ function checkSecurityEvidenceBinding() {
   const { data } = read;
   const sourceTree = resolveSourceTree();
   const candidate = data?.candidate;
+  // A record carried across evidence-only commits (the same decision checkEvidenceFreshness took) is bound to the commit and the tree it
+  // was produced for: the candidate must name exactly that commit and that tree, never the later commit. Anything else is exact as before.
+  const carried = data?.commit !== sourceCommit ? carryDecisionFor("security", data) : null;
+  const carriedBinding = carried?.carried === true ? carried : null;
   if (data?.schema !== "pipeline.security-evidence.v1") failures.push("evidence/security-latest.json: exact-candidate security evidence v1 is required");
   if (!candidate || candidate.status !== "clean") failures.push("evidence/security-latest.json: candidate binding is unavailable or dirty");
-  if (candidate?.commit !== sourceCommit) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
-  if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
+  if (candidate?.commit !== (carriedBinding?.evidenceCommit ?? sourceCommit)) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
+  if (!sourceTree || candidate?.tree !== (carriedBinding?.evidenceTree ?? sourceTree)) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
   if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
   if (candidate?.destination === "local-only") failures.push("evidence/security-latest.json: the security evidence was produced for a local-only repository without a remote and cannot be used for a push; configure a remote and rerun security-scan.mjs --remote <push remote> before pushing");
   if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
@@ -2565,7 +2584,11 @@ try {
     // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
     // have triggered (Finding 5) -- never a second independent `git rev-parse`.
     securityFailures.push(
-      ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
+      ...checkSecurityCompleteness({
+        projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree(), withCodes: true,
+        // The same reader decision as for the v1 record (answered once per process); a refusal keeps the exact-commit meaning.
+        carryForward: (evidenceCommit) => carryDecisionFor("security", { commit: evidenceCommit }),
+      }),
     );
   }
 

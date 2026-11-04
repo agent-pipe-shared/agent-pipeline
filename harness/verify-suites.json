@@ -4518,6 +4518,12 @@
       "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
     },
     {
+      "name": "push-gate-real-decision-carry-tests",
+      "file": "plugins/pipeline-core/lib/push-gate-real-decision-carry.test.mjs",
+      "invariantPinned": "A real push decision, through hooks/guard-push.mjs and through the managed pre-push hook template, accepts a Verify and a Security record bound to commit A after evidence-only commits, and refuses with the stable code EF-STALE-COMMIT and the carry reason a product-file commit, a change of a gate-consumed file outside the evidence set, a failed or unavailable secret scan (Security only) and a record bound to a commit that is not an ancestor; the hook log and the push-prepare readback name the passed-over commits (C19 D4b/E3 rest, AC-108)",
+      "nonOverlapNote": "Unique cases: the end-to-end push decision with a carried record on both real consumers; evidence-carry-forward.test.mjs pins the decision and the reader, evidence-freshness-codes.test.mjs the codes and the push-prepare messages, guard-push-v2.test.mjs the exact-commit v2 binding"
+    },
+    {
       "name": "module-slice-proposal-tests",
       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
       "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
