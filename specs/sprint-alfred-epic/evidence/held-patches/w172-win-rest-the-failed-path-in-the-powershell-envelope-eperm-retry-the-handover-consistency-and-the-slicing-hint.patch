@@ -29,7 +29,7 @@ index 100de796d..63d8c607b 100644
        "name": "windows-authority-readiness-tests",
        "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
 diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
-index eb1f9ad12..c53571c14 100644
+index eb1f9ad12..9a073f72b 100644
 --- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
 +++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
 @@ -95,7 +95,8 @@ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchMod
@@ -42,7 +42,7 @@ index eb1f9ad12..c53571c14 100644
  import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
  
  // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
-@@ -1091,11 +1092,19 @@ if (isDirectInvocation(import.meta.url)) {
+@@ -1091,10 +1092,23 @@ if (isDirectInvocation(import.meta.url)) {
          process.stderr.write("WARNING (guard-dispatch): marked native host-commit route is not a single direct Claude Task or Codex spawn_agent; child changes will not be host-committed.\n");
        } else {
          const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
@@ -52,21 +52,25 @@ index eb1f9ad12..c53571c14 100644
 -          subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
 +        // E4: a second concurrent launch on Windows meets a registry file the first launch holds; that is contention, not a
 +        // permission fault, so the preparation is retried and then refused with the sequential rule (never icacls advice).
++        // Q10: the path the failed native open reported is read right after each preparation, before the readiness probe the
++        // retry wrapper runs can make its own native calls (every native failure replaces the remembered path).
++        let envelopeFailedPath = null;
 +        const prepared = prepareWithWindowsContentionRetry({
-+          prepare: () => prepareNativeGoldfishHostState({
-+            root: rootDir, runner: nativeRunner, input,
-+            admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
-+            subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
-+          }),
++          prepare: () => {
++            const attempt = prepareNativeGoldfishHostState({
++              root: rootDir, runner: nativeRunner, input,
++              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
++              subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
++            });
++            envelopeFailedPath = lastWindowsAuthorityFailedPath();
++            return attempt;
++          },
 +          projectRoot: resolve(rootDir), pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"),
 +          waitCommand: `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} wait --root ${rootDir} --timeout 120`,
          });
-+        // Q10: read the path the failed native open reported before the readiness probe below can run its own native calls.
-+        const envelopeFailedPath = lastWindowsAuthorityFailedPath();
          if (prepared.ok) nativePendingPrepared = true;
          if (!prepared.ok) {
-           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
-@@ -1122,8 +1131,8 @@ if (isDirectInvocation(import.meta.url)) {
+@@ -1122,8 +1136,8 @@ if (isDirectInvocation(import.meta.url)) {
              // Q10: a native Windows authority reason (WIN-AUTH-OPEN and siblings) also names the folder, the preview and the apply command.
              let windowsAuthorityText = "";
              try {
@@ -390,10 +394,10 @@ index 8dba0f5a9..951052fce 100644
    const scratch = mkdtempSync(join(tempDir, "pipeline-semgrep-preflight-"));
 diff --git a/plugins/pipeline-core/scripts/win-authority-rest.test.mjs b/plugins/pipeline-core/scripts/win-authority-rest.test.mjs
 new file mode 100644
-index 000000000..dbe55147f
+index 000000000..842b57f01
 --- /dev/null
 +++ b/plugins/pipeline-core/scripts/win-authority-rest.test.mjs
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,267 @@
 +// SPDX-License-Identifier: SUL-1.0
 +// Candidate 19c, w172 (AC-108, the Windows native runs Q10 PowerShell half, W3, W6, E4): the failed path rides in the PowerShell
 +// failure envelope, the security readiness probes retry once on EPERM, the public handover update keeps the Current state
@@ -642,6 +646,7 @@ index 000000000..dbe55147f
 +  assert.equal(result.ok, false);
 +  assert.equal(result.reason, "WIN-AUTH-OPEN");
 +  assert.equal(calls, 3, "bounded");
++  assert.equal(result.contention, true, "the guard prints this repair instead of the folder repair");
 +  assert.match(result.repair, /one Goldfish launch at a time/iu);
 +  assert.ok(result.repair.includes(WAIT), "names the wait command");
 +  assert.doesNotMatch(result.repair, /icacls/u, "contention is not a folder fault, so no permission change is offered");
