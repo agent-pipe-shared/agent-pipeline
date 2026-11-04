@@ -85,6 +85,7 @@ import {
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 import { devNull } from "node:os";
+import { derivePatterns } from "../scripts/check-private-identifiers.mjs";
 import { bindRealSessionCleanup, startBoundRequester } from "./test-session-cleanup-requester-fixture.mjs";
 
 const cases = [];
@@ -3917,6 +3918,35 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
     assert.equal(readFileSync(absolute, "utf8").includes("this staging file is NOT yet bound as project authority"), false,
       `${key}: canonical generated artifacts must not claim they are pre-authority staging files`);
   }
+
+  // AC-108 / E5: a private identifier in the generated text is an early typed warning, never a
+  // refusal, and never changes the bound plan. Patterns are injected, not read from this machine.
+  // The injected pattern is a local pattern on a distinctive token of the text this very project generated, so the
+  // fixture needs no second answer round (a second, different answer round is refused by the intake itself).
+  const sampleLine = plan.targets.designInput.content.split("\n").map((line) => line.trim()).find((line) => line.length >= 12 && !line.startsWith("#") && !line.includes("sha256"));
+  assert.ok(sampleLine, "the generated design-input.md has a plain text line to build a pattern from");
+  const leakedValue = sampleLine.slice(0, 12);
+  const injected = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "local-pattern", value: leakedValue }] });
+  const noMatch = derivePatterns({ home: "", username: "", userProfile: "", email: "no.match.intake@example.invalid" });
+  const cleanPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: noMatch });
+  assert.equal("warnings" in cleanPlan, false, "no match: the result shape is unchanged");
+  const leakPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: injected });
+  const plainPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: [] });
+  assert.equal("warnings" in plainPlan, false);
+  assert.equal(leakPlan.warnings.length, 1);
+  const [warning] = leakPlan.warnings;
+  assert.equal(warning.code, "INTAKE-PRIVATE-IDENTIFIER");
+  assert.deepEqual(warning.categories, ["local-pattern"]);
+  assert.ok(warning.targets.includes("design-input.md"));
+  assert.equal(JSON.stringify(warning).includes(leakedValue), false, "the warning never carries the matched value");
+  assert.match(warning.remedy, /pre-commit/u);
+  assert.equal(leakPlan.planSha256, plainPlan.planSha256);
+  assert.deepEqual(leakPlan.targets, plainPlan.targets);
+  // A detector failure is silent: an early hint, not a gate.
+  const broken = [{ category: "email", expression: { test() { throw new Error("detector failure"); } } }];
+  const failed = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: broken });
+  assert.equal("warnings" in failed, false);
+  assert.equal(failed.planSha256, plainPlan.planSha256);
 });
 
 // NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while

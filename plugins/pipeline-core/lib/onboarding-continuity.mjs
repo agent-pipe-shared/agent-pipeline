@@ -19,6 +19,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { derivePatterns, inspectAddedLines } from "../scripts/check-private-identifiers.mjs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
 import {inspectSourceOwnedControlledMethodDispatchHandle} from "./controlled-continuity-method-dispatch.mjs";
@@ -7520,7 +7521,7 @@ function intakeGenerateApplyAction(root, planSha256, runner) {
 }
 
 function buildOnboardingIntakeGeneratePlan({
-  rootDir, runner, repositoryCapability = "local", spawn = defaultGitSpawn,
+  rootDir, runner, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null,
 } = {}) {
   const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
   if (observed.status !== "present") {
@@ -7578,7 +7579,45 @@ function buildOnboardingIntakeGeneratePlan({
   const authoringCopy = observeIntakeAuthoringCopyAdmission({
     root: binding.root, featureId, repositoryCapability, spawn,
   });
-  return { ...binding, planSha256, authoringCopy, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner) };
+  const warnings = intakePrivateIdentifierWarnings({ root: binding.root, targets, spawn, patterns: privateIdentifierPatterns });
+  return {
+    ...binding, planSha256, authoringCopy, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner),
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
+}
+
+// An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
+// (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
+// reports category and target names only, never the matched value. Any failure is silent.
+function intakePrivateIdentifierWarnings({ root, targets, spawn, patterns }) {
+  try {
+    let active = patterns;
+    if (!active) {
+      const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
+      const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
+      const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
+      active = derivePatterns({
+        email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
+      });
+    }
+    const categories = new Set();
+    const matched = [];
+    for (const target of Object.values(targets)) {
+      const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
+      if (found.size === 0) continue;
+      for (const category of found.keys()) categories.add(category);
+      matched.push(basename(target.path));
+    }
+    if (matched.length === 0) return [];
+    return [{
+      code: "INTAKE-PRIVATE-IDENTIFIER",
+      categories: [...categories].sort(),
+      targets: matched,
+      remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
+    }];
+  } catch {
+    return [];
+  }
 }
 
 // The private authoring copy is admitted ONLY when its path is git-ignored in the target
