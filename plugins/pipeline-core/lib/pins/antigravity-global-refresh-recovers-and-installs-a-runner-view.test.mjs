@@ -265,6 +265,22 @@ test('the transform is one closed table: frontmatter model line only, anything u
   assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\nmodel: sonnet\nmodel: haiku\n---\n')), { code: 'AGV-AGENT-MODEL-AMBIGUOUS' });
 });
 
+test('the runner view also maps the frontmatter tools list to the runner registry names, one closed table, typed refusals (D1)', () => {
+  const view = (tools, model = 'model: sonnet\n') => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from(`---\nname: x\n${model}tools: ${tools}\n---\nbody\n`)).toString();
+  assert.equal(view('[Read, Grep, Glob]', ''), '---\nname: x\ntools: [read_file, grep_search, find_by_name]\n---\nbody\n', 'an agent without a model line still gets its tools mapped');
+  assert.equal(view('[Read, Edit, Write, Grep, Glob, Bash]'), '---\nname: x\nmodel: flash\ntools: [read_file, edit_file, write_file, grep_search, find_by_name, run_command]\n---\nbody\n');
+  assert.equal(view('[]', ''), '---\nname: x\ntools: []\n---\nbody\n', 'an empty list stays empty');
+  assert.throws(() => view('[Read, WebFetch]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' });
+  assert.throws(() => view('[read_file]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' }, 'a name that is already native is not silently accepted');
+  assert.throws(() => view('Read, Grep'), { code: 'AGV-AGENT-TOOLS-UNPARSEABLE' });
+  assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\ntools: [Read]\ntools: [Grep]\n---\n')), { code: 'AGV-AGENT-TOOLS-AMBIGUOUS' });
+  for (const name of ['critic', 'goldfish-implementor', 'goldfish-deep', 'goldfish-mechanic', 'readiness-reviewer', 'plan-verifier', 'consult-advisor', 'afk-claude-worker']) {
+    const source = readFileSync(join(import.meta.dirname, '..', '..', 'agents', `${name}.md`));
+    const out = snap.transformAgyRunnerAgent(`agents/${name}.md`, source).toString();
+    assert.doesNotMatch(out, /^tools:.*\b(Read|Write|Edit|Bash|Grep|Glob)\b/mu, `${name}: no Claude tool name survives in the runner view`);
+  }
+});
+
 test('an agent with an unmapped model value refuses the global install before anything changes', (t) => {
   const w = world(t, { agents: { 'a.md': agentFile('sonnet'), 'c.md': agentFile('inherit') } });
   halfDone(w);

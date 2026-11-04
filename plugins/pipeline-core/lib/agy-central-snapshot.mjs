@@ -502,6 +502,10 @@ export function classifyAgySnapshot({ observation = {}, deps = {} } = {}) {
 // The table is PO decision D13 (Antigravity model tier mapping): sonnet and haiku run on the flash tier, opus on the pro tier.
 // `inherit` is not a target, and every other `model:` value (inherit, flash, pro, any full model id) is a typed refusal.
 export const AGY_RUNNER_MODEL_MAP = Object.freeze({ sonnet: 'flash', haiku: 'flash', opus: 'pro' });
+// Candidate 19 (D1, AGY greenfield): the runner's tool registry has no Claude tool names; `invoke_subagent` failed at once with
+// `unknown component: tool "Read" not found in registry`, so no pipeline subagent could start. The frontmatter `tools:` list is rewritten through
+// this second closed table; the names come from the runner's own registry as reported by that run (a real Antigravity smoke run is still open).
+export const AGY_RUNNER_TOOL_MAP = Object.freeze({ Read: 'read_file', Write: 'write_file', Edit: 'edit_file', Bash: 'run_command', Grep: 'grep_search', Glob: 'find_by_name' });
 const VIEW_DIR = 'agy-runner-view';
 const VIEW_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 const AGENT_FILE = /^agents\/[^/]+\.md$/;
@@ -516,12 +520,26 @@ export function transformAgyRunnerAgent(relPath, bytes) {
   const close = lines.findIndex((line, index) => index > 0 && line.replace(/\r$/, '') === '---');
   if (close === -1) return bytes;
   const hits = [];
-  for (let index = 1; index < close; index++) if (/^model:/.test(lines[index])) hits.push(index);
-  if (hits.length === 0) return bytes;
+  const toolHits = [];
+  for (let index = 1; index < close; index++) {
+    if (/^model:/.test(lines[index])) hits.push(index);
+    if (/^tools:/.test(lines[index])) toolHits.push(index);
+  }
   if (hits.length > 1) throw fail('AGV-AGENT-MODEL-AMBIGUOUS', relPath);
-  const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
-  if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
-  lines[hits[0]] = `model: ${AGY_RUNNER_MODEL_MAP[match[1]]}${match[2]}`;
+  if (toolHits.length > 1) throw fail('AGV-AGENT-TOOLS-AMBIGUOUS', relPath);
+  if (hits.length === 0 && toolHits.length === 0) return bytes;
+  if (hits.length === 1) {
+    const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
+    if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
+    lines[hits[0]] = `model: ${AGY_RUNNER_MODEL_MAP[match[1]]}${match[2]}`;
+  }
+  if (toolHits.length === 1) {
+    const match = /^tools:[ \t]*\[(.*)\][ \t]*(\r?)$/.exec(lines[toolHits[0]]);
+    if (!match) throw fail('AGV-AGENT-TOOLS-UNPARSEABLE', relPath);
+    const names = match[1].split(',').map((name) => name.trim()).filter((name) => name !== '');
+    if (names.some((name) => !Object.hasOwn(AGY_RUNNER_TOOL_MAP, name))) throw fail('AGV-AGENT-TOOL-UNMAPPED', relPath);
+    lines[toolHits[0]] = `tools: [${names.map((name) => AGY_RUNNER_TOOL_MAP[name]).join(', ')}]${match[2]}`;
+  }
   return Buffer.from(lines.join('\n'), 'utf8');
 }
 
