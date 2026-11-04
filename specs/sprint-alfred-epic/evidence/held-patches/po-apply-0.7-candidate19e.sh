@@ -5,6 +5,7 @@
 # found after 19d was installed. Plan: specs/sprint-alfred-epic/plans/windows-authority-latency-plan-2026-11-04.md; evidence:
 # specs/sprint-alfred-epic/evidence/windows-consumer-probe-stage2-result.md
 #   w213  the repair cycle seen on Windows: a deferred heal and a cancel of a slice without a queue row now name the repair that can really be run (move-aside when no Goldfish runs)
+#   w214  the first Windows trace: inspect met a registry.lock that vanished between the closure walk's listing and its stat; a vanished lock is skipped, every other vanished entry stays a fault
 # Run with: bash /absolute/path/to/specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19e.sh   (from the repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches
@@ -23,6 +24,7 @@ step2() {
   echo "applied $1"
 }
 step2 w213-a-deferred-heal-and-a-cancel-without-a-queue-row-name-a-runnable-repair "fix(repair): a deferred heal and a cancel of a slice without a queue row name the repair that can really be run"
+step2 w214-the-closure-walk-skips-a-registry-lock-that-vanished-between-listing-and-stat "fix(authority): the registry closure walk skips a registry.lock that vanished between its listing and its stat"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
