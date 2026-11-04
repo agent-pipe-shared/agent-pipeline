@@ -7,6 +7,11 @@
 #   w190  the control-plane scan module and the push gate path modules are registered in the guard split map, the never-liftable kernel paths and the threat model (found by the regression suites)
 #   w165  a pending-unavailable Goldfish stop failure names its cause and the recover helper plan and apply command (E1 text part; Windows greenfield)
 #   w166  one shared reader of the bound authority documents returns sealed and digests (late-binding build step 1a; inert, no reader moves onto it yet)
+#   w171  the managed pre-push hook and the security completeness gate take the shared freshness verdict; the carry-forward is active (D4b/E3 rest)
+#   w167  a signed feature-package reconcile commits exactly its own files with one commit capability; the close steps before the ceremony leave a clean tree (D3)
+#   w168  Windows authority failures name path and cause and repair; the preflight probes close and push and reports the bootstrap facts (E2, Q10 node half, W1, W2, W7)
+#   w169  the PowerShell guard admits what the Bash guard admits and its refusals name the way out (E7 PowerShell part, W4, W5)
+#   w170  one typed orchestrator commit helper: check, commit with the trailer, write the dispatch record (E1 second half)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches
@@ -29,6 +34,11 @@ step2 w162-d4b-stage-3-a-verify-or-security-record-is-carried-across-evidence-on
 step2 w165-e1-a-pending-unavailable-stop-failure-names-its-cause-and-the-recover-helper "fix(hook): a pending-unavailable Goldfish stop failure names its cause and the recover helper plan and apply command"
 step2 w166-late-binding-step-1a-one-shared-reader-of-the-bound-authority-returns-sealed-and-digests "feat(authority): one shared reader of the bound authority documents returns sealed and digests, inert until the readers move onto it"
 step2 w190-fix-the-control-plane-scan-module-and-the-push-gate-path-modules-are-registered-in-the-guard-pins "fix(guard): the control-plane script scan module and the push gate path modules are listed in the split map, the never-liftable kernel paths and the threat model"
+step2 w171-d4b-the-pre-push-hook-and-the-security-gate-take-the-shared-freshness-verdict-and-the-carry-forward-is-on "feat(push): the managed pre-push hook and the security completeness gate take the shared freshness verdict and the carry-forward of Verify and Security across evidence-only commits is active"
+step2 w167-d3-a-signed-reconcile-commits-its-own-files-and-the-close-chain-leaves-a-clean-tree-before-the-ceremony "feat(close): a signed feature-package reconcile commits exactly its own files with one commit capability and the close steps before the ceremony leave a clean tree"
+step2 w168-win-authority-failures-name-path-and-cause-and-the-preflight-probes-the-platform "feat(windows): authority failures name the path, the cause and the repair, and the preflight probes close and push and reports the bootstrap facts"
+step2 w169-ps-the-powershell-guard-admits-what-the-bash-guard-admits-and-its-refusals-name-the-way-out "feat(guard): the PowerShell guard admits what the Bash guard admits and its refusals name the way out"
+step2 w170-e1-one-typed-orchestrator-commit-helper-checks-commits-with-the-trailer-and-writes-the-dispatch-record "feat(dispatch): one typed orchestrator commit helper checks a Goldfish diff, commits it with the trailer and writes the dispatch record"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
