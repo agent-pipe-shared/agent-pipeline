@@ -28,6 +28,7 @@
 #   w196  the runbooks name no source-only path and the vendored push-release-flow copy follows its original (found by the first Full Verify of the whole chain)
 #   w197  the host-commit recovery message pins and the present-plan duplicate-check mirror are restated after w170 and w180 (found by the first Full Verify of the whole chain)
 #   w198  the analysis-run command is named in the implementation continuation reference (found by the first Full Verify of the whole chain; the defect predates the chain)
+#   w199  the remote identity case expects the typed local-only subject of a repository without a remote (red in the main tree too; found by the first Full Verify)
 #   w192  the never-liftable kernel paths list the modules that the whole chain adds (seal reader, carry-forward reader and decision, gitleaks adapter, probe retry) and the pre-push hook import table is restated (found by the kernel closure suite on the whole chain)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -74,6 +75,7 @@ step2 w195-lb5-case-completion-policy "fix(candidate-19c): extend the onboarding
 step2 w196-runbook-consumer-paths-and-vendored-flow "fix(candidate-19c): runbooks name no source-only path and the vendored push-release-flow copy follows its original"
 step2 w197-restated-host-commit-message-pins-and-present-plan-mirror "fix(candidate-19c): restate the host-commit recovery message pins and the present-plan duplicate-check mirror after w170 and w180"
 step2 w198-the-analysis-run-command-is-named-in-the-implementation-reference "fix(candidate-19c): name the analysis-run command in the implementation continuation reference so the entry point reachability check finds it"
+step2 w199-remote-identity-case-for-the-local-only-subject "test(security): restate the remote identity case for the typed local-only subject of a repository without a remote (QG-04)"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
