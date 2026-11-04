@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 1e9f2060d..c39321e47 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -6168,6 +6168,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],
+       ["./project-authority-read.mjs", ["plugins", "pipeline-core", "lib", "project-authority-read.mjs"]],
+       ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
++      // QG-04 restatement (C19 D4b/E3): the completeness gate now takes the shared freshness verdict, so its local import closure grew by this module (no local imports of its own).
++      ["./evidence-freshness-codes.mjs", ["plugins", "pipeline-core", "lib", "evidence-freshness-codes.mjs"]],
+       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
+       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
+       ["./security-policy-resolver.mjs", ["plugins", "pipeline-core", "lib", "security-policy-resolver.mjs"]],
