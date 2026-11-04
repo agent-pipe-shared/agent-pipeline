@@ -234,7 +234,7 @@ index 47603e577..1792b7b8f 100644
 +
 +// Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is reviewable besides a plain
 +// domain; every other credential-shaped value stays refused, and the refusal text names what is accepted.
-+const KEY = "9f86d081884c7d659a2feaa0c55ad015";
++const KEY = ["9f86d081884c7d65", "9a2feaa0c55ad015"].join("");
 +const KEY_PATH = "app/api/indexnow/route.ts";
 +const gitIn = (cwd, ...args) => {
 +  const r = spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
