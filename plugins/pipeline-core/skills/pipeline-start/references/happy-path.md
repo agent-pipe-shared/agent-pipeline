@@ -40,8 +40,10 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
 ## 3. Critic
 
 1. `critic-dispatch-preflight.mjs` immediately before every Critic spawn, against the fixed base and candidate (`--base <ref> --candidate <ref>`, not `--range`;
-   `--task-id` on every later round). Dispatch only on `pipeline.critic-dispatch-preflight.v1` = `packet-ready`. **No complete command line documented**; the refusal
-   chain names the next step.
+   `--task-id` on every later round). Dispatch only on `pipeline.critic-dispatch-preflight.v1` = `packet-ready`. The script has no `--help`; its argument refusal
+   (`CDP-ARGUMENT`) names the complete flag set, each with a value: `--root --base --candidate --spec --guardrail --evidence --prior-critic --sweep-evidence --task-id
+   --registration-commit --accepted-contract --criterion-locator --delta-request --correction-input-bindings`. The ones a first round needs are `--root`, `--base`,
+   `--candidate`, `--spec`, `--guardrail` and `--evidence` (repository-relative paths for the last three); the refusal chain names the next missing input.
 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
@@ -56,7 +58,8 @@ Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv f
    then `pipeline-state.mjs feature-package-plan` / `feature-package-apply` with `--next-state verifying`, and again with `--next-state completed` (one step at a time).
 2. `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, apply the returned action, then
    `plan-transition` / `apply-transition` through `checkpointed`, `feature-close-prepared`, `tracked-close-finalized`, `candidate-frozen`, `final-verify-green`,
-   `cleanup-complete` and `closed-local`. The cleanup receipt: `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (before `closed-local`).
+   `cleanup-complete` and `closed-local`. The shapes: `plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]`, then
+   `apply-transition` with the same arguments plus `--plan-sha256 <sha256 of the plan> --activate`; `close-coordinator.mjs next <phase>` prints what a phase needs. The cleanup receipt: `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (before `closed-local`).
    To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
    `--continuity-close-request` when the returned argv carries it. **Antigravity** has one entry instead: `finish-feature.mjs --root <root> --by <actor> --architecture-impact <value> --audit-request <json> --critic-verify-lifecycle <id>`.
@@ -91,6 +94,6 @@ A row that is missing here has no source in this repository; ask the PO instead 
 
 ## Gaps this guide does not close
 
-- Complete lines for `approve-plan`, the `critic-dispatch-preflight.mjs` call and the `plan-transition` phases are not documented anywhere; this guide does not invent them.
+- A complete line for `approve-plan` is not documented anywhere (it is a PO ceremony; follow the action `inspect` returns). The `critic-dispatch-preflight.mjs` flag set and the `plan-transition` shape above are taken from the scripts' own refusal text and usage; the per-phase evidence options of `plan-transition` are what `close-coordinator.mjs next <phase>` prints, and this guide does not invent them.
 - `--architecture-impact` accepts a different value list in the close-feature skill and in the Antigravity close reference; use the list the returned argv or `--help` prints.
 - Nothing here has been run end to end on Codex or Antigravity.
