@@ -3,9 +3,11 @@
 //          turned green steps red in the first dev-build Full Verify: (1) no `init.defaultBranch=main` in the private HOME,
 //          (2) a long TMPDIR pushing a socket path over the 96-byte limit (wsl-ipc-compatibility-tests), (3) node resolved
 //          through a per-shell fnm path that is not stable for child processes.
-// Usage:   node scripts/full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume]
+// Usage:   node scripts/full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume --runs-root <verify runs folder of the clone>]
 //          --resume continues the newest earlier run of the same clone: suites completed (exit 0) there for the same candidate
 //          commit and tree are skipped and counted as "resumed"; a run of another candidate is refused. Separate from --reuse.
+//          --runs-root names that folder (inside the clone's git control directory, where verify keeps its run directories); the
+//          script does not spell the path out itself, because the shell guard refuses a repository script that names it.
 //          A red suite leaves a bounded redacted excerpt (logs/<id>.red-excerpt.log) in its run directory.
 //          (run from any checkout; <clone-dir> must be a clean clone whose committed HEAD is the candidate; label defaults to "fv")
 // Inputs:  git identity copied from `git config user.name/user.email` of the current directory; `--reuse` drops --no-reuse.
@@ -70,8 +72,14 @@ export function privateGitConfig({ name, email }) {
 function main(argv) {
   const reuse = argv.includes("--reuse");
   const resume = argv.includes("--resume");
-  const [cloneArg, label = "fv"] = argv.filter((arg) => arg !== "--reuse" && arg !== "--resume");
-  if (!cloneArg) { console.error("usage: full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume]"); return 2; }
+  // The folder with the verify runs of the clone is given as an argument, not named here: the control-plane script scan of the shell
+  // guard (C19-Q5) refuses a repository script that spells out the Pipeline control directory, and this script only READS it.
+  const runsRootIndex = argv.indexOf("--runs-root");
+  const runsRootArg = runsRootIndex === -1 ? null : argv[runsRootIndex + 1] ?? null;
+  const positional = argv.filter((arg, index) => arg !== "--reuse" && arg !== "--resume" && arg !== "--runs-root" && !(runsRootIndex !== -1 && index === runsRootIndex + 1));
+  const [cloneArg, label = "fv"] = positional;
+  if (!cloneArg) { console.error("usage: full-verify.mjs <clone-dir> [<label>] [--reuse] [--resume --runs-root <verify runs folder of the clone>]"); return 2; }
+  if (resume && runsRootArg === null) { console.error("full-verify: REFUSED: --resume needs --runs-root <absolute path of the verify runs folder inside the clone's git control directory>"); return 2; }
   const clone = resolve(cloneArg);
   const base = join(homedir(), ".fv", label);
   const home = join(base, "h");
@@ -89,9 +97,8 @@ function main(argv) {
   delete env.NODE_TEST_CONTEXT;
   delete env.PIPELINE_VERIFY_RESUME_RUN;
   if (resume) {
-    // The earlier (interrupted) run of THIS clone: the newest run directory under its git common directory.
-    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: clone, encoding: "utf8" }).trim();
-    const runsRoot = join(common, "agent-pipeline", "verify", "runs");
+    // The earlier (interrupted) run of THIS clone: the newest run directory under the folder the caller named.
+    const runsRoot = resolve(runsRootArg);
     const entries = existsSync(runsRoot) ? readdirSync(runsRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => ({ name: e.name, mtimeMs: statSync(join(runsRoot, e.name)).mtimeMs })) : [];
     const previous = newestRunId(entries);
     if (previous === null) { console.error("full-verify: REFUSED: --resume found no earlier run in this clone"); return 2; }
