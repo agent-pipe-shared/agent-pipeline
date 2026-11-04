@@ -92,7 +92,10 @@ export function verifyAcceptedDeliveryContract({envelope,observations} = {}) {
     const mode = observations.selectedMode;
     if (!own(mode,['mode','scope','source']) || mode.mode !== envelope.policyBinding.mode
       || !['signature','chat'].includes(mode.mode)) return no('CAC-MODE-UNAVAILABLE');
-    const bound = verifyDesignApprovalRequest({request:envelope.request,featureId:envelope.featureId,receipts:observations.receipts,currentSources:observations.currentSources});
+    // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
+    const sealPlanSha256 = envelope.request.binding?.sealPlanSha256;
+    const bound = verifyDesignApprovalRequest({request:envelope.request,featureId:envelope.featureId,receipts:observations.receipts,currentSources:observations.currentSources,
+      ...(sealPlanSha256 === undefined ? {} : {sealPlanSha256})});
     if (!bound.ok) return no('CAC-SOURCE-BINDING-MISMATCH');
     const approval = envelope.approval.designApproval;
     let signer = null;

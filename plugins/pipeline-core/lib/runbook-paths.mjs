@@ -52,7 +52,7 @@ function startSteps() {
 function planSteps() {
   const recovery = ["submit-plan"];
   return [
-    inspectStep(["set-feature", "submit-plan", "present-plan", "approve-plan"]),
+    inspectStep(["set-feature", "submit-plan", "prepare-seal", "present-plan", "approve-plan"]),
     scriptStep({
       id: "set-feature", script: STATE, verb: "set-feature", closed: true,
       argv: ["set-feature", "--id", "<feature-id>", "--plan-path", "<prd-path>", "--spec-path", "<spec-path>"],
@@ -62,12 +62,19 @@ function planSteps() {
     scriptStep({
       id: "submit-plan", script: STATE, verb: "submit-plan", closed: true, argv: ["submit-plan", "--by", "<name>", "--profile", "<epic|feature|mini>"],
       needs: ["a complete PRD and Spec (no framing placeholder text; the architecture design for epic and feature profiles)"],
-      producer: "plan submission bound to the PRD and Spec digests, lifecycle awaiting-approval", next: ["present-plan"],
+      producer: "plan submission and lifecycle awaiting-approval; a package outside the PRD release scope (mini) binds the PRD and Spec digests here, in the PRD release scope the package stays an unsealed draft",
+      next: ["prepare-seal", "present-plan"],
+    }),
+    scriptStep({
+      id: "prepare-seal", script: STATE, verb: "prepare-seal", argv: ["prepare-seal", "--review-receipt", "<review-receipt-path>"],
+      needs: ["the PRD release scope: the design package is an unsealed draft (inspect: sealSituation.situation draft); review it first; run after submit-plan and again after any edit of the PRD, the Spec or the design input"],
+      producer: "scratch/seal-plan.json: the digest-bound seal plan of the draft; State is not written; it also retires a damaged or stray plan file",
+      next: ["present-plan"],
     }),
     scriptStep({
       id: "present-plan", script: STATE, verb: "present-plan", argv: ["present-plan", "--by", "<name>", "--review-receipt", "<review-receipt-path>"],
-      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)"],
-      producer: "plan presentation record bound to the exact submission, and the design approval request file under scratch/",
+      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)", "the prepared seal plan, for a draft package in the PRD release scope"],
+      producer: "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
       next: ["sign-intent", "approve-plan"],
     }),
     scriptStep({
@@ -79,11 +86,12 @@ function planSteps() {
     scriptStep({
       id: "approve-plan", script: STATE, verb: "approve-plan", argv: ["approve-plan", "--design-workflow-approval-request", "<design-approval-request-path>"],
       needs: ["the plan is presented", "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"],
-      producer: "plan approval recorded in pipeline state, lifecycle approved; continue with the implement runbook", next: [],
+      producer: "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook", next: [],
     }),
     scriptStep({
       id: "reopen-design", script: STATE, verb: "reopen-design", closed: true, argv: ["reopen-design", "--by", "<name>"],
-      needs: ["recovery: the plan or spec authority is stale or unavailable"], producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
+      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"],
+      producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
     }),
     scriptStep({
       id: "cancel-submitted-plan", script: STATE, verb: "cancel-submitted-plan", closed: true,

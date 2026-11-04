@@ -17,7 +17,7 @@
       "pathId": "plan",
       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "1877baa016dd052711cb4419e764030b1f5bd202fa1f760906d3ffebfecb1be8"
+      "sha256": "9dffaf4fae1c4c2eb6eabe295fa90248dc0410d2cd129c64071d1fad286462d3"
     },
     {
       "pathId": "implement",

@@ -71,6 +71,7 @@ import {
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
+  readPromotionDesignInputCapture,
   planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingIntakeCheckpoint,
   observeOnboardingEnrollmentHistory,
@@ -2042,6 +2043,55 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
 });
 
+// Late binding build step 5 (docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md; AC-108 closest accepted criterion):
+// the bind at the end of onboarding leaves an UNSEALED DRAFT (`sealed: false`, paths without digests) for a package in the EL-19
+// scope (profile other than `mini`); every other package keeps today's bind of the digests, byte for byte.
+check("LB5-1 a feature-profile promotion leaves the unsealed draft, records the digests in the history, and replays", () => {
+  const seed = promotionSeed("lb5-draft");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.deepEqual(plan.targets.state.value.continuity.authority, {
+    sealed: false, prd: { path: seed.request.prdPath }, spec: { path: seed.request.specPath }, result: null,
+  });
+  const entry = plan.targets.history.value.transactions[1];
+  assert.equal(entry.prdSha256, plan.authority.prd.sha256, "the history keeps the digests as provenance");
+  assert.equal(entry.specSha256, plan.authority.spec.sha256);
+  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "applied");
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(state.continuity.authority.sealed, false);
+  assert.equal(Object.hasOwn(state.continuity.authority.prd, "sha256"), false);
+  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "replayed");
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  // The draft admits an edit of the PRD (the whole point of the late binding); the design input stays evidence.
+  writeFileSync(join(seed.root, seed.request.prdPath), `${readFileSync(join(seed.root, seed.request.prdPath), "utf8")}\nA sentence added in the draft.\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+check("LB5-2 a mini-profile promotion binds the digests exactly as today (outside the EL-19 scope)", () => {
+  const seed = promotionSeed("lb5-mini");
+  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
+  const authority = plan.targets.state.value.continuity.authority;
+  assert.equal(Object.hasOwn(authority, "sealed"), false);
+  assert.deepEqual(authority, { prd: plan.authority.prd, spec: plan.authority.spec, result: null });
+  assert.equal(authority.prd.sha256, digest(readFileSync(join(seed.root, seed.request.prdPath))));
+  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "applied");
+  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "replayed");
+});
+
+check("LB5-3 the design-input capture of the seal plan is read from a real promotion history; no history reads as absent", () => {
+  const seed = promotionSeed("lb5-capture");
+  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), { status: "absent" }, "a kickoff-only history records no design input");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), {
+    status: "present", path: seed.request.designInputPath, sha256: digest(readFileSync(join(seed.root, seed.request.designInputPath))),
+  });
+  const bare = fixture("lb5-capture-no-history");
+  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: bare }), { status: "absent" }, "no onboarding history at all");
+  writeFileSync(join(seed.root, seed.request.designInputPath), "# altered after promotion\n");
+  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), { status: "drift" });
+});
+
 // SSc.4: the two earlier per-target boundaries (temp-fsync, rename), additive
 // to the four pre-existing "-published" (directory-fsync) commit-boundary
 // hooks -- matching KICKOFF_FAULT_STAGES' finer per-target-per-boundary
@@ -2564,9 +2614,18 @@ function promotedArtifact(seed, name) {
   return join(seed.root, "specs", "promoted", name);
 }
 
+// QG-04 restatement (C19 late binding, build step 5): a package in the EL-19 scope (every profile but `mini`) leaves the promotion as
+// the unsealed draft (LB5-1), so the cases below that pin the bound DIGEST of the promotion run with the `mini` profile, which keeps
+// today's bind byte for byte. Nothing is weakened: the digest binding and the reopening boundary are asserted exactly as before.
+function promoteMini(seed) {
+  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  return plan;
+}
+
 check("promotion binds the PRD as the approval subject and presents the Spec beside it", () => {
   const seed = promotionSeed("prd-is-the-plan");
-  const plan = planOnboardingKickoffPromotion(seed.request);
+  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
   assert.equal(plan.feature.planPath, "specs/promoted/prd_promoted.md");
   assert.equal(plan.authority.prd.path, plan.feature.planPath);
   assert.equal(plan.authority.spec.path, "specs/promoted/spec.md");
@@ -2595,7 +2654,7 @@ check("the recorded promotion transaction names the PRD and the Spec with both d
 
 check("editing the promoted PRD invalidates the mutual digest binding", () => {
   const seed = promotionSeed("prd-drift");
-  promote(seed);
+  promoteMini(seed);
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
   const path = promotedArtifact(seed, "prd_promoted.md");
   writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
@@ -2604,7 +2663,7 @@ check("editing the promoted PRD invalidates the mutual digest binding", () => {
 
 check("editing the promoted Spec invalidates the mutual digest binding", () => {
   const seed = promotionSeed("spec-drift");
-  promote(seed);
+  promoteMini(seed);
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
   const path = promotedArtifact(seed, "spec.md");
   writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
@@ -2655,7 +2714,7 @@ check("the promoted state's language is the promoted PRD's marker, not the kicko
 // binding, and both are re-established by submit-plan/approve-plan.
 check("a reopened design may edit its promoted documents without ending the session", () => {
   const seed = promotionSeed("reopen-drift");
-  promote(seed);
+  promoteMini(seed);
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
 
   // Exactly what `reopenPlanDesign` records: phase back to design, approval
@@ -5538,7 +5597,7 @@ for (const [label, options] of Object.entries({
   });
 }
 
-assert.equal(cases.length, 324, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 327,"the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

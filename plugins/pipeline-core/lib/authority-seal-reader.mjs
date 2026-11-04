@@ -26,6 +26,14 @@ export const AUTHORITY_SEAL_EXITS = Object.freeze({
   reopenDesign: "reopen-design",
 });
 
+/**
+ * The ONE scope predicate of the late binding (EL-19, the PRD release scope): a package is sealed at its approval unless its profile is
+ * `mini`. The bind at the end of onboarding (a draft instead of digests), the seal plan and `prepare-seal` all read it from here.
+ */
+export function inSealScope(profile) {
+  return profile !== "mini";
+}
+
 function safePath(value) {
   if (typeof value !== "string" || value.length < 1 || value.length > 240 || value.startsWith("/") || value.includes("\\") || value.includes("\0")) return false;
   return value.split("/").every((part) => part.length > 0 && part !== "." && part !== "..");

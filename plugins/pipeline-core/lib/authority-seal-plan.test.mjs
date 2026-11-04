@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -471,4 +471,168 @@ test("LB4-20 prepare-seal accepts only its closed flags", () => {
     const result = fx.cli(argv);
     assert.equal(result.status, 2, argv.join(" "));
   }
+});
+
+// ---------------------------------------------------------------------------------------------- build step 5: the state machine
+// Every state of the seal has a command the agent can run that leaves a consistent state, `reopen-design` is executable in each of
+// them, and the read-only readback (`inspect` -> sealSituation) names the next command and the exits. Cases LB5-4 to LB5-11.
+const seal = (fx) => JSON.parse(fx.cli(["inspect"]).out).sealSituation;
+const sealedContinuityOf = (fx) => ({ schema: "pipeline.continuity.v0", featureId: FEATURE, revision: 0, runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: { path: PLAN, sha256: sha(fx.read(PLAN)) }, spec: { path: SPEC, sha256: sha(fx.read(SPEC)) }, result: null }, queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } });
+const startSealed = (fx) => {
+  fx.write("continuity-init-request.json", `${JSON.stringify(sealedContinuityOf(fx), null, 2)}\n`);
+  fx.must(["continuity-init", "--expected-revision", "absent", "--request-file", "continuity-init-request.json", "--lock-token", "seal-fixture-token"]);
+};
+const exitIds = (situation) => situation.exits.map((exit) => exit.verb);
+
+test("LB5-4 draft without a plan: the readback names the next command; before the submission that is submit-plan, after it prepare-seal; reopen-design is an exit", async () => {
+  const { sanctionedPipelineStateArgs } = await import("./guard/sanctioned-args-scripts.mjs");
+  const fx = buildDraft("lb5-draft-no-plan");
+  fx.startDraft();
+  const early = seal(fx);
+  assert.equal(early.schema, "pipeline.seal-situation.v1");
+  assert.equal(early.situation, "draft");
+  assert.equal(early.plan.status, "none");
+  assert.equal(early.next.verb, "submit-plan", "a plan prepared before the submission is the plan of another revision");
+  assert.ok(exitIds(early).includes("reopen-design"));
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  const submitted = seal(fx);
+  assert.equal(submitted.plan.status, "none");
+  assert.equal(submitted.next.verb, "prepare-seal");
+  assert.equal(sanctionedPipelineStateArgs(["prepare-seal"], fx.root), true, "the lifecycle guard admits the repair command");
+  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), true);
+  assert.equal(sanctionedPipelineStateArgs(["inspect"], fx.root), true);
+  const before = fx.stateBytes();
+  assert.equal(fx.cli(["inspect"]).status, 0);
+  assert.deepEqual(fx.stateBytes(), before, "the readback writes nothing");
+  assert.equal(existsSync(fx.planFile()), false, "the readback writes no plan");
+  fx.must([submitted.next.verb]);
+  assert.equal(seal(fx).plan.status, "current");
+  assert.equal(seal(fx).next.verb, "present-plan");
+});
+
+test("LB5-5 draft with a prepared plan: present-plan is next, then approve-plan; reopen-design voids the plan and the next command works", () => {
+  const fx = buildDraft("lb5-draft-plan");
+  fx.startDraft();
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).next.verb, "present-plan");
+  fx.must(["present-plan", "--by", "synthetic-presenter", "--review-receipt", RECEIPT]);
+  assert.equal(seal(fx).plan.status, "presented");
+  assert.equal(seal(fx).next.verb, "approve-plan");
+  fx.must(["reopen-design", "--by", "synthetic-author"]);
+  assert.equal(existsSync(fx.planFile()), false, "reopen-design voids the prepared plan");
+  const reopened = seal(fx);
+  assert.equal(reopened.situation, "draft");
+  assert.equal(reopened.plan.status, "none");
+  assert.ok(["submit-plan", "prepare-seal"].includes(reopened.next.verb));
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).plan.status, "current");
+});
+
+test("LB5-6 draft with a stale plan (prepared before the submission): the readback says stale, prepare-seal repairs it", () => {
+  const fx = buildDraft("lb5-draft-stale");
+  fx.startDraft();
+  fx.must(["prepare-seal"]);
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  const stale = seal(fx);
+  assert.equal(stale.plan.status, "stale");
+  assert.equal(stale.next.verb, "prepare-seal");
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).plan.status, "current");
+});
+
+test("LB5-7 draft whose PRD was edited after the plan: the readback says drifted, prepare-seal repairs it, and the edited bytes are what seals", () => {
+  const fx = buildDraft("lb5-draft-drift");
+  fx.startDraft();
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  fx.must(["prepare-seal"]);
+  fx.write(SPEC, `${fx.read(SPEC).toString("utf8")}\nAC-2 is added in the draft.\n`);
+  const drifted = seal(fx);
+  assert.equal(drifted.plan.status, "drifted");
+  assert.equal(drifted.next.verb, "prepare-seal");
+  assert.match(drifted.plan.reason, /spec/u);
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).plan.status, "current");
+});
+
+test("LB5-8 unreadable, orphaned plan file on a draft: the readback says unreadable, prepare-seal replaces it (also a link in its place)", () => {
+  const fx = buildDraft("lb5-draft-garbage");
+  fx.startDraft();
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  mkdirSync(dirname(fx.planFile()), { recursive: true });
+  writeFileSync(fx.planFile(), "not json at all\n");
+  const garbage = seal(fx);
+  assert.equal(garbage.plan.status, "unreadable");
+  assert.equal(garbage.next.verb, "prepare-seal");
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).plan.status, "current");
+  // A plan file that is not a plain single-link file is replaced as well, never followed.
+  const elsewhere = join(dirname(fx.planFile()), "elsewhere.json");
+  writeFileSync(elsewhere, "{}\n");
+  rmSync(fx.planFile());
+  symlinkSync(elsewhere, fx.planFile());
+  assert.equal(seal(fx).plan.status, "unreadable");
+  fx.must(["prepare-seal"]);
+  assert.equal(seal(fx).plan.status, "current");
+  assert.equal(readFileSync(elsewhere, "utf8"), "{}\n", "the link target was not written through");
+});
+
+test("LB5-9 sealed package: nothing to prepare, reopen-design is the exit as before, a stray plan file is retired by prepare-seal", () => {
+  const fx = buildDraft("lb5-sealed");
+  fx.startDraft();
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  fx.must(["prepare-seal"]);
+  fx.must(["present-plan", "--by", "synthetic-presenter", "--review-receipt", RECEIPT]);
+  assert.equal(fx.approve().status, 0);
+  const sealed = seal(fx);
+  assert.equal(sealed.situation, "sealed");
+  assert.equal(sealed.next, null);
+  assert.deepEqual(exitIds(sealed), ["reopen-design"]);
+  assert.equal(sealed.plan.status, "none");
+  mkdirSync(dirname(fx.planFile()), { recursive: true });
+  writeFileSync(fx.planFile(), `${JSON.stringify({ schema: "pipeline.authority-seal-plan.v1" })}\n`);
+  const orphan = seal(fx);
+  assert.equal(orphan.plan.status, "orphaned");
+  assert.equal(orphan.next.verb, "prepare-seal", "the repair of a stray plan file on a sealed package");
+  const bytes = fx.stateBytes();
+  const retired = fx.cli(["prepare-seal"]);
+  assert.equal(retired.status, 2);
+  assert.match(retired.out, /PSP-ALREADY-SEALED/u);
+  assert.match(retired.out, /stray seal plan file .* was retired/u);
+  assert.equal(existsSync(fx.planFile()), false);
+  assert.deepEqual(fx.stateBytes(), bytes, "retiring the file writes no State");
+  assert.equal(seal(fx).plan.status, "none");
+  assert.equal(seal(fx).next, null);
+  assert.equal(fx.cli(["reopen-design", "--by", "synthetic-author"]).status, 0, "reopen-design from a sealed package behaves as before");
+});
+
+test("LB5-10 bound but not yet approved: the readback names reopen-design with its exact command; it is executable and the next command works", () => {
+  const fx = buildDraft("lb5-bound-unapproved");
+  startSealed(fx);
+  const bound = seal(fx);
+  assert.equal(bound.situation, "bound-unapproved");
+  assert.equal(bound.next, null, "no automatic migration: the project stays locked until its approval");
+  assert.deepEqual(exitIds(bound), ["reopen-design"]);
+  assert.match(bound.exits[0].command, /reopen-design --by <name>$/u);
+  const before = fx.stateBytes();
+  assert.equal(fx.cli(["inspect"]).status, 0);
+  assert.deepEqual(fx.stateBytes(), before, "the migration is the reader and the exits only: inspect writes no State");
+  const reopened = fx.cli(["reopen-design", "--by", "synthetic-author"]);
+  assert.equal(reopened.status, 0, reopened.out);
+  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  assert.equal(readAuthoritySeal(fx.current().continuity.authority).status, "sealed", "a bound package re-binds as before");
+});
+
+test("LB5-11 outside the scope: a state without continuity authority reads none and names no seal command", () => {
+  const fx = buildDraft("lb5-none");
+  // `set-feature` binds a continuity of its own, so the state without any continuity authority is written into the fixture directly
+  // (the legacy shape of a project that has not initialized continuity); the readback must stay read-only on it.
+  const legacy = fx.current();
+  delete legacy.continuity;
+  fx.write("project/pipeline-state.json", `${JSON.stringify(legacy, null, 2)}\n`);
+  const none = seal(fx);
+  assert.equal(none.situation, "none");
+  assert.equal(none.next, null);
+  assert.deepEqual(none.exits, []);
 });

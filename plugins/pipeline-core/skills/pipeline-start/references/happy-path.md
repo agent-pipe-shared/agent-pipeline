@@ -21,10 +21,18 @@ command tables.
    read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9
    (profile drift) block is a repository state and names the adoption renewal.
-4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3.
+   **PRD release scope (every profile but `mini`, EL-19): the design package is an unsealed DRAFT** (`inspect` -> `sealSituation.situation` is `draft`); onboarding
+   binds no digest, so the PRD and the Spec stay editable until the approval. Review the package, then step 3b. A `mini` package binds the digests as before.
+3b. `pipeline-state.mjs prepare-seal [--review-receipt <repo-relative-json>]` (agent, draft packages only; run after step 3, and again after any edit of the PRD, the Spec or
+   the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
+   names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+   present the plan to the PO; its digest is part of what the one signature covers.
 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
-   the action `pipeline-state.mjs inspect` returns.
+   the action `pipeline-state.mjs inspect` returns. **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
+   same transaction. A project bound before this change (`bound-unapproved`) stays locked until its approval; `pipeline-state.mjs reopen-design --by <name>` is executable in
+   every state (it voids a prepared seal plan, unlocks a bound package, releases a sealed one); the refusals about a draft or a bound package name it as an exit.
 6. `register-feature-package.mjs --root <root>` (agent). It prints `commitPaths`: commit them BEFORE the binding is generated. After registration do not edit
    the PRD, Spec, `acceptance.md`, `result.md` or the envelope. Owner: `references/implementation-continuation.md`.
    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses

@@ -712,6 +712,16 @@ function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, s
   return receiptPath;
 }
 
+// QG-04 restatement (C19 late binding, build step 5): a package in the PRD release scope is an unsealed draft after onboarding, so
+// the live route is submit-plan, prepare-seal, present-plan, approve-plan (the one signature seals). The helper runs the extra step
+// only for a draft; a sealed package (outside the scope) keeps the old route unchanged.
+function prepareSealWhenDraft(state, rootDir, receipt, label = "prepare-seal") {
+  const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
+  if (current.continuity?.authority?.sealed !== false) return;
+  const prepared = state(["prepare-seal", "--review-receipt", receipt]);
+  assert.equal(prepared.code, 0, `${label}: ${prepared.stderr}`);
+}
+
 // The approval half of the live route. The request path is read from the
 // presentation (DAB-REQUEST-PATH), the canonical intent is signed in process, and
 // the proof lands next to the request, which is where the route reads it.
@@ -5444,6 +5454,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
     assert.equal(submitted.code, 0, submitted.stderr);
     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
+    prepareSealWhenDraft(state, path, reviewReceiptPath);
     const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
     assert.equal(presented.code, 0, presented.stderr);
     const approved = state(designApprovalRequestArgv(path));
@@ -5542,7 +5553,9 @@ for (const runner of ["claude", "codex", "antigravity"]) {
           const result = state(argv);
           assert.equal(result.code, 0, `${runner}: ${argv[0]}: ${result.stderr}`);
         }
-        const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceipt()]);
+        const receiptForPresentation = reviewReceipt();
+        prepareSealWhenDraft(state, path, receiptForPresentation, `${runner}: prepare-seal`);
+        const presented = state(["present-plan", "--by", "po", "--review-receipt", receiptForPresentation]);
         assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
         const approved = state(designApprovalRequestArgv(path));
         assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
@@ -5603,6 +5616,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
       const awaitingEntry = publicInspect();
       assert.deepEqual(awaitingEntry.nextAction, draftEntry.nextAction,
         `${runner}: awaiting approval remains owned by the same public inspect driver`);
+      prepareSealWhenDraft(state, path, firstReviewReceipt, `${runner}: prepare-seal`);
       const presented = state(["present-plan", "--by", "po", "--review-receipt", firstReviewReceipt]);
       assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
       const approved = state(designApprovalRequestArgv(path));
@@ -5743,6 +5757,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
     // submitted PRD/spec are immutable to the staged lifecycle policy.
     const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath });
     assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
+    prepareSealWhenDraft(state, path, reviewReceiptPath);
     const presentedProjdrift = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
     assert.equal(presentedProjdrift.code, 0, presentedProjdrift.stderr);
     const approvedProjdrift = state(designApprovalRequestArgv(path));

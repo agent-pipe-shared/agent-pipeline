@@ -25,7 +25,7 @@
 import { createHash } from "node:crypto";
 
 import { canonical } from "./po-approval-proof.mjs";
-import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+import { inSealScope, readAuthoritySeal } from "./authority-seal-reader.mjs";
 
 export const SEAL_PLAN_SCHEMA = "pipeline.authority-seal-plan.v1";
 /** The one place a prepared plan lives; a re-prepare replaces it (idempotent), so a stale or orphaned plan retires itself. */
@@ -97,7 +97,7 @@ function reviewFault(review, documents) {
  */
 export function buildSealPlan(input) {
   const { authority, featureId, revision, profile, documents, designInputCapture, reviews } = input;
-  if (!isRecord(authority) || profile === "mini") {
+  if (!isRecord(authority) || !inSealScope(profile)) {
     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
   }
   const seal = readAuthoritySeal(authority);

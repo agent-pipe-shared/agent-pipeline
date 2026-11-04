@@ -47,8 +47,11 @@ function promotedProject(name) {
     "",
   ].join("\n"));
   writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
+  // QG-04 restatement (C19 late binding, build step 5): a package in the EL-19 scope (every profile but `mini`) is promoted as the
+  // unsealed draft, whose PRD and Spec stay editable by design, so there is no bound-document drift to explain. The drift cases of
+  // this file pin the bound digest and therefore promote a package outside the scope (`mini`), which binds the digests as before.
   const plan = planOnboardingKickoffPromotion({
-    rootDir: dir, profile: "feature", featureId: `feature-${name}`,
+    rootDir: dir, profile: "mini", featureId: `feature-${name}`,
     planPath: "specs/promoted/prd_promoted.md", prdPath: "specs/promoted/prd_promoted.md",
     specPath: "specs/promoted/spec.md", designInputPath: "specs/promoted/design-input.md",
   });

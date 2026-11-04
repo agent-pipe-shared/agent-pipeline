@@ -402,7 +402,9 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
     const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
       companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
     const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
-      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
+      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources,
+      // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
+      ...(physicalRequest.binding?.sealPlanSha256 === undefined ? {} : { sealPlanSha256: physicalRequest.binding.sealPlanSha256 }) });
     if (!checked.ok || checked.intentSha256 !== intentSha256) return null;
     for (const [path, sha256] of facts) {
       if (path === requestPath) continue;

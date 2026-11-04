@@ -112,7 +112,7 @@ import {
   validPlanCancellation,
   validPlanMixedStateRecovery,
 } from "./plan-spec-state-v2.mjs";
-import { readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
+import { inSealScope, readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
@@ -1631,6 +1631,28 @@ function operatorConfirmedContinuity(observed, operatorAuthority) {
 function boundAuthorityDigests(continuity) {
   const seal = readAuthoritySeal(continuity?.authority);
   return seal.status === "sealed" ? seal.digests : {};
+}
+
+/**
+ * Late binding, the bind at the end of onboarding (build step 5). A package in the EL-19 scope (every profile but `mini`, the one
+ * shared predicate) leaves the promotion as the UNSEALED DRAFT -- `sealed: false`, the paths and no digest -- because the PRD and the
+ * Spec stay editable until the plan approval seals them. Every other package keeps today's bind of the digests, byte for byte.
+ * The digests of the promotion time stay in the promotion plan and in the private history as provenance.
+ */
+function promotionAuthority(profile, authority) {
+  if (!inSealScope(profile)) return { prd: authority.prd, spec: authority.spec, result: null };
+  return { sealed: false, prd: { path: authority.prd.path }, spec: { path: authority.spec.path }, result: null };
+}
+
+/**
+ * Does the continuity authority of a promoted state bind `sha256` for `role`? For a package outside the scope the state binds the
+ * digest itself. For a package in the scope the state must be the draft of exactly this path (the digest is held by the plan and
+ * the history, not by the state); a sealed shape never matches a draft promotion, and a draft never matches a digest promotion.
+ */
+function promotionBinds(continuity, profile, role, path, sha256) {
+  const seal = readAuthoritySeal(continuity?.authority);
+  if (inSealScope(profile)) return seal.status === "draft" && seal.paths[role] === path;
+  return seal.status === "sealed" && seal.digests[role] === sha256;
 }
 
 function normalizedContinuity(state, observed) {
@@ -5887,9 +5909,9 @@ function validatePromotionPlan(plan) {
     || state.activeFeature.planPath !== input.planPath || state.activeFeature.phase !== "design"
     || state.planApproved !== false || state.continuity.featureId !== input.featureId
     || state.continuity.authority.prd.path !== input.prdPath
-    || boundAuthorityDigests(state.continuity).prd !== plan.authority.prd.sha256
+    || !promotionBinds(state.continuity, input.profile, "prd", input.prdPath, plan.authority.prd.sha256)
     || state.continuity.authority.spec.path !== input.specPath
-    || boundAuthorityDigests(state.continuity).spec !== plan.authority.spec.sha256
+    || !promotionBinds(state.continuity, input.profile, "spec", input.specPath, plan.authority.spec.sha256)
     || !(state.bootstrapAcknowledgementRequired === undefined || state.bootstrapAcknowledgementRequired === true)
     || !validateContinuityState(state.continuity, input.featureId).ok) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
@@ -6013,8 +6035,8 @@ function buildCoordinatorSourcedPromotionPlan({
       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
       || observed.state?.continuity?.featureId !== input.featureId
-      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
-      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
+      || !promotionBinds(observed.state?.continuity, input.profile, "prd", input.prdPath, authority.prd.sha256)
+      || !promotionBinds(observed.state?.continuity, input.profile, "spec", input.specPath, authority.spec.sha256)) {
       fail("KICKOFF-PROMOTION-REPLAY", "coordinator-sourced binding replay does not match the exact completed postimage");
     }
     const binding = {
@@ -6075,6 +6097,9 @@ function buildCoordinatorSourcedPromotionPlan({
     specPath: authority.spec.path, specSha256: authority.spec.sha256,
     language: kickoffLanguage(observed.root),
   });
+  // Late binding step 5: a package in the EL-19 scope leaves the bootstrap bind as the unsealed draft, exactly like the kickoff-sourced
+  // promotion; a package outside the scope keeps the bound digests of initialContinuity byte for byte.
+  if (inSealScope(input.profile)) continuity.authority = promotionAuthority(input.profile, authority);
   if (new Set(["de", "en"]).has(authority.poLanguage)) {
     continuity.runtime = { ...continuity.runtime, humanFacingLanguage: authority.poLanguage };
   } else if (authority.poLanguage !== null) {
@@ -6213,8 +6238,8 @@ function buildKickoffPromotionPlan({
       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
       || observed.state?.continuity?.featureId !== input.featureId
-      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
-      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
+      || !promotionBinds(observed.state?.continuity, input.profile, "prd", input.prdPath, authority.prd.sha256)
+      || !promotionBinds(observed.state?.continuity, input.profile, "spec", input.specPath, authority.spec.sha256)) {
       fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
     }
     const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
@@ -6274,7 +6299,7 @@ function buildKickoffPromotionPlan({
   next.planApproved = false;
   next.continuity.featureId = input.featureId;
   next.continuity.revision = kickoff.revision + 1;
-  next.continuity.authority = { prd: authority.prd, spec: authority.spec, result: null };
+  next.continuity.authority = promotionAuthority(input.profile, authority);
   next.continuity.queueHead = {
     packageId: "kickoff-promotion", actionId: "review-work", nextAction: "review",
     productRetryCount: 0, environmentRerouteCount: 0, dispatch: null,
@@ -9368,8 +9393,8 @@ function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionClean
     || observed.history.transactions.length !== 2 || !promotedRevisions.includes(state?.continuity?.revision)
     || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
     || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
-    || boundAuthorityDigests(state.continuity).prd !== entry.prdSha256
-    || boundAuthorityDigests(state.continuity).spec !== entry.specSha256
+    || !promotionBinds(state.continuity, entry.profile, "prd", entry.planPath, entry.prdSha256)
+    || !promotionBinds(state.continuity, entry.profile, "spec", entry.specPath, entry.specSha256)
     || entry.afterStateSha256 !== observed.stateObservation.sha256
     || !isObject(binding.binding.sessionCleanup)) return null;
   let beforeSha256;

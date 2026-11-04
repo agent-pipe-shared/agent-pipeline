@@ -928,6 +928,13 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const bootstrapPolicy = readCriticalHumanProofPolicy(cwd);
       assert.equal(bootstrapPolicy.ok, true);
       designWorkflowDeps.readCriticalHumanProofPolicy = () => bootstrapPolicy;
+      // QG-04 restatement (C19 late binding, build step 5): a package in the PRD release scope is an unsealed draft after onboarding
+      // (`sealed: false`), so the approval path is submit-plan, prepare-seal, present-plan, approve-plan; the one signature seals.
+      // A sealed package (outside the scope) keeps the old path without the extra step.
+      if (readFixtureState(cwd).continuity?.authority?.sealed === false) {
+        const prepared = run("node", [stateScript, "prepare-seal", "--review-receipt", reviewReceiptPath]);
+        assert.equal(prepared.status, 0, prepared.stderr);
+      }
       const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--review-receipt", reviewReceiptPath];
       const presented = run("node", presentedArgv);
       assert.equal(presented.status, 0, presented.stderr);
@@ -1421,7 +1428,14 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         [`${sourceBase}/design.md`, `Revised design for ${featureId}.\n`],
         [`${sourceBase}/traceability.md`, `Requirements for ${featureId} are mapped.\n`],
       ];
-      for (const [relativePath, bytes] of fixtureSources) writeFileSync(join(path, relativePath), bytes);
+      // QG-04 restatement (C19 late binding, build step 5): the design input is the intake capture of the PO's request. The seal plan
+      // refuses a design input that differs from the bytes captured at promotion (PSP-PROVENANCE), so this fixture keeps the captured
+      // file when the intake wrote it and only writes the canned text for a project that has none; design.md and traceability.md are
+      // authored as before.
+      for (const [relativePath, bytes] of fixtureSources) {
+        if (relativePath.endsWith("/design-input.md") && existsSync(join(path, relativePath))) continue;
+        writeFileSync(join(path, relativePath), bytes);
+      }
       // QG-04 (E12, ADR-0085): one ordinary review over the finished sources replaces the Advisor/readiness package; the report
       // and receipt are committed WITH the sources so the design candidate stays the single HEAD (the candidate assertion below holds).
       mkdirSync(join(path, sourceBase, "review"), { recursive: true });

@@ -451,7 +451,7 @@ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs'
 import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
 import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
 import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
-import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
+import { inSealScope, readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
 import {
   SEAL_PLAN_PATH, advisoryBindingFromAdmission, buildSealPlan, checkSealPlanForApply, provenanceUnavailableRefusal, readSealDocuments,
   readinessBindingFromSources, sealPaths, sealPlanNotPresentedRefusal, sealedAuthorityFromPlan, unreadableReviewRefusal,
@@ -4373,7 +4373,11 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       if (!validPlanPresentation(presentation) || presentation.schema !== PLAN_PRESENTATION_DESIGN_SCHEMA || presentation.submissionSha256 !== lifecycle.submissionSha256) {
         return { kind: "collect-input", mutation: false, requiresConfirmation: false, code: "DAB-REVIEW-RECEIPT-REQUIRED",
           inputs: [{ name: "reviewReceipt", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true }],
-          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required." };
+          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
+            // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
+            + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
+              ? " This package is an unsealed draft: run prepare-seal --review-receipt with the same receipt(s) BEFORE present-plan (the approval seals the PRD and the Spec); reopen-design stays available at any time."
+              : "") };
       }
       const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
       const observed = observeDesignApprovalRequest({ dir, presentation, submission, deps, signature: mode?.mode === "signature" });
@@ -7138,12 +7142,14 @@ function writeSealPlanFile(dir, plan) {
     if (!directory.isDirectory() || directory.isSymbolicLink() || realpathSync(scratch) !== scratch) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/ is not a plain directory" };
     const target = join(scratch, "seal-plan.json");
     const bytes = Buffer.from(`${JSON.stringify(plan, null, 2)}\n`, "utf8");
-    if (existsSync(target)) {
-      const stat = lstatSync(target);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/seal-plan.json is not a plain single-link file; move or delete that one file and run prepare-seal again" };
-      if (readFileSync(target).equals(bytes)) return { ok: true, replay: true };
+    let existing = null;
+    try { existing = lstatSync(target); } catch { /* no plan file yet */ }
+    if (existing !== null) {
+      if (existing.isDirectory()) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/seal-plan.json is a directory; move that directory away and run prepare-seal again" };
+      if (existing.isFile() && existing.nlink === 1 && readFileSync(target).equals(bytes)) return { ok: true, replay: true };
     }
     // Replace atomically: a crash leaves either the old plan or the new one, never a torn file (the plan is also digest-checked on read).
+    // The rename replaces a link or an unreadable leftover by name and never writes through it, so a damaged plan file is always repaired here.
     const temporary = join(scratch, `.seal-plan.${process.pid}.tmp`);
     writeFileSync(temporary, bytes, { mode: 0o600, flag: "w" });
     renameSync(temporary, target);
@@ -7166,9 +7172,75 @@ function checkPreparedSealPlan(dir, state) {
 function removeSealPlanFile(dir) {
   try {
     const target = join(realpathSync(resolve(dir)), "scratch", "seal-plan.json");
-    if (existsSync(target)) { unlinkSync(target); return true; }
+    if (sealPlanFileExists(dir)) { unlinkSync(target); return true; }
   } catch { /* a plan that cannot be removed is retired by the next prepare-seal */ }
   return false;
+}
+
+/** True for any entry at the plan path, a dangling link included (existsSync follows links and would miss it). */
+function sealPlanFileExists(dir) {
+  try { lstatSync(join(realpathSync(resolve(dir)), "scratch", "seal-plan.json")); return true; } catch { return false; }
+}
+
+function sealCommand(verb, args = []) {
+  return { verb, command: ["node", fileURLToPath(import.meta.url), verb, ...args].join(" ") };
+}
+
+/**
+ * Late binding step 5: the read-only verdict on where a package stands in the seal and the command that moves it. Three situations
+ * (plus "none" outside the scope): `draft` (the PRD and Spec are not bound yet), `bound-unapproved` (digests bound at onboarding, the
+ * plan not approved yet: the project stays locked until its approval) and `sealed`. It writes nothing and migrates nothing.
+ * `reopen-design` is an exit of every situation, so no state is a dead end. `plan.status` describes scratch/seal-plan.json.
+ */
+function inspectSealSituation(dir, base) {
+  const SCHEMA = "pipeline.seal-situation.v1";
+  const reopen = { ...sealCommand("reopen-design", ["--by", "<name>"]) };
+  const authority = base.continuity?.authority;
+  if (authority === null || typeof authority !== "object" || Array.isArray(authority)) {
+    return { schema: SCHEMA, situation: "none", plan: { status: "none" }, next: null, exits: [], reason: "the State carries no continuity authority, so there is nothing to seal" };
+  }
+  const seal = readAuthoritySeal(authority);
+  const fileExists = sealPlanFileExists(dir);
+  if (seal.status === "sealed") {
+    const approved = base.planApproved === true;
+    return {
+      schema: SCHEMA,
+      situation: approved ? "sealed" : "bound-unapproved",
+      plan: fileExists ? { status: "orphaned", reason: "scratch/seal-plan.json exists on a package that is already sealed; it is inert" } : { status: "none" },
+      next: fileExists ? sealCommand("prepare-seal") : null,
+      exits: [reopen],
+      reason: approved
+        ? "the PRD and the Spec are sealed by the plan approval; reopen-design is the only way to change them"
+        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design unlocks it",
+    };
+  }
+  if (seal.status !== "draft") {
+    return { schema: SCHEMA, situation: "invalid", plan: { status: fileExists ? "orphaned" : "none" }, next: null, exits: [reopen], reason: seal.reason };
+  }
+  const exits = [sealCommand("prepare-seal"), reopen];
+  const gate = checkPreparedSealPlan(dir, base);
+  let plan;
+  if (gate.refusal !== undefined && gate.refusal.code === "PSP-DOCUMENT-MISSING") {
+    plan = { status: "documents-missing", reason: gate.refusal.reason };
+  } else if (gate.plan !== undefined) {
+    const presented = base.planPresentation?.designApprovalBinding?.sealPlanSha256 === gate.plan.planSha256;
+    plan = { status: presented ? "presented" : "current", planSha256: gate.plan.planSha256 };
+  } else if (!fileExists) {
+    plan = { status: "none" };
+  } else {
+    const code = gate.refusal?.code;
+    plan = { status: code === "PSP-PLAN-STALE" ? "stale" : code === "PSP-APPLY-DRIFT" ? "drifted" : "unreadable", reason: gate.refusal?.reason ?? "scratch/seal-plan.json is not a readable seal plan" };
+  }
+  let next;
+  if (plan.status === "documents-missing") next = null;
+  else if (base.planSubmission === undefined || base.planSubmission === null) next = sealCommand("submit-plan", ["--by", "<name>", "--profile", "<epic|feature>"]);
+  else if (plan.status === "current") next = sealCommand("present-plan", ["--by", "<name>", "--review-receipt", "<review-receipt-path>"]);
+  else if (plan.status === "presented") next = sealCommand("approve-plan");
+  else next = sealCommand("prepare-seal");
+  return {
+    schema: SCHEMA, situation: "draft", plan, next, exits,
+    reason: "the PRD and the Spec are an unsealed draft: review the package, prepare-seal, present the plan; the one signature of the approval seals them",
+  };
 }
 
 function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
@@ -13151,7 +13223,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       let documents = null;
       let designInputCapture = null;
       const reviews = [];
-      if (seal.status === "draft" && profile !== "mini") {
+      if (seal.status === "draft" && inSealScope(profile)) {
         const docs = currentSealDocuments(dir, seal);
         if (!docs.ok) return stop(docs);
         documents = docs.documents;
@@ -13177,7 +13249,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         for (const extra of (deps.reviewBindings?.() ?? [])) reviews.push(extra);
       }
       const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews });
-      if (!built.ok) return stop(built);
+      if (!built.ok) {
+        // A plan file left on a package that is already sealed is inert but orphaned: this command retires it (it never writes State).
+        if (built.code === "PSP-ALREADY-SEALED" && removeSealPlanFile(dir)) console.log("The stray seal plan file (scratch/seal-plan.json) was retired; State was not changed.");
+        return stop(built);
+      }
       const persisted = writeSealPlanFile(dir, built.plan);
       if (!persisted.ok) { console.error(`Error: prepare-seal refused (${persisted.code}): ${persisted.message}.`); return 2; }
       console.log(JSON.stringify({ schema: "pipeline.authority-seal-prepare.v1", path: SEAL_PLAN_PATH, replay: persisted.replay, plan: built.plan }, null, 2));
@@ -13979,6 +14055,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           ? reopenDesignNextActionText(dir)
           : nextActionSection(base),
         continuityAuthorityDrift: drift,
+        // Late binding step 5: read-only, writes nothing; the situation, the next command and the exits (reopen-design is always one).
+        sealSituation: inspectSealSituation(dir, base),
         publicHandoverDuty: {
           ...publicHandoverDuty,
           nextAction: publicHandoverDuty.status === "current" ? null : {

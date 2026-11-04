@@ -22,6 +22,7 @@
       "next": [
         "set-feature",
         "submit-plan",
+        "prepare-seal",
         "present-plan",
         "approve-plan"
       ],
@@ -72,9 +73,10 @@
         "a complete PRD and Spec (no framing placeholder text; the architecture design for epic and feature profiles)"
       ],
       "evidenceSchema": null,
-      "producer": "plan submission bound to the PRD and Spec digests, lifecycle awaiting-approval",
+      "producer": "plan submission and lifecycle awaiting-approval; a package outside the PRD release scope (mini) binds the PRD and Spec digests here, in the PRD release scope the package stays an unsealed draft",
       "humanGate": false,
       "next": [
+        "prepare-seal",
         "present-plan"
       ],
       "commit": null,
@@ -92,15 +94,41 @@
       }
     },
     {
+      "id": "prepare-seal",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs prepare-seal --review-receipt <review-receipt-path>",
+      "needs": [
+        "the PRD release scope: the design package is an unsealed draft (inspect: sealSituation.situation draft); review it first; run after submit-plan and again after any edit of the PRD, the Spec or the design input"
+      ],
+      "evidenceSchema": null,
+      "producer": "scratch/seal-plan.json: the digest-bound seal plan of the draft; State is not written; it also retires a damaged or stray plan file",
+      "humanGate": false,
+      "next": [
+        "present-plan"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "prepare-seal",
+        "argv": [
+          "prepare-seal",
+          "--review-receipt",
+          "<review-receipt-path>"
+        ],
+        "closed": false
+      }
+    },
+    {
       "id": "present-plan",
       "who": "agent",
       "command": "node <plugin-root>/scripts/pipeline-state.mjs present-plan --by <name> --review-receipt <review-receipt-path>",
       "needs": [
         "a submitted plan",
-        "a tracked design review receipt (at most two --review-receipt)"
+        "a tracked design review receipt (at most two --review-receipt)",
+        "the prepared seal plan, for a draft package in the PRD release scope"
       ],
       "evidenceSchema": null,
-      "producer": "plan presentation record bound to the exact submission, and the design approval request file under scratch/",
+      "producer": "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
       "humanGate": false,
       "next": [
         "sign-intent",
@@ -156,7 +184,7 @@
         "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"
       ],
       "evidenceSchema": null,
-      "producer": "plan approval recorded in pipeline state, lifecycle approved; continue with the implement runbook",
+      "producer": "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook",
       "humanGate": false,
       "next": [],
       "commit": null,
@@ -176,7 +204,7 @@
       "who": "agent",
       "command": "node <plugin-root>/scripts/pipeline-state.mjs reopen-design --by <name>",
       "needs": [
-        "recovery: the plan or spec authority is stale or unavailable"
+        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"
       ],
       "evidenceSchema": null,
       "producer": "lifecycle returns to draft",

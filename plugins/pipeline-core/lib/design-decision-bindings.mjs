@@ -317,7 +317,9 @@ function verifyBasis(root, requestFile, approval, receiptFiles) {
     return { path: ref.path, bytes: file.bytes };
   });
   requireValue(receiptFiles.length === receipts.length, 'DDB-REVIEW-RECEIPT-DRIFT');
-  const checked = verifyDesignApprovalRequest({ request, featureId: request.binding.featureId, receipts, currentSources: request.binding.sources });
+  // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
+  const checked = verifyDesignApprovalRequest({ request, featureId: request.binding.featureId, receipts, currentSources: request.binding.sources,
+    ...(request.binding.sealPlanSha256 === undefined ? {} : { sealPlanSha256: request.binding.sealPlanSha256 }) });
   requireValue(checked.ok && checked.bindingSha256 === approval.bindingSha256
     && checked.intentSha256 === approval.intentSha256, 'DDB-REQUEST-BINDING');
   candidateProvenance(root, checked.candidate, request.binding.sources);
