@@ -320,8 +320,8 @@ Found only on the full chain, not in any slice clone: the kernel closure suite (
 | pin-catalogue-admit-prescribed-lifecycle-verbs-tests | the duplicate-check mutant mirror hit w180's `prepare-seal` branch first | fixed (pin restated), w197 |
 | product-capability-inventory-tests (PCI24, PCI30) | `analysis-run.mjs` admitted by the guard since w148 but named nowhere; PCI30 follows | fixed, w198 (predates the chain) |
 | native-goldfish-host-finalizer-regression-tests | green alone (76 s); red only under the Full Verify load | environment (load) |
-| verify-suite-append-history-check | `VSA-PRIOR-ENTRY-CHANGED` at 7281e012c (a 3 November edit of an existing registry entry); identical in the main tree | pre-existing, open (needs a recovery record or a PO decision on the registry history) |
-| security-remote-identity-tests (SRI001) | red in the main tree with the same assertion | pre-existing, open |
+| verify-suite-append-history-check | `VSA-PRIOR-ENTRY-CHANGED` at 7281e012c (a 3 November in-place extension of one `caseIds` list); identical in the main tree. The shape is the K143 exception kind, but `verify-suite-history-recovery.json` admits exactly one `rewrites` entry by design ("not extendable"; `check-verify-suite-append.mjs` lines 175 and 322) | open, PO decision: lifting the one-entry cap in the history check and recording a second entry (commit 7281e012c, its parent, both registry digests) |
+| security-remote-identity-tests (SRI001) | red in the main tree too: the case still asserted "not clean" for a repository without a remote, while the scan returns the typed local-only subject that the push gate refuses | fixed (pin restated), w199; 2/2 on the rehearsal clone |
 | codex-isolated-critic-protected-preimage-tests | `critic-review/SKILL.md` and `roles/critic.md` differ from the pinned preimage; identical in the main tree | known; never re-pinned by the agent |
 | security-scan | needs `--remote upstream` in the clone | environment |
 
