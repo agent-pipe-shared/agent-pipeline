@@ -59,6 +59,17 @@ All four are the same design question: what is granted by a signature or an acce
 
 The revised text has not had a second review; the review budget is spent on a working local candidate first (PO decision 2026-11-03).
 
+## Proposed amendment of 2026-11-04: one definition of "evidence-only", one shared freshness function
+
+Found by reading the code after the first build stage (patch w156, which is inert): the push boundary already carries Verify and Security across record-only commits through the release-promotion envelope (`lib/release-promotion-envelope.mjs`, `RECORD_ONLY_PATH_PATTERNS`, used by `hooks/guard-push.mjs` and `scripts/push-prepare.mjs`), and the Critic delta course has a third, narrower test (`lib/feature-package-registration.mjs`). Three definitions of "may change without invalidating a record" is itself a trust-boundary hazard, so point 2 is amended before any reader is wired:
+
+- **One path set, owned by one module.** The base is the set the production envelope already uses (reviewed and in force). The two classes this ADR needs and the envelope lacks, `specs/<feature>/audit-bundles/**` and `project/push-threat-model.md`, are added as a named extension that the envelope does not accept until it has been reviewed for them. The Critic delta course keeps its own narrower test on purpose (it answers a different question: whether a commit is a correction candidate); it is not widened.
+- **The wider members of the envelope set are acknowledged, not silently adopted:** `backlog/**`, `docs/state.md` and the two pipeline-state files are not product code, but they are consumed by gates. Carrying a Security record across them needs the secret scan of point 2 like any other path; Verify may be carried across them only if the independent review of this amendment confirms that no Verify suite reads them as input. Until then the carry-forward decision of w156 keeps its narrower set and refuses these paths.
+- **One shared freshness function** replaces the four hand-written comparisons (`hooks/guard-push.mjs`, `lib/security-completeness-gate.mjs`, `scripts/push-prepare.mjs`, and the template of the managed pre-push hook in `scripts/pre-push-hook-install.mjs`), returns a stable code next to the message (today `scripts/push-gate-satisfiability.mjs` classifies by the substring `is stale (HEAD is`), and the hook template loads it by dynamic import as it already does for the security completeness gate. The envelope stays one input of that function, not a second path next to it.
+- **Order of work:** (1) the shared module with the single path set and no behaviour change, pinned by the existing push suites; (2) the shared freshness function with stable codes, still exact-commit only; (3) the carry-forward branch behind its own opt-in. No stage widens what a push accepts before the independent review of this amendment.
+
+This amendment has had no review. It changes nothing in code.
+
 ## Not decided
 
 Nothing is built by this draft. It needs an independent review (fresh context, ADR-0014 contract); the patches follow in the apply script behind their own opt-in block.
