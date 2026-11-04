@@ -1,0 +1,209 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 42c2eafb2..40edeb1b2 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1207,6 +1207,17 @@ manualCheck("GD75 allow  D183: a pointer prompt (marker line + pipeline-briefing
+   assert.equal(answer.hookSpecificOutput.updatedInput.model, "sonnet");
+ });
+ 
++manualCheck("GD75b allow  D183 x E1: an admitted pointer prompt leaves the same pending host-commit state as the inline briefing (the child's stop finds it)", () => {
++  const inline = generatedItemFixture();
++  const inlineRun = runAtOut(generatedDispatch(inline, "gd75b-inline", {}), inline.root);
++  assert.equal(inlineRun.code, ALLOW, `inline exit ${inlineRun.code} -- ${inlineRun.stderr.trim().slice(0, 300)}`);
++  const pointed = generatedItemFixture();
++  const pointerRun = runAtOut(pointerDispatch(pointed, pointerFixture(pointed), "gd75b-pointer"), pointed.root);
++  assert.equal(pointerRun.code, ALLOW, `pointer exit ${pointerRun.code} -- ${pointerRun.stderr.trim().slice(0, 300)}`);
++  assert.equal(pendingNativeStates(inline.root).length, 1, `inline leaves one pending state: ${inlineRun.stderr.slice(0, 300)}`);
++  assert.equal(pendingNativeStates(pointed.root).length, 1, `a pointer prompt must leave one pending state too: ${pointerRun.stderr.slice(0, 400)}`);
++});
++
+ manualCheck("GD76 block  D183: a pointer with a wrong digest is refused DBG-REF-DIGEST, and a file modified after generation is refused DBG-REF-DIGEST", () => {
+   const governed = sharedRefusalFixture();
+   const wrong = runAtOut(pointerDispatch(governed, pointerFixture(governed, { digest: "0".repeat(64) }), "gd76a"), governed.root);
+@@ -1254,7 +1265,7 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
+   }
+ });
+ 
+-assert.equal(cases.length, 82, "the complete dispatch guard corpus must register before execution");
++assert.equal(cases.length, 83, "the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index a4f19dd5c..054b9f012 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -111,7 +111,7 @@ function stopFailureNotice(failure) {
+   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
+   // E1 (Claude Windows greenfield): a stop failure with no pending state named neither why nor the command that recovers it.
+   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
+-    ? ` Cause: the launch had no pending host-commit state when its tool call returned, which is the normal case for a background launch. Recovery: ${recoverySentence(failure.dispatchId)}`
++    ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId)}`
+     : failure.code === "NGHF-COMMIT-EXCEPTION"
+       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
+       : "";
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
+index 183cae1c9..f884cc5b0 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
+@@ -248,7 +248,13 @@ const cases = [
+     const stopFailure = { code: "NGHF-PENDING-UNAVAILABLE", dispatchId: "gf-store-backup", observedAt: "2026-11-03T00:23:33.503Z", stage: null, reason: null, detail: null };
+     const message = nativeGoldfishHookMessage(null, { stopFailure });
+     assert.match(message, /NGHF-PENDING-UNAVAILABLE/u);
+-    assert.match(message, /no pending host-commit state when its tool call returned/u);
++    // E1 (Windows run 2026-11-04): this record is written by a SubagentStop, so "no pending state at the launch return" was the wrong
++    // cause. The notice says the stop could not read it, and says when the record names no reason.
++    assert.match(message, /at its stop the child's pending host-commit state could not be read \(this record carries no reason; it may predate the reason field\)/u);
++    assert.doesNotMatch(message, /normal case for a background launch/u);
++    const reasoned = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, reason: "NGHS-PENDING-MISSING" } });
++    assert.match(reasoned, /\(NGHF-PENDING-UNAVAILABLE; reason NGHS-PENDING-MISSING\)/u);
++    assert.match(reasoned, /could not be read\. Recovery:/u, "no 'no reason' remark when the record has one");
+     assert.match(message, /scripts\/goldfish-host-commit-recover\.mjs plan --root <root> --dispatch-id gf-store-backup/u);
+     assert.match(message, /--expect-sha256/u);
+     const other = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, code: "NGHF-STOP-UNRESOLVED" } });
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 5b01d2782..86f36eb3a 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -324,6 +324,19 @@ const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-diagnos
+ const STOP_FAILURE_LEGACY_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
+ const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
+ 
++/**
++ * E1 (Windows consumer, 2026-11-04): the persisted stop failure carries a stage and a reason (the reason of a commit exception sits in
++ * its bounded detail), and the build warning dropped both. Control characters are removed and the text is bounded; the record was
++ * scrubbed when it was written, this only keeps one warning line one line.
++ */
++function stopFailureCauseText(entry) {
++  const clean = (value) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 160) : "");
++  const reason = clean(entry?.reason) || clean(entry?.detail?.reason);
++  const stage = clean(entry?.stage);
++  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null].filter(Boolean);
++  return parts.length > 0 ? parts.join(", ") : "no reason recorded";
++}
++
+ /**
+  * PF-61: the persisted stop-failure diagnostics of background Goldfish whose host commit failed at SubagentStop (read-only).
+  * At most 20 regular, non-symlink files, each read bounded to 64 KiB; only objects of the stop-failure schema with string
+@@ -885,7 +898,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   }
+   for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
+     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+-    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
++    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}, ${stopFailureCauseText(entry)}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+   }
+ 
+   // Agent definition: effort, model alias and the maxTurns cliff.
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 072968e3e..95c53ada1 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1565,6 +1565,22 @@ test("PF-61 reader one persisted diagnostic yields exactly one warning naming di
+   assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
+ });
+ 
++test("PF-61 reader the warning names the recorded stage and reason, the detail's reason when the record has none, and says so when there is none", async () => {
++  const { runDispatchBriefing } = await lib();
++  const messageOf = async (over) => {
++    const fx = makeFixture();
++    const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure(over)] }));
++    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++    return stopWarnings(result)[0].message;
++  };
++  assert.match(await messageOf({ stage: "pending-read", reason: "NGHS-PENDING-MISSING" }), /observed 2026-10-26T10:00:00\.000Z, stage pending-read, reason NGHS-PENDING-MISSING\); verify/u);
++  assert.match(await messageOf({ code: "SDC-AUTHORITY-UNAVAILABLE", detail: { reason: "registry-lock-held" } }), /reason registry-lock-held\); verify/u);
++  assert.match(await messageOf({}), /no reason recorded\); verify/u);
++  const hostile = await messageOf({ reason: `line one\nline two ${"x".repeat(400)}` });
++  assert.equal(hostile.includes("\n"), false, "one warning stays one line");
++  assert.ok(hostile.length < 700, `the cause text is bounded (${hostile.length})`);
++});
++
+ test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+index 2d0309dec..984c4c662 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+@@ -96,6 +96,17 @@ function readPendingBindings(commonDir) {
+   return found;
+ }
+ 
++/** The bounded, already scrubbed cause fields of a stop-failure record: the reason (or the detail's own reason), the stage and the detail; absent fields are left out. */
++export function stopFailureCause(record) {
++  const reason = typeof record?.reason === "string" && record.reason !== "" ? record.reason
++    : typeof record?.detail?.reason === "string" && record.detail.reason !== "" ? record.detail.reason : null;
++  return {
++    ...(reason ? { reason } : {}),
++    ...(typeof record?.stage === "string" && record.stage !== "" ? { stage: record.stage } : {}),
++    ...(record?.detail && typeof record.detail === "object" && !Array.isArray(record.detail) ? { detail: record.detail } : {}),
++  };
++}
++
+ /** The newest stop-failure record with its file name (the exported reader gives the content, not the file). */
+ function newestStopFailure(commonDir) {
+   const record = readNativeGoldfishStopFailure({ commonDir });
+@@ -105,7 +116,7 @@ function newestStopFailure(commonDir) {
+     if (!/^stop-failure-.+\.json$/u.test(name)) continue;
+     try {
+       const entry = JSON.parse(readFileSync(join(directory, name), "utf8"));
+-      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...(typeof record.reason === "string" ? { reason: record.reason } : {}) };
++      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...stopFailureCause(record) };
+     } catch { /* skip */ }
+   }
+   return null;
+@@ -288,7 +299,7 @@ export function plan(options) {
+     if (present) refusals.push(refuse("GHCR-RECORD-EXISTS", `${recordTarget} already exists and is never overwritten`, "inspect it; if it already records this delivery there is nothing to land, otherwise remove only your own failed attempt and plan again"));
+   }
+ 
+-  const stopFailure = stop && (!dispatchId || stop.dispatchId === dispatchId) ? { file: stop.file, code: stop.code } : null;
++  const stopFailure = stop && (!dispatchId || stop.dispatchId === dispatchId) ? { file: stop.file, code: stop.code, ...stopFailureCause(stop) } : null;
+   const result = { schema: PLAN_SCHEMA, status: refusals.length === 0 ? "ready" : "refused", code: refusals[0]?.code ?? "GHCR-READY",
+     dispatchId, source, candidateCommit, head: headSha, stopFailure, paths: refusals.length === 0 ? paths : [], refusals,
+     ...(stopFailure ? {} : { stopFailureNote: "no stop-failure record for this dispatch; the stop left no diagnostic" }) };
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+index cf6dcd1d5..4df9c5ca1 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+@@ -26,7 +26,7 @@ const git = (cwd, ...args) => {
+   return r.stdout.trim();
+ };
+ 
+-function fixture({ pending = true, stop = true } = {}) {
++function fixture({ pending = true, stop = true, stopOver = {} } = {}) {
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "ghcr-")));
+   git(root, "init", "-q");
+   git(root, "config", "user.name", "Fixture");
+@@ -55,7 +55,7 @@ function fixture({ pending = true, stop = true } = {}) {
+     mkdirSync(dir, { recursive: true });
+     writeFileSync(join(dir, STOP_FILE), `${JSON.stringify({
+       schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: DISPATCH, toolUseId: "toolu_1", status: "recovery-required",
+-      code: "NGHF-FIXTURE-CODE", stage: null, reason: null, commit: null, observedAt: "2026-11-02T10:00:00.000Z" })}\n`);
++      code: "NGHF-FIXTURE-CODE", stage: null, reason: null, commit: null, observedAt: "2026-11-02T10:00:00.000Z", ...stopOver })}\n`);
+   }
+   return { root, head };
+ }
+@@ -106,6 +106,23 @@ test("apply: exactly one commit, three trailers last, pointer to the stop failur
+   } finally { cleanup(root); }
+ });
+ 
++test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
++  const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
++  try {
++    assert.deepEqual(run(recorded.root, "plan").json.stopFailure, { file: STOP_FILE, code: "NGHF-FIXTURE-CODE", reason: "NGHS-PENDING-MISSING", stage: "pending-read" });
++  } finally { cleanup(recorded.root); }
++  const detailed = fixture({ stopOver: { reason: null, detail: { reason: "native-concurrent-unowned-head" } } });
++  try {
++    const found = run(detailed.root, "plan").json.stopFailure;
++    assert.equal(found.reason, "native-concurrent-unowned-head");
++    assert.equal(found.file, STOP_FILE);
++  } finally { cleanup(detailed.root); }
++  const bare = fixture();
++  try {
++    assert.deepEqual(Object.keys(run(bare.root, "plan").json.stopFailure).sort(), ["code", "file"], "a record without a cause adds no empty cause fields");
++  } finally { cleanup(bare.root); }
++});
++
+ test("plan without a stop-failure record is ready with stopFailure null and says the stop left no diagnostic", () => {
+   const { root } = fixture({ stop: false });
+   try {
