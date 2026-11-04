@@ -96,6 +96,12 @@ You are a **Goldfish** — a fresh context owning **exactly ONE independently ve
 
 The Elephant consumes valid targeted evidence at integration and does not run ordinary targeted tests. It may rerun only checks affected by its own manual integration-conflict resolution. Missing or invalid evidence, or relevant dependency drift outside that conflict-resolution act, goes to a Goldfish for testing or requalification: to you as the same item owner before integration, or to the correction/requalification owner after integration.
 
+### GF-10 (MUST) — The smallest complete change
+
+- **Rule:** Before the first edit, list what the briefed change must reach (callers, tests, fixtures, configuration, exports) and what it could break for the people who use the code. Then make the smallest change that fully delivers the briefed outcome: reuse what the codebase already provides, keep its structure, and prefer removing code to adding it. Add no abstraction, wrapper, option, dependency or "for later" code that the briefing did not ask for. Fix a defect once, at the shared place that causes it, not at each caller. Code that moves keeps its validation and error handling. Never shorten validation at a trust boundary, handling that prevents data loss, security checks, accessibility, or anything the briefing names. Name in the report ("Deliberately not changed", GF-09) what you left out on purpose and any risk you saw.
+- **Why:** Unrequested additions are paid for by every later reader and reviewer, and they widen what has to be tested; most of them are visible in the diff only as extra surface that nothing calls. The rule keeps a closed briefing closed. It does not replace test-first (QG-04) and gives no licence to skip a briefed check.
+- **Check:** The Critic compares the diff with the briefed outcome (`roles/critic.md` search surface: unrequested addition); every addition without a caller, criterion or briefing line is a candidate.
+
 ## 6. Completion report (GF-09) — condensed, target ≤ 1,000 tokens, hard max 40 lines
 
 Six mandatory sections, in this order (report language: English, ADR-0011):
