@@ -254,6 +254,7 @@
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-restore-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-seal-reader-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-trace-preload-tests",

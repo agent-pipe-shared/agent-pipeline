@@ -4528,6 +4528,12 @@
       "file": "plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs",
       "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback is advice only and writes nothing (C19 D4a)",
       "nonOverlapNote": "Unique cases: the pushThreatModelReadback helper of scripts/register-feature-package.mjs; the pins that run the registration end to end pin the rest of its output"
+    },
+    {
+      "name": "authority-seal-reader-tests",
+      "file": "plugins/pipeline-core/lib/authority-seal-reader.test.mjs",
+      "invariantPinned": "The one shared reader of the bound authority documents returns sealed and digests, reads a state without the sealed marker as sealed (the identity for every bound project), reads a draft as paths without digests, fails closed on any invalid shape, never throws, and every refusal names a typed exit so that no state is a dead end (C19 late-binding build step 1a, inert)",
+      "nonOverlapNote": "Unique cases: lib/authority-seal-reader.mjs; continuity-state tests pin the persisted authority schema, which does not know the sealed marker yet"
     }
   ]
 }
