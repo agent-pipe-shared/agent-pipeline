@@ -133,6 +133,10 @@ export function parseArchitectureDesign(prd) {
   requireValue(model?.schema === "pipeline.fitness-model.v1" && model.profileId?.trim() && model.revision === 1
     && Array.isArray(model.allowedBoundaryCrossings) && model.antiFragmentationPolicy
     && (model.modules === undefined || Array.isArray(model.modules)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
+  const budgets = model.sizeBudgets;
+  requireValue(budgets === undefined || (budgets !== null && typeof budgets === "object" && !Array.isArray(budgets)
+    && Object.keys(budgets).every(key => ["maxFileLines", "maxModuleLines"].includes(key))
+    && Object.values(budgets).every(value => Number.isInteger(value) && value > 0)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
   const moduleRows = input.modules.map(module => ({ id: module.id,
     ownedPaths: module.ownedPaths, allowedDependencies: module.allowedDependencies,
     authorityEffects: module.authorityEffects, verificationEntryPoints: module.verificationEntryPoints,

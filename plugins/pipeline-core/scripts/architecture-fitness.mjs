@@ -967,6 +967,71 @@ export function runFitnessQualification({ rootDir = DEFAULT_ROOT, mode = "candid
   return { ...qualifyFitnessModelRun({ materialization, run, candidateCommit }), materialization };
 }
 
+const DEFAULT_MAX_FILE_LINES = 500;
+const DEFAULT_MAX_MODULE_LINES = 2500;
+
+function countTextLines(absPath) {
+  let buffer;
+  try {
+    if (!fs.statSync(absPath).isFile()) return null;
+    buffer = fs.readFileSync(absPath);
+  } catch { return null; }
+  if (buffer.includes(0)) return null;
+  let count = 0;
+  for (const byte of buffer) if (byte === 10) count += 1;
+  return buffer.length > 0 && buffer[buffer.length - 1] !== 10 ? count + 1 : count;
+}
+
+function listFiles(absDir, relDir, out) {
+  let entries;
+  try { entries = fs.readdirSync(absDir, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) listFiles(path.join(absDir, entry.name), rel, out);
+    else if (entry.isFile()) out.add(rel);
+  }
+}
+
+/**
+ * Advisory size report (never an outcome, finding or part of overallStatus):
+ * lists files and modules over the optional fitness-model sizeBudgets.
+ */
+export function evaluateSizeBudgets({ rootDir = DEFAULT_ROOT, inventory = [], fitnessModel = {} } = {}) {
+  const configured = fitnessModel?.sizeBudgets || {};
+  const budgets = {
+    maxFileLines: configured.maxFileLines ?? DEFAULT_MAX_FILE_LINES,
+    maxModuleLines: configured.maxModuleLines ?? DEFAULT_MAX_MODULE_LINES
+  };
+  const overBudget = [];
+  for (const mod of inventory) {
+    const candidates = new Set();
+    for (const pattern of mod.ownedPaths || []) {
+      const base = pattern.replace(/\\/g, "/").replace(/\/\*\*?$/, "");
+      const abs = path.join(rootDir, base);
+      let stat = null;
+      try { stat = fs.statSync(abs); } catch { /* missing path is skipped */ }
+      if (stat?.isDirectory()) listFiles(abs, base, candidates);
+      else if (stat?.isFile()) candidates.add(base);
+    }
+    let total = 0;
+    for (const rel of [...candidates].sort()) {
+      if (resolveModuleForPath(rel, inventory)?.id !== mod.id) continue;
+      const lines = countTextLines(path.join(rootDir, rel));
+      if (lines === null) continue;
+      total += lines;
+      if (lines > budgets.maxFileLines) {
+        overBudget.push({ module: mod.id, scope: "file", path: rel, lines, budget: budgets.maxFileLines });
+      }
+    }
+    if (total > budgets.maxModuleLines) {
+      overBudget.push({ module: mod.id, scope: "module", path: null, lines: total, budget: budgets.maxModuleLines });
+    }
+  }
+  overBudget.sort((a, b) => a.module.localeCompare(b.module) || String(a.path).localeCompare(String(b.path)));
+  return { budgets, overBudget };
+}
+
 /**
  * Main evaluation entry point: evaluates architecture fitness across all 10 property classes.
  */
@@ -1174,6 +1239,7 @@ export function evaluateArchitectureFitness(options = {}) {
       totalClasses: evaluatedOutcomes.length
     },
     stalenessDebt: collectedStalenessDebt,
+    sizeBudgetAdvisory: evaluateSizeBudgets({ rootDir, inventory, fitnessModel }),
     reducedBaseline,
     timestamp: (now instanceof Date ? now : new Date(now)).toISOString()
   };

@@ -26,6 +26,7 @@ import {
   evaluateParallelOverlap,
   evaluateProfileDrift,
   evaluateCalibratedFrictionThresholds,
+  evaluateSizeBudgets,
   OUTCOME_PASS,
   OUTCOME_FINDING,
   OUTCOME_UNAVAILABLE,
@@ -55,6 +56,70 @@ it("physical fitness rejects empty and whitespace-only contract and verification
     assert.equal(evaluateContractPresenceFreshness({ rootDir, inventory }).outcome, OUTCOME_PASS);
     assert.equal(evaluateVerificationLocality({ rootDir, inventory }).outcome, OUTCOME_PASS);
   } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+});
+
+describe("size budgets are an advisory that never changes the evaluation (AC-108)", () => {
+  const lines = (n) => "x\n".repeat(n);
+  const makeRoot = (files) => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-size-"));
+    for (const [rel, body] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(rootDir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(rootDir, rel), body);
+    }
+    return rootDir;
+  };
+  const inventory = [{ id: "app", ownedPaths: ["src/**"] }, { id: "other", ownedPaths: ["lib/**"] }];
+
+  it("a 501-line file is reported as a file row against the default 500", () => {
+    const rootDir = makeRoot({ "src/big.mjs": lines(501), "src/small.mjs": lines(500) });
+    try {
+      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: {} });
+      assert.deepEqual(res.budgets, { maxFileLines: 500, maxModuleLines: 2500 });
+      assert.deepEqual(res.overBudget, [{ module: "app", scope: "file", path: "src/big.mjs", lines: 501, budget: 500 }]);
+    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+  });
+
+  it("files that together exceed 2500 lines yield a module row", () => {
+    const files = {};
+    for (let i = 0; i < 6; i += 1) files[`lib/f${i}.mjs`] = lines(450);
+    const rootDir = makeRoot(files);
+    try {
+      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: {} });
+      assert.deepEqual(res.overBudget, [{ module: "other", scope: "module", path: null, lines: 2700, budget: 2500 }]);
+    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+  });
+
+  it("sizeBudgets overrides one budget and leaves the other default", () => {
+    const rootDir = makeRoot({ "src/a.mjs": lines(11), "src/b.mjs": lines(5) });
+    try {
+      const res = evaluateSizeBudgets({ rootDir, inventory, fitnessModel: { sizeBudgets: { maxFileLines: 10 } } });
+      assert.deepEqual(res.budgets, { maxFileLines: 10, maxModuleLines: 2500 });
+      assert.deepEqual(res.overBudget, [{ module: "app", scope: "file", path: "src/a.mjs", lines: 11, budget: 10 }]);
+    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+  });
+
+  it("missing and binary files are skipped without throwing", () => {
+    const rootDir = makeRoot({ "src/blob.bin": Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(lines(900))]).toString("latin1") });
+    fs.writeFileSync(path.join(rootDir, "src/blob.bin"), Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(lines(900))]));
+    try {
+      const withMissing = [...inventory, { id: "ghost", ownedPaths: ["nowhere/**", "absent.txt"] }];
+      const res = evaluateSizeBudgets({ rootDir, inventory: withMissing, fitnessModel: {} });
+      assert.deepEqual(res.overBudget, []);
+    } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+  });
+
+  it("the advisory leaves overallStatus, summary and outcomes exactly as they are", () => {
+    const now = new Date("2026-01-01T00:00:00Z");
+    const base = evaluateArchitectureFitness({ rootDir: REPO_ROOT, now });
+    const tight = evaluateArchitectureFitness({ rootDir: REPO_ROOT, now,
+      fitnessModel: { ...loadFitnessModel(REPO_ROOT), sizeBudgets: { maxFileLines: 1, maxModuleLines: 1 } } });
+    assert.ok(tight.sizeBudgetAdvisory.overBudget.length > 0);
+    assert.deepEqual(base.sizeBudgetAdvisory.budgets, { maxFileLines: 500, maxModuleLines: 2500 });
+    assert.equal(tight.overallStatus, base.overallStatus);
+    assert.deepEqual(tight.summary, base.summary);
+    assert.deepEqual(tight.outcomes, base.outcomes);
+    assert.equal(validateAgainstSchema(tight, fitnessEvidenceSchema).valid, true);
+  });
 });
 
 import * as class9Authority from "../lib/architecture-adoption-authority.mjs";

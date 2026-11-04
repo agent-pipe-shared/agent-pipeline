@@ -108,6 +108,27 @@ test("field-local diagnostics identify the single invalid architecture input", (
     error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH"
       && error.field === "fitnessModel.modules[0].ownedPaths");
 });
+test("fitness model sizeBudgets accepts positive integers, refuses others and is passed through unchanged (AC-108)", () => {
+  const accepted = design();
+  accepted.fitnessModel.sizeBudgets = { maxFileLines: 300, maxModuleLines: 1500 };
+  const parsed = parseArchitectureDesign(prd(accepted));
+  assert.deepEqual(parsed.fitnessModel.sizeBudgets, { maxFileLines: 300, maxModuleLines: 1500 });
+  assert.deepEqual(JSON.parse(architectureDesignTargets(parsed).find(row => row.path === "architecture/fitness-model.json").bytes).sizeBudgets,
+    { maxFileLines: 300, maxModuleLines: 1500 });
+  const partial = design();
+  partial.fitnessModel.sizeBudgets = { maxFileLines: 10 };
+  assert.deepEqual(parseArchitectureDesign(prd(partial)).fitnessModel.sizeBudgets, { maxFileLines: 10 });
+  for (const bad of [0, -1, 1.5, "500"]) {
+    const input = design();
+    input.fitnessModel.sizeBudgets = { maxFileLines: bad };
+    assert.throws(() => parseArchitectureDesign(prd(input)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH", String(bad));
+  }
+  const unknownKey = design();
+  unknownKey.fitnessModel.sizeBudgets = { maxFiles: 5 };
+  assert.throws(() => parseArchitectureDesign(prd(unknownKey)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
+  const without = JSON.parse(architectureDesignTargets(parseArchitectureDesign(prd(design()))).find(row => row.path === "architecture/fitness-model.json").bytes);
+  assert.equal("sizeBudgets" in without, false);
+});
 function snapshot(root) {
   const result = {};
   function visit(directory, prefix = "") {

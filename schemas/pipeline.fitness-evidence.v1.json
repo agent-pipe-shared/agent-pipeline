@@ -139,6 +139,9 @@
     "stalenessDebt": {
       "type": "array"
     },
+    "sizeBudgetAdvisory": {
+      "type": "object"
+    },
     "reducedBaseline": {
       "type": "object"
     },
