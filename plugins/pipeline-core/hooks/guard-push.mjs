@@ -181,6 +181,7 @@ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
 import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
@@ -2352,38 +2353,38 @@ function checkEvidenceFreshness(relPath) {
     return failures;
   }
   const { data } = read;
-  if (data?.exitCode !== 0) {
+  // The verdict (which failure, in which order) comes from the shared function; the messages stay here.
+  const promoted = () => {
+    const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
+    if (!promoRead.ok) return false;
+    const verifyRead = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
+      ? read
+      : readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH);
+    const securityRead = relPath === SECURITY_EVIDENCE_DEFAULT_PATH
+      ? read
+      : readEvidence(SECURITY_EVIDENCE_DEFAULT_PATH);
+    if (!verifyRead.ok || !securityRead.ok) return false;
+    const validation = validateReleasePromotionEnvelope(promoRead.data, {
+      repoDir: evidenceProjectDir,
+      targetBoundary: "push",
+      // Both inputs are re-read from their canonical paths.  Passing either
+      // one implicitly was the substitution seam closed by envelope v2.
+      verifyEvidence: verifyRead.data,
+      securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityRead.raw, data: securityRead.data },
+    });
+    return validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit;
+  };
+  const codes = evidenceFreshnessFailureCodes({
+    data: data ?? {}, expectedCommit: sourceCommit, promoted, isVerify: relPath === VERIFY_EVIDENCE_DEFAULT_PATH,
+    satisfiesPushBoundary: () => verifyEvidenceSatisfiesBoundary(data, "push"),
+  });
+  if (codes.includes(EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO)) {
     failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
   }
-  if (data?.commit !== sourceCommit) {
-    let promoted = false;
-    const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
-    if (promoRead.ok) {
-      const verifyRead = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
-        ? read
-        : readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH);
-      const securityRead = relPath === SECURITY_EVIDENCE_DEFAULT_PATH
-        ? read
-        : readEvidence(SECURITY_EVIDENCE_DEFAULT_PATH);
-      if (verifyRead.ok && securityRead.ok) {
-        const validation = validateReleasePromotionEnvelope(promoRead.data, {
-          repoDir: evidenceProjectDir,
-          targetBoundary: "push",
-          // Both inputs are re-read from their canonical paths.  Passing either
-          // one implicitly was the substitution seam closed by envelope v2.
-          verifyEvidence: verifyRead.data,
-          securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityRead.raw, data: securityRead.data },
-        });
-        if (validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit) {
-          promoted = true;
-        }
-      }
-    }
-    if (!promoted) {
-      failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
-    }
+  if (codes.includes(EVIDENCE_FRESHNESS_CODES.STALE_COMMIT)) {
+    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
   }
-  if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && !verifyEvidenceSatisfiesBoundary(data, "push")) {
+  if (codes.includes(EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY)) {
     failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);
   }
   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && data?.selection?.execution === "impacted") {
