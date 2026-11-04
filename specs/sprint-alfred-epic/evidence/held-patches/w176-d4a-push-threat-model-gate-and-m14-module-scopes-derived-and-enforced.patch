@@ -18,26 +18,6 @@ index 5112f0cb0..545b5f686 100644
  The approved design-flow closure additionally protects, in kernel-array order,
  `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
  `lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`
-diff --git a/harness/verify-suites.json b/harness/verify-suites.json
-index b3ced4f18..90046231f 100644
---- a/harness/verify-suites.json
-+++ b/harness/verify-suites.json
-@@ -4520,13 +4520,13 @@
-     {
-       "name": "module-slice-proposal-tests",
-       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
--      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
-+      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing; the dispatch briefing tool derives a module's write scope from this cut and refuses a path that crosses into another module or a module whose dependencies have no accepted result, with no second implementation of the cut (C19 M1.4)",
-       "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
-     },
-     {
-       "name": "register-feature-package-readback-tests",
-       "file": "plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs",
--      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback is advice only and writes nothing (C19 D4a)",
-+      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback writes nothing, and the rule itself is enforced where the model is needed: with an active push approval the plan approval request, push preparation and the feature close refuse a missing, empty or invalid model with a typed code and the repair (C19 D4a)",
-       "nonOverlapNote": "Unique cases: the pushThreatModelReadback helper of scripts/register-feature-package.mjs; the pins that run the registration end to end pin the rest of its output"
-     },
-     {
 diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
 index 63a7ab1ae..a2e274c4a 100644
 --- a/plugins/pipeline-core/lib/close-chain-guide.mjs

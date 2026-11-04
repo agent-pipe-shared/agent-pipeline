@@ -1,0 +1,214 @@
+diff --git a/harness/scripts/check-verify-suite-append.mjs b/harness/scripts/check-verify-suite-append.mjs
+index 3395eeceb..4dac02b5d 100644
+--- a/harness/scripts/check-verify-suite-append.mjs
++++ b/harness/scripts/check-verify-suite-append.mjs
+@@ -98,7 +98,8 @@ function exactDuplicateRepairShape(entry) {
+ // registry digests; the witness derives the rest from bytes: every prior row survives in order,
+ // byte-identical except that its caseCompletion.caseIds strictly extend (same order, same maxBytes).
+ const REWRITE_ENTRY_SCHEMA = "pipeline.verify-suite-case-list-extension-entry.v1";
+-const REWRITE_ENTRY_KEYS = ["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
++const REWRITES_MAX = 8;
++const REWRITE_ENTRY_KEYS =["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
+   .sort().join("\0");
+ 
+ function exactRewriteShape(entry) {
+@@ -128,7 +129,21 @@ function extendsCaseList(before, after) {
+   return canonical(beforeRest) === canonical(afterRest);
+ }
+ 
+-/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions and insertions only. */
++/**
++ * A row that had NO case-completion policy gains its first one and is byte-identical otherwise: gate coverage only grows
++ * (the same direction as extending a case list). Decision of the Elephant under the PO's 2026-11-04 K143 decision,
++ * named as such in the held patch notes; it is still only admitted through an entry bound to one commit and its bytes.
++ */
++function addsFirstCasePolicy(before, after) {
++  if (Object.hasOwn(before ?? {}, "caseCompletion")) return false;
++  const next = after?.caseCompletion;
++  if (next === null || typeof next !== "object" || !Array.isArray(next.caseIds) || next.caseIds.length === 0
++    || !Number.isSafeInteger(next.maxBytes) || next.maxBytes <= 0) return false;
++  const { caseCompletion: _policy, ...rest } = after;
++  return canonical(rest) === canonical(before);
++}
++
++/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions (or a first case-completion policy) and insertions only. */
+ export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, afterBytes } = {}) {
+   if (!exactRewriteShape(entry)) return fail("VSA-REWRITE-SHAPE");
+   if (commit !== entry.commit || parent !== entry.parent
+@@ -147,6 +162,7 @@ export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes,
+       if (canonical(row) === key) break;
+       if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
+         && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
++      if (row?.name === prior.name && row?.file === prior.file && addsFirstCasePolicy(prior, row)) { extended += 1; break; }
+       at += 1;
+     }
+     if (at === after.suites.length) return fail("VSA-REWRITE-PRIOR-ENTRY-CHANGED");
+@@ -171,8 +187,11 @@ function exactRecoveryShape(value) {
+   if (Object.hasOwn(value, "duplicateRepairs")
+     && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
+       && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
++  // PO decision 2026-11-04: several recorded in-place case-list extensions are admitted, each bound to its OWN commit,
++  // parent and both registry digests (a bounded list of distinct commits, never a pattern), listed oldest first.
+   if (Object.hasOwn(value, "rewrites")
+-    && !(Array.isArray(value.rewrites) && value.rewrites.length === 1 && exactRewriteShape(value.rewrites[0]))) return false;
++    && !(Array.isArray(value.rewrites) && value.rewrites.length >= 1 && value.rewrites.length <= REWRITES_MAX
++      && value.rewrites.every(exactRewriteShape) && new Set(value.rewrites.map((item) => item.commit)).size === value.rewrites.length)) return false;
+   return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
+     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
+ }
+@@ -316,11 +335,11 @@ export function evaluateDuplicateRepair({
+   return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
+ }
+ 
+-function readRewrite(root, read) {
++function readRewrites(root, read) {
+   try {
+     const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
+-    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites[0] : null;
+-  } catch { return null; }
++    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites : [];
++  } catch { return []; }
+ }
+ 
+ function bindRewrite({ root, run, read, entry }) {
+@@ -414,10 +433,10 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+     if (!OID.test(head)) return fail("VSA-HEAD");
+     const worktree = read(resolve(root, REGISTRY), "utf8");
+     const entry = readRecovery(root, read);
+-    const rewrite = bindRewrite({ root, run, read, entry: readRewrite(root, read) });
+-    // The b7 restoration is proven against the registry state just before the recorded in-place
++    const rewrites = readRewrites(root, read).map((item) => bindRewrite({ root, run, read, entry: item })).filter(Boolean);
++    // The b7 restoration is proven against the registry state just before the FIRST (oldest) recorded in-place
+     // case-list extension when one is recorded; every commit after it is checked by the walk below.
+-    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrite ? rewrite.beforeBytes : worktree, entry });
++    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrites.length > 0 ? rewrites[0].beforeBytes : worktree, entry });
+     const configCommits = run(["log", "--first-parent", "--reverse", "--format=%H", "--", CONFIG])
+       .trim().split("\n").filter(Boolean);
+     let introduction = null;
+@@ -458,9 +477,9 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+           && before === recovery.defectBytes && after === recovery.restoredBytes) {
+           // This is the one exact defect-to-restoration transition. Any other
+           // historical failure remains subject to the original prefix policy.
+-        } else if (rewrite && commit === rewrite.entry.commit
+-          && sha256Hex(before) === rewrite.entry.preimageSha256 && sha256Hex(after) === rewrite.entry.postimageSha256) {
+-          // The one recorded in-place case-list extension (bound to this commit and its bytes).
++        } else if (rewrites.some((item) => commit === item.entry.commit
++          && sha256Hex(before) === item.entry.preimageSha256 && sha256Hex(after) === item.entry.postimageSha256)) {
++          // A recorded in-place case-list extension (bound to this commit and its bytes).
+         } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
+           && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
+           dupAddSeen = true;
+diff --git a/harness/scripts/check-verify-suite-append.test.mjs b/harness/scripts/check-verify-suite-append.test.mjs
+index e3d14150d..d52070b1f 100644
+--- a/harness/scripts/check-verify-suite-append.test.mjs
++++ b/harness/scripts/check-verify-suite-append.test.mjs
+@@ -369,3 +369,78 @@ test("full history traversal refuses a rewrite when recovery is missing or inval
+     assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
+   });
+ });
++
++const kPlain = (name) => ({ name, file: `${name}.test.mjs` });
++const kPolicy = (ids) => ({ schema: "pipeline.verify-case-completion-policy.v1", caseIds: ids, maxBytes: 65536 });
++const kCased = (name, ids) => ({ ...kPlain(name), caseCompletion: kPolicy(ids) });
++const kEntry = (commit, parent, before, after) => ({
++  schema: "pipeline.verify-suite-case-list-extension-entry.v1", commit, parent,
++  preimageSha256: sha256(before), postimageSha256: sha256(after), owner: "Elephant", signed: false,
++  reason: "Historical, unsigned exception recorded by the Elephant for a test of several recorded entries.",
++});
++
++test("evaluateCaseListExtension also admits a first case-completion policy on a row that had none, and nothing else", () => {
++  const before = registryText([kPlain("a"), kPlain("b")]);
++  const after = registryText([kPlain("a"), kCased("b", ["B1"])]);
++  const run = (b, a) => evaluateCaseListExtension({ entry: kEntry("b".repeat(40), "a".repeat(40), b, a), commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a });
++  assert.equal(run(before, after).ok, true);
++  const reworded = registryText([kPlain("a"), { ...kCased("b", ["B1"]), invariantPinned: "reworded" }]);
++  assert.equal(run(before, reworded).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a first policy next to another change is refused");
++  const emptyPolicy = registryText([kPlain("a"), kCased("b", [])]);
++  assert.equal(run(before, emptyPolicy).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "an empty policy adds no coverage");
++  const noChange = registryText([kPlain("a"), kPlain("b")]);
++  assert.equal(run(before, noChange).code, "VSA-REWRITE-NO-EXTENSION");
++});
++
++/** Three registry commits after TP-13: an append, a first policy on a row (R1), a case-list extension (R2); returns the entries of R1 and R2. */
++function twoRewriteHistory(f, recordedFrom) {
++  f.writeConfig([f.tp13]);
++  const registry = join(f.root, "harness", "verify-suites.json");
++  const states = [
++    registryText([kPlain("a"), kCased("b", ["B1"])]),
++    registryText([kCased("a", ["A1"]), kCased("b", ["B1"])]),
++    registryText([kCased("a", ["A1"]), kCased("b", ["B1", "B2"])]),
++  ];
++  const commits = [];
++  for (const [index, text] of states.entries()) {
++    writeFileSync(registry, text);
++    f.commit(`registry state ${index}`);
++    commits.push(f.git("rev-parse", "HEAD").trim());
++  }
++  const entries = [kEntry(commits[1], commits[0], states[0], states[1]), kEntry(commits[2], commits[1], states[1], states[2])];
++  writeFileSync(join(f.root, "harness", "verify-suite-history-recovery.json"),
++    JSON.stringify({ schema: "pipeline.verify-suite-history-recovery.v1", entries: [entry], rewrites: recordedFrom(entries) }));
++  f.commit("record the exceptions");
++  return entries;
++}
++
++test("full history traversal admits several recorded case-list extensions, each bound to its own commit, and refuses a recording that misses one", () => {
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => entries);
++    const result = checkVerifySuiteAppend({ rootDir: f.root });
++    assert.equal(result.ok, true, JSON.stringify(result));
++  });
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => [entries[0]]);
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
++  });
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => [entries[1]]);
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
++  });
++});
++
++test("the recovery file admits at most eight rewrites, each commit once, and a recording that is not exact binds nothing", () => {
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => [...entries, entries[1]]);
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "the same commit twice voids the list");
++  });
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => [...entries, ...Array.from({ length: 7 }, (_, i) => kEntry(String(i).repeat(40), "f".repeat(40), "x", "y"))]);
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "nine entries void the list");
++  });
++  fixture((f) => {
++    twoRewriteHistory(f, (entries) => [{ ...entries[0], signed: true }, entries[1]]);
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED", "a signed-looking entry voids the list");
++  });
++});
+diff --git a/harness/verify-suite-history-recovery.json b/harness/verify-suite-history-recovery.json
+index 5a09514c3..88cbd4454 100644
+--- a/harness/verify-suite-history-recovery.json
++++ b/harness/verify-suite-history-recovery.json
+@@ -41,6 +41,26 @@
+       "owner": "Elephant",
+       "signed": false,
+       "reason": "Historical, unsigned exception recorded by the Elephant (Full Verify finding V3): this one commit extended the caseCompletion case-ID lists of four existing registry rows in place and inserted one row. Narrow and not extendable: it is bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
++    },
++    {
++      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
++      "commit": "7281e012cd6a791e54d3931034b457730cc3f720",
++      "parent": "896bae494ee424777a5477d297a2fca8f8dc02be",
++      "preimageSha256": "8d999db3d3f7e308fc8024152dd3a63e67affe8d5b5dbc846cc02bfacb4d03f5",
++      "postimageSha256": "9e92bfb5148da894e875cbe6c0161362cbe5df9317bd008df399517b3d5934fa",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "Historical, unsigned exception recorded by the Elephant (PO decision of 2026-11-04, second entry of this kind): this one commit listed G23C004 in the caseCompletion case-ID list of the existing g23 read-help registry row in place. Narrow and not extendable by pattern: every entry is bound to its own commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
++    },
++    {
++      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
++      "commit": "4ec6622a27033775279b0d5e62a5efa087727395",
++      "parent": "c5e7af3a099a3f70e9b11ecb2cd0f8271154f57f",
++      "preimageSha256": "16dee97b2fd84d271b4790acb67a38ab79e62d0ba9c44f79d852745f5da58183",
++      "postimageSha256": "bb82cc67253f2d1505916554d1a840a01399922b8c6e02d34a65d47e9399259f",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "Historical, unsigned exception recorded by the Elephant (third entry of this kind, under the PO decision of 2026-11-04): this one commit gave the existing analysis-run command admission registry row its first caseCompletion policy in place, so gate coverage only grew. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the row is otherwise unchanged."
+     }
+   ]
+ }

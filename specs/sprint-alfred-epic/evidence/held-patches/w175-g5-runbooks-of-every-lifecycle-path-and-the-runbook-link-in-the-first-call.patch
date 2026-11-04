@@ -35,21 +35,6 @@ index 46ab49996..ebeb80200 100644
  ## Quick reference — who runs each layer
  
  | Layer | Step | Runs as |
-diff --git a/harness/verify-suites.json b/harness/verify-suites.json
-index b3ced4f18..aa267076c 100644
---- a/harness/verify-suites.json
-+++ b/harness/verify-suites.json
-@@ -4496,8 +4496,8 @@
-     {
-       "name": "generate-runbook-tests",
-       "file": "plugins/pipeline-core/scripts/generate-runbook.test.mjs",
--      "invariantPinned": "The committed close-path runbook and its index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the generation is deterministic, and every phase of the close requirement table appears exactly once as a step (C19 G5 stage 1, AC-108)",
--      "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs and the two committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
-+      "invariantPinned": "The committed runbooks of the close, start, plan, implement and push paths and their index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the command catalogue, the inspect next-action verbs and the push release flow tables, the generation is deterministic, every runbook is valid against its schema with every step command present in the catalogue, every phase of the close requirement table appears exactly once as a step, and the typed runbook link of the first call of a standard command appears once per session and path and always on a refusal while every pre-existing result field stays unchanged (C19 G5, AC-108)",
-+      "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs, lib/runbook-link.mjs and the committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
-     },
-     {
-       "name": "evidence-carry-forward-tests",
 diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
 index 7f0b315f5..10059c957 100644
 --- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
