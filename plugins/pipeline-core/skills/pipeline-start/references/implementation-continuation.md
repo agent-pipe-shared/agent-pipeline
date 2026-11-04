@@ -78,7 +78,7 @@ The package topology requires an `acceptance.md` and a `result.md` for an approv
 feature and no design step writes them, so the command creates a missing one itself
 (Pipeline-owned, `authority: false`, immutable: an acceptance pointer to the approved
 Spec's path and digest that adds no criterion, and a result record that says
-implementation is in progress and is not acceptance) and registers an existing one
+it was written at registration, does not track progress and is not acceptance) and registers an existing one
 as found, never rewritten. It also writes the Critic review unit
 `specs/<feature>/design/critic-review-unit.json` (a `design` entry, `retention:
 retain`), which a Critic review of the course reads at its first review's base. A

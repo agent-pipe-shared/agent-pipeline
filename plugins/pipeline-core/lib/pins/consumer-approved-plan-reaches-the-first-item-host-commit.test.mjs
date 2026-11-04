@@ -329,7 +329,9 @@ test("(f) the generated files name the Spec path and digest and nothing else fro
   assert.deepEqual(quoted(acceptance), [SPEC, specSha256], "the pointer names the Spec path and its digest, nothing else");
   assert.deepEqual(quoted(result), [FEATURE], "the result record names the feature id, nothing else");
   assert.match(acceptance, /adds no acceptance criterion/u);
-  assert.match(result, /implementation is in progress/u);
+  // Restated (QG-04, Codex greenfield F3): the record no longer claims "implementation is in progress", a state that stays bound after the close; the intent (it names itself as a registration-time, non-acceptance record) is kept.
+  assert.match(result, /written at registration and does not track progress/u);
+  assert.doesNotMatch(result, /in progress/u);
   assert.match(result, /not acceptance/u);
   for (const text of [acceptance, result]) {
     assert.ok(![fx.root, WORK, REPO_ROOT, PLAN, "/home/", "/Users/", "\\Users\\"].some((leak) => text.includes(leak)), "no machine path, no repository root, no PRD content");
