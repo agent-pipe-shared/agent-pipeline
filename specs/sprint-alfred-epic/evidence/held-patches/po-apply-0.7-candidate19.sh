@@ -35,6 +35,7 @@
 #   w147  register the analysis-run lib and CLI suites (delta on w146)
 #   w148  the shell guard admits the analysis-run command by its exact argument shape (F2b, Codex greenfield; Goldfish slice, imported by the Elephant; delta on w147)
 #   w149  register the analysis-run admission suite (delta on w148)
+#   w150  the happy path cuts the implementation dispatches along the design modules (M1.4, all three greenfield runs; guidance only; delta on w132 and w145)
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
@@ -90,6 +91,7 @@ step2 w146-f2a-the-analysis-run-command-runs-the-registered-verify-command-in-a-
 step2 w147-f2a-register-the-analysis-run-suites "chore(verify): register the analysis-run lib and CLI suites"
 step2 w148-f2b-the-shell-guard-admits-the-analysis-run-command-by-its-exact-argument-shape "feat(guard): the shell guard admits the analysis-run command by its exact argument shape"
 step2 w149-f2b-register-the-analysis-run-admission-suite "chore(verify): register the analysis-run admission suite"
+step2 w150-m14-the-happy-path-cuts-implementation-dispatches-along-the-design-modules "docs(happy-path): cut the implementation dispatches along the modules of the design"
 # OPT-IN block (PO decision 2026-11-03, authority carry-forward, ADR draft docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md; the revised ADR text has had one
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then

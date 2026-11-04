@@ -1,0 +1,14 @@
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index ef9e4a7fe..c0c1dd7ff 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -32,6 +32,9 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
+    Antigravity adds `--host-session-id <id from this session's native hook>`.
+ 2. Generate the binding: `dispatch-briefing.mjs binding --root <root> --dispatch-id <id> --item <slug> --criterion AC-<n> --agent-type <type> --model-id <model> --check <node test> --path <...>`
+    and put its `skeleton` (or `block`) first in the briefing filled from `templates/prompts/goldfish-task.md`. A directory in `--path` ends with `/`.
++   Cut the dispatches along the modules of the design (`architecture/fitness-model.json`): one dispatch per module, with that module's `ownedPaths` as the
++   `--path` scope, so the write scopes are disjoint and the dispatches can run in parallel. A design with a single module leaves no parallel slice; take
++   that back to the design (the readiness question about decomposition) instead of splitting one module by file.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.

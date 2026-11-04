@@ -194,7 +194,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | M1.1 | Design skeleton with several modules and a cut rule | built as a cut rule in the skeleton comment (the skeleton keeps one example module; no generated multi-module layout) | w140 |
 | M1.2 | Decomposition criterion in the readiness review and design guidance | built (w144, reviewer wording as a question, never a block; guidance part is the w140 skeleton rule; whether a model raises it is a greenfield measurement) | Elephant (text) |
 | M1.3 | `sizeBudgets` in the fitness model, reported not blocking | built (w143; advisory field `sizeBudgetAdvisory`, defaults 500 lines per file and 2500 per module, no outcome, no change of `overallStatus`; the walk over owned paths costs time on large repositories and is unmeasured; no consumer renders it yet) | Goldfish slice |
-| M1.4 | Slices follow modules (parallel dispatch) | planned | with M1.2 and the slice planner |
+| M1.4 | Slices follow modules (parallel dispatch) | partly built (w150: guidance in the happy path; the slice planner and `dispatch-briefing.mjs` do not derive scopes from modules, nothing enforces the cut) | Elephant (text) |
 
 ### Claude Code on Windows (E, Q7 to Q10)
 
@@ -239,7 +239,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a (only guidance built, w145), D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, the live-hook end-to-end run of the analysis lane (F2 is built in code, w146 to w149), M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
+Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a (only guidance built, w145), D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, the live-hook end-to-end run of the analysis lane (F2 is built in code, w146 to w149), M1.4 (only guidance built, w150), G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
 
 Count now: **built 20 items** (the 14 below plus Q8, F1/opt-in, M1.1, M1.2, M1.3 and Q9) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, and again on 2026-11-04 at 633d83eff through w149 plus GF-10, default chain and opt-in variant (w138) both exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
