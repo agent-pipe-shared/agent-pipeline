@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
+index 2f4ea1bdc..4b05efdb9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
+@@ -76,9 +76,10 @@ const cases = [
+     for (const reason of ["async-launch", "no-pending"]) {
+       const message = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-PENDING-UNAVAILABLE",
+         reason, commit: null, record: null });
+-      assert.match(message, /Dispatch: <dispatchId> \(goldfish\)/u, reason);
++      assert.match(message, /goldfish-host-commit-recover\.mjs plan/u, reason);
++      assert.match(message, /typed orchestrator-attested dispatch record/u, reason);
+       assert.doesNotMatch(message, /write the dispatch record via/u, reason);
+-      assert.match(message, /dispatch-record-write\.mjs refuses/u, reason);
++      assert.match(message, /dispatch-record-write\.mjs still refuses/u, reason);
+       assert.match(message, /not host-observed evidence/u, reason);
+       assert.doesNotMatch(message, /NGHS-/u, reason);
+     }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 41adeddbf..c4c2a3593 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -225,7 +225,8 @@ const cases = [
+     const backgroundMessage = nativeGoldfishHookMessage(background);
+     assert.match(backgroundMessage, /\(NGHF-PENDING-UNAVAILABLE\)/u);
+     assert.match(backgroundMessage, /background/u);
+-    assert.match(backgroundMessage, /Dispatch: <dispatchId> \(goldfish\)/u);
++    assert.match(backgroundMessage, /goldfish-host-commit-recover\.mjs plan/u);
++    assert.match(backgroundMessage, /one ordinary commit with the dispatch trailer/u);
+     assert.match(backgroundMessage, /dispatch-record-write\.mjs/u);
+     const unprepared = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: launch({ status: "completed" }, false) }, dependencies);
+     assert.equal(unprepared.code, "NGHF-PENDING-UNAVAILABLE");
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index bd81301e0..f3cf51d1a 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -189,7 +189,8 @@ test("AC-123 present-plan RED: a scratch mirror without the duplicate check admi
+   return withFixture("feature", f => {
+     const r1 = receipt(f, "red-dup");
+     const argv = ["present-plan", "--by", "F", "--review-receipt", r1, "--review-receipt", r1];
+-    const mirror = mirrorSanctionedArgs(s => s.replace("|| receipts.has(args[index + 1])", ""));
++    // The duplicate check is spelled the same in the `prepare-seal` branch (which precedes `present-plan`), so every occurrence is removed.
++    const mirror = mirrorSanctionedArgs(s => s.replaceAll("|| receipts.has(args[index + 1])", ""));
+     return import(pathToFileURL(mirror.file).href).then(mod => {
+       try {
+         assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true);
