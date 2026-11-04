@@ -364,6 +364,7 @@
         "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-drift-exits-tests",
         "verify-phase:harness/scripts/verify.mjs:control-placement-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-plane-script-scan-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
