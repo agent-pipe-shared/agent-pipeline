@@ -50,6 +50,25 @@ test("AC-239 adr-decision: present, not-applicable when no decision qualifies, m
   const unknown = rows(full({ architectureImpact: () => null }))["adr-decision"];
   assert.equal(unknown.status, "unknown");
   assert.equal(unknown.remedy, null);
+  // Every ADR path the design names must exist; the check takes precedence over a not-applicable impact (report-only).
+  const promised = ["docs/adr/0001-a.md", "docs/adr/0002-b.md"];
+  const withPromise = (paths, over = {}) => full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => paths, exists: (p) => new Set([...promised.slice(0, 1), ...(over.have ?? [])]).has(p), ...(over.readers ?? {}) });
+  const allThere = rows(withPromise(promised, { have: [promised[1]] }))["adr-decision"];
+  assert.equal(allThere.status, "present");
+  assert.match(String(allThere.evidence), /0001-a\.md/u);
+  assert.match(String(allThere.evidence), /0002-b\.md/u);
+  const gap = rows(withPromise(promised))["adr-decision"];
+  assert.equal(gap.status, "missing");
+  assert.match(gap.remedy, /docs\/adr\/0002-b\.md/u);
+  assert.doesNotMatch(gap.remedy, /0001-a\.md/u);
+  assert.match(gap.remedy, /architecture-decision/u);
+  // Absent, throwing or null reader, and an empty array, leave every existing impact outcome unchanged.
+  for (const reader of [undefined, () => { throw new Error("x"); }, () => null, () => []]) {
+    assert.equal(rows(full({ promisedAdrPaths: reader }))["adr-decision"].status, "present");
+    assert.equal(rows(full({ promisedAdrPaths: reader, architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");
+    assert.equal(rows(full({ promisedAdrPaths: reader, listDir: () => [] }))["adr-decision"].status, "missing");
+    assert.equal(rows(full({ promisedAdrPaths: reader, architectureImpact: () => null }))["adr-decision"].status, "unknown");
+  }
 });
 
 test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {

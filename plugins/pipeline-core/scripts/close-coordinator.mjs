@@ -38,6 +38,7 @@ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
+import { loadMapBundle } from "./module-inventory.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
@@ -1191,7 +1192,13 @@ function qualityReaders(root) {
 function readQualityRows(root, coordinator) {
   const { readers, handoverPath } = qualityReaders(root);
   const impact = coordinator.architectureImpact ?? null;
-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact } });
+  // The ADR paths the design records in the module map's adrReferences (architecture/map/*.md); null when the map cannot be read.
+  const promisedAdrPaths = () => {
+    const bundle = loadMapBundle(root);
+    if (!bundle.ok) return null;
+    return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
+  };
+  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
 }
 function auditPackageIndex(root, coordinator) {
   const { readers } = qualityReaders(root);

@@ -5,12 +5,13 @@
 //   security-scan         present when both evidence/security-latest.v2.json and its .verdict.json exist (the files check-close-security-completeness.mjs reads).
 //   adr-decision          the typed architecture impact of the close decides: a decision-added/-superseded impact is present when docs/adr has a record and missing otherwise,
 //                         any other typed impact is not-applicable, and no impact signal is unknown.
+//                         Before that, every ADR path the design names (promisedAdrPaths) must exist: all there is present, any absent is missing and wins over a not-applicable impact (report-only).
 //   architecture-fitness  present when the Pipeline State rigorHistory holds an observation for the feature that carries a fitness projection; missing when history is readable without one.
 //   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
 //                         When the receipts are readable the row names a PASSING review's report (the last in listing order) and is missing when every report records a fail.
 //   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
 // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
-// handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer. A reader that throws or is not supplied yields "unknown".
+// handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
 import { createHash } from "node:crypto";
 
@@ -43,6 +44,16 @@ function securityRow(readers) {
 
 function adrRow(readers) {
   const id = "adr-decision";
+  const promised = call(readers.promisedAdrPaths);
+  if (promised.ok && Array.isArray(promised.value) && promised.value.length > 0) {
+    const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
+    if (checks.every((c) => c.found.ok)) {
+      const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
+      return absent.length === 0
+        ? row(id, "present", promised.value.join(", "))
+        : row(id, "missing", null, `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
+    }
+  }
   const impact = call(readers.architectureImpact);
   if (!impact.ok || typeof impact.value !== "string") return unknown(id);
   if (NO_DECISION_IMPACTS.has(impact.value)) return row(id, "not-applicable");
