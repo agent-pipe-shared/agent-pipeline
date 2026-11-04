@@ -24,6 +24,29 @@ The time before the first checkpoint grows with the number of earlier dispatches
 
 Expected shape: spawns per admission is about 2 x (files + directories) in the first process that reads the registry. This matches the growth from 245 s to over 8 min between the runs.
 
+## 2a. What the second Windows run adds (same day, installed 19c)
+
+- Probes 4 and 5 left NO pending host-commit state and no reservation, although the dispatch was admitted; the stop recorded `NGHS-PENDING-MISSING: ENOENT ... lstat` (the w207 reason). No `WARNING (guard-dispatch): native host-commit preparation failed` was shown.
+- The registry lock of a dead pid stayed for more than ten minutes, across a runner restart, and blocked `dispatch-briefing build` (`DBG-RULESET-LOCK-HELD`).
+- All five probes used the generated pointer prompt; a Linux case (GD75b) shows an admitted pointer prompt leaves the same pending state as the inline briefing. The pointer is ruled out.
+- `guard-dispatch` is registered with `timeout: 330` (hooks.json) and its internal admission budget is 300 s, checked only at the named phase checkpoints, none of which lies before the registry reads. The consumer saw the hook run for more than 8 minutes.
+
+Reading (a suspicion until the trace is in): the host ended the hook at its timeout while it held the registry lock and before it wrote the pending state. A timed-out PreToolUse hook is not a block, so the launch went on with no admission result: no pending state, no reservation, no warning (an ended process prints nothing), and a lock owned by a dead process. This explains the E1 failure and the dead lock with one cause, and it explains why it got worse with every dispatch.
+
+## 2b. Direction 0 (new): the guard must refuse before the host ends it
+
+Independent of how fast the checks become, an admission that cannot finish must end as a typed refusal with its lock released, never as a timeout.
+
+What: a deadline for the native authority calls. `lib/windows-owned-authority-backend.mjs` gets a settable deadline (set once by `guard-dispatch` to its hook entry plus the 300 s budget, and cleared afterwards); `invokeNative` refuses a further spawn after it with a typed code (for example `WIN-AUTH-DEADLINE`). The exception unwinds through `withSessionAuthorityBoundary`, whose `finally` already removes the lock; `guard-dispatch` prints `BLOCKED (guard-dispatch): GUARD-DISPATCH-SLOW` with the repair text (retry; the number of reservations to settle; the latency plan's route). A deadline check is also added at the start of each registry file read loop in `stateRead` so a pure-file loop cannot run past it.
+
+Why first: it is small, needs no Windows measurement to be right, turns a silent unguarded launch into a visible refusal, and stops the dead locks.
+
+Risk: it is a new refusal in the authority path; the code and the repair text must be mapped in `describeWindowsAuthorityRefusal` and the refusal table; a lock already held by a dead owner must still be retired by the next admission. Critic review required.
+
+Tests: a spawn seam that advances a fake clock past the deadline yields the typed refusal, the lock file is gone, and no pending state is written; below the deadline nothing changes.
+
+Order: Direction 0 first, then the measurement decides 1 and 3, and 2a runs alongside.
+
 ## 3. Measurement needed first
 
 The opt-in authority trace already counts native spawns (`nativeAuthorityStats`: count, ms, maxMs, byOperation, memo hits and misses). The Windows session starts the runner from a shell with `PIPELINE_AUTHORITY_TRACE=1` and `PIPELINE_AUTHORITY_TRACE_FILE` set (PO yes in that chat), runs ONE dispatch, and reports the `pipeline.hook-authority-trace.v1` lines, the number of reservations (`session-authority-repair.mjs inspect`), and the per-phase times. Decision rule:
