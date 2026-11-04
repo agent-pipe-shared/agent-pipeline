@@ -35,6 +35,8 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
    Cut the dispatches along the modules of the design (`architecture/fitness-model.json`): one dispatch per module, with that module's `ownedPaths` as the
    `--path` scope, so the write scopes are disjoint and the dispatches can run in parallel. A design with a single module leaves no parallel slice; take
    that back to the design (the readiness question about decomposition) instead of splitting one module by file.
+   `module-slice-proposal.mjs --prd <plan path>` prints that cut read-only: the waves from the module dependencies, the modules it serializes because
+   their owned paths overlap, and the `slice-queue.mjs add` arguments; it writes no queue.
 3. Dispatch by runner:
    - **Claude**: `Agent` / `Task` with the functional `agentType`.
    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.

@@ -623,6 +623,7 @@
         "verify-phase:harness/scripts/verify.mjs:model-role-v3-baseline-tests",
         "verify-phase:harness/scripts/verify.mjs:module-cluster-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:module-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:module-slice-proposal-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-commit-execution-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-regression-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-tests",

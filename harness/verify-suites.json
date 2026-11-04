@@ -4516,6 +4516,12 @@
       "file": "plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs",
       "invariantPinned": "The push-prepare evidence freshness check carries a stable code next to its unchanged message for a missing, failed and stale record, the push gate satisfiability classification prefers the code and falls back to the prose for a result without one, and a code never overrides a green result (C19 D4b/E3 stage 2a, AC-108)",
       "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
+    },
+    {
+      "name": "module-slice-proposal-tests",
+      "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
+      "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
+      "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
     }
   ]
 }
