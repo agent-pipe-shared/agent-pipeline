@@ -513,7 +513,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
       // channel only; the proof path is never printed into the operator block, whose lines stay
       // within the copy-safe bound no matter how long the key directory path is.
       write(hasReadiness ? `${JSON.stringify(output)}\n` : `${JSON.stringify(output, null, 2)}\n`);
-      writeError(`${signIntent}\n\nThis is the only command you run.\nThe agent imports the signed proof itself.\n`);
+      writeError(`${signIntent}\n\nThis is the only command you run.\nThe agent imports the signed proof itself:\nit runs authorizeBySignatureCommand of the JSON output.\n`);
       return 0;
     }
     if (command === "refreeze-plan") {

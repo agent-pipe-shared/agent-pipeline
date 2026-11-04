@@ -95,10 +95,10 @@ function isObject(value) { return value !== null && typeof value === "object" &&
 function normalizePath(value, label) {
   if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX || value.trim() !== value
     || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")) {
-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
+    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
   }
   if (value.split("/").some((part) => part === "" || part === "." || part === "..")) {
-    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
+    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path: relative to the repository root, no leading "./" or "/", no trailing "/", no backslash, no ".." segment (for example "specs/<feature>/spec.md").`);
   }
   return value;
 }
