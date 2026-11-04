@@ -179,7 +179,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | D2a | Receipt of a caller-authored verdict says `freshContext: false` and carries the label | built | w135 |
 | D2b | A caller-authored verdict satisfies the close gate only at rigor 0 and low risk | built (decided); the rigor-0 branches are covered by code reading only, because the audit route always has a package at rigor 1 or 2; the risk class has no State source and is read from the authored dispatch records | w137 (needs w135) |
 | D3 | Signatures: dirty-tree check before the ceremony, a signed reconcile commits its own files, no double signature | ADR first (decided: opt-in block) | one ADR with D4b, E3, F1 |
-| D4a | Push threat model materialized in the design phase when a push approval is active | planned | Goldfish slice |
+| D4a | Push threat model materialized in the design phase when a push approval is active | partly built (w145: guidance in the happy path; the command has no phase precondition; no design-phase readback and no enforcement) | Elephant (text) |
 | D4b | Evidence-only commits carry Verify and Security forward (candidate equality over the product subtree) | ADR first (decided: opt-in block) | one ADR with D3, E3, F1 |
 | D5 | Pre-tool header names the real guard code | built | w127 |
 | D6 | Exact CLI signatures in `happy-path.md` and the close skill | built (flag sets of the critic preflight and the close transitions; the full generated runbook is G5) | w132 |
@@ -239,7 +239,7 @@ Legend: **built** = held patch exists, applies to HEAD, own tests green in a clo
 | Runner export of phase windows and token buckets (Codex) | moved to 0.7.1 |
 | C18-5 pre-granted allowlist | decided: not introduced |
 
-Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a, D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, F2 build (analysis lane), M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
+Open after the 2026-11-03/04 autonomous window, not built yet: D3 (signed reconcile commits its own files), D4a (only guidance built, w145), D4b (evidence-only carry-forward), E1, E2, E3, E4, E7 guard part, F2 build (analysis lane), M1.4, G5 runbook, the late-binding ADR build chain, Q2, Q3, F9 rest. Q8, F1, M1.1, M1.3 and Q9 are built (w139, w138 opt-in, w140, w143, w141). Nothing here is claimed done.
 
 Count now: **built 20 items** (the 14 below plus Q8, F1/opt-in, M1.1, M1.2, M1.3 and Q9) (D1, D2a, D2b, D5, D6, D7, D8, E5, E6/Q10 text, F4, Q1 and F3, F6, Q5, Q7, in patches w126 to w137 with w129a and w129b; the apply script was rehearsed in a clone on 2026-11-03 through w137 plus GF-10 with exit 0, which proves only that the chain applies, not a Full Verify), **ADR first 5** (D3, D4b, E3, F1, F2; both drafts had one independent Opus review on 2026-11-03 with ten findings, all addressed in the drafts, the revised text is not re-reviewed until a working local candidate exists, PO decision), **planned** the rest.
 
