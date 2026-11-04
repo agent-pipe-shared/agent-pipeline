@@ -59,6 +59,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { satisfiabilityStatusForFreshnessCode } from "../lib/evidence-freshness-codes.mjs";
 import {
   checkCriticalHumanProofPolicy,
   checkCriticalProofModeConflict,
@@ -148,7 +149,10 @@ export function checkVerifyEvidenceBound(dir, headCommit, deps = {}) {
   const evidenceDir = resolveEvidenceDir(dir, deps);
   const check = checker("verify-evidence-bound", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps);
   let status;
+  // A typed code wins over the message; a result without one (an older checker, an injected double) is classified by the prose as before.
+  const typed = check.ok ? null : satisfiabilityStatusForFreshnessCode(check.code);
   if (check.ok) status = "fresh-and-bound";
+  else if (typed !== null) status = typed;
   else if (check.message.includes("is missing or unreadable")) status = "missing";
   else if (check.message.includes("exitCode=")) status = "verify-failed";
   else if (check.message.includes("is stale (HEAD is")) status = "stale-commit";

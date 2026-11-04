@@ -4501,6 +4501,12 @@
       "file": "plugins/pipeline-core/lib/record-only-paths.test.mjs",
       "invariantPinned": "The record-only path set that the production push gate accepts through the release-promotion envelope is byte-identical to the one it had before it moved into its own module and is re-exported unchanged; the two classes the authority carry-forward draft adds are separate and not record-only; the narrower carry-forward decision never accepts a path outside the shared set plus the extension (C19 D4b/E3 stage 2, AC-108)",
       "nonOverlapNote": "Unique cases: lib/record-only-paths.mjs and the identity of its re-exports; release-promotion-envelope.test.mjs, guard-push-promotion.test.mjs and push-prepare.test.mjs pin the envelope and the push behaviour that use the set"
+    },
+    {
+      "name": "evidence-freshness-codes-tests",
+      "file": "plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs",
+      "invariantPinned": "The push-prepare evidence freshness check carries a stable code next to its unchanged message for a missing, failed and stale record, the push gate satisfiability classification prefers the code and falls back to the prose for a result without one, and a code never overrides a green result (C19 D4b/E3 stage 2a, AC-108)",
+      "nonOverlapNote": "Unique cases: lib/evidence-freshness-codes.mjs and the code path of push-gate-satisfiability; push-prepare.test.mjs and push-gate-satisfiability.test.mjs pin the messages and the prose classification"
     }
   ]
 }

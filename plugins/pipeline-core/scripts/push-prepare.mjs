@@ -54,6 +54,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { EVIDENCE_FRESHNESS_CODES } from "../lib/evidence-freshness-codes.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
@@ -219,8 +220,8 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   const data = evidenceInput?.data ?? null;
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
   const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
-  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
-  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
+  if (data === null) return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.MISSING, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
+  if (data.exitCode !== 0) return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
   if (data.commit !== headCommit) {
     const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
@@ -243,7 +244,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
       if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
         if (id === "verify-evidence") {
           if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
-            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+            return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
           }
           return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
         }
@@ -252,10 +253,10 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
         }
       }
     }
-    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
+    return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.STALE_COMMIT, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
   }
   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+    return { id, ok: false, code: EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
