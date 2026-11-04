@@ -19,4 +19,10 @@ mkdirSync(resolve(clone, "scratch"), { recursive: true });
 copyFileSync(resolve(repo, script), resolve(clone, "scratch", basename(script)));
 const r = sh("bash", [`scratch/${basename(script)}`], clone, { GIT_AUTHOR_NAME: "Rehearsal", GIT_AUTHOR_EMAIL: "rehearsal@example.invalid", GIT_COMMITTER_NAME: "Rehearsal", GIT_COMMITTER_EMAIL: "rehearsal@example.invalid" });
 writeFileSync(resolve(import.meta.dirname, `out-${basename(process.argv[3] ?? "clone")}.log`), `${r.stdout}\n--- stderr ---\n${r.stderr}`);
-console.log(`start ${head}\nexit ${r.status}\n${r.stdout.split("\n").slice(-30).join("\n")}\n${r.stderr.split("\n").slice(-15).join("\n")}`);
+// Candidate 19 (w155): applying the chain is not enough; a registered suite that the capability inventory does not name makes a Full Verify red. Run the registration checker on the resulting tree.
+let registration = "";
+if (r.status === 0) {
+  const check = sh("node", ["harness/scripts/check-verify-suite-registration.mjs"], clone);
+  registration = `registration check exit ${check.status}: ${(check.stdout + check.stderr).trim().split("\n").slice(-3).join(" | ")}\n`;
+}
+console.log(`start ${head}\nexit ${r.status}\n${registration}${r.stdout.split("\n").slice(-30).join("\n")}\n${r.stderr.split("\n").slice(-15).join("\n")}`);
