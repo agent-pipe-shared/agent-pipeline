@@ -13,6 +13,12 @@ two-failed-attempts rule.
 Language: English (agent-facing prompt, ADR-0011).
 
 USAGE (Elephant)
+-1. THIS FILE IS THE FIELD SPECIFICATION, NOT A FORM TO FILL BY HAND. The
+   briefing that is dispatched is generated from a closed package by
+   `scripts/dispatch-briefing.mjs build` of the plugin (package in, briefing
+   file out), and the dispatch hook refuses a briefing that does not come from
+   it. Filling the fields below in a free-written prompt is the failure mode
+   (CLAUDE.md, "Dispatch from the template, never freehand"), not a shortcut.
 0. INCLUDE `templates/prompts/agent-obligations.md` verbatim at the top of the
    briefing (or, if the agent can read the repo, point it at that exact path).
    It is GENERATED from the guards themselves — the closed shell grammar, the
