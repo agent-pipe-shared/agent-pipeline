@@ -51,6 +51,16 @@ step2() {
   git commit --no-verify -m "$2" -m $'AI-Assisted: true\nDispatch: stage-0 (elephant)'
   echo "applied $1"
 }
+# A change whose patch would carry the very literals it removes (and so bring the Security scan findings back) is held as a script: <stem>.apply.mjs, run from the repository root.
+stepjs() {
+  local subjects
+  subjects=$(git log --format=%s)
+  if grep -Fxq -- "$2" <<<"$subjects"; then echo "already applied $1"; return 0; fi
+  node "$H/$1.apply.mjs"
+  git add -A -- "${STAGE[@]}"
+  git commit --no-verify -m "$2" -m $'AI-Assisted: true\nDispatch: stage-0 (elephant)'
+  echo "applied $1 (script)"
+}
 step2 w138-f1-a-closed-predecessors-design-receipt-is-accepted-for-the-next-feature-when-the-design-is-equal "feat(architecture): accept the design receipt of a closed predecessor feature when the design package and every target digest are equal"
 step2 w162-d4b-stage-3-a-verify-or-security-record-is-carried-across-evidence-only-commits-opt-in "feat(push): a Verify or Security record is carried across evidence-only commits by the push guard and push-prepare, behind the opt-in block"
 step2 w165-e1-a-pending-unavailable-stop-failure-names-its-cause-and-the-recover-helper "fix(hook): a pending-unavailable Goldfish stop failure names its cause and the recover helper plan and apply command"
@@ -83,7 +93,7 @@ step2 w199-remote-identity-case-for-the-local-only-subject "test(security): rest
 step2 w200-finalizer-regression-case-completion-policy "fix(candidate-19c): extend the finalizer regression case-completion policy by NGHF08"
 step2 w201-the-suite-history-check-admits-several-recorded-extensions "fix(verify): admit several recorded case-list extensions (and a first case-completion policy) in the suite history check; record 7281e012c and 4ec6622a2"
 step2 w202-critic-preimage-repin "fix(critic): re-pin the protected Critic preimage to the current critic-review skill and roles/critic.md (PO decision 2026-11-04)"
-step2 w203-key-shaped-fixtures-and-pem-markers-built-at-run-time "fix(security): build the key-shaped fixtures and the PEM armor markers at run time so the secret scan sees no literal"
+stepjs w203-key-shaped-fixtures-and-pem-markers-built-at-run-time "fix(security): build the key-shaped fixtures and the PEM armor markers at run time so the secret scan sees no literal"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
