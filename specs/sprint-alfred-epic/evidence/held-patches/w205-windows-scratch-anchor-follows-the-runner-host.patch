@@ -1,0 +1,114 @@
+diff --git a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+index cfe5468c7..ec3f0e6b8 100644
+--- a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
++++ b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+@@ -494,18 +494,49 @@ function defaultProcessIdentity(pid) {
+ 
+ const TRANSIENT_SHELLS = new Set(["sh", "bash", "dash", "zsh", "ksh", "mksh", "fish", "busybox"]);
+ 
++const TRANSIENT_WINDOWS_SHELLS = new Set(["bash.exe", "sh.exe", "zsh.exe", "dash.exe", "pwsh.exe", "powershell.exe", "cmd.exe", "conhost.exe"]);
++
++/**
++ * E2 (candidate 19): one Windows process, read through the CIM process table: `{ parentPid, name }`, or a throw when it cannot be read. The
++ * stage 1 Windows probe measured a scratch binding reported `reanchored` by the preflight and `dead-anchor` seconds later: off Linux the anchor
++ * was the one-shot shell that ran the call, which is gone when the call returns.
++ */
++function defaultReadWindowsProcess(pid, spawn = spawnSync) {
++  const script = `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($null -eq $p) { exit 3 }; Write-Output ($p.ParentProcessId.ToString() + ' ' + $p.Name)`;
++  const result = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", timeout: 5000, windowsHide: true });
++  if (result.error || result.status !== 0) throw new Error("windows process unreadable");
++  const match = /^(\d+) (.+)$/u.exec(String(result.stdout).trim());
++  if (!match) throw new Error("windows process unreadable");
++  return { parentPid: Number(match[1]), name: match[2].trim() };
++}
++
+ /**
+  * The long-lived runner host a scratch binding is anchored to (D54, E37 (b)). A Claude hook or
+  * a Bash tool call runs under a shell started for that one call, below the runner host
+  * (measured: node -> bash -> claude), so that shell is gone seconds after the bind and the next
+  * sweep would retire a live session's binding. On Linux this walks up from `startPid` past
+- * shell processes; elsewhere, or when `/proc` cannot be read, it keeps `startPid` as before.
++ * shell processes; on Windows it does the same through the process table (`readWindowsProcess`,
++ * shells by image name); elsewhere, or when the process table cannot be read, it keeps `startPid` as before.
+  */
+ export function resolveRunnerHostPid({
+   startPid = process.ppid,
+   platform = process.platform,
+   readStat = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8"),
++  spawn = spawnSync,
++  readWindowsProcess = (pid) => defaultReadWindowsProcess(pid, spawn),
+ } = {}) {
++  if (platform === "win32") {
++    if (!Number.isSafeInteger(startPid) || startPid < 5) return startPid;
++    let pid = startPid;
++    for (let depth = 0; depth < 8 && pid > 4; depth += 1) {
++      let node;
++      try { node = readWindowsProcess(pid); } catch { return startPid; }
++      if (!node || !Number.isSafeInteger(node.parentPid) || typeof node.name !== "string") return startPid;
++      if (!TRANSIENT_WINDOWS_SHELLS.has(node.name.toLowerCase())) return pid;
++      pid = node.parentPid;
++    }
++    return startPid;
++  }
+   if (platform !== "linux" || !Number.isSafeInteger(startPid) || startPid < 2) return startPid;
+   let pid = startPid;
+   for (let depth = 0; depth < 8 && pid > 1; depth += 1) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-scratch-lifecycle.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-scratch-lifecycle.test.mjs
+index 48bad1441..e8260cc7c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-scratch-lifecycle.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-scratch-lifecycle.test.mjs
+@@ -227,7 +227,53 @@ test("D54: the runner host anchor skips one-shot shells, and keeps the start pid
+   assert.equal(resolveRunnerHostPid({ startPid: 200, platform: "linux", readStat }), 200, "a runner host as the parent is kept");
+   assert.equal(resolveRunnerHostPid({ startPid: 410, platform: "linux", readStat }), 410, "shells all the way up keep the start pid");
+   assert.equal(resolveRunnerHostPid({ startPid: 999, platform: "linux", readStat }), 999, "an unreadable /proc keeps the start pid");
+-  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "win32", readStat }), 300, "off Linux the start pid is kept");
++  // Restated 2026-11-04 (candidate 19, E2, QG-04, own hunk; intent kept: a platform with no process-table reader keeps the start pid): this case
++  // used platform "win32", which now walks the Windows process table, so the keep-the-start-pid case moves to a platform with no reader.
++  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "darwin", readStat }), 300, "off Linux and Windows the start pid is kept");
++});
++
++test("E2: on Windows the runner host anchor skips one-shot shells by image name, and keeps the start pid when the process table cannot be read", () => {
++  const table = {
++    5300: { parentPid: 5200, name: "bash.exe" },
++    5200: { parentPid: 5100, name: "bash.exe" },
++    5100: { parentPid: 4000, name: "claude.exe" },
++    4000: { parentPid: 4, name: "explorer.exe" },
++    6300: { parentPid: 6200, name: "PowerShell.exe" },
++    6200: { parentPid: 6100, name: "cmd.exe" },
++    6100: { parentPid: 6000, name: "conhost.exe" },
++    6000: { parentPid: 5900, name: "sh.exe" },
++    5900: { parentPid: 5800, name: "bash.exe" },
++    5800: { parentPid: 5700, name: "bash.exe" },
++    5700: { parentPid: 5600, name: "bash.exe" },
++    5600: { parentPid: 5500, name: "bash.exe" },
++    5500: { parentPid: 5400, name: "bash.exe" },
++  };
++  const readWindowsProcess = (pid) => { if (!table[pid]) throw new Error("absent"); return table[pid]; };
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess }), 5100, "the walk passes both shells and stops at the runner host");
++  assert.equal(resolveRunnerHostPid({ startPid: 5100, platform: "win32", readWindowsProcess }), 5100, "a runner host as the parent is kept");
++  assert.equal(resolveRunnerHostPid({ startPid: 6300, platform: "win32", readWindowsProcess }), 6300, "shells beyond the depth bound keep the start pid");
++  assert.equal(resolveRunnerHostPid({ startPid: 7777, platform: "win32", readWindowsProcess }), 7777, "an unreadable process keeps the start pid");
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess: () => ({ parentPid: "x", name: 3 }) }), 5300, "a malformed row keeps the start pid");
++  assert.equal(resolveRunnerHostPid({ startPid: 4, platform: "win32", readWindowsProcess }), 4, "the system process is never walked");
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", readWindowsProcess: (pid) => ({ ...table[pid], name: table[pid].name.toUpperCase() }) }), 5100, "image names compare case-insensitively");
++});
++
++test("E2: the default Windows process reader asks the CIM process table once per process, parses its line, and fails closed", () => {
++  const calls = [];
++  const rows = { 5300: "5200 bash.exe\r\n", 5200: "5100 bash.exe\r\n", 5100: "4000 claude.exe\r\n" };
++  const spawn = (executable, args, options) => {
++    calls.push({ executable, args, options });
++    const pid = /ProcessId=(\d+)/u.exec(args.at(-1))?.[1];
++    return rows[pid] === undefined ? { status: 3, stdout: "" } : { status: 0, stdout: rows[pid] };
++  };
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn }), 5100);
++  assert.equal(calls.length, 3, "one process-table read per step of the walk");
++  assert.equal(calls[0].executable, "powershell.exe");
++  assert.deepEqual(calls[0].args.slice(0, 3), ["-NoProfile", "-NonInteractive", "-Command"]);
++  assert.equal(calls[0].options.timeout, 5000, "the read is bounded");
++  assert.equal(resolveRunnerHostPid({ startPid: 9999, platform: "win32", spawn }), 9999, "a process that is not in the table keeps the start pid");
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn: () => ({ status: 0, stdout: "garbage" }) }), 5300, "an unparsable line keeps the start pid");
++  assert.equal(resolveRunnerHostPid({ startPid: 5300, platform: "win32", spawn: () => ({ error: new Error("ENOENT") }) }), 5300, "no PowerShell keeps the start pid");
+ });
+ 
+ test("the lifecycle is fail-open: an unusable root is a typed fault, never a throw", () => {
