@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
+import { readFileSync } from "node:fs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -114,6 +115,44 @@ test("RCD14: the refusal of an attached value prints the spelling to use, and bo
   const result = await refusal(attached);
   assert.equal(result.exitCode, 2);
   assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
+});
+
+test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {
+  const hint = String(lsListingHint("ls -la .git/agent-pipeline", "-la", root));
+  assert.match(hint, /listed as names only/u);
+  assert.match(hint, /`ls -1 <dir>`/u);
+  assert.match(hint, /`find <dir> -maxdepth 1`/u);
+  assert.match(hint, /intended read limit/u);
+  assert.equal(lsListingHint("ls -l .git", "-l", root) === null, false);
+  assert.equal(lsListingHint("ls -1 .git/agent-pipeline", "-1", root), null, "an admitted flag needs no hint");
+  assert.equal(lsListingHint("ls -a .git/agent-pipeline", "-a", root), null);
+  assert.equal(lsListingHint("rg --hidden needle README.md", "--hidden", root), null, "only ls gets the listing hint");
+  assert.equal(lsListingHint("ls -la a | head -n 2", "-la", root), null, "pipelines are not diagnosed");
+  assert.equal(lsListingHint(undefined, "-la", root), null);
+  assert.equal(lsListingHint("ls -la docs", undefined, root), null);
+});
+
+test("RCD16: the unsupported-read refusal prints the ls listing hint after the flag it names (wiring pin; the control root itself is not protected in a bare checkout)", () => {
+  const source = readFileSync(join(root, "plugins", "pipeline-core", "lib", "guard", "evaluate.mjs"), "utf8");
+  assert.match(source, /lsListingHint\(readCommand, flag, root\)/u);
+  assert.match(source, /clusterSpellingHint\(readCommand, flag, root\) \?\? lsListingHint\(readCommand, flag, root\)/u);
+  assert.match(source, /flagSpellingHint\(flag\) \?\? listing/u);
+  assert.match(source, /import \{[^}]*lsListingHint[^}]*\} from "\.\.\/read-command-diagnosis\.mjs"/u);
+});
+
+test("RCD17: a refused short-flag cluster gets the split spelling only when the grammar admits it, and the refusal prints it", async () => {
+  assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "fixture must be refused");
+  assert.equal(isReadOnlyDiagnosticCommand("rg -l -n needle README.md", root), true, "the split spelling is admitted");
+  assert.equal(clusterSpellingHint("rg -ln needle README.md", "-ln", root), "a combined short-flag cluster is not admitted here; give each flag on its own: -l -n");
+  assert.equal(clusterSpellingHint("rg -n needle README.md", "-n", root), null, "a single flag is no cluster");
+  assert.equal(clusterSpellingHint("rg --hidden needle README.md", "--hidden", root), null, "a long flag is no cluster");
+  assert.equal(clusterSpellingHint("rg -ln needle README.md | head -n 2", "-ln", root), null, "pipelines are not diagnosed");
+  assert.equal(clusterSpellingHint("rg -zz needle README.md", "-zz", root), null, "no hint when the split spelling is refused too");
+  assert.equal(clusterSpellingHint(undefined, "-ln", root), null);
+  const result = await refusal("rg -ln needle README.md");
+  assert.equal(result.exitCode, 2);
+  assert.match(String(result.stderr), /Rejected element: the flag "-ln" \(a combined short-flag cluster is not admitted here; give each flag on its own: -l -n\)\./u);
+  assert.equal(isReadOnlyDiagnosticCommand("rg -ln needle README.md", root), false, "the diagnosed command itself stays refused");
 });
 
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {

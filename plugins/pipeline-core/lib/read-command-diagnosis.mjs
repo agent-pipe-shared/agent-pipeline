@@ -63,6 +63,43 @@ export function flagSpellingHint(flag) {
   return null;
 }
 
+/**
+ * F9 (candidate 19): a short-flag cluster such as `rg -ln` is refused where the same flags given one by one (`rg -l -n`) are admitted. The hint is
+ * printed only when the grammar itself admits the split spelling, so it is never a guess; it grants nothing.
+ * @returns {string|null}
+ */
+export function clusterSpellingHint(command, flag, root) {
+  if (typeof command !== "string" || typeof flag !== "string" || !/^-[A-Za-z]{2,}$/u.test(flag)) return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+  const { executable, argv } = parsed.segments[0];
+  const split = [...flag.slice(1)].map((letter) => `-${letter}`);
+  const expanded = argv.flatMap((token) => (token === flag ? split : [token]));
+  if (!isReadOnlyDiagnosticCommand([executable, ...expanded.map(quote)].join(" "), root)) return null;
+  return `a combined short-flag cluster is not admitted here; give each flag on its own: ${split.join(" ")}`;
+}
+
+const NAMES_ONLY_LS_FLAGS = new Set(["-1", "-a", "-A"]);
+
+/**
+ * Q2 (candidate 19): a listing of a protected directory (the control root among them) is admitted as a names-only listing, so `ls -la <dir>` is
+ * refused there while `ls -la docs` is not. The refusal names the flag, and the flag alone reads as an unsafe spelling; this adds the part the
+ * flag cannot say: which spellings ARE admitted and how to list the same names another way. Returns one sentence for an `ls` command, else null.
+ * Prose only; it grants nothing, the grammar (`isNamesOnlyLsArgs`) stays the single authority.
+ * @returns {string|null}
+ */
+export function lsListingHint(command, flag, root) {
+  if (typeof command !== "string" || typeof flag !== "string" || NAMES_ONLY_LS_FLAGS.has(flag)) return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
+  if (String(parsed.segments[0].executable).split("/").pop() !== "ls") return null;
+  return "a protected directory, such as the control root, is listed as names only: `ls <dir>`, `ls -1 <dir>`, `ls -a <dir>` or `ls -A <dir>`; "
+    + "`find <dir> -maxdepth 1` lists the same names; this is an intended read limit, not a fault of the directory";
+}
+
 /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
 export function firstUnadmittedFlag(command, root) {
   if (typeof command !== "string" || command.trim() === "") return null;
