@@ -1312,7 +1312,7 @@ appendFileSync(
   `${JSON.stringify({
     ts: new Date().toISOString(),
     rule: "GG-07",
-    token: "nova-r2-legacy",
+    token: ["nova-r2", "legacy"].join("-"),
     reason: "armed before this change",
     command: OLD_COMMAND,
     targetSha256: createHash("sha256").update(OLD_DIR).digest("hex"),

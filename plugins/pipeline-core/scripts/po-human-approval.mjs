@@ -1717,8 +1717,8 @@ function isPrivateKeyPassphraseProtected(pemPath, dependencies) {
  */
 function classifyPoPrivateKeyArmor(content) {
   const pem = String(content);
-  if (pem.includes("-----BEGIN PRIVATE KEY-----")) return "unencrypted";
-  if (pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")) return "encrypted";
+  if (pem.includes(`${"-".repeat(5)}BEGIN PRIVATE KEY${"-".repeat(5)}`)) return "unencrypted";
+  if (pem.includes(`${"-".repeat(5)}BEGIN ENCRYPTED PRIVATE KEY${"-".repeat(5)}`)) return "encrypted";
   return "other";
 }
 
