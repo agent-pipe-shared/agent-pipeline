@@ -47,6 +47,25 @@ Tests: a spawn seam that advances a fake clock past the deadline yields the type
 
 Order: Direction 0 first, then the measurement decides 1 and 3, and 2a runs alongside.
 
+## 2c. The first real trace (Windows, installed 19c, authority trace on)
+
+- An ALLOWED Bash or PowerShell call costs about 0.4 s in `guard-lifecycle-ready` with no native observation. `guard-worktree-isolation` and `guard-dispatch-budget` cost 0.2 to 1.3 s with none.
+- Bootstrap-type calls cost about 7.5 s (5 native observations, about 2 s in them, about 5 s unexplained).
+- ONE `guard-lifecycle-ready` process ended with exit code 2 (a refusal) after 144 s wall time: 220 native observations (131.6 s; `read` 52, `read-source` 52, `inspect` 58, `ancestor` 20, `ancestor-above-root` 12, `publish` 7, `remove` 4, `create-directory` 1), 238 custody inspections (5.2 s), 4273 memo hits against 194 misses. The same process held the registry lock (`pipeline.session-authority-legacy-lock.v2`) while it ran: `inspect` of the consumer showed it as the live lock holder and then met a `registry.lock` that had vanished between listing and `lstat` (ENOENT). The Goldfish child that made the refused call took 193.8 s instead of 41 to 53 s.
+- No trace line for `guard-dispatch.mjs` exists although a dispatch was launched. The writer runs at process exit, so that hook either never exited normally or does not install the trace. Open.
+
+Reading from the source: a refused call goes through `recordHumanGuardDenial` (lib/human-guard-override.mjs). Only `GUARD-READ-COMMAND-UNSUPPORTED` and `GUARD-READ-TARGET-MISSING` take the cheap pure return (`classifyNonLiftableGuardDenials`). Every other refusal resolves the repository topology and its git observation, may journal a copy-only command offer, and plans a route, all under the legacy authority lock; on Windows each of the several hundred checks it makes is a PowerShell start. The outcome for a shape or grammar refusal is nearly always "no human override route is offered", so the cost buys nothing, and it blocks every other hook that needs the registry for its whole duration. This one mechanism explains the 144 s, the lock held by a live process, the `registry.lock` ENOENT race, the second parallel launch refused (E4) and the children that run minutes instead of seconds.
+
+## 2d. Direction 5 (new, first in the order): the refusal path must be cheap and must not hold the registry lock
+
+What: in `recordHumanGuardDenial`, a denial whose `eligibility()` result is not eligible (the `HGO-NONOVERRIDABLE-*` family, which includes the grammar and shape refusals) and that carries neither a guard-push denial nor typed retry actions returns the route that the read-only companion `previewHumanGuardRecovery` already computes (`recoveryRoute(..., { repository: null })`) BEFORE `topology`, `repositoryObservation` and the journaling. Only a route whose status is `external-operator-required` continues to the journaled offer as today. The legacy authority lock is not taken for the cheap return.
+
+Why it is safe to try: the cheap companion exists and is the same route function; the change moves an already pure result in front of side effects. The test that proves it: for every non-eligible fixture the result of the cheap return equals the result of the old path (same status, code and reason text), and no request is appended and no lock file is created.
+
+Risk: `lib/human-guard-override.mjs` is a protected guard module (operator commits it); an `external-operator-required` route still pays today's cost, so the second step is to measure whether its journaling needs the full custody scan at all. Critic review required.
+
+Order: Direction 5 and Direction 0 first (together they remove the unguarded launch and the long lock), then the measurement of what remains decides Directions 1 and 3.
+
 ## 3. Measurement needed first
 
 The opt-in authority trace already counts native spawns (`nativeAuthorityStats`: count, ms, maxMs, byOperation, memo hits and misses). The Windows session starts the runner from a shell with `PIPELINE_AUTHORITY_TRACE=1` and `PIPELINE_AUTHORITY_TRACE_FILE` set (PO yes in that chat), runs ONE dispatch, and reports the `pipeline.hook-authority-trace.v1` lines, the number of reservations (`session-authority-repair.mjs inspect`), and the per-phase times. Decision rule:
