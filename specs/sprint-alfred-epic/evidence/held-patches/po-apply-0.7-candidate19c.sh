@@ -23,6 +23,7 @@
 #   w193  the push-init delivery anchor fixture materializes the push threat model that the new gate requires (found by the push-init suite on the chain)
 #   w194  the SECGATE-2 installed-plugin fixture copies the shared evidence freshness module that the security completeness gate now imports (found by the D4a sweep on the chain)
 #   w180  the seal is prepared as one digest-bound plan (prepare-seal) and applied with the plan approval (late-binding build step 4; ordered after w192 so that the kernel pins it extends are in place)
+#   w181  onboarding leaves an unsealed draft in the EL-19 scope, the seal situation readback, a repair for every seal state, the verifiers accept the seal plan digest (late-binding build step 5; a delta on w180, ordered right after it)
 #   w192  the never-liftable kernel paths list the modules that the whole chain adds (seal reader, carry-forward reader and decision, gitleaks adapter, probe retry) and the pre-push hook import table is restated (found by the kernel closure suite on the whole chain)
 # Run with: bash specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh   (repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
@@ -64,6 +65,7 @@ step2 w194-secgate2-fixture-copies-the-shared-evidence-freshness-module "test(on
 step2 w192-the-kernel-closure-lists-the-modules-that-the-whole-chain-adds "fix(guard): list the seal reader, the carry-forward reader and decision, the gitleaks adapter and the probe retry in the never-liftable kernel paths and restate the pre-push hook dynamic import table to its twelve call sites"
 # The derived files, in one step: backlog ledger transitions, inventory baseline (needs the HEAD of the source commit above), Reader inputs.
 step2 w180-lb4-the-seal-is-prepared-as-one-digest-bound-plan-and-applied-with-the-plan-approval "feat(late-binding): the seal is prepared as one digest-bound plan and applied with the plan approval, and the seal plan suite and module are registered in the kernel pins"
+step2 w181-lb5-onboarding-leaves-a-draft-in-scope-bound-projects-migrate-every-state-has-a-repair "feat(late-binding): onboarding leaves an unsealed draft in the EL-19 scope, the seal situation readback and the repair of every seal state, and the verifiers of a signed design approval accept the seal plan digest"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
