@@ -1050,6 +1050,8 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
     ["AGENTS.md", true],
     ["pipeline.user.yaml", true],
     [".gitignore", true],
+    [".gitattributes", true],
+    ["sub/.gitattributes", false],
     ["project/pipeline.json", true],
     ["src/implementation.mjs", false],
     ["lib/production.mjs", false],
