@@ -4489,6 +4489,12 @@
       "file": "plugins/pipeline-core/scripts/generate-runbook.test.mjs",
       "invariantPinned": "The committed close-path runbook and its index are byte-identical to what generate-runbook.mjs generates from the close chain tables, the generation is deterministic, and every phase of the close requirement table appears exactly once as a step (C19 G5 stage 1, AC-108)",
       "nonOverlapNote": "Unique cases: scripts/generate-runbook.mjs and the two committed runbook files; close-chain-guide.test.mjs pins the tables the generator reads"
+    },
+    {
+      "name": "evidence-carry-forward-tests",
+      "file": "plugins/pipeline-core/lib/evidence-carry-forward.test.mjs",
+      "invariantPinned": "A Verify or Security record is carried from an earlier commit to a later one only when every changed path lies in the closed evidence set, the product tree hash is equal, the earlier commit is an ancestor and, for Security, a secret scan of the changed files is clean; every other outcome fails closed and the decision never changes the repository (C19 D4b/E3 stage 1, AC-108)",
+      "nonOverlapNote": "Unique cases: lib/evidence-carry-forward.mjs only; no reader calls it yet, so no other suite pins a carry-forward"
     }
   ]
 }

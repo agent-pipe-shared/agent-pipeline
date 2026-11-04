@@ -449,6 +449,7 @@
         "verify-phase:harness/scripts/verify.mjs:entry-gates-greenfield-pending-tests",
         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:evidence-carry-forward-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
         "verify-phase:harness/scripts/verify.mjs:execution-lane-credential-tests",
