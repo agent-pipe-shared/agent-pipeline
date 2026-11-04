@@ -1,0 +1,952 @@
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.mjs b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+index 3678df6ea..b64d8ef74 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+@@ -25,7 +25,7 @@
+ import { createHash } from "node:crypto";
+ 
+ import { canonical } from "./po-approval-proof.mjs";
+-import { readAuthoritySeal } from "./authority-seal-reader.mjs";
++import { inSealScope, readAuthoritySeal } from "./authority-seal-reader.mjs";
+ 
+ export const SEAL_PLAN_SCHEMA = "pipeline.authority-seal-plan.v1";
+ /** The one place a prepared plan lives; a re-prepare replaces it (idempotent), so a stale or orphaned plan retires itself. */
+@@ -97,7 +97,7 @@ function reviewFault(review, documents) {
+  */
+ export function buildSealPlan(input) {
+   const { authority, featureId, revision, profile, documents, designInputCapture, reviews } = input;
+-  if (!isRecord(authority) || profile === "mini") {
++  if (!isRecord(authority) || !inSealScope(profile)) {
+     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
+   }
+   const seal = readAuthoritySeal(authority);
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+index d9f2c1d42..721c73484 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+@@ -7,7 +7,7 @@
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { after, test } from "node:test";
+ import { fileURLToPath } from "node:url";
+@@ -472,3 +472,167 @@ test("LB4-20 prepare-seal accepts only its closed flags", () => {
+     assert.equal(result.status, 2, argv.join(" "));
+   }
+ });
++
++// ---------------------------------------------------------------------------------------------- build step 5: the state machine
++// Every state of the seal has a command the agent can run that leaves a consistent state, `reopen-design` is executable in each of
++// them, and the read-only readback (`inspect` -> sealSituation) names the next command and the exits. Cases LB5-4 to LB5-11.
++const seal = (fx) => JSON.parse(fx.cli(["inspect"]).out).sealSituation;
++const sealedContinuityOf = (fx) => ({ schema: "pipeline.continuity.v0", featureId: FEATURE, revision: 0, runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: { path: PLAN, sha256: sha(fx.read(PLAN)) }, spec: { path: SPEC, sha256: sha(fx.read(SPEC)) }, result: null }, queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } });
++const startSealed = (fx) => {
++  fx.write("continuity-init-request.json", `${JSON.stringify(sealedContinuityOf(fx), null, 2)}\n`);
++  fx.must(["continuity-init", "--expected-revision", "absent", "--request-file", "continuity-init-request.json", "--lock-token", "seal-fixture-token"]);
++};
++const exitIds = (situation) => situation.exits.map((exit) => exit.verb);
++
++test("LB5-4 draft without a plan: the readback names the next command; before the submission that is submit-plan, after it prepare-seal; reopen-design is an exit", async () => {
++  const { sanctionedPipelineStateArgs } = await import("./guard/sanctioned-args-scripts.mjs");
++  const fx = buildDraft("lb5-draft-no-plan");
++  fx.startDraft();
++  const early = seal(fx);
++  assert.equal(early.schema, "pipeline.seal-situation.v1");
++  assert.equal(early.situation, "draft");
++  assert.equal(early.plan.status, "none");
++  assert.equal(early.next.verb, "submit-plan", "a plan prepared before the submission is the plan of another revision");
++  assert.ok(exitIds(early).includes("reopen-design"));
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  const submitted = seal(fx);
++  assert.equal(submitted.plan.status, "none");
++  assert.equal(submitted.next.verb, "prepare-seal");
++  assert.equal(sanctionedPipelineStateArgs(["prepare-seal"], fx.root), true, "the lifecycle guard admits the repair command");
++  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), true);
++  assert.equal(sanctionedPipelineStateArgs(["inspect"], fx.root), true);
++  const before = fx.stateBytes();
++  assert.equal(fx.cli(["inspect"]).status, 0);
++  assert.deepEqual(fx.stateBytes(), before, "the readback writes nothing");
++  assert.equal(existsSync(fx.planFile()), false, "the readback writes no plan");
++  fx.must([submitted.next.verb]);
++  assert.equal(seal(fx).plan.status, "current");
++  assert.equal(seal(fx).next.verb, "present-plan");
++});
++
++test("LB5-5 draft with a prepared plan: present-plan is next, then approve-plan; reopen-design voids the plan and the next command works", () => {
++  const fx = buildDraft("lb5-draft-plan");
++  fx.startDraft();
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).next.verb, "present-plan");
++  fx.must(["present-plan", "--by", "synthetic-presenter", "--review-receipt", RECEIPT]);
++  assert.equal(seal(fx).plan.status, "presented");
++  assert.equal(seal(fx).next.verb, "approve-plan");
++  fx.must(["reopen-design", "--by", "synthetic-author"]);
++  assert.equal(existsSync(fx.planFile()), false, "reopen-design voids the prepared plan");
++  const reopened = seal(fx);
++  assert.equal(reopened.situation, "draft");
++  assert.equal(reopened.plan.status, "none");
++  assert.ok(["submit-plan", "prepare-seal"].includes(reopened.next.verb));
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).plan.status, "current");
++});
++
++test("LB5-6 draft with a stale plan (prepared before the submission): the readback says stale, prepare-seal repairs it", () => {
++  const fx = buildDraft("lb5-draft-stale");
++  fx.startDraft();
++  fx.must(["prepare-seal"]);
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  const stale = seal(fx);
++  assert.equal(stale.plan.status, "stale");
++  assert.equal(stale.next.verb, "prepare-seal");
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).plan.status, "current");
++});
++
++test("LB5-7 draft whose PRD was edited after the plan: the readback says drifted, prepare-seal repairs it, and the edited bytes are what seals", () => {
++  const fx = buildDraft("lb5-draft-drift");
++  fx.startDraft();
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  fx.must(["prepare-seal"]);
++  fx.write(SPEC, `${fx.read(SPEC).toString("utf8")}\nAC-2 is added in the draft.\n`);
++  const drifted = seal(fx);
++  assert.equal(drifted.plan.status, "drifted");
++  assert.equal(drifted.next.verb, "prepare-seal");
++  assert.match(drifted.plan.reason, /spec/u);
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).plan.status, "current");
++});
++
++test("LB5-8 unreadable, orphaned plan file on a draft: the readback says unreadable, prepare-seal replaces it (also a link in its place)", () => {
++  const fx = buildDraft("lb5-draft-garbage");
++  fx.startDraft();
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  mkdirSync(dirname(fx.planFile()), { recursive: true });
++  writeFileSync(fx.planFile(), "not json at all\n");
++  const garbage = seal(fx);
++  assert.equal(garbage.plan.status, "unreadable");
++  assert.equal(garbage.next.verb, "prepare-seal");
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).plan.status, "current");
++  // A plan file that is not a plain single-link file is replaced as well, never followed.
++  const elsewhere = join(dirname(fx.planFile()), "elsewhere.json");
++  writeFileSync(elsewhere, "{}\n");
++  rmSync(fx.planFile());
++  symlinkSync(elsewhere, fx.planFile());
++  assert.equal(seal(fx).plan.status, "unreadable");
++  fx.must(["prepare-seal"]);
++  assert.equal(seal(fx).plan.status, "current");
++  assert.equal(readFileSync(elsewhere, "utf8"), "{}\n", "the link target was not written through");
++});
++
++test("LB5-9 sealed package: nothing to prepare, reopen-design is the exit as before, a stray plan file is retired by prepare-seal", () => {
++  const fx = buildDraft("lb5-sealed");
++  fx.startDraft();
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  fx.must(["prepare-seal"]);
++  fx.must(["present-plan", "--by", "synthetic-presenter", "--review-receipt", RECEIPT]);
++  assert.equal(fx.approve().status, 0);
++  const sealed = seal(fx);
++  assert.equal(sealed.situation, "sealed");
++  assert.equal(sealed.next, null);
++  assert.deepEqual(exitIds(sealed), ["reopen-design"]);
++  assert.equal(sealed.plan.status, "none");
++  mkdirSync(dirname(fx.planFile()), { recursive: true });
++  writeFileSync(fx.planFile(), `${JSON.stringify({ schema: "pipeline.authority-seal-plan.v1" })}\n`);
++  const orphan = seal(fx);
++  assert.equal(orphan.plan.status, "orphaned");
++  assert.equal(orphan.next.verb, "prepare-seal", "the repair of a stray plan file on a sealed package");
++  const bytes = fx.stateBytes();
++  const retired = fx.cli(["prepare-seal"]);
++  assert.equal(retired.status, 2);
++  assert.match(retired.out, /PSP-ALREADY-SEALED/u);
++  assert.match(retired.out, /stray seal plan file .* was retired/u);
++  assert.equal(existsSync(fx.planFile()), false);
++  assert.deepEqual(fx.stateBytes(), bytes, "retiring the file writes no State");
++  assert.equal(seal(fx).plan.status, "none");
++  assert.equal(seal(fx).next, null);
++  assert.equal(fx.cli(["reopen-design", "--by", "synthetic-author"]).status, 0, "reopen-design from a sealed package behaves as before");
++});
++
++test("LB5-10 bound but not yet approved: the readback names reopen-design with its exact command; it is executable and the next command works", () => {
++  const fx = buildDraft("lb5-bound-unapproved");
++  startSealed(fx);
++  const bound = seal(fx);
++  assert.equal(bound.situation, "bound-unapproved");
++  assert.equal(bound.next, null, "no automatic migration: the project stays locked until its approval");
++  assert.deepEqual(exitIds(bound), ["reopen-design"]);
++  assert.match(bound.exits[0].command, /reopen-design --by <name>$/u);
++  const before = fx.stateBytes();
++  assert.equal(fx.cli(["inspect"]).status, 0);
++  assert.deepEqual(fx.stateBytes(), before, "the migration is the reader and the exits only: inspect writes no State");
++  const reopened = fx.cli(["reopen-design", "--by", "synthetic-author"]);
++  assert.equal(reopened.status, 0, reopened.out);
++  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  assert.equal(readAuthoritySeal(fx.current().continuity.authority).status, "sealed", "a bound package re-binds as before");
++});
++
++test("LB5-11 outside the scope: a state without continuity authority reads none and names no seal command", () => {
++  const fx = buildDraft("lb5-none");
++  // `set-feature` binds a continuity of its own, so the state without any continuity authority is written into the fixture directly
++  // (the legacy shape of a project that has not initialized continuity); the readback must stay read-only on it.
++  const legacy = fx.current();
++  delete legacy.continuity;
++  fx.write("project/pipeline-state.json", `${JSON.stringify(legacy, null, 2)}\n`);
++  const none = seal(fx);
++  assert.equal(none.situation, "none");
++  assert.equal(none.next, null);
++  assert.deepEqual(none.exits, []);
++});
+diff --git a/plugins/pipeline-core/lib/authority-seal-reader.mjs b/plugins/pipeline-core/lib/authority-seal-reader.mjs
+index c1d5ab038..7c777ed42 100644
+--- a/plugins/pipeline-core/lib/authority-seal-reader.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-reader.mjs
+@@ -26,6 +26,14 @@ export const AUTHORITY_SEAL_EXITS = Object.freeze({
+   reopenDesign: "reopen-design",
+ });
+ 
++/**
++ * The ONE scope predicate of the late binding (EL-19, the PRD release scope): a package is sealed at its approval unless its profile is
++ * `mini`. The bind at the end of onboarding (a draft instead of digests), the seal plan and `prepare-seal` all read it from here.
++ */
++export function inSealScope(profile) {
++  return profile !== "mini";
++}
++
+ function safePath(value) {
+   if (typeof value !== "string" || value.length < 1 || value.length > 240 || value.startsWith("/") || value.includes("\\") || value.includes("\0")) return false;
+   return value.split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
+diff --git a/plugins/pipeline-core/lib/continuity-drift-exits.test.mjs b/plugins/pipeline-core/lib/continuity-drift-exits.test.mjs
+index 7ddef84cf..bc739e2e8 100644
+--- a/plugins/pipeline-core/lib/continuity-drift-exits.test.mjs
++++ b/plugins/pipeline-core/lib/continuity-drift-exits.test.mjs
+@@ -47,8 +47,11 @@ function promotedProject(name) {
+     "",
+   ].join("\n"));
+   writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
++  // QG-04 restatement (C19 late binding, build step 5): a package in the EL-19 scope (every profile but `mini`) is promoted as the
++  // unsealed draft, whose PRD and Spec stay editable by design, so there is no bound-document drift to explain. The drift cases of
++  // this file pin the bound digest and therefore promote a package outside the scope (`mini`), which binds the digests as before.
+   const plan = planOnboardingKickoffPromotion({
+-    rootDir: dir, profile: "feature", featureId: `feature-${name}`,
++    rootDir: dir, profile: "mini", featureId: `feature-${name}`,
+     planPath: "specs/promoted/prd_promoted.md", prdPath: "specs/promoted/prd_promoted.md",
+     specPath: "specs/promoted/spec.md", designInputPath: "specs/promoted/design-input.md",
+   });
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index 5a4f21b53..1227c8248 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -92,7 +92,10 @@ export function verifyAcceptedDeliveryContract({envelope,observations} = {}) {
+     const mode = observations.selectedMode;
+     if (!own(mode,['mode','scope','source']) || mode.mode !== envelope.policyBinding.mode
+       || !['signature','chat'].includes(mode.mode)) return no('CAC-MODE-UNAVAILABLE');
+-    const bound = verifyDesignApprovalRequest({request:envelope.request,featureId:envelope.featureId,receipts:observations.receipts,currentSources:observations.currentSources});
++    // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
++    const sealPlanSha256 = envelope.request.binding?.sealPlanSha256;
++    const bound = verifyDesignApprovalRequest({request:envelope.request,featureId:envelope.featureId,receipts:observations.receipts,currentSources:observations.currentSources,
++      ...(sealPlanSha256 === undefined ? {} : {sealPlanSha256})});
+     if (!bound.ok) return no('CAC-SOURCE-BINDING-MISMATCH');
+     const approval = envelope.approval.designApproval;
+     let signer = null;
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index bbacf8ef8..0113bcd1a 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -317,7 +317,9 @@ function verifyBasis(root, requestFile, approval, receiptFiles) {
+     return { path: ref.path, bytes: file.bytes };
+   });
+   requireValue(receiptFiles.length === receipts.length, 'DDB-REVIEW-RECEIPT-DRIFT');
+-  const checked = verifyDesignApprovalRequest({ request, featureId: request.binding.featureId, receipts, currentSources: request.binding.sources });
++  // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
++  const checked = verifyDesignApprovalRequest({ request, featureId: request.binding.featureId, receipts, currentSources: request.binding.sources,
++    ...(request.binding.sealPlanSha256 === undefined ? {} : { sealPlanSha256: request.binding.sealPlanSha256 }) });
+   requireValue(checked.ok && checked.bindingSha256 === approval.bindingSha256
+     && checked.intentSha256 === approval.intentSha256, 'DDB-REQUEST-BINDING');
+   candidateProvenance(root, checked.candidate, request.binding.sources);
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index bf9ca36eb..bbc442f67 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -112,7 +112,7 @@ import {
+   validPlanCancellation,
+   validPlanMixedStateRecovery,
+ } from "./plan-spec-state-v2.mjs";
+-import { readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
++import { inSealScope, readAuthoritySeal, requireSealedAuthority } from "./authority-seal-reader.mjs";
+ import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+ import { readMachinePlane } from "./machine-plane.mjs";
+ import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
+@@ -1633,6 +1633,28 @@ function boundAuthorityDigests(continuity) {
+   return seal.status === "sealed" ? seal.digests : {};
+ }
+ 
++/**
++ * Late binding, the bind at the end of onboarding (build step 5). A package in the EL-19 scope (every profile but `mini`, the one
++ * shared predicate) leaves the promotion as the UNSEALED DRAFT -- `sealed: false`, the paths and no digest -- because the PRD and the
++ * Spec stay editable until the plan approval seals them. Every other package keeps today's bind of the digests, byte for byte.
++ * The digests of the promotion time stay in the promotion plan and in the private history as provenance.
++ */
++function promotionAuthority(profile, authority) {
++  if (!inSealScope(profile)) return { prd: authority.prd, spec: authority.spec, result: null };
++  return { sealed: false, prd: { path: authority.prd.path }, spec: { path: authority.spec.path }, result: null };
++}
++
++/**
++ * Does the continuity authority of a promoted state bind `sha256` for `role`? For a package outside the scope the state binds the
++ * digest itself. For a package in the scope the state must be the draft of exactly this path (the digest is held by the plan and
++ * the history, not by the state); a sealed shape never matches a draft promotion, and a draft never matches a digest promotion.
++ */
++function promotionBinds(continuity, profile, role, path, sha256) {
++  const seal = readAuthoritySeal(continuity?.authority);
++  if (inSealScope(profile)) return seal.status === "draft" && seal.paths[role] === path;
++  return seal.status === "sealed" && seal.digests[role] === sha256;
++}
++
+ function normalizedContinuity(state, observed) {
+   const current = state.continuity;
+   if (!isObject(current)
+@@ -5887,9 +5909,9 @@ function validatePromotionPlan(plan) {
+     || state.activeFeature.planPath !== input.planPath || state.activeFeature.phase !== "design"
+     || state.planApproved !== false || state.continuity.featureId !== input.featureId
+     || state.continuity.authority.prd.path !== input.prdPath
+-    || boundAuthorityDigests(state.continuity).prd !== plan.authority.prd.sha256
++    || !promotionBinds(state.continuity, input.profile, "prd", input.prdPath, plan.authority.prd.sha256)
+     || state.continuity.authority.spec.path !== input.specPath
+-    || boundAuthorityDigests(state.continuity).spec !== plan.authority.spec.sha256
++    || !promotionBinds(state.continuity, input.profile, "spec", input.specPath, plan.authority.spec.sha256)
+     || !(state.bootstrapAcknowledgementRequired === undefined || state.bootstrapAcknowledgementRequired === true)
+     || !validateContinuityState(state.continuity, input.featureId).ok) {
+     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
+@@ -6013,8 +6035,8 @@ function buildCoordinatorSourcedPromotionPlan({
+       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+       || observed.state?.continuity?.featureId !== input.featureId
+-      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
+-      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
++      || !promotionBinds(observed.state?.continuity, input.profile, "prd", input.prdPath, authority.prd.sha256)
++      || !promotionBinds(observed.state?.continuity, input.profile, "spec", input.specPath, authority.spec.sha256)) {
+       fail("KICKOFF-PROMOTION-REPLAY", "coordinator-sourced binding replay does not match the exact completed postimage");
+     }
+     const binding = {
+@@ -6075,6 +6097,9 @@ function buildCoordinatorSourcedPromotionPlan({
+     specPath: authority.spec.path, specSha256: authority.spec.sha256,
+     language: kickoffLanguage(observed.root),
+   });
++  // Late binding step 5: a package in the EL-19 scope leaves the bootstrap bind as the unsealed draft, exactly like the kickoff-sourced
++  // promotion; a package outside the scope keeps the bound digests of initialContinuity byte for byte.
++  if (inSealScope(input.profile)) continuity.authority = promotionAuthority(input.profile, authority);
+   if (new Set(["de", "en"]).has(authority.poLanguage)) {
+     continuity.runtime = { ...continuity.runtime, humanFacingLanguage: authority.poLanguage };
+   } else if (authority.poLanguage !== null) {
+@@ -6213,8 +6238,8 @@ function buildKickoffPromotionPlan({
+       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+       || observed.state?.continuity?.featureId !== input.featureId
+-      || boundAuthorityDigests(observed.state?.continuity).prd !== authority.prd.sha256
+-      || boundAuthorityDigests(observed.state?.continuity).spec !== authority.spec.sha256) {
++      || !promotionBinds(observed.state?.continuity, input.profile, "prd", input.prdPath, authority.prd.sha256)
++      || !promotionBinds(observed.state?.continuity, input.profile, "spec", input.specPath, authority.spec.sha256)) {
+       fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
+     }
+     const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
+@@ -6274,7 +6299,7 @@ function buildKickoffPromotionPlan({
+   next.planApproved = false;
+   next.continuity.featureId = input.featureId;
+   next.continuity.revision = kickoff.revision + 1;
+-  next.continuity.authority = { prd: authority.prd, spec: authority.spec, result: null };
++  next.continuity.authority = promotionAuthority(input.profile, authority);
+   next.continuity.queueHead = {
+     packageId: "kickoff-promotion", actionId: "review-work", nextAction: "review",
+     productRetryCount: 0, environmentRerouteCount: 0, dispatch: null,
+@@ -9368,8 +9393,8 @@ function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionClean
+     || observed.history.transactions.length !== 2 || !promotedRevisions.includes(state?.continuity?.revision)
+     || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
+     || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
+-    || boundAuthorityDigests(state.continuity).prd !== entry.prdSha256
+-    || boundAuthorityDigests(state.continuity).spec !== entry.specSha256
++    || !promotionBinds(state.continuity, entry.profile, "prd", entry.planPath, entry.prdSha256)
++    || !promotionBinds(state.continuity, entry.profile, "spec", entry.specPath, entry.specSha256)
+     || entry.afterStateSha256 !== observed.stateObservation.sha256
+     || !isObject(binding.binding.sessionCleanup)) return null;
+   let beforeSha256;
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index 7db7b1b6e..df09ddf67 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -71,6 +71,7 @@ import {
+   planOnboardingContinuityRepair,
+   planOnboardingKickoff,
+   planOnboardingKickoffPromotion,
++  readPromotionDesignInputCapture,
+   planOnboardingKickoffPromotionCleanupRecovery,
+   readOnboardingIntakeCheckpoint,
+   observeOnboardingEnrollmentHistory,
+@@ -2042,6 +2043,55 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
+   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+ });
+ 
++// Late binding build step 5 (docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md; AC-108 closest accepted criterion):
++// the bind at the end of onboarding leaves an UNSEALED DRAFT (`sealed: false`, paths without digests) for a package in the EL-19
++// scope (profile other than `mini`); every other package keeps today's bind of the digests, byte for byte.
++check("LB5-1 a feature-profile promotion leaves the unsealed draft, records the digests in the history, and replays", () => {
++  const seed = promotionSeed("lb5-draft");
++  const plan = planOnboardingKickoffPromotion(seed.request);
++  assert.deepEqual(plan.targets.state.value.continuity.authority, {
++    sealed: false, prd: { path: seed.request.prdPath }, spec: { path: seed.request.specPath }, result: null,
++  });
++  const entry = plan.targets.history.value.transactions[1];
++  assert.equal(entry.prdSha256, plan.authority.prd.sha256, "the history keeps the digests as provenance");
++  assert.equal(entry.specSha256, plan.authority.spec.sha256);
++  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "applied");
++  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
++  assert.equal(state.continuity.authority.sealed, false);
++  assert.equal(Object.hasOwn(state.continuity.authority.prd, "sha256"), false);
++  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "replayed");
++  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
++  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
++  // The draft admits an edit of the PRD (the whole point of the late binding); the design input stays evidence.
++  writeFileSync(join(seed.root, seed.request.prdPath), `${readFileSync(join(seed.root, seed.request.prdPath), "utf8")}\nA sentence added in the draft.\n`);
++  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
++});
++
++check("LB5-2 a mini-profile promotion binds the digests exactly as today (outside the EL-19 scope)", () => {
++  const seed = promotionSeed("lb5-mini");
++  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
++  const authority = plan.targets.state.value.continuity.authority;
++  assert.equal(Object.hasOwn(authority, "sealed"), false);
++  assert.deepEqual(authority, { prd: plan.authority.prd, spec: plan.authority.spec, result: null });
++  assert.equal(authority.prd.sha256, digest(readFileSync(join(seed.root, seed.request.prdPath))));
++  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "applied");
++  assert.equal(applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }).status, "replayed");
++});
++
++check("LB5-3 the design-input capture of the seal plan is read from a real promotion history; no history reads as absent", () => {
++  const seed = promotionSeed("lb5-capture");
++  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), { status: "absent" }, "a kickoff-only history records no design input");
++  const plan = planOnboardingKickoffPromotion(seed.request);
++  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
++  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), {
++    status: "present", path: seed.request.designInputPath, sha256: digest(readFileSync(join(seed.root, seed.request.designInputPath))),
++  });
++  const bare = fixture("lb5-capture-no-history");
++  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: bare }), { status: "absent" }, "no onboarding history at all");
++  writeFileSync(join(seed.root, seed.request.designInputPath), "# altered after promotion\n");
++  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: seed.root }), { status: "drift" });
++});
++
+ // SSc.4: the two earlier per-target boundaries (temp-fsync, rename), additive
+ // to the four pre-existing "-published" (directory-fsync) commit-boundary
+ // hooks -- matching KICKOFF_FAULT_STAGES' finer per-target-per-boundary
+@@ -2564,9 +2614,18 @@ function promotedArtifact(seed, name) {
+   return join(seed.root, "specs", "promoted", name);
+ }
+ 
++// QG-04 restatement (C19 late binding, build step 5): a package in the EL-19 scope (every profile but `mini`) leaves the promotion as
++// the unsealed draft (LB5-1), so the cases below that pin the bound DIGEST of the promotion run with the `mini` profile, which keeps
++// today's bind byte for byte. Nothing is weakened: the digest binding and the reopening boundary are asserted exactly as before.
++function promoteMini(seed) {
++  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
++  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
++  return plan;
++}
++
+ check("promotion binds the PRD as the approval subject and presents the Spec beside it", () => {
+   const seed = promotionSeed("prd-is-the-plan");
+-  const plan = planOnboardingKickoffPromotion(seed.request);
++  const plan = planOnboardingKickoffPromotion({ ...seed.request, profile: "mini" });
+   assert.equal(plan.feature.planPath, "specs/promoted/prd_promoted.md");
+   assert.equal(plan.authority.prd.path, plan.feature.planPath);
+   assert.equal(plan.authority.spec.path, "specs/promoted/spec.md");
+@@ -2595,7 +2654,7 @@ check("the recorded promotion transaction names the PRD and the Spec with both d
+ 
+ check("editing the promoted PRD invalidates the mutual digest binding", () => {
+   const seed = promotionSeed("prd-drift");
+-  promote(seed);
++  promoteMini(seed);
+   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+   const path = promotedArtifact(seed, "prd_promoted.md");
+   writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+@@ -2604,7 +2663,7 @@ check("editing the promoted PRD invalidates the mutual digest binding", () => {
+ 
+ check("editing the promoted Spec invalidates the mutual digest binding", () => {
+   const seed = promotionSeed("spec-drift");
+-  promote(seed);
++  promoteMini(seed);
+   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+   const path = promotedArtifact(seed, "spec.md");
+   writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+@@ -2655,7 +2714,7 @@ check("the promoted state's language is the promoted PRD's marker, not the kicko
+ // binding, and both are re-established by submit-plan/approve-plan.
+ check("a reopened design may edit its promoted documents without ending the session", () => {
+   const seed = promotionSeed("reopen-drift");
+-  promote(seed);
++  promoteMini(seed);
+   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+ 
+   // Exactly what `reopenPlanDesign` records: phase back to design, approval
+@@ -5538,7 +5597,7 @@ for (const [label, options] of Object.entries({
+   });
+ }
+ 
+-assert.equal(cases.length, 324, "the complete onboarding continuity corpus must be registered before execution begins");
++assert.equal(cases.length, 327,"the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index c39321e47..fcefa32ea 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -712,6 +712,16 @@ function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, s
+   return receiptPath;
+ }
+ 
++// QG-04 restatement (C19 late binding, build step 5): a package in the PRD release scope is an unsealed draft after onboarding, so
++// the live route is submit-plan, prepare-seal, present-plan, approve-plan (the one signature seals). The helper runs the extra step
++// only for a draft; a sealed package (outside the scope) keeps the old route unchanged.
++function prepareSealWhenDraft(state, rootDir, receipt, label = "prepare-seal") {
++  const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
++  if (current.continuity?.authority?.sealed !== false) return;
++  const prepared = state(["prepare-seal", "--review-receipt", receipt]);
++  assert.equal(prepared.code, 0, `${label}: ${prepared.stderr}`);
++}
++
+ // The approval half of the live route. The request path is read from the
+ // presentation (DAB-REQUEST-PATH), the canonical intent is signed in process, and
+ // the proof lands next to the request, which is where the route reads it.
+@@ -5444,6 +5454,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
+     assert.equal(submitted.code, 0, submitted.stderr);
+     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
++    prepareSealWhenDraft(state, path, reviewReceiptPath);
+     const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
+     assert.equal(presented.code, 0, presented.stderr);
+     const approved = state(designApprovalRequestArgv(path));
+@@ -5542,7 +5553,9 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+           const result = state(argv);
+           assert.equal(result.code, 0, `${runner}: ${argv[0]}: ${result.stderr}`);
+         }
+-        const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceipt()]);
++        const receiptForPresentation = reviewReceipt();
++        prepareSealWhenDraft(state, path, receiptForPresentation, `${runner}: prepare-seal`);
++        const presented = state(["present-plan", "--by", "po", "--review-receipt", receiptForPresentation]);
+         assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
+         const approved = state(designApprovalRequestArgv(path));
+         assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
+@@ -5603,6 +5616,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+       const awaitingEntry = publicInspect();
+       assert.deepEqual(awaitingEntry.nextAction, draftEntry.nextAction,
+         `${runner}: awaiting approval remains owned by the same public inspect driver`);
++      prepareSealWhenDraft(state, path, firstReviewReceipt, `${runner}: prepare-seal`);
+       const presented = state(["present-plan", "--by", "po", "--review-receipt", firstReviewReceipt]);
+       assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
+       const approved = state(designApprovalRequestArgv(path));
+@@ -5743,6 +5757,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+     // submitted PRD/spec are immutable to the staged lifecycle policy.
+     const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath });
+     assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
++    prepareSealWhenDraft(state, path, reviewReceiptPath);
+     const presentedProjdrift = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
+     assert.equal(presentedProjdrift.code, 0, presentedProjdrift.stderr);
+     const approvedProjdrift = state(designApprovalRequestArgv(path));
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index 91dc65685..3f3b150eb 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -52,7 +52,7 @@ function startSteps() {
+ function planSteps() {
+   const recovery = ["submit-plan"];
+   return [
+-    inspectStep(["set-feature", "submit-plan", "present-plan", "approve-plan"]),
++    inspectStep(["set-feature", "submit-plan", "prepare-seal", "present-plan", "approve-plan"]),
+     scriptStep({
+       id: "set-feature", script: STATE, verb: "set-feature", closed: true,
+       argv: ["set-feature", "--id", "<feature-id>", "--plan-path", "<prd-path>", "--spec-path", "<spec-path>"],
+@@ -62,12 +62,19 @@ function planSteps() {
+     scriptStep({
+       id: "submit-plan", script: STATE, verb: "submit-plan", closed: true, argv: ["submit-plan", "--by", "<name>", "--profile", "<epic|feature|mini>"],
+       needs: ["a complete PRD and Spec (no framing placeholder text; the architecture design for epic and feature profiles)"],
+-      producer: "plan submission bound to the PRD and Spec digests, lifecycle awaiting-approval", next: ["present-plan"],
++      producer: "plan submission and lifecycle awaiting-approval; a package outside the PRD release scope (mini) binds the PRD and Spec digests here, in the PRD release scope the package stays an unsealed draft",
++      next: ["prepare-seal", "present-plan"],
++    }),
++    scriptStep({
++      id: "prepare-seal", script: STATE, verb: "prepare-seal", argv: ["prepare-seal", "--review-receipt", "<review-receipt-path>"],
++      needs: ["the PRD release scope: the design package is an unsealed draft (inspect: sealSituation.situation draft); review it first; run after submit-plan and again after any edit of the PRD, the Spec or the design input"],
++      producer: "scratch/seal-plan.json: the digest-bound seal plan of the draft; State is not written; it also retires a damaged or stray plan file",
++      next: ["present-plan"],
+     }),
+     scriptStep({
+       id: "present-plan", script: STATE, verb: "present-plan", argv: ["present-plan", "--by", "<name>", "--review-receipt", "<review-receipt-path>"],
+-      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)"],
+-      producer: "plan presentation record bound to the exact submission, and the design approval request file under scratch/",
++      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)", "the prepared seal plan, for a draft package in the PRD release scope"],
++      producer: "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
+       next: ["sign-intent", "approve-plan"],
+     }),
+     scriptStep({
+@@ -79,11 +86,12 @@ function planSteps() {
+     scriptStep({
+       id: "approve-plan", script: STATE, verb: "approve-plan", argv: ["approve-plan", "--design-workflow-approval-request", "<design-approval-request-path>"],
+       needs: ["the plan is presented", "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"],
+-      producer: "plan approval recorded in pipeline state, lifecycle approved; continue with the implement runbook", next: [],
++      producer: "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook", next: [],
+     }),
+     scriptStep({
+       id: "reopen-design", script: STATE, verb: "reopen-design", closed: true, argv: ["reopen-design", "--by", "<name>"],
+-      needs: ["recovery: the plan or spec authority is stale or unavailable"], producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
++      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"],
++      producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
+     }),
+     scriptStep({
+       id: "cancel-submitted-plan", script: STATE, verb: "cancel-submitted-plan", closed: true,
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 4a7e7f8b7..86b313481 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "1877baa016dd052711cb4419e764030b1f5bd202fa1f760906d3ffebfecb1be8"
++      "sha256": "9dffaf4fae1c4c2eb6eabe295fa90248dc0410d2cd129c64071d1fad286462d3"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index 76309adc5..3ceb9e898 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -22,6 +22,7 @@
+       "next": [
+         "set-feature",
+         "submit-plan",
++        "prepare-seal",
+         "present-plan",
+         "approve-plan"
+       ],
+@@ -72,9 +73,10 @@
+         "a complete PRD and Spec (no framing placeholder text; the architecture design for epic and feature profiles)"
+       ],
+       "evidenceSchema": null,
+-      "producer": "plan submission bound to the PRD and Spec digests, lifecycle awaiting-approval",
++      "producer": "plan submission and lifecycle awaiting-approval; a package outside the PRD release scope (mini) binds the PRD and Spec digests here, in the PRD release scope the package stays an unsealed draft",
+       "humanGate": false,
+       "next": [
++        "prepare-seal",
+         "present-plan"
+       ],
+       "commit": null,
+@@ -91,16 +93,42 @@
+         "closed": true
+       }
+     },
++    {
++      "id": "prepare-seal",
++      "who": "agent",
++      "command": "node <plugin-root>/scripts/pipeline-state.mjs prepare-seal --review-receipt <review-receipt-path>",
++      "needs": [
++        "the PRD release scope: the design package is an unsealed draft (inspect: sealSituation.situation draft); review it first; run after submit-plan and again after any edit of the PRD, the Spec or the design input"
++      ],
++      "evidenceSchema": null,
++      "producer": "scratch/seal-plan.json: the digest-bound seal plan of the draft; State is not written; it also retires a damaged or stray plan file",
++      "humanGate": false,
++      "next": [
++        "present-plan"
++      ],
++      "commit": null,
++      "catalogue": {
++        "script": "pipeline-state.mjs",
++        "verb": "prepare-seal",
++        "argv": [
++          "prepare-seal",
++          "--review-receipt",
++          "<review-receipt-path>"
++        ],
++        "closed": false
++      }
++    },
+     {
+       "id": "present-plan",
+       "who": "agent",
+       "command": "node <plugin-root>/scripts/pipeline-state.mjs present-plan --by <name> --review-receipt <review-receipt-path>",
+       "needs": [
+         "a submitted plan",
+-        "a tracked design review receipt (at most two --review-receipt)"
++        "a tracked design review receipt (at most two --review-receipt)",
++        "the prepared seal plan, for a draft package in the PRD release scope"
+       ],
+       "evidenceSchema": null,
+-      "producer": "plan presentation record bound to the exact submission, and the design approval request file under scratch/",
++      "producer": "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
+       "humanGate": false,
+       "next": [
+         "sign-intent",
+@@ -156,7 +184,7 @@
+         "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"
+       ],
+       "evidenceSchema": null,
+-      "producer": "plan approval recorded in pipeline state, lifecycle approved; continue with the implement runbook",
++      "producer": "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook",
+       "humanGate": false,
+       "next": [],
+       "commit": null,
+@@ -176,7 +204,7 @@
+       "who": "agent",
+       "command": "node <plugin-root>/scripts/pipeline-state.mjs reopen-design --by <name>",
+       "needs": [
+-        "recovery: the plan or spec authority is stale or unavailable"
++        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"
+       ],
+       "evidenceSchema": null,
+       "producer": "lifecycle returns to draft",
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+index d893ae411..cd8a3b223 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+@@ -182,7 +182,10 @@ test("R6-2 case 7: State without continuity -> continuityAuthorityDrift is an ex
+   const { payload } = result;
+   assert.equal(Object.hasOwn(payload, KEY), true, "the new key is present");
+   assert.equal(payload[KEY], null, "explicit null, not omitted");
+-  assert.deepEqual(Object.keys(payload).filter((key) => key !== KEY).sort(), [...ORIGINAL_KEYS].sort(), "no other key appears or disappears");
++  // QG-04 restatement (C19): two additive read-only keys of the same payload are named here and nothing else is allowed to appear:
++  // `runbook` (G5, the typed link of the first call of a standard command) and `sealSituation` (late binding step 5, the seal readback).
++  const ADDITIVE_KEYS = new Set(["runbook", "sealSituation"]);
++  assert.deepEqual(Object.keys(payload).filter((key) => key !== KEY && !ADDITIVE_KEYS.has(key)).sort(), [...ORIGINAL_KEYS].sort(), "no other key appears or disappears");
+   assert.equal(payload.schema, "pipeline.inspect.v1");
+   assert.equal(typeof payload.generatedAt, "string");
+   assert.deepEqual(payload.activeFeature, { id: "drift-fixture", planPath: PLAN_PATH, phase: "implementation" });
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 88eb4b7ff..7cf48ee6e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -451,7 +451,7 @@ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs'
+ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
+ import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
+ import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
+-import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
++import { inSealScope, readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
+ import {
+   SEAL_PLAN_PATH, advisoryBindingFromAdmission, buildSealPlan, checkSealPlanForApply, provenanceUnavailableRefusal, readSealDocuments,
+   readinessBindingFromSources, sealPaths, sealPlanNotPresentedRefusal, sealedAuthorityFromPlan, unreadableReviewRefusal,
+@@ -4373,7 +4373,11 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+       if (!validPlanPresentation(presentation) || presentation.schema !== PLAN_PRESENTATION_DESIGN_SCHEMA || presentation.submissionSha256 !== lifecycle.submissionSha256) {
+         return { kind: "collect-input", mutation: false, requiresConfirmation: false, code: "DAB-REVIEW-RECEIPT-REQUIRED",
+           inputs: [{ name: "reviewReceipt", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true }],
+-          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required." };
++          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
++            // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
++            + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
++              ? " This package is an unsealed draft: run prepare-seal --review-receipt with the same receipt(s) BEFORE present-plan (the approval seals the PRD and the Spec); reopen-design stays available at any time."
++              : "") };
+       }
+       const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
+       const observed = observeDesignApprovalRequest({ dir, presentation, submission, deps, signature: mode?.mode === "signature" });
+@@ -7138,12 +7142,14 @@ function writeSealPlanFile(dir, plan) {
+     if (!directory.isDirectory() || directory.isSymbolicLink() || realpathSync(scratch) !== scratch) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/ is not a plain directory" };
+     const target = join(scratch, "seal-plan.json");
+     const bytes = Buffer.from(`${JSON.stringify(plan, null, 2)}\n`, "utf8");
+-    if (existsSync(target)) {
+-      const stat = lstatSync(target);
+-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/seal-plan.json is not a plain single-link file; move or delete that one file and run prepare-seal again" };
+-      if (readFileSync(target).equals(bytes)) return { ok: true, replay: true };
++    let existing = null;
++    try { existing = lstatSync(target); } catch { /* no plan file yet */ }
++    if (existing !== null) {
++      if (existing.isDirectory()) return { ok: false, code: "PSP-PLAN-WRITE", message: "scratch/seal-plan.json is a directory; move that directory away and run prepare-seal again" };
++      if (existing.isFile() && existing.nlink === 1 && readFileSync(target).equals(bytes)) return { ok: true, replay: true };
+     }
+     // Replace atomically: a crash leaves either the old plan or the new one, never a torn file (the plan is also digest-checked on read).
++    // The rename replaces a link or an unreadable leftover by name and never writes through it, so a damaged plan file is always repaired here.
+     const temporary = join(scratch, `.seal-plan.${process.pid}.tmp`);
+     writeFileSync(temporary, bytes, { mode: 0o600, flag: "w" });
+     renameSync(temporary, target);
+@@ -7166,11 +7172,77 @@ function checkPreparedSealPlan(dir, state) {
+ function removeSealPlanFile(dir) {
+   try {
+     const target = join(realpathSync(resolve(dir)), "scratch", "seal-plan.json");
+-    if (existsSync(target)) { unlinkSync(target); return true; }
++    if (sealPlanFileExists(dir)) { unlinkSync(target); return true; }
+   } catch { /* a plan that cannot be removed is retired by the next prepare-seal */ }
+   return false;
+ }
+ 
++/** True for any entry at the plan path, a dangling link included (existsSync follows links and would miss it). */
++function sealPlanFileExists(dir) {
++  try { lstatSync(join(realpathSync(resolve(dir)), "scratch", "seal-plan.json")); return true; } catch { return false; }
++}
++
++function sealCommand(verb, args = []) {
++  return { verb, command: ["node", fileURLToPath(import.meta.url), verb, ...args].join(" ") };
++}
++
++/**
++ * Late binding step 5: the read-only verdict on where a package stands in the seal and the command that moves it. Three situations
++ * (plus "none" outside the scope): `draft` (the PRD and Spec are not bound yet), `bound-unapproved` (digests bound at onboarding, the
++ * plan not approved yet: the project stays locked until its approval) and `sealed`. It writes nothing and migrates nothing.
++ * `reopen-design` is an exit of every situation, so no state is a dead end. `plan.status` describes scratch/seal-plan.json.
++ */
++function inspectSealSituation(dir, base) {
++  const SCHEMA = "pipeline.seal-situation.v1";
++  const reopen = { ...sealCommand("reopen-design", ["--by", "<name>"]) };
++  const authority = base.continuity?.authority;
++  if (authority === null || typeof authority !== "object" || Array.isArray(authority)) {
++    return { schema: SCHEMA, situation: "none", plan: { status: "none" }, next: null, exits: [], reason: "the State carries no continuity authority, so there is nothing to seal" };
++  }
++  const seal = readAuthoritySeal(authority);
++  const fileExists = sealPlanFileExists(dir);
++  if (seal.status === "sealed") {
++    const approved = base.planApproved === true;
++    return {
++      schema: SCHEMA,
++      situation: approved ? "sealed" : "bound-unapproved",
++      plan: fileExists ? { status: "orphaned", reason: "scratch/seal-plan.json exists on a package that is already sealed; it is inert" } : { status: "none" },
++      next: fileExists ? sealCommand("prepare-seal") : null,
++      exits: [reopen],
++      reason: approved
++        ? "the PRD and the Spec are sealed by the plan approval; reopen-design is the only way to change them"
++        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design unlocks it",
++    };
++  }
++  if (seal.status !== "draft") {
++    return { schema: SCHEMA, situation: "invalid", plan: { status: fileExists ? "orphaned" : "none" }, next: null, exits: [reopen], reason: seal.reason };
++  }
++  const exits = [sealCommand("prepare-seal"), reopen];
++  const gate = checkPreparedSealPlan(dir, base);
++  let plan;
++  if (gate.refusal !== undefined && gate.refusal.code === "PSP-DOCUMENT-MISSING") {
++    plan = { status: "documents-missing", reason: gate.refusal.reason };
++  } else if (gate.plan !== undefined) {
++    const presented = base.planPresentation?.designApprovalBinding?.sealPlanSha256 === gate.plan.planSha256;
++    plan = { status: presented ? "presented" : "current", planSha256: gate.plan.planSha256 };
++  } else if (!fileExists) {
++    plan = { status: "none" };
++  } else {
++    const code = gate.refusal?.code;
++    plan = { status: code === "PSP-PLAN-STALE" ? "stale" : code === "PSP-APPLY-DRIFT" ? "drifted" : "unreadable", reason: gate.refusal?.reason ?? "scratch/seal-plan.json is not a readable seal plan" };
++  }
++  let next;
++  if (plan.status === "documents-missing") next = null;
++  else if (base.planSubmission === undefined || base.planSubmission === null) next = sealCommand("submit-plan", ["--by", "<name>", "--profile", "<epic|feature>"]);
++  else if (plan.status === "current") next = sealCommand("present-plan", ["--by", "<name>", "--review-receipt", "<review-receipt-path>"]);
++  else if (plan.status === "presented") next = sealCommand("approve-plan");
++  else next = sealCommand("prepare-seal");
++  return {
++    schema: SCHEMA, situation: "draft", plan, next, exits,
++    reason: "the PRD and the Spec are an unsealed draft: review the package, prepare-seal, present the plan; the one signature of the approval seals them",
++  };
++}
++
+ function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
+   const continuity = state?.continuity;
+   if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
+@@ -13151,7 +13223,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       let documents = null;
+       let designInputCapture = null;
+       const reviews = [];
+-      if (seal.status === "draft" && profile !== "mini") {
++      if (seal.status === "draft" && inSealScope(profile)) {
+         const docs = currentSealDocuments(dir, seal);
+         if (!docs.ok) return stop(docs);
+         documents = docs.documents;
+@@ -13177,7 +13249,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         for (const extra of (deps.reviewBindings?.() ?? [])) reviews.push(extra);
+       }
+       const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews });
+-      if (!built.ok) return stop(built);
++      if (!built.ok) {
++        // A plan file left on a package that is already sealed is inert but orphaned: this command retires it (it never writes State).
++        if (built.code === "PSP-ALREADY-SEALED" && removeSealPlanFile(dir)) console.log("The stray seal plan file (scratch/seal-plan.json) was retired; State was not changed.");
++        return stop(built);
++      }
+       const persisted = writeSealPlanFile(dir, built.plan);
+       if (!persisted.ok) { console.error(`Error: prepare-seal refused (${persisted.code}): ${persisted.message}.`); return 2; }
+       console.log(JSON.stringify({ schema: "pipeline.authority-seal-prepare.v1", path: SEAL_PLAN_PATH, replay: persisted.replay, plan: built.plan }, null, 2));
+@@ -13979,6 +14055,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           ? reopenDesignNextActionText(dir)
+           : nextActionSection(base),
+         continuityAuthorityDrift: drift,
++        // Late binding step 5: read-only, writes nothing; the situation, the next command and the exits (reopen-design is always one).
++        sealSituation: inspectSealSituation(dir, base),
+         publicHandoverDuty: {
+           ...publicHandoverDuty,
+           nextAction: publicHandoverDuty.status === "current" ? null : {
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 091919205..f8194ec9f 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -402,7 +402,9 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+     const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
+       companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
+     const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
+-      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
++      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources,
++      // Late binding step 4: the request of a draft package carries the digest of its prepared seal plan; the signature covers it.
++      ...(physicalRequest.binding?.sealPlanSha256 === undefined ? {} : { sealPlanSha256: physicalRequest.binding.sealPlanSha256 }) });
+     if (!checked.ok || checked.intentSha256 !== intentSha256) return null;
+     for (const [path, sha256] of facts) {
+       if (path === requestPath) continue;
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index 1207028e2..fa2d14f6b 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -928,6 +928,13 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       const bootstrapPolicy = readCriticalHumanProofPolicy(cwd);
+       assert.equal(bootstrapPolicy.ok, true);
+       designWorkflowDeps.readCriticalHumanProofPolicy = () => bootstrapPolicy;
++      // QG-04 restatement (C19 late binding, build step 5): a package in the PRD release scope is an unsealed draft after onboarding
++      // (`sealed: false`), so the approval path is submit-plan, prepare-seal, present-plan, approve-plan; the one signature seals.
++      // A sealed package (outside the scope) keeps the old path without the extra step.
++      if (readFixtureState(cwd).continuity?.authority?.sealed === false) {
++        const prepared = run("node", [stateScript, "prepare-seal", "--review-receipt", reviewReceiptPath]);
++        assert.equal(prepared.status, 0, prepared.stderr);
++      }
+       const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--review-receipt", reviewReceiptPath];
+       const presented = run("node", presentedArgv);
+       assert.equal(presented.status, 0, presented.stderr);
+@@ -1421,7 +1428,14 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         [`${sourceBase}/design.md`, `Revised design for ${featureId}.\n`],
+         [`${sourceBase}/traceability.md`, `Requirements for ${featureId} are mapped.\n`],
+       ];
+-      for (const [relativePath, bytes] of fixtureSources) writeFileSync(join(path, relativePath), bytes);
++      // QG-04 restatement (C19 late binding, build step 5): the design input is the intake capture of the PO's request. The seal plan
++      // refuses a design input that differs from the bytes captured at promotion (PSP-PROVENANCE), so this fixture keeps the captured
++      // file when the intake wrote it and only writes the canned text for a project that has none; design.md and traceability.md are
++      // authored as before.
++      for (const [relativePath, bytes] of fixtureSources) {
++        if (relativePath.endsWith("/design-input.md") && existsSync(join(path, relativePath))) continue;
++        writeFileSync(join(path, relativePath), bytes);
++      }
+       // QG-04 (E12, ADR-0085): one ordinary review over the finished sources replaces the Advisor/readiness package; the report
+       // and receipt are committed WITH the sources so the design candidate stays the single HEAD (the candidate assertion below holds).
+       mkdirSync(join(path, sourceBase, "review"), { recursive: true });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 1c124a343..ac8418a0a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -21,10 +21,18 @@ command tables.
+    read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
+ 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9
+    (profile drift) block is a repository state and names the adoption renewal.
+-4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3.
++   **PRD release scope (every profile but `mini`, EL-19): the design package is an unsealed DRAFT** (`inspect` -> `sealSituation.situation` is `draft`); onboarding
++   binds no digest, so the PRD and the Spec stay editable until the approval. Review the package, then step 3b. A `mini` package binds the digests as before.
++3b. `pipeline-state.mjs prepare-seal [--review-receipt <repo-relative-json>]` (agent, draft packages only; run after step 3, and again after any edit of the PRD, the Spec or
++   the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
++   names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
++4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
++   present the plan to the PO; its digest is part of what the one signature covers.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
+-   the action `pipeline-state.mjs inspect` returns.
++   the action `pipeline-state.mjs inspect` returns. **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
++   same transaction. A project bound before this change (`bound-unapproved`) stays locked until its approval; `pipeline-state.mjs reopen-design --by <name>` is executable in
++   every state (it voids a prepared seal plan, unlocks a bound package, releases a sealed one); the refusals about a draft or a bound package name it as an exit.
+ 6. `register-feature-package.mjs --root <root>` (agent). It prints `commitPaths`: commit them BEFORE the binding is generated. After registration do not edit
+    the PRD, Spec, `acceptance.md`, `result.md` or the envelope. Owner: `references/implementation-continuation.md`.
+    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses

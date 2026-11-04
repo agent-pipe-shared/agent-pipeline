@@ -11,7 +11,7 @@ index b7b2729ed..05b7b4294 100644
  `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
  `scripts/security-readiness/gitleaks-readiness.mjs`,
 diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
-index 3fde27b83..63003e863 100644
+index b4b327f85..47d1e16c0 100644
 --- a/docs/product-capability-inventory.json
 +++ b/docs/product-capability-inventory.json
 @@ -254,6 +254,7 @@
@@ -913,14 +913,13 @@ index 9d48d9501..db8327e6c 100644
          spec: { path: poGateAuthority.specPath, sha256: poGateAuthority.specSha256 },
          result: null,
 diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
-index b4c9f3066..18b1c199e 100644
+index a24065209..88eb4b7ff 100644
 --- a/plugins/pipeline-core/scripts/pipeline-state.mjs
 +++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
-@@ -451,6 +451,12 @@ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs'
- import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
+@@ -452,6 +452,11 @@ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
  import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
  import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
-+import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
+ import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
 +import {
 +  SEAL_PLAN_PATH, advisoryBindingFromAdmission, buildSealPlan, checkSealPlanForApply, provenanceUnavailableRefusal, readSealDocuments,
 +  readinessBindingFromSources, sealPaths, sealPlanNotPresentedRefusal, sealedAuthorityFromPlan, unreadableReviewRefusal,
@@ -929,7 +928,7 @@ index b4c9f3066..18b1c199e 100644
  import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
  import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
  import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
-@@ -765,7 +771,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+@@ -766,7 +771,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
  const PIPELINE_STATE_COMMANDS = Object.freeze([
    "materialize-architecture", "afk-project",
    "inspect", "update-public-handover", "rebind-approval",
@@ -938,20 +937,10 @@ index b4c9f3066..18b1c199e 100644
    "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
    "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance",
    "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
-@@ -7096,6 +7102,74 @@ function validPriorAuthority(state, prd, spec) {
-   return authority;
+@@ -7108,6 +7113,64 @@ function continuityRefusal(code, state) {
+   return isDraftAuthority(state?.continuity) ? { ok: false, code, exits: readAuthoritySeal(state.continuity.authority).exits } : { ok: false, code };
  }
  
-+// Late binding: a draft package (`sealed: false`) binds no PRD/Spec digest. The PO rebind, decision and acknowledge routes compare and
-+// rewrite bound digests, so they refuse a draft; the refusal keeps its code and adds the typed exits (prepare-seal, reopen-design).
-+function isDraftAuthority(continuity) {
-+  return readAuthoritySeal(continuity?.authority).status === "draft";
-+}
-+
-+function continuityRefusal(code, state) {
-+  return isDraftAuthority(state?.continuity) ? { ok: false, code, exits: readAuthoritySeal(state.continuity.authority).exits } : { ok: false, code };
-+}
-+
 +// Late binding step 4 (docs/adr/draft-late-binding-of-prd-and-spec-at-the-approval.md): the prepared seal plan. `prepare-seal` writes
 +// only the plan file (never State); `present-plan` puts its digest into the design approval binding the PO signs; `approve-plan`
 +// re-reads the bytes under the State writer lock and seals in the same transaction.
@@ -1012,8 +1001,8 @@ index b4c9f3066..18b1c199e 100644
 +
  function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
    const continuity = state?.continuity;
-   if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
-@@ -9958,7 +10032,10 @@ function observeDesignApprovalRequest({ dir, presentation, submission, deps = {}
+   if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
+@@ -9971,7 +10034,10 @@ function observeDesignApprovalRequest({ dir, presentation, submission, deps = {}
    if (!inputs.ok) return inputs;
    const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
    if (!decisionDraft.ok) return {ok:false,code:decisionDraft.code};
@@ -1025,7 +1014,7 @@ index b4c9f3066..18b1c199e 100644
    if (!checked.ok) return checked;
    if (canonicalDesignApproval(request.binding) !== canonicalDesignApproval(presentation.designApprovalBinding)
      || canonicalDesignApproval(checked.candidate) !== canonicalDesignApproval(designWorkflowGitCandidate(dir, deps))) return { ok: false, code: "DAB-CANDIDATE-DRIFT" };
-@@ -11979,7 +12056,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -11992,7 +12058,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
          if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
          const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
          if (!decisionDraft.ok) { console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.`); return 2; }
@@ -1038,7 +1027,7 @@ index b4c9f3066..18b1c199e 100644
          if (!binding.ok) { console.error(binding.code); return 2; }
          const result = createDesignApprovalRequest({ binding: binding.binding, candidate: designWorkflowGitCandidate(dir, deps) });
          if (!result.ok) { console.error(result.code); return 2; }
-@@ -12112,6 +12193,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12125,6 +12195,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
        console.log(written.replay
          ? "Design is already open; zero-write replay accepted."
          : `Design reopened by "${by}" on ${reopenedAt}; lifecycle="draft".`);
@@ -1049,7 +1038,7 @@ index b4c9f3066..18b1c199e 100644
        return 0;
      }
  
-@@ -12284,6 +12369,17 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12297,6 +12371,17 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
          return 2;
        }
        const advisorRequired = ["epic", "feature"].includes(base.planSubmission?.profile);
@@ -1067,7 +1056,7 @@ index b4c9f3066..18b1c199e 100644
        let designRead = null;
        if (advisorRequired) {
          if (approvalFlags["design-approval-request"] !== base.planPresentation.designApprovalRequestPath) { console.error("DAB-REQUEST-PATH: use present-plan --review-receipt"); return 2; }
-@@ -12389,6 +12485,19 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12402,6 +12487,19 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
        const written = writeState(dir, undefined, base, {
          transition: (observed) => {
            approvedAt = now();
@@ -1087,7 +1076,7 @@ index b4c9f3066..18b1c199e 100644
            const transition = approveDesignSubmittedPlan({
              state: observed,
              expectedStateSha256: sha256CanonicalJson(observed),
-@@ -12414,6 +12523,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12427,6 +12525,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
                ...transition,
                state: {
                  ...transition.state,
@@ -1095,7 +1084,7 @@ index b4c9f3066..18b1c199e 100644
                  updatedAt: approvedAt,
                  ...(globalChat
                    ? { planApprovalAttribution: chatAttributionRecord({ kind: "plan", by }) }
-@@ -12439,6 +12549,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12452,6 +12551,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
              ? { ok: true }
              : { ok: false, code: observed?.code ?? "PO-GATE-AUTHORITY-STALE" };
          },
@@ -1104,7 +1093,7 @@ index b4c9f3066..18b1c199e 100644
          sourceCompanionCapture: () => acceptedCapture,
          afterValidation: () => {
            if (!acceptedCapture) return {ok:true};
-@@ -12450,9 +12562,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -12463,9 +12564,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
          requirePhysicalReadback: true,
        });
        if (!stateWriteSucceeded(written)) {
@@ -1119,7 +1108,7 @@ index b4c9f3066..18b1c199e 100644
        const aggregateArchitecture=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'architecture'});
        const aggregateModel=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'model-policy'});
        if(!aggregateArchitecture.ok || !aggregateModel.ok) {
-@@ -13013,6 +13130,60 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+@@ -13026,6 +13132,60 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
      // invalidate that proof (M-2 item 4, evidence/cb-1a-measurement.md) --
      // this command therefore refuses outright rather than offering a
      // --force, so there is no accidental route to that outcome.
