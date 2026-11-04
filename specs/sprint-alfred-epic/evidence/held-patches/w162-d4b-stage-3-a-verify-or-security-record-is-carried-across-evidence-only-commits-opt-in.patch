@@ -1,0 +1,289 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 47dc60eff..c675f4911 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -182,6 +182,7 @@ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.m
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
++import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
+ import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+@@ -2354,7 +2355,7 @@ function checkEvidenceFreshness(relPath) {
+   }
+   const { data } = read;
+   // The verdict (which failure, in which order) comes from the shared function; the messages stay here.
+-  const promoted = () => {
++  const promotedByEnvelope = () => {
+     const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
+     if (!promoRead.ok) return false;
+     const verifyRead = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
+@@ -2374,6 +2375,13 @@ function checkEvidenceFreshness(relPath) {
+     });
+     return validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit;
+   };
++  // OPT-IN (candidate 19, step 3): the evidence-only carry-forward is the second way a record bound to an earlier commit stays fresh.
++  const promoted = () => {
++    if (promotedByEnvelope()) return true;
++    const kind = relPath === VERIFY_EVIDENCE_DEFAULT_PATH ? "verify" : relPath === SECURITY_EVIDENCE_DEFAULT_PATH ? "security" : null;
++    if (kind === null) return false;
++    return evidenceCarriedForward({ root: evidenceProjectDir, record: data, kind, candidateCommit: sourceCommit }).carried === true;
++  };
+   const codes = evidenceFreshnessFailureCodes({
+     data: data ?? {}, expectedCommit: sourceCommit, promoted, isVerify: relPath === VERIFY_EVIDENCE_DEFAULT_PATH,
+     satisfiesPushBoundary: () => verifyEvidenceSatisfiesBoundary(data, "push"),
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs b/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs
+new file mode 100644
+index 000000000..8f36086a9
+--- /dev/null
++++ b/plugins/pipeline-core/lib/evidence-carry-forward-reader.mjs
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Reader of the evidence-only carry-forward decision (candidate 19, D4b/E3 order of work, step 3; OPT-IN block of the apply script,
++ * docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md point 2 and the amendment of 2026-11-04).
++ *
++ * `lib/evidence-carry-forward.mjs` answers "may the record bound to commit A be carried to commit B?" and grants nothing. This module is
++ * the one place a push-gate reader asks it: it never throws, it returns the decision (or a refusal with a reason), and it supplies the
++ * secret scan that a Security record needs (SEC-01). A Verify record needs no scan. An unavailable scanner, a finding, an invalid commit
++ * or any error is a refusal: the record stays stale for HEAD, exactly as without this patch.
++ */
++import { spawnSync } from "node:child_process";
++import { isInstalled, resolveGitleaksConfigPath } from "../scripts/security-adapters/gitleaks.mjs";
++import { evaluateEvidenceCarryForward } from "./evidence-carry-forward.mjs";
++
++export const CARRY_FORWARD_SCAN_TIMEOUT_MS = 120000;
++
++/**
++ * Secret scan of the commits a carry-forward passes over: `gitleaks git <root> --log-opts <evidenceCommit>..<commit>` with the plugin's
++ * resolved gitleaks config. Exit 0 is clean, exit 2 (forced with --exit-code 2) is a finding, anything else (missing binary, missing
++ * config, timeout, spawn error, gitleaks' own error exit 1) is `unavailable`, which the decision treats as a refusal.
++ */
++export function gitleaksRangeSecretScan(_files, { root, commit, evidenceCommit } = {}, deps = {}) {
++  if (typeof root !== "string" || typeof commit !== "string" || typeof evidenceCommit !== "string") return { status: "unavailable" };
++  try {
++    const binary = (deps.isInstalled ?? isInstalled)(deps.env ?? process.env);
++    if (!binary?.installed || typeof binary.path !== "string") return { status: "unavailable" };
++    const config = (deps.resolveConfig ?? resolveGitleaksConfigPath)();
++    if (typeof config !== "string" || config === "") return { status: "unavailable" };
++    const result = (deps.spawn ?? spawnSync)(binary.path, [
++      "git", root,
++      "--log-opts", `${evidenceCommit}..${commit}`,
++      "--config", config,
++      "--no-banner", "--redact", "--exit-code", "2",
++    ], { encoding: "utf8", timeout: deps.timeoutMs ?? CARRY_FORWARD_SCAN_TIMEOUT_MS, shell: false });
++    if (result?.error || result?.status === null || result?.status === undefined) return { status: "unavailable" };
++    if (result.status === 0) return { status: "clean" };
++    if (result.status === 2) return { status: "finding" };
++    return { status: "unavailable" };
++  } catch {
++    return { status: "unavailable" };
++  }
++}
++
++/**
++ * @param {object} input
++ * @param {string} input.root repository root
++ * @param {{commit?: string}} input.record the parsed Verify or Security record
++ * @param {"verify"|"security"} input.kind
++ * @param {string} input.candidateCommit the full commit id the record would be carried to
++ * @returns {{carried: boolean, reason: string}} never throws
++ */
++export function evidenceCarriedForward({ root, record, kind, candidateCommit, secretScan = gitleaksRangeSecretScan, evaluate = evaluateEvidenceCarryForward } = {}) {
++  try {
++    const decision = evaluate({ root, evidenceCommit: record?.commit, candidateCommit, kind, secretScan });
++    return decision?.carried === true ? decision : { carried: false, reason: typeof decision?.reason === "string" ? decision.reason : "NOT-CARRIED" };
++  } catch {
++    return { carried: false, reason: "CARRY-FORWARD-INPUT-INVALID" };
++  }
++}
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+index 859d9b3c8..e33894fea 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+@@ -63,7 +63,7 @@ export function productTreeSha256(root, commit) {
+  * @param {string} input.evidenceCommit the full commit id the record is bound to
+  * @param {string} input.candidateCommit the full commit id the record would be carried to
+  * @param {"verify"|"security"} input.kind
+- * @param {(files: string[], context: {root: string, commit: string}) => {status: "clean"|"finding"|"unavailable"}} [input.secretScan] required for kind "security"
++ * @param {(files: string[], context: {root: string, commit: string, evidenceCommit: string}) => {status: "clean"|"finding"|"unavailable"}} [input.secretScan] required for kind "security"
+  * @returns {{carried: boolean, reason: string, ...}} `carried: true` only when every changed path lies in the evidence set (and, for security, the scan is clean)
+  */
+ export function evaluateEvidenceCarryForward({ root, evidenceCommit, candidateCommit, kind, secretScan } = {}) {
+@@ -85,7 +85,7 @@ export function evaluateEvidenceCarryForward({ root, evidenceCommit, candidateCo
+   if (kind === "security") {
+     if (typeof secretScan !== "function") return result(false, "SECRET-SCAN-UNAVAILABLE");
+     let scan;
+-    try { scan = secretScan(changedPaths, { root, commit: candidateCommit }); } catch { scan = null; }
++    try { scan = secretScan(changedPaths, { root, commit: candidateCommit, evidenceCommit }); } catch { scan = null; }
+     if (scan?.status !== "clean") return result(false, scan?.status === "finding" ? "SECRET-SCAN-FINDING" : "SECRET-SCAN-UNAVAILABLE");
+   }
+   return result(true, "EVIDENCE-ONLY", { passedOverCommits, changedEvidencePaths: changedPaths, productTreeSha256: after });
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+index 700dc8abf..b0cc9deea 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+@@ -6,7 +6,11 @@ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+ 
++import { randomBytes } from "node:crypto";
++
+ import { CARRY_FORWARD_SCHEMA, EVIDENCE_PATH_PATTERNS, evaluateEvidenceCarryForward, isEvidencePath, productTreeSha256 } from "./evidence-carry-forward.mjs";
++import { evidenceCarriedForward, gitleaksRangeSecretScan } from "./evidence-carry-forward-reader.mjs";
++import { isInstalled as isGitleaksInstalled } from "../scripts/security-adapters/gitleaks.mjs";
+ 
+ const scratchRoots = [];
+ test.after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, force: true }); });
+@@ -152,3 +156,61 @@ test("ECF8: arguments are validated and the decision never changes the repositor
+   assert.equal(git(root, "status", "--porcelain=v1"), before);
+   assert.equal(git(root, "rev-parse", "HEAD"), head);
+ });
++
++test("ECF9: the reader never throws, carries Verify and Security with a scan, and refuses everything else", () => {
++  const { root, base } = baseRepo();
++  const head = commit(root, { "specs/f/evidence/a.json": "{}\n" }, "evidence");
++  const product = commit(root, { "src/app.mjs": "export const a = 9;\n" }, "product");
++  const clean = () => ({ status: "clean" });
++  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "verify", candidateCommit: head }).carried, true, "Verify needs no scan");
++  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: head, secretScan: clean }).carried, true);
++  const refusals = [
++    [{ record: { commit: base }, kind: "security", candidateCommit: head, secretScan: () => ({ status: "finding" }) }, "SECRET-SCAN-FINDING"],
++    [{ record: { commit: base }, kind: "security", candidateCommit: head, secretScan: () => ({ status: "unavailable" }) }, "SECRET-SCAN-UNAVAILABLE"],
++    [{ record: { commit: base }, kind: "verify", candidateCommit: product }, "PRODUCT-PATH-CHANGED"],
++    [{ record: { commit: head }, kind: "verify", candidateCommit: base }, "NOT-AN-ANCESTOR"],
++    [{ record: { commit: "main" }, kind: "verify", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
++    [{ record: null, kind: "verify", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
++    [{ record: { commit: base }, kind: "critic", candidateCommit: head }, "CARRY-FORWARD-INPUT-INVALID"],
++  ];
++  for (const [input, reason] of refusals) {
++    const decision = evidenceCarriedForward({ root, ...input });
++    assert.equal(decision.carried, false, reason);
++    assert.equal(decision.reason, reason);
++  }
++  assert.equal(evidenceCarriedForward({ root: join(root, "missing"), record: { commit: base }, kind: "verify", candidateCommit: head }).carried, false, "a root that is not a repository is a refusal, not a throw");
++});
++
++test("ECF10: the range scan asks gitleaks for exactly the passed-over commits and maps every outcome closed", () => {
++  const calls = [];
++  const deps = (status, extra = {}) => ({
++    isInstalled: () => ({ installed: true, path: "/bin/gitleaks-fixture" }),
++    resolveConfig: () => "/cfg/gitleaks.toml",
++    spawn: (path, args, options) => { calls.push({ path, args, options }); return { status, ...extra }; },
++  });
++  const context = { root: "/repo", commit: "c".repeat(40), evidenceCommit: "a".repeat(40) };
++  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(0)), { status: "clean" });
++  assert.deepEqual(calls[0].args, ["git", "/repo", "--log-opts", `${"a".repeat(40)}..${"c".repeat(40)}`, "--config", "/cfg/gitleaks.toml", "--no-banner", "--redact", "--exit-code", "2"]);
++  assert.equal(calls[0].options.shell, false);
++  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(2)), { status: "finding" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(1)), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(null)), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, deps(0, { error: new Error("ETIMEDOUT") })), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), isInstalled: () => ({ installed: false }) }), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), resolveConfig: () => null }), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], context, { ...deps(0), spawn: () => { throw new Error("spawn failed"); } }), { status: "unavailable" });
++  assert.deepEqual(gitleaksRangeSecretScan([], { root: "/repo", commit: "c".repeat(40) }, deps(0)), { status: "unavailable" }, "no evidence commit, no range");
++  assert.deepEqual(gitleaksRangeSecretScan(), { status: "unavailable" });
++});
++
++test("ECF11: with the real gitleaks, a clean range is clean and a planted token is a finding (skipped when gitleaks is not installed)", { skip: !isGitleaksInstalled(process.env).installed }, () => {
++  const { root, base } = baseRepo();
++  const cleanHead = commit(root, { "specs/f/evidence/a.json": "{\"ok\":true}\n" }, "clean evidence");
++  assert.equal(evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: cleanHead }).carried, true);
++  // Built at run time so this source file never contains a token-shaped literal.
++  const token = ["gh", "p_", randomBytes(27).toString("base64").replace(/[^A-Za-z0-9]/gu, "A").padEnd(36, "x").slice(0, 36)].join("");
++  const leakyHead = commit(root, { "specs/f/evidence/leak.json": JSON.stringify({ token }) + "\n" }, "evidence with a token");
++  const decision = evidenceCarriedForward({ root, record: { commit: base }, kind: "security", candidateCommit: leakyHead });
++  assert.equal(decision.carried, false);
++  assert.equal(decision.reason, "SECRET-SCAN-FINDING");
++});
+diff --git a/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs b/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs
+index 6e979d45d..5555714fe 100644
+--- a/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs
++++ b/plugins/pipeline-core/lib/evidence-freshness-codes.test.mjs
+@@ -99,6 +99,28 @@ test("EFC7: push-prepare reports a promoted record as fresh and a boundary failu
+   assert.equal(unknownId.code, "EF-STALE-COMMIT", "only the two known evidence ids can be promoted");
+ });
+ 
++test("EFC8: push-prepare accepts a record carried across evidence-only commits, says so, and keeps every other refusal", () => {
++  const dir = evidenceDir({ "evidence/verify-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }), "evidence/security-latest.json": JSON.stringify({ exitCode: 0, commit: OTHER }) });
++  const seen = [];
++  const carrying = (carried) => ({ evidenceCarriedForward: (input) => { seen.push(input); return { carried }; } });
++  const security = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, HEAD, carrying(true));
++  assert.equal(security.ok, true);
++  assert.equal(security.message, `evidence/security-latest.json is fresh and green at HEAD (promoted from ${OTHER.slice(0, 8)} via evidence-only carry-forward).`);
++  assert.deepEqual(seen.map(({ root, kind, candidateCommit, record }) => ({ root, kind, candidateCommit, commit: record.commit })), [{ root: dir, kind: "security", candidateCommit: HEAD, commit: OTHER }]);
++  const refused = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, HEAD, carrying(false));
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "EF-STALE-COMMIT");
++  const unknownId = checkEvidenceFreshness("other-evidence", "evidence/security-latest.json", dir, HEAD, carrying(true));
++  assert.equal(unknownId.code, "EF-STALE-COMMIT", "only the two known evidence ids can be carried");
++  const sameCommit = evidenceDir({ "evidence/security-latest.json": JSON.stringify({ exitCode: 0, commit: HEAD }) });
++  seen.length = 0;
++  assert.equal(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", sameCommit, HEAD, carrying(true)).message, "evidence/security-latest.json is fresh and green at HEAD.");
++  assert.deepEqual(seen, [], "an exact-commit record never asks the reader");
++  const failed = evidenceDir({ "evidence/security-latest.json": JSON.stringify({ exitCode: 1, commit: OTHER }) });
++  assert.equal(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", failed, HEAD, carrying(true)).code, "EF-EXIT-NOT-ZERO", "a failed record is never carried");
++  assert.deepEqual(seen, []);
++});
++
+ test("EFC4: a wrong code never overrides a green result, and an unknown code falls back to the prose", () => {
+   const dir = evidenceDir({});
+   const ok = checkVerifyEvidenceBound(dir, HEAD, { checkEvidenceFreshness: () => ({ ok: true, code: "EF-STALE-COMMIT", message: "fresh" }), resolveEvidenceProjectDir: () => dir });
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 8f48bf889..bae86b4d8 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -55,6 +55,7 @@ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHu
+ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes } from "../lib/evidence-freshness-codes.mjs";
++import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
+@@ -222,8 +223,8 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+   const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
+   // The verdict (which failure, in which order) comes from the shared function; this function keeps its messages, remedies and I/O.
+   let promotedFrom = null;
+-  const promoted = () => {
+-    if (id !== "verify-evidence" && id !== "security-evidence") return false;
++  let promotedVia = "release-promotion-envelope";
++  const promotedByEnvelope = () => {
+     const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
+     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
+     if (promotionEnvelope === null) return false;
+@@ -242,8 +243,22 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+       securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data },
+       deps,
+     }) : { ok: false, reason: "promotion-input-missing" };
+-    if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
++    return validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit;
++  };
++  // OPT-IN (candidate 19, step 3): a record bound to an earlier commit is also carried across evidence-only commits when the closed
++  // evidence set, the unchanged product tree and (for Security) a clean secret scan of the passed-over commits all hold.
++  const promoted = () => {
++    if (id !== "verify-evidence" && id !== "security-evidence") return false;
++    if (promotedByEnvelope()) {
++      promotedFrom = data.commit;
++      return true;
++    }
++    const carried = (deps.evidenceCarriedForward ?? evidenceCarriedForward)({
++      root: dir, record: data, kind: id === "verify-evidence" ? "verify" : "security", candidateCommit: headCommit,
++    });
++    if (carried.carried === true) {
+       promotedFrom = data.commit;
++      promotedVia = "evidence-only carry-forward";
+       return true;
+     }
+     return false;
+@@ -256,7 +271,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {})
+   if (code === EVIDENCE_FRESHNESS_CODES.EXIT_NOT_ZERO) return { id, ok: false, code, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
+   if (code === EVIDENCE_FRESHNESS_CODES.STALE_COMMIT) return { id, ok: false, code, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
+   if (code === EVIDENCE_FRESHNESS_CODES.NOT_PUSH_BOUNDARY) return { id, ok: false, code, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
+-  if (promotedFrom !== null) return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via release-promotion-envelope).` };
++  if (promotedFrom !== null) return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${promotedFrom.slice(0, 8)} via ${promotedVia}).` };
+   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
+ }
+ 

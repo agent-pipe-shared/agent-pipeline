@@ -48,6 +48,7 @@
 #   w160  the w148 ARA suite gets its case-completion registry row and policy (the checker reported it VULNERABLE-UNREGISTERED on the chain), and the checker test's pins follow the measured counts
 #   w161  D4b/E3 order of work step 2b (first half): push-prepare and guard-push take the freshness verdict (missing, exit code, stale commit, push boundary) from one shared function and keep their own messages; the hook template and the security completeness gate are not moved
 #   w138  (OPT-IN, APPLY_AUTHORITY_CARRY=1) the design receipt of a closed predecessor feature is accepted when the design is equal (F1, Codex greenfield; ADR authority carry-forward point 1)
+#   w162  (OPT-IN, APPLY_AUTHORITY_CARRY=1) D4b/E3 step 3: the push guard and push-prepare accept a Verify or Security record bound to an earlier commit when every commit since changed only the closed evidence set (Security additionally needs a clean gitleaks scan of those commits); WIDENS what a push accepts
 #   w120  (default, APPLY_LEAN_RULE=0 leaves out) Goldfish rule GF-10 and the Critic search item unrequested addition (B1, own definition)
 #   w121  (default, with w120) the short rendering of GF-10 in the generated Goldfish briefing (B1)
 # Afterwards the Elephant stamps, and the PO installs (only on the PO's word).
@@ -118,8 +119,9 @@ step2 w161-d4b-stage-2b-push-prepare-and-guard-push-take-the-freshness-verdict-f
 # independent review and no second one yet). Off by default; apply with:  APPLY_AUTHORITY_CARRY=1 bash <this script>
 if [ "${APPLY_AUTHORITY_CARRY:-0}" = "1" ]; then
   step2 w138-f1-a-closed-predecessors-design-receipt-is-accepted-for-the-next-feature-when-the-design-is-equal "feat(architecture): accept the design receipt of a closed predecessor feature when the design package and every target digest are equal"
+  step2 w162-d4b-stage-3-a-verify-or-security-record-is-carried-across-evidence-only-commits-opt-in "feat(push): a Verify or Security record is carried across evidence-only commits by the push guard and push-prepare, behind the opt-in block"
 else
-  echo "skipped w138 (authority carry-forward block) because APPLY_AUTHORITY_CARRY is not 1"
+  echo "skipped w138 and w162 (authority carry-forward block) because APPLY_AUTHORITY_CARRY is not 1"
 fi
 # The lean-change rule GF-10 (own definition, role files) and its short paragraph in the generated Goldfish briefing. PO decision 2026-11-03: adopt (measured on two past slices,
 # 11 % and 31 % fewer changed lines, indicative). Applied by default; leave out with:  APPLY_LEAN_RULE=0 bash <this script>
