@@ -38,6 +38,11 @@
       "disposition": "required"
     },
     {
+      "name": "analysis-run-command-admission-tests",
+      "path": "plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "antigravity-execution-host-tests",
       "path": "plugins/pipeline-core/lib/antigravity-execution-host.test.mjs",
       "disposition": "required"

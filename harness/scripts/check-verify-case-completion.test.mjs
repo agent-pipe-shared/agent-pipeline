@@ -162,9 +162,15 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // Restated 2026-11-02 (candidate 18, QG-04, own hunk): four sites counts were outgrown by their suites, measured on the applied candidate-18 chain with the
   // unchanged classifier: claude-intake-prompt-capture 48->69, critic-dispatch-preflight 389->406, g23-read-help 20->36, po-human-approval-signing-handoff 17->23.
   // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
+  // Restated 2026-11-04 (candidate 19, QG-04, own hunk; w160): analysis-run-command-admission-tests (w148) registers its ARA001 to ARA003 cases
+  // with the completion protocol but never had a completion-registry row or a verify-suites caseCompletion policy, so the real checker reported it
+  // VULNERABLE-UNREGISTERED. It now has a `required` row and a policy, is counted here (+1 classified, measured top-level-assertions, 14 sites,
+  // registry 388 -> 389) and is excluded from the R5 set below (registered after R5). The sites count of devplan-shell-lane-recovery-tests moves
+  // 13 -> 14 (the guard trailer refusal change adds one assertion). Only these numbers change; no assertion is weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
+    ["analysis-run-command-admission-tests","plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs","top-level-assertions",14],
     ["architecture-close-disposition-tests","plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","top-level-assertions",16],
     ["architecture-entry-required-source-tests","harness/scripts/architecture-entry-required-source.test.mjs","top-level-assertions",13],
     ["architecture-prospective-companion-tests","plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs","top-level-assertions",21],
@@ -200,7 +206,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["design-workflow-candidate-binding-codex-tests","plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs","top-level-assertions",16],
     ["design-workflow-candidate-binding-tests","plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs","top-level-assertions",13],
     ["design-workflow-package-builder-tests","plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs","top-level-assertions",28],
-    ["devplan-shell-lane-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs","top-level-assertions",13],
+    ["devplan-shell-lane-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs","top-level-assertions",14],
     ["devplan-shell-sanctioned-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs","top-level-assertions",40],
     ["doc-reader-course-budget-tests","harness/scripts/doc-reader-course-budget.test.mjs","top-level-assertions",8],
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
@@ -285,7 +291,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 388);
+  assert.equal(result.registryCount, 389);
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -293,6 +299,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   const addedAfterR5 = new Set([
     "administrative-commit-policy-tests",
     "agy-item-delivery-tests",
+    "analysis-run-command-admission-tests",
     "architecture-entry-required-source-tests",
     "architecture-prospective-companion-tests",
     "architecture-prospective-materialization-tests",
