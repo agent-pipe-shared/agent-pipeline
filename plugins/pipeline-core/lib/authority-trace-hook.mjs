@@ -32,6 +32,28 @@ export async function installHookAuthorityTrace(options = {}) {
     const observed = await load("lib/windows-private-state.mjs", "nativeObservationStats");
     const authority = await load("lib/windows-owned-authority-backend.mjs", "nativeAuthorityStats");
     const hook = options.hook ?? (basename(process.argv[1] ?? "") || "(stdin)");
+    // A hook the host ends at its timeout never reaches the exit writer below. admissionProgress(phase) (lib/admission-progress.mjs)
+    // calls this writer at each admission phase, so the lines up to the point where the process died are already in the file.
+    globalThis[Symbol.for("pipeline.authority-trace-progress")] = (phase) => {
+      try {
+        const c = custody?.() ?? { count: 0 };
+        const o = observed?.() ?? { count: 0, ms: 0 };
+        const a = authority?.() ?? { count: 0, ms: 0 };
+        const line = `${JSON.stringify({
+          schema: "pipeline.hook-authority-progress.v1",
+          hook,
+          pid: process.pid,
+          phase: String(phase).slice(0, 120),
+          atMs: Date.now(),
+          processMs: Math.round(performance.now()),
+          custodyInspections: c.count ?? 0,
+          nativeObservations: { count: (o.count ?? 0) + (a.count ?? 0), ms: (o.ms ?? 0) + (a.ms ?? 0) },
+        })}\n`;
+        const file = process.env.PIPELINE_AUTHORITY_TRACE_FILE;
+        if (typeof file === "string" && file !== "") appendFileSync(file, line);
+        else process.stderr.write(`AUTHORITY-TRACE ${line}`);
+      } catch { /* a diagnostic never changes the exit of the process it observes */ }
+    };
     let written = false;
     process.on("exit", (code) => {
       if (written) return;

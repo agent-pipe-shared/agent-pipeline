@@ -2,6 +2,7 @@
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
 import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
+import { admissionProgress } from './admission-progress.mjs';
 import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
@@ -201,7 +202,21 @@ export const NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE = "subagent-stop";
 /** PF-55: a preparation that refuses after it wrote the queue row restores the queue as it was. */
 export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
   const written = [];
-  const result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
+  // The process-wide deadline covers the WHOLE preparation, not only the registry publish: the queue and integration reads, the git
+  // reads and the baseline capture before it ran unbounded in a measured Windows run. It only runs with the real clock (a test that
+  // injects `now` keeps its own checkpoint semantics) and is cleared on every exit, so a later call in the same process is never
+  // judged by an old admission's budget. An overrun before the publish becomes the same typed refusal as one inside it, and the
+  // queue row it wrote is restored below like for any other refusal.
+  const deadline = args?.admissionDeadline;
+  const realClockDeadline = deadline && typeof deadline === "object" && typeof deadline.now !== "function";
+  let result;
+  try {
+    if (realClockDeadline) setAdmissionDeadline(deadline);
+    result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
+  } catch (error) {
+    if (error?.code !== "GUARD-DISPATCH-SLOW") throw error;
+    result = { ok: false, code: error.code, reason: error.reason ?? error.message ?? null, ...(typeof error.repair === "string" ? { repair: error.repair } : {}) };
+  } finally { if (realClockDeadline) clearAdmissionDeadline(); }
   if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
   return result;
 }
@@ -213,6 +228,10 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   if (typeof fields.prompt !== "string" || !hostMarkers.some((marker) => fields.prompt.includes(marker))) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
   const parsed = parseNativeGoldfishBriefing(fields.prompt);
   if (!parsed.ok) return fail(parsed.code);
+  // Phase marks of the whole preparation (each reaches the opt-in authority trace file at once and judges the budget): a measured
+  // Windows run spent its whole hook timeout before the first mark that used to exist.
+  const checkpoint = createAdmissionCheckpoint(admissionDeadline);
+  checkpoint("prepare-start");
   // A background launch is admitted only when the caller states the SubagentStop completion route is registered, so a
   // pending state is never written for a dispatch nothing would complete. D19 (PF-26): the Claude host launches every
   // Agent-tool subagent asynchronously and its tool input may carry NO run_in_background key, so an ABSENT key takes the
@@ -224,6 +243,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   const backgroundCompletion = runner === "claude" && backgroundCapable && subagentStopCompletionRegistered === true;
   if (runner === "claude" && fields.runInBackground !== false && !backgroundCompletion) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
   const binding = parsed.binding;
+  checkpoint("queue-resolve");
   const deliveryQueue = binding.itemDelivery
     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
       candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
@@ -236,7 +256,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
-    if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+    if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
@@ -252,13 +272,15 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   const nativeTypeMatches = binding.adapterVersion === 2 && runner === "codex"
     ? fields.role === binding.nativeAgentType : role === binding.role;
   if (!nativeTypeMatches) return fail("NGHS-ROLE-MISMATCH");
+  checkpoint("candidate-git");
   const physicalRoot = realpathSync(resolve(root ?? input.cwd ?? process.cwd()));
   const readGit = dependencies.git ?? git;
   const head = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{commit}"]);
   const tree = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{tree}"]);
   if (head !== binding.candidateCommit || tree !== binding.candidateTree) return fail("NGHS-CANDIDATE-MISMATCH");
   const resultPath = `scratch/.native-host-return-${binding.dispatchId}.json`;
-  const captured = (dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
+  checkpoint("agy-baseline");
+  const captured =(dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
     candidateCommit: head, resultPath });
   if (!captured?.ok && !binding.itemDelivery) return fail(captured?.code ?? "NGHS-BASELINE");
   const commonDir = (dependencies.resolveCommonDir ?? resolveGitCommonDir)(physicalRoot);
@@ -272,15 +294,11 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
   };
   let stored;
-  // The process-wide deadline only runs with the real clock (a test that injects `now` keeps its own checkpoint semantics) and is
-  // cleared on every exit, so a later call in the same process is never judged by an old admission's budget.
-  const realClockDeadline = admissionDeadline && typeof admissionDeadline === "object" && typeof admissionDeadline.now !== "function";
+  checkpoint("publish-start");
   try {
-    if (realClockDeadline) setAdmissionDeadline(admissionDeadline);
     stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
   }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
-  finally { if (realClockDeadline) clearAdmissionDeadline(); }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
 
@@ -736,9 +754,12 @@ export function inspectSourceOwnedNativeConfiguredObservation({root,sessionId,to
 // GUARD-DISPATCH-SLOW refusal when the elapsed time already exceeds the budget. withSessionAuthorityBoundary releases the
 // registry lock on the throw. Without a deadline argument it does nothing (no line, no throw).
 export function createAdmissionCheckpoint(deadline){
-  if(!deadline||typeof deadline!=='object')return ()=>{};
+  // Every phase mark also reaches the opt-in authority trace file at once (admissionProgress; a no-op without the trace), so a hook
+  // the host ends at its timeout still leaves the phases it reached.
+  if(!deadline||typeof deadline!=='object')return phase=>admissionProgress(phase);
   const now=typeof deadline.now==='function'?deadline.now:Date.now,write=typeof deadline.write==='function'?deadline.write:line=>process.stderr.write(line);
   return phase=>{
+    admissionProgress(phase);
     const elapsed=now()-deadline.startMs,seconds=(elapsed/1000).toFixed(1);
     write(`guard-dispatch: phase ${phase} at ${seconds}s\n`);
     if(elapsed>deadline.budgetMs){
@@ -749,17 +770,21 @@ export function createAdmissionCheckpoint(deadline){
 }
 function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
   const checkpoint=createAdmissionCheckpoint(admissionDeadline);
+  checkpoint('repository-inspect');
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
   // PF-52: a catalogue left by another plugin version is moved aside before presence is decided.
+  checkpoint('registry-migrate');
   if(nativeManagedRegistryPresent(repository))migrateSourceUpdatedSessionAuthorityRegistry({repository});
   if(!nativeManagedRegistryPresent(repository)) {
     if(!state.delivery)return writeExclusive(commonDir,name,state);
     // D44: no production route created the session-authority registry, so the first governed item
     // dispatch in a real repository creates it here (idempotent), then continues on the registry path.
+    checkpoint('registry-init');
     const initialized=initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
     if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault(`item-delivery-registry-initialization-failed (${initialized.reason??initialized.status})`);
   }
+  checkpoint('owner');
   const owner=nativeAuthorityOwner(repository),current=nativeManagedCurrentOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
   const handle=Object.freeze({}),operation={handle,name,association:current.association,
     bindingSha256:nativeManagedDigest({repository:{primaryRoot:repository.primaryRoot,commonDir:repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit}),phase:'reserved',sourceFacts:[],pendingSha256:null};
@@ -768,8 +793,11 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
   // PF-86: the boundary-independent git read runs before the registry lock; a fault falls back to the in-boundary read.
   let prescan=null;
   let facts=null;
+  checkpoint('prescan');
   if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
+  checkpoint('lock-wait');
   return withSessionAuthorityBoundary({repository},boundary=>{
+    checkpoint('lock-held');
     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
     if(state.delivery){
       const governed=resolveGovernedItemQueue({root:state.root});

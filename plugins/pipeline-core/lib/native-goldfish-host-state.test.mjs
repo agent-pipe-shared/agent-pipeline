@@ -200,7 +200,9 @@ const cases = [
     const item = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator, { admissionDeadline });
     assert.equal(item.prepared.ok, false);
     assert.equal(item.prepared.code, "GUARD-DISPATCH-SLOW");
-    assert.match(String(item.prepared.reason), /integrated-slice-read|collision-check/u);
+    // The first mark of the whole preparation is read at clock 0, the next one is already past the budget; which mark names the overrun
+    // is not the point (marks cover the queue, git and baseline reads before the registry publish too), that a phase is named is.
+    assert.match(String(item.prepared.reason), /^GUARD-DISPATCH-SLOW: admission phase [a-z-]+ reached 200\.0s, over the 100\.0s budget$/u);
     assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
     const repo = inspectSignedDescriptorCustodyRepository(root);
     assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
@@ -235,6 +237,52 @@ const cases = [
     assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
     assert.equal(admissionDeadlineActive(), false);
   }) },
+  { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
+    const backend = await import("./windows-owned-authority-backend.mjs");
+    const writerKey = Symbol.for("pipeline.authority-trace-progress");
+    const prior = globalThis[writerKey];
+    try {
+      const marks = [];
+      delete globalThis[writerKey];
+      backend.recordNativeAuthoritySpawn("read", 7, true);
+      assert.deepEqual(marks, [], "no writer, no mark");
+      globalThis[writerKey] = (phase) => marks.push(phase);
+      backend.recordNativeAuthoritySpawn("read-source", 520, true);
+      assert.equal(marks.length, 1);
+      assert.match(marks[0], /^native:read-source:520ms:native-goldfish-host-state\.test\.mjs:\d+/u, marks[0]);
+      assert.equal(/[\\/]|file:/u.test(marks[0]), false, "a file name and a line, never a path");
+      // A throwing writer never changes the observation it describes.
+      globalThis[writerKey] = () => { throw new Error("writer down"); };
+      assert.doesNotThrow(() => backend.recordNativeAuthoritySpawn("inspect", 3, true));
+    } finally {
+      if (prior === undefined) delete globalThis[writerKey]; else globalThis[writerKey] = prior;
+    }
+  } },
+  { id: "D177-trace-progress-survives-a-killed-hook", name: "D177 with the authority trace on, every admission phase mark reaches the trace file at once, so a hook the host ends leaves its phases; without the trace nothing is written", run: () => {
+    const dir = mkdtempSync(join(nativeContractFixtureParent(), "admission-progress-"));
+    try {
+      const trace = join(dir, "trace.jsonl");
+      const script = `const {installHookAuthorityTrace}=await import(${JSON.stringify(new URL("./authority-trace-hook.mjs", import.meta.url).href)});`
+        + `const {admissionProgress}=await import(${JSON.stringify(new URL("./admission-progress.mjs", import.meta.url).href)});`
+        + `await installHookAuthorityTrace({hook:"guard-dispatch.mjs"});admissionProgress("hook-entry");admissionProgress("lock-wait");process.kill(process.pid,"SIGKILL");`;
+      const env = { ...process.env, PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: trace };
+      const killed = spawnSync(process.execPath, ["--input-type=module", "-e", script], { env, encoding: "utf8" });
+      assert.notEqual(killed.status, 0, "the child ends by a signal, like a hook the host ends");
+      const rows = readFileSync(trace, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      assert.deepEqual(rows.map((row) => [row.schema, row.hook, row.phase]), [
+        ["pipeline.hook-authority-progress.v1", "guard-dispatch.mjs", "hook-entry"],
+        ["pipeline.hook-authority-progress.v1", "guard-dispatch.mjs", "lock-wait"],
+      ], "the phases reached before the kill are in the file and no exit trace line was written");
+      assert.ok(rows.every((row) => Number.isFinite(row.atMs) && Number.isFinite(row.processMs) && Number.isInteger(row.nativeObservations.count)), JSON.stringify(rows));
+      // Off by default: no trace variable, no file, no output.
+      const quiet = join(dir, "quiet.jsonl");
+      const off = spawnSync(process.execPath, ["--input-type=module", "-e", `const {admissionProgress}=await import(${JSON.stringify(new URL("./admission-progress.mjs", import.meta.url).href)});admissionProgress("hook-entry");`],
+        { env: { ...process.env, PIPELINE_AUTHORITY_TRACE: "", PIPELINE_AUTHORITY_TRACE_FILE: quiet }, encoding: "utf8" });
+      assert.equal(off.status, 0);
+      assert.equal(existsSync(quiet), false);
+      assert.equal(off.stdout + off.stderr, "");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  } },
   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
     input.tool_input.prompt = "ordinary Goldfish briefing";

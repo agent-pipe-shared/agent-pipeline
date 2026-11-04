@@ -590,6 +590,8 @@ kernel authority, so a maintenance window cannot lift them:
 `plugins/pipeline-core/lib/agy-host-commit-execution.mjs`,
 `plugins/pipeline-core/lib/agy-item-delivery.mjs`,
 `plugins/pipeline-core/lib/architecture-prospective-materialization.mjs`,
+`plugins/pipeline-core/lib/admission-deadline.mjs`,
+`plugins/pipeline-core/lib/admission-progress.mjs`,
 `plugins/pipeline-core/lib/backlog-state.mjs`,
 `plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs`,
 `plugins/pipeline-core/lib/claude-hook-session-owner.mjs`,

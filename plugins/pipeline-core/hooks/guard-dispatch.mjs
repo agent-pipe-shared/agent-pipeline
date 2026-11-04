@@ -86,8 +86,10 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
-// D177: hook entry time (module evaluation is the hook's start); the admission deadline measures from here.
-const HOOK_ENTRY_MS = Date.now();
+// D177: the admission deadline measures from the start of this PROCESS, not from module evaluation: the imports above are hoisted and
+// run first, and on Windows loading them is part of the time the host's hook timeout counts. performance.timeOrigin is the epoch
+// millisecond at which the process started.
+const HOOK_ENTRY_MS = Math.round(performance.timeOrigin);
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
@@ -97,10 +99,12 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { describeWindowsAuthorityRefusal, prepareWithWindowsContentionRetry } from "../lib/windows-authority-readiness.mjs";
 import { lastWindowsAuthorityFailedPath } from "../lib/windows-owned-authority-backend.mjs";
+import { admissionProgress } from "../lib/admission-progress.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
 // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
 if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+admissionProgress("hook-entry");
 
 // W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
 const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
@@ -1097,8 +1101,10 @@ if (isDirectInvocation(import.meta.url)) {
         // Q10: the path the failed native open reported is read right after each preparation, before the readiness probe the
         // retry wrapper runs can make its own native calls (every native failure replaces the remembered path).
         let envelopeFailedPath = null;
+        admissionProgress("dispatch-checks-done");
         const prepared = prepareWithWindowsContentionRetry({
           prepare: () => {
+            admissionProgress("prepare-attempt");
             const attempt = prepareNativeGoldfishHostState({
               root: rootDir, runner: nativeRunner, input,
               admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
@@ -1110,6 +1116,7 @@ if (isDirectInvocation(import.meta.url)) {
           projectRoot: resolve(rootDir), pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline"),
           waitCommand: `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} wait --root ${rootDir} --timeout 120`,
         });
+        admissionProgress("prepare-done");
         if (prepared.ok) nativePendingPrepared = true;
         if (!prepared.ok) {
           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;

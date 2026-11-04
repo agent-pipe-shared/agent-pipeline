@@ -129,9 +129,16 @@ test("APT8 each Agent PreToolUse hook script appends a trace line when the varia
         env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file, CLAUDE_PROJECT_DIR: project }),
       });
       assert.equal(existsSync(file), true, `${name} wrote no trace`);
-      const lines = readFileSync(file, "utf8").trim().split("\n");
-      assert.equal(lines.length, 1, `${name} wrote ${lines.length} lines`);
-      assert.equal(JSON.parse(lines[0]).hook, `${name}.mjs`);
+      // One exit trace line per process; a hook that marks its phases (guard-dispatch: hook-entry) also appended progress lines, which
+      // reach the file at once instead of at exit (lib/admission-progress.mjs). Restated, not weakened: the exit line is still exactly one.
+      const rows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+      const lines = rows.filter((row) => row.schema === "pipeline.hook-authority-trace.v1");
+      const progress = rows.filter((row) => row.schema === "pipeline.hook-authority-progress.v1");
+      assert.equal(lines.length, 1, `${name} wrote ${lines.length} trace lines`);
+      assert.equal(lines.length + progress.length, rows.length, `${name} wrote a line of an unknown schema`);
+      assert.equal(lines[0].hook, `${name}.mjs`);
+      assert.ok(progress.every((row) => row.hook === `${name}.mjs`), `${name} progress lines name another hook`);
+      if (name === "guard-dispatch") assert.deepEqual(progress.map((row) => row.phase), ["hook-entry"]);
       const off = join(dir, `hook-off-${name}.jsonl`);
       const res = spawnSync(process.execPath, [join(hooksDir, `${name}.mjs`)], { encoding: "utf8", input: "", cwd: project, env: envFor({ PIPELINE_AUTHORITY_TRACE_FILE: off, CLAUDE_PROJECT_DIR: project }) });
       assert.equal(existsSync(off), false, `${name} wrote with the variable unset`);

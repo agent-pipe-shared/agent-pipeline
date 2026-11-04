@@ -32,6 +32,30 @@ export function recordNativeAuthoritySpawn(operation,ms,ok){
  if(ms>nativeAuthorityCounters.maxMs)nativeAuthorityCounters.maxMs=ms;
  if(!ok)nativeAuthorityCounters.failed+=1;
  const name=String(operation);nativeAuthorityByOperation.set(name,(nativeAuthorityByOperation.get(name)??0)+1);
+ nativeSpawnMark(name,ms);
+}
+// With the opt-in authority trace installed (a writer on a well-known global, lib/admission-progress.mjs), every native observation also
+// appends one line naming the operation, its duration and the two nearest callers outside the native modules (file:line only, no path,
+// no input). A process the host ends leaves no exit line, and one counter line cannot say which caller made 220 observations; this can.
+// Nothing runs without the trace: the stack is only read when a writer exists.
+const NATIVE_SITE_SKIP=/windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
+function nativeCallSites(){
+ const limit=Error.stackTraceLimit;Error.stackTraceLimit=40;let stack='';
+ try{stack=String(new Error().stack??'');}finally{Error.stackTraceLimit=limit;}
+ const sites=[];
+ for(const line of stack.split('\n').slice(1)){
+  const match=/([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
+  if(match===null||NATIVE_SITE_SKIP.test(line))continue;
+  sites.push(`${match[1]}:${match[2]}`);if(sites.length===2)break;
+ }
+ return sites.join('<');
+}
+function nativeSpawnMark(name,ms){
+ try{
+  const progress=globalThis[Symbol.for('pipeline.authority-trace-progress')];
+  if(typeof progress!=='function')return;
+  progress(`native:${name}:${ms}ms:${nativeCallSites()}`);
+ }catch{/* a diagnostic never changes the observation it describes */}
 }
 // Process-local memo of READ-ONLY native observations, keyed on the observed object's lstat identity (see invoke below).
 const MEMO_MAX=512;
