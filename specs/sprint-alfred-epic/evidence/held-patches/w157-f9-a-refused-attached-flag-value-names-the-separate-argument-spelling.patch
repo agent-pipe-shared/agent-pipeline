@@ -1,0 +1,87 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index bf26ed2ca..92331f335 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "../read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -531,7 +531,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+           try { flag = firstUnadmittedFlag(readCommand, root); } catch { flag = null; }
+         }
+       }
+-      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"`;
++      const spelling = flag === null ? null : flagSpellingHint(flag);
++      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
+       return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index 81ec663e1..25c25f2ac 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -49,6 +49,20 @@ export function firstUnadmittedGlobValue(command, root) {
+   return null;
+ }
+ 
++/**
++ * F9 (candidate 19): a flag written with its value attached (`-A8`, `-m5`, `--max-count=5`) is refused by the grammar, which takes the value as a
++ * separate argument. Returns one sentence naming the spelling to use, or null for any other flag. Prose only; it grants nothing.
++ * @returns {string|null}
++ */
++export function flagSpellingHint(flag) {
++  if (typeof flag !== "string") return null;
++  const short = /^-([ABCm])(\d{1,4})$/u.exec(flag);
++  if (short) return `an attached value is not admitted; give it as a separate argument: -${short[1]} ${short[2]}`;
++  const long = /^(--[a-z][a-z-]*)=(.+)$/u.exec(flag);
++  if (long) return `the "--flag=value" spelling is not admitted; give the value as a separate argument: ${long[1]} <value>`;
++  return null;
++}
++
+ /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
+ export function firstUnadmittedFlag(command, root) {
+   if (typeof command !== "string" || command.trim() === "") return null;
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index 9097721d9..9269139c6 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT } from "./read-command-diagnosis.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+@@ -97,6 +97,25 @@ test("RCD12: the outside-root read refusal says it is intended and names the nat
+   assert.match(String(result.stderr), /native Read tool/u);
+ });
+ 
++test("RCD13: an attached flag value gets the separate-argument spelling, other flags get none", () => {
++  assert.equal(flagSpellingHint("-A8"), "an attached value is not admitted; give it as a separate argument: -A 8");
++  assert.equal(flagSpellingHint("-m25"), "an attached value is not admitted; give it as a separate argument: -m 25");
++  assert.match(String(flagSpellingHint("--max-count=5")), /--max-count <value>/u);
++  assert.equal(flagSpellingHint("--hidden"), null);
++  assert.equal(flagSpellingHint("-n"), null);
++  assert.equal(flagSpellingHint("-la"), null);
++  assert.equal(flagSpellingHint(undefined), null);
++});
++
++test("RCD14: the refusal of an attached value prints the spelling to use, and both spellings stay judged by the grammar", async () => {
++  const attached = "rg -n -A8 needle README.md";
++  assert.equal(isReadOnlyDiagnosticCommand(attached, root), false, "fixture must be refused");
++  assert.equal(isReadOnlyDiagnosticCommand("rg -n -A 8 needle README.md", root), true, "the suggested spelling is admitted");
++  const result = await refusal(attached);
++  assert.equal(result.exitCode, 2);
++  assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
