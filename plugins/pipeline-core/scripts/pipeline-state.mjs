@@ -449,6 +449,7 @@ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs'
 import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
 import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
 import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
+import { readAuthoritySeal } from "../lib/authority-seal-reader.mjs";
 import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
@@ -6024,6 +6025,7 @@ function resultBootstrapEligible(state, prd, spec) {
   return Boolean(state?.activeFeature && lifecycle.ok && lifecycle.status === "implementing"
     && validateContinuityState(continuity, state.activeFeature.id).ok
     && continuity.featureId === state.activeFeature.id
+    && !isDraftAuthority(continuity)
     && continuity.authority.result === null
     && continuity.queueHead !== null && continuity.queueHead.dispatch === null
     && continuity.blocker === null && continuity.acknowledgedFinal === null
@@ -7094,9 +7096,19 @@ function validPriorAuthority(state, prd, spec) {
   return authority;
 }
 
+// Late binding: a draft package (`sealed: false`) binds no PRD/Spec digest. The PO rebind, decision and acknowledge routes compare and
+// rewrite bound digests, so they refuse a draft; the refusal keeps its code and adds the typed exits (prepare-seal, reopen-design).
+function isDraftAuthority(continuity) {
+  return readAuthoritySeal(continuity?.authority).status === "draft";
+}
+
+function continuityRefusal(code, state) {
+  return isDraftAuthority(state?.continuity) ? { ok: false, code, exits: readAuthoritySeal(state.continuity.authority).exits } : { ok: false, code };
+}
+
 function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
   const continuity = state?.continuity;
-  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
+  if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
     || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
     || continuity.authority.prd.sha256 !== oldAuthority.planSha256
     || continuity.authority.spec.sha256 !== oldAuthority.specSha256
@@ -7108,7 +7120,7 @@ function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
 
 function eligibleDecisionContinuity(state, prd, spec) {
   const continuity = state?.continuity;
-  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
+  if (!continuity || isDraftAuthority(continuity) || !validateContinuityState(continuity, state.activeFeature?.id).ok
     || continuity.authority.prd.path !== prd.path
     || continuity.authority.spec.path !== spec.path
     || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
@@ -7141,7 +7153,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
   const oldAuthority = validRebindApproval(state, prd, spec, profile);
   if (oldAuthority === null || oldAuthority.specSha256 !== marker.digest || oldAuthority.specSha256 === spec.sha256) return { ok: false, code: "PO-REBIND-APPROVAL" };
   const continuity = eligibleRebindContinuity(state, prd, spec, oldAuthority);
-  if (continuity === null) return { ok: false, code: "PO-REBIND-CONTINUITY" };
+  if (continuity === null) return continuityRefusal("PO-REBIND-CONTINUITY", state);
   const nextPrdBytes = replaceRebindMarker(prd.bytes, marker, spec.sha256);
   if (nextPrdBytes === null) return { ok: false, code: "PO-REBIND-PRD-MARKER" };
   const nextPrdSha256 = sha256Bytes(nextPrdBytes);
@@ -7228,7 +7240,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
     return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
   }
   const continuity = eligibleDecisionContinuity(state, prd, spec);
-  if (continuity === null) return { ok: false, code: "PO-DECISION-CONTINUITY" };
+  if (continuity === null) return continuityRefusal("PO-DECISION-CONTINUITY", state);
   const documentDrift = marker.digest !== spec.sha256;
   const bindingDrift = priorAuthority.planSha256 !== prd.sha256
     || priorAuthority.specSha256 !== spec.sha256
@@ -7652,6 +7664,7 @@ export function resolvePoRebindRunner(explicitRunner, env) {
 // not merely trusted.
 function eligibleAcknowledgeContinuity(state, prd, spec, reopenedApprovedDraft = false) {
   const continuity = state?.continuity;
+  if (isDraftAuthority(continuity)) return null;
   const currentBinding = continuity?.authority?.prd?.sha256 === prd.sha256
     && continuity?.authority?.spec?.sha256 === spec.sha256;
   const invalidatedBinding = reopenedApprovedDraft
@@ -7746,7 +7759,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
     return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
   }
   const continuity = eligibleAcknowledgeContinuity(state, prd, spec, changingProfile ? false : reopenedApprovedDraft);
-  if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
+  if (continuity === null) return continuityRefusal("PO-ACK-CONTINUITY", state);
   if (changingProfile && (continuity.authority.result !== null || continuity.acknowledgedFinal !== null
     || continuity.recovery !== null || (marker !== null && marker.digest !== spec.sha256))) {
     return { ok: false, code: "PO-ACK-CONTINUITY" };

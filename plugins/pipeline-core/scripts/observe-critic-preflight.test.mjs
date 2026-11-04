@@ -7,6 +7,7 @@ import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, 
 import { join } from "node:path";
 import test from "node:test";
 import { runObservedCriticPreflight } from "./observe-critic-preflight.mjs";
+import { resolveCriticPreflightContext } from "../lib/critic-preflight-observer.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 const here = new URL(".", import.meta.url);
@@ -70,6 +71,49 @@ function args(fx, evidence = true) {
   if (evidence) result.push("--evidence", "evidence/verify.json");
   return result;
 }
+
+// Late binding (LB3): rewrite the fixture State into a draft package (paths, no digests, `sealed: false`).
+function makeDraft(fx) {
+  const statePath = join(fx.root, "project/pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  const a = state.continuity.authority;
+  state.continuity.authority = {
+    sealed: false,
+    prd: { path: a.prd.path },
+    spec: { path: a.spec.path },
+    result: a.result === null || a.result === undefined ? null : { path: a.result.path },
+  };
+  state.continuity.queueHead.dispatch = null;
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+test("LB3: a draft package binds the digest of the bytes the review read, and an edit afterwards makes a new request carry a new digest", () => {
+  const fx = fixture();
+  try {
+    makeDraft(fx);
+    const specPath = "specs/sprint-alfred-epic/spec.md";
+    const first = resolveCriticPreflightContext({ root: fx.root, specPath });
+    assert.equal(first.ok, true, JSON.stringify(first));
+    const bound = createHash("sha256").update(readFileSync(join(fx.root, specPath))).digest("hex");
+    assert.equal(first.context.ownerBinding.specSha256, bound);
+    writeFileSync(join(fx.root, specPath), `${readFileSync(join(fx.root, specPath), "utf8")}\nedited in the draft\n`);
+    const second = resolveCriticPreflightContext({ root: fx.root, specPath });
+    assert.equal(second.ok, true, JSON.stringify(second));
+    assert.notEqual(second.context.ownerBinding.specSha256, first.context.ownerBinding.specSha256, "the first binding is stale after the edit; re-request binds the new bytes");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("LB3: a sealed package keeps its digest comparison: an edit without a rebind is refused", () => {
+  const fx = fixture();
+  try {
+    const specPath = "specs/sprint-alfred-epic/spec.md";
+    assert.equal(resolveCriticPreflightContext({ root: fx.root, specPath }).ok, true);
+    writeFileSync(join(fx.root, specPath), `${readFileSync(join(fx.root, specPath), "utf8")}\nedited after the seal\n`);
+    const refused = resolveCriticPreflightContext({ root: fx.root, specPath });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, "C1O-SCOPE-BINDING");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
 
 test("observed controller preserves real rejected producer bytes and retains same-lineage immutable receipts", () => {
   const fx = fixture();

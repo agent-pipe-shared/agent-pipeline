@@ -6,6 +6,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 
 const SOURCE_KEYS = ["schema", "producer", "observationRevision", "stage", "outcome", "code", "candidate", "specSha256"];
 const STAGES = ["arguments", "request", "candidate", "paths", "inventory", "manifest", "governance", "candidate-files", "evidence", "prior-evidence", "complete"];
@@ -111,9 +112,12 @@ function ownerSnapshot(root, statePath, specPath) {
   if (state === null || typeof state !== "object" || Array.isArray(state) || state.activeFeature === null || typeof state.activeFeature !== "object" || Array.isArray(state.activeFeature)
     || typeof state.activeFeature.id !== "string" || !validateContinuityState(state.continuity, state.activeFeature.id).ok) fail("C1O-SCOPE-UNAVAILABLE");
   const continuity = state.continuity;
-  if (continuity.authority.spec.path !== specPath || !DIGEST.test(continuity.authority.spec.sha256)) fail("C1O-SCOPE-BINDING");
+  // Late binding: a draft package records the Spec path and no digest. The review then binds the digest of the exact bytes read here
+  // (returned as specSha256 and recorded in the owner binding), and a difference afterwards is C1O-SCOPE-STALE (re-request the review).
+  const draft = readAuthoritySeal(continuity.authority).status === "draft";
+  if (continuity.authority.spec.path !== specPath || (!draft && !DIGEST.test(continuity.authority.spec.sha256))) fail("C1O-SCOPE-BINDING");
   const specBytes = boundedFile(root, specPath, "C1O-SCOPE-BINDING"), specSha256 = sha256(specBytes);
-  if (specSha256 !== continuity.authority.spec.sha256) fail("C1O-SCOPE-BINDING");
+  if (!draft && specSha256 !== continuity.authority.spec.sha256) fail("C1O-SCOPE-BINDING");
   if (!ID.test(continuity.featureId)) fail("C1O-SCOPE-UNAVAILABLE");
   const phase = typeof state.activeFeature.phase === "string" && ID.test(state.activeFeature.phase) ? state.activeFeature.phase : null;
   return { stateBytes, stateSha256: sha256(stateBytes), revision: continuity.revision, specBytes, specSha256, featureId: continuity.featureId, phase };

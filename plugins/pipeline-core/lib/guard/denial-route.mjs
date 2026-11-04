@@ -7,6 +7,7 @@ import { isSessionCapabilityFailurePhase } from "../codex-onboarding-capabilitie
 import { placeholder, renderHumanCopySafeCommand } from "../copy-safe-command.mjs";
 import { consumeHumanGuardOverride, humanGuardRouteUnavailableReason, recordHumanGuardDenial } from "../human-guard-override.mjs";
 import { readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
+import { readAuthoritySeal } from "../authority-seal-reader.mjs";
 import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_CREDENTIAL_TARGET_REMEDY, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
 import { verdict } from "./verdict.mjs";
@@ -352,8 +353,20 @@ export function boundAuthorityDocumentPath(root, requested) {
     }
     if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
     if (planInvalidationReleasesBinding(state)) return null;
-    if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
     const authority = state.continuity?.authority;
+    // Late binding (ADR draft-late-binding-of-prd-and-spec-at-the-approval): a draft package carries paths and no digest, so the PRD and
+    // the Spec are ordinary editable files until the seal. The design input stays guarded: its capture digest is provenance and the seal
+    // refuses on a difference. This check runs before the design-phase release below, which would admit the design input as well.
+    // Only a well-formed draft takes this branch; an unmarked or invalid shape falls through to the unchanged rules.
+    if (readAuthoritySeal(authority).status === "draft") {
+      const designInput = join(dirname(authority.spec.path), "design-input.md");
+      try {
+        return resolve(root, designInput) === requested ? designInput : null;
+      } catch {
+        return null;
+      }
+    }
+    if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
     if (authority === null || typeof authority !== "object") return null;
     const prdPath = authority.prd?.path;
     const specPath = authority.spec?.path;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Deterministic, provider-neutral workflow dispatch preflight. */
 import { createHash } from "node:crypto";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE } from "./project-authority.mjs";
 
@@ -251,6 +252,9 @@ function validPhase26Envelope(request, calibration, capabilities) {
 function validateContinuityBinding(request, state) {
   const valid = validateContinuityState(state, request.continuityBinding.featureId);
   if (!valid.ok) return "WF-CONTINUITY-INVALID";
+  // A dispatch binds the authority digests; a draft package (late binding) has none until the seal (exits: prepare-seal, reopen-design).
+  const seal = readAuthoritySeal(state.authority);
+  if (seal.status === "draft") return "WF-CONTINUITY-UNSEALED";
   const binding = request.continuityBinding;
   if (binding.queueRevision !== state.revision) return "WF-CONTINUITY-STALE";
   const head = state.queueHead;
@@ -386,6 +390,7 @@ function hasStrictNarrowing(request, failover, trusted) {
 function validateFailoverTrust(request, state, trusted) {
   const failover = request.failover;
   if (!validTrustedCoordinatorContext(trusted, request)) return "WF-FAILOVER-TRUST";
+  if (readAuthoritySeal(state.authority).status === "draft") return "WF-CONTINUITY-UNSEALED";
   if (failover.createdByDuty !== trusted.creator.duty
     || !sameAuthorityDigests(trusted.creator.authorityDigests, request.continuityBinding.authorityDigests)
     || trusted.creator.authorityDigests.prdSha256 !== state.authority.prd.sha256
@@ -637,7 +642,7 @@ export const WORKFLOW_WRITER_PREFLIGHT_CODES = Object.freeze([
   "WF-MALFORMED", "WF-MODE", "WF-SIDE-EFFECTS", "WF-PATHS", "WF-ISOLATION",
   "WF-GUARD", "WF-ALLOWLIST", "WF-VERIFY", "WF-ESCALATION", "WF-NO-WRITE",
   "WF-BOUNDED-CAPABILITY", "WF-ISOLATED-CAPABILITY", "WF-PHASE26-SCHEMA",
-  "WF-CONTINUITY-INVALID", "WF-CONTINUITY-STALE", "WF-CONTINUITY-HEAD",
+  "WF-CONTINUITY-INVALID", "WF-CONTINUITY-STALE", "WF-CONTINUITY-HEAD", "WF-CONTINUITY-UNSEALED",
   "WF-ROUTE-BINDING", "WF-GLOBAL-STATE-PROHIBITED", "WF-FAILOVER-SCHEMA",
   "WF-FAILOVER-TRUST", "WF-FAILOVER-TRUST-READ", "WF-FAILOVER-NARROWING",
   "WF-FAILOVER-FROZEN", "WF-FAILOVER-IDENTITY", "WF-FAILOVER-STATE",

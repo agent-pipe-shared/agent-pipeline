@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
@@ -242,6 +243,9 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
     const lifecycle = derivePlanLifecycle(state, observation);
     requireValue(lifecycle.ok && ["approved", "implementing"].includes(lifecycle.status), "ARCHITECTURE-DESIGN-APPROVAL-STALE");
     const continuity = state.continuity;
+    // Late binding: an architecture design is an authority-bearing gate after the approval, so a draft package is refused with its own
+    // typed code (exits: prepare-seal, reopen-design) instead of reading as a stale digest.
+    requireValue(readAuthoritySeal(continuity?.authority).status !== "draft", "ARCHITECTURE-DESIGN-AUTHORITY-NOT-SEALED");
     requireValue(continuity?.featureId === state.activeFeature.id
       && continuity.authority?.prd?.path === authority.planPath && continuity.authority.prd.sha256 === observation.planSha256
       && continuity.authority?.spec?.path === authority.specPath && continuity.authority.spec.sha256 === observation.specSha256,

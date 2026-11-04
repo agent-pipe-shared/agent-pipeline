@@ -6,7 +6,9 @@
  * digests are ever emitted; observer error text is never propagated.
  */
 
-export const CONTINUITY_AUTHORITY_DRIFT_SCHEMA = "pipeline.continuity-authority-drift.v1";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+
+export const CONTINUITY_AUTHORITY_DRIFT_SCHEMA ="pipeline.continuity-authority-drift.v1";
 export const CONTINUITY_AUTHORITY_DRIFT_CODE = "CONTINUITY-AUTHORITY-DRIFT";
 export const CONTINUITY_AUTHORITY_DRIFT_ROUTE = "continuity-authority-revision-plan";
 
@@ -53,6 +55,18 @@ function observeSafely(observeSha256, path) {
 }
 
 export function projectContinuityAuthorityDrift(continuity, observeSha256) {
+  // A draft package (late binding, `sealed: false`) records paths and no digest: there is nothing to drift from until the seal.
+  const seal = readAuthoritySeal(continuity.authority);
+  if (seal.status === "draft") {
+    return {
+      schema: CONTINUITY_AUTHORITY_DRIFT_SCHEMA,
+      status: "current",
+      featureId: continuity.featureId,
+      revision: continuity.revision,
+      artifacts: ROLES.map((role) => ({ role, path: seal.paths[role], recordedSha256: null, observedSha256: null, state: "unbound" })),
+      recovery: null,
+    };
+  }
   const artifacts = ROLES.map((role) => {
     const recorded = continuity.authority[role];
     const observed = observeSafely(observeSha256, recorded.path);

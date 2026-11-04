@@ -289,6 +289,11 @@ for (const [name, mutate, code] of [
   ["different head", (input) => { input.continuityBinding.actionId = "other-action"; }, "WF-CONTINUITY-HEAD"],
   ["different authority", (input) => { input.continuityBinding.authorityDigests.prdSha256 = E; }, "WF-CONTINUITY-HEAD"],
   ["different active duty", (_input, state) => { state.runtime.activeDuty = "Critic"; }, "WF-CONTINUITY-HEAD"],
+  // late binding (LB3): a draft package binds no authority digest, so no dispatch can bind it; the sealed rows above keep their verdicts
+  ["unsealed draft package", (_input, state) => {
+    state.queueHead.dispatch = null; // a draft state can carry no dispatch; it is the only valid draft shape here
+    state.authority = { sealed: false, prd: { path: "specs/prd.md" }, spec: { path: "specs/spec.md" }, result: { path: "specs/result.md" } };
+  }, "WF-CONTINUITY-UNSEALED"],
   ["delegation request", (input) => { input.mayDelegate = true; }, "WF-PHASE26-SCHEMA"],
   ["OS isolation assertion", (input) => { input.assurance.osIsolationAsserted = true; }, "WF-PHASE26-SCHEMA"],
 ]) {

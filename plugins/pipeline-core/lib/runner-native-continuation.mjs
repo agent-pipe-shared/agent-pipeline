@@ -8,6 +8,7 @@
  * prompt.
  */
 import { createHash } from "node:crypto";
+import { readAuthoritySeal } from "./authority-seal-reader.mjs";
 
 export const RUNNER_NATIVE_CONTINUATION_SCHEMA = "pipeline.runner-native-continuation.v1";
 export const CONTINUATION_STATES = Object.freeze([
@@ -152,6 +153,9 @@ export function buildRunnerNativeContinuationRequest({ continuationId, activeFea
     || !object(continuity) || continuity.featureId !== activeFeature.id || continuity.blocker !== null
     || !object(continuity.queueHead) || !object(continuity.authority) || !validRunner(runner)
     || !validAcceptance(acceptance) || !validEvidence(evidence) || !validProgress(progress)) return { ok: false, code: "RNC-SCHEMA" };
+  const seal = readAuthoritySeal(continuity.authority);
+  // A native goal binds the approved plan and Spec digests; a draft package carries none (typed exits: prepare-seal, reopen-design).
+  if (seal.status === "draft") return { ok: false, code: "RNC-UNSEALED", exits: seal.exits };
   const head = continuity.queueHead;
   const subject = {
     featureId: activeFeature.id, phase: activeFeature.phase,
