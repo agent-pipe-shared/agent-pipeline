@@ -1,0 +1,933 @@
+diff --git a/docs/audit-bundles-technical.md b/docs/audit-bundles-technical.md
+index 799de226c..50b098cd5 100644
+--- a/docs/audit-bundles-technical.md
++++ b/docs/audit-bundles-technical.md
+@@ -66,3 +66,35 @@ does not trust any value it did not itself recompute
+ provider-neutral step layered on an unchanged, already-built bundle; no key
+ or key location ever enters the bundle content itself
+ (`audit-bundle.mjs:54-83`).
++
++## Human approval evidence and the approval trace
++
++A plan may name an optional `evidence` input (keys `traceReportPath`,
++`proofPaths` (at most 16), `verifyRecordPath`, `securityScanPath`; repository
++relative paths). The bundle then carries, by path and digest, the approval
++trace report, the detached signature proofs, the release-mode Verify record and
++the Security scan record, all bound to the candidate the bundle audits (the
++last close commit itself). An item that is not named, unreadable, bound to
++another candidate, not a release Verify, or not a passing scan is a typed gap
++in the manifest (`NOT-REFERENCED`, `UNREADABLE`, `OTHER-CANDIDATE`,
++`NOT-RELEASE-VERIFY`, `NOT-PASSING`), never silently skipped. A plan whose
++candidate differs from the package candidate is refused
++(`AB-CANDIDATE-MISMATCH`). Without `evidence` the bundle is byte-identical to
++before.
++
++The trace itself is `scripts/human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json]`,
++a read-only operator command (`--out` writes the JSON report create-only inside
++the repository, for the bundle to carry; the guard admits only `--repo`,
++`--commit` and `--format`). For a candidate it enumerates the approval records
++the gates consumed (push approval, plan and design approvals, critical-action
++authorizations, override capabilities, chat-mode attributions) and proves each
++chain: the record names the exact candidate or plan digest, a detached Ed25519
++proof exists whose signed digest equals that binding, it verifies against the
++project's key directory and trust anchor with a registered human key, and it was
++consumed once. Verdicts: `traced`; `attribution-only` (a chat-mode approval, an
++attribution record and not proof); `untraceable` with the exact break (exit 1).
++It never signs, never consumes a proof and never approves anything. Records that
++the stores do not retain a proof for are reported as untraceable with their
++reason code (`PROOF-NOT-RETAINED-IN-CAPABILITY`, `PLAN-PROOF-NOT-RETAINED`,
++`DESIGN-INTENT-NOT-RECONSTRUCTIBLE`); publication, release-preflight and briefed
++test authorizations are named as not enumerated in every result.
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index fe59ecc7b..b4b327f85 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -2375,7 +2375,9 @@
+         "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
+-        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
++        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
++        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-command-tests",
++        "verify-phase:harness/scripts/verify.mjs:human-approval-trace-tests"
+       ],
+       "runners": [
+         "host-only"
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index bdc21ff5a..5af9d8bf9 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4582,6 +4582,18 @@
+       "file": "plugins/pipeline-core/lib/authority-seal-readers.test.mjs",
+       "invariantPinned": "The continuity state schema accepts the draft authority (sealed false, paths without digests) and rejects every other shape, a state without the marker keeps its exact old verdict, the core readers of the bound authority (continuity-state, plan-spec-state-v2, critical-action authorization, po-gate authority read, onboarding continuity) read through the shared seal reader, the authority-bearing gates refuse an unsealed package with the typed exits prepare-seal and reopen-design, and reopen-design and the ordinary compare-and-swap stay executable on a draft (C19 late-binding build step 2)",
+       "nonOverlapNote": "Unique cases: the draft schema shapes and the per-reader draft verdicts; authority-seal-reader tests pin the shared reader itself, continuity-state and plan-spec-state-v2 tests pin the unchanged sealed verdicts"
++    },
++    {
++      "name": "human-approval-trace-tests",
++      "file": "plugins/pipeline-core/lib/human-approval-trace.test.mjs",
++      "invariantPinned": "The read-only human approval trace proves, for a candidate commit, that every approval record the gates consumed names the exact candidate or plan digest, has a detached Ed25519 proof whose signed digest equals that binding, verifies against the project's public key directory and trust anchor with a registered human key, and was consumed once; a chat-mode approval is reported as attribution-only, every other break as untraceable with the exact break and a typed gap, and nothing is ever signed, consumed or written (C19 Q3)",
++      "nonOverlapNote": "Unique cases: lib/human-approval-trace.mjs; the audit bundle tests pin how the bundle carries the result and the command tests pin the operator command"
++    },
++    {
++      "name": "human-approval-trace-command-tests",
++      "file": "plugins/pipeline-core/scripts/human-approval-trace.test.mjs",
++      "invariantPinned": "The operator command human-approval-trace prints the trace table and the typed verdict, exits non-zero on untraceable, is read-only (an output path is create-only) and is admitted by the guard command catalogue only with --repo and the optional --commit and --format (C19 Q3)",
++      "nonOverlapNote": "Unique cases: scripts/human-approval-trace.mjs and its guard catalogue admission; the library tests pin the verdict logic"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 17d53f912..93aa8df9c 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -7,12 +7,18 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ import { validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
++import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
+ 
+ const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u; const BUNDLE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
+ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za-z0-9_-]{16,16384}$/u;
+ function fail(code, message = "Audit bundle operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
+ function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+ function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
++function evidenceSection(manifest) {
++  if (!Object.hasOwn(manifest, "evidence")) return "";
++  const lines = manifest.evidence.items.map((entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`).join("\n");
++  return `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${lines}\n`;
++}
+ function auditorReadme(manifest) {
+   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
+   return `# Audit bundle: ${manifest.bundleId}
+@@ -28,7 +34,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
+ ## Artifacts
+ 
+ ${artifactLines}
+-
++${evidenceSection(manifest)}
+ ## Offline verification
+ 
+ Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
+@@ -65,17 +71,98 @@ function sanitizeExportEvidence(exportEvidence) {
+   if (hasReceipt && !receiptShape(exportEvidence.receipt)) fail("AB-EXPORT-RECEIPT");
+   return Object.freeze({ ...(hasProfile ? { profileDigest: canonicalSha256(exportEvidence.profile) } : {}), ...(hasReceipt ? { receipt: Object.freeze({ ...exportEvidence.receipt }) } : {}) });
+ }
+-function planShape(plan) { const hasExport = hasExportMetadata(plan); return exact(plan, hasExport ? ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", "exportMetadata"] : ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts"])
+-  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExport || exportMetadataShape(plan.exportMetadata)); }
++// Q3: the optional top-level keys a plan or manifest may carry, each validated when present. The absent case keeps the
++// exact key list it always had, so old bundles and plans stay byte-identical and verifiable.
++const OPTIONAL_KEYS = ["exportMetadata", "evidence"];
++function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
++const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
++const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
++const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
++const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
++function evidenceShape(value) {
++  return exact(value, ["schema", "candidateBound", "traceStatus", "items"]) && value.schema === "pipeline.audit-bundle-evidence.v1" && value.candidateBound === true
++    && (value.traceStatus === null || TRACE_STATUSES.has(value.traceStatus)) && Array.isArray(value.items) && value.items.length <= 64
++    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
++      && (entry.status === "carried" || entry.status === "gap") && (entry.code === null || /^[A-Z0-9-]{3,48}$/u.test(entry.code))
++      && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
++}
++function planShape(plan) { return exact(plan, ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", ...optionalKeys(plan)])
++  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)); }
+ 
+-export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence } = {}) {
++function readEvidenceFile(root, path) {
++  let source; try { source = rootPath(root, path, "AB-EVIDENCE-PATH"); } catch { return null; }
++  try { const bytes = readFileSync(source); return { bytes, sha256: digest(bytes) }; } catch { return null; }
++}
++function jsonOrNull(bytes) { try { return parseStrictJson(bytes); } catch { return null; } }
++const sameCandidate = (value, candidate) => value !== null && typeof value === "object" && value.commit === candidate.commit && value.tree === candidate.tree;
++/**
++ * Q3: carry, by path and digest, the evidence an auditor needs to follow every human approval back to the human: the
++ * human-approval trace report (which embeds each detached proof), any explicitly referenced detached proof files, the
++ * release-mode Verify record and the security scan, each bound to the audited candidate. An item that is missing or
++ * bound to another candidate is a typed gap in the manifest, never silently skipped. Nothing here signs or approves.
++ */
++function collectEvidence(root, candidate, evidence, firstIndex) {
++  if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
++  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"]);
++  if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
++  const artifacts = []; const items = []; let traceStatus = null; let traceHasProof = false;
++  const carry = (cls, sourcePath, sha256) => { const bundlePath = `artifacts/${String(firstIndex + artifacts.length + 1).padStart(3, "0")}-${cls}`; artifacts.push({ sourcePath, bundlePath, sha256 }); return bundlePath; };
++  const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
++  let traceBundlePath = null;
++  if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
++  else {
++    const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
++    if (!report || report.schema !== TRACE_SCHEMA || !TRACE_STATUSES.has(report.status) || !Array.isArray(report.rows)) gap("approval-trace", "UNREADABLE");
++    else if (!sameCandidate(report.candidate, candidate)) gap("approval-trace", "OTHER-CANDIDATE");
++    else {
++      traceStatus = report.status; traceHasProof = report.rows.some((row) => row?.proof !== null && typeof row?.proof === "object");
++      traceBundlePath = carry(EVIDENCE_CLASSES.trace, evidence.traceReportPath, file.sha256);
++      items.push({ item: "approval-trace", status: "carried", code: report.status === "traced" ? null : report.status === "attribution-only" ? "TRACE-ATTRIBUTION-ONLY" : "TRACE-UNTRACEABLE", bundlePath: traceBundlePath });
++    }
++  }
++  const proofs = evidence.proofPaths ?? [];
++  if (proofs.length === 0) { if (traceBundlePath !== null && traceHasProof) items.push({ item: "approval-proofs", status: "carried", code: null, bundlePath: traceBundlePath }); else gap("approval-proofs", "NOT-REFERENCED"); }
++  for (const entry of proofs) {
++    if (!exact(entry, ["kind", "path"]) || !/^[a-z-]{1,40}$/u.test(entry.kind)) fail("AB-EVIDENCE-INPUT");
++    const file = readEvidenceFile(root, entry.path); const proof = file && jsonOrNull(file.bytes);
++    if (!exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || proof.schema !== PROOF_SCHEMA || !SHA.test(proof.intentSha256)) { gap(`approval-proofs:${entry.kind}`, "UNREADABLE"); continue; }
++    items.push({ item: `approval-proofs:${entry.kind}`, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.proof, entry.path, file.sha256) });
++  }
++  if (evidence.verifyRecordPath === undefined) gap("verify-record", "NOT-REFERENCED");
++  else {
++    const file = readEvidenceFile(root, evidence.verifyRecordPath); const record = file && jsonOrNull(file.bytes);
++    if (!record || record.schema !== "pipeline.verify-evidence.v0") gap("verify-record", "UNREADABLE");
++    else if (record.commit !== candidate.commit || record.tree !== candidate.tree || !sameCandidate(record.candidate, candidate)) gap("verify-record", "OTHER-CANDIDATE");
++    else if (verifyEvidenceSatisfiesBoundary(record, "release") !== true) gap("verify-record", "NOT-RELEASE-VERIFY");
++    else items.push({ item: "verify-record", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.verify, evidence.verifyRecordPath, file.sha256) });
++  }
++  if (evidence.securityScanPath === undefined) gap("security-scan", "NOT-REFERENCED");
++  else {
++    const file = readEvidenceFile(root, evidence.securityScanPath); const record = file && jsonOrNull(file.bytes);
++    if (!record || record.schema !== "pipeline.security-evidence.v0" || !Array.isArray(record.findings)) gap("security-scan", "UNREADABLE");
++    else if (!sameCandidate(record.candidate, candidate)) gap("security-scan", "OTHER-CANDIDATE");
++    else if (record.exitCode !== 0 || record.findings.length > 0) gap("security-scan", "NOT-PASSING");
++    else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
++  }
++  return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
++}
++
++/**
++ * `candidate` (optional) is the commit and tree the caller is auditing: when given it must equal the feature package's
++ * candidate exactly, so a bundle is never labelled with the parent of the commit it was asked to audit (Q3).
++ * `evidence` (optional) carries the approval trace, detached proofs, release Verify record and security scan; see `collectEvidence`.
++ */
++export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence } = {}) {
+   const root = resolve(repositoryRoot ?? ""); if (!BUNDLE_ID.test(bundleId ?? "")) fail("AB-BUNDLE-ID");
+   const packageCheck = validateFeaturePackage(root, manifestPath); if (!packageCheck.ok || !packageCheck.receipt?.candidate) fail("AB-PACKAGE");
++  if (candidate !== undefined && !(exact(candidate, ["commit", "tree"]) && OID.test(candidate.commit) && OID.test(candidate.tree) && candidate.commit === packageCheck.receipt.candidate.commit && candidate.tree === packageCheck.receipt.candidate.tree)) fail("AB-CANDIDATE-MISMATCH", "The audited candidate is not the feature package candidate.");
+   const policy = resolveEffectiveOrganizationPolicy({ coreVersion, packs });
+   const manifest = JSON.parse(readFileSync(join(root, packageCheck.receipt.manifest), "utf8"));
+   const artifacts = manifest.artifacts.map((entry, index) => ({ sourcePath: entry.path, bundlePath: `artifacts/${String(index + 1).padStart(3, "0")}-${entry.class}`, sha256: entry.sha256 }));
+   const exportMetadata = sanitizeExportEvidence(exportEvidence);
+-  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}) });
++  const carried = evidence === undefined ? null : collectEvidence(root, packageCheck.receipt.candidate, evidence, artifacts.length);
++  if (carried !== null) artifacts.push(...carried.artifacts);
++  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}) });
+ }
+ 
+ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
+@@ -83,7 +170,7 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
+   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
+   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
+-  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}) };
++  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}) };
+   const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
+   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
+   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
+@@ -93,12 +180,27 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
+ export function verifyAuditBundleSync({ bundleRoot } = {}) {
+   const root = resolve(bundleRoot ?? ""); let manifest;
+   try { manifest = parseStrictJson(readFileSync(join(root, "manifest.json"))); } catch { return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: "invalid", findings: Object.freeze(["AB-MANIFEST"]) }); }
+-  const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256");
+-  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
++  const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256"); const hasEvidence = Object.hasOwn(manifest, "evidence");
++  if (!exact(manifest, manifestKeys(manifest, hasReadme)) || (hasEvidence && !evidenceShape(manifest.evidence)) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
+   if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
+   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
++  if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
+   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
+ }
++function manifestKeys(manifest, hasReadme) { return ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", ...optionalKeys(manifest), ...(hasReadme ? ["readmeSha256"] : [])]; }
++// Q3: every carried evidence item must name an artifact the manifest lists, and the carried trace report must be bound to
++// the manifest's own candidate -- a bundle cannot present another commit's trace as its evidence.
++function evidenceFindings(root, manifest) {
++  const findings = []; const listed = new Set(Array.isArray(manifest.artifacts) ? manifest.artifacts.filter((entry) => entry !== null && typeof entry === "object").map((entry) => entry.path) : []);
++  for (const item of manifest.evidence.items) {
++    if (item.bundlePath !== null && !listed.has(item.bundlePath)) { findings.push(`AB-EVIDENCE-ITEM ${item.item}`); continue; }
++    if (item.item === "approval-trace" && item.bundlePath !== null) {
++      let report = null; try { report = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { report = null; }
++      if (report?.schema !== TRACE_SCHEMA || !sameCandidate(report.candidate, manifest.candidate ?? {}) || report.status !== manifest.evidence.traceStatus) findings.push("AB-EVIDENCE-TRACE-CANDIDATE");
++    }
++  }
++  return findings;
++}
+ 
+ export async function verifyAuditBundle(options = {}) { return verifyAuditBundleSync(options); }
+ 
+@@ -107,7 +209,7 @@ async function signatureRequest(bundleRoot) {
+   try { bytes = await readFile(join(root, "manifest.json")); manifest = parseStrictJson(bytes); } catch { fail("AB-SIGNATURE-MANIFEST"); }
+   const hasExport = hasExportMetadata(manifest);
+   const hasReadme = Object.hasOwn(manifest, "readmeSha256");
+-  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasReadme && !SHA.test(manifest.readmeSha256)) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
++  if (!exact(manifest, manifestKeys(manifest, hasReadme)) || (Object.hasOwn(manifest, "evidence") && !evidenceShape(manifest.evidence)) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasReadme && !SHA.test(manifest.readmeSha256)) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
+   return Object.freeze({ schema: "pipeline.audit-bundle-signature-request.v1", bundleId: manifest.bundleId, manifestSha256: digest(bytes), candidate: Object.freeze({ ...manifest.candidate }), effectivePolicySha256: manifest.effectivePolicySha256 });
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index c2513eb68..13bf1596c 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -8,6 +8,7 @@ import { join } from "node:path";
+ import test from "node:test";
+ import { buildAuditBundle, planAuditBundle, planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
+ import { canonicalSha256 } from "./governance-event.mjs";
++import { planVerifySelection } from "./verify-selection.mjs";
+ 
+ const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ // E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
+@@ -151,6 +152,64 @@ test("E-AC-20 leaves the plan and manifest unchanged when no export metadata is
+   const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+   assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "readmeSha256", "schema"]);
+ });
++// Q3 / AC-108: the bundle binds the audited candidate itself, carries the approval trace with its detached proofs, the
++// release Verify record and the security scan, and reports every missing item as a typed gap.
++const CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
++const SELECTION_POLICY = { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] };
++function evidenceFiles(root, { traceCandidate = CANDIDATE, traceStatus = "traced", verifyCandidate = CANDIDATE, verifyMode = "release", securityCandidate = CANDIDATE, securityFindings = [] } = {}) {
++  mkdirSync(join(root, "evidence"), { recursive: true });
++  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: "c".repeat(64), keyReference: "po-key-1", publicKey: "-----BEGIN PUBLIC KEY-----\nx\n-----END PUBLIC KEY-----\n", signatureBase64: "c2ln" };
++  const write = (name, value) => { writeFileSync(join(root, "evidence", name), `${JSON.stringify(value)}\n`); return `evidence/${name}`; };
++  const selection = planVerifySelection({ mode: verifyMode, candidateCommit: verifyCandidate.commit, registeredSuiteIds: ["test"], policy: SELECTION_POLICY });
++  return {
++    traceReportPath: write("trace.json", { schema: "pipeline.human-approval-trace.v1", candidate: traceCandidate, status: traceStatus, counts: {}, rows: [{ kind: "push", verdict: traceStatus, proof }], outOfCandidate: 0, notEnumerated: [] }),
++    proofPaths: [{ kind: "push", path: write("push-proof.json", proof) }],
++    verifyRecordPath: write("verify.json", { schema: "pipeline.verify-evidence.v0", ...verifyCandidate, candidate: verifyCandidate, exitCode: 0, selection }),
++    securityScanPath: write("security.json", { schema: "pipeline.security-evidence.v0", candidate: securityCandidate, findings: securityFindings, exitCode: 0 }),
++  };
++}
++const planWith = (input, extra) => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], ...extra });
++test("Q3 the bundle carries the trace, the detached proof, the release Verify record and the security scan, bound to the audited candidate", async () => {
++  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: evidenceFiles(input.root) });
++  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}`), ["approval-trace:carried", "approval-proofs:push:carried", "verify-record:carried", "security-scan:carried"]);
++  assert.ok(plan.evidence.items.every((entry) => entry.code === null)); assert.equal(plan.evidence.traceStatus, "traced");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
++  assert.equal(manifest.candidate.commit, CANDIDATE.commit); assert.equal(manifest.candidate.tree, CANDIDATE.tree);
++  assert.deepEqual(manifest.artifacts.slice(5).map((entry) => entry.path.replace(/^artifacts\/\d{3}-/u, "")), ["approval-trace", "approval-proof", "verify-record", "security-scan"]);
++  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /Human approval evidence/u);
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
++  writeFileSync(join(input.root, "bundle", manifest.artifacts[8].path), "tampered");
++  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
++});
++test("Q3 a missing item is a typed gap, never silently skipped", () => {
++  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: {} });
++  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
++  assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
++});
++test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
++  const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();
++  const plan = planWith(input, { evidence: { ...evidenceFiles(input.root, { traceCandidate: other, verifyCandidate: other, securityCandidate: other }) } });
++  assert.deepEqual(plan.evidence.items.filter((entry) => entry.status === "gap").map((entry) => `${entry.item}:${entry.code}`), ["approval-trace:OTHER-CANDIDATE", "verify-record:OTHER-CANDIDATE", "security-scan:OTHER-CANDIDATE"]);
++  const input2 = fixture(); const plan2 = planWith(input2, { evidence: evidenceFiles(input2.root, { verifyMode: "candidate", securityFindings: [{ id: "x" }] }) });
++  assert.deepEqual(plan2.evidence.items.filter((entry) => entry.status === "gap").map((entry) => `${entry.item}:${entry.code}`), ["verify-record:NOT-RELEASE-VERIFY", "security-scan:NOT-PASSING"]);
++});
++test("Q3 an untraceable or attribution-only trace is carried with its verdict named, not hidden", () => {
++  const input = fixture(); const plan = planWith(input, { evidence: evidenceFiles(input.root, { traceStatus: "untraceable" }) });
++  assert.equal(plan.evidence.traceStatus, "untraceable"); assert.equal(plan.evidence.items[0].code, "TRACE-UNTRACEABLE");
++  const input2 = fixture(); assert.equal(planWith(input2, { evidence: evidenceFiles(input2.root, { traceStatus: "attribution-only" }) }).evidence.items[0].code, "TRACE-ATTRIBUTION-ONLY");
++});
++test("Q3 the bundle binds the audited candidate, not its parent, and refuses a different candidate", () => {
++  const input = fixture(); assert.equal(planWith(input, { candidate: CANDIDATE }).candidate.commit, CANDIDATE.commit);
++  for (const wrong of [{ commit: "9".repeat(40), tree: CANDIDATE.tree }, { commit: CANDIDATE.commit, tree: "9".repeat(40) }, { commit: CANDIDATE.commit }]) assert.throws(() => planWith(input, { candidate: wrong }), (error) => error.code === "AB-CANDIDATE-MISMATCH");
++});
++test("Q3 verification rejects a carried trace that is bound to another commit than the manifest", async () => {
++  const input = fixture(); const plan = planWith(input, { evidence: evidenceFiles(input.root) }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  const bundle = join(input.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")); const tracePath = manifest.artifacts.find((entry) => entry.path.endsWith("approval-trace")).path;
++  const forged = Buffer.from(`${JSON.stringify({ schema: "pipeline.human-approval-trace.v1", candidate: { commit: "e".repeat(40), tree: "f".repeat(40) }, status: "traced", rows: [] })}\n`); writeFileSync(join(bundle, tracePath), forged);
++  manifest.artifacts = manifest.artifacts.map((entry) => entry.path === tracePath ? { ...entry, sha256: hash(forged) } : entry); writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`);
++  assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-EVIDENCE-TRACE-CANDIDATE"));
++});
+ // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
+ // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
+ // still builds and verifies, because nothing in the trust chain ever reads it.
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+index 63fc222a5..cd81eb6a2 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+@@ -25,7 +25,9 @@ function safePath(root, relative) {
+ }
+ function blocked(code, remedy) { return { schema: "pipeline.feature-close-audit-preflight.v1", status: "blocked", code, remedy, mutation: false, requiresAdditionalApproval: false }; }
+ 
+-export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath } = {}) {
++// Q3: `evidence` (optional) names the approval trace report, detached proofs, release Verify record and security scan the
++// bundle carries (see lib/audit-bundle.mjs); the bundle is always bound to the exact `candidate` asked for.
++export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath, evidence } = {}) {
+   if (!ID.test(featureId ?? "")) return blocked("FCA-FEATURE-ID", "Supply the exact active feature ID as one safe path component.");
+   if (!candidate || Object.keys(candidate).sort().join() !== "commit,tree" || !OID.test(candidate.commit ?? "") || !OID.test(candidate.tree ?? "") || candidate.commit === candidate.tree || /^0+$/u.test(candidate.commit) || /^0+$/u.test(candidate.tree)) return blocked("FCA-CANDIDATE", "Resolve the qualified source candidate commit and tree before planning its snapshot.");
+   if (!Array.isArray(packs) || packs.length === 0) return blocked("FCA-POLICY-REQUIRED", "Resolve the applicable organization policy packs and core version through the existing policy workflow; do not invent a policy to complete closure. The shipped core baseline pack can be named by id in the audit request: \"packs\":[\"pipeline-core-baseline\"] (docs/organization-policy-packs.md).");
+@@ -68,7 +70,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+       return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
+     }
+     let bundlePlan;
+-    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs }); }
++    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}) }); }
+     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
+     const destination = outputPath ?? `audit-bundles/${featureId}/${candidate.commit}`;
+     const target = safePath(root, destination);
+@@ -86,11 +88,13 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+       safePath(root, `${destination}/README.md`);
+       const verification = await verifyAuditBundle({ bundleRoot: target });
+       const expectedArtifacts = bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
+-      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
++      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
+       status = "reuse-verified";
+       existingManifestSha256 = hash(bytes);
+     }
+-    return { schema: "pipeline.feature-close-audit-preflight.v1", status, ...binding, planSha256: canonicalSha256(binding), existingManifestSha256, mutation: false, requiresAdditionalApproval: false,
++    // Q3: when evidence was named, the summary the close reads names the human-approval trace verdict and every typed gap.
++    const humanApproval = bundlePlan.evidence ? { traceStatus: bundlePlan.evidence.traceStatus, gaps: bundlePlan.evidence.items.filter((item) => item.status === "gap" || item.code !== null).map((item) => `${item.item}:${item.code}`) } : null;
++    return { schema: "pipeline.feature-close-audit-preflight.v1", status, ...binding, planSha256: canonicalSha256(binding), existingManifestSha256, ...(humanApproval ? { humanApproval } : {}), mutation: false, requiresAdditionalApproval: false,
+       assurance: "candidate-bound-local-snapshot-not-closure-or-backup", nextStep: status === "build-required" ? "Revalidate this plan, create missing destination parents safely, build create-only with bundlePlan, then verify before close." : "Revalidate the exact bundle and source bindings before the existing governed close transition." };
+   } catch (error) { return blocked(error.message?.startsWith("FCA-") ? error.message : "FCA-INPUT-UNAVAILABLE", "Inspect missing, malformed or unsafe package/output inputs; preserve existing files and re-plan without writes."); }
+ }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 528a482b7..f446e7545 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -78,6 +78,18 @@ function auditPackRequest(args, root) {
+   } catch { return null; }
+ }
+ 
++function humanApprovalTraceArgs(args, root) {
++  if (args[0] !== "--repo" || args[1] !== root || args.length % 2 !== 0) return false;
++  const seen = new Set();
++  for (let index = 2; index < args.length; index += 2) {
++    const flag = args[index], value = args[index + 1];
++    if (seen.has(flag)) return false;
++    seen.add(flag);
++    if (flag === "--commit" ? !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value) : flag === "--format" ? !["table", "json"].includes(value) : true) return false;
++  }
++  return true;
++}
++
+ // C19 F2b: the closed analysis-run shape -- `--root` (`.` or the exact root), then optionally one
+ // `--commit` (HEAD or a 7-40 char lowercase hex sha) and one `--timeout-seconds` (1..1800, digits only), any order.
+ function sanctionedAnalysisRunArgs(args, root) {
+@@ -501,6 +513,9 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   // The source CLI returns its static usage before parsing or reading signing state.
+   if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
+   if (script === AUDIT_PACK_SCRIPT) return ["plan", "verify"].includes(auditPackRequest(args, root)?.verb);
++  // Q3: the read-only human-approval trace. One closed shape -- `--repo <this root>` plus optional `--commit <full oid>` and
++  // `--format table|json`, each at most once. `--out` (the only write the script has) is deliberately not admitted here.
++  if (script === HUMAN_APPROVAL_TRACE_SCRIPT) return humanApprovalTraceArgs(args, root);
+   if (script === ANALYSIS_RUN_SCRIPT) return sanctionedAnalysisRunArgs(args, root);
+   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 6a13f0e59..5b76a8fcf 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -32,6 +32,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
+ // which is out of scope for this file.
+ export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
+ export const AUDIT_PACK_SCRIPT = fileURLToPath(new URL("../../scripts/audit-pack.mjs", import.meta.url));
++export const HUMAN_APPROVAL_TRACE_SCRIPT = fileURLToPath(new URL("../../scripts/human-approval-trace.mjs", import.meta.url));
+ export const ANALYSIS_RUN_SCRIPT = fileURLToPath(new URL("../../scripts/analysis-run.mjs", import.meta.url));
+ 
+ export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+diff --git a/plugins/pipeline-core/lib/human-approval-trace.mjs b/plugins/pipeline-core/lib/human-approval-trace.mjs
+new file mode 100644
+index 000000000..7599dd658
+--- /dev/null
++++ b/plugins/pipeline-core/lib/human-approval-trace.mjs
+@@ -0,0 +1,200 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Read-only trace of every human approval a gate consumed back to the human's detached proof (Q3, AC-108).
++ *
++ * For a candidate commit it enumerates the approval records the gates consume (private push and
++ * feature-package-reconcile approvals, legacy tracked-state approvals, deploy approvals, the plan approval and its
++ * design approval, human guard override capabilities) and gives each a typed verdict:
++ *   - `traced`           the record names this candidate, a detached Ed25519 proof exists whose signed digest equals
++ *                        the intent rebuilt from the record, the proof verifies against the project's committed trust
++ *                        anchors, the signing key is a registered human key (committed anchor or this machine's
++ *                        operator key), and the proof was consumed exactly once (replay journal);
++ *   - `attribution-only` a chat-mode approval: an attribution record, never proof (the repository already labels it so);
++ *   - `untraceable`      the exact break is named in `break`.
++ * The trace never signs, never consumes a proof and never writes: the pin and the consumption marker belong to the
++ * write half (`critical-action-authorization.mjs`), and only that module's pure readers are used here.
++ */
++import { createHash } from "node:crypto";
++import { lstatSync, readFileSync, readdirSync } from "node:fs";
++import { join, resolve } from "node:path";
++import { spawnSync } from "node:child_process";
++import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
++import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readPrivateCriticalConsumption, resolveCriticalApprovalCommonDir } from "./critical-action-authorization.mjs";
++import { canonical, criticalActionAuthority, object, SHA256, trustAnchorsFor, validCandidate } from "./critical-action-authorization-read.mjs";
++import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
++import { createPoApprovalIntent } from "./po-approval-proof.mjs";
++import { resolveLocalOperatorKeyAnchor } from "./po-human-approval-read.mjs";
++
++export const HUMAN_APPROVAL_TRACE_SCHEMA = "pipeline.human-approval-trace.v1";
++export const TRACE_VERDICTS = Object.freeze(["traced", "attribution-only", "untraceable"]);
++/** What this trace does not enumerate; named in every result so a gap is never silent. */
++export const TRACE_NOT_ENUMERATED = Object.freeze(["publication", "release-preflight", "briefed-test-authorization"]);
++const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
++const MAX_RECORDS = 256;
++
++const proofDigest = (proof) => createHash("sha256").update(canonical(proof)).digest("hex");
++const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
++const isChat = (record) => (object(record?.criticalProofWaiver) && /chat/u.test(String(record.criticalProofWaiver.mode ?? "chat")))
++  || (object(record?.humanApproval) && /chat/u.test(String(record.humanApproval.mode ?? "")));
++
++function readTraceState(root) {
++  for (const path of ["project/pipeline-state.json", ".claude/pipeline-state.json"]) {
++    const value = readJson(join(root, path));
++    if (object(value)) return value;
++  }
++  return {};
++}
++
++function gitCandidate(root) {
++  const run = (args) => { const out = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000, shell: false }); return out.status === 0 ? out.stdout.trim() : null; };
++  const commit = run(["rev-parse", "HEAD"]); const tree = run(["rev-parse", "HEAD^{tree}"]);
++  return commit && tree ? { commit, tree } : null;
++}
++
++function storeEnvelopes(common, kind) {
++  const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); const found = [];
++  let names = [];
++  try { names = readdirSync(directory).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().slice(0, MAX_RECORDS); } catch { return found; }
++  for (const name of names) {
++    const envelope = readJson(join(directory, name));
++    if (object(envelope) && envelope.schema === CRITICAL_APPROVAL_STORE_SCHEMA && envelope.kind === kind && object(envelope.approval)) found.push({ source: `private-store:${kind}/${name}`, kind, approval: envelope.approval });
++  }
++  return found;
++}
++
++function boundFileDigest(root, path) {
++  try {
++    if (typeof path !== "string" || path === "" || path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
++    const target = join(root, path); if (!lstatSync(target).isFile()) return null;
++    return createHash("sha256").update(readFileSync(target)).digest("hex");
++  } catch { return null; }
++}
++
++/** One signed record -> `null` (traced) or the first break, plus the signer. The same rebuild `verifySignedAction` performs, without its write hooks. */
++function chainBreak({ kind, recorded, candidate, subject, state, root, trust, localAnchor }) {
++  if (!object(recorded) || !object(recorded.proof) || !object(recorded.action) || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) return { code: "RECORD-INCOMPLETE" };
++  if (recorded.action.kind !== kind) return { code: "KIND" };
++  if (subject !== undefined) {
++    let expected;
++    try { expected = criticalActionSubjectSha256({ kind, candidate: { commit: candidate.commit, tree: candidate.tree }, subject }); } catch { return { code: "RECORD-INCOMPLETE" }; }
++    if (recorded.action.subjectSha256 !== expected) return { code: "SUBJECT-MISMATCH" };
++  }
++  const authority = criticalActionAuthority({ state, kind, candidate, projectDir: root });
++  let intent;
++  try {
++    intent = createPoApprovalIntent({ kind: "critical-action", featureId: authority.featureId, planSha256: authority.planSha256, specSha256: authority.specSha256,
++      candidate: { commit: candidate.commit, tree: candidate.tree }, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(recorded.action), decision: "approved" });
++  } catch { return { code: "STATE-AUTHORITY" }; }
++  if (intent.sha256 !== recorded.intentSha256) return { code: "INTENT-MISMATCH" };
++  return verifyProofAndKey({ intent, proof: recorded.proof, proofSha256: recorded.proofSha256, trust, localAnchor });
++}
++
++function verifyProofAndKey({ intent, proof, proofSha256, trust, localAnchor }) {
++  const verified = verifyAgainstTrustAnchors({ intent, anchors: trust.anchors, proof });
++  if (!verified.verified) return { code: verified.code === "PO-APPROVAL-TRUST-MISMATCH" ? "TRUST-MISMATCH" : verified.code === "PO-APPROVAL-PROOF-MISMATCH" ? "SIGNATURE-MISMATCH" : "PROOF-INVALID" };
++  if (verified.proofSha256 !== proofSha256 || proofDigest(proof) !== proofSha256) return { code: "DIGEST-MISMATCH" };
++  const key = verified.signer.publicKeySha256;
++  const registered = trust.anchors.some((anchor) => anchor.publicKeySha256 === key) || localAnchor?.publicKeySha256 === key;
++  return registered ? { code: null, signer: verified.signer } : { code: "KEY-NOT-REGISTERED", signer: verified.signer };
++}
++
++function baseRow({ kind, source, approval, mode }) {
++  return { kind, source, mode, forCommit: approval?.forCommit ?? null, approvedAt: approval?.approvedAt ?? approval?.grantedAt ?? null, by: approval?.approvedBy ?? null,
++    intentSha256: null, proofSha256: null, keyReference: null, publicKeySha256: null, proof: null, verdict: "untraceable", break: null };
++}
++
++/**
++ * @param {{repositoryRoot: string, candidate?: {commit: string, tree: string}, state?: object, machinePlaneDeps?: object, gitCommonDir?: string}} input
++ */
++export function traceHumanApprovals({ repositoryRoot, candidate, state, machinePlaneDeps = {}, gitCommonDir } = {}) {
++  const root = resolve(repositoryRoot ?? "");
++  const audited = candidate ?? gitCandidate(root);
++  if (!validCandidate(audited)) { const error = new Error("The audited candidate is not a valid commit and tree."); error.code = "HAT-CANDIDATE"; throw error; }
++  const tracked = object(state) ? state : readTraceState(root);
++  const common = gitCommonDir ?? resolveCriticalApprovalCommonDir(root);
++  const trust = trustAnchorsFor(root, "TRACE");
++  const localAnchor = resolveLocalOperatorKeyAnchor(machinePlaneDeps);
++  const consumed = new Set([...(common ? readPrivateCriticalConsumption(common) : []), ...(Array.isArray(tracked.criticalProofConsumption) ? tracked.criticalProofConsumption.filter(object) : [])].map((entry) => `${entry.kind}:${entry.proofSha256}`));
++
++  const records = [];
++  if (common) for (const kind of STORE_KINDS) records.push(...storeEnvelopes(common, kind));
++  const privateKeys = new Set(records.map((entry) => `${entry.kind}:${entry.approval.forCommit}:${entry.approval.approvedAt}`));
++  for (const [kind, slot] of [["push", "pushApproval"], ["feature-package-reconcile", "featurePackageReconcileApproval"]]) {
++    const legacy = tracked[slot]?.lastApproved;
++    if (object(legacy) && !privateKeys.has(`${kind}:${legacy.forCommit}:${legacy.approvedAt}`)) records.push({ source: `tracked-state:${slot}`, kind, approval: legacy });
++  }
++  const seen = new Map();
++  for (const entry of records) { const digest = entry.approval.criticalProof?.proofSha256; if (typeof digest === "string") seen.set(digest, (seen.get(digest) ?? 0) + 1); }
++
++  const rows = []; let outOfCandidate = 0;
++  for (const entry of records) {
++    const approval = entry.approval;
++    if (approval.forCommit !== audited.commit) { outOfCandidate += 1; continue; }
++    const recorded = approval.criticalProof;
++    if (recorded === null || recorded === undefined) {
++      const row = baseRow({ kind: entry.kind, source: entry.source, approval, mode: isChat(approval) ? "chat" : "none" });
++      if (isChat(approval)) rows.push({ ...row, verdict: "attribution-only" }); else rows.push({ ...row, break: "PROOF-MISSING" });
++      continue;
++    }
++    const row = { ...baseRow({ kind: entry.kind, source: entry.source, approval, mode: "signature" }), intentSha256: recorded.intentSha256 ?? null, proofSha256: recorded.proofSha256 ?? null, proof: object(recorded.proof) ? recorded.proof : null };
++    let outcome;
++    if (!trust.ok) outcome = { code: trust.code };
++    else {
++      const subject = entry.kind === "push" ? { sourceCommit: audited.commit, remote: approval.remote, destination: approval.destination, threatModel: { path: approval.threatModel?.path, sha256: approval.threatModel?.sha256 } } : undefined;
++      outcome = entry.kind === "push" && (boundFileDigest(root, approval.threatModel?.path) !== approval.threatModel?.sha256) ? { code: "THREAT-MODEL" }
++        : chainBreak({ kind: entry.kind, recorded, candidate: audited, subject, state: tracked, root, trust, localAnchor });
++      if (outcome.code === null && (seen.get(recorded.proofSha256) ?? 0) > 1) outcome = { ...outcome, code: "REPLAYED" };
++      if (outcome.code === null && !consumed.has(`${entry.kind}:${recorded.proofSha256}`)) outcome = { ...outcome, code: "NOT-CONSUMED" };
++    }
++    rows.push({ ...row, keyReference: outcome.signer?.keyReference ?? null, publicKeySha256: outcome.signer?.publicKeySha256 ?? null, verdict: outcome.code === null ? "traced" : "untraceable", break: outcome.code });
++  }
++
++  for (const [index, entry] of (Array.isArray(tracked.deployApprovals) ? tracked.deployApprovals.filter(object).slice(0, MAX_RECORDS) : []).entries()) {
++    const recorded = entry.criticalProof; const row = { ...baseRow({ kind: "deploy", source: `tracked-state:deployApprovals[${index}]`, approval: entry, mode: "signature" }), intentSha256: recorded?.intentSha256 ?? null, proofSha256: recorded?.proofSha256 ?? null, proof: object(recorded?.proof) ? recorded.proof : null };
++    const outcome = !trust.ok ? { code: trust.code } : chainBreak({ kind: "deploy", recorded, candidate: audited, subject: { artifact: entry.forArtifact, environment: entry.forEnvironment }, state: tracked, root, trust, localAnchor });
++    rows.push({ ...row, keyReference: outcome.signer?.keyReference ?? null, publicKeySha256: outcome.signer?.publicKeySha256 ?? null, verdict: outcome.code === null ? "traced" : "untraceable", break: outcome.code });
++  }
++
++  const plan = tracked.planApproval;
++  if (tracked.planApproved === true && object(plan)) {
++    const design = plan.designApproval; const row = baseRow({ kind: "plan-approval", source: "tracked-state:planApproval", approval: plan, mode: "chat" });
++    if (object(design) && design.mode === "signature") {
++      const proof = design.proof;
++      const intent = { sha256: design.intentSha256 };
++      const outcome = !trust.ok ? { code: trust.code } : !object(proof) || !SHA256.test(design.proofSha256 ?? "") || !SHA256.test(design.intentSha256 ?? "") ? { code: "RECORD-INCOMPLETE" }
++        : verifyProofAndKey({ intent, proof, proofSha256: design.proofSha256, trust, localAnchor });
++      // The design intent's content is only rebuildable from the scratch approval request inside pipeline-state.mjs
++      // (observeDesignApprovalRequest), which this read-only trace does not import: the signature, the key and the
++      // digest are proven, the link from the intent to the plan binding is reported as the exact break.
++      rows.push({ ...row, mode: "signature", intentSha256: design.intentSha256 ?? null, proofSha256: design.proofSha256 ?? null, proof: object(proof) ? proof : null, keyReference: outcome.signer?.keyReference ?? null, publicKeySha256: outcome.signer?.publicKeySha256 ?? null, verdict: "untraceable", break: outcome.code ?? "DESIGN-INTENT-NOT-RECONSTRUCTIBLE" });
++    } else if (object(design) && design.mode === "chat") rows.push({ ...row, verdict: "attribution-only" });
++    else if (String(plan.by ?? plan.approvedBy ?? "").startsWith("verified:")) rows.push({ ...row, mode: "signature", break: "PLAN-PROOF-NOT-RETAINED" });
++    else rows.push({ ...row, verdict: "attribution-only" });
++  }
++
++  if (common) {
++    const directory = join(common, "agent-pipeline", "human-guard-overrides", "capabilities"); let names = [];
++    try { names = readdirSync(directory).filter((name) => name.endsWith(".json")).sort().slice(0, MAX_RECORDS); } catch { names = []; }
++    for (const name of names) {
++      const capability = readJson(join(directory, name)); const mode = capability?.humanApproval?.mode;
++      if (!object(capability) || typeof mode !== "string") continue;
++      const row = { ...baseRow({ kind: "human-guard-override", source: `override-capability:${name}`, approval: { approvedAt: capability.authorizedAt }, mode }), forCommit: capability.signedCandidate?.commit ?? null };
++      if (mode === "chat-attributed-unattested") rows.push({ ...row, verdict: "attribution-only" });
++      else rows.push({ ...row, break: "PROOF-NOT-RETAINED-IN-CAPABILITY" });
++    }
++  }
++
++  if (rows.length === 0) rows.push({ ...baseRow({ kind: "none", source: "none", approval: null, mode: "none" }), break: "NO-APPROVAL-RECORD" });
++  const counts = Object.fromEntries(TRACE_VERDICTS.map((verdict) => [verdict, rows.filter((row) => row.verdict === verdict).length]));
++  const status = counts.untraceable > 0 ? "untraceable" : counts["attribution-only"] > 0 ? "attribution-only" : "traced";
++  return { schema: HUMAN_APPROVAL_TRACE_SCHEMA, candidate: { commit: audited.commit, tree: audited.tree }, status, counts, rows, outOfCandidate, notEnumerated: [...TRACE_NOT_ENUMERATED] };
++}
++
++/** A fixed-width table plus the typed verdict, for the operator command. */
++export function formatHumanApprovalTrace(result) {
++  const cell = (value, width) => String(value ?? "-").slice(0, width).padEnd(width);
++  const lines = [`candidate ${result.candidate.commit}`, `${cell("kind", 22)} ${cell("verdict", 16)} ${cell("mode", 10)} ${cell("key", 18)} break`];
++  for (const row of result.rows) lines.push(`${cell(row.kind, 22)} ${cell(row.verdict, 16)} ${cell(row.mode, 10)} ${cell(row.keyReference, 18)} ${row.break ?? "-"}`);
++  lines.push(`not enumerated: ${result.notEnumerated.join(", ")}`, `verdict: ${result.status}`);
++  return `${lines.join("\n")}\n`;
++}
+diff --git a/plugins/pipeline-core/lib/human-approval-trace.test.mjs b/plugins/pipeline-core/lib/human-approval-trace.test.mjs
+new file mode 100644
+index 000000000..25e0ac4d3
+--- /dev/null
++++ b/plugins/pipeline-core/lib/human-approval-trace.test.mjs
+@@ -0,0 +1,141 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Q3 / AC-108: every human approval a gate consumed must be provable back to the human. These cases build a
++ * REAL git repository, a REAL Ed25519 key pair and the exact record chain `approve-push` writes (subject ->
++ * action -> intent -> detached proof -> private store entry plus consumption marker), then ask the read-only
++ * trace for its verdict. Nothing is stubbed except the machine plane's home directory.
++ */
++import assert from "node:assert/strict";
++import { createHash, generateKeyPairSync, sign } from "node:crypto";
++import { execFileSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
++import { writeCriticalApproval } from "./critical-action-authorization.mjs";
++import { createPoApprovalIntent } from "./po-approval-proof.mjs";
++import { HUMAN_APPROVAL_TRACE_SCHEMA, traceHumanApprovals } from "./human-approval-trace.mjs";
++
++const roots = [];
++const NOW = "2026-11-04T10:00:00.000Z";
++const EXPIRES = "2026-11-05T10:00:00.000Z";
++const PLAN_SHA = "c".repeat(64);
++const SPEC_SHA = "d".repeat(64);
++const THREAT_PATH = "specs/demo/threat-model.md";
++const THREAT_BODY = "# threat model\n";
++const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
++const git = (root, ...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
++
++function keypair() {
++  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
++  const publicPem = publicKey.export({ type: "spki", format: "pem" }).toString();
++  return { publicPem, privateKey, publicKeySha256: createHash("sha256").update(publicPem).digest("hex") };
++}
++
++/** A git repository whose committed policy registers `anchors`, plus the threat-model file the push subject binds. */
++function repository({ anchors }) {
++  const root = mkdtempSync(join(tmpdir(), "approval-trace-")); roots.push(root);
++  git(root, "init", "-q"); git(root, "config", "user.email", "t@example.invalid"); git(root, "config", "user.name", "t");
++  mkdirSync(join(root, "project"), { recursive: true }); mkdirSync(join(root, "specs", "demo"), { recursive: true });
++  writeFileSync(join(root, THREAT_PATH), THREAT_BODY);
++  writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: anchors }, null, 2)}\n`);
++  git(root, "add", "-A"); git(root, "commit", "-q", "-m", "fixture");
++  const candidate = { commit: git(root, "rev-parse", "HEAD"), tree: git(root, "rev-parse", "HEAD^{tree}") };
++  return { root, candidate, common: join(root, ".git") };
++}
++
++/** The chain approve-push writes. `signedFor` lets a case sign an intent for another candidate than the one recorded. */
++function pushApproval({ key, candidate, signedFor = candidate, keyReference = "po-key-1" }) {
++  const threatModel = { path: THREAT_PATH, sha256: createHash("sha256").update(THREAT_BODY).digest("hex") };
++  const action = { kind: "push", subjectSha256: criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, remote: "origin", destination: "refs/heads/main", threatModel } }), expiresAt: EXPIRES };
++  const intent = createPoApprovalIntent({ kind: "critical-action", featureId: "demo-feature", planSha256: PLAN_SHA, specSha256: SPEC_SHA, candidate: signedFor, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved" });
++  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: intent.sha256, keyReference, publicKey: key.publicPem, signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64") };
++  return { approvedBy: "Human", approvedAt: NOW, forCommit: candidate.commit, remote: "origin", destination: "refs/heads/main", threatModel,
++    criticalProof: { proofSha256: createHash("sha256").update(canonical(proof)).digest("hex"), intentSha256: intent.sha256, action, proof } };
++}
++const stateFor = () => ({ activeFeature: { id: "demo-feature" }, planApproval: { poGateAuthority: { planSha256: PLAN_SHA, specSha256: SPEC_SHA } } });
++const trace = (repo, extra = {}) => traceHumanApprovals({ repositoryRoot: repo.root, candidate: repo.candidate, state: stateFor(), ...extra });
++const row = (result, kind = "push") => result.rows.find((entry) => entry.kind === kind);
++
++test("a complete push chain is traced from the record to the registered human key", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  assert.equal(writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key, candidate: repo.candidate }) }).ok, true);
++  const result = trace(repo);
++  assert.equal(result.schema, HUMAN_APPROVAL_TRACE_SCHEMA);
++  assert.equal(result.status, "traced"); assert.equal(row(result).verdict, "traced"); assert.equal(row(result).break, null);
++  assert.equal(row(result).publicKeySha256, key.publicKeySha256);
++});
++
++test("a push approval that carries neither a proof nor an attribution is untraceable and names the break", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  const approval = { ...pushApproval({ key, candidate: repo.candidate }), criticalProof: null };
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval });
++  const result = trace(repo);
++  assert.equal(result.status, "untraceable"); assert.equal(row(result).verdict, "untraceable"); assert.equal(row(result).break, "PROOF-MISSING");
++});
++
++test("a proof signed for another candidate does not trace to this candidate", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key, candidate: repo.candidate, signedFor: { commit: "e".repeat(40), tree: "f".repeat(40) } }) });
++  const result = trace(repo);
++  assert.equal(result.status, "untraceable"); assert.equal(row(result).break, "INTENT-MISMATCH");
++});
++
++test("a key that is not in the registered set is untraceable", () => {
++  const registered = keypair(); const stranger = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: registered.publicKeySha256 }] });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key: stranger, candidate: repo.candidate }) });
++  const result = trace(repo);
++  assert.equal(result.status, "untraceable"); assert.equal(row(result).break, "TRUST-MISMATCH");
++});
++
++test("an open (empty) anchor set only traces a key that is this machine's registered operator key", () => {
++  const key = keypair(); const repo = repository({ anchors: [] });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key, candidate: repo.candidate }) });
++  const home = mkdtempSync(join(tmpdir(), "machine-home-")); roots.push(home); const keyDirectory = mkdtempSync(join(tmpdir(), "po-key-dir-")); roots.push(keyDirectory);
++  const unregistered = trace(repo, { machinePlaneDeps: { homedirFn: () => home } });
++  assert.equal(row(unregistered).break, "KEY-NOT-REGISTERED");
++  writeFileSync(join(keyDirectory, "trust-policy.json"), JSON.stringify({ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }));
++  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({ schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDirectory, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: NOW }));
++  assert.equal(trace(repo, { machinePlaneDeps: { homedirFn: () => home } }).status, "traced");
++});
++
++test("a proof that was consumed twice is a replay", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  const approval = pushApproval({ key, candidate: repo.candidate });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval });
++  const directory = join(repo.common, "agent-pipeline", "critical-approvals", "approvals", "push");
++  const [first] = readdirSync(directory);
++  writeFileSync(join(directory, "9999999999999999-copy.json"), readFileSync(join(directory, first)));
++  const result = trace(repo);
++  assert.equal(result.status, "untraceable"); assert.ok(result.rows.some((entry) => entry.break === "REPLAYED"));
++});
++
++test("an approval whose proof was never consumed is untraceable", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key, candidate: repo.candidate }) });
++  rmSync(join(repo.common, "agent-pipeline", "critical-approvals", "consumed"), { recursive: true });
++  assert.equal(row(trace(repo)).break, "NOT-CONSUMED");
++});
++
++test("a chat-mode approval is labelled attribution-only and never as proof", () => {
++  const key = keypair(); const repo = repository({ anchors: [] });
++  const approval = { ...pushApproval({ key, candidate: repo.candidate }), criticalProof: null, criticalProofWaiver: { kind: "push", mode: "chat-attributed-unattested", source: "pipeline.user.yaml" }, humanApproval: { kind: "push", mode: "chat-attributed-unattested" } };
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval });
++  const result = trace(repo);
++  assert.equal(result.status, "attribution-only"); assert.equal(row(result).verdict, "attribution-only"); assert.equal(row(result).proofSha256, null);
++});
++
++test("a candidate with no approval record at all is untraceable, not silently clean", () => {
++  const repo = repository({ anchors: [] });
++  const result = trace(repo);
++  assert.equal(result.status, "untraceable"); assert.equal(result.rows[0].break, "NO-APPROVAL-RECORD");
++});
++
++test("the trace only reads: the private store is byte-identical afterwards", () => {
++  const key = keypair(); const repo = repository({ anchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
++  writeCriticalApproval({ gitCommonDir: repo.common, kind: "push", approval: pushApproval({ key, candidate: repo.candidate }) });
++  const listing = () => git(repo.root, "status", "--porcelain", "--ignored") + readdirSync(join(repo.common, "agent-pipeline", "critical-approvals", "consumed")).join();
++  const before = listing(); trace(repo); assert.equal(listing(), before);
++});
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index b0523a738..190286f86 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -279,7 +279,9 @@ function action(command, values, planSha256) {
+ 
+ function auditRequest(root, path) {
+   const request = readJsonFile(root, path, "feature-close audit request");
+-  const expected = ["schema", "manifestPath", "coreVersion", "packs", "criticVerifyLifecycleId"].sort().join("\0");
++  // Q3: `evidence` is optional -- the approval trace report, detached proofs, release Verify record and security scan the audit bundle carries.
++  const keys = ["schema", "manifestPath", "coreVersion", "packs", "criticVerifyLifecycleId"];
++  const expected = (Object.hasOwn(request.value, "evidence") ? [...keys, "evidence"] : keys).sort().join("\0");
+   if (request.value.schema !== "pipeline.feature-close-audit-request.v1"
+     || Object.keys(request.value).sort().join("\0") !== expected
+     || !SAFE_RELATIVE.test(request.value.manifestPath ?? "")
+@@ -731,6 +733,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+         manifestPath: request.value.manifestPath,
+         coreVersion: request.value.coreVersion,
+         packs: request.value.packs,
++        ...(request.value.evidence !== undefined ? { evidence: request.value.evidence } : {}),
+       };
+       const auditPlan = await planFeatureCloseAudit(options);
+       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+diff --git a/plugins/pipeline-core/scripts/human-approval-trace.mjs b/plugins/pipeline-core/scripts/human-approval-trace.mjs
+new file mode 100644
+index 000000000..ef54450a8
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/human-approval-trace.mjs
+@@ -0,0 +1,59 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Read-only operator command: trace every human approval a gate consumed for a candidate commit back to the human's
++ * detached proof (Q3, AC-108). Prints a table and a typed verdict (`traced`, `attribution-only`, `untraceable`).
++ *   node human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json] [--out <repo-relative path>]
++ * Exit 0 for `traced` and `attribution-only`, 1 for `untraceable`, 2 for a command error. `--out` writes the JSON report
++ * create-only inside the repository (for the audit bundle to carry); nothing else is ever written.
++ */
++import { spawnSync } from "node:child_process";
++import { closeSync, mkdirSync, openSync, realpathSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
++import { pathToFileURL } from "node:url";
++import { canonicalizeJson } from "../lib/governance-event.mjs";
++import { formatHumanApprovalTrace, traceHumanApprovals } from "../lib/human-approval-trace.mjs";
++
++function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
++function parse(argv) {
++  if (argv.length % 2 !== 0) fail("HAT-ARGUMENT", "Usage: human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json] [--out <path>]");
++  const flags = new Map();
++  for (let index = 0; index < argv.length; index += 2) {
++    const key = argv[index]; const value = argv[index + 1];
++    if (!["--repo", "--commit", "--format", "--out"].includes(key) || flags.has(key) || value === undefined || value.startsWith("--")) fail("HAT-ARGUMENT", "Human approval trace arguments are invalid.");
++    flags.set(key, value);
++  }
++  if (!flags.has("--repo")) fail("HAT-ARGUMENT", "--repo is required.");
++  const format = flags.get("--format") ?? "table";
++  if (!["table", "json"].includes(format)) fail("HAT-ARGUMENT", "--format must be table or json.");
++  return { repo: flags.get("--repo"), commit: flags.get("--commit") ?? null, format, out: flags.get("--out") ?? null };
++}
++function git(root, args) { const out = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000, shell: false }); return out.status === 0 ? out.stdout.trim() : null; }
++function reportPath(root, out) {
++  if (isAbsolute(out) || out.includes("\\") || out.split("/").some((part) => part === "" || part === "." || part === "..")) fail("HAT-OUT", "--out must be a plain repository-relative path.");
++  const target = resolve(root, out); const rel = relative(root, target);
++  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("HAT-OUT", "--out must stay inside the repository.");
++  return target;
++}
++
++export function main(argv = process.argv.slice(2), deps = {}) {
++  const options = parse(argv); const root = realpathSync(resolve(options.repo));
++  let candidate;
++  if (options.commit !== null) {
++    const commit = /^[a-f0-9]{40,64}$/u.test(options.commit) ? git(root, ["rev-parse", "--verify", `${options.commit}^{commit}`]) : null;
++    const tree = commit === null ? null : git(root, ["rev-parse", `${commit}^{tree}`]);
++    if (commit === null || tree === null) fail("HAT-CANDIDATE", "--commit must name a commit of this repository by its full object id.");
++    candidate = { commit, tree };
++  }
++  const result = (deps.trace ?? traceHumanApprovals)({ repositoryRoot: root, ...(candidate ? { candidate } : {}), ...(deps.machinePlaneDeps ? { machinePlaneDeps: deps.machinePlaneDeps } : {}) });
++  if (options.out !== null) {
++    const target = reportPath(root, options.out); mkdirSync(dirname(target), { recursive: true });
++    const fd = openSync(target, "wx", 0o644); try { writeFileSync(fd, `${canonicalizeJson(result)}\n`); } finally { closeSync(fd); }
++  }
++  return { result, text: options.format === "json" ? `${JSON.stringify(result)}\n` : formatHumanApprovalTrace(result) };
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
++  try { const { result, text } = main(); process.stdout.write(text); if (result.status === "untraceable") process.exitCode = 1; }
++  catch (error) { process.stderr.write(`${error.code ?? "HAT-FAILED"}: ${error.message}\n`); process.exitCode = 2; }
++}
+diff --git a/plugins/pipeline-core/scripts/human-approval-trace.test.mjs b/plugins/pipeline-core/scripts/human-approval-trace.test.mjs
+new file mode 100644
+index 000000000..d7c6f4de7
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/human-approval-trace.test.mjs
+@@ -0,0 +1,54 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
++import { isSanctionedLifecycleCommand } from "../lib/guard/command-catalogue.mjs";
++
++const script = fileURLToPath(new URL("./human-approval-trace.mjs", import.meta.url));
++const git = (root, ...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
++function repository() {
++  const root = mkdtempSync(join(tmpdir(), "approval-trace-cli-"));
++  git(root, "init", "-q"); git(root, "config", "user.email", "t@example.invalid"); git(root, "config", "user.name", "t");
++  mkdirSync(join(root, "project"), { recursive: true });
++  writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [] })}\n`);
++  git(root, "add", "-A"); git(root, "commit", "-q", "-m", "fixture");
++  return { root, commit: git(root, "rev-parse", "HEAD") };
++}
++const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
++
++test("a candidate without any approval record is untraceable: the table names the break and the exit is 1", () => {
++  const { root, commit } = repository(); const result = run("--repo", root);
++  assert.equal(result.status, 1); assert.match(result.stdout, new RegExp(`candidate ${commit}`, "u")); assert.match(result.stdout, /NO-APPROVAL-RECORD/u); assert.match(result.stdout, /verdict: untraceable/u);
++});
++
++test("a chat-mode approval prints attribution-only and exits 0; the JSON form carries the typed verdict", () => {
++  const { root, commit } = repository();
++  const approval = { approvedBy: "Human", approvedAt: "2026-11-04T10:00:00.000Z", forCommit: commit, remote: "origin", destination: "refs/heads/main", threatModel: { path: "x.md", sha256: "a".repeat(64) }, criticalProof: null, criticalProofWaiver: { kind: "push", mode: "chat-attributed-unattested", source: "pipeline.user.yaml" } };
++  assert.equal(writeCriticalApproval({ gitCommonDir: join(root, ".git"), kind: "push", approval }).ok, true);
++  const table = run("--repo", root); assert.equal(table.status, 0); assert.match(table.stdout, /attribution-only/u); assert.match(table.stdout, /verdict: attribution-only/u);
++  const json = JSON.parse(run("--repo", root, "--format", "json", "--commit", commit).stdout); assert.equal(json.status, "attribution-only"); assert.equal(json.rows[0].proofSha256, null);
++});
++
++test("the report is written create-only inside the repository and never anywhere else", () => {
++  const { root } = repository();
++  assert.equal(run("--repo", root, "--out", "scratch/trace.json").status, 1); assert.ok(existsSync(join(root, "scratch", "trace.json")));
++  assert.equal(JSON.parse(readFileSync(join(root, "scratch", "trace.json"), "utf8")).schema, "pipeline.human-approval-trace.v1");
++  for (const bad of ["scratch/trace.json", "../escape.json", "/abs.json"]) { const again = run("--repo", root, "--out", bad); assert.equal(again.status, 2, bad); }
++});
++
++test("the guard admits exactly the read-only argv shapes and never the --out write", () => {
++  const { root, commit } = repository();
++  const admitted = (...args) => isSanctionedLifecycleCommand(`node ${script} ${args.join(" ")}`, root);
++  assert.equal(admitted("--repo", root), true); assert.equal(admitted("--repo", root, "--commit", commit, "--format", "json"), true);
++  for (const bad of [["--repo", root, "--out", "scratch/x.json"], ["--repo", `${root}-other`], ["--repo", root, "--format", "xml"], ["--repo", root, "--commit", "HEAD"], ["--repo", root, "--format", "json", "--format", "table"], ["--repo"]]) assert.equal(admitted(...bad), false, bad.join(" "));
++});
++
++test("bad arguments are a command error (2), not a verdict", () => {
++  const { root } = repository();
++  for (const args of [[], ["--repo"], ["--repo", root, "--format", "xml"], ["--repo", root, "--commit", "HEAD"], ["--repo", root, "--bogus", "x"]]) assert.equal(run(...args).status, 2, args.join(" "));
++});
