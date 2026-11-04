@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index 9b9bf4e9c..eebd0fc7d 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -180,6 +180,8 @@ export const READ_SCOPE_DENIAL_REMEDY = [
+   "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head / rg-to-tail pipeline is admitted when every read target resolves inside the project root.",
+   "Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal.",
+   "Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root.",
++  // Q2 (candidate 19): the refusal is intended; say so and name the one alternative that exists besides re-targeting.
++  "This refusal is intended, not a fault of the command: shell reads are kept inside the project root. For one exact file outside the root, the native Read tool with that file path is the alternative; it applies its own read-scope rules.",
+ ];
+ 
+ // NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index dd3c894ff..9097721d9 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -87,6 +87,16 @@ test("RCD11: the refusal names the glob value and the admitted forms, and still
+   assert.equal(isReadOnlyDiagnosticCommand(command, root), false);
+ });
+ 
++test("RCD12: the outside-root read refusal says it is intended and names the native Read alternative, and stays a refusal", async () => {
++  const command = "grep -n needle /etc/hostname";
++  assert.equal(isReadOnlyDiagnosticCommand(command, root), false, "fixture must be refused");
++  const result = await refusal(command);
++  assert.equal(result.exitCode, 2);
++  assert.match(String(result.stderr), /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  assert.match(String(result.stderr), /This refusal is intended, not a fault of the command/u);
++  assert.match(String(result.stderr), /native Read tool/u);
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
