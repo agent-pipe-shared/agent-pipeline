@@ -30,6 +30,8 @@ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import * as scanModule from "./security-scan.mjs";
 import { deriveSummaryVerdict, formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
@@ -2043,6 +2045,123 @@ assertEqual(
   assertIncludes("CLI: all scanners skipped does not report a clean scan", res.stdout, anyScannerRan ? "Verdict: PARTIAL (policy exit 0)" : "Verdict: INCOMPLETE (policy exit 0)");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");
   assertTrue("CLI: evidence file actually created", existsSync(join(rootDir, "evidence", "security-latest.json")), "no evidence file");
+}
+
+// ---- Local-only security subject (C19-D8, AC-108) -------------------------------------------------
+{
+  const noScannerManifest = `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`;
+  const makeRemoteFixture = (label, remotes) => {
+    const rootDir = makeRootDir(label);
+    writeManifest(rootDir, noScannerManifest);
+    writeFileSync(join(rootDir, "governed.txt"), "committed candidate bytes\n");
+    git(rootDir, "init", "-q");
+    git(rootDir, "config", "user.name", "Security Fixture");
+    git(rootDir, "config", "user.email", "security-fixture@example.invalid");
+    for (const name of remotes) git(rootDir, "remote", "add", name, `https://example.invalid/pipeline/${name}.git`);
+    git(rootDir, "add", "-A");
+    git(rootDir, "commit", "-qm", "security fixture");
+    return rootDir;
+  };
+
+  const localRoot = makeRemoteFixture("runner-local-only-root", []);
+  const local = await runSecurityScan({ rootDir: localRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: zero remotes and no remote name -> clean candidate typed local-only, no repository identity", {
+    exitCode: local.exitCode, status: local.evidence.candidate.status, destination: local.evidence.candidate.destination,
+    repositorySha256: local.evidence.candidate.repositorySha256, reason: local.evidence.candidate.reason,
+    verified: local.evidence.candidate.snapshot.verifiedBeforeAfter,
+  }, { exitCode: 0, status: "clean", destination: "local-only", repositorySha256: null, reason: null, verified: true });
+  assertTrue("local-only: evidence file is written", existsSync(join(localRoot, "evidence", "security-latest.json")), "no evidence file");
+
+  const remoteRoot = makeRemoteFixture("runner-remote-bound-root", ["origin"]);
+  const bound = await runSecurityScan({ rootDir: remoteRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: a remote-bound candidate carries destination remote and a repository identity", {
+    status: bound.evidence.candidate.status, destination: bound.evidence.candidate.destination,
+    hasIdentity: /^[0-9a-f]{64}$/u.test(bound.evidence.candidate.repositorySha256 ?? ""),
+  }, { status: "clean", destination: "remote", hasIdentity: true });
+
+  const ambiguousRoot = makeRemoteFixture("runner-two-remotes-root", ["origin", "mirror"]);
+  const ambiguous = await runSecurityScan({ rootDir: ambiguousRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: two remotes without a name stays unsupported remote-ambiguous", {
+    status: ambiguous.evidence.candidate.status, reason: ambiguous.evidence.candidate.reason,
+    destination: ambiguous.evidence.candidate.destination, repositorySha256: ambiguous.evidence.candidate.repositorySha256,
+  }, { status: "unsupported", reason: "remote-ambiguous", destination: "remote", repositorySha256: null });
+
+  const unknown = await runSecurityScan({ rootDir: localRoot, remoteName: "nowhere", env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: a given unknown remote name stays unsupported remote-not-configured even with zero remotes", {
+    status: unknown.evidence.candidate.status, reason: unknown.evidence.candidate.reason,
+    destination: unknown.evidence.candidate.destination,
+  }, { status: "unsupported", reason: "remote-not-configured", destination: "remote" });
+
+  const same = scanModule.sameCandidate;
+  assertTrue("local-only: sameCandidate is exported", typeof same === "function", String(same));
+  if (typeof same === "function") {
+    assertEqual("local-only: sameCandidate is false between a local-only and a remote-bound candidate", [
+      same({ ...local.evidence.candidate, repositorySha256: null }, { ...local.evidence.candidate, destination: "remote" }),
+      same(local.evidence.candidate, bound.evidence.candidate),
+    ], [false, false]);
+    assertEqual("local-only: sameCandidate holds between two identical local-only candidates", same(local.evidence.candidate, local.evidence.candidate), true);
+  }
+
+  {
+    // The push gate refuses local-only evidence with one typed line (placed here: guard-push.test.mjs is a protected
+    // test path outside this slice's write scope). Fixture mirrors guard-push.test.mjs: enrolled governance, manifest, evidence.
+    const dir = makeRootDir("guard-push-local-only-evidence");
+    git(dir, "init", "-q", "-b", "main");
+    const controller = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
+    const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
+    controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    git(dir, "config", "user.email", "goldfish@example.invalid");
+    git(dir, "config", "user.name", "Goldfish");
+    writeFileSync(join(dir, "README.md"), "fixture\n");
+    git(dir, "add", "README.md");
+    git(dir, "commit", "-qm", "init");
+    const head = git(dir, "rev-parse", "HEAD");
+    writeManifest(dir, "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n  security:\n    mode: blocking\n    type: automated\n");
+    mkdirSync(join(dir, "evidence"), { recursive: true });
+    const payload = {
+      schema: "pipeline.security-evidence.v1", exitCode: 0, commit: head,
+      candidate: {
+        status: "clean", commit: head, tree: git(dir, "rev-parse", "HEAD^{tree}"), inputSha256: "a".repeat(64), repositorySha256: null,
+        destination: "local-only", inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
+        snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
+      },
+      policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) },
+    };
+    const canon = (value) => Array.isArray(value) ? `[${value.map(canon).join(",")}]`
+      : value && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canon(value[key])}`).join(",")}}`
+        : JSON.stringify(value);
+    writeFileSync(join(dir, "evidence", "security-latest.json"), JSON.stringify({ ...payload, payloadSha256: createHash("sha256").update(canon(payload)).digest("hex") }));
+    const guard = spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url))], {
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push origin main:refs/heads/feature-test" } }),
+      encoding: "utf8", cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir }, timeout: 20000,
+    });
+    assertEqual("local-only: guard-push blocks the push", guard.status, 2);
+    assertIncludes("local-only: guard-push names the typed local-only refusal", guard.stderr, "produced for a local-only repository without a remote and cannot be used for a push");
+    assertIncludes("local-only: guard-push tells the operator to configure a remote and rerun the scan", guard.stderr, "configure a remote and rerun security-scan.mjs");
+  }
+
+  const cli = spawnSync(process.execPath, [fileURLToPath(new URL("./security-scan.mjs", import.meta.url)), "--root", localRoot], {
+    encoding: "utf8", timeout: 60000,
+  });
+  assertIncludes("local-only: CLI prints the typed destination", cli.stdout, "destination: local-only");
+  assertIncludes("local-only: CLI says the evidence cannot be used for a push", cli.stdout, "cannot be used for a push");
 }
 
 // ---- Summary -------------------------------------------------------------------------------------

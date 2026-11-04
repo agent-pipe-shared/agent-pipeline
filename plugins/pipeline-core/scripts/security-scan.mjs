@@ -370,13 +370,17 @@ function observeCandidate(rootDir, remoteName = null) {
   if (!inspected.ok) return {
     status: "unsupported", commit: commit.toString("utf8").trim(), tree: tree.toString("utf8").trim(),
     inputSha256: createHash("sha256").update(inventory).digest("hex"), repositorySha256: null,
-    inventory: null, reason: inspected.reason,
+    destination: "remote", inventory: null, reason: inspected.reason,
   };
   const clean = status.length === 0;
-  const remote = resolveSecurityRemoteIdentity(rootDir, remoteName);
+  // Typed local-only subject: only when NO remote name was given and the repository has zero remotes.
+  // Every other remote refusal stays unsupported; the push gate refuses local-only evidence.
+  const localOnly = remoteName === null && hasZeroRemotes(rootDir);
+  const remote = localOnly ? { ok: true, repositorySha256: null } : resolveSecurityRemoteIdentity(rootDir, remoteName);
   if (!remote.ok) return {
     status: "unsupported", commit: commit.toString("utf8").trim(), tree: tree.toString("utf8").trim(),
     inputSha256: createHash("sha256").update(inventory).digest("hex"), repositorySha256: null,
+    destination: "remote",
     inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
     reason: remote.reason,
   };
@@ -386,14 +390,22 @@ function observeCandidate(rootDir, remoteName = null) {
     tree: tree.toString("utf8").trim(),
     inputSha256: createHash("sha256").update(inventory).digest("hex"),
     repositorySha256: remote.repositorySha256,
+    destination: localOnly ? "local-only" : "remote",
     inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
     reason: clean ? null : "working-tree-not-clean",
   };
 }
 
-function sameCandidate(left, right) {
+/** One read-only `git remote` call: true only when git succeeds and lists no remote at all. */
+function hasZeroRemotes(rootDir) {
+  const listed = gitResult(rootDir, ["remote"]);
+  return listed.status === 0 && String(listed.stdout ?? "").split(/\r?\n/u).filter(Boolean).length === 0;
+}
+
+export function sameCandidate(left, right) {
   return left.status === "clean" && right.status === "clean"
     && left.commit === right.commit && left.tree === right.tree && left.inputSha256 === right.inputSha256
+    && left.destination === right.destination
     && left.repositorySha256 === right.repositorySha256;
 }
 
@@ -1176,6 +1188,10 @@ function printSummary(evidence) {
   }
   const verdict = deriveSummaryVerdict(evidence);
   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
+  if (evidence.candidate?.destination === "local-only") {
+    console.log("destination: local-only");
+    console.log("Security evidence for a local-only repository cannot be used for a push; configure a remote and rerun the scan.");
+  }
   console.log(`\nVerdict: ${verdict}${policyNote} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
 }
 

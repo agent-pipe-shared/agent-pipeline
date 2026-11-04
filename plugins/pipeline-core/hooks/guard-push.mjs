@@ -2437,6 +2437,7 @@ function checkSecurityEvidenceBinding() {
   if (candidate?.commit !== sourceCommit) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
   if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
   if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
+  if (candidate?.destination === "local-only") failures.push("evidence/security-latest.json: the security evidence was produced for a local-only repository without a remote and cannot be used for a push; configure a remote and rerun security-scan.mjs --remote <push remote> before pushing");
   if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
   const remoteIdentity = resolveSecurityRemoteIdentity(evidenceProjectDir, pushBinding.remote);
   if (!remoteIdentity.ok) {
