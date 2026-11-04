@@ -19,6 +19,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { canonicalJson, sha256, readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
+import { decideCriticEvidenceCarry } from "./critic-evidence-carry.mjs";
 import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
 import { CVL_OID as OID, PACKET, cvlFail as fail, exact, candidate, bytesSha256, residualFindingId, readBoundConsumedCriticReceipt, ROUTE_NO_OBSERVATION } from "./review-admission-read.mjs";
 export { RESIDUAL_ACCEPTANCE_BASIS, RESIDUAL_ACCEPTANCE_CLASS_BASIS, residualFindingId, readBoundConsumedCriticReceipt } from "./review-admission-read.mjs";
@@ -79,29 +80,40 @@ export function inspectConsumedCriticEvidenceCarryForward({ repoRoot, gitCommonD
   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId,
     candidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree } },
   { ...deps, readConsumedCandidateReceiptFn: () => consumed });
-  let range;
+  let range = null;
   try {
     range = (deps.classifyRegisteredEvidenceOnlyCommitsFn ?? classifyRegisteredEvidenceOnlyCommits)({
       repoRoot, featureId, baseCommit: reviewedCandidate.commit,
       candidateCommit: targetCandidate.commit, admitCriticExports: true,
       ...(deps.readConsumedCandidateReceiptFn ? { readConsumedCandidateReceiptFn: deps.readConsumedCandidateReceiptFn } : {}),
     });
-  } catch { fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified."); }
-  if (range.candidateTree !== targetCandidate.tree
-    || !Array.isArray(range.rangeCommits) || range.rangeCommits.length === 0
-    || !Array.isArray(range.evidenceOnlyCommits)
-    || range.evidenceOnlyCommits.length !== range.rangeCommits.length
-    || !range.rangeCommits.every((commit, index) => commit === range.evidenceOnlyCommits[index])
-    || !Array.isArray(range.correctionCommits) || range.correctionCommits.length !== 0) {
-    fail("CVL-CARRY-CONTENT-CHANGED", "Critic carry-forward range contains unreviewed content.");
+  } catch { range = null; }
+  const registeredEvidenceOnly = range !== null && range.candidateTree === targetCandidate.tree
+    && Array.isArray(range.rangeCommits) && range.rangeCommits.length > 0
+    && Array.isArray(range.evidenceOnlyCommits)
+    && range.evidenceOnlyCommits.length === range.rangeCommits.length
+    && range.rangeCommits.every((commit, index) => commit === range.evidenceOnlyCommits[index])
+    && Array.isArray(range.correctionCommits) && range.correctionCommits.length === 0;
+  // AC-108 (PO decision 2026-11-04): a range that is not registered evidence only still carries when every path changed between the
+  // reviewed commit and the target lies in the administration and documentation set (lib/critic-evidence-carry.mjs). Anything else
+  // refuses exactly as before: CVL-CARRY-RANGE when the registered classification itself could not be read, otherwise content changed.
+  let administration = null;
+  if (!registeredEvidenceOnly) {
+    administration = (deps.decideCriticEvidenceCarryFn ?? decideCriticEvidenceCarry)({ repoRoot,
+      reviewedCommit: reviewedCandidate.commit, candidateCommit: targetCandidate.commit, featureIds: [featureId] });
+    if (administration.carried !== true || administration.candidateTree !== targetCandidate.tree) {
+      if (range === null) fail("CVL-CARRY-RANGE", "Evidence-only Git range cannot be verified.");
+      fail("CVL-CARRY-CONTENT-CHANGED", "Critic carry-forward range contains unreviewed content.");
+    }
   }
   const proof = Object.freeze({
     schema: "pipeline.critic-evidence-carry-forward.v1", featureId,
     reviewedCandidate: { commit: reviewedCandidate.commit, tree: reviewedCandidate.tree },
     targetCandidate: { ...targetCandidate }, criticPacketId,
     criticReceiptSha256: bound.criticReceiptSha256,
-    manifestSha256: range.manifestSha256,
-    evidenceOnlyCommits: [...range.evidenceOnlyCommits],
+    manifestSha256: administration === null ? range.manifestSha256 : (range?.manifestSha256 ?? null),
+    evidenceOnlyCommits: administration === null ? [...range.evidenceOnlyCommits] : [...administration.passedOverCommits],
+    ...(administration !== null || (range?.administrationDocumentationCommits?.length ?? 0) > 0 ? { route: "administration-documentation" } : {}),
   });
   return Object.freeze({ proof, proofSha256: sha256(canonicalJson(proof)) });
 }

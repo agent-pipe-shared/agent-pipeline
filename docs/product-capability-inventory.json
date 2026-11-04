@@ -374,6 +374,7 @@
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-evidence-carry-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",

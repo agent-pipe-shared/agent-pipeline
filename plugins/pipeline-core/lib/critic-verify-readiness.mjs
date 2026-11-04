@@ -87,10 +87,14 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, 
       const digest = lifecycleReceiptDigest(directory, id);
       const residualDeps = digest === null ? null : loadResidualAcceptanceDeps({ gitCommonDir, projectDir: repoRoot,
         criticReceiptSha256: digest, ...(residualAuthorizeFn === undefined ? {} : { authorizeFn: residualAuthorizeFn }) });
-      if (residualDeps === null) readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
-      else readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
+      const lifecycle = residualDeps === null ? readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence })
+        : readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
+      // AC-108: a Critic review carried across later commits names the original reviewed commit and the passed-over commits (readback).
+      const proof = lifecycle?.receipt?.carryForward?.proof;
       return { ...exact, currentCheckoutOk: true, privateLifecycleBound: true,
-        receiptId: id, code: "critic-bound-verify-valid" };
+        receiptId: id, code: "critic-bound-verify-valid",
+        ...(proof ? { carriedForward: { reviewedCommit: proof.reviewedCandidate?.commit ?? null,
+          passedOverCommits: [...(proof.evidenceOnlyCommits ?? [])], route: proof.route ?? "registered-evidence-only" } } : {}) };
     } catch { /* Other candidates and invalid private records are not admission. */ }
   }
   return { ...exact, code: "private-critic-binding-unavailable" };

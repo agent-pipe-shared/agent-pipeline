@@ -528,6 +528,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/critic-review-lineage.mjs",
   "plugins/pipeline-core/lib/critic-review-lineage-core.mjs",
   "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+  "plugins/pipeline-core/lib/critic-evidence-carry.mjs",
+  "plugins/pipeline-core/lib/administration-documentation-paths.mjs",
   "plugins/pipeline-core/lib/feature-close-audit-receipt.mjs",
   "plugins/pipeline-core/lib/governance-review-action.mjs",
   "plugins/pipeline-core/lib/organization-policy.mjs",

@@ -331,6 +331,10 @@ below assumes it holds and is written to catch a change that would break it.
   also remain protected: `lib/onboarding-initial-answers-state.mjs`,
   `lib/onboarding-initial-answers-transaction.mjs`,
   `lib/onboarding-later-language.mjs`, and `lib/critic-course-admission.mjs`.
+  The Critic evidence carry across administration and documentation only commits
+  (PO decision 2026-11-04) is imported by `lib/critic-verify-lifecycle.mjs` and
+  `lib/critic-course-admission.mjs`, so its decision module `lib/critic-evidence-carry.mjs`
+  and its path set `lib/administration-documentation-paths.mjs` are protected too.
   The pure validation half split out of `lib/critic-review-lineage.mjs`
   (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
   unchanged) is protected for the same reason.

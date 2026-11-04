@@ -15,6 +15,7 @@ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MODES = new Set(["full", "delta"]);
@@ -512,16 +513,21 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   const root = realpathSync(repoRoot);
   const evidenceOnly = [];
   const correction = [];
+  const administration = [];
   for (const commit of source.rangeCommits) {
-    (evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+    const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)))
-      ? evidenceOnly : correction).push(commit);
+        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)));
+    // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
+    const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
+    if (passedOver && !registered) administration.push(commit);
+    (passedOver ? evidenceOnly : correction).push(commit);
   }
   return Object.freeze({
     ...source,
     correctionCommits: Object.freeze(correction),
     evidenceOnlyCommits: Object.freeze(evidenceOnly),
+    administrationDocumentationCommits: Object.freeze(administration),
   });
 }
 
@@ -758,7 +764,7 @@ function evidenceCommitV2(root,commit,featureId){
 function transport(root,from,to,original,aliases){
  const aliasIds=aliases.map(a=>a.descriptor.aliasFeatureId),ids=[original,...aliasIds];
  for(const commit of range(root,from,to)){
-  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids))continue;
+  if(ids.some(id=>evidenceCommitV2(root,commit,id))||criticExportOnlyCommit(root,commit,ids)||administrationDocumentationOnlyCommit(root,commit,{featureIds:ids}))continue;
   const parents=gitBytes(root,['rev-list','--parents','-n','1',commit],'CCA-RANGE-READ').toString('utf8').trim().split(/\s+/u);if(parents.length!==2)fail('CCA-TRANSPORT');
   const changed=gitBytes(root,['diff','--name-only','-z',parents[1],commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
   const allowed=new Set();

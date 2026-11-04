@@ -807,6 +807,113 @@ test("D227 the private record carries the class to the lifecycle deps, and the v
   assert.equal(Object.hasOwn(minorLoaded.residualAcceptance, "reasonClass"), false);
 });
 
+import { readCarriedForwardReadback } from "./critic-evidence-carry.mjs";
+// AC-108 (PO decision 2026-11-04, carry-forward ADR open question 2): the Critic evidence of an earlier reviewed commit R stays valid across
+// commits that are administration or documentation only. These are real gate decisions on a git fixture: the lifecycle record and read
+// (what the close gate reads), the readiness check (what the push gate calls) and the advisory. A content change anywhere invalidates.
+test("AC-108 a Critic review carries across administration-only commits through the lifecycle, the push readiness check and the advisory", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+  };
+  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
+  const featureId = "admin-carry-feature";
+  git(["init", "--quiet"]);
+  writeAt("src/app.js", "export const reviewed = 1;\n");
+  writeAt("docs/state.md", "# State\n");
+  writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const reviewed = commitAll("reviewed source");
+  const read = consumed(critic({ candidate: { base: oid("f"), ...reviewed }, reviewRange: { base: oid("f"), commit: reviewed.commit, diffSha256: sha("1") } }));
+  const deps = { readConsumedCandidateReceiptFn: () => read };
+  const gitCommonDir = join(root, ".git");
+  const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir, featureId, criticPacketId: read.receipt.packetId, targetCandidate: target }, deps);
+
+  // Not a close commit, not an export, not a registration: a dispatch record and the backlog index at the root level.
+  writeAt("evidence/dispatch-record-t1.json", "{}\n");
+  writeAt("backlog/index.json", "{}\n");
+  const admin = commitAll("administration: dispatch record and backlog index");
+  writeAt("docs/guide.md", "# Guide\n");
+  const docs = commitAll("documentation");
+  const carried = carry(docs);
+  assert.equal(carried.proof.reviewedCandidate.commit, reviewed.commit, "the original reviewed commit is named");
+  assert.deepEqual(carried.proof.evidenceOnlyCommits, [admin.commit, docs.commit], "the passed-over commits are named");
+  assert.equal(carried.proof.route, "administration-documentation");
+
+  const verify = { schema: "pipeline.verify-evidence.v0", exitCode: 0, commit: docs.commit, tree: docs.tree, candidate: { ...docs },
+    verifyRun: { status: "passed", terminalSha256: sha("c") }, steps: [{ exitCode: 0 }] };
+  const recorded = recordCriticVerifyLifecycle({ repoRoot: root, featureId, gitCommonDir, criticPacketId: read.receipt.packetId,
+    candidate: docs, evidencePath: "evidence/verify-latest.json", evidence: verify }, deps);
+  assert.equal(recorded.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
+  assert.equal(readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: recorded.receipt.id, candidate: docs,
+    evidencePath: "evidence/verify-latest.json", evidence: verify }, deps).receiptSha256, recorded.receiptSha256, "the close gate's reader accepts it");
+
+  const gate = inspectCriticBoundVerify({ repoRoot: root, gitCommonDir, head: docs.commit, tree: docs.tree, worktreeState: "clean",
+    evidencePath: "evidence/verify-latest.json", evidence: verify, readLifecycle: (input) => readCriticVerifyLifecycle(input, deps) });
+  assert.equal(gate.currentCheckoutOk, true, "the push readiness check passes");
+  assert.equal(gate.code, "critic-bound-verify-valid");
+  assert.equal(gate.carriedForward.reviewedCommit, reviewed.commit);
+  assert.deepEqual(gate.carriedForward.passedOverCommits, [admin.commit, docs.commit]);
+  // The push-prepare readback reads the same receipt by its id (the exported check of the exact checkout returns only the id).
+  const readback = readCarriedForwardReadback(gitCommonDir, gate.receiptId);
+  assert.equal(readback.reviewedCommit, reviewed.commit);
+  assert.deepEqual(readback.passedOverCommits, [admin.commit, docs.commit]);
+  assert.equal(readCarriedForwardReadback(gitCommonDir, sha("0")), null, "no receipt, no readback");
+  assert.equal(readCarriedForwardReadback(gitCommonDir, "../x"), null, "a malformed id is never read");
+
+  assert.equal(courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId, candidateCommit: docs.commit,
+    resolveHistoryFn: () => ({ history: [{ candidate: { commit: reviewed.commit } }] }) }), null, "no content commit, no advice");
+
+  // A content change anywhere in the range invalidates exactly as before, also when administration commits follow it.
+  writeAt("src/app.js", "export const reviewed = 2;\n");
+  const source = commitAll("source change");
+  writeAt("docs/guide.md", "# Guide 2\n");
+  const tail = commitAll("documentation after the source change");
+  for (const target of [source, tail]) assert.throws(() => carry(target), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
+  const tailVerify = { ...verify, commit: tail.commit, tree: tail.tree, candidate: { ...tail } };
+  assert.throws(() => recordCriticVerifyLifecycle({ repoRoot: root, featureId, gitCommonDir, criticPacketId: read.receipt.packetId,
+    candidate: tail, evidencePath: "evidence/verify-latest.json", evidence: tailVerify }, deps), error => error.code === "CVL-CARRY-CONTENT-CHANGED");
+  const refusedGate = inspectCriticBoundVerify({ repoRoot: root, gitCommonDir, head: tail.commit, tree: tail.tree, worktreeState: "clean",
+    evidencePath: "evidence/verify-latest.json", evidence: tailVerify, readLifecycle: (input) => readCriticVerifyLifecycle(input, deps) });
+  assert.equal(refusedGate.currentCheckoutOk, false);
+  assert.equal(Object.hasOwn(refusedGate, "carriedForward"), false);
+  assert.equal(courseAdmission.criticCarryAdvisory({ repoRoot: root, featureId, candidateCommit: tail.commit,
+    resolveHistoryFn: () => ({ history: [{ candidate: { commit: reviewed.commit } }] }) }).status, "content-after-last-review");
+
+  // The earlier receipt stays bound to its own candidate: it does not admit the later one.
+  assert.throws(() => readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: recorded.receipt.id, candidate: tail,
+    evidencePath: "evidence/verify-latest.json", evidence: tailVerify }, deps));
+});
+
+test("AC-108 the course classification with the carry option passes administration-only commits over; the course counters stay unchanged", t => {
+  const root = fixture(t);
+  const git = (args) => execFileSync("git", ["-C", root, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const commitAll = (message) => {
+    git(["add", "-A"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", message]);
+    return git(["rev-parse", "HEAD"]);
+  };
+  const writeAt = (path, text) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), text); };
+  const featureId = "admin-course-feature";
+  git(["init", "--quiet"]);
+  writeAt("src/app.js", "1\n");
+  writeAt(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  const reviewed = commitAll("reviewed");
+  writeAt("evidence/dispatch-record-t1.json", "{}\n");
+  const admin = commitAll("administration");
+  writeAt("src/app.js", "2\n");
+  const content = commitAll("content");
+  const withOption = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed, candidateCommit: content, admitCriticExports: true });
+  assert.deepEqual(withOption.evidenceOnlyCommits, [admin]);
+  assert.deepEqual(withOption.correctionCommits, [content]);
+  const without = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: root, featureId, baseCommit: reviewed, candidateCommit: content });
+  assert.deepEqual(without.correctionCommits, [admin, content], "without the option the counters are what they were");
+});
+
 import { validateCriticDispositionAddendum as validateAddendumForMessage } from "./critic-disposition-addendum.mjs";
 
 // 17 (AGY greenfield): the Critic addendum's evidence binding is a closed object whose schema string and fields the agent had to read

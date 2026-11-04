@@ -4524,6 +4524,12 @@
       "nonOverlapNote": "Unique cases: the end-to-end push decision with a carried record on both real consumers; evidence-carry-forward.test.mjs pins the decision and the reader, evidence-freshness-codes.test.mjs the codes and the push-prepare messages, guard-push-v2.test.mjs the exact-commit v2 binding"
     },
     {
+      "name": "critic-evidence-carry-tests",
+      "file": "plugins/pipeline-core/lib/critic-evidence-carry.test.mjs",
+      "invariantPinned": "The Critic evidence of a reviewed commit R stays valid for a candidate C exactly when R is an ancestor of C, the range is not empty and every changed path lies in the closed administration and documentation set as a regular non-executable file; every class of the set is pinned by name, ADRs, source, configuration, tests, the Spec texts, the root README, Critic exports and disposition addenda are content, a content path anywhere in the range or any fault answers no, and the answer names the passed-over commits (C19 AC-108, PO decision 2026-11-04)",
+      "nonOverlapNote": "Unique cases: lib/administration-documentation-paths.mjs and lib/critic-evidence-carry.mjs; critic-verify-lifecycle.test.mjs pins the receipt, the readiness check and the advisory that take the decision, record-only-paths.test.mjs the base set"
+    },
+    {
       "name": "module-slice-proposal-tests",
       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
       "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",

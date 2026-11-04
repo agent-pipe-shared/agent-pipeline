@@ -42,6 +42,7 @@ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
 import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
@@ -836,6 +837,9 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     // check compares), for example a feature-package-reconcile commit, is not evidence-only: it becomes the candidate. An unreadable manifest on either side fails toward the candidate.
     if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))
       && (!paths.includes(manifestPath) || manifestCoreUnchanged(root, parents[0], oid, manifestPath))) continue;
+    // AC-108 (PO decision 2026-11-04): a commit that changes only administration and documentation paths is no correction either, so the
+    // correction candidate is the newest commit with content; the course transport passes these commits over as well.
+    if (parents.length === 1 && administrationDocumentationOnlyCommit(root, oid, { featureIds: [featureId] })) continue;
     candidate = oid; break;
   }
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });

@@ -245,9 +245,22 @@ passed-over commits is clean; an unavailable scanner or a finding means the reco
 is not carried. Anything else, including a spec, plan, `project/guard-config.json` or
 any source change, refuses as before, and the stale message then names the carry
 reason (`[EF-STALE-COMMIT; carry-forward refused: PRODUCT-PATH-CHANGED]`). The
-`push-prepare` report and the hook log name the passed-over commits. Critic rounds
-are not carried: a new correction candidate still needs its own review. This is
-active by default (PO decision of 2026-11-04; ADR
+`push-prepare` report and the hook log name the passed-over commits. There is no
+complete Critic carry-forward: a new correction candidate still needs its own
+review. The one exception (PO decision of 2026-11-04, open question 2 of the ADR) is
+the Critic evidence of an earlier reviewed commit R: it stays valid for a later
+candidate C when R is an ancestor of C and every path changed between R and C is
+administration or documentation (`lib/administration-documentation-paths.mjs`:
+the record-only set, Markdown under `docs/` except `docs/adr/**`, READMEs inside the
+documentation trees, `backlog/**`, the generated `lifecycle.json` and `result.md`,
+`specs/<feature>/evidence/**`, `audit-bundles/<feature>/**`). Source, scripts,
+configuration, schemas, tests, ADRs and the PRD, Spec and plan texts are content;
+one content path anywhere in the range invalidates the evidence exactly as before.
+The decision is `lib/critic-evidence-carry.mjs`; the private Critic and Verify
+lifecycle receipt takes it, so the close gate and the push gate read the same
+answer, and the `push-prepare` readback names the original reviewed commit and the
+passed-over commits. The carry-forward of Verify and Security is active by default
+(PO decision of 2026-11-04; ADR
 `docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md`).
 
 ```

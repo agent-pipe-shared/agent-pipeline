@@ -3,7 +3,7 @@
   "id": "draft-authority-carry-forward-and-signed-reconcile-commit",
   "title": "Authority carries forward across features and evidence-only commits, and a signed reconcile commits its own files",
   "status": "accepted",
-  "digest": "148d81c9d167c661a73c0e3b95f9cda4b904baf0ae8d7ba5b3d78f26e4434a77",
+  "digest": "03a68c65b911dcc90bd714ceec329eef0ecea95830786ffd0df6dd3904ca49bb",
   "scope": "global",
   "date": "2026-11-03"
 }

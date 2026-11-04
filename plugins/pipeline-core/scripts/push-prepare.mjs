@@ -59,6 +59,7 @@ import { evidenceCarriedForward } from "../lib/evidence-carry-forward-reader.mjs
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs";
+import { describeCriticCarry, readCarriedForwardReadback } from "../lib/critic-evidence-carry.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
@@ -808,8 +809,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     if ((deps.requiresPublicationReview ?? requiresPublicationReview)(stateRead?.status === "ok" ? stateRead.state : null,
       { readSource })) {
       const review = (deps.checkCriticBoundVerify ?? checkCurrentCriticBoundVerify)(dir);
+      // AC-108: a review carried across later commits is named in the readback (original reviewed commit, passed-over commits).
+      const carriedReview = review.ok === true ? (review.carriedForward ?? readCarriedForwardReadback(resolveGitCommonDirPath(dir, deps), review.receiptId)) : null;
       checks.push({ id: "critic-bound-verify", ok: review.ok === true,
-        message: review.ok ? "independent Critic and Verify bind this exact candidate"
+        message: review.ok ? (carriedReview ? `independent Critic and Verify bind this candidate: ${describeCriticCarry(carriedReview)}`
+          : "independent Critic and Verify bind this exact candidate")
           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
           ? criticBoundVerifyRemedy(dir, headCommit)
