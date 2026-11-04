@@ -93,7 +93,11 @@ function stopFailureNotice(failure) {
   if (!failure || typeof failure.code !== "string") return null;
   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${describeFailureDetail(failure.detail)}`;
+  // E1 (Claude Windows greenfield): a stop failure with no pending state named neither why nor the command that recovers it.
+  const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
+    ? ` Cause: the launch had no pending host-commit state when its tool call returned, which is the normal case for a background launch. Recovery: run scripts/goldfish-host-commit-recover.mjs plan --root <root>${failure.dispatchId ? ` --dispatch-id ${failure.dispatchId}` : ""}, check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; it makes one ordinary commit with the dispatch trailer.`
+    : "";
+  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeFailureDetail(failure.detail)}`;
 }
 
 export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {

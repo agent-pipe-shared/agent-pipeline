@@ -244,6 +244,16 @@ const cases = [
       });
     }finally{rmSync(root,{recursive:true,force:true});}
   }},
+  { id: "NGHF08", name: "A pending-unavailable stop failure names the cause and the recover helper plan and apply command", run: () => {
+    const stopFailure = { code: "NGHF-PENDING-UNAVAILABLE", dispatchId: "gf-store-backup", observedAt: "2026-11-03T00:23:33.503Z", stage: null, reason: null, detail: null };
+    const message = nativeGoldfishHookMessage(null, { stopFailure });
+    assert.match(message, /NGHF-PENDING-UNAVAILABLE/u);
+    assert.match(message, /no pending host-commit state when its tool call returned/u);
+    assert.match(message, /scripts\/goldfish-host-commit-recover\.mjs plan --root <root> --dispatch-id gf-store-backup/u);
+    assert.match(message, /--expect-sha256/u);
+    const other = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, code: "NGHF-STOP-UNRESOLVED" } });
+    assert.doesNotMatch(other, /goldfish-host-commit-recover/u, "the recovery line belongs to the pending-unavailable code only");
+  }},
 
 ];
 
