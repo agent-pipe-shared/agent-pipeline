@@ -16,7 +16,9 @@
  *
  * Prints one JSON line (`pipeline.mandatory-hook-refresh.v1`); exits 0 only when the mandatory hooks are ready.
  */
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
 import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "./pre-commit-hook-install.mjs";
@@ -46,6 +48,14 @@ function refreshOne(hook, rootDir, dependencies) {
   }
 }
 
+/** W1: the version of the plugin copy this refresh binds the hooks to (null when its manifest cannot be read). */
+function readBoundPluginVersion() {
+  try {
+    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../.claude-plugin/plugin.json", import.meta.url)), "utf8"));
+    return typeof manifest?.version === "string" ? manifest.version : null;
+  } catch { return null; }
+}
+
 export function refreshMandatoryHooks(rootDir = process.cwd(), dependencies = {}) {
   const root = resolve(rootDir);
   const results = HOOKS.map((hook) => refreshOne(hook, root, dependencies));
@@ -54,6 +64,8 @@ export function refreshMandatoryHooks(rootDir = process.cwd(), dependencies = {}
   return {
     schema: MANDATORY_HOOK_REFRESH_SCHEMA,
     root,
+    // W1: the plugin version the refreshed hooks are bound to now. The hook marker records no earlier version, so the old one is not reported.
+    pluginVersion: (dependencies.pluginVersion ?? readBoundPluginVersion)(),
     status: failed ? "failed" : readiness.status === "ready" ? "ready" : "pending",
     results,
     readiness: { status: readiness.status, code: readiness.code, required: readiness.required },

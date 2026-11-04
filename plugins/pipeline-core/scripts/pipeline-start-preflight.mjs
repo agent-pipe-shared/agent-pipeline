@@ -38,6 +38,7 @@ import { parseYaml } from "../lib/yaml-lite.mjs";
 import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
 import { writeHostSkillCatalog } from "../lib/host-skill-catalog.mjs";
 import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
+import { inspectSessionAuthorityLock } from "../lib/session-authority-registry.mjs";
 import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
 import {
   evaluateSelfApplicationAttestation,
@@ -2046,11 +2047,112 @@ const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE"
 const MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES = new Set(["ready", "confirmation-required", "admission-pending"]);
 
 /** The readback field: only the bootstrap's own `status` and `code`, folded to a closed shape. */
-function modelRoleBootstrapField(value) {
+export function modelRoleBootstrapField(value) {
+  const code = typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE;
   return {
     status: MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES.has(value?.status) ? value.status : "unavailable",
-    code: typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE,
+    code,
+    // W2: a policy-required refusal states how to fix it instead of leaving the session to guess.
+    ...(code === "MODEL-ROLE-BOOTSTRAP-POLICY-REQUIRED"
+      ? { nextAction: "Set the model and effort for this role in pipeline.user.yaml (model routing), or run node scripts/model-role-bootstrap.mjs in the plugin root to see the policy it requires, then rerun the preflight." }
+      : {}),
   };
+}
+
+export const BOOTSTRAP_FACTS_SCHEMA = "pipeline.bootstrap-facts.v1";
+const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
+
+/**
+ * W2: the four facts the skill asks for before the confirmation line, read by the preflight itself so that no session
+ * has to read `project/pipeline.json` and the handover by hand: runtime status, role with the model-role readback,
+ * calibration file with the handover date, and whether Verify is configured. Each file read carries its sha256 (digest-bound);
+ * an unreadable file is reported as nulls, never invented. Read-only; the Verify command is not executed.
+ */
+export function observeBootstrapFacts({ rootDir = process.cwd(), status = null, role, modelRoleBootstrap, read = readFileSync } = {}) {
+  const root = resolve(rootDir);
+  const modelRole = modelRoleBootstrap === undefined ? { status: "unavailable", code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE } : modelRoleBootstrapField(modelRoleBootstrap);
+  const facts = {
+    schema: BOOTSTRAP_FACTS_SCHEMA,
+    runtime: { status },
+    modelRole: { role: role ?? "elephant", status: modelRole.status, code: modelRole.code },
+    calibration: { file: null, sha256: null, project: null, handover: null, handoverSha256: null, handoverDate: null },
+    verify: { available: false },
+  };
+  let calibration = null;
+  try {
+    const bytes = read(resolve(root, "project/pipeline.json"));
+    calibration = JSON.parse(bytes.toString("utf8"));
+    facts.calibration.file = "project/pipeline.json";
+    facts.calibration.sha256 = sha256Hex(bytes);
+  } catch { calibration = null; }
+  if (calibration === null || typeof calibration !== "object") return facts;
+  facts.calibration.project = typeof calibration.project === "string" ? calibration.project : null;
+  facts.verify = { available: typeof calibration.verify === "string" && calibration.verify.trim() !== "" };
+  const handover = typeof calibration.handover === "string" && !isAbsolute(calibration.handover) && !calibration.handover.split(/[\\/]/u).includes("..") ? calibration.handover : null;
+  if (handover === null) return facts;
+  try {
+    const bytes = read(resolve(root, handover));
+    const head = bytes.toString("utf8").split("\n").slice(0, 60).join("\n");
+    const labelled = /^\W*(?:last updated|updated|stand|date)\b[^0-9\n]*(\d{4}-\d{2}-\d{2})/imu.exec(head);
+    const dates = head.match(/\d{4}-\d{2}-\d{2}/gu) ?? [];
+    facts.calibration.handover = handover;
+    facts.calibration.handoverSha256 = sha256Hex(bytes);
+    facts.calibration.handoverDate = labelled ? labelled[1] : dates.length > 0 ? dates.sort().at(-1) : null;
+  } catch { /* the handover path stays null: unreadable is reported, not guessed */ }
+  return facts;
+}
+
+export const CLOSE_PUSH_CAPABILITY_SCHEMA = "pipeline.close-push-capability.v1";
+const READY_ROW = (id) => ({ id, status: "ready", nextAction: null });
+
+/**
+ * E2: a fail-fast probe at bootstrap: can close and push work on THIS platform. Four checks (node reachable, Windows ACL
+ * readiness, registry lock, owner route), each a typed row naming the repair when it is not ready. Every probe and the
+ * platform are injected, so the Windows branch is exercised on any machine. A probe that throws degrades the row; it is
+ * never read as ready. `unavailable` is reserved for a fault only an operator action can clear; a lock held by a live,
+ * stale or unjudgeable owner is `degraded` (the next acquisition retires a provably dead owner by itself).
+ */
+export function observeCloseAndPushCapability({
+  platform = process.platform, nodePath = process.execPath, exists = existsSync, windowsAuthorityReadiness = null,
+  lockProbe = () => ({ status: "unknown" }), ownerRouteProbe = () => ({ status: "unavailable" }),
+  repairScript = "scripts/session-authority-repair.mjs",
+} = {}) {
+  const rows = [];
+  let nodeOk = false;
+  try { nodeOk = typeof nodePath === "string" && nodePath !== "" && exists(nodePath) === true; } catch { nodeOk = false; }
+  rows.push(nodeOk ? READY_ROW("node") : { id: "node", status: "unavailable", nextAction: "Node is not reachable from this session: install Node or put it on PATH, then rerun the preflight." });
+  if (platform !== "win32") rows.push({ id: "acl", status: "not-applicable", nextAction: null });
+  else if (windowsAuthorityReadiness?.status === "ready") rows.push(READY_ROW("acl"));
+  else {
+    const causes = Array.isArray(windowsAuthorityReadiness?.causes) ? windowsAuthorityReadiness.causes : [];
+    const paths = causes.filter((cause) => typeof cause?.path === "string").slice(0, 3).map((cause) => `${cause.reason} at ${cause.path}`);
+    rows.push({ id: "acl", status: "unavailable", nextAction: paths.length > 0
+      ? `Repair the access list of: ${paths.join("; ")} (each cause in windowsAuthorityReadiness carries a preview command that changes nothing and the apply command).`
+      : "Read windowsAuthorityReadiness in this output; it names each path and the repair." });
+  }
+  let lock;
+  try { lock = lockProbe(); } catch { lock = { status: "unknown" }; }
+  const lockRepair = `node ${repairScript} inspect, then the routine heal it names; last resort move-aside when no Goldfish runs.`;
+  if (lock?.status === "absent") rows.push(READY_ROW("lock"));
+  else if (lock?.status === "held") rows.push({ id: "lock", status: "degraded", nextAction: lock.owner === "live"
+    ? `The registry lock is held by a running process (${lock.ageSeconds ?? "?"}s): wait for it, then ${lockRepair}`
+    : lock.owner === "dead" ? `The registry lock is stale (owner gone, ${lock.ageSeconds ?? "?"}s); the next operation retires it. If it persists: ${lockRepair}`
+    : `The registry lock owner cannot be confirmed alive or gone (${lock.ageSeconds ?? "?"}s): ${lockRepair}` });
+  else rows.push({ id: "lock", status: "degraded", nextAction: `The registry lock state could not be observed: ${lockRepair}` });
+  let route;
+  try { route = ownerRouteProbe(); } catch { route = { status: "unavailable" }; }
+  rows.push(route?.status === "ready" ? READY_ROW("ownerRoute")
+    : { id: "ownerRoute", status: "unavailable", nextAction: "The runner host process could not be identified, so close and push cannot be owned by this session: restart the session from the runner's normal entry, then rerun the preflight." });
+  const status = rows.some((row) => row.status === "unavailable") ? "unavailable" : rows.some((row) => row.status === "degraded") ? "degraded" : "ready";
+  return { schema: CLOSE_PUSH_CAPABILITY_SCHEMA, status, platform, checks: rows };
+}
+
+/** W1: the plain sentence for a `hook-refresh-required` status. The exit code stays 2 (enforcement tests pin it), so a runner that shows exit 2 as a tool error also shows why and what to run. */
+export function hookRefreshNotice(result) {
+  if (result?.status !== "hook-refresh-required") return "";
+  const action = result.nextAction;
+  const command = action && typeof action === "object" && Array.isArray(action.argv) ? [action.executable ?? "node", ...action.argv].join(" ") : null;
+  return `pipeline-start-preflight: status hook-refresh-required (valid JSON on stdout; exit code 2 is intentional: it enforces the refresh, it is not a crash).${command ? ` Run: ${command}` : ""}`;
 }
 
 /**
@@ -2332,8 +2434,31 @@ export function main(options = {}) {
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { runModelRoleBootstrapFn: () => modelRoleBootstrap }),
   });
+  // W7: the two housekeeping receipts used to be written to stderr as two more JSON objects, so a runner that merges
+  // stderr into the tool result showed three objects. They now ride under one named key of the single stdout document.
+  // Housekeeping never decides the exit code and a fault in it only shrinks the key.
+  const bootstrapHousekeeping = {};
+  // Exactly as before, an ungoverned project (governance-activation scope) ran no housekeeping at all.
+  if (result.statusScope !== "pipeline-governance-activation") {
+    try { bootstrapHousekeeping.scratchLifecycle = runBootstrapScratchLifecycle(); } catch { /* housekeeping never decides a bootstrap's exit code */ }
+    try { bootstrapHousekeeping.worktreeSweep = runBootstrapWorktreeSweep(); } catch { /* same */ }
+  }
+  let closeAndPushCapability;
+  try {
+    closeAndPushCapability = observeCloseAndPushCapability({
+      windowsAuthorityReadiness: result.windowsAuthorityReadiness ?? null,
+      lockProbe: defaultRegistryLockProbe,
+      ownerRouteProbe: () => ({ status: resolveRunnerHostPid() ? "ready" : "unavailable" }),
+      repairScript: resolve(result.pluginRoot ?? ".", "scripts/session-authority-repair.mjs"),
+    });
+  } catch { closeAndPushCapability = undefined; }
+  let bootstrapFacts;
+  try { bootstrapFacts = observeBootstrapFacts({ rootDir: process.cwd(), status: result.status, role, modelRoleBootstrap }); } catch { bootstrapFacts = undefined; }
   const envelope = {
     ...result,
+    ...(Object.keys(bootstrapHousekeeping).length === 0 ? {} : { bootstrapHousekeeping }),
+    ...(closeAndPushCapability === undefined ? {} : { closeAndPushCapability }),
+    ...(bootstrapFacts === undefined ? {} : { bootstrapFacts }),
     ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
@@ -2355,23 +2480,19 @@ export function main(options = {}) {
       // stderr unavailable; the JSON field on stdout still carries the warning.
     }
   }
-  // Deliberately on stderr and deliberately NOT a field of the typed preflight result:
-  // stdout is a parsed `pipeline.start-preflight.v1` envelope under a measured payload
-  // budget, so the housekeeping receipt travels beside it rather than inside it.
-  try {
-    process.stderr.write(`${JSON.stringify(runBootstrapScratchLifecycle())}\n`);
-  } catch {
-    // Housekeeping never decides a bootstrap's exit code.
-  }
-  // A second, independent housekeeping event (see runBootstrapWorktreeSweep's own doc
-  // comment for why this is deliberately not folded into the scratch lifecycle above).
-  // Wrapped the same way: never allowed to affect this function's return value.
-  try {
-    process.stderr.write(`${JSON.stringify(runBootstrapWorktreeSweep())}\n`);
-  } catch {
-    // Housekeeping never decides a bootstrap's exit code.
+  // W7: the housekeeping receipts moved into `bootstrapHousekeeping` above (still beside the typed result, not inside it).
+  // W1: one plain sentence for a status whose exit code is intentionally non-zero, so a runner's tool-error banner says why.
+  const refreshNotice = hookRefreshNotice(result);
+  if (refreshNotice !== "") {
+    try { process.stderr.write(`${refreshNotice}\n`); } catch { /* stderr unavailable; stdout still carries the status */ }
   }
   return pipelineStartPreflightExitCode(result);
+}
+
+/** E2: the registry lock as the capability probe sees it; any fault is `unknown`, which degrades the row and never reads as ready. */
+function defaultRegistryLockProbe() {
+  try { return inspectSessionAuthorityLock({ repository: discoverRepository(resolve(process.cwd())) }); }
+  catch { return { status: "unknown" }; }
 }
 
 /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */

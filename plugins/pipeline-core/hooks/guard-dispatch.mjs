@@ -95,6 +95,7 @@ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchMod
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
 // Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
@@ -1118,7 +1119,14 @@ if (isDirectInvocation(import.meta.url)) {
               : "";
             const repair = typeof prepared.repair === "string" && prepared.repair.trim() !== "" ? prepared.repair : sessionAuthorityRepair(prepared.code, rootDir);
             const repairText = repair ? ` Repair: ${repair.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 800)}` : "";
-            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${repairText}\n`);
+            // Q10: a native Windows authority reason (WIN-AUTH-OPEN and siblings) also names the folder, the preview and the apply command.
+            let windowsAuthorityText = "";
+            try {
+              windowsAuthorityText = describeWindowsAuthorityRefusal({ reason: prepared.reason, projectRoot: resolve(rootDir),
+                pluginRoot: resolve(fileURLToPath(new URL("..", import.meta.url))), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") })
+                .replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 900);
+            } catch { windowsAuthorityText = ""; }
+            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${windowsAuthorityText}${repairText}\n`);
             process.exit(2);
           }
           // The dispatch continues with no pending state: leave the typed code where this launch's PostToolUse can name it

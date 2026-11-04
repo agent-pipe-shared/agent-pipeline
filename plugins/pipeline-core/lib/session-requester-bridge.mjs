@@ -1767,9 +1767,20 @@ export function isSourceOwnedContinuityOwnerRouteRequester(input){
   const entry=requesters.get(context.requesterHandle),invocation=entry?.currentInvocationHandle?invocations.get(entry.currentInvocationHandle):null;
   return Boolean(invocation&&invocation.producerId===OWNER_ROUTE_PRODUCER&&invocation.assurance==='physical-readback');
 }
-function ownerRouteProcessStatus(recorded){
+/**
+ * dead only on proof, live only on a matching identity, unknown otherwise. E2: on Windows the answer used to be
+ * unconditionally unknown, so a lock whose owner (this session's own finished child) was gone never classified as stale.
+ * The platform, the observer and the identity comparison are injected so the Windows branch runs on any machine.
+ */
+export function ownerRouteProcessStatus(recorded,{platform=process.platform,observeWindows=observeNativeWindowsProcess,same=sameNativeWindowsProcess}={}){
   try{
-    if(process.platform==='win32')return 'unknown';
+    if(platform==='win32'){
+      if(recorded?.platform!=='win32'||!Number.isSafeInteger(recorded.pid))return 'unknown';
+      const found=observeWindows({pid:recorded.pid});
+      if(found?.status==='absent')return 'dead';
+      if(found?.status!=='present'||!found.process)return 'unknown';
+      return same({...recorded,cwd:null},{...found.process,cwd:null})?'live':'dead';
+    }
     const observed=observePosixProcess(recorded.pid);
     if(observed===null||['Z','X'].includes(observed.state))return 'dead';
     if(observed.start!==recorded.start||observed.bootSha256!==recorded.bootSha256)return 'dead';

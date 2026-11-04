@@ -281,14 +281,22 @@ function retireLock(repo,observed,cause,io={},report={}){
   sweepRetiredLocks(repo);
   return dir;
 }
+/** E2: the repair a held registry lock prints: the existing wait or release-lock sentence, then the one route that clears it (inspect, heal, last resort move-aside). */
+export function registryLockRepairText(observed,root){
+  const who=observed.pid===null||observed.pid===undefined?'an owner it does not record':`pid ${observed.pid}`;
+  const waitedMs=observed.waitedMs??0;
+  const routine=fileURLToPath(new URL('../scripts/routine-repair.mjs',import.meta.url));
+  const head=observed.owner==='live'
+    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
+    :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+  return `${head}. If it stays held although its owner has finished (for example the repair run that was just started): node ${REPAIR_SCRIPT} inspect --root ${root}, then node ${routine} run heal --root ${root} --reason "<why>", and as the last resort when no Goldfish runs node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root ${root} --reason "<why>"`;
+}
 function lockHeldFault(repo,observed,reason){
-  const root=repo.primaryRoot,who=observed.pid===null?'an owner it does not record':`pid ${observed.pid}`;
+  const root=repo.primaryRoot;
   const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
   const waitedMs=observed.waitedMs??0;
   error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds,waitedMs,waitBoundMs:SESSION_AUTHORITY_LOCK_WAIT_MS});
-  error.repair=observed.owner==='live'
-    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
-    :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+  error.repair=registryLockRepairText(observed,root);
   throw error;
 }
 /** Takes the registry lock, retiring a lock whose owner is provably gone; otherwise refuses naming owner, age and repair. */

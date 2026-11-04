@@ -67,12 +67,14 @@
  */
 import { randomBytes, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
 import { porcelainPaths } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
@@ -685,8 +687,22 @@ if (isDirectInvocation(import.meta.url)) {
     if (result.status === "dirty") process.exitCode = 1;
     if (["failed", "source-complete/event-unavailable"].includes(result.status)) process.exitCode = 2;
   } catch (error) {
-    const code = error instanceof VerifyEvidenceError ? error.code : "VEP-ERROR";
-    process.stderr.write(`verify-evidence-producer: ${code}: ${error.message}\n`);
+    process.stderr.write(formatVerifyEvidenceFailure(error));
     process.exitCode = 2;
   }
+}
+
+/**
+ * Q10: the one-line failure text. A native Windows authority refusal (WIN-AUTH-OPEN and its siblings) used to print only
+ * the bare code; it now also names the exact folder, the preview that changes nothing and the apply command the operator runs.
+ * The platform and the description are injected; a failing description never changes the line.
+ */
+export function formatVerifyEvidenceFailure(error, { platform = process.platform, describe = describeWindowsAuthorityRefusal, rootDir = process.cwd() } = {}) {
+  const code = error instanceof VerifyEvidenceError ? error.code : "VEP-ERROR";
+  const reason = typeof error?.reason === "string" ? error.reason : error?.message;
+  let extra = "";
+  try {
+    extra = String(describe({ reason, platform, projectRoot: resolve(rootDir), pluginRoot: resolve(dirname(fileURLToPath(import.meta.url)), ".."), privateRoot: join(resolve(rootDir), ".git", "agent-pipeline") }) ?? "").trim();
+  } catch { extra = ""; }
+  return `verify-evidence-producer: ${code}: ${error?.message}${extra === "" ? "" : ` ${extra}`}\n`;
 }

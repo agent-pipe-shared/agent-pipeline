@@ -38,12 +38,46 @@ export function windowsAuthorityDetail(error) {
   return error?.reason === 'WIN-AUTH-DACL' && DACL_DETAIL.test(error?.detail) ? error.detail : null;
 }
 
-function guidance(pathClass, reason) {
+/** Q10: the two commands that repair a folder the native open could not use. The first only lists the access list. */
+function openRepairCommands(path) {
+  if (typeof path !== 'string' || path === '' || path.includes('"')) return [];
+  return [
+    { shell: 'cmd', purpose: 'preview', changesNothing: true, command: `icacls "${path}"` },
+    { shell: 'cmd', purpose: 'apply', changesNothing: false, command: `icacls "${path}" /grant "%USERNAME%:(OI)(CI)F"` },
+  ];
+}
+
+function guidance(pathClass, reason, path) {
+  const commands = reason === 'WIN-AUTH-OPEN' ? openRepairCommands(path) : [];
   return { kind: 'operator-review', mutation: false,
-    summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
+    summary: `Inspect the ${pathClass} path${path ? ` ${path}` : ''} for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
     inspection: ['Confirm the exact path exists and is a physical non-reparse directory.', 'For private Pipeline authority, inspect its owner and protected DACL.'],
-    repairPreview: null,
+    repairPreview: commands.length === 0 ? null : { folder: path, commands,
+      reason: 'the first command only lists the folder access list; the second grants the current user full control and is run by the operator',
+      afterwards: 'Rerun the preflight; it reads the folder back and continues only when it opens.' },
   };
+}
+
+/**
+ * Q10: the text a refusal prints after the bare WIN-AUTH-* code: the exact folder, a preview that changes nothing, the
+ * apply command the operator runs, and the rule for a second concurrent launch. The platform and the probe are injected.
+ * Returns '' when the platform is not Windows or the reason is not a native authority reason.
+ */
+export function describeWindowsAuthorityRefusal({ reason, platform = process.platform, projectRoot, pluginRoot, privateRoot, assess = assessWindowsAuthorityReadiness } = {}) {
+  if (platform !== 'win32' || !NATIVE_REASON.test(reason ?? '')) return '';
+  let causes = [];
+  try { causes = assess({ projectRoot, pluginRoot, privateRoot })?.causes ?? []; } catch { causes = []; }
+  const located = causes.filter(cause => typeof cause?.path === 'string' && cause.path !== '' && (cause.reason === reason || reason === 'WIN-AUTH-OPEN'));
+  const rest = reason === 'WIN-AUTH-OPEN'
+    ? ' If another Goldfish launch is still running, start only one Goldfish launch at a time on Windows and wait for it to return before the next.'
+    : '';
+  if (located.length === 0) return ` The folder was not located; read windowsAuthorityReadiness.causes in the preflight output (node scripts/pipeline-start-preflight.mjs), which names each path.${rest}`;
+  const rows = located.slice(0, 3).map(cause => {
+    const commands = reason === 'WIN-AUTH-OPEN' ? openRepairCommands(cause.path) : [];
+    return commands.length === 0 ? `Path: ${cause.path}.`
+      : `Path: ${cause.path}. Preview (changes nothing): ${commands[0].command} . Apply (you run it): ${commands[1].command} .`;
+  });
+  return ` ${rows.join(' ')}${rest}`;
 }
 
 /** The injected probe is called once per distinct path; it must only observe, never repair. */
@@ -73,7 +107,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
       // can be skipped until onboarding creates them.
       if (!exists(path)) {
         if (pathClass === 'private' && path.toLowerCase().startsWith(projectRoot.toLowerCase())) continue;
-        causes.push({ pathClass, reason: 'WIN-AUTH-OPEN', path, nextAction: guidance(pathClass, 'WIN-AUTH-OPEN') });
+        causes.push({ pathClass, reason: 'WIN-AUTH-OPEN', path, nextAction: guidance(pathClass, 'WIN-AUTH-OPEN', path) });
         continue;
       }
       const key = `${path.toLowerCase()}|${privatePath ? 'private' : 'ancestor'}|${boundaryRoot?.toLowerCase() ?? 'strict'}`;
@@ -92,7 +126,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
       }
       if (reason) {
         const detail = details.get(key);
-        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason) });
+        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason, path) });
       }
     }
   }
