@@ -62,7 +62,7 @@
     {
       "id": "layer-1b",
       "who": "agent",
-      "command": "node harness/scripts/check-doc-reconciliation.mjs --base … --candidate …",
+      "command": "the project's doc-reconciliation script: check-doc-reconciliation.mjs --base … --candidate …",
       "needs": [
         "--base and --candidate named by the caller"
       ],

@@ -23,13 +23,13 @@
       "pathId": "implement",
       "path": "plugins/pipeline-core/runbooks/implement-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "10c8f23289d1cb086c76cf8adbcd8d359013c3e33d253aebb6fcf71fc6be0dfe"
+      "sha256": "456ef95efbb5726c48497147d5f6ba9265a2aa73556c718513a697ffac2e52bb"
     },
     {
       "pathId": "push",
       "path": "plugins/pipeline-core/runbooks/push-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "be09a0fed85c41ab749e3d66a95115455909e4922f435155bf5b46c898c762ef"
+      "sha256": "59c1a972084129cad93bd66642d9a7b640077aa88d01e361d97176d4f54e8ba8"
     }
   ]
 }

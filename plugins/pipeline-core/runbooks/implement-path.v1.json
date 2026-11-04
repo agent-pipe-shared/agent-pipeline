@@ -131,7 +131,7 @@
     {
       "id": "verify",
       "who": "agent",
-      "command": "<the project's verify command from its calibration, e.g. node harness/scripts/verify.mjs>",
+      "command": "<the project's verify command from its calibration>",
       "needs": [
         "the work is committed"
       ],

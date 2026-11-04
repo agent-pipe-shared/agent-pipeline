@@ -129,7 +129,7 @@ function implementSteps() {
       commit: "commit the work with the AI-Assisted and Dispatch trailers; the record must cover the committed paths", next: ["verify"],
     }),
     otherStep({
-      id: "verify", command: "<the project's verify command from its calibration, e.g. node harness/scripts/verify.mjs>",
+      id: "verify", command: "<the project's verify command from its calibration>",
       needs: ["the work is committed"], producer: "the Verify evidence file for the candidate commit", next: [],
     }),
     scriptStep({
@@ -188,7 +188,7 @@ function pushSteps(flowText) {
       return scriptStep({ ...base, script: note.script, verb: note.verb, argv });
     }
     // A backticked span is the command when it is one (git, gh, the project's reconciliation script); otherwise the whole cell is the instruction.
-    if (span !== null && span[1].startsWith("check-doc-reconciliation.mjs")) return otherStep({ ...base, command: `node harness/scripts/${span[1]}` });
+    if (span !== null && span[1].startsWith("check-doc-reconciliation.mjs")) return otherStep({ ...base, command: `the project's doc-reconciliation script: ${span[1]}` });
     return otherStep({ ...base, command: span !== null && /^(git|gh) /u.test(span[1]) ? span[1] : cells[2].replace(/`/gu, "") });
   });
   for (const id of Object.keys(PUSH_ANNOTATIONS)) {
