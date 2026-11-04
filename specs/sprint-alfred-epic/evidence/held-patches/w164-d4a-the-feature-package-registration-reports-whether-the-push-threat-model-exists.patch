@@ -1,0 +1,128 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 28f354dd2..be1a444b2 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1014,6 +1014,7 @@
+         "verify-phase:harness/scripts/verify.mjs:reference-path-check",
+         "verify-phase:harness/scripts/verify.mjs:reference-path-tests",
+         "verify-phase:harness/scripts/verify.mjs:refresh-mandatory-hooks-tests",
++        "verify-phase:harness/scripts/verify.mjs:register-feature-package-readback-tests",
+         "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:release-promotion-envelope-tests",
+         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 8adbb537f..2f024bc21 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4522,6 +4522,12 @@
+       "file": "plugins/pipeline-core/lib/module-slice-proposal.test.mjs",
+       "invariantPinned": "The slice proposal cuts one slice per module of an approved architecture design, orders the slices in waves from the module dependencies, serializes modules whose owned paths overlap so that no wave holds two slices writing the same path, refuses a dependency cycle and every invalid input with a typed code and never throws, prints add commands that the slice queue library accepts, reads the design through the approval parser and writes nothing (C19 M1.4)",
+       "nonOverlapNote": "Unique cases: lib/module-slice-proposal.mjs and scripts/module-slice-proposal.mjs; slice-queue.test.mjs and slice-queue-cli tests pin the queue itself, architecture-design tests pin the design parser"
++    },
++    {
++      "name": "register-feature-package-readback-tests",
++      "file": "plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs",
++      "invariantPinned": "The feature package registration reports whether the push threat model exists and, when it does not, the command that creates it and that its output belongs in the same draft commit before the item binding; the readback is advice only and writes nothing (C19 D4a)",
++      "nonOverlapNote": "Unique cases: the pushThreatModelReadback helper of scripts/register-feature-package.mjs; the pins that run the registration end to end pin the rest of its output"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+new file mode 100644
+index 000000000..1509bc29e
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
++import { pushThreatModelReadback } from "./register-feature-package.mjs";
++
++const roots = [];
++test.after(() => { for (const dir of roots) rmSync(dir, { recursive: true, force: true }); });
++const tempRoot = () => { const dir = mkdtempSync(join(tmpdir(), "rfp-")); roots.push(dir); return dir; };
++
++test("RFPR1: a missing push threat model is reported with the command and where its output belongs", () => {
++  const readback = pushThreatModelReadback(tempRoot());
++  assert.equal(readback.path, "project/push-threat-model.md");
++  assert.equal(readback.path, PUSH_THREAT_MODEL_FILE);
++  assert.equal(readback.present, false);
++  assert.equal(readback.materializeCommand, "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model");
++  assert.match(readback.commitWith, /same draft commit/u);
++  assert.match(readback.commitWith, /before the item binding/u);
++  assert.match(readback.why, /second round/u);
++});
++
++test("RFPR2: an existing push threat model is reported present and names no command", () => {
++  const root = tempRoot();
++  mkdirSync(join(root, "project"), { recursive: true });
++  writeFileSync(join(root, PUSH_THREAT_MODEL_FILE), "# threat model\n");
++  assert.deepEqual(pushThreatModelReadback(root), { path: "project/push-threat-model.md", present: true });
++});
++
++test("RFPR3: the readback is advice only and writes nothing", () => {
++  const root = tempRoot();
++  pushThreatModelReadback(root);
++  pushThreatModelReadback(root);
++  assert.throws(() => writeFileSync(join(root, "project", "x"), "x"), /ENOENT/u, "no project directory was created by the readback");
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 8ba3297c1..9d0e54085 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -25,9 +25,10 @@
+ // commits. The result names the rigor level and its `rigorSource`. Prints one JSON result.
+ // Exit 0: registered | already-registered. Exit 2: refused (typed FPR-* code).
+ import { spawnSync } from "node:child_process";
+-import { realpathSync, statSync } from "node:fs";
++import { existsSync, realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+ import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
+ 
+@@ -47,7 +48,25 @@ function commitPlan(root, result) {
+     { step: 3, action: "commit all of commitPaths in one commit (Conventional Commits, the dispatch trailers your role requires)" },
+     { step: 4, action: "only then generate the item binding: dispatch-briefing.mjs binding --root <root> ... (a binding generated before this commit carries a stale candidate)" },
+   ];
+-  return { commitPaths: [result.manifestPath, result.envelopePath, ...generatedPaths], envelopeTracked: trackedEnvelope, envelopeIgnored: forceEnvelope, order: steps };
++  return { commitPaths: [result.manifestPath, result.envelopePath, ...generatedPaths], envelopeTracked: trackedEnvelope, envelopeIgnored: forceEnvelope, order: steps, pushThreatModel: pushThreatModelReadback(root) };
++}
++
++/**
++ * D4a readback: every non-checkpoint push demands `project/push-threat-model.md` (push-prepare's `push-threat-model` check). A model first created at
++ * the Close changes the candidate after the Critic and Verify already ran and forces a second round for no product change, so the registration (the
++ * draft commit, before the binding) says whether it exists and, when it does not, names the command and where its output belongs. Advice only: it
++ * writes nothing and enforces nothing.
++ */
++export function pushThreatModelReadback(root) {
++  const present = existsSync(resolve(root, PUSH_THREAT_MODEL_FILE));
++  if (present) return { path: PUSH_THREAT_MODEL_FILE, present: true };
++  return {
++    path: PUSH_THREAT_MODEL_FILE,
++    present: false,
++    materializeCommand: "node <plugin-root>/scripts/pipeline-state.mjs materialize-push-threat-model",
++    commitWith: "commitPaths, in the same draft commit, before the item binding is generated",
++    why: "a push needs this file; created at the Close it moves the candidate after the Critic and Verify ran and forces a second round",
++  };
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 8b4455e3c..add838851 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -24,6 +24,7 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
+    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses
+    if the file exists) and commit `project/push-threat-model.md` with the draft commit. A threat model first created at the Close moves the candidate
+    after the Critic and Verify already ran, which forces a second round for no product change (Antigravity greenfield finding D4a).
++   The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
+ 7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
+ 
+ ## 2. Implementation (one dispatch per task, from the template)
