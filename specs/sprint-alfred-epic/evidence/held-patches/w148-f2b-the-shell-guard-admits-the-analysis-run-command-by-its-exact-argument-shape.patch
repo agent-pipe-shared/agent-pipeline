@@ -1,0 +1,133 @@
+diff --git a/plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs b/plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs
+new file mode 100644
+index 000000000..3a1dbcdfc
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs
+@@ -0,0 +1,70 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19 F2b (AC-108): the shell guard admits the analysis-run command by its exact argument shape only.
++import assert from "node:assert/strict";
++import { join } from "node:path";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
++import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
++import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
++import { ANALYSIS_RUN_SCRIPT } from "./constants.mjs";
++import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
++
++const root = process.cwd();
++const script = "plugins/pipeline-core/scripts/analysis-run.mjs";
++const cases = [];
++function test(name, run) { cases.push({ id: `ARA${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
++const run = (args, path = script) => `node ${path} ${args}`;
++
++test("the script constant names the plugin analysis-run CLI", () => {
++  assert.equal(ANALYSIS_RUN_SCRIPT, join(root, script));
++  assert.equal(resolveSanctionedScriptInvocation(run("--root ."), root)?.script, ANALYSIS_RUN_SCRIPT);
++});
++
++test("only the closed argument shape is admitted", () => {
++  const admitted = [
++    "--root .",
++    `--root ${root}`,
++    `--timeout-seconds 900 --commit HEAD --root ${root}`,
++    "--root . --commit abc1234",
++    `--root . --commit ${"a".repeat(40)} --timeout-seconds 1`,
++    "--root . --timeout-seconds 1800",
++  ];
++  for (const args of admitted) assert.equal(isSanctionedLifecycleCommand(run(args), root), true, args);
++  const refused = [
++    "", "--commit HEAD", "--root", "--root /elsewhere", "--root ./", "--root ..", "--root=.",
++    "--root . --unknown x", "--root . --root .", "--root . --commit HEAD --commit HEAD",
++    "--root . --timeout-seconds 5 --timeout-seconds 5", "--root . --commit=HEAD", "--root . --timeout-seconds=5",
++    "--root . --commit -x", "--root . --commit ../x", "--root . --commit a/b", "--root . --commit main:x",
++    "--root . --commit abc123", "--root . --commit ABCDEF1", `--root . --commit ${"a".repeat(41)}`,
++    "--root . --commit head", "--root . --timeout-seconds 0", "--root . --timeout-seconds 1801",
++    "--root . --timeout-seconds 1e3", "--root . --timeout-seconds -5", "--root . --timeout-seconds 05x",
++    "--root . --commit", "--root . --timeout-seconds", "--root . --commit HEAD extra", "--root . extra",
++    "--root . --commit HEAD --timeout-seconds 5 --extra",
++  ];
++  for (const args of refused) assert.equal(isSanctionedLifecycleCommand(run(args), root), false, args);
++  assert.equal(isSanctionedLifecycleCommand("node --test x.test.mjs", root), false);
++  assert.equal(isSanctionedLifecycleCommand(run("--root .", "scratch/analysis-run.mjs"), root), false);
++  assert.equal(isSanctionedLifecycleCommand(run("--root .", "plugins/pipeline-core/scripts/other.mjs"), root), false);
++});
++
++test("the Dev-Plan lane exempts only the admitted shape from the opaque-script candidate", () => {
++  const candidates = (command) => {
++    const observed = [];
++    devPlanShellRefusalHit(command, root, {
++      extractShellWriteTargetsFn: () => [],
++      devPlanGateVerdictFn: ({ filePath, forceLifecycleGate }) => { observed.push({ filePath, forceLifecycleGate: forceLifecycleGate === true }); return { verdict: "allow" }; },
++    });
++    return observed;
++  };
++  assert.deepEqual(candidates(run("--root .")), []);
++  assert.deepEqual(candidates(run(`--root ${root} --commit HEAD --timeout-seconds 900`)), []);
++  assert.deepEqual(candidates(run("--root . --extra")), [{ filePath: script, forceLifecycleGate: true }]);
++  assert.deepEqual(candidates(run("--root . --commit ../x")), [{ filePath: script, forceLifecycleGate: true }]);
++  assert.deepEqual(candidates(run("--root .", "plugins/pipeline-core/scripts/other.mjs")),
++    [{ filePath: "plugins/pipeline-core/scripts/other.mjs", forceLifecycleGate: true }]);
++  assert.deepEqual(candidates(run("--root .", "scratch/analysis-run.mjs")),
++    [{ filePath: "scratch/analysis-run.mjs", forceLifecycleGate: true }]);
++  assert.deepEqual(candidates("node --test x.test.mjs"), [{ filePath: "x.test.mjs", forceLifecycleGate: true }]);
++});
++
++if (cases.length !== 3) throw new Error("analysis-run admission case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index ec3ec7c34..30f2f7a28 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -78,6 +78,23 @@ function auditPackRequest(args, root) {
+   } catch { return null; }
+ }
+ 
++// C19 F2b: the closed analysis-run shape -- `--root` (`.` or the exact root), then optionally one
++// `--commit` (HEAD or a 7-40 char lowercase hex sha) and one `--timeout-seconds` (1..1800, digits only), any order.
++function sanctionedAnalysisRunArgs(args, root) {
++  if (args.length % 2 !== 0) return false;
++  const seen = new Set();
++  for (let index = 0; index < args.length; index += 2) {
++    const flag = args[index], value = args[index + 1];
++    if (seen.has(flag)) return false;
++    seen.add(flag);
++    if (flag === "--root" ? !(value === "." || exactRoot(args, root, index))
++      : flag === "--commit" ? !(value === "HEAD" || /^[0-9a-f]{7,40}$/u.test(value))
++        : flag === "--timeout-seconds" ? !(/^[0-9]{1,4}$/u.test(value) && Number(value) >= 1 && Number(value) <= 1800)
++          : true) return false;
++  }
++  return seen.has("--root");
++}
++
+ function designCourseRelativePath(value) {
+   return typeof value === "string" && value.length <= 240 && !/[\\:\0]/u.test(value)
+     && value.split("/").every((part) => part && !part.startsWith(".") && part !== "scratch" && part !== "node_modules");
+@@ -480,6 +497,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   // The source CLI returns its static usage before parsing or reading signing state.
+   if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
+   if (script === AUDIT_PACK_SCRIPT) return ["plan", "verify"].includes(auditPackRequest(args, root)?.verb);
++  if (script === ANALYSIS_RUN_SCRIPT) return sanctionedAnalysisRunArgs(args, root);
+   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index e699e89b2..6a13f0e59 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -32,6 +32,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
+ // which is out of scope for this file.
+ export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
+ export const AUDIT_PACK_SCRIPT = fileURLToPath(new URL("../../scripts/audit-pack.mjs", import.meta.url));
++export const ANALYSIS_RUN_SCRIPT = fileURLToPath(new URL("../../scripts/analysis-run.mjs", import.meta.url));
+ 
+ export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+ 

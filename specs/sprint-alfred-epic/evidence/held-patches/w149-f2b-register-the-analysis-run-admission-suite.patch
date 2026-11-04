@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index cb26cf9c2..83b4d7da1 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -232,6 +232,7 @@
+         "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
+         "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
+         "verify-phase:harness/scripts/verify.mjs:analysis-run-cli-tests",
++        "verify-phase:harness/scripts/verify.mjs:analysis-run-command-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:analysis-run-lib-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 2a50c8d0c..100e51331 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4471,6 +4471,12 @@
+       "file": "plugins/pipeline-core/scripts/analysis-run.test.mjs",
+       "invariantPinned": "The analysis-run command accepts only --root, --commit and --timeout-seconds, prints one JSON line with the result path and the verdict, and exits 2 for a refusal or a changed working tree (C19 F2a, AC-108)",
+       "nonOverlapNote": "Unique cases: scripts/analysis-run.mjs argument closure and exit codes; the logic is pinned by analysis-run-lib-tests"
++    },
++    {
++      "name": "analysis-run-command-admission-tests",
++      "file": "plugins/pipeline-core/lib/guard/analysis-run-command-admission.test.mjs",
++      "invariantPinned": "The shell guard admits the analysis-run command only by its closed argument shape (--root once, optional --commit HEAD or hex, optional --timeout-seconds 1 to 1800), keeps every other argument shape, script copy and node --test run refused, and the Dev-Plan lane makes no opaque-script candidate of the admitted shape only (C19 F2b, AC-108)",
++      "nonOverlapNote": "Unique cases: sanctionedAnalysisRunArgs and its Dev-Plan lane effect; the command itself is pinned by analysis-run-lib-tests and analysis-run-cli-tests"
+     }
+   ]
+ }
