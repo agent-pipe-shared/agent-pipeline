@@ -1004,6 +1004,7 @@
         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",

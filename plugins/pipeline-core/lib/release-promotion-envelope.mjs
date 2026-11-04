@@ -19,6 +19,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { validateVerifySelection } from "./verify-selection.mjs";
+import { RECORD_ONLY_PATH_PATTERNS, isRecordOnlyPath } from "./record-only-paths.mjs";
 
 // v2 closes the last promotion substitution seam: both records a consumer
 // relies on are now supplied explicitly and security is byte-bound.
@@ -73,27 +74,9 @@ export function securityEvidenceBindingFromInput(input, { sourceCommit, sourceTr
   };
 }
 
-export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
-  /^evidence\/.*$/u,
-  /^backlog\/evidence\/.*$/u,
-  /^specs\/[^/]+\/evidence\/.*$/u,
-  /^specs\/[^/]+\/lifecycle\.json$/u,
-  /^specs\/[^/]+\/result\.md$/u,
-  /^backlog\/STATUS\.md$/u,
-  /^backlog\/index\.json$/u,
-  /^backlog\/transitions\.ndjson$/u,
-  /^backlog\/items\/.*$/u,
-  /^backlog\/PO-TOPICS\.md$/u,
-  /^docs\/state\.md$/u,
-  /^\.claude\/pipeline-state\.json$/u,
-  /^project\/pipeline-state\.json$/u,
-]);
-
-export function isRecordOnlyPath(path) {
-  if (typeof path !== "string") return false;
-  const normalized = path.replaceAll("\\", "/").replace(/^\.\//u, "");
-  return RECORD_ONLY_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
-}
+// The record-only path set lives in lib/record-only-paths.mjs (candidate 19: one owner for the definition); the
+// names stay exported from here so every existing importer keeps working unchanged.
+export { RECORD_ONLY_PATH_PATTERNS, isRecordOnlyPath };
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;

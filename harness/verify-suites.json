@@ -4495,6 +4495,12 @@
       "file": "plugins/pipeline-core/lib/evidence-carry-forward.test.mjs",
       "invariantPinned": "A Verify or Security record is carried from an earlier commit to a later one only when every changed path lies in the closed evidence set, the product tree hash is equal, the earlier commit is an ancestor and, for Security, a secret scan of the changed files is clean; every other outcome fails closed and the decision never changes the repository (C19 D4b/E3 stage 1, AC-108)",
       "nonOverlapNote": "Unique cases: lib/evidence-carry-forward.mjs only; no reader calls it yet, so no other suite pins a carry-forward"
+    },
+    {
+      "name": "record-only-paths-tests",
+      "file": "plugins/pipeline-core/lib/record-only-paths.test.mjs",
+      "invariantPinned": "The record-only path set that the production push gate accepts through the release-promotion envelope is byte-identical to the one it had before it moved into its own module and is re-exported unchanged; the two classes the authority carry-forward draft adds are separate and not record-only; the narrower carry-forward decision never accepts a path outside the shared set plus the extension (C19 D4b/E3 stage 2, AC-108)",
+      "nonOverlapNote": "Unique cases: lib/record-only-paths.mjs and the identity of its re-exports; release-promotion-envelope.test.mjs, guard-push-promotion.test.mjs and push-prepare.test.mjs pin the envelope and the push behaviour that use the set"
     }
   ]
 }
