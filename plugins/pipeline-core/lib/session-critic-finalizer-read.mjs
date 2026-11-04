@@ -26,12 +26,18 @@ export function record(value) { return value !== null && typeof value === "objec
 export function exact(value, keys) {
   return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
+// D2a: the session flags of a result/receipt must agree with its independence label; no label is the legacy true/false pair.
+export function independenceFlagsConsistent(independence, session) {
+  if (independence === "caller-authored-fallback") return session.freshContext === false && session.historyInherited === true;
+  if (independence === undefined || independence === "source-issued-origin") return session.freshContext === true && session.historyInherited === false;
+  return false;
+}
 export function validateSessionCriticReceipt(receipt) {
-  if (!exact(receipt, RECEIPT_KEYS) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
+  if (!exact(receipt, Object.hasOwn(receipt ?? {}, "independence") ? [...RECEIPT_KEYS, "independence"] : RECEIPT_KEYS) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
     || !PACKET_ID.test(receipt.packetId) || !SHA256.test(receipt.packetDigest)
     || !exact(receipt.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
-    || !SAFE_ID.test(receipt.session.id) || receipt.session.freshContext !== true
-    || receipt.session.historyInherited !== false || receipt.session.mayDelegate !== false
+    || !SAFE_ID.test(receipt.session.id) || !independenceFlagsConsistent(receipt.independence, receipt.session)
+    || receipt.session.mayDelegate !== false
     || !OID.test(receipt.rulesetSha)
     || receipt.assurance !== SESSION_CRITIC_ASSURANCE || !SHA256.test(receipt.verdictSha256)
     || !Number.isSafeInteger(receipt.findingCount) || receipt.findingCount < 0

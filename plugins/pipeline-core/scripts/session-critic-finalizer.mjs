@@ -20,7 +20,7 @@ import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admi
 import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
-import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
+import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt, independenceFlagsConsistent } from "../lib/session-critic-finalizer-read.mjs";
 export { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, SessionCriticFinalizerError, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
 /** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
 
@@ -505,12 +505,14 @@ export function admitSessionCriticReview(options, deps = {}) {
     status: "admitted", packetId, packetDigest: prepared.packetDigest,
     admissionSha256: sha256(canonicalJson(admission.admission)) });
 }
-function buildResult({ packet, packetDigest, session, verdict }) {
+function buildResult({ packet, packetDigest, session, verdict, independence }) {
+  const fallback = independence === "caller-authored-fallback";
   return Object.freeze({
     schema: SESSION_CRITIC_RESULT_SCHEMA,
     packetId: packet.packetId,
     packetDigest,
-    session: { id: session, freshContext: true, historyInherited: false, mayDelegate: false },
+    session: { id: session, freshContext: !fallback, historyInherited: fallback, mayDelegate: false },
+    independence,
     candidate: { base: packet.candidate.base, commit: packet.candidate.commit, tree: packet.candidate.tree },
     reviewRange: { base: packet.diff.base, commit: packet.diff.commit, diffSha256: packet.diff.sha256 },
     rulesetSha: packet.ruleset.oid,
@@ -520,15 +522,15 @@ function buildResult({ packet, packetDigest, session, verdict }) {
 }
 function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
   const sessionBinding = packet.request.sessionBinding;
-  if (!exact(result, RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
+  if (!exact(result, Object.hasOwn(result ?? {}, "independence") ? [...RESULT_KEYS, "independence"] : RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
     || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
       : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
     || sessionBinding.schema !== SESSION_PACKET_BINDING_SCHEMA
     || !exact(result.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
-    || result.session.id !== sessionBinding.sessionId || result.session.freshContext !== true
-    || result.session.historyInherited !== false || result.session.mayDelegate !== false
+    || result.session.id !== sessionBinding.sessionId || !independenceFlagsConsistent(result.independence, result.session)
+    || result.session.mayDelegate !== false
     || packet.route.projectionDigest !== sessionBinding.preflightSha256
     || packet.route.assurance !== sessionBinding.assurance
     || canonicalJson(result.candidate) !== canonicalJson({ base: packet.candidate.base, commit: packet.candidate.commit, tree: packet.candidate.tree })
@@ -550,6 +552,7 @@ function receiptFor(result) {
     verdictSha256: sha256(canonicalJson(result.verdict)),
     findingCount: result.verdict.findings.length,
     reviewPass: result.verdict.pass,
+    ...(Object.hasOwn(result, "independence") ? { independence: result.independence } : {}),
   });
 }
 
@@ -669,12 +672,12 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
 
   let event = null;
-  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
-  validateResult(result, prepared.packet, prepared.packetDigest);
-  const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
-    sessionId: id, verdictSha256: expectedReceipt.verdictSha256 }, options, deps);
+    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps);
+  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence });
+  validateResult(result, prepared.packet, prepared.packetDigest);
+  const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
   const receipt = validateSessionCriticReceipt(receiptFor(recorded.record.body));
   if (canonicalJson(receipt) !== canonicalJson(expectedReceipt)) fail("SCF-RECEIPT-BINDING");

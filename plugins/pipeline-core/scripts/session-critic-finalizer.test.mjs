@@ -1551,7 +1551,14 @@ test("Cut A (4) a bound Source record completes with the receipt unchanged and s
     assert.equal(result.origin, "source");
     assert.equal(result.nativeAttestation, false);
     assert.equal(validateSessionCriticReceipt(result.receipt), result.receipt);
-    assert.equal(Object.hasOwn(result.receipt, "independence"), false);
+    // D2a: a source-issued finalization keeps the fresh-context flags and now carries its label.
+    assert.equal(result.receipt.independence, "source-issued-origin");
+    assert.equal(result.receipt.session.freshContext, true);
+    assert.equal(result.receipt.session.historyInherited, false);
+    // A legacy receipt (no label, true/false) stays valid; a source label with false/true is refused.
+    const { independence: _label, ...legacy } = result.receipt;
+    assert.equal(validateSessionCriticReceipt(legacy), legacy);
+    assert.throws(() => validateSessionCriticReceipt({ ...result.receipt, session: { ...result.receipt.session, freshContext: false, historyInherited: true } }), codeIs("SCF-RECEIPT"));
   } finally { cleanup(fx); }
 });
 
@@ -1777,7 +1784,16 @@ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps re
     assert.equal(result.independence, "caller-authored-fallback");
     assert.equal(result.origin, "caller-authored");
     assert.equal(result.receipt.reviewPass, true);
-    assert.equal(Object.hasOwn(result.receipt, "independence"), false);
+    // D2a: the receipt of a self-authored verdict does not claim a fresh independent context.
+    assert.equal(result.receipt.independence, "caller-authored-fallback");
+    assert.equal(result.receipt.session.freshContext, false);
+    assert.equal(result.receipt.session.historyInherited, true);
+    assert.equal(validateSessionCriticReceipt(result.receipt), result.receipt);
+    const flags = (freshContext, historyInherited) => ({ ...result.receipt.session, freshContext, historyInherited });
+    assert.throws(() => validateSessionCriticReceipt({ ...result.receipt, session: flags(true, false) }), codeIs("SCF-RECEIPT"));
+    assert.throws(() => validateSessionCriticReceipt({ ...result.receipt, independence: "unknown-label" }), codeIs("SCF-RECEIPT"));
+    assert.throws(() => validateSessionCriticReceipt({ ...result.receipt, independence: "source-issued-origin" }), codeIs("SCF-RECEIPT"));
+    assert.throws(() => validateSessionCriticReceipt({ ...result.receipt, session: flags(true, true) }), codeIs("SCF-RECEIPT"));
   } finally { cleanup(fx); }
 });
 
