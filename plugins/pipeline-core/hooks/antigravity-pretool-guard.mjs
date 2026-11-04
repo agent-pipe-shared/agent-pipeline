@@ -638,7 +638,10 @@ export async function runAntigravityPreToolGuard(rawInput) {
       }
       for (const target of readTargets) {
         const refusal = nativeReadTargetRefusal(target, readRoot, workspaceRoots);
-        if (refusal !== null) deny(refusal, { code: "native-read-credential-root", fields: { tool: normalized.toolName, kind: target.kind } });
+        // Candidate 19 (D5): the diagnostic header carries the guard code the refusal text itself names (GUARD-READ-TARGET-MISSING for a plain
+        // missing project file) instead of a fixed credential-root label that read as a credential block for every refused native read.
+        const innerCode = /\bGUARD-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/u.exec(refusal)?.[0];
+        if (refusal !== null) deny(refusal, { code: innerCode ?? "native-read-refused", fields: { tool: normalized.toolName, kind: target.kind } });
       }
     }
     allow();

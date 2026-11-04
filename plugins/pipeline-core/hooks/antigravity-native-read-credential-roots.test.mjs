@@ -227,3 +227,23 @@ test("D87-6 the denial text is the one the Claude native Read produces, so the t
     assert.match(d.text, /non-credential file/u, `${name}: the typed refusal states its repair\n${d.text}`);
   }
 }));
+
+// Candidate 19 (D5, AGY greenfield priority 5): the diagnostic header on stderr named a fixed credential-root code for every refused native read, so a
+// plain missing project file read as a credential block. The header now carries the guard code the refusal text names.
+function headerCode(root, toolCall) {
+  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
+  const child = spawnSync(process.execPath, [adapter], {
+    cwd: root, input: JSON.stringify({ cwd: root, ...toolCall }), encoding: "utf8", timeout: 60000,
+    env: { ...baseEnv, CLAUDE_PROJECT_DIR: root },
+  });
+  return /\bcode=(\S+)/u.exec(String(child.stderr))?.[1] ?? null;
+}
+
+test("D5 the diagnostic header names the real guard code: a missing project file is GUARD-READ-TARGET-MISSING, a credential file GUARD-READ-CREDENTIAL-TARGET", { timeout: 300000 }, () => withFixture((root) => {
+  for (const path of [join(root, "docs", "does-not-exist.md"), "docs/does-not-exist.md"]) {
+    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-TARGET-MISSING", path);
+  }
+  for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
+    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-CREDENTIAL-TARGET", path);
+  }
+}));
