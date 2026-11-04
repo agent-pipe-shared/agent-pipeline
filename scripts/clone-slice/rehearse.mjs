@@ -24,5 +24,8 @@ let registration = "";
 if (r.status === 0) {
   const check = sh("node", ["harness/scripts/check-verify-suite-registration.mjs"], clone);
   registration = `registration check exit ${check.status}: ${(check.stdout + check.stderr).trim().split("\n").slice(-3).join(" | ")}\n`;
+  // Candidate 19 (w160): the same holds for the case-completion registry; a suite that registers its cases but has no registry row or caseCompletion policy is reported VULNERABLE-UNREGISTERED.
+  const completion = sh("node", ["harness/scripts/check-verify-case-completion.mjs"], clone);
+  registration += `case-completion check exit ${completion.status}: ${(completion.stdout + completion.stderr).trim().split("\n").slice(-3).join(" | ")}\n`;
 }
 console.log(`start ${head}\nexit ${r.status}\n${registration}${r.stdout.split("\n").slice(-30).join("\n")}\n${r.stderr.split("\n").slice(-15).join("\n")}`);
