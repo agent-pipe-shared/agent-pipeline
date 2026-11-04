@@ -286,7 +286,7 @@ Windows facts received 2026-11-04 (from the transcript of the native Windows run
 
 ### Candidate 19c build log (2026-11-04, after the sitting)
 
-Second apply script `specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh`, step order: w138 w162 w165 w166 w190 w171 w173 w167 w191 w168 w172 w169 w170 w177 w174 w175 w176 w193 w192, then the derived-files refresh. Every slice below was built by a pipeline Goldfish in a scratch clone (host commits do not land on that route), then verified, completed and committed by the Elephant. Rehearsal of the whole script in a fresh clone exits 0 with the registration check clean (1173 registered, 0 unregistered) and the case-completion check clean (389 entries); this proves applicability and registration only. Nothing here is Full Verify, Critic review or a run of a real runner.
+Second apply script `specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19c.sh`, step order: w138 w162 w165 w166 w190 w171 w173 w167 w191 w168 w172 w169 w170 w177 w179 w174 w175 w176 w193 w194 w192 w180, then the derived-files refresh. Every slice below was built by a pipeline Goldfish in a scratch clone (host commits do not land on that route), then verified, completed and committed by the Elephant. Rehearsal of the whole script in a fresh clone exits 0 with the registration check clean (1173 registered, 0 unregistered) and the case-completion check clean (389 entries); this proves applicability and registration only. Nothing here is Full Verify, Critic review or a run of a real runner.
 
 | Slice | Content | Items | Verified in the slice or chain clone | Open |
 |---|---|---|---|---|
@@ -301,10 +301,14 @@ Second apply script `specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7
 | w175 | generated runbooks for start, plan, implement, close and push; typed `runbook` link in the first call of the six standard commands | G5 | 20 generator cases, command suites | two exact-shape result pins restated under QG-04 |
 | w176, w193 | D4a: the push threat model gate refuses at plan approval, push preparation and feature close when a push approval is active; M1.4: the briefing tool derives and enforces module slice scopes | D4a, M1.4, F11 | 161, 91, 53, 12 cases | queue rows of `slice-queue add` hold owned-path patterns while a binding lists exact files, so `DBG-QUEUE-ROW-DRIFT` is possible end to end |
 | w190, w192 | the never-liftable kernel paths and the split map list every module the chain adds | closure pins | kernel closure green on the full chain | |
+| w179 | late-binding step 3: the guard admits PRD and Spec edits in the draft, the remaining authority readers follow the draft, the Critic preflight binds the digest it read | late-binding ADR | slice suites | own Critic review |
+| w180 | late-binding step 4: `prepare-seal` writes one digest-bound seal plan, the plan digest is an additive key of the design approval binding, `approve-plan` seals in the same transaction (rebased variant ordered after w192) | late-binding ADR | on the chain clone: kernel closure, seal plan 21, design approval binding 49, seal readers 12, plan-spec-state-v2 27, guard lifecycle 427, onboarding continuity 324; registration 1174, case completion 389 | Critic preflight binding is an injection point only; no live `approve-plan` run with the session authority catalogue |
+| w194 | the SECGATE-2 installed-plugin fixture copies the shared freshness module | D4b/E3 | SECGATE-2 1/1, file exit 0 in the chain clone | |
+| w181 (running) | late-binding step 5: bind trigger by EL-19 scope, migration of bound projects (reader and exits only), repair for every new state, happy path and runbooks | late-binding ADR | not yet delivered | |
 
 Found only on the full chain, not in any slice clone: the kernel closure suite (five modules, one stale dynamic-import table, w192), the capability inventory (w191) and the push-init delivery anchor (w193). Environment finding, not ours: `human-guard-override.test.mjs` case Q9 is red in the unchanged base clone (`domain-ancestor-unsafe`).
 
-Still to build: late-binding steps 3 to 5, Q2 control-root half, F9 rest. Then a Full Verify on a rehearsal clone, an own Critic review of the late-binding chain and of D3 (the PO lifted the suspension for these only), the stamp of 19c by the Elephant and the PO's install. Nothing in this section is accepted by the PO.
+Still to build: late-binding step 5 (dispatched as w181), Q2 control-root half (not reproduced in a clone; recorded as non-reproducible, the refusal texts are pinned), F9 rest (reworded pinned refusal texts, not sliced). Then a Full Verify on a rehearsal clone, an own Critic review of the late-binding chain and of D3 (the PO lifted the suspension for these only), the stamp of 19c by the Elephant and the PO's install. Nothing in this section is accepted by the PO.
 
 ## End note: derived files
 
