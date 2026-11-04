@@ -2244,6 +2244,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/existing-public-anchor.test.mjs"
     },
     {
+      "name": "control-plane-script-scan-tests",
+      "file": "plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs",
+      "invariantPinned": "A node script run from a repository path that names the Pipeline control-plane directory is refused with GUARD-CONTROLPLANE-SCRIPT; unreadable, oversized, symlinked and sanctioned plugin scripts are not claimed (C19-Q5, AC-108)",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs"
+    },
+    {
       "name": "git-stash-readonly-tests",
       "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",

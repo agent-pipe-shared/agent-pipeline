@@ -18,6 +18,7 @@ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL
 import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
 import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
 import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
@@ -273,7 +274,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     return verdict(0);
   }
   if (SHELL_TOOLS.includes(toolName)) {
-    const gateStrength = gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    const controlPlaneHit = controlPlaneScriptHit((input.tool_input.command ?? input.tool_input.CommandLine), root);
+    if (controlPlaneHit !== null) return controlPlaneScriptBlocked(controlPlaneHit);
+    const gateStrength =gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (gateStrength !== null) return gateStrength;
     // Second, and only when gate strength had nothing to say: the test-path authority gate's
     // shell lane. Ordered after its stricter sibling deliberately -- a command that weakens
