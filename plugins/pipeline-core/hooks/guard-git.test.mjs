@@ -821,7 +821,8 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
 // the consuming repository has no guard-config yet.
 check("GIT03-6 block  a missing marker is enforced by default", 'git commit -m "chore: bump"', BLOCK, {
   projectDir: NO_CONFIG_DIR,
-  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
+  // Candidate 19 (D7): the refusal also prints the accepted trailer form, so an agent does not need a second attempt to learn it.
+  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`"],
 });
 // GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
 // commitMessageFindings' readFile throw, the throw was swallowed, and the commit went

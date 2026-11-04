@@ -67,6 +67,8 @@ for (const [name, attempted, supplied] of controls) check(`draft shell refuses $
   assert.equal(hit?.verdict, 'block');
   assert.equal(hit?.lifecycleStatus, 'draft');
   assert.equal(hit?.lane, 'opaque-script-execution');
+  // Candidate 19 (D7): an absolute interpreter path in the refused command gets the bare-node spelling hint.
+  assert.match(hit?.reason ?? '', /Use the bare `node`/u);
 });
 for (const [name, metadata] of [
   ['matching planner marked mutating', { mutation: true, requiresConfirmation: true }],

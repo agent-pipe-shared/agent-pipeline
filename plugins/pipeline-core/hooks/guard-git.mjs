@@ -1122,6 +1122,10 @@ let inspection;
       "guardrails/git.md GIT-03: the anonymous `AI-Assisted: true` marker is the COMPLETE assistance signal.",
       "Provider or model co-author trailers, session URLs or IDs, and account identifiers turn public history into a correlation index, and public history cannot be unpublished.",
       "There is no override for this rule. Rewrite the message.",
+      // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
+      ...(blocking.some((f) => conventionCodes.has(f.code))
+        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own."]
+        : []),
       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
     ]);
   }

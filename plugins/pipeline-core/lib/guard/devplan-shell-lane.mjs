@@ -168,7 +168,15 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
         };
       }
       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
-      if (result.verdict === "block") return { ...result, candidate, lane };
+      if (result.verdict === "block") {
+        // Candidate 19 (D7): an absolute interpreter path is not the draft scratch-script shape, so the command reads as an opaque script run; say so and name the working spelling.
+        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 0
+          && isAbsolute(words[0]) && ["node", "node.exe"].includes(basename(words[0]).toLowerCase());
+        const reason = absoluteNode && typeof result.reason === "string"
+          ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
+          : result.reason;
+        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
+      }
       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
       if (advisory === null && typeof result.advisory === "string") {
         advisory = { advisory: true, notice: result.advisory, code: result.advisoryCode ?? null, candidate, lane };
