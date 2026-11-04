@@ -1,0 +1,97 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 50122b16a..db737401c 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -71,6 +71,19 @@ function resolveSubagentStopToolUseId(input) {
+   return meta.toolUseId;
+ }
+ 
++/**
++ * E1 (candidate 19): why the pending state could not be read at a stop. `readNativeGoldfishPending` answers every read failure with one code and the
++ * underlying error as `reason`; the stop dropped that reason, so a pending state that was never written and one that exists but could not be read (a
++ * private-path check, a Windows ACL fault) looked identical. The reason now travels, scrubbed of every path-like token and bounded, into the stop-failure
++ * record. Diagnostic only; it changes no admission.
++ * @returns {string|null}
++ */
++function pendingReadReason(pending) {
++  const code = typeof pending?.code === "string" && /^[A-Z0-9-]{1,40}$/u.test(pending.code) ? pending.code : "NGHS-PENDING-MISSING";
++  const cause = boundedErrorMessage({ message: typeof pending?.reason === "string" ? pending.reason : "" });
++  return cause ? `${code}: ${cause}` : code;
++}
++
+ // Any child that is not a known Goldfish role, has no usable meta file, names no pending dispatch, or belongs to a
+ // foreground (PostToolUse-completed) state is simply not this route's: the caller reports a silent not-applicable.
+ function readSubagentStopPending({ commonDir, input }) {
+@@ -79,7 +92,7 @@ function readSubagentStopPending({ commonDir, input }) {
+   const toolUseId = resolveSubagentStopToolUseId(input);
+   if (toolUseId === null) return { ok: false, code: "NGHF-STOP-UNRESOLVED" };
+   const pending = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: input.session_id, correlationId: toolUseId });
+-  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE" };
++  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending) };
+   if (pending.state.completionRoute !== NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
+     || pending.state.binding?.agentType !== agentType) return { ok: false, code: "NGHF-NOT-SUBAGENT-STOP-ROUTE" };
+   return { ok: true, pending };
+@@ -171,7 +184,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+       stopMkdir(directory, { recursive: true, mode: 0o700 });
+       stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
+         dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
+-        reason: null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+       return;
+     }
+     if (result?.status === "authored-commit-recorded") {
+@@ -377,7 +390,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+       // AC-164: an unresolvable marked Goldfish stop leaves a code-only record; a foreground state (NOT-SUBAGENT-STOP-ROUTE) is normal and silent.
+       if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
+         const marked = markedStopContract(input);
+-        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId };
++        if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId,
++          reason: typeof stop.reason === "string" ? stop.reason : null };
+       }
+       return fail(stop.code, "not-applicable");
+     }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index c4c2a3593..565a52231 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -653,7 +653,7 @@ const cases = [
+     assert.deepEqual(read.detail.extraPaths, ["src/extra.mjs"]);
+     assert.match(nativeGoldfishHookMessage(null, { stopFailure: read }), /src\/extra\.mjs/u);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
+-  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, stopInput }) => {
++  { id: "NGHF29", name: "A contract-bearing stop whose meta file cannot be resolved writes a record keyed by session and agent, with the code", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+     const before = snapshot(commonDir);
+     const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+     assert.equal(result.status, "not-applicable");
+@@ -667,6 +667,18 @@ const cases = [
+     assert.equal(recorded.code, "NGHF-STOP-UNRESOLVED");
+     assert.equal(recorded.dispatchId, binding.dispatchId);
+     assert.equal(readNativeGoldfishStopFailure({ commonDir }).code, "NGHF-STOP-UNRESOLVED");
++    // E1 (candidate 19): a stop whose meta file resolves but whose pending state cannot be read records WHY, scrubbed of every path, so a
++    // pending state that was never written and one that could not be read no longer look identical.
++    writeMeta("agent-orphan", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
++    const orphan = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding), { agent_id: "agent-orphan" }) }, dependencies);
++    assert.equal(orphan.code, "NGHF-PENDING-UNAVAILABLE");
++    const unavailable = diagEntries(commonDir).map((name) => JSON.parse(readFileSync(join(diagDir(commonDir), name), "utf8"))).find((entry) => entry.code === "NGHF-PENDING-UNAVAILABLE");
++    assert.ok(unavailable, "a record for the unavailable pending state exists");
++    assert.match(String(unavailable.reason), /^NGHS-PENDING-MISSING\b/u, "the read failure code travels");
++    assert.equal(String(unavailable.reason).length <= 200, true, "the reason is bounded");
++    assert.equal(JSON.stringify(unavailable).includes(root), false, "no host path travels");
++    assert.equal(readNativeGoldfishStopFailure({ commonDir }).reason === unavailable.reason || diagEntries(commonDir).length === 2, true);
++    assert.equal(facts.commits, 0);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
+   { id: "NGHF30", name: "A stop of an unmarked or non-Goldfish child writes no diagnostic at all", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
+     const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+index a30d0e765..2d0309dec 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+@@ -105,7 +105,7 @@ function newestStopFailure(commonDir) {
+     if (!/^stop-failure-.+\.json$/u.test(name)) continue;
+     try {
+       const entry = JSON.parse(readFileSync(join(directory, name), "utf8"));
+-      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId };
++      if (entry?.code === record.code && entry?.observedAt === record.observedAt) return { file: name, code: record.code, dispatchId: record.dispatchId, ...(typeof record.reason === "string" ? { reason: record.reason } : {}) };
+     } catch { /* skip */ }
+   }
+   return null;
