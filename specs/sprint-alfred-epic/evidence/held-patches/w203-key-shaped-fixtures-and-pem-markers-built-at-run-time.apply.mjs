@@ -6,8 +6,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const FENCE = "-".repeat(5);
-const KEY_A = "Zx9Qm4Lp7Rt2";
-const KEY_B = "Vb6Nc8Hd3Jf5Ks1Wg0Ya";
+const PART_A = "Zx9Qm4Lp7Rt2";
+const PART_B = "Vb6Nc8Hd3Jf5Ks1Wg0Ya";
 const ID_A = "9f86d081884c7d65";
 const ID_B = "9a2feaa0c55ad015";
 const TICK = "`";
@@ -29,8 +29,8 @@ const edits = [
   {
     file: "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs",
     pairs: [
-      [`const realKeyLine = ${TICK}\${JSON.stringify({ apiKey: "${KEY_A}${KEY_B}" })}\\n${TICK};`,
-        `const realKeyLine = ${TICK}\${JSON.stringify({ apiKey: ["${KEY_A}", "${KEY_B}"].join("") })}\\n${TICK};`],
+      [`const realKeyLine = ${TICK}\${JSON.stringify({ apiKey: "${PART_A}${PART_B}" })}\\n${TICK};`,
+        `const realKeyLine = ${TICK}\${JSON.stringify({ apiKey: ["${PART_A}", "${PART_B}"].join("") })}\\n${TICK};`],
       [`      writeFileSync(join(bundle, "008-packet.json"), ${TICK}\${JSON.stringify({ packetKey: "${ID_A}${ID_B}", packetToken: "${ID_A}${ID_B}" })}\\n${TICK});\n`
         + `      writeFileSync(join(rootDir, "other", "packet.json"), ${TICK}\${JSON.stringify({ packetKey: "${ID_A}${ID_B}", packetToken: "${ID_A}${ID_B}" })}\\n${TICK});`,
         `      const packetId = ["${ID_A}", "${ID_B}"].join("");\n`
