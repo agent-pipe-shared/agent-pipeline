@@ -25,6 +25,15 @@ name the coverage materialization checks: the plan path,
 `architecture/baseline.json`, every implementation-surface path and the task
 scope must each be covered by `disposition.scope`.
 
+Decomposition: read the declared modules against the responsibilities the Spec
+names. When one module carries more than one separable responsibility (two parts
+that could be built without talking to each other), or the design declares a
+single module for a Spec with several independent outcomes, raise it as a
+question to the Elephant: name the responsibilities that could be cut and say
+that a single module leaves no slice that can run in parallel. This is a
+question in the review, never a block, and a justified single module (one
+responsibility, small scope) is not a finding.
+
 Return one concise readiness review with references. The host, not this agent,
 creates the sanitized, dispatch-bound duty and execution receipts; never return
 or persist raw prompts, answers, paths, credentials, or private coordinates.
