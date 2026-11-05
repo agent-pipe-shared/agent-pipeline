@@ -103,7 +103,21 @@ What 19e builds from it (all held, nothing measured on Windows yet):
 
 Estimate (reasoning from the counts, not a promise): the first cycle stays near 75 to 100 starts; the second and third drop to about 15 each (lock, records that really changed, directories whose identity changed). That is about 130 starts, about 130 s, below the 330 s the host allows. The first cycle is the remaining cost; shrinking it further needs batching (Direction 1) or sharing between processes (Direction 3).
 
-Open from this measurement: (1) the admission deadline did not fire before the host limit; its budget should be re-derived from the host limit (a typed `GUARD-DISPATCH-SLOW` with a repair is better than a killed hook that lets the dispatch run unguarded); (2) the three cycles themselves (a design change: one boundary for the whole admission); (3) some trace lines are lost when several hook processes append at once (13 of 112 marks missing in one process), so counts must be read from the counters, not from line counts; (4) the eligible refusal still publishes its request under the lock (`hgo-publish-wait` to `hgo-publish-held`, 93 starts) and only w215/w218 reduce that.
+The deadline DID fire (w220, from the marks): in B the 295 s mark falls between the marks 1179 and 1180, the lock is removed right after it, and a new lock cycle that only reads starts 4.2 s later (A: 9.3 s later) and never reaches `candidate-git`. `prepareNativeGoldfishHostState` cleared the deadline in its `finally` and only then ran `rollbackGovernedItemQueue`, which enters the registry boundary (a whole cycle) with no deadline; the host ended the hook in it, so the refusal was never printed. B's "46 read-source" are two cycles (23 + 23), not one. w220 makes the preparation stop at 245 s and runs the rollback under the full 295 s window, and reports an unrestorable queue row in the refusal. Not proven by a mark that names the rollback (the peer's reading: consistent, alternatives not ruled out).
+
+Open from this measurement: (1) the joint Windows proof of w215, w218, w219 and w220 (needs the PO's apply, a stamp and the refreshed Windows copy); (2) the three cycles themselves (a design change: one boundary for the whole admission); (3) some trace lines are lost when several hook processes append at once (13 of 112 marks missing in one process), so counts must be read from the counters, not from line counts; (4) the eligible refusal still publishes its request under the lock (`hgo-publish-wait` to `hgo-publish-held`, 93 starts) and only w215/w218 reduce that.
+
+## 2h. Full Verify of the 19e chain (Linux, 2026-11-05)
+
+Three Full Verify runs on clean single-remote clones of the chain (`--mode candidate --no-reuse`, 1176 steps):
+
+| Run | Reds | Cause and fix |
+|---|---|---|
+| 1 | 7 | three case-completion declaration mismatches and the registry pin (w222), a stale PowerShell parity row for a plain `rg` (w222), the ENOTDIR regression of w219 (w221), and a two-remote clone that made security-scan ambiguous (environment: one remote in the clone) |
+| 2 | 1 | `codex-pretool-guard-tests` cases 8 and 15: the 8 s adapter spawn timeout of the test is shorter than an adapter start under load; green alone (w223, 30 s, below the 45 s hook timeout, no assertion change) |
+| 3 | 0 | commit `cb3dbfe94`, clean tree, exact binding, 1176 steps all exit 0, top-level exit 0, wall 6020 s |
+
+This is Linux evidence only. It says nothing about the Windows latency: the estimates in 2g stay reasoning until the peer measures a stamped build.
 
 ## 3. Measurement needed first
 
