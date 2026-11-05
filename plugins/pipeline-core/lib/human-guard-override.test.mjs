@@ -174,6 +174,22 @@ test("lifecycle-not-ready denial sets never create or consume a human-override r
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("a consumption with no capability file answers absent without entering the registry boundary or creating anything", () => {
+  const root = fixture();
+  try {
+    const toolInput = { command: "cd sub && wc -l a.txt | tail -2" };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-PARSE-UNSUPPORTED: the command is outside the closed Pipeline shell grammar" }];
+    const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials });
+    assert.equal(consumed.status, "absent");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority")), false, "the registry boundary (lock and registry reads) was not entered");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "human-guard-overrides")), false, "the pre-check creates nothing");
+    // With the store present but its capabilities directory empty the answer is the same and the registry lock is never taken.
+    mkdirSync(join(root, ".git", "agent-pipeline", "human-guard-overrides", "capabilities"), { recursive: true });
+    assert.equal(consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials }).status, "absent");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("lifecycle co-denial diagnostics remain bounded", () => {
   const long = "X".repeat(2_000);
   const recovery = humanGuardOverrideInternals.lifecycleNotReadyRecovery([

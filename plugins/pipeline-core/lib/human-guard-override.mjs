@@ -4996,6 +4996,16 @@ function consumeHumanGuardOverrideCore({
     try { repo = controlPathTopology(rootDir); }
     catch { return { status: "absent" }; }
   }
+  // Nothing can be consumed when no capability file exists, and the consumption below answers `absent` for that case without writing
+  // anything. Entering its boundary first takes the registry lock and reads the whole registry (about a hundred native process starts, two
+  // minutes, on Windows) just to find an empty directory, and every refused command with no armed capability paid that before its
+  // refusal could be printed. This is the same plain directory read the consumption starts with, made before the boundary instead of
+  // inside it; it creates nothing. A directory that cannot be read answers `absent` there too.
+  try {
+    if (!readdirSync(join(repo.common, "agent-pipeline", "human-guard-overrides", "capabilities")).some((name) => name.endsWith(".json"))) return { status: "absent" };
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return { status: "absent" };
+  }
   return hgoConsumptionBoundary(repo, () => {
   const paths = storage(repo.common);
   const toolInputSha256 = toolInputIdentitySha256(toolName, toolInput);
