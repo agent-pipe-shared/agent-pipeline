@@ -1,0 +1,76 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 9fa63ae6d..9de3f5ff2 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -305,7 +305,12 @@
+           "D177-b-member-records-once-per-admission",
+           "D177-c-batch-member-records-equal-single",
+           "D177-differential-settled",
++          "D177-registry-lock-vanished-between-listing-and-stat",
++          "D177-rollback-runs-under-its-own-later-deadline",
+           "D177-slow-phase-releases-lock",
++          "D177-source-digest-read-once-per-identity",
++          "D177-trace-progress-native-observation-sites",
++          "D177-trace-progress-survives-a-killed-hook",
+           "NGHS01",
+           "NGHS02",
+           "NGHS03",
+@@ -1348,7 +1353,8 @@
+           "SAS16",
+           "SAS17",
+           "SAS18",
+-          "SAS19"
++          "SAS19",
++          "SAS20"
+         ],
+         "maxBytes": 65536
+       }
+@@ -2299,7 +2305,8 @@
+           "GD79",
+           "GD80",
+           "GD81",
+-          "GD82"
++          "GD82",
++          "GD83"
+         ],
+         "maxBytes": 65536
+       },
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 71414d0d0..bf27a6329 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -259,7 +259,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",288],
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",295],
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+index f4a1daa26..2ca2d5aa3 100644
+--- a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
++++ b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+@@ -37,7 +37,10 @@ function withRoot(body) {
+ // One row per shape of ADMITTED_GRAMMAR_SHAPES (same order). A shape the PowerShell dialect must refuse says why; the walk fails when a shape is added
+ // to the Bash table without a row here, so the two dialects cannot drift apart silently.
+ const SHAPE_DISPOSITION = [
+-  { bashOnly: "rg, cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands; reads there are Get-Content, Get-ChildItem or the native Read, Glob and Grep tools. The git part of this shape is walked by the git cases below" },
++  // E7 (9b0935da5): the PowerShell tool admits a single read-only rg exactly like the Bash grammar, so the plain-singleton shape is admitted in both dialects.
++  // cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands; reads there are Get-Content, Get-ChildItem or the native
++  // Read, Glob and Grep tools. The git part of this shape is walked by the git cases below.
++  { bashOnly: "cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands (a read-only rg is admitted, E7)", psExitCode: 0 },
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+@@ -50,7 +53,8 @@ test("every shape of the Bash grammar table has a disposition, and a Bash-only s
+   ADMITTED_GRAMMAR_SHAPES.forEach((shape, index) => {
+     assert.equal(isReadOnlyDiagnosticCommand(shape.example, root), true, `Bash admits its own example: ${shape.example}`);
+     assert.equal(typeof SHAPE_DISPOSITION[index].bashOnly, "string");
+-    assert.equal(ps(shape.example).exitCode, 2, `Bash-only shape stays refused: ${shape.example}`);
++    const expected = SHAPE_DISPOSITION[index].psExitCode ?? 2;
++    assert.equal(ps(shape.example).exitCode, expected, expected === 2 ? `Bash-only shape stays refused: ${shape.example}` : `shape the PowerShell dialect admits like Bash: ${shape.example}`);
+   });
+ }));
+ 

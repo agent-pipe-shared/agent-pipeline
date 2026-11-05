@@ -10,6 +10,8 @@
 #   w218  the same marks: every native write cleared the whole native memo; a write now drops only the written object, its directory and what is below it
 #   w219  the same marks: a refused command with no capability paid ~110 starts (lock, whole registry, domain-owner reads) in the consumption attempt; no capability file now answers absent first (protected file, hence PO applies)
 #   w220  the same marks: the 295 s admission deadline fires but is cleared before the queue rollback, which then runs a whole unbounded registry cycle until the host ends the hook; the preparation now stops at 245 s and the rollback runs under a second, later deadline (builds on w215: same test file)
+#   w221  first Full Verify of this chain (codex pretool guard case 24): w219 also answered absent for ENOTDIR; only a missing capabilities directory (ENOENT) answers absent now (protected file, hence PO applies; builds on w219)
+#   w222  first Full Verify of this chain: case-completion policies lacked the D177 cases of the native host-state suite, SAS20 and GD83, the registry pin of the repair suite moves 288 -> 295, and the PowerShell parity row for a plain rg expects the E7 admission
 # Run with: bash /absolute/path/to/specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19e.sh   (from the repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches
@@ -33,6 +35,8 @@ step2 w215-an-installed-source-file-is-read-once-per-file-identity "fix(authorit
 step2 w218-a-native-write-drops-only-the-memo-entries-of-the-written-object-its-directory-and-what-is-below-it "fix(authority): a native write drops only the memo entries of the written object, its directory and what is below it"
 step2 w219-a-consumption-with-no-capability-file-answers-absent-before-the-registry-boundary "fix(guard): a consumption with no capability file answers absent before it enters the registry boundary"
 step2 w220-the-queue-rollback-of-a-refused-admission-runs-under-its-own-later-deadline "fix(dispatch): the queue rollback of a refused admission runs under its own later deadline instead of none"
+step2 w221-a-consumption-answers-absent-only-for-a-capabilities-directory-that-is-not-there "fix(guard): a consumption answers absent only for a capabilities directory that is not there, a file in its place still fails closed"
+step2 w222-the-case-completion-policies-follow-the-cases-candidate-19-added-and-the-powershell-parity-row-for-rg "test(verify): extend the case-completion policies by the cases candidate 19 added and restate the PowerShell parity row for a read-only rg"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
