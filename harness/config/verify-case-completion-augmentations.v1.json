@@ -309,6 +309,7 @@
           "D177-rollback-runs-under-its-own-later-deadline",
           "D177-slow-phase-releases-lock",
           "D177-source-digest-read-once-per-identity",
+          "D177-stop-pending-read-waits-for-a-held-registry-lock",
           "D177-trace-progress-native-observation-sites",
           "D177-trace-progress-survives-a-killed-hook",
           "NGHS01",

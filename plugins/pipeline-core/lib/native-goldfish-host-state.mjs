@@ -416,10 +416,15 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
 }
 
 /** Read the pending Claude or Codex dispatch selected by the exact stop event. */
-export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId } = {}) {
+// A stop reads its pending state through the registry, whose lock a sibling hook of the same dispatch (the launching hook, a guard, another stop)
+// may still hold: one lock cycle takes 60 to 100 s on Windows. Answering "the pending state is missing" at the first held lock (live on Windows
+// with 19f: NGHF-PENDING-UNAVAILABLE, reason registry-lock-held) lost a Goldfish's delivery although the pending state existed. The read waits for
+// the lock, bounded well inside the 300 s stop hook budget; only a lock still held after that is reported, with the same reason as before.
+export const NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS = 90_000;
+export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait } = {}) {
   if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return fail("NGHS-READ-INPUT");
   try {
-    const stored = readPrivate(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`));
+    const stored = retryWhileSessionAuthorityLockHeld(() => read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`)), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}) });
     const state = stored.value;
     if (!nativeStateSchema(state.schema) || state.runner !== runner
       || state.sessionId !== sessionId || state.toolUseId !== correlationId

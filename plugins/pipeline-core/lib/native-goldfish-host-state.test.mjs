@@ -299,6 +299,27 @@ const cases = [
       assert.equal(reads, 2, "a refused path reads nothing");
     } finally { rmSync(dir, { recursive: true, force: true }); }
   } },
+  { id: "D177-stop-pending-read-waits-for-a-held-registry-lock", name: "a stop's read of its pending state waits for a registry lock a sibling hook still holds (bounded) instead of reporting the state missing; a lock still held after the budget is reported with its reason, and any other fault is not retried", run: async () => {
+    const mod = await import("./native-goldfish-host-state.mjs");
+    const value = { schema: mod.NATIVE_GOLDFISH_HOST_STATE_SCHEMA, runner: "claude", sessionId: "s1", toolUseId: "t1", binding: { candidateCommit: "a".repeat(40) } };
+    const held = () => Object.assign(new Error("registry-lock-held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
+    const clock = (start = 0) => { let at = start; return { sleep: (ms) => { at += ms; }, now: () => at }; };
+    const input = { commonDir: "unused", runner: "claude", sessionId: "s1", correlationId: "t1" };
+    // The lock is held for the first two reads and free for the third.
+    let calls = 0;
+    const waited = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; if (calls < 3) throw held(); return { value, sha256: "b".repeat(64) }; }, lockWait: clock() });
+    assert.equal(waited.ok, true, JSON.stringify(waited));assert.equal(calls, 3, "two held reads were waited for");
+    // A lock that stays held past the budget is reported exactly as before (the code the stop-failure record names), not hidden.
+    calls = 0;
+    const stuck = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; throw held(); }, lockWait: clock() });
+    assert.equal(stuck.ok, false);assert.equal(stuck.code, "NGHS-PENDING-MISSING");assert.equal(stuck.reason, "registry-lock-held");
+    assert.ok(calls > 3, "the read was retried until the budget ended");
+    // Any other fault is not waited for.
+    calls = 0;
+    const absent = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; throw Object.assign(new Error("gone"), { code: "ENOENT" }); }, lockWait: clock() });
+    assert.equal(absent.code, "NGHS-PENDING-MISSING");assert.equal(calls, 1, "a missing file is not retried");
+    assert.ok(mod.NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS >= 60_000 && mod.NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS < 300_000, "the wait fits inside the 300 s stop hook");
+  } },
   { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
     const backend = await import("./windows-owned-authority-backend.mjs");
     const writerKey = Symbol.for("pipeline.authority-trace-progress");
