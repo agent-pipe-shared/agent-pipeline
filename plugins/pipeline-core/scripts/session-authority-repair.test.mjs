@@ -764,6 +764,33 @@ const cases = [
     assert.equal(trace.authorityMemo.size, 1, JSON.stringify(trace));
     assert.equal(trace.elapsedMs, 5);
   }) },
+  { id: "SAS20", name: "authority memo (10) a write drops only the entries of the written object, its directory and what is below it; a read elsewhere stays memoized and a hit is still identity-checked", run: () => memoFixture(({ dir, calls, file }) => {
+    const sibling = join(dir, "sub", "b.txt"), other = join(dir, "other", "c.txt");
+    mkdirSync(join(dir, "sub"), { recursive: true }); mkdirSync(join(dir, "other"), { recursive: true });
+    writeFileSync(file, "one"); writeFileSync(sibling, "two"); writeFileSync(other, "three");
+    const read = (path) => readWindowsOwnedAuthorityFile({ path, maxBytes: 100 });
+    read(file); read(sibling); read(other);
+    assert.deepEqual(calls, ["read", "read", "read"]);
+    // A publish of a file in sub/ drops that file's entry only; the other two reads stay memoized.
+    publishWindowsOwnedAuthorityFile({ path: sibling, bytes: Buffer.from("x"), expectedSha256: null, expectedFacts: null });
+    read(file); read(other);
+    assert.deepEqual(calls, ["read", "read", "read", "publish"], "reads outside the written object are not repeated");
+    read(sibling);
+    assert.equal(calls.at(-1), "read", "the written file is read again");
+    // A removal of a directory drops what is below it.
+    read(sibling);
+    const before = calls.length;
+    removeWindowsOwnedAuthorityFile({ path: join(dir, "sub"), expectedSha256: "b".repeat(64), expectedFacts: MEMO_FACTS });
+    read(sibling);
+    assert.deepEqual(calls.slice(before), ["remove", "read"], "an entry below the removed directory is read again");
+    read(other);
+    assert.equal(calls.length, before + 2, "an unrelated entry is still memoized");
+    // A hit is still checked against the object's own identity: a changed file is read again although no write went through this module.
+    writeFileSync(other, "four-longer");
+    read(other);
+    assert.equal(calls.at(-1), "read");
+    assert.equal(calls.length, before + 3);
+  }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

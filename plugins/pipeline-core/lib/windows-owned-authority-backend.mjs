@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {isAbsolute,resolve} from 'node:path';
+import {dirname,isAbsolute,resolve,sep} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 import {assertAdmissionDeadline} from './admission-deadline.mjs';
@@ -72,9 +72,18 @@ export function nativeAuthorityStats(){
  return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoSize:authorityMemo.size};
 }
 function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
+// A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
+// still compares the observed object's own identity (device, file id, size, times), so an entry elsewhere in the tree stays valid across the write
+// and stays checked on every hit. Dropping only these entries, not the whole memo, keeps the many unrelated reads that follow a publish from
+// each starting a new native process (about one second each on Windows).
+function forgetMemoAround(written){
+ // Paths compare without case: a case-insensitive file system may spell one object two ways, and dropping too much is harmless.
+ const folded=written.toLowerCase(),parent=dirname(folded),below=folded.endsWith(sep)?folded:folded+sep;
+ for(const [key,entry] of authorityMemo){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below))authorityMemo.delete(key);}
+}
 function invoke(request){
  const operation=request.operation;
- if(MEMO_MUTATING.has(operation)){authorityMemo.clear();try{return invokeNative(request);}finally{authorityMemo.clear();}}
+ if(MEMO_MUTATING.has(operation)){forgetMemoAround(request.path);try{return invokeNative(request);}finally{forgetMemoAround(request.path);}}
  if(!MEMO_READ_ONLY.has(operation)||process.env.PIPELINE_AUTHORITY_NO_MEMO==='1')return invokeNative(request);
  const key=JSON.stringify([operation,request.path,request.directory??null,request.boundaryRoot??null,request.maxBytes??null]);
  const before=memoIdentity(request.path);
@@ -85,7 +94,7 @@ function invoke(request){
  // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
  assertAdmissionDeadline();
  const value=invokeNative(request);
- if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
+ if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
  return value;
 }
 function invokeNative(request){
