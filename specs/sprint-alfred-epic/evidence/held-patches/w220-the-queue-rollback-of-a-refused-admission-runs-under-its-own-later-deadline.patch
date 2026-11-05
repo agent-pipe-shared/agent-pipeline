@@ -1,0 +1,89 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 40aa2edd6..165243b6e 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -215,17 +215,45 @@ export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
+   // queue row it wrote is restored below like for any other refusal.
+   const deadline = args?.admissionDeadline;
+   const realClockDeadline = deadline && typeof deadline === "object" && typeof deadline.now !== "function";
++  const windows = realClockDeadline ? admissionDeadlineWindows(deadline) : null;
+   let result;
+   try {
+-    if (realClockDeadline) setAdmissionDeadline(deadline);
++    if (realClockDeadline) setAdmissionDeadline(windows.preparation);
+     result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
+   } catch (error) {
+     if (error?.code !== "GUARD-DISPATCH-SLOW") throw error;
+     result = { ok: false, code: error.code, reason: error.reason ?? error.message ?? null, ...(typeof error.repair === "string" ? { repair: error.repair } : {}) };
+   } finally { if (realClockDeadline) clearAdmissionDeadline(); }
+-  if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
++  if (result?.ok !== true) {
++    const retained = restoreWrittenQueueRows(written, windows, dependencies.rollbackGovernedItemQueueFn ?? rollbackGovernedItemQueue);
++    if (retained > 0 && result && typeof result === "object") result = { ...result, reason: `${result.reason ?? result.code ?? "the admission was refused"}; ${QUEUE_ROW_RETAINED_NOTICE}` };
++  }
+   return result;
+ }
++// The rollback of a refused admission enters the registry boundary like any other writer, which on a slow host is a whole registry cycle. The
++// preparation therefore stops EARLIER than the hook's budget, and the rollback runs under the full budget as a second, later deadline. A
++// measured Windows run (2026-11-05) let the preparation overrun, cleared the deadline in the `finally` above and then ran the rollback
++// without any: a full cycle of about a hundred native process starts, and the host ended the hook before it could print the refusal.
++const ROLLBACK_RESERVE_MS = 50_000;
++/** The preparation window (the budget less the rollback reserve) and the rollback window (the whole budget), both from the same start. */
++export function admissionDeadlineWindows({ startMs, budgetMs } = {}) {
++  const reserve = Number.isFinite(budgetMs) && budgetMs > 2 * ROLLBACK_RESERVE_MS ? ROLLBACK_RESERVE_MS : 0;
++  return { preparation: { startMs, budgetMs: budgetMs - reserve }, rollback: { startMs, budgetMs } };
++}
++const QUEUE_ROW_RETAINED_NOTICE = "the queue row it wrote could not be restored in time and stays; run the routine heal, or cancel the slice, to release it";
++/** Restores every queue row a refused admission wrote, newest first, under the rollback window; returns how many rows stay unrestored. */
++export function restoreWrittenQueueRows(written, windows, rollbackFn) {
++  if (written.length === 0) return 0;
++  let retained = 0;
++  try {
++    if (windows) setAdmissionDeadline(windows.rollback);
++    for (const row of written.reverse()) {
++      const outcome = rollbackFn(row);
++      if (outcome?.status === "refused" && outcome.code === "GUARD-DISPATCH-SLOW") retained += 1;
++    }
++  } finally { if (windows) clearAdmissionDeadline(); }
++  return retained;
++}
+ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered, admissionDeadline = null } = {}, dependencies = {}, written = []) {
+   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
+   const fields = toolFields(runner, input);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 574872c62..ec8a41a9e 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -208,6 +208,32 @@ const cases = [
+       assert.equal(reg.statListedRegistryEntry(repo, lock).isFile(), true, "an existing lock is statted as before");
+     } finally { rmSync(commonDir, { recursive: true, force: true }); }
+   } },
++  { id: "D177-rollback-runs-under-its-own-later-deadline", name: "D177 the preparation stops earlier than the hook budget and the queue rollback of a refused admission runs under the full budget as a second deadline that is cleared afterwards; a rollback that overruns is counted as a retained row and named in the refusal", run: async () => {
++    const mod = await import("./native-goldfish-host-state.mjs");
++    const dl = await import("./admission-deadline.mjs");
++    const windows = mod.admissionDeadlineWindows({ startMs: 1000, budgetMs: 300000 });
++    assert.deepEqual(windows, { preparation: { startMs: 1000, budgetMs: 250000 }, rollback: { startMs: 1000, budgetMs: 300000 } });
++    assert.deepEqual(mod.admissionDeadlineWindows({ startMs: 1000, budgetMs: 60000 }).preparation, { startMs: 1000, budgetMs: 60000 }, "a small budget keeps no reserve");
++    assert.equal(dl.admissionDeadlineActive(), false);
++    // The rollback runs with a deadline set (the second, later window), one call per row newest first, and clears it afterwards.
++    const seen = [];
++    const retained = mod.restoreWrittenQueueRows(["first", "second"], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, (row) => { seen.push([row, dl.admissionDeadlineActive()]); return { status: "restored" }; });
++    assert.deepEqual(seen, [["second", true], ["first", true]]);
++    assert.equal(retained, 0);
++    assert.equal(dl.admissionDeadlineActive(), false, "cleared after the rollback");
++    // A rollback that runs out of its window is counted, and the next row is still tried.
++    const slow = mod.restoreWrittenQueueRows(["a", "b"], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, (row) => (row === "b" ? { status: "refused", code: "GUARD-DISPATCH-SLOW" } : { status: "restored" }));
++    assert.equal(slow, 1);
++    assert.equal(dl.admissionDeadlineActive(), false);
++    // No window (an injected clock) sets nothing; no rows do nothing.
++    const none = mod.restoreWrittenQueueRows(["x"], null, () => { assert.equal(dl.admissionDeadlineActive(), false); return { status: "restored" }; });
++    assert.equal(none, 0);
++    assert.equal(mod.restoreWrittenQueueRows([], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, () => assert.fail("no row, no call")), 0);
++    // An expired rollback window really stops a native observation, so the retained row is what the refusal reports.
++    dl.setAdmissionDeadline({ startMs: Date.now() - 400000, budgetMs: 300000 });
++    assert.throws(() => dl.assertAdmissionDeadline(), (error) => error.code === "GUARD-DISPATCH-SLOW");
++    dl.clearAdmissionDeadline();
++  } },
+   { id: "D177-slow-phase-releases-lock", name: "D177 a stubbed clock past the budget yields GUARD-DISPATCH-SLOW naming the phase, one stderr-style line per phase, and the registry lock is free afterwards", run: () => fixture(({ root }) => {
+     const { original, repository, runtime, items } = d177Setup(root, false);
+     const lines = []; let calls = 0;

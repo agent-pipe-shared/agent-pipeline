@@ -9,6 +9,7 @@
 #   w215  19d marks, dispatch A and B: 320 PowerShell starts in 330 s; 92 were participant() re-reading every installed source file at each port construction; the digest is kept per process by file identity
 #   w218  the same marks: every native write cleared the whole native memo; a write now drops only the written object, its directory and what is below it
 #   w219  the same marks: a refused command with no capability paid ~110 starts (lock, whole registry, domain-owner reads) in the consumption attempt; no capability file now answers absent first (protected file, hence PO applies)
+#   w220  the same marks: the 295 s admission deadline fires but is cleared before the queue rollback, which then runs a whole unbounded registry cycle until the host ends the hook; the preparation now stops at 245 s and the rollback runs under a second, later deadline (builds on w215: same test file)
 # Run with: bash /absolute/path/to/specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19e.sh   (from the repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches
@@ -31,6 +32,7 @@ step2 w214-the-closure-walk-skips-a-registry-lock-that-vanished-between-listing-
 step2 w215-an-installed-source-file-is-read-once-per-file-identity "fix(authority): an installed source file is read once per file identity instead of at every port construction"
 step2 w218-a-native-write-drops-only-the-memo-entries-of-the-written-object-its-directory-and-what-is-below-it "fix(authority): a native write drops only the memo entries of the written object, its directory and what is below it"
 step2 w219-a-consumption-with-no-capability-file-answers-absent-before-the-registry-boundary "fix(guard): a consumption with no capability file answers absent before it enters the registry boundary"
+step2 w220-the-queue-rollback-of-a-refused-admission-runs-under-its-own-later-deadline "fix(dispatch): the queue rollback of a refused admission runs under its own later deadline instead of none"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

@@ -84,6 +84,27 @@ One ordinary dispatch (`gf-probe-7`, pointer prompt, a single-file task, no refu
 
 The next Windows run of a normal dispatch on 19d therefore shows which phase the 330 s belong to (or refuses with `GUARD-DISPATCH-SLOW` before the host ends the hook). Directions 1 and 3 are decided on that line, not on the registry size.
 
+## 2g. Measurement 2 (Windows, installed 19d, 2026-11-05): the cost is the NUMBER of native starts, and what 19e does about it
+
+Two dispatches (A after a move-aside, B on the registry A left) and the progress marks of 19d. Facts, from the peer's reading of the trace file:
+
+- The guard-dispatch hook is ended by the host at 330 s in both runs, no `GUARD-DISPATCH-SLOW` before (the admission deadline did not fire; its default is above the host limit's reach for this path, see open item below). 320 and 290 native PowerShell starts, 0.94 to 1.2 s each: 90 percent of the wall clock.
+- The hook makes the SAME cycle three times: take the registry lock (`inspect` x2, `publish`), read the whole state (`read`, `read-source` of the 23 distinct installed source files, `inspect` of every record), read the domain-owner namespaces (`ancestor`, `read`, `read-source`), remove the lock. One cycle is 85 to 100 starts. The cycle after a move-aside (A) adds the registry initialisation once (publish per member, create-directory).
+- The native backend memoizes read-only observations by the observed object's identity, so within one cycle the 31 source reads of `participant()` shrink to the 23 distinct files, but EVERY native write (the lock create and remove included) cleared the whole memo, so each cycle started cold. The third cycle even showed 46 `read-source`.
+- The expensive refusals were Bash `GUARD-PARSE-UNSUPPORTED` (composed shell commands), not the missing-file read (that read costs 0.9 s, 0 starts): 122 s (not overridable) and 253 s (eligible). 112 starts happen BEFORE the first `hgo-start` mark with identical counts in two runs: the consumption attempt that `denial-route.mjs` makes first enters `hgoConsumptionBoundary` (lock, whole registry, domain-owner reads, unlock) and finds an empty `capabilities` directory.
+
+What 19e builds from it (all held, nothing measured on Windows yet):
+
+| patch | change | expected effect |
+| --- | --- | --- |
+| w215 | `participant()` keeps the digest of each installed source file per process, keyed by the file's identity | the 23 distinct source reads happen once per process, not once per cycle |
+| w218 | a native write drops only the memo entries of the written object, its directory and what is below it | the reads that follow the lock create and remove stay memoized across cycles; each hit is still identity-checked |
+| w219 | `consumeHumanGuardOverride` answers `absent` from a plain directory read when no capability file exists | a refused command without a capability no longer takes any registry work: about 110 starts and two minutes gone for that case |
+
+Estimate (reasoning from the counts, not a promise): the first cycle stays near 75 to 100 starts; the second and third drop to about 15 each (lock, records that really changed, directories whose identity changed). That is about 130 starts, about 130 s, below the 330 s the host allows. The first cycle is the remaining cost; shrinking it further needs batching (Direction 1) or sharing between processes (Direction 3).
+
+Open from this measurement: (1) the admission deadline did not fire before the host limit; its budget should be re-derived from the host limit (a typed `GUARD-DISPATCH-SLOW` with a repair is better than a killed hook that lets the dispatch run unguarded); (2) the three cycles themselves (a design change: one boundary for the whole admission); (3) some trace lines are lost when several hook processes append at once (13 of 112 marks missing in one process), so counts must be read from the counters, not from line counts; (4) the eligible refusal still publishes its request under the lock (`hgo-publish-wait` to `hgo-publish-held`, 93 starts) and only w215/w218 reduce that.
+
 ## 3. Measurement needed first
 
 The opt-in authority trace already counts native spawns (`nativeAuthorityStats`: count, ms, maxMs, byOperation, memo hits and misses). The Windows session starts the runner from a shell with `PIPELINE_AUTHORITY_TRACE=1` and `PIPELINE_AUTHORITY_TRACE_FILE` set (PO yes in that chat), runs ONE dispatch, and reports the `pipeline.hook-authority-trace.v1` lines, the number of reservations (`session-authority-repair.mjs inspect`), and the per-phase times. Decision rule:
