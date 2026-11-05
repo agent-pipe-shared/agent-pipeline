@@ -373,7 +373,10 @@ function deferredSettledPending(commonDir, inspect) {
   const pendingDir = pendingDirOf(commonDir);
   const preview = previewSettledPending(commonDir, inspect);
   const count = preview.settledCount + planOrphanAuthority({ pendingDir }).retire.length + preview.leavingDispatchIds.length;
-  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed" } };
+  // A member whose dispatch ended without releasing it (the hook that admitted it was ended by the host, or the child never reported) stays
+  // armed for ever, and heal never un-arms a member: "run heal again when nothing is armed" would then never come true. The text therefore
+  // also names the one way out for the case that no Goldfish runs, so a refusal always carries a repair that can really be run.
+  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), the way out is: " + moveAsideNext(), next: moveAsideNext() } };
 }
 
 /** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */

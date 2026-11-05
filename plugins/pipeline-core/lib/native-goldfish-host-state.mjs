@@ -34,6 +34,12 @@ import { fileURLToPath } from "node:url";
 
 // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
 const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+/** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
+ * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
+function orphanReservationRepair(sliceId) {
+  return `a native dispatch state still names slice ${sliceId} although the queue has no row for it (the queue file was restored or replaced after the dispatch started), so a cancel has nothing to change. If no Goldfish runs for it: node ${ROUTINE_REPAIR_SCRIPT} run heal --root <root> --reason "<why>"; when heal defers because a member is still armed, node ${ROUTINE_REPAIR_SCRIPT} run move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted)`;
+}
 // D75: every cancel names why the slice ends. The argument and the one-line teaching of each class are shared by all cancel repairs.
 // Lazy on purpose: slice-queue.mjs and this module import each other, so the vocabulary is read at call time, never at load time.
 const cancelClassArg = () => `--class <${CANCEL_CLASSES.join('|')}>`;
@@ -1279,7 +1285,12 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
       const preimage=readFileSync(path),raw=parseStrictJson(preimage);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
       const row=raw.slices.find(entry=>entry.id===sliceId);
-      if(!row)return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`};
+      if(!row){
+        let named=false;
+        try{named=readNativeManagedInventory(repository,'native-goldfish')[0].entries.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId);}
+        catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
+        return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`,...(named?{repair:orphanReservationRepair(sliceId)}:{})};
+      }
       if(row.state==='cancelled')return {status:'refused',code:'SQ-ITEM-CANCEL-ALREADY',reason:`slice ${sliceId} is already cancelled`};
       if(row.tier==='critic')return {status:'refused',code:'SQ-ITEM-CANCEL-CRITIC',reason:`slice ${sliceId} is the shared critic slice; it is not cancelled with this verb`};
       let native=[];

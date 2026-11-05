@@ -1214,6 +1214,14 @@ const cases = [
     assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
     const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
     assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
+    // The queue file is restored or replaced after the dispatch started: its row is gone, the dispatch state remains. A cancel has nothing
+    // to change, and the refusal must name a repair that can really be run (heal, then move-aside when heal defers), not only "not found".
+    const queueRaw=JSON.parse(readFileSync(queuePath,'utf8'));queueRaw.slices=queueRaw.slices.filter(entry=>entry.id!=='ITEM-AC-3');
+    writeFileSync(queuePath,`${JSON.stringify(queueRaw,null,2)}\n`);
+    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
+    assert.equal(orphan.code,'SQ-NOT-FOUND',JSON.stringify(orphan));
+    assert.match(orphan.repair,/routine-repair\.mjs run heal --root <root>/u);assert.match(orphan.repair,/routine-repair\.mjs run move-aside --no-goldfish-running --root <root>/u);
+    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).repair,undefined,'a slice no dispatch state names gets no repair text');
   })},
 
   { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {

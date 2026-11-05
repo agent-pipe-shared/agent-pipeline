@@ -363,6 +363,10 @@ test("C19: heal with a member armed leaves the settled pending states and stop-f
   assert.equal(first.result.settledPending.deferred.count, 2);
   assert.match(first.result.settledPending.deferred.reason, /armed or running/u);
   assert.match(first.result.settledPending.deferred.reason, /run heal again/u);
+  // Never fully blocking: a member whose dispatch ended without a release stays armed for ever and heal never un-arms it, so "run heal again
+  // when nothing is armed" alone would never come true. The deferral also names the one way out for the case that no Goldfish runs.
+  assert.match(first.result.settledPending.deferred.reason, /the way out is: node .*routine-repair\.mjs run move-aside --no-goldfish-running --root <root> --reason "<why>"/u);
+  assert.match(first.result.settledPending.deferred.next, /routine-repair\.mjs run move-aside --no-goldfish-running/u);
   const idle = stub(withProducer(idleProducer, rowOf(settled, "integrated-by-commit")));
   const second = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: idle.spawn, ...SETTLED_DEPS });
   assert.equal(second.exit, 0, JSON.stringify(second.result));
