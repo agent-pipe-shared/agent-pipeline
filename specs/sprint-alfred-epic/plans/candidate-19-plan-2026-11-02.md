@@ -371,6 +371,17 @@ Built before that: w229 (queue split), w230 (F4b, Goldfish, held), w231 (untrack
 
 Finding 2026-11-05 (E4 reproduced on Linux): two Goldfish launches in one reply were both refused with `SDC-LOCK-HELD` at the phase `registry-migrate`, each waiting only `SESSION_AUTHORITY_LOCK_WAIT_MS` (1.5 s) for the other's lock. Neither got through. `publishNativeAuthorityState` is not wrapped in `retryWhileSessionAuthorityLockHeld`, unlike the queue writers. Planned fix w232: retry the publish while the lock is held and nothing has been written yet, bounded by the admission deadline. Built after w229, because both change `native-goldfish-host-state.mjs`.
 
+Windows measurement of 19g (peer session on the Claude Windows greenfield clone, 2026-11-05, stamp 5412f8937, one run each, branch `pipeline-probe/19f`, nothing pushed):
+
+- Warm dispatch is not under the 60 s threshold: guard prepare 108.8 s, 110.7 s and 113.3 s (19f: 124.0 s, 123.1 s), about 145 native operations at about 470 ms each. Phases of dispatch A: dispatch checks 51.8 s, integration readiness 11.3 s, candidate Git 7.2 s, owner 4.4 s, prescan to lock wait 12.5 s, reserve to done 14.4 s. Hot sites: `session-authority-registry.mjs` inspect at line 565 (37 calls, 18 s), read-source at line 380 (19 calls, 9.5 s), `session-authority-domain-owner.mjs` line 60 (15 calls, 7.5 s).
+- An hgo-eligible refusal costs 107.5 s cold and 57.5 s warm; almost all of it lies between `hgo-publish-wait` and `hgo-publish-held`, the registry publication that records the override request (`hgoPlanningPublication`).
+- E4 is not fixed: the second of two launches in one reply is still refused `SDC-LOCK-HELD`, after 13.1 s, during the first launch's dispatch-checks window. That is before the publish that w232 wraps.
+- w227 held in one of three stops: two SubagentStop host commits failed `NGHF-PENDING-UNAVAILABLE` with `registry-lock-held` (recovered with `goldfish-host-commit-recover`), one landed through the stop hook.
+- The queue split works as designed on Windows: the tree stays clean after every dispatch, `validate` reports source `working`, `handoverConflict` false, no queue error; the cancels of `gf-probe-1/2` with `--started --class superseded` succeed.
+- Not measured: the SubagentStop duration (it writes no trace lines).
+
+Reading: the latency is the count of native operations on Windows, not a single slow step, and the registry lock is held across long multi-operation windows, so parallel launches and sibling stops still lose against it. By PO rule 4 of 2026-11-05 this is the clear finding; whether latency work continues is the PO's decision.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
