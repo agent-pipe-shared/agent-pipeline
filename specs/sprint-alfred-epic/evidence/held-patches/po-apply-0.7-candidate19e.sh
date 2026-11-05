@@ -12,6 +12,7 @@
 #   w220  the same marks: the 295 s admission deadline fires but is cleared before the queue rollback, which then runs a whole unbounded registry cycle until the host ends the hook; the preparation now stops at 245 s and the rollback runs under a second, later deadline (builds on w215: same test file)
 #   w221  first Full Verify of this chain (codex pretool guard case 24): w219 also answered absent for ENOTDIR; only a missing capabilities directory (ENOENT) answers absent now (protected file, hence PO applies; builds on w219)
 #   w222  first Full Verify of this chain: case-completion policies lacked the D177 cases of the native host-state suite, SAS20 and GD83, the registry pin of the repair suite moves 288 -> 295, and the PowerShell parity row for a plain rg expects the E7 admission
+#   w223  second Full Verify (the only red left): the codex pretool guard suite spawns the adapter with an 8 s timeout, which ends cases 8 and 15 under the load of a Full Verify (green alone); now 30 s, below the 45 s production hook timeout
 # Run with: bash /absolute/path/to/specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate19e.sh   (from the repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches
@@ -37,6 +38,7 @@ step2 w219-a-consumption-with-no-capability-file-answers-absent-before-the-regis
 step2 w220-the-queue-rollback-of-a-refused-admission-runs-under-its-own-later-deadline "fix(dispatch): the queue rollback of a refused admission runs under its own later deadline instead of none"
 step2 w221-a-consumption-answers-absent-only-for-a-capabilities-directory-that-is-not-there "fix(guard): a consumption answers absent only for a capabilities directory that is not there, a file in its place still fails closed"
 step2 w222-the-case-completion-policies-follow-the-cases-candidate-19-added-and-the-powershell-parity-row-for-rg "test(verify): extend the case-completion policies by the cases candidate 19 added and restate the PowerShell parity row for a read-only rg"
+step2 w223-the-adapter-spawns-of-the-codex-pretool-guard-suite-get-30-seconds-under-a-loaded-full-verify "test(codex): the adapter spawns of the pretool guard suite get 30 seconds instead of 8 under a loaded Full Verify"
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
