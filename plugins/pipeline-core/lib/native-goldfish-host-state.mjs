@@ -331,7 +331,9 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   let stored;
   checkpoint("publish-start");
   try {
-    stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
+    // E4: a sibling launch in the same reply holds the registry lock for a whole cycle; one bounded 1.5 s wait refused both.
+    // The publish is retried while the lock is held and nothing has been written yet, within the admission deadline.
+    stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered), admissionDeadline, dependencies.publishRetry);
   }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
@@ -809,7 +811,17 @@ export function createAdmissionCheckpoint(deadline){
     }
   };
 }
-function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
+/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (capped at 60 s, the
+ * deadline checkpoints still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a
+ * held lock met before the boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does. */
+export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
+  const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
+  const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
+    ?Math.max(0,Math.min(60000,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs)))
+    :10000;
+  return retryWhileSessionAuthorityLockHeld(attempt,{budgetMs:remaining,now,...(typeof options.sleep==='function'?{sleep:options.sleep}:{})});
+}
+function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null,entered={value:false}){
   const checkpoint=createAdmissionCheckpoint(admissionDeadline);
   checkpoint('repository-inspect');
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
@@ -838,6 +850,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
   if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
   checkpoint('lock-wait');
   return withSessionAuthorityBoundary({repository},boundary=>{
+    entered.value=true;
     checkpoint('lock-held');
     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
     if(state.delivery){

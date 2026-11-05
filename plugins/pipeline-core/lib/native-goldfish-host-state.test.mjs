@@ -18,7 +18,7 @@ import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
-import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
+import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld } from "./native-goldfish-host-state.mjs";
 import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
 import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
 import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
@@ -1808,6 +1808,27 @@ const cases = [
     }finally{process.chdir(priorCwd);}
     assert.deepEqual(readFileSync(location.workingPath),theirs);
   })},
+
+  { id: "NGHS65", name: "E4: the pre-launch publish waits for a sibling launch's registry lock within the admission deadline instead of refusing at the first bounded wait; a lock met after the boundary ran is never retried", run: () => {
+    const held=()=>Object.assign(new Error('registry-lock-held'),{code:'SDC-LOCK-HELD'});
+    let clock=0;const sleep=ms=>{clock+=ms;},now=()=>clock;
+    // Two held answers (the sibling's cycle), then the lock is free: the publish succeeds on the third attempt.
+    let calls=0;
+    const ok=retryPublishWhileLockHeld(()=>{calls+=1;if(calls<3)throw held();return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
+    assert.deepEqual([ok,calls],[{ok:true},3]);
+    // The budget is what remains of the admission deadline: with 100 ms left the held lock is refused, typed, after the wait.
+    clock=0;calls=0;
+    assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw held();},{startMs:0,budgetMs:100,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');
+    assert.ok(calls>=1&&clock<=100+1000,`bounded by the deadline: ${calls} calls, ${clock} ms`);
+    // A lock refusal raised after the boundary callback entered (something may be written) is rethrown at once.
+    clock=0;calls=0;
+    assert.throws(()=>retryPublishWhileLockHeld(entered=>{calls+=1;entered.value=true;throw held();},{startMs:0,budgetMs:295000,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');
+    assert.equal(calls,1);
+    // Any other fault is not retried.
+    calls=0;
+    assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw Object.assign(new Error('x'),{code:'NGHS-OTHER'});},null,{sleep,now}),error=>error.code==='NGHS-OTHER');
+    assert.equal(calls,1);
+  }},
 
 ];
 
