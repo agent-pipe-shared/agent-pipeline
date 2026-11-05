@@ -403,6 +403,10 @@ PO decision on the measurement (2026-11-05, late): option B is built for sure. T
   - Applied only by its own script `po-apply-0.7-candidate19h-w235.sh` after the main 19h script.
   - What it gives up is in its notes.
 - **Apply scripts:** `po-apply-0.7-candidate19h.sh` (w233, w234 and the derived files) and the optional `po-apply-0.7-candidate19h-w235.sh`.
+- **Rehearsals in fresh clones:**
+  - c20a, main script at a6a75c8c4: exit 0, registration 1174 (0 unregistered), case-completion 389 entries valid, gitleaks probe PASS.
+  - c20b, main script plus the optional w235 script at b46650325: exit 0, registration and case-completion as above. The first c20b run found a `pipefail` defect in the w235 prerequisite check, fixed in b46650325.
+  - Cross-check suites on the c20b tree, one at a time: native-goldfish-host-finalizer 50/50, session-authority-repair 46/46, authority-trace-preload 9/9, check-verify-case-completion 32/32, guard-dispatch 83/83, subagent-start-receipt 8/8. native-goldfish-host-state ran 79/79 on the w234 slice clone; w235 does not touch it.
 - **Not proven:** no Windows run of w233 to w235, no Full Verify of this state, no Critic review, no PO acceptance.
 
 ## End note: derived files
