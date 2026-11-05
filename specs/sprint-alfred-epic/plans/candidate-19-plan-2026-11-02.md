@@ -355,6 +355,16 @@ PO tile answers 2026-11-04 (late): (1) Stage 2 live dispatches on a throwaway br
 Windows consumer probe, stage 1 (baseline, installed plugin 95d3e8145, `evidence/windows-consumer-probe-stage1-baseline-result.md`): no `WIN-AUTH-*` cause (Q10 untested), `dead-anchor` right after a `reanchored` preflight line (E2), no pending host-commit state with an `NGHF-PENDING-UNAVAILABLE` stop failure on record (supports the E1 hypothesis), the PowerShell tool admits only contained literal reads while Bash admits all eight probe commands (E7 measured). Stage 2 (live dispatches for E1 and E4) needs the consumer owner's explicit go.
 
 Only a real run can close: native Windows (E1, E2, E4, E7, Q10), real runner runs, hook activation, the own Critic review of the late-binding chain and D3, the stamp of 19c (on the PO's call), the PO's install and acceptance.
+## Scope of the last candidate (PO decision 2026-11-05)
+
+The PO asked to build the queue split and everything still below 75 % of the completion matrix before 19g is applied. Reading of that scope, measured against the tree:
+
+- The delivery matrix (`evidence/delivery-status-current.md`) has 281 items, 0 below 75, so it adds nothing. `scripts/matrix-gaps.mjs` without an argument reads the old snapshot `delivery-remeasure-2026-10-22`; its stages are outdated and are not a work list.
+- The completion matrix above is read as the work list. Its rows are older than the 19c build log, so each row not marked built was compared with that log. Still unbuilt and buildable here: F4b (decisions to record), the unexercised e-mail category of E5, the onboarding end-to-end suite of Q8. The verify command part of E6 is checked against `configure-verify`.
+- Everything else not built needs native Windows, a real runner run, a Critic review, an ADR or a PO decision and stays on the PO list by category.
+
+Queue split design (PO option A): the working copy lives under the Git common directory, the tracked `specs/<feature>/slice-queue.json` is only the handover copy. `governed.path` stays the handover path; a new `workingPath` is what readers and writers open. No working copy: the handover copy is read byte-identical as the seed, so pending states keep their `queueSha256`. A small sidecar records the handover digest last seen: handover changed and working unchanged since then means the handover copy is adopted (another PC pushed); both changed means the working copy wins, the result names the conflict and `slice-queue.mjs import` is the sanctioned repair. `push-prepare` writes the handover copy and commits it before its clean-tree check. The git hooks gain no new refusal: a stale handover copy costs another PC an older view, never a blocked push.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
