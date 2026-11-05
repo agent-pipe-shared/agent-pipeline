@@ -1,0 +1,163 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 45cae878f..5ab2c3694 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1367,7 +1367,8 @@
+           "SAS21",
+           "SAS22",
+           "SAS23",
+-          "SAS24"
++          "SAS24",
++          "SAS25"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 3304a2b33..188693dca 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -259,7 +259,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",319], // cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",324], // cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/plugins/pipeline-core/lib/authority-trace-hook.mjs b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+index 33688bc04..7115d26b2 100644
+--- a/plugins/pipeline-core/lib/authority-trace-hook.mjs
++++ b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+@@ -77,7 +77,8 @@ export async function installHookAuthorityTrace(options = {}) {
+             failed: (o.failed ?? 0) + (a.failed ?? 0),
+             byOperation: a.byOperation ?? {},
+           },
+-          authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, size: a.authorityMemoSize ?? 0 },
++          // persistedHits: the share of the hits answered from the cross-process memo (the 19g measurement could not tell it apart).
++          authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, persistedHits: a.authorityMemoPersistedHits ?? 0, size: a.authorityMemoSize ?? 0 },
+           counters: { custody: custody !== null, observed: observed !== null, authority: authority !== null },
+         };
+         const line = `${JSON.stringify(trace)}\n`;
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 2a31f0385..0bc87593e 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -61,6 +61,7 @@ function nativeSpawnMark(name,ms){
+ const MEMO_MAX=512;
+ const MEMO_READ_ONLY=new Set(['inspect','ancestor','ancestor-above-root','read','read-source','inspect-source-image']);
+ const MEMO_MUTATING=new Set(['publish','create-directory','remove']);
++const MEMO_BYTELESS=new Set(['inspect','ancestor','ancestor-above-root']);
+ const authorityMemo=new Map();
+ const authorityMemoCounters={hits:0,misses:0,persistedHits:0};
+ // Cross-process layer of the same memo. Every hook is a new process, and a dispatch or a refusal runs several of them, each re-observing the
+@@ -87,6 +88,10 @@ function persistedFile(){
+ function persistedValueShape(operation,value){
+  if(!object(value)||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts))return false;
+  if(operation==='inspect-source-image')return exact(value,['ok','facts','size','sha256','committed'])&&Number.isSafeInteger(value.size)&&value.size>=0&&value.size<=134217728&&/^[a-f0-9]{64}$/u.test(value.sha256);
++ // w235 (19g Windows measurement): the two hottest sites, the registry closure walk (inspect) and the ancestor chain (ancestor,
++ // ancestor-above-root), return no bytes and were never kept across processes, so every hook process paid them again. They are kept
++ // under the same identity rule as every other entry: answered only while the object's current lstat identity equals the stored one.
++ if(MEMO_BYTELESS.has(operation))return exact(value,['ok','facts','bytes','committed'])&&value.bytes===null;
+  return exact(value,['ok','facts','bytes','committed'])&&typeof value.bytes==='string'&&value.bytes.length<=PERSIST_MAX_VALUE_BASE64&&BASE64.test(value.bytes);
+ }
+ function persistedEntryShape(row){
+diff --git a/plugins/pipeline-core/scripts/authority-trace-preload.mjs b/plugins/pipeline-core/scripts/authority-trace-preload.mjs
+index 2a04406d5..7568abfb6 100644
+--- a/plugins/pipeline-core/scripts/authority-trace-preload.mjs
++++ b/plugins/pipeline-core/scripts/authority-trace-preload.mjs
+@@ -47,7 +47,7 @@ if (process.env.PIPELINE_AUTHORITY_TRACE === "1") {
+           wallMs: Math.round(performance.now()),
+           custodyInspections: zero,
+           nativeObservations: { ...zero, failed: 0, byOperation: {} },
+-          authorityMemo: { hits: 0, misses: 0, size: 0 },
++          authorityMemo: { hits: 0, misses: 0, persistedHits: 0, size: 0 },
+           counters: { custody: false, observed: false, authority: false },
+         };
+         const line = `${JSON.stringify(trace)}\n`;
+diff --git a/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs b/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
+index b1d1ba66d..03b58b1f5 100644
+--- a/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
++++ b/plugins/pipeline-core/scripts/authority-trace-preload.test.mjs
+@@ -50,7 +50,8 @@ test("APT2 with the switch and a file, a process that exits 2 leaves one v1 line
+   assert.deepEqual(trace.counters, { custody: true, observed: true, authority: true }, "the three counter modules must load");
+   assert.deepEqual(trace.custodyInspections, { count: 0, ms: 0, maxMs: 0 });
+   assert.deepEqual(trace.nativeObservations, { count: 0, ms: 0, maxMs: 0, failed: 0, byOperation: {} });
+-  assert.deepEqual(trace.authorityMemo, { hits: 0, misses: 0, size: 0 });
++  // w235: the share answered from the cross-process memo is reported too.
++  assert.deepEqual(trace.authorityMemo, { hits: 0, misses: 0, persistedHits: 0, size: 0 });
+ });
+ 
+ test("APT4 a COPY of the file elsewhere reads the counters of the plugin named by PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT, and none without it", () => {
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 191f98e12..b7e3a9f4c 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -15,7 +15,7 @@ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+ import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
+ import * as pipelineState from "./pipeline-state.mjs";
+ import { fileURLToPath } from "node:url";
+-import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
++import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+@@ -28,6 +28,7 @@ import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+ 
+ // Memo cases (SAS09..SAS17): a fake native spawn on a real temp file; the real PowerShell exists only on Windows.
+ const MEMO_FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
++const BYTELESS = new Set(["inspect", "ancestor", "ancestor-above-root"]);
+ function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = false } = {}) {
+   const dir = mkdtempSync(join(tmpdir(), "authority-memo-"));
+   const memoFile = persist ? join(dir, "observation-memo.json") : undefined;
+@@ -37,7 +38,8 @@ function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = fal
+     calls.push(request.operation);
+     if (hook) hook(request);
+     const body = refuse ? { ok: false, code: "WIN-AUTH-ACL", committed: false }
+-      : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
++      // w235: inspect, ancestor and ancestor-above-root answer with bytes null, exactly as the real helper does (windows-owned-authority-native.ps1).
++      : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: BYTELESS.has(request.operation) ? null : Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
+     return { status: 0, signal: null, stderr: "", stdout: JSON.stringify(body) };
+   };
+   setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn, memoFile });
+@@ -877,6 +879,40 @@ const cases = [
+     assert.equal(calls.length, before + 1, "a persisted entry of a written object is gone (and its identity changed as well)");
+     assert.equal(existsSync(memoFile), true);
+   }, { persist: true }) },
++  { id: "SAS25", name: "authority memo (15, w235) the byte-less observations the hottest sites make (inspect, ancestor) are kept across processes under the same identity rule; a byte-less operation carrying bytes in the file is never trusted", run: () => memoFixture(({ dir: base, calls, file, memoFile }) => {
++    writeFileSync(file, "one");
++    // The observed directory is not the one that holds the memo file (writing that file changes its parent's identity, a correct miss).
++    const dir = join(base, "observed");mkdirSync(dir);
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
++    observeWindowsAuthorityAncestor({ path: dir });
++    assert.deepEqual(calls, ["inspect", "inspect", "ancestor"]);
++    flushWindowsOwnedAuthorityBackendMemo();
++    // A new process answers all three from the file, with no native start.
++    resetWindowsOwnedAuthorityBackendMemo();
++    const before = nativeAuthorityStats();
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
++    observeWindowsAuthorityAncestor({ path: dir });
++    assert.equal(calls.length, 3, "no new native start");
++    assert.equal(nativeAuthorityStats().authorityMemoPersistedHits - before.authorityMemoPersistedHits, 3);
++    // A new entry in the directory changes its identity: the directory observations are misses, the unchanged file still hits.
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    writeFileSync(join(dir, "b.txt"), "two");
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
++    observeWindowsAuthorityAncestor({ path: dir });
++    assert.equal(calls.length, 5, "the changed directory is observed again (inspect and ancestor), the unchanged file is not");
++    // A tampered file where a byte-less operation carries bytes is dropped entry by entry.
++    flushWindowsOwnedAuthorityBackendMemo();
++    const good = JSON.parse(readFileSync(memoFile, "utf8"));
++    writeFileSync(memoFile, JSON.stringify({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, bytes: Buffer.from("x").toString("base64") } })) }));
++    resetWindowsOwnedAuthorityBackendMemo();
++    const spawned = calls.length;
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.equal(calls.length, spawned + 1, "an inspect entry with bytes is not the helper's shape and is not trusted");
++  }, { persist: true }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

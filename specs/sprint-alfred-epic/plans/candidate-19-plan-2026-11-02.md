@@ -384,6 +384,27 @@ Reading: the latency is the count of native operations on Windows, not a single 
 
 PO decision on the measurement (2026-11-05, late): option B is built for sure. The second launch in one reply gets its lock retry at the site that actually refuses now, and the SubagentStop host commit stops losing the registry lock. The holder is not identified yet: the stop read already waits 90 s, so the fix waits for the holder evidence from the Windows peer instead of raising the wait blind. In parallel, the native operations are validated from the ground up in an open-ended analysis of alternatives. Guiding question: which protection would be given up if, for example, only directory roots were checked instead of each path? The threat model the PO states is that the pipeline confines the agent, not the human.
 
+## Candidate 19h (built 2026-11-05/06 after the PO decision on the 19g measurement)
+
+- **w233 (E4), Elephant-built:**
+  - The governed queue preparation of a second launch waited only the 10 s default for the first launch's registry lock. It now waits within the admission deadline.
+  - The guard's one admission budget is the named constant `ADMISSION_BUDGET_MS`.
+  - New cases NGHS66 and NGHS67; GD73 restated.
+- **w234 (stop), Goldfish C19H-W234-STOP:**
+  - Root cause, proven on Linux (NGHS68): `readNativeGoldfishPending` retried only the plain file read. The registry boundary of `authenticatedNativePendingState` ran after the retry, so a sibling holding the lock ended the stop with `NGHS-PENDING-MISSING: registry-lock-held` after one 1.5 s acquisition. Read and authentication are now one attempt inside the 90 s retry.
+  - Stop-failure records carry the lock holder (owner, pid, acquiredAt, waitedMs).
+  - `native-goldfish-host.mjs` (SubagentStop and PostToolUse) and `subagent-start-receipt.mjs` write authority trace lines.
+  - The sub-1.5 s timing seen on Windows is not reproduced. The new record fields tell it apart on the next run.
+  - Its host commit did not land (`NGHR-FINAL-JSON`). It was recovered with `goldfish-host-commit-recover`.
+- **Options analysis C19H-NATIVE-OPTIONS:** `evidence/native-checks-options-2026-11-05.md` lists 12 checks, 11 options and 10 open questions, result-neutral. Its host commit on Linux left neither a commit nor a stop-failure record and was recovered the same way. The Elephant's recommendation is in `evidence/native-checks-recommendation-2026-11-05.md`.
+- **w235 (option O3 (i)), Elephant-built, held for PO consent:**
+  - The cross-process memo also keeps the byte-less `inspect` and `ancestor` observations, which were never persisted because the real helper answers them with `bytes: null`.
+  - The trace reports `persistedHits`.
+  - Applied only by its own script `po-apply-0.7-candidate19h-w235.sh` after the main 19h script.
+  - What it gives up is in its notes.
+- **Apply scripts:** `po-apply-0.7-candidate19h.sh` (w233, w234 and the derived files) and the optional `po-apply-0.7-candidate19h-w235.sh`.
+- **Not proven:** no Windows run of w233 to w235, no Full Verify of this state, no Critic review, no PO acceptance.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
