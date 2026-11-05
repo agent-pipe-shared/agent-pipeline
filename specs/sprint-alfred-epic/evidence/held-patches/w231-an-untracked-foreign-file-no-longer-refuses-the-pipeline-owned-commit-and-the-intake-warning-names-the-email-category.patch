@@ -1,0 +1,115 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index df09ddf67..6cf7977ab 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -4001,6 +4001,16 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path
+   assert.match(warning.remedy, /pre-commit/u);
+   assert.equal(leakPlan.planSha256, plainPlan.planSha256);
+   assert.deepEqual(leakPlan.targets, plainPlan.targets);
++  // E5 rest: the e-mail category (case-insensitive, as derivePatterns builds it for an address) is reported by its own
++  // name, again without the value. The generated text holds no address, so the category is fed a whole word of that
++  // text (the e-mail form matches only between word boundaries), in upper case to prove the match ignores case.
++  const emailWord = sampleLine.split(/[^A-Za-z]+/u).find((word) => word.length >= 5);
++  assert.ok(emailWord, "the sample line has a plain word of five letters or more");
++  const emailPatterns = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "email", value: emailWord.toUpperCase() }] });
++  const emailPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: emailPatterns });
++  assert.deepEqual(emailPlan.warnings?.[0]?.categories, ["email"]);
++  assert.equal(JSON.stringify(emailPlan.warnings).toLowerCase().includes(emailWord.toLowerCase()), false);
++  assert.equal(emailPlan.planSha256, plainPlan.planSha256);
+   // A detector failure is silent: an early hint, not a gate.
+   const broken = [{ category: "email", expression: { test() { throw new Error("detector failure"); } } }];
+   const failed = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: broken });
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+index 842bcfee4..ea10bf324 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+@@ -5,8 +5,9 @@
+ //
+ // PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
+ // queue, and a tree guard-override audit log an older build left) so the clean-tree checks of push-prepare, push-init and the PO
+-// approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
+-// or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
++// approval pass again. It refuses when another tracked file is modified, staged or deleted, naming those paths; an
++// untracked foreign file is listed in `untouched` and left alone. It never commits, stashes or discards a file the
++// Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
+ // The caller states who runs it, and exactly one of the two flags is required: `--agent` adds the GIT-03
+ // provenance pair (`AI-Assisted: true`, `Dispatch: stage-0 (elephant)`) for an agent session; `--human`
+ // commits without provenance trailers, as a PO's own terminal commit does. A call naming neither is refused,
+@@ -17,7 +18,7 @@ import { spawnSync } from "node:child_process";
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
++import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ 
+ const SCHEMA = "pipeline.commit-pipeline-owned.v1";
+@@ -65,15 +66,22 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
+   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
+   const { owned, others } = classifyDirtyTree(status.stdout, root);
+-  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
+-  if (!owned.length) return { status: "nothing-to-commit", owned: [] };
+-  if (parsed.dryRun) return { status: "dry-run", owned };
++  // An untracked foreign file cannot enter the commit: `git add` and `git commit` below name only the owned paths,
++  // so it is reported in `untouched`, never committed and never a reason to refuse. A modified, staged or deleted
++  // tracked file still refuses, because the clean-tree checks this command serves would refuse it anyway.
++  const untracked = new Set(porcelainPaths(status.stdout.split("\n").filter((line) => line.startsWith("?? ")).join("\n")));
++  const blocking = others.filter((path) => !untracked.has(path));
++  const untouched = others.filter((path) => untracked.has(path));
++  const left = untouched.length ? { untouched } : {};
++  if (blocking.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
++  if (!owned.length) return { status: "nothing-to-commit", owned: [], ...left };
++  if (parsed.dryRun) return { status: "dry-run", owned, ...left };
+   const add = git(["add", "--", ...owned]);
+   if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
+   const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent }), "--", ...owned]);
+   if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
+   const head = git(["rev-parse", "HEAD"]);
+-  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null };
++  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null, ...left };
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+index 396704a03..2b6d8084c 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+@@ -27,6 +27,37 @@ test("K98 row 7/7: the push-approval record refusal names the fold and the admit
+   assert.match(result.reason, /Dispatch: stage-0 \(elephant\)/u);
+ });
+ 
++function runWith(statusOut) {
++  const root = mkdtempSync(join(tmpdir(), "cpo-untracked-"));
++  const calls = [];
++  const spawn = (_cmd, args) => {
++    calls.push(args.slice(2));
++    if (args.includes("status")) return { status: 0, stdout: statusOut, stderr: "" };
++    if (args.includes("rev-parse")) return { status: 0, stdout: "a".repeat(40) + "\n", stderr: "" };
++    return { status: 0, stdout: "", stderr: "" };
++  };
++  return { result: commitPipelineOwned(["--root", root, "--agent"], { spawn }), calls };
++}
++
++test("an untracked foreign file is listed as untouched and the owned queue is still committed by its own path", () => {
++  const { result, calls } = runWith("?? docs/report.md\n M specs/feature/slice-queue.json\n");
++  assert.equal(result.status, "committed");
++  assert.deepEqual(result.owned, ["specs/feature/slice-queue.json"]);
++  assert.deepEqual(result.untouched, ["docs/report.md"]);
++  const add = calls.find((args) => args[0] === "add"), commit = calls.find((args) => args[0] === "commit");
++  assert.deepEqual(add.slice(add.indexOf("--") + 1), ["specs/feature/slice-queue.json"]);
++  assert.deepEqual(commit.slice(commit.indexOf("--") + 1), ["specs/feature/slice-queue.json"]);
++});
++
++test("a modified tracked foreign file still refuses, and the untracked one is named apart from it", () => {
++  const { result, calls } = runWith(" M src/app.mjs\n?? docs/report.md\n M specs/feature/slice-queue.json\n");
++  assert.equal(result.status, "refused");
++  assert.equal(result.code, "CPO-FOREIGN-CHANGES");
++  assert.deepEqual(result.others, ["src/app.mjs"]);
++  assert.deepEqual(result.untouched, ["docs/report.md"]);
++  assert.equal(calls.some((args) => args[0] === "commit" || args[0] === "add"), false);
++});
++
+ test("K98 row 7/7: a refusal for any other foreign file keeps the plain reason", () => {
+   const result = refusedFor(" M other.txt\n");
+   assert.equal(result.code, "CPO-FOREIGN-CHANGES");
