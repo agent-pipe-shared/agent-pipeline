@@ -1280,10 +1280,24 @@ const cases = [
     // to change, and the refusal must name a repair that can really be run (heal, then move-aside when heal defers), not only "not found".
     const queueRaw=JSON.parse(readFileSync(queuePath,'utf8'));queueRaw.slices=queueRaw.slices.filter(entry=>entry.id!=='ITEM-AC-3');
     writeFileSync(queuePath,`${JSON.stringify(queueRaw,null,2)}\n`);
-    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
+    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',cancelClass:'budget'});
     assert.equal(orphan.code,'SQ-NOT-FOUND',JSON.stringify(orphan));
-    assert.match(orphan.repair,/routine-repair\.mjs run heal --root <root>/u);assert.match(orphan.repair,/routine-repair\.mjs run move-aside --no-goldfish-running --root <root>/u);
+    // The repair names the one command that can really be run: the started cancel (heal defers while the member is armed, move-aside refuses an
+    // open item reservation), not the routine repairs.
+    assert.match(orphan.repair,/slice-queue\.mjs cancel ITEM-AC-3 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
+    assert.doesNotMatch(orphan.repair,/routine-repair\.mjs/u);
     assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).repair,undefined,'a slice no dispatch state names gets no repair text');
+    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).code,'SQ-NOT-FOUND','and nothing is re-created for it');
+    // While the orphan reservation stands, a new slice over the same write scope is refused; on the caller's word (--started) the missing row is
+    // re-created as a cancelled one from the dispatch state, and the reservation stops blocking.
+    const blocked=dispatch('ITEM-AC-4','DELIVER-AC-4','native-tool-four',candidate);
+    assert.notEqual(blocked.ok,true,JSON.stringify(blocked));
+    const released=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
+    assert.equal(released.status,'cancelled',JSON.stringify(released));assert.equal(released.orphan,true);assert.equal(released.started,true);
+    assert.equal(row('ITEM-AC-3').state,'cancelled');assert.equal(row('ITEM-AC-3').cancelClass,'budget');assert.deepEqual(row('ITEM-AC-3').writeScope,['src/change.mjs']);
+    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'again',started:true,cancelClass:'budget'}).code,'SQ-ITEM-CANCEL-ALREADY','a second call finds the cancelled row');
+    const fourth=dispatch('ITEM-AC-4','DELIVER-AC-4','native-tool-four',candidate);
+    assert.equal(fourth.ok,true,JSON.stringify(fourth));
   })},
 
   { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {
