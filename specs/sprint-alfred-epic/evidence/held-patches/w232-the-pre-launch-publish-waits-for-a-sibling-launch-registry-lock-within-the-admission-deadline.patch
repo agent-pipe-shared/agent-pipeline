@@ -1,0 +1,97 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index caf2c0ee9..09c0c2553 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -375,7 +375,8 @@
+           "NGHS61",
+           "NGHS62",
+           "NGHS63",
+-          "NGHS64"
++          "NGHS64",
++          "NGHS65"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 6baef18c9..a8b5e555d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -331,7 +331,9 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   let stored;
+   checkpoint("publish-start");
+   try {
+-    stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline);
++    // E4: a sibling launch in the same reply holds the registry lock for a whole cycle; one bounded 1.5 s wait refused both.
++    // The publish is retried while the lock is held and nothing has been written yet, within the admission deadline.
++    stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered), admissionDeadline, dependencies.publishRetry);
+   }
+   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+@@ -809,7 +811,17 @@ export function createAdmissionCheckpoint(deadline){
+     }
+   };
+ }
+-function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
++/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (capped at 60 s, the
++ * deadline checkpoints still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a
++ * held lock met before the boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does. */
++export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
++  const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
++  const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
++    ?Math.max(0,Math.min(60000,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs)))
++    :10000;
++  return retryWhileSessionAuthorityLockHeld(attempt,{budgetMs:remaining,now,...(typeof options.sleep==='function'?{sleep:options.sleep}:{})});
++}
++function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null,entered={value:false}){
+   const checkpoint=createAdmissionCheckpoint(admissionDeadline);
+   checkpoint('repository-inspect');
+   const repository=inspectSignedDescriptorCustodyRepository(state.root);
+@@ -838,6 +850,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+   if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
+   checkpoint('lock-wait');
+   return withSessionAuthorityBoundary({repository},boundary=>{
++    entered.value=true;
+     checkpoint('lock-held');
+     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
+     if(state.delivery){
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index fd4959173..c9f3ddaf8 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -18,7 +18,7 @@ import { createGovernanceScopeController } from "./governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
+-import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
++import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld } from "./native-goldfish-host-state.mjs";
+ import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
+ import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
+ import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
+@@ -1809,6 +1809,27 @@ const cases = [
+     assert.deepEqual(readFileSync(location.workingPath),theirs);
+   })},
+ 
++  { id: "NGHS65", name: "E4: the pre-launch publish waits for a sibling launch's registry lock within the admission deadline instead of refusing at the first bounded wait; a lock met after the boundary ran is never retried", run: () => {
++    const held=()=>Object.assign(new Error('registry-lock-held'),{code:'SDC-LOCK-HELD'});
++    let clock=0;const sleep=ms=>{clock+=ms;},now=()=>clock;
++    // Two held answers (the sibling's cycle), then the lock is free: the publish succeeds on the third attempt.
++    let calls=0;
++    const ok=retryPublishWhileLockHeld(()=>{calls+=1;if(calls<3)throw held();return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
++    assert.deepEqual([ok,calls],[{ok:true},3]);
++    // The budget is what remains of the admission deadline: with 100 ms left the held lock is refused, typed, after the wait.
++    clock=0;calls=0;
++    assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw held();},{startMs:0,budgetMs:100,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');
++    assert.ok(calls>=1&&clock<=100+1000,`bounded by the deadline: ${calls} calls, ${clock} ms`);
++    // A lock refusal raised after the boundary callback entered (something may be written) is rethrown at once.
++    clock=0;calls=0;
++    assert.throws(()=>retryPublishWhileLockHeld(entered=>{calls+=1;entered.value=true;throw held();},{startMs:0,budgetMs:295000,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');
++    assert.equal(calls,1);
++    // Any other fault is not retried.
++    calls=0;
++    assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw Object.assign(new Error('x'),{code:'NGHS-OTHER'});},null,{sleep,now}),error=>error.code==='NGHS-OTHER');
++    assert.equal(calls,1);
++  }},
++
+ ];
+ 
+ /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
