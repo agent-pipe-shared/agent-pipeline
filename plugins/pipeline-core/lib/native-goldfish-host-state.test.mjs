@@ -208,6 +208,32 @@ const cases = [
       assert.equal(reg.statListedRegistryEntry(repo, lock).isFile(), true, "an existing lock is statted as before");
     } finally { rmSync(commonDir, { recursive: true, force: true }); }
   } },
+  { id: "D177-rollback-runs-under-its-own-later-deadline", name: "D177 the preparation stops earlier than the hook budget and the queue rollback of a refused admission runs under the full budget as a second deadline that is cleared afterwards; a rollback that overruns is counted as a retained row and named in the refusal", run: async () => {
+    const mod = await import("./native-goldfish-host-state.mjs");
+    const dl = await import("./admission-deadline.mjs");
+    const windows = mod.admissionDeadlineWindows({ startMs: 1000, budgetMs: 300000 });
+    assert.deepEqual(windows, { preparation: { startMs: 1000, budgetMs: 250000 }, rollback: { startMs: 1000, budgetMs: 300000 } });
+    assert.deepEqual(mod.admissionDeadlineWindows({ startMs: 1000, budgetMs: 60000 }).preparation, { startMs: 1000, budgetMs: 60000 }, "a small budget keeps no reserve");
+    assert.equal(dl.admissionDeadlineActive(), false);
+    // The rollback runs with a deadline set (the second, later window), one call per row newest first, and clears it afterwards.
+    const seen = [];
+    const retained = mod.restoreWrittenQueueRows(["first", "second"], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, (row) => { seen.push([row, dl.admissionDeadlineActive()]); return { status: "restored" }; });
+    assert.deepEqual(seen, [["second", true], ["first", true]]);
+    assert.equal(retained, 0);
+    assert.equal(dl.admissionDeadlineActive(), false, "cleared after the rollback");
+    // A rollback that runs out of its window is counted, and the next row is still tried.
+    const slow = mod.restoreWrittenQueueRows(["a", "b"], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, (row) => (row === "b" ? { status: "refused", code: "GUARD-DISPATCH-SLOW" } : { status: "restored" }));
+    assert.equal(slow, 1);
+    assert.equal(dl.admissionDeadlineActive(), false);
+    // No window (an injected clock) sets nothing; no rows do nothing.
+    const none = mod.restoreWrittenQueueRows(["x"], null, () => { assert.equal(dl.admissionDeadlineActive(), false); return { status: "restored" }; });
+    assert.equal(none, 0);
+    assert.equal(mod.restoreWrittenQueueRows([], { rollback: { startMs: Date.now(), budgetMs: 300000 } }, () => assert.fail("no row, no call")), 0);
+    // An expired rollback window really stops a native observation, so the retained row is what the refusal reports.
+    dl.setAdmissionDeadline({ startMs: Date.now() - 400000, budgetMs: 300000 });
+    assert.throws(() => dl.assertAdmissionDeadline(), (error) => error.code === "GUARD-DISPATCH-SLOW");
+    dl.clearAdmissionDeadline();
+  } },
   { id: "D177-slow-phase-releases-lock", name: "D177 a stubbed clock past the budget yields GUARD-DISPATCH-SLOW naming the phase, one stderr-style line per phase, and the registry lock is free afterwards", run: () => fixture(({ root }) => {
     const { original, repository, runtime, items } = d177Setup(root, false);
     const lines = []; let calls = 0;

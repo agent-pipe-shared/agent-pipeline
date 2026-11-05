@@ -215,16 +215,44 @@ export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
   // queue row it wrote is restored below like for any other refusal.
   const deadline = args?.admissionDeadline;
   const realClockDeadline = deadline && typeof deadline === "object" && typeof deadline.now !== "function";
+  const windows = realClockDeadline ? admissionDeadlineWindows(deadline) : null;
   let result;
   try {
-    if (realClockDeadline) setAdmissionDeadline(deadline);
+    if (realClockDeadline) setAdmissionDeadline(windows.preparation);
     result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
   } catch (error) {
     if (error?.code !== "GUARD-DISPATCH-SLOW") throw error;
     result = { ok: false, code: error.code, reason: error.reason ?? error.message ?? null, ...(typeof error.repair === "string" ? { repair: error.repair } : {}) };
   } finally { if (realClockDeadline) clearAdmissionDeadline(); }
-  if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
+  if (result?.ok !== true) {
+    const retained = restoreWrittenQueueRows(written, windows, dependencies.rollbackGovernedItemQueueFn ?? rollbackGovernedItemQueue);
+    if (retained > 0 && result && typeof result === "object") result = { ...result, reason: `${result.reason ?? result.code ?? "the admission was refused"}; ${QUEUE_ROW_RETAINED_NOTICE}` };
+  }
   return result;
+}
+// The rollback of a refused admission enters the registry boundary like any other writer, which on a slow host is a whole registry cycle. The
+// preparation therefore stops EARLIER than the hook's budget, and the rollback runs under the full budget as a second, later deadline. A
+// measured Windows run (2026-11-05) let the preparation overrun, cleared the deadline in the `finally` above and then ran the rollback
+// without any: a full cycle of about a hundred native process starts, and the host ended the hook before it could print the refusal.
+const ROLLBACK_RESERVE_MS = 50_000;
+/** The preparation window (the budget less the rollback reserve) and the rollback window (the whole budget), both from the same start. */
+export function admissionDeadlineWindows({ startMs, budgetMs } = {}) {
+  const reserve = Number.isFinite(budgetMs) && budgetMs > 2 * ROLLBACK_RESERVE_MS ? ROLLBACK_RESERVE_MS : 0;
+  return { preparation: { startMs, budgetMs: budgetMs - reserve }, rollback: { startMs, budgetMs } };
+}
+const QUEUE_ROW_RETAINED_NOTICE = "the queue row it wrote could not be restored in time and stays; run the routine heal, or cancel the slice, to release it";
+/** Restores every queue row a refused admission wrote, newest first, under the rollback window; returns how many rows stay unrestored. */
+export function restoreWrittenQueueRows(written, windows, rollbackFn) {
+  if (written.length === 0) return 0;
+  let retained = 0;
+  try {
+    if (windows) setAdmissionDeadline(windows.rollback);
+    for (const row of written.reverse()) {
+      const outcome = rollbackFn(row);
+      if (outcome?.status === "refused" && outcome.code === "GUARD-DISPATCH-SLOW") retained += 1;
+    }
+  } finally { if (windows) clearAdmissionDeadline(); }
+  return retained;
 }
 function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered, admissionDeadline = null } = {}, dependencies = {}, written = []) {
   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
