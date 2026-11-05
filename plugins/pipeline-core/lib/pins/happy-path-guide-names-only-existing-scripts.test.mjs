@@ -17,6 +17,13 @@ test("the happy-path guide names only scripts that ship, and the start skill loa
   assert.match(readFileSync(SKILL, "utf8"), /\x60references\/happy-path\.md\x60 for the ordered command chain/u);
 });
 
+test("the guide tells when to call the architecture-decision skill: at design promotion, for every decision the design names", () => {
+  const guide = readFileSync(GUIDE, "utf8");
+  assert.match(guide, /architecture-decision/u);
+  assert.match(guide, /decisions to record/iu);
+  assert.ok(existsSync(join(PLUGIN, "skills", "architecture-decision", "SKILL.md")));
+});
+
 test("the guide keeps its honesty markers and holds no host path", () => {
   const guide = readFileSync(GUIDE, "utf8");
   assert.match(guide, /## Gaps this guide does not close/u);

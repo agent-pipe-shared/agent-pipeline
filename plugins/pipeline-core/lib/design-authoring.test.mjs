@@ -7,6 +7,7 @@ import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, has
 import { createHash } from "node:crypto";
 import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
 import { devNull } from "node:os";
+import { readFileSync } from "node:fs";
 const completionCases = [];
 function test(name, optionsOrRun, possibleRun) {
   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
@@ -28,6 +29,20 @@ test("authoring skeleton uses the actual architecture contract and remains visib
   assert.deepEqual(parsed.modules[0].verificationEntryPoints, ["tests/application.test.mjs"]);
   assert.match(parsed.disposition.rationale, /Authored/u);
   assert.match(renderDesignTraceabilitySkeleton(), /WHEN <trigger>.*SHALL/u);
+});
+test("the skeleton asks for the decisions to record (title, trigger, ADR path) and the readiness reviewer asks about them, never blocking", () => {
+  const text = renderArchitectureDesignSkeleton();
+  assert.match(text, /decisions to record/iu);
+  for (const trigger of [/module boundaries/iu, /data keeping/iu, /offline and error strategy/iu, /security trade-off/iu]) assert.match(text, trigger);
+  assert.match(text, /title, trigger and ADR path/iu);
+  assert.match(text, /adrReferences/u);
+  assert.equal(stagingDesignNeedsAuthoring(text, ""), true);
+  const authored = text.replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/u, "").replace(/REPLACE: /gu, "Authored: ");
+  assert.deepEqual(parseArchitectureDesign(authored).modules[0].adrReferences, []);
+  const reviewer = readFileSync(new URL("../agents/readiness-reviewer.md", import.meta.url), "utf8");
+  assert.match(reviewer, /Decisions to record/u);
+  assert.match(reviewer, /architecture-decision/u);
+  assert.match(reviewer, /question[^.]*never a block/iu);
 });
 test("compact readback retains executable recovery and digests without copying design contents", () => {
   const action = { kind: "command", argv: ["inspect"] };
@@ -93,7 +108,7 @@ test("staging authoring distinguishes generated placeholders from reviewed sourc
   assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
 });
 
-if (completionCases.length !== 4) throw new Error("case completion count drift: expected 4, got " + completionCases.length);
+if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

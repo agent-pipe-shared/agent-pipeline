@@ -12,7 +12,7 @@ export function renderArchitectureDesignSkeleton() {
     implementationSurface: ["src/application.mjs"], fitnessModel: { schema: "pipeline.fitness-model.v1",
       profileId: "REPLACE: project fitness profile", revision: 1, allowedBoundaryCrossings: [],
       antiFragmentationPolicy: { rejectTrivialFacades: true } } };
-  return "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths. Split modules as needed: cut one module per separable responsibility, a part that two people could build without talking to each other, each with its own ownedPaths, publicContracts and verificationEntryPoints; a single module means no slice can run in parallel. The disposition records a proposal for the final signed design; this template grants no approval. -->\n"
+  return "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths. Split modules as needed: cut one module per separable responsibility, a part that two people could build without talking to each other, each with its own ownedPaths, publicContracts and verificationEntryPoints; a single module means no slice can run in parallel. The disposition records a proposal for the final signed design; this template grants no approval. Decisions to record: for every decision that needs an ADR, name its title, trigger and ADR path (docs/adr/NNNN-title.md) in the adrReferences of the module it concerns; classic triggers are module boundaries, data keeping, offline and error strategy, and a security trade-off. -->\n"
     + "```pipeline-architecture-design\n" + JSON.stringify(design, null, 2) + "\n```\n";
 }
 

@@ -19,6 +19,8 @@ command tables.
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
 2. Review receipt and design course (agent): `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`; dispatch the
    read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
+   Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
+   `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9
    (profile drift) block is a repository state and names the adoption renewal.
    **PRD release scope (every profile but `mini`, EL-19): the design package is an unsealed DRAFT** (`inspect` -> `sealSituation.situation` is `draft`); onboarding

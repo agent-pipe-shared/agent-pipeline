@@ -57,7 +57,13 @@ function planSteps() {
       id: "set-feature", script: STATE, verb: "set-feature", closed: true,
       argv: ["set-feature", "--id", "<feature-id>", "--plan-path", "<prd-path>", "--spec-path", "<spec-path>"],
       needs: ["the PRD and the Spec are authored in the work tree"], producer: "activeFeature in pipeline state, lifecycle draft",
-      commit: "commit the authored PRD and Spec before submitting", next: ["submit-plan"],
+      commit: "commit the authored PRD and Spec before submitting", next: ["record-decisions", "submit-plan"],
+    }),
+    otherStep({
+      id: "record-decisions", command: "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
+      needs: ["the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"],
+      producer: "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
+      commit: "commit the ADRs with the design", next: ["submit-plan"],
     }),
     scriptStep({
       id: "submit-plan", script: STATE, verb: "submit-plan", closed: true, argv: ["submit-plan", "--by", "<name>", "--profile", "<epic|feature|mini>"],

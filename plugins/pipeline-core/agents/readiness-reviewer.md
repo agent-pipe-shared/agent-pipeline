@@ -34,6 +34,13 @@ that a single module leaves no slice that can run in parallel. This is a
 question in the review, never a block, and a justified single module (one
 responsibility, small scope) is not a finding.
 
+Decisions to record: read the design for choices that need an ADR (module
+boundaries, data keeping, offline and error strategy, a security trade-off). When
+the design makes such a choice and no module names an ADR path for it in
+`adrReferences` (title, trigger and path), raise it as a question to the Elephant
+and point to the `architecture-decision` skill. This is a question, never a block;
+the close only reports which named ADR paths exist.
+
 Return one concise readiness review with references. The host, not this agent,
 creates the sanitized, dispatch-bound duty and execution receipts; never return
 or persist raw prompts, answers, paths, credentials, or private coordinates.

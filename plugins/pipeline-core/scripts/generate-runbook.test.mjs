@@ -201,6 +201,16 @@ test("the start, plan and implement paths hold their lifecycle steps in order", 
   assert.deepEqual(impl.filter((id) => ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"].includes(id)), ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"]);
 });
 
+test("the plan path has one step at design promotion that calls the architecture-decision skill, before submit-plan", () => {
+  const steps = docOf("plan").steps;
+  const step = steps.find((s) => s.id === "record-decisions");
+  assert.ok(step, "record-decisions step");
+  assert.match(step.command, /architecture-decision/u);
+  assert.equal(step.catalogue, null);
+  assert.equal(step.who, "agent");
+  assert.ok(steps.findIndex((s) => s.id === "record-decisions") < steps.findIndex((s) => s.id === "submit-plan"));
+});
+
 test("the push path is derived from the quick-reference table of docs/push-release-flow.md", () => {
   const flow = readFileSync(join(REPO_ROOT, "docs/push-release-flow.md"), "utf8");
   const table = flow.slice(flow.indexOf("## Quick reference"));

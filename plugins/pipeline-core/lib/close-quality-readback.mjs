@@ -49,9 +49,10 @@ function adrRow(readers) {
     const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
     if (checks.every((c) => c.found.ok)) {
       const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
+      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : "missing"}`).join(", ");
       return absent.length === 0
-        ? row(id, "present", promised.value.join(", "))
-        : row(id, "missing", null, `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
+        ? row(id, "present", listing)
+        : row(id, "missing", listing,`The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
     }
   }
   const impact = call(readers.architectureImpact);

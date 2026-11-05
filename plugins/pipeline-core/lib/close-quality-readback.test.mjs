@@ -71,6 +71,19 @@ test("AC-239 adr-decision: present, not-applicable when no decision qualifies, m
   }
 });
 
+test("AC-239 adr-decision: the evidence lists every named ADR path with whether it exists, report-only", () => {
+  const promised = ["docs/adr/0001-a.md", "docs/adr/0002-b.md"];
+  const gap = rows(full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => promised, exists: (p) => p === promised[0] }))["adr-decision"];
+  assert.equal(gap.status, "missing");
+  assert.match(String(gap.evidence), /docs\/adr\/0001-a\.md: exists/u);
+  assert.match(String(gap.evidence), /docs\/adr\/0002-b\.md: missing/u);
+  const ok = rows(full({ promisedAdrPaths: () => promised, exists: () => true }))["adr-decision"];
+  assert.equal(ok.status, "present");
+  assert.match(String(ok.evidence), /docs\/adr\/0002-b\.md: exists/u);
+  // Report-only: the readback never throws and the other rows keep their outcome.
+  assert.equal(rows(full({ promisedAdrPaths: () => promised, exists: () => false }))["security-scan"].status, "missing");
+});
+
 test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
   assert.equal(rows(full())["architecture-fitness"].status, "present");
   const missing = rows(full({ rigorHistory: () => [{ body: { featureId: "other", fitnessProjection: {} } }] }))["architecture-fitness"];
