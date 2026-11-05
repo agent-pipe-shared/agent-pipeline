@@ -193,6 +193,21 @@ const cases = [
       assert.equal(got.reads, 0, "a memo hit performs no repository-root read (no per-row git proof)");
     }
   }); } },
+  { id: "D177-registry-lock-vanished-between-listing-and-stat", name: "a registry.lock that disappears between the closure walk's listing and its stat is skipped (nobody holds it any more); any other vanished entry, and any other error, stays a fault", run: async () => {
+    const reg = await import("./session-authority-registry.mjs");
+    const commonDir = mkdtempSync(join(nativeContractFixtureParent(), "lock-vanish-"));
+    try {
+      const repo = { commonDir };
+      const lock = "agent-pipeline/session-authority/registry.lock", catalogue = "agent-pipeline/session-authority/catalogue.json";
+      const failWith = (code) => () => { throw Object.assign(new Error(code), { code }); };
+      assert.equal(reg.statListedRegistryEntry(repo, lock, failWith("ENOENT")), null, "a vanished lock is skipped");
+      assert.throws(() => reg.statListedRegistryEntry(repo, catalogue, failWith("ENOENT")), (error) => error.code === "ENOENT", "any other vanished entry is a fault");
+      assert.throws(() => reg.statListedRegistryEntry(repo, lock, failWith("EACCES")), (error) => error.code === "EACCES", "another error on the lock is a fault");
+      mkdirSync(join(commonDir, "agent-pipeline/session-authority"), { recursive: true });
+      writeFileSync(join(commonDir, lock), "x");
+      assert.equal(reg.statListedRegistryEntry(repo, lock).isFile(), true, "an existing lock is statted as before");
+    } finally { rmSync(commonDir, { recursive: true, force: true }); }
+  } },
   { id: "D177-slow-phase-releases-lock", name: "D177 a stubbed clock past the budget yields GUARD-DISPATCH-SLOW naming the phase, one stderr-style line per phase, and the registry lock is free afterwards", run: () => fixture(({ root }) => {
     const { original, repository, runtime, items } = d177Setup(root, false);
     const lines = []; let calls = 0;
