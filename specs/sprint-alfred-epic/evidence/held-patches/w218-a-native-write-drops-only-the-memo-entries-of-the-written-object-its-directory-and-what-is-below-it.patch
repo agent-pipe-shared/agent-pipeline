@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index a285099fc..7c4f73f4e 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
+ import {spawnSync} from 'node:child_process';
+ import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync} from 'node:fs';
+ import {fileURLToPath} from 'node:url';
+-import {isAbsolute,resolve} from 'node:path';
++import {dirname,isAbsolute,resolve,sep} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ import {assertAdmissionDeadline} from './admission-deadline.mjs';
+@@ -72,9 +72,18 @@ export function nativeAuthorityStats(){
+  return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoSize:authorityMemo.size};
+ }
+ function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
++// A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
++// still compares the observed object's own identity (device, file id, size, times), so an entry elsewhere in the tree stays valid across the write
++// and stays checked on every hit. Dropping only these entries, not the whole memo, keeps the many unrelated reads that follow a publish from
++// each starting a new native process (about one second each on Windows).
++function forgetMemoAround(written){
++ // Paths compare without case: a case-insensitive file system may spell one object two ways, and dropping too much is harmless.
++ const folded=written.toLowerCase(),parent=dirname(folded),below=folded.endsWith(sep)?folded:folded+sep;
++ for(const [key,entry] of authorityMemo){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below))authorityMemo.delete(key);}
++}
+ function invoke(request){
+  const operation=request.operation;
+- if(MEMO_MUTATING.has(operation)){authorityMemo.clear();try{return invokeNative(request);}finally{authorityMemo.clear();}}
++ if(MEMO_MUTATING.has(operation)){forgetMemoAround(request.path);try{return invokeNative(request);}finally{forgetMemoAround(request.path);}}
+  if(!MEMO_READ_ONLY.has(operation)||process.env.PIPELINE_AUTHORITY_NO_MEMO==='1')return invokeNative(request);
+  const key=JSON.stringify([operation,request.path,request.directory??null,request.boundaryRoot??null,request.maxBytes??null]);
+  const before=memoIdentity(request.path);
+@@ -85,7 +94,7 @@ function invoke(request){
+  // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
+  assertAdmissionDeadline();
+  const value=invokeNative(request);
+- if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
++ if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
+  return value;
+ }
+ function invokeNative(request){
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 7ea455d7a..2a4b2941e 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -764,6 +764,33 @@ const cases = [
+     assert.equal(trace.authorityMemo.size, 1, JSON.stringify(trace));
+     assert.equal(trace.elapsedMs, 5);
+   }) },
++  { id: "SAS20", name: "authority memo (10) a write drops only the entries of the written object, its directory and what is below it; a read elsewhere stays memoized and a hit is still identity-checked", run: () => memoFixture(({ dir, calls, file }) => {
++    const sibling = join(dir, "sub", "b.txt"), other = join(dir, "other", "c.txt");
++    mkdirSync(join(dir, "sub"), { recursive: true }); mkdirSync(join(dir, "other"), { recursive: true });
++    writeFileSync(file, "one"); writeFileSync(sibling, "two"); writeFileSync(other, "three");
++    const read = (path) => readWindowsOwnedAuthorityFile({ path, maxBytes: 100 });
++    read(file); read(sibling); read(other);
++    assert.deepEqual(calls, ["read", "read", "read"]);
++    // A publish of a file in sub/ drops that file's entry only; the other two reads stay memoized.
++    publishWindowsOwnedAuthorityFile({ path: sibling, bytes: Buffer.from("x"), expectedSha256: null, expectedFacts: null });
++    read(file); read(other);
++    assert.deepEqual(calls, ["read", "read", "read", "publish"], "reads outside the written object are not repeated");
++    read(sibling);
++    assert.equal(calls.at(-1), "read", "the written file is read again");
++    // A removal of a directory drops what is below it.
++    read(sibling);
++    const before = calls.length;
++    removeWindowsOwnedAuthorityFile({ path: join(dir, "sub"), expectedSha256: "b".repeat(64), expectedFacts: MEMO_FACTS });
++    read(sibling);
++    assert.deepEqual(calls.slice(before), ["remove", "read"], "an entry below the removed directory is read again");
++    read(other);
++    assert.equal(calls.length, before + 2, "an unrelated entry is still memoized");
++    // A hit is still checked against the object's own identity: a changed file is read again although no write went through this module.
++    writeFileSync(other, "four-longer");
++    read(other);
++    assert.equal(calls.at(-1), "read");
++    assert.equal(calls.length, before + 3);
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

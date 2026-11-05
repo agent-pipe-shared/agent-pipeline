@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 4766c662a..574872c62 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -252,6 +252,27 @@ const cases = [
+     assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
+     assert.equal(admissionDeadlineActive(), false);
+   }) },
++  { id: "D177-source-digest-read-once-per-identity", name: "D177 an installed source file is read once per file identity: a second call and a second producer sharing the file read nothing, a changed size or time reads again, and a file that is not a regular file is refused", run: async () => {
++    const reg = await import("./session-authority-registry.mjs");
++    const dir = mkdtempSync(join(nativeContractFixtureParent(), "source-digest-"));
++    try {
++      const file = join(dir, "a.mjs");
++      writeFileSync(file, "export const a=1;\n");
++      let reads = 0;
++      const read = (path) => { reads += 1; return readFileSync(path); };
++      const first = reg.installedSourceSha256(file, "one", { read });
++      assert.equal(reads, 1, "the first call reads the file");
++      assert.equal(reg.installedSourceSha256(file, "one", { read }), first, "the same digest");
++      assert.equal(reg.installedSourceSha256(file, "two", { read }), first, "another producer sharing the file gets the same digest");
++      assert.equal(reads, 1, "an unchanged file identity is not read again");
++      writeFileSync(file, "export const a=22;\n");
++      const changed = reg.installedSourceSha256(file, "one", { read });
++      assert.equal(reads, 2, "a changed file is read again");
++      assert.notEqual(changed, first, "and its digest follows its bytes");
++      assert.throws(() => reg.installedSourceSha256(dir, "one", { read }), (error) => error.code === "SDC-AUTHORITY-UNAVAILABLE" && /one:source-file/.test(error.reason ?? error.message), "a directory is not a source file");
++      assert.equal(reads, 2, "a refused path reads nothing");
++    } finally { rmSync(dir, { recursive: true, force: true }); }
++  } },
+   { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
+     const backend = await import("./windows-owned-authority-backend.mjs");
+     const writerKey = Symbol.for("pipeline.authority-trace-progress");
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 647c7a624..cd25b26b2 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -369,7 +369,18 @@ export function isActiveSourceOwnedSessionAuthorityBoundary({boundary:token,root
+   return !!found&&boundaryContext.getStore()?.token===token&&found.repository.primaryRoot===rootDir;
+ }
+ 
+-function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));const s=lstatSync(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);return {path,sha256:hash(process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs))};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
++// A participant binds the digest of its installed source files. Reading them costs one native process start per file on win32 (about one second each),
++// and the same file is shared by several producers and read again by every portsFor call, so a digest is kept per process, keyed by the file's lstat
++// identity: a file whose identity, size, times or mode changed is read again, an unchanged one is not. The stat itself is still made on every call.
++const sourceDigestMemo=new Map();
++export function installedSourceSha256(abs,producerId,{lstat=lstatSync,read=null}={}){
++  const s=lstat(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);
++  const key=`${s.dev}:${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}:${s.mode}`,hit=sourceDigestMemo.get(abs);
++  if(hit&&hit.key===key)return hit.sha256;
++  const bytes=read?read(abs):process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs);
++  const sha256=hash(bytes);sourceDigestMemo.set(abs,{key,sha256});return sha256;
++}
++function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));return {path,sha256:installedSourceSha256(abs,producerId)};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
+ function portsFor(repo,ports){if(!Array.isArray(ports)||ports.length!==12)fail('SDC-AUTHORITY-UNAVAILABLE','complete-twelve-ports-required');return definitions.map((def,index)=>{const row=ports[index];exact(row,['producerId','port'],'participant-port');if(row.producerId!==def[0])fail('SDC-AUTHORITY-UNAVAILABLE','participant-order');const predicate=def[1][`isOwned${def[2]}AuthorityProducerPort`];if(typeof predicate!=='function'||predicate(row.port,{repository:repo})!==true)fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:unowned-port`);for(const method of ['readBaseline','observeOperation','observeTerminal','reconcile','readAssurance'])if(typeof row.port[method]!=='function')fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:missing-method`);return {port:row.port,participant:participant(def)};});}
+ function sourceFacts(values,namespaces){if(!Array.isArray(values)||values.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','source-fact-bound');let total=0;for(const v of values){exact(v,['namespaceId','pathSha256','sha256','size','identity','semanticSha256'],'source-fact');if(!namespaces.includes(v.namespaceId))fail('SDC-AUTHORITY-UNAVAILABLE','unknown-namespace');sha(v.pathSha256);sha(v.sha256);sha(v.semanticSha256);exact(v.identity,['dev','ino','mode','nlink'],'source-identity');if(!/^\d+$/.test(v.identity.dev)||!/^\d+$/.test(v.identity.ino)||!Number.isSafeInteger(v.identity.mode)||v.identity.nlink!==1)fail('SDC-PRIVATE-PATH','source-identity');const journal=JOURNAL_NAMESPACES.includes(v.namespaceId),bound=v.namespaceId==='native-goldfish-host-commit'?SESSION_AUTHORITY_LIMITS.maxNativeRequestBytes:journal?SESSION_AUTHORITY_LIMITS.maxJournalEntryBytes:SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes;if(!Number.isSafeInteger(v.size)||v.size<0||v.size>bound)fail('SDC-AUTHORITY-UNAVAILABLE',`source-entry-bound: a ${v.namespaceId} entry of ${v.size} bytes exceeds ${bound}`);if(!journal)total+=v.size;}if(total>SESSION_AUTHORITY_LIMITS.maxSourceTotalBytes)fail('SDC-AUTHORITY-UNAVAILABLE','source-total-bound');return values;}
+ function memberships(values,p){if(!Array.isArray(values)||values.length!==p.namespaceIds.length)fail('SDC-AUTHORITY-UNAVAILABLE',`${p.producerId}:namespace-closure`);let count=0;const seen=new Set();for(const v of values){exact(v,['namespaceId','rootSha256','entrySetSha256','entryCount','sourceFacts'],'membership');if(seen.has(v.namespaceId)||!p.namespaceIds.includes(v.namespaceId))fail('SDC-AUTHORITY-UNAVAILABLE','namespace-identity');seen.add(v.namespaceId);sha(v.rootSha256);sha(v.entrySetSha256);sourceFacts(v.sourceFacts,p.namespaceIds);if(!Number.isSafeInteger(v.entryCount)||v.entryCount<0||v.entryCount!==v.sourceFacts.length)fail('SDC-AUTHORITY-UNAVAILABLE','namespace-entry-count');count+=v.entryCount;}if(count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','namespace-entry-bound');return values;}
