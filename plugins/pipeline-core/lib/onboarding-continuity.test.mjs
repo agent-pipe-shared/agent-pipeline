@@ -4001,6 +4001,16 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   assert.match(warning.remedy, /pre-commit/u);
   assert.equal(leakPlan.planSha256, plainPlan.planSha256);
   assert.deepEqual(leakPlan.targets, plainPlan.targets);
+  // E5 rest: the e-mail category (case-insensitive, as derivePatterns builds it for an address) is reported by its own
+  // name, again without the value. The generated text holds no address, so the category is fed a whole word of that
+  // text (the e-mail form matches only between word boundaries), in upper case to prove the match ignores case.
+  const emailWord = sampleLine.split(/[^A-Za-z]+/u).find((word) => word.length >= 5);
+  assert.ok(emailWord, "the sample line has a plain word of five letters or more");
+  const emailPatterns = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "email", value: emailWord.toUpperCase() }] });
+  const emailPlan = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: emailPatterns });
+  assert.deepEqual(emailPlan.warnings?.[0]?.categories, ["email"]);
+  assert.equal(JSON.stringify(emailPlan.warnings).toLowerCase().includes(emailWord.toLowerCase()), false);
+  assert.equal(emailPlan.planSha256, plainPlan.planSha256);
   // A detector failure is silent: an early hint, not a gate.
   const broken = [{ category: "email", expression: { test() { throw new Error("detector failure"); } } }];
   const failed = planOnboardingIntakeGenerate({ rootDir: root, privateIdentifierPatterns: broken });

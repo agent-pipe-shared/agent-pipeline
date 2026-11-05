@@ -5,8 +5,9 @@
 //
 // PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
 // queue, and a tree guard-override audit log an older build left) so the clean-tree checks of push-prepare, push-init and the PO
-// approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
-// or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
+// approval pass again. It refuses when another tracked file is modified, staged or deleted, naming those paths; an
+// untracked foreign file is listed in `untouched` and left alone. It never commits, stashes or discards a file the
+// Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
 // The caller states who runs it, and exactly one of the two flags is required: `--agent` adds the GIT-03
 // provenance pair (`AI-Assisted: true`, `Dispatch: stage-0 (elephant)`) for an agent session; `--human`
 // commits without provenance trailers, as a PO's own terminal commit does. A call naming neither is refused,
@@ -17,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
+import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 const SCHEMA = "pipeline.commit-pipeline-owned.v1";
@@ -65,15 +66,22 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
   const { owned, others } = classifyDirtyTree(status.stdout, root);
-  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
-  if (!owned.length) return { status: "nothing-to-commit", owned: [] };
-  if (parsed.dryRun) return { status: "dry-run", owned };
+  // An untracked foreign file cannot enter the commit: `git add` and `git commit` below name only the owned paths,
+  // so it is reported in `untouched`, never committed and never a reason to refuse. A modified, staged or deleted
+  // tracked file still refuses, because the clean-tree checks this command serves would refuse it anyway.
+  const untracked = new Set(porcelainPaths(status.stdout.split("\n").filter((line) => line.startsWith("?? ")).join("\n")));
+  const blocking = others.filter((path) => !untracked.has(path));
+  const untouched = others.filter((path) => untracked.has(path));
+  const left = untouched.length ? { untouched } : {};
+  if (blocking.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
+  if (!owned.length) return { status: "nothing-to-commit", owned: [], ...left };
+  if (parsed.dryRun) return { status: "dry-run", owned, ...left };
   const add = git(["add", "--", ...owned]);
   if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
   const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent }), "--", ...owned]);
   if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
   const head = git(["rev-parse", "HEAD"]);
-  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null };
+  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null, ...left };
 }
 
 if (isDirectInvocation(import.meta.url)) {
