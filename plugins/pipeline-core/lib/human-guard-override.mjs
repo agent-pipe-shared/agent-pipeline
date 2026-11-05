@@ -5002,8 +5002,23 @@ function consumeHumanGuardOverrideCore({
   // refusal could be printed. This is the same plain directory read the consumption starts with, made before the boundary instead of
   // inside it; it creates nothing. Only a directory that is not there answers `absent` here; a file where a directory belongs
   // (ENOTDIR) or any other fault is a persistence anomaly and goes on to the boundary, which fails closed with its typed code.
+  // A used capability stays on disk with the status `consumed`, so on a machine that ever ran a ceremony the directory is never empty and
+  // the check above alone never fires (a Windows consumer still paid 84 s and 189 native starts for one refused command). The consumption
+  // below skips, before any lock or audit row, every capability that is not `armed` or is bound to another tool, so a store in which no
+  // readable file is an armed capability for this tool answers `absent` there too; the same plain reads decide it here. A file that cannot
+  // be read or parsed, or any other fault, is not decided here and goes on to the boundary, which validates and records it.
   try {
-    if (!readdirSync(join(repo.common, "agent-pipeline", "human-guard-overrides", "capabilities")).some((name) => name.endsWith(".json"))) return { status: "absent" };
+    const capabilitiesDir = join(repo.common, "agent-pipeline", "human-guard-overrides", "capabilities");
+    const names = readdirSync(capabilitiesDir).filter((name) => name.endsWith(".json"));
+    let decidable = true;
+    for (const name of names) {
+      let record;
+      try { record = JSON.parse(readFileSync(join(capabilitiesDir, name), "utf8")); }
+      catch { decidable = false; break; }
+      if (record === null || typeof record !== "object" || Array.isArray(record)) { decidable = false; break; }
+      if (record.status === "armed" && record.toolName === toolName) { decidable = false; break; }
+    }
+    if (decidable) return { status: "absent" };
   } catch (error) {
     if (error?.code === "ENOENT") return { status: "absent" };
   }

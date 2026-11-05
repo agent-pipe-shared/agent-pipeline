@@ -190,6 +190,35 @@ test("a consumption with no capability file answers absent without entering the 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("a store of used capabilities answers absent without the registry boundary; an armed one for the tool or an unreadable file still enters it", () => {
+  const root = fixture();
+  try {
+    const toolInput = { command: "cd sub && wc -l a.txt | tail -2" };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-PARSE-UNSUPPORTED: the command is outside the closed Pipeline shell grammar" }];
+    const dir = join(root, ".git", "agent-pipeline", "human-guard-overrides", "capabilities");
+    const registry = join(root, ".git", "agent-pipeline", "session-authority");
+    const consume = () => consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials });
+    // The fixture store is not a private one, so the boundary may fault on its ownership check: either outcome proves it was entered.
+    const outcome = () => { try { return consume().status; } catch (error) { return `threw:${error.code}`; } };
+    mkdirSync(dir, { recursive: true });
+    // A consumed capability for this tool and an armed one for another tool are skipped by the consumption itself, before any lock.
+    writeFileSync(join(dir, `${"a".repeat(64)}.json`), JSON.stringify({ status: "consumed", toolName: "Bash" }));
+    writeFileSync(join(dir, `${"b".repeat(64)}.json`), JSON.stringify({ status: "armed", toolName: "Write" }));
+    assert.equal(consume().status, "absent");
+    assert.equal(existsSync(registry), false, "used and foreign capabilities do not enter the registry boundary");
+    // An armed capability for this tool is not decided by the plain reads: the boundary validates it (here: it fails validation and is only skipped).
+    writeFileSync(join(dir, `${"c".repeat(64)}.json`), JSON.stringify({ status: "armed", toolName: "Bash" }));
+    assert.ok(outcome() !== "absent" || existsSync(registry), "an armed capability for the tool goes on to the boundary");
+    rmSync(registry, { recursive: true, force: true });
+    rmSync(join(dir, `${"c".repeat(64)}.json`));
+    assert.equal(outcome(), "absent", "without the armed file the shortcut answers again");
+    assert.equal(existsSync(registry), false);
+    // A file that cannot be parsed is not decided by the plain reads either.
+    writeFileSync(join(dir, `${"d".repeat(64)}.json`), "{ not json");
+    assert.ok(outcome() !== "absent" || existsSync(registry), "an unreadable capability file goes on to the boundary");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("lifecycle co-denial diagnostics remain bounded", () => {
   const long = "X".repeat(2_000);
   const recovery = humanGuardOverrideInternals.lifecycleNotReadyRecovery([
