@@ -1,0 +1,35 @@
+# w234: a SubagentStop that meets the registry lock waits for it and names the holder (E5)
+
+Goldfish-built (slice C19H-W234-STOP) on a scratch clone at the base of w233. Delta on w233 and the earlier held patches (it changes `lib/native-goldfish-host-state.mjs`, `lib/native-goldfish-host-finalizer.mjs`, `hooks/native-goldfish-host.mjs`, `hooks/subagent-start-receipt.mjs`). Criterion binding: AC-108 is the closest existing accepted criterion; the PRD and the Spec are unchanged.
+
+## Found
+
+Windows (19g installed): two of three SubagentStop host commits failed with `NGHF-PENDING-UNAVAILABLE`, reason `NGHS-PENDING-MISSING: registry-lock-held`, at the very end of the Goldfish run, although `readNativeGoldfishPending` already retried a held lock for 90 s (w227).
+
+Root cause, by code and reproduced on Linux with a real registry fixture: the 90 s retry wrapped only `read(...)` (the plain-fs `readPrivate`, which never touches the registry). The next statement, `authenticatedNativePendingState(stored)` (`lib/native-goldfish-host-state.mjs`, the `withSessionAuthorityBoundary` call of an item-delivery state), runs inside the same `try` but OUTSIDE that retry. It takes the registry lock; a sibling hook of the same dispatch holding it makes `acquireRegistryLock` refuse `SDC-LOCK-HELD` / `registry-lock-held` after its own 1.5 s bound, and the `catch` of `readNativeGoldfishPending` turned that into `NGHS-PENDING-MISSING` with the reason, at once. Every governed item-delivery Goldfish has such a state, so the 90 s wait of w227 never applied to the lock that mattered. NGHS68 reproduces exactly the logged result (`{"ok":false,"code":"NGHS-PENDING-MISSING","reason":"registry-lock-held"}`) with a live process holding the boundary; it was RED before the first production edit.
+
+What is reproduced is the live-holder path, which refuses after the 1.5 s bound of one acquisition. The Windows records landed within 30 ms of the expected stop; that sub-1.5 s timing is NOT reproduced and is not decidable from the old record. A concrete instant path exists in `acquireRegistryLock` (`retired>=2` or `races>=64`: a plain `SDC-LOCK-HELD` with no wait and no `error.lock`, for example a holder judged dead and retired twice). Either way the cause sits outside the retry, and the new `owner`, `waitedMs` and `holderPid` fields in the record (observed read-only through `inspectSessionAuthorityLock` when the error carries none) discriminate the two paths on the next Windows run.
+
+## What it changes
+
+- `readNativeGoldfishPending`: the read and the authenticating boundary are one attempt inside the retry. `authenticatedNativePendingState` marks `entered` as the first statement inside its boundary callback, so only a lock refusal raised before the boundary opened is retried (the boundary entry may heal the catalogue); the budget stays `NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS` (90 s). Worst case on the stop path is 90 s for the pending read plus 90 s for the existing terminal-prepare wait, inside the 300 s SubagentStop budget.
+- New exported `sessionAuthorityLockFacts(error, { waitedMs, root })`: closed, path-free facts of a held-lock refusal (`errorCode`, `reason`, `waitedMs`, `holderPid`, `acquiredAt`, `owner`, `ageSeconds`). It prefers the `error.lock` the registry attaches; where a refusal carries none it observes the lock read-only through `inspectSessionAuthorityLock`. `waitedMs` is the caller's own measure of the whole wait.
+- A failed pending read returns that `lock`; `readSubagentStopPending`, the `unresolved` diagnostic and the stop-failure record carry it. The terminal-prepare failure (`failAt`) carries it too. The record gains an additive `lock` object (schema version unchanged: the reader ignores unknown keys and the field is sanitised on write and on read by the new `sanitizeStopFailureLock`). The hook's failure notice names `error`, `waited N ms` and `held by pid N (live) since T`.
+- `retryWhileSessionAuthorityLockHeld` gains an optional `onWait` callback (a diagnostic hook, errors swallowed).
+- Authority trace: `hooks/native-goldfish-host.mjs` (both events) and `hooks/subagent-start-receipt.mjs` install `installHookAuthorityTrace` exactly like the guard hooks (opt-in `PIPELINE_AUTHORITY_TRACE=1`, after the governance-scope exit) and write `pipeline.hook-authority-progress.v1` marks: `hook-entry:<event>`, `pending-read`, `lock-wait`, `lock-held`, `commit`, `exit` (the SubagentStart hook: `hook-entry:SubagentStart`, `receipt-write`, `exit`). The tally line is the existing exit writer. No marks or output without the opt-in.
+
+## Checks
+
+- New case NGHS68 (`native-goldfish-host-state.test.mjs`): item-delivery pending state, a real child process holding the registry boundary; (a) a 5 s hold is waited out and the read succeeds (RED before the fix); (b) a hold that outlasts the budget reports the reason and the holder (pid, acquiredAt, owner live, code, waitedMs).
+- New cases NGHF41, NGHF42 (`native-goldfish-host-finalizer.test.mjs`): the holder facts in the result, the stop-failure record and the hook notice, no host path in the record; non-lock errors carry none; hostile lock values are reduced to the closed fields; both hooks install the trace and mark entry and exit. Case ids added to `harness/config/verify-case-completion-augmentations.v1.json`.
+- Suites on the slice clone, one at a time, final state: native-goldfish-host-state 79/79, native-goldfish-host-finalizer 50/50, native-goldfish-host-finalizer-regression 4/4, native-goldfish-host-state-regression 3/3, subagent-start-receipt 8/8, authority-trace-preload 9/9, check-verify-case-completion 32/32. `apply --check` of the patch on a clean clone at the w233 base: exit 0. There is no separate test file for the `native-goldfish-host.mjs` hook entry point or for `authority-trace-hook.mjs`; the hook wiring is pinned by source in NGHF42.
+- The new patch-scope check (`w234-...check.test.mjs`) passes 2/2.
+
+## Not changed / not proven
+
+- The root cause is proven on Linux by reproduction and by code, not on Windows. A Windows run under `PIPELINE_AUTHORITY_TRACE=1` is the confirming measurement; the new marks make the next lock cycle visible.
+- `readNativeCodexPending` calls the same `authenticatedNativePendingState` without a wait (the Codex stop route); it was not part of the briefed Windows/Claude finding and is left unchanged.
+- `NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS` is not raised. A Windows lock cycle of 60 to 100 s fits the 90 s budget only barely; if the next measurement still shows a stop refused at the budget, the holder facts now in the record say who held the lock and since when.
+- The `unresolved` record path (pending state unreadable at all) carries `lock` by the same code but has no dedicated case; it is covered by NGHS68 (the read result) and the code path shared with NGHF41.
+- The session-authority-registry locking protocol and `registryClosure` are untouched. The Linux `SDC-AUTHORITY-UNAVAILABLE` / `state-push-owner-unavailable` stop failure was already retried (w227); here it is also reported with the lock facts when it ends the budget.
+- No full Verify run, no independent Critic review.

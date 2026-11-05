@@ -1,0 +1,427 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 45cae878f..19629ea75 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -378,7 +378,8 @@
+           "NGHS64",
+           "NGHS65",
+           "NGHS66",
+-          "NGHS67"
++          "NGHS67",
++          "NGHS68"
+         ],
+         "maxBytes": 65536
+       }
+@@ -644,7 +645,9 @@
+           "NGHF37",
+           "NGHF38",
+           "NGHF39",
+-          "NGHF40"
++          "NGHF40",
++          "NGHF41",
++          "NGHF42"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 054b9f012..dc49f08f8 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -7,12 +7,15 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail } from "../lib/native-goldfish-host-finalizer.mjs";
++import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
++import { admissionProgress } from "../lib/admission-progress.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
++// E5: the same opt-in authority trace the guard hooks write (progress marks while running, the tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ 
+ 
+ /** Called by the original Elephant host return adapter after actual checks.
+@@ -64,7 +67,7 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
+       if (!newest || observedAt > newest.observedAt) {
+         newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+           stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
+-          detail: sanitizeStopFailureDetail(entry.detail) };
++          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) };
+       }
+     }
+     return newest;
+@@ -89,6 +92,17 @@ function describeFailureDetail(detail) {
+   return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+ }
+ 
++/** E5: one short sentence naming the registry lock holder a failed stop met, or "" when the failure was not a lock. */
++function describeLock(lock) {
++  const clean = sanitizeStopFailureLock(lock);
++  if (!clean) return "";
++  const parts = [];
++  if (clean.errorCode) parts.push(`error ${clean.errorCode}`);
++  if (clean.waitedMs !== undefined) parts.push(`waited ${clean.waitedMs} ms`);
++  if (clean.holderPid !== undefined) parts.push(`held by pid ${clean.holderPid}${clean.owner ? ` (${clean.owner})` : ""}${clean.acquiredAt ? ` since ${clean.acquiredAt}` : ""}`);
++  return parts.length > 0 ? ` Registry lock: ${parts.join("; ")}.` : "";
++}
++
+ /** E1: the one recovery sentence every failed host commit names -- the helper that verifies, commits and records in one step. */
+ function recoverySentence(dispatchId) {
+   return `run scripts/goldfish-host-commit-recover.mjs plan --root <root>${dispatchId ? ` --dispatch-id ${dispatchId}` : ""} --briefing <briefing file> --handback <hand-back file> (the briefing is the file dispatch-briefing.mjs wrote for this dispatch, the hand-back file holds the text the Goldfish returned), check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; apply makes one ordinary commit with the dispatch trailer and writes the typed orchestrator-attested dispatch record, which is not host-observed evidence.`;
+@@ -115,7 +129,7 @@ function stopFailureNotice(failure) {
+     : failure.code === "NGHF-COMMIT-EXCEPTION"
+       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
+       : "";
+-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeFailureDetail(failure.detail)}`;
++  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}`;
+ }
+ 
+ export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
+@@ -157,6 +171,10 @@ if (isDirectInvocation(import.meta.url)) {
+   let input;
+   try { input = JSON.parse(readFileSync(0, "utf8")); }
+   catch { process.exit(0); }
++  // E5: progress marks of the opt-in authority trace (no-ops without it): entry here, pending-read / lock-wait / lock-held / commit inside the
++  // finalizer, exit on every way out.
++  admissionProgress(`hook-entry:${typeof input?.hook_event_name === "string" ? input.hook_event_name.slice(0, 32) : "unknown"}`);
++  process.once("exit", () => admissionProgress("exit"));
+   // T6-A: bind this Claude hook process to its own hook-observed session owner.
+   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+   let result;
+diff --git a/plugins/pipeline-core/hooks/subagent-start-receipt.mjs b/plugins/pipeline-core/hooks/subagent-start-receipt.mjs
+index e20ec9bcc..0de54116c 100644
+--- a/plugins/pipeline-core/hooks/subagent-start-receipt.mjs
++++ b/plugins/pipeline-core/hooks/subagent-start-receipt.mjs
+@@ -32,6 +32,10 @@ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { lifecycleSubagentIdentity, recordBootstrapPreflightReceipt } from "../lib/guard/bootstrap-receipt.mjs";
++import { admissionProgress } from "../lib/admission-progress.mjs";
++
++// E5: the same opt-in authority trace the guard hooks write (progress marks, tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
++if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isDirectInvocation(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+ 
+ function plainObject(value) {
+   return value !== null && typeof value === "object" && !Array.isArray(value)
+@@ -72,6 +76,8 @@ if (isDirectInvocation(import.meta.url)) {
+   let input;
+   try { input = JSON.parse(readFileSync(0, "utf8")); }
+   catch { process.exit(0); }
+-  try { recordSubagentStartReceipt(input); }
++  admissionProgress("hook-entry:SubagentStart");
++  process.once("exit", () => admissionProgress("exit"));
++  try { admissionProgress("receipt-write"); recordSubagentStartReceipt(input); }
+   catch { /* SubagentStart is non-blocking; no receipt just means the step-0 fallback applies. */ }
+ }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 9e10874ee..b80d3cd64 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -3,7 +3,8 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
+ import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS } from './native-goldfish-host-state.mjs';
++import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, sessionAuthorityLockFacts } from './native-goldfish-host-state.mjs';
++import { admissionProgress } from './admission-progress.mjs';
+ import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
+ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
+ import { parseStrictJson } from './governance-event.mjs';
+@@ -26,7 +27,11 @@ import { inspectNativeGoldfishDispatchAttempt, bindNativeGoldfishDispatchAttempt
+ function fail(code, status = "recovery-required") { return { status, code, commit: null, record: null }; }
+ // PF-70: a thrown refusal carries its slug reason (e.g. selected-state-invalid-json); only that bounded slug travels, never a message or path.
+ function causeReason(error) { return typeof error?.reason === "string" && /^[a-z0-9][a-z0-9.-]{0,95}$/u.test(error.reason) ? error.reason : null; }
+-function failAt(stage, error, fallback) { return { ...fail(error?.code ?? fallback), stage, causeReason: causeReason(error) }; }
++// E5: when the cause is a held registry lock, the bounded holder facts travel with the failure (and into the stop-failure record).
++function failAt(stage, error, fallback, waitedMs = null) {
++  const lock = sessionAuthorityLockFacts(error, { waitedMs: waitedMs ?? error?.lock?.waitedMs ?? null });
++  return { ...fail(error?.code ?? fallback), stage, causeReason: causeReason(error), ...(lock ? { lock } : {}) };
++}
+ function physicalRoot(value) {
+   try { return realpathSync(resolve(value)); } catch { return null; }
+ }
+@@ -92,7 +97,7 @@ function readSubagentStopPending({ commonDir, input }) {
+   const toolUseId = resolveSubagentStopToolUseId(input);
+   if (toolUseId === null) return { ok: false, code: "NGHF-STOP-UNRESOLVED" };
+   const pending = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: input.session_id, correlationId: toolUseId });
+-  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending) };
++  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending), ...(pending.lock ? { lock: pending.lock } : {}) };
+   if (pending.state.completionRoute !== NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
+     || pending.state.binding?.agentType !== agentType) return { ok: false, code: "NGHF-NOT-SUBAGENT-STOP-ROUTE" };
+   return { ok: true, pending };
+@@ -184,7 +189,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+       stopMkdir(directory, { recursive: true, mode: 0o700 });
+       stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
+         dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
+-        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null,
++        ...(sanitizeStopFailureLock(unresolved.lock) ? { lock: sanitizeStopFailureLock(unresolved.lock) } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+       return;
+     }
+     if (result?.status === "authored-commit-recorded") {
+@@ -213,7 +219,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+       dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
+       code: result?.code ?? null, stage: typeof result?.stage === "string" ? result.stage : null,
+       reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null,
+-      ...(detail ? { detail } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++      ...(detail ? { detail } : {}), ...(sanitizeStopFailureLock(result?.lock) ? { lock: sanitizeStopFailureLock(result.lock) } : {}),
++      observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+   } catch { /* diagnostic only */ }
+ }
+ 
+@@ -244,6 +251,20 @@ export function sanitizeStopFailureDetail(detail) {
+   for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
+   return Object.keys(out).length > 0 ? out : null;
+ }
++/**
++ * E5: the closed, bounded `lock` of a stop-failure result and record: the error code and reason slugs, the measured wait, the holder's pid,
++ * acquiredAt, owner status and age. Anything else is dropped, so no path and no raw exception text can travel. Exported for the hook reader.
++ * @returns {object|null}
++ */
++export function sanitizeStopFailureLock(lock) {
++  if (lock === null || typeof lock !== "object" || Array.isArray(lock)) return null;
++  const out = {};
++  for (const key of ["errorCode", "reason"]) if (detailSlug(lock[key])) out[key] = lock[key];
++  for (const key of ["waitedMs", "holderPid", "ageSeconds"]) if (Number.isSafeInteger(lock[key]) && lock[key] >= 0 && lock[key] <= 2 ** 31) out[key] = lock[key];
++  if (typeof lock.acquiredAt === "string" && lock.acquiredAt.length <= 40 && Number.isFinite(Date.parse(lock.acquiredAt))) out.acquiredAt = lock.acquiredAt;
++  if (["live", "dead", "unknown"].includes(lock.owner)) out.owner = lock.owner;
++  return Object.keys(out).length > 0 ? out : null;
++}
+ const withDetail = (result, detail) => { const clean = sanitizeStopFailureDetail(detail); return clean ? { ...result, detail: clean } : result; };
+ 
+ // AC-164: a SubagentStop whose pending state cannot be resolved is a MARKED Goldfish's only when the child itself carries the
+@@ -391,7 +412,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+       if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
+         const marked = markedStopContract(input);
+         if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId,
+-          reason: typeof stop.reason === "string" ? stop.reason : null };
++          reason: typeof stop.reason === "string" ? stop.reason : null, lock: stop.lock ?? null };
+       }
+       return fail(stop.code, "not-applicable");
+     }
+@@ -435,8 +456,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
+ 
+   // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
+-  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}) }); }
+-  catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
++  const lockClock = typeof dependencies.lockWait?.now === "function" ? dependencies.lockWait.now : Date.now, lockStartedMs = lockClock();
++  let lockWaitMarked = false;
++  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}), onWait: () => { if (!lockWaitMarked) { lockWaitMarked = true; admissionProgress("lock-wait"); } } }); }
++  catch(error) { const failed = failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY", lockClock() - lockStartedMs); if (failed.lock) admissionProgress("lock-held"); return failed; }
++  admissionProgress("commit");
+ 
+   let committed;
+   try {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 565a52231..9c7d6b49f 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -8,7 +8,8 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync
+ import { tmpdir, devNull } from "node:os";
+ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+-import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
++import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
++import { sessionAuthorityLockFacts } from "./native-goldfish-host-state.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
+ import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
+@@ -803,6 +804,40 @@ const cases = [
+     const reseal = (r) => { const { receiptSha256, ...subject } = r; return { ...subject, receiptSha256: createHash("sha256").update(canonicalizeJson(subject)).digest("hex") }; };
+     check({ receipt, root, binding, facts, git, reseal, validate: validateNativeGoldfishHostObservation });
+   }, "claude", 1, "goldfish-implementor", { background: true }) })),
++  // NGHF41-NGHF42 -- E5 (19g Windows measurement): a stop that meets a held registry lock names the holder in its failure, its record and its hook message.
++  { id: "NGHF41", name: "E5: a registry lock held beyond the bound leaves the holder pid, acquiredAt, owner, error code and waited ms in the result, the stop-failure record and the hook message", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    let clock = 0;
++    const lock = Object.freeze({ owner: "live", pid: 4242, acquiredAt: "2026-11-05T10:00:00.000Z", ageSeconds: 61, waitedMs: 1500, waitBoundMs: 1500 });
++    const held = { ...dependencies, lockWait: { budgetMs: 300, now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: () => {
++      throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held", lock }); } };
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, held);
++    assert.equal(failed.code, "SDC-LOCK-HELD", JSON.stringify(failed));
++    assert.deepEqual(failed.lock, { errorCode: "SDC-LOCK-HELD", reason: "registry-lock-held", waitedMs: clock, holderPid: 4242, acquiredAt: "2026-11-05T10:00:00.000Z", owner: "live", ageSeconds: 61 });
++    assert.ok(clock > 0 && clock <= 300, "the wait was measured on the injected clock");
++    const text = readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8");
++    assert.deepEqual(JSON.parse(text).lock, failed.lock);
++    assert.equal(text.includes(root), false);
++    const notice = nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
++    assert.match(notice, /held by pid 4242 \(live\) since 2026-11-05T10:00:00\.000Z/u);
++    assert.match(notice, /error SDC-LOCK-HELD/u);
++    assert.equal(facts.commits, 0);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF42", name: "E5: a failure that is not a lock carries no lock facts, and a hostile lock value is reduced to its closed bounded fields", run: () => {
++    assert.equal(sanitizeStopFailureLock(null), null);
++    assert.equal(sanitizeStopFailureLock([]), null);
++    assert.deepEqual(sanitizeStopFailureLock({ errorCode: "SDC-LOCK-HELD", waitedMs: 12, holderPid: -3, acquiredAt: "not a date", owner: "root", path: "/home/x/y", reason: "a/b" }), { errorCode: "SDC-LOCK-HELD", waitedMs: 12 });
++    assert.equal(sessionAuthorityLockFacts(Object.assign(new Error("x"), { code: "NGHS-OTHER" })), null);
++    assert.equal(sessionAuthorityLockFacts(Object.assign(new Error("x"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "other" })), null);
++    const sourcePin = (name) => readFileSync(new URL(`../hooks/${name}`, import.meta.url), "utf8");
++    // Both stop-side hooks and the SubagentStart hook install the same authority trace as the guard hooks, with progress marks.
++    for (const name of ["native-goldfish-host.mjs", "subagent-start-receipt.mjs"]) {
++      const text = sourcePin(name);
++      assert.match(text, /PIPELINE_AUTHORITY_TRACE === "1"[^\n]*installHookAuthorityTrace\(\)/u, `${name} installs the authority trace`);
++      assert.match(text, /admissionProgress\(`?"?hook-entry/u, `${name} marks its entry`);
++      assert.match(text, /process\.once\("exit", \(\) => admissionProgress\("exit"\)\)/u, `${name} marks its exit`);
++    }
++  } },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index eb89bb0ef..aca6a4709 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -3,7 +3,7 @@ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativ
+ import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+ import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
+ import { admissionProgress } from './admission-progress.mjs';
+-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
++import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord, inspectSessionAuthorityLock } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
+ /** Private runner-hook correlation state for native Goldfish host commits. */
+@@ -424,16 +424,49 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
+ // with 19f: NGHF-PENDING-UNAVAILABLE, reason registry-lock-held) lost a Goldfish's delivery although the pending state existed. The read waits for
+ // the lock, bounded well inside the 300 s stop hook budget; only a lock still held after that is reported, with the same reason as before.
+ export const NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS = 90_000;
++/**
++ * E5 (19g Windows measurement): the registry lock a stop met, as bounded facts that carry no path. `error.lock` (set by the registry's own
++ * lock refusal: owner status, pid, acquiredAt, age) is preferred; a lock refusal without it (the closure walk outside a boundary) is observed
++ * read-only through `inspectSessionAuthorityLock` when a root is known. `waitedMs` is the caller's own measure of the whole wait.
++ * Any other error is not a lock and answers null. Diagnostic only; it never changes an admission.
++ */
++export function sessionAuthorityLockFacts(error, { waitedMs = null, root = null } = {}) {
++  const held = error?.code === "SDC-LOCK-HELD" || (error?.code === "SDC-AUTHORITY-UNAVAILABLE" && error?.reason === "state-push-owner-unavailable");
++  if (!held) return null;
++  let observed = error.lock !== null && typeof error.lock === "object" ? error.lock : null;
++  if (!observed && typeof root === "string") {
++    try { const seen = inspectSessionAuthorityLock({ repository: inspectSignedDescriptorCustodyRepository(root) }); if (seen.status === "held") observed = seen; }
++    catch { /* the holder stays unnamed */ }
++  }
++  const whole = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
++  const slug = (value) => (typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(value) ? value : null);
++  const at = typeof observed?.acquiredAt === "string" && Number.isFinite(Date.parse(observed.acquiredAt)) && observed.acquiredAt.length <= 40 ? observed.acquiredAt : null;
++  return { errorCode: slug(error.code), reason: slug(error.reason), waitedMs: whole(waitedMs), holderPid: whole(observed?.pid), acquiredAt: at,
++    owner: ["live", "dead", "unknown"].includes(observed?.owner) ? observed.owner : null, ageSeconds: whole(observed?.ageSeconds) };
++}
+ export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait } = {}) {
+   if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return fail("NGHS-READ-INPUT");
++  const clock = typeof lockWait?.now === "function" ? lockWait.now : Date.now, startedMs = clock();
++  let stored = null, marked = false;
++  admissionProgress("pending-read");
+   try {
+-    const stored = retryWhileSessionAuthorityLockHeld(() => read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`)), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}) });
+-    const state = stored.value;
+-    if (!nativeStateSchema(state.schema) || state.runner !== runner
+-      || state.sessionId !== sessionId || state.toolUseId !== correlationId
+-      || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
+-    return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored), sha256: stored.sha256 };
+-  } catch(error) { return { ...fail("NGHS-PENDING-MISSING"), reason:error.reason??error.message }; }
++    // E5 root cause: the authenticating boundary of an item-delivery state (authenticatedNativePendingState) takes the registry lock too, and it
++    // used to run AFTER this wait, so a sibling hook holding the lock turned into "pending state missing" at once. Read and authentication are
++    // now one attempt inside the wait. Only a refusal raised before the boundary callback ran is retried (`entered`, set as the callback's first
++    // statement): once the boundary is open its entry may have healed the catalogue, so a later lock refusal is reported, not repeated.
++    return retryWhileSessionAuthorityLockHeld((entered) => {
++      stored = read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`));
++      const state = stored.value;
++      if (!nativeStateSchema(state.schema) || state.runner !== runner
++        || state.sessionId !== sessionId || state.toolUseId !== correlationId
++        || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
++      return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored, entered), sha256: stored.sha256 };
++    }, { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}), onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
++  } catch(error) {
++    const lock = sessionAuthorityLockFacts(error, { waitedMs: clock() - startedMs, root: stored?.value?.root });
++    if (lock) admissionProgress("lock-held");
++    return { ...fail("NGHS-PENDING-MISSING"), reason:error.reason??error.message, ...(lock ? { lock } : {}) };
++  }
+ }
+ 
+ /** Resolve Codex's SubagentStop only through its write-once agent-start binding. */
+@@ -591,10 +624,11 @@ function effectiveNativePendingState(read,entry) {
+   const latest=nativeScopeAmendments(read,entry,operation).at(-1);
+   return latest?{...entry.value,binding:{...entry.value.binding,allowedPaths:latest.value.allowedPaths},delivery:{...entry.value.delivery,writeScope:latest.value.writeScope}}:entry.value;
+ }
+-function authenticatedNativePendingState(stored) {
++function authenticatedNativePendingState(stored, entered = { value: false }) {
+   if(!stored.value.delivery)return stored.value;
+   const repository=inspectSignedDescriptorCustodyRepository(stored.value.root);
+   return withSessionAuthorityBoundary({repository},boundary=>{
++    entered.value=true;
+     const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
+     const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===stored.sha256&&row.relativePath.startsWith('pending-'));
+     if(!entry)throw nativeManagedFault('native-item-scope-pending-unowned');
+@@ -1068,7 +1102,7 @@ export function resolveGovernedItemQueue({ root } = {}) {
+ 
+ /** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
+  * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
+-export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now()}={}) {
++export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null}={}) {
+   const deadline=now()+budgetMs;let delay=25;
+   for(;;){
+     const entered={value:false};
+@@ -1077,6 +1111,7 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
+       // C18-1C: a sibling stop holding the registry also surfaces as SDC-AUTHORITY-UNAVAILABLE / state-push-owner-unavailable.
+       const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable');
+       if(!transient||entered.value||now()+delay>deadline)throw error;
++      if(typeof onWait==='function'){try{onWait(error,delay);}catch{/* a diagnostic never changes the wait */}}
+       sleep(delay);delay=Math.min(delay*2,1000);
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 669f72108..4314adceb 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1873,6 +1873,49 @@ const cases = [
+     assert.match(state,/return retryPublishWhileLockHeld\(entered=>withSessionAuthorityBoundary\(\{repository\},\(\)=>\{\n\s*entered\.value=true;\n\s*const current=nativeManagedCurrentOwner/u);
+   }},
+ 
++  { id: "NGHS68", name: "E5: a stop's read of an item-delivery pending state waits for a registry lock a sibling holds (the authenticating boundary is inside the wait); a lock still held is reported with holder pid, acquiredAt, owner, error code, waitedMs", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root}),repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
++    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
++    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
++    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
++    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
++    const read=lockWait=>runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'native-session-one',correlationId:'native-tool-one',...(lockWait?{lockWait}:{})}));
++    assert.equal(read().ok,true,'with no sibling the item-delivery pending state reads');
++    const marker=join(root,'fixture-host','sibling-holds-lock-stop');
++    // The sibling hook of the same dispatch: another process holds the registry boundary.
++    const holder=ms=>{
++      rmSync(marker,{force:true});
++      const script=`import {inspectSignedDescriptorCustodyRepository} from ${JSON.stringify(new URL('./worktree-lifecycle.mjs',import.meta.url).href)};`
++        +`import {withSessionAuthorityBoundary} from ${JSON.stringify(new URL('./session-authority-registry.mjs',import.meta.url).href)};`
++        +`import {writeFileSync} from 'node:fs';const repository=inspectSignedDescriptorCustodyRepository(${JSON.stringify(root)});`
++        +`withSessionAuthorityBoundary({repository},()=>{writeFileSync(${JSON.stringify(marker)},'held');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${ms});});`;
++      const child=spawn(process.execPath,['--input-type=module','-e',script],{stdio:'ignore'});
++      const until=Date.now()+20000;while(!existsSync(marker)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);
++      assert.ok(existsSync(marker),'the sibling took the lock');
++      return child;
++    };
++    // (a) A lock held for a few seconds is waited out: the read succeeds instead of answering "pending state missing" at once.
++    let child=holder(5000);
++    try{
++      const started=Date.now(),waited=read();
++      assert.equal(waited.ok,true,JSON.stringify(waited));
++      assert.ok(Date.now()-started>=2500,`the read waited for the sibling (${Date.now()-started} ms)`);
++    }finally{child.kill();}
++    // (b) A lock still held when the budget ends is reported with the reason AND the holder facts.
++    child=holder(12000);
++    try{
++      const stuck=read({budgetMs:300});
++      assert.equal(stuck.ok,false);assert.equal(stuck.code,'NGHS-PENDING-MISSING');assert.equal(stuck.reason,'registry-lock-held');
++      assert.equal(stuck.lock?.errorCode,'SDC-LOCK-HELD',JSON.stringify(stuck));
++      assert.equal(stuck.lock.holderPid,child.pid,'the record names the holder process');
++      assert.match(stuck.lock.acquiredAt,/^\d{4}-\d{2}-\d{2}T/u);
++      assert.equal(stuck.lock.owner,'live');
++      assert.ok(Number.isSafeInteger(stuck.lock.waitedMs)&&stuck.lock.waitedMs>=0,'waitedMs is a measured integer');
++    }finally{child.kill();}
++  })},
++
+ ];
+ 
+ /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
