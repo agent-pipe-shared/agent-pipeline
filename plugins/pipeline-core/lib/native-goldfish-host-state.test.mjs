@@ -252,6 +252,27 @@ const cases = [
     assert.equal(setAdmissionDeadline({ startMs: Number.NaN, budgetMs: 1 }), false);
     assert.equal(admissionDeadlineActive(), false);
   }) },
+  { id: "D177-source-digest-read-once-per-identity", name: "D177 an installed source file is read once per file identity: a second call and a second producer sharing the file read nothing, a changed size or time reads again, and a file that is not a regular file is refused", run: async () => {
+    const reg = await import("./session-authority-registry.mjs");
+    const dir = mkdtempSync(join(nativeContractFixtureParent(), "source-digest-"));
+    try {
+      const file = join(dir, "a.mjs");
+      writeFileSync(file, "export const a=1;\n");
+      let reads = 0;
+      const read = (path) => { reads += 1; return readFileSync(path); };
+      const first = reg.installedSourceSha256(file, "one", { read });
+      assert.equal(reads, 1, "the first call reads the file");
+      assert.equal(reg.installedSourceSha256(file, "one", { read }), first, "the same digest");
+      assert.equal(reg.installedSourceSha256(file, "two", { read }), first, "another producer sharing the file gets the same digest");
+      assert.equal(reads, 1, "an unchanged file identity is not read again");
+      writeFileSync(file, "export const a=22;\n");
+      const changed = reg.installedSourceSha256(file, "one", { read });
+      assert.equal(reads, 2, "a changed file is read again");
+      assert.notEqual(changed, first, "and its digest follows its bytes");
+      assert.throws(() => reg.installedSourceSha256(dir, "one", { read }), (error) => error.code === "SDC-AUTHORITY-UNAVAILABLE" && /one:source-file/.test(error.reason ?? error.message), "a directory is not a source file");
+      assert.equal(reads, 2, "a refused path reads nothing");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  } },
   { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
     const backend = await import("./windows-owned-authority-backend.mjs");
     const writerKey = Symbol.for("pipeline.authority-trace-progress");
