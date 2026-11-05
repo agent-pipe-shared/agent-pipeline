@@ -2,9 +2,9 @@
 // Source-owned native physical observations. This module issues no authority brand.
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync} from 'node:fs';
+import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {dirname,isAbsolute,resolve,sep} from 'node:path';
+import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 import {assertAdmissionDeadline} from './admission-deadline.mjs';
@@ -62,14 +62,87 @@ const MEMO_MAX=512;
 const MEMO_READ_ONLY=new Set(['inspect','ancestor','ancestor-above-root','read','read-source','inspect-source-image']);
 const MEMO_MUTATING=new Set(['publish','create-directory','remove']);
 const authorityMemo=new Map();
-const authorityMemoCounters={hits:0,misses:0};
+const authorityMemoCounters={hits:0,misses:0,persistedHits:0};
+// Cross-process layer of the same memo. Every hook is a new process, and a dispatch or a refusal runs several of them, each re-observing the
+// same unchanged installed sources, directories and records (about one PowerShell start, 0.5 to 1 s, per observation on Windows). The layer
+// keeps only what this module itself observed and validated: a READ-ONLY observation, keyed as the in-process memo is, together with the
+// object's lstat identity (device, file id, mode, links, size, mtime, ctime, birthtime). A persisted entry answers only while the object's
+// CURRENT identity is equal to the stored one (a content write, an ACL or owner change and a replacement all change one of them), exactly the
+// check every in-process hit already makes, so a stale entry is never returned; it is then only a longer-lived copy of the same trust. The
+// file lives in the user's private application-data directory (not in the repository), is size-bounded, schema- and helper-bound, validated
+// entry by entry on load (a malformed or foreign entry is dropped, never trusted), written by an atomic rename after merging what another
+// process wrote meanwhile, and ignored entirely under PIPELINE_AUTHORITY_NO_MEMO=1. Any fault reading or writing it only means "no persisted
+// answer": the observation then runs as before.
+const PERSIST_SCHEMA='pipeline.authority-observation-memo.v1';
+const PERSIST_MAX_ENTRIES=1024,PERSIST_MAX_VALUE_BASE64=24576,PERSIST_MAX_FILE_BYTES=8*1024*1024,PERSIST_FLUSH_EVERY=24;
+const BASE64=/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+let persisted=null,persistedDirty=0,persistedExitHook=false;
+const persistedDropped=new Set();
+function persistedFile(){
+ // A test that fakes the native spawn never touches the user's real file: it persists only when it names its own.
+ if(testSeam.spawn!==undefined||testSeam.memoFile!==undefined)return testSeam.memoFile??null;
+ const base=process.env.LOCALAPPDATA;
+ return typeof base==='string'&&isAbsolute(base)&&resolve(base)===base?join(base,'agent-pipeline','authority-observation-memo.v1.json'):null;
+}
+function persistedValueShape(operation,value){
+ if(!object(value)||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts))return false;
+ if(operation==='inspect-source-image')return exact(value,['ok','facts','size','sha256','committed'])&&Number.isSafeInteger(value.size)&&value.size>=0&&value.size<=134217728&&/^[a-f0-9]{64}$/u.test(value.sha256);
+ return exact(value,['ok','facts','bytes','committed'])&&typeof value.bytes==='string'&&value.bytes.length<=PERSIST_MAX_VALUE_BASE64&&BASE64.test(value.bytes);
+}
+function persistedEntryShape(row){
+ if(!exact(row,['key','path','identity','value'])||typeof row.key!=='string'||row.key.length>34000||typeof row.path!=='string'||!isAbsolute(row.path)||typeof row.identity!=='string'||!/^[0-9:]{1,200}$/u.test(row.identity))return false;
+ let parts;try{parts=JSON.parse(row.key);}catch{return false;}
+ return Array.isArray(parts)&&parts.length===5&&MEMO_READ_ONLY.has(parts[0])&&parts[1]===row.path&&persistedValueShape(parts[0],row.value);
+}
+function readPersistedFile(file){
+ const rows=new Map();
+ try{
+  const info=lstatSync(file);if(!info.isFile()||info.isSymbolicLink()||info.size>PERSIST_MAX_FILE_BYTES)return rows;
+  const data=JSON.parse(readFileSync(file,'utf8'));
+  if(!exact(data,['schema','helperSha256','entries'])||data.schema!==PERSIST_SCHEMA||data.helperSha256!==HELPER_SHA256||!Array.isArray(data.entries))return rows;
+  for(const row of data.entries.slice(-PERSIST_MAX_ENTRIES))if(persistedEntryShape(row))rows.set(row.key,{path:row.path,identity:row.identity,value:row.value});
+ }catch{/* no persisted answer */}
+ return rows;
+}
+function loadPersisted(){
+ if(persisted!==null)return persisted;
+ const file=persistedFile();persisted=file===null?new Map():readPersistedFile(file);
+ return persisted;
+}
+/** Writes the cross-process memo (merged with what another process wrote meanwhile) by an atomic rename. Runs at process exit and every few
+ * new entries; a fault is swallowed because the memo only ever saves work. */
+export function flushWindowsOwnedAuthorityBackendMemo(){
+ if(persisted===null||persistedDirty===0)return;
+ const file=persistedFile();if(file===null)return;
+ let temp=null;
+ try{
+  const merged=new Map(readPersistedFile(file));for(const key of persistedDropped)merged.delete(key);
+  for(const [key,entry] of persisted){merged.delete(key);merged.set(key,entry);}
+  const rows=[...merged].slice(-PERSIST_MAX_ENTRIES).map(([key,entry])=>({key,path:entry.path,identity:entry.identity,value:entry.value}));
+  const text=JSON.stringify({schema:PERSIST_SCHEMA,helperSha256:HELPER_SHA256,entries:rows});
+  if(Buffer.byteLength(text)>PERSIST_MAX_FILE_BYTES)return;
+  mkdirSync(dirname(file),{recursive:true,mode:0o700});
+  temp=`${file}.${process.pid}.tmp`;writeFileSync(temp,text,{flag:'w',mode:0o600});renameSync(temp,file);temp=null;persistedDirty=0;persistedDropped.clear();
+ }catch{/* the memo only saves work */}
+ finally{if(temp!==null){try{unlinkSync(temp);}catch{/* already gone */}}}
+}
+function rememberPersisted(key,request,identity,value){
+ if(typeof value?.bytes==='string'&&value.bytes.length>PERSIST_MAX_VALUE_BASE64)return;
+ if(!persistedValueShape(request.operation,value))return;
+ const rows=loadPersisted();rows.delete(key);rows.set(key,{path:request.path,identity,value});
+ while(rows.size>PERSIST_MAX_ENTRIES)rows.delete(rows.keys().next().value);
+ persistedDirty+=1;
+ if(testSeam.memoFile===undefined&&!persistedExitHook){persistedExitHook=true;process.once('exit',flushWindowsOwnedAuthorityBackendMemo);}
+ if(persistedDirty>=PERSIST_FLUSH_EVERY)flushWindowsOwnedAuthorityBackendMemo();
+}
 let testSeam={platform:undefined,spawn:undefined};
 // Test seam: only an explicit import can set it; the CLI never does. Defaults to the real platform and spawn.
-export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn};}
-export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();}
+export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn,memoFile:seam?.memoFile};persisted=null;persistedDirty=0;persistedDropped.clear();}
+// Clears the in-process memo and forgets the loaded cross-process copy (a new process starts with neither; the file itself stays).
+export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();persisted=null;persistedDirty=0;persistedDropped.clear();}
 export function nativeAuthorityStats(){
  const byOperation={};for(const name of [...nativeAuthorityByOperation.keys()].sort())byOperation[name]=nativeAuthorityByOperation.get(name);
- return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoSize:authorityMemo.size};
+ return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
 }
 function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
 // A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
@@ -80,6 +153,8 @@ function forgetMemoAround(written){
  // Paths compare without case: a case-insensitive file system may spell one object two ways, and dropping too much is harmless.
  const folded=written.toLowerCase(),parent=dirname(folded),below=folded.endsWith(sep)?folded:folded+sep;
  for(const [key,entry] of authorityMemo){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below))authorityMemo.delete(key);}
+ // The cross-process copy follows (hygiene only: a hit there is identity-checked anyway, and a write changes the identity of what it touched).
+ if(persisted!==null)for(const [key,entry] of persisted){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below)){persisted.delete(key);persistedDropped.add(key);persistedDirty+=1;}}
 }
 function invoke(request){
  const operation=request.operation;
@@ -89,12 +164,18 @@ function invoke(request){
  const before=memoIdentity(request.path);
  const entry=authorityMemo.get(key);
  if(entry!==undefined){if(before!==null&&entry.identity===before){authorityMemoCounters.hits+=1;return entry.value;}authorityMemo.delete(key);}
+ // Another process may have observed this very object, unchanged, a moment or hours ago: its entry answers only for the same identity.
+ const stored=before===null?undefined:loadPersisted().get(key);
+ if(stored!==undefined){
+  if(stored.identity===before&&stored.path===request.path){authorityMemoCounters.hits+=1;authorityMemoCounters.persistedHits+=1;authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value:stored.value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);return stored.value;}
+  persisted.delete(key);
+ }
  authorityMemoCounters.misses+=1;
  // A read-only observation is the unit of cost on Windows (one PowerShell start); the admission deadline stops a long run of them. Never on
  // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
  assertAdmissionDeadline();
  const value=invokeNative(request);
- if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
+ if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);rememberPersisted(key,request,before,value);}
  return value;
 }
 function invokeNative(request){

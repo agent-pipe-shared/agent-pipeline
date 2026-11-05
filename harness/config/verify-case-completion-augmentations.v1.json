@@ -1354,7 +1354,11 @@
           "SAS17",
           "SAS18",
           "SAS19",
-          "SAS20"
+          "SAS20",
+          "SAS21",
+          "SAS22",
+          "SAS23",
+          "SAS24"
         ],
         "maxBytes": 65536
       }

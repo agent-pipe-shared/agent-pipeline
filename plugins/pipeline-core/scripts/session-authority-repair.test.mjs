@@ -15,7 +15,7 @@ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
 import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
 import * as pipelineState from "./pipeline-state.mjs";
 import { fileURLToPath } from "node:url";
-import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
+import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -28,8 +28,9 @@ import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
 
 // Memo cases (SAS09..SAS17): a fake native spawn on a real temp file; the real PowerShell exists only on Windows.
 const MEMO_FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
-function memoFixture(run, { hook, refuse = false, bytes = "hello" } = {}) {
+function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "authority-memo-"));
+  const memoFile = persist ? join(dir, "observation-memo.json") : undefined;
   const calls = [];
   const spawn = (_executable, _args, options) => {
     const request = JSON.parse(options.input);
@@ -39,9 +40,9 @@ function memoFixture(run, { hook, refuse = false, bytes = "hello" } = {}) {
       : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
     return { status: 0, signal: null, stderr: "", stdout: JSON.stringify(body) };
   };
-  setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn });
+  setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn, memoFile });
   resetWindowsOwnedAuthorityBackendMemo();
-  try { return run({ dir, calls, file: join(dir, "a.txt") }); }
+  try { return run({ dir, calls, file: join(dir, "a.txt"), memoFile }); }
   finally { setWindowsOwnedAuthorityBackendTestSeam(undefined); resetWindowsOwnedAuthorityBackendMemo(); delete process.env.PIPELINE_AUTHORITY_NO_MEMO; rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -791,6 +792,88 @@ const cases = [
     assert.equal(calls.at(-1), "read");
     assert.equal(calls.length, before + 3);
   }) },
+  // ---- cross-process layer: a later hook process answers from what an earlier one observed, only for the same object identity ----
+  { id: "SAS21", name: "authority memo (11) a new process answers an unchanged object from the persisted observation of an earlier one, with no native start", run: () => memoFixture(({ calls, file, memoFile }) => {
+    writeFileSync(file, "one");
+    const first = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.deepEqual(calls, ["read", "inspect"]);
+    flushWindowsOwnedAuthorityBackendMemo();
+    assert.equal(existsSync(memoFile), true);
+    // A new process: nothing in memory, the file stays.
+    resetWindowsOwnedAuthorityBackendMemo();
+    const before = nativeAuthorityStats();
+    const second = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.deepEqual(calls, ["read", "inspect"], "no new native start");
+    assert.deepEqual(second.bytes, first.bytes);
+    assert.equal(second.nativeFacts, first.nativeFacts);
+    assert.equal(nativeAuthorityStats().authorityMemoPersistedHits - before.authorityMemoPersistedHits, 2);
+  }, { persist: true }) },
+  { id: "SAS22", name: "authority memo (12) a persisted observation answers only for the identical identity: a changed size, mtime or a replaced file spawns again", run: () => memoFixture(({ dir, calls, file, memoFile }) => {
+    writeFileSync(file, "one");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    writeFileSync(file, "longer content now");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 2, "a changed size is a miss");
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    utimesSync(file, new Date(1_000_000_000_000), new Date(1_000_000_000_000));
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 3, "a touched mtime is a miss");
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 3, "the unchanged identity answers from the file again");
+    const kept = readFileSync(memoFile, "utf8");
+    assert.match(kept, /pipeline\.authority-observation-memo\.v1/u);
+    assert.equal(existsSync(`${memoFile}.${process.pid}.tmp`), false, "no temporary file is left behind");
+  }, { persist: true }) },
+  { id: "SAS23", name: "authority memo (13) a corrupt, foreign or tampered persisted file is ignored entry by entry and never trusted", run: () => memoFixture(({ calls, file, memoFile }) => {
+    writeFileSync(file, "one");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    flushWindowsOwnedAuthorityBackendMemo();
+    const good = JSON.parse(readFileSync(memoFile, "utf8"));
+    const attempt = (data) => {
+      writeFileSync(memoFile, typeof data === "string" ? data : JSON.stringify(data));
+      resetWindowsOwnedAuthorityBackendMemo();
+      const before = calls.length;
+      inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+      return calls.length - before;
+    };
+    assert.equal(attempt("{ not json"), 1, "malformed JSON");
+    assert.equal(attempt({ ...good, schema: "other" }), 1, "foreign schema");
+    assert.equal(attempt({ ...good, helperSha256: "0".repeat(64) }), 1, "another helper build");
+    assert.equal(attempt({ ...good, extra: true }), 1, "an unknown top-level key");
+    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, extra: 1 } })) }), 1, "a value with an unknown key");
+    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, facts: "not-facts" } })) }), 1, "facts that are not facts");
+    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, path: `${row.path}x` })) }), 1, "a path that is not the key's path");
+    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, key: JSON.stringify(["publish", row.path, null, null, null]) })) }), 1, "a mutating operation is never persisted");
+    // The untampered file still answers (control).
+    assert.equal(attempt(good), 0, "the valid file answers");
+  }, { persist: true }) },
+  { id: "SAS24", name: "authority memo (14) PIPELINE_AUTHORITY_NO_MEMO=1 ignores the persisted file; a write drops the persisted entries of what it touches", run: () => memoFixture(({ calls, file, memoFile }) => {
+    writeFileSync(file, "one");
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    process.env.PIPELINE_AUTHORITY_NO_MEMO = "1";
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    assert.equal(calls.length, 2, "the opt-out spawns although the file holds the observation");
+    delete process.env.PIPELINE_AUTHORITY_NO_MEMO;
+    resetWindowsOwnedAuthorityBackendMemo();
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    assert.equal(calls.length, 2, "without the opt-out the persisted observation answers");
+    publishWindowsOwnedAuthorityFile({ path: file, bytes: Buffer.from("x"), expectedSha256: null, expectedFacts: null });
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    const before = calls.length;
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    assert.equal(calls.length, before + 1, "a persisted entry of a written object is gone (and its identity changed as well)");
+    assert.equal(existsSync(memoFile), true);
+  }, { persist: true }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
