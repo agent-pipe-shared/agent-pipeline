@@ -1,0 +1,260 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 224e69c86..960bd6813 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1479,7 +1479,8 @@
+           "DAU001",
+           "DAU002",
+           "DAU003",
+-          "DAU004"
++          "DAU004",
++          "DAU005"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 7bcf54663..3304a2b33 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -199,7 +199,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
+     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
+     ["design-approval-route-tests","plugins/pipeline-core/lib/design-approval-route.test.mjs","top-level-assertions",66],
+-    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",36],
++    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",45],
+     ["design-course-command-admission-tests","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","top-level-assertions",44],
+     ["design-course-coordinator-tests","plugins/pipeline-core/scripts/design-course-coordinator.test.mjs","top-level-assertions",6],
+     ["design-course-session-tests","plugins/pipeline-core/scripts/design-course-session.test.mjs","top-level-assertions",66],
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 95e2f5992..fcbcbdca0 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -34,6 +34,13 @@ that a single module leaves no slice that can run in parallel. This is a
+ question in the review, never a block, and a justified single module (one
+ responsibility, small scope) is not a finding.
+ 
++Decisions to record: read the design for choices that need an ADR (module
++boundaries, data keeping, offline and error strategy, a security trade-off). When
++the design makes such a choice and no module names an ADR path for it in
++`adrReferences` (title, trigger and path), raise it as a question to the Elephant
++and point to the `architecture-decision` skill. This is a question, never a block;
++the close only reports which named ADR paths exist.
++
+ Return one concise readiness review with references. The host, not this agent,
+ creates the sanitized, dispatch-bound duty and execution receipts; never return
+ or persist raw prompts, answers, paths, credentials, or private coordinates.
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index c25a74bb3..ac21d4718 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -49,9 +49,10 @@ function adrRow(readers) {
+     const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
+     if (checks.every((c) => c.found.ok)) {
+       const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
++      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : "missing"}`).join(", ");
+       return absent.length === 0
+-        ? row(id, "present", promised.value.join(", "))
+-        : row(id, "missing", null, `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
++        ? row(id, "present", listing)
++        : row(id, "missing", listing,`The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
+     }
+   }
+   const impact = call(readers.architectureImpact);
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 516f0c80f..6a7394a8b 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -71,6 +71,19 @@ test("AC-239 adr-decision: present, not-applicable when no decision qualifies, m
+   }
+ });
+ 
++test("AC-239 adr-decision: the evidence lists every named ADR path with whether it exists, report-only", () => {
++  const promised = ["docs/adr/0001-a.md", "docs/adr/0002-b.md"];
++  const gap = rows(full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => promised, exists: (p) => p === promised[0] }))["adr-decision"];
++  assert.equal(gap.status, "missing");
++  assert.match(String(gap.evidence), /docs\/adr\/0001-a\.md: exists/u);
++  assert.match(String(gap.evidence), /docs\/adr\/0002-b\.md: missing/u);
++  const ok = rows(full({ promisedAdrPaths: () => promised, exists: () => true }))["adr-decision"];
++  assert.equal(ok.status, "present");
++  assert.match(String(ok.evidence), /docs\/adr\/0002-b\.md: exists/u);
++  // Report-only: the readback never throws and the other rows keep their outcome.
++  assert.equal(rows(full({ promisedAdrPaths: () => promised, exists: () => false }))["security-scan"].status, "missing");
++});
++
+ test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
+   assert.equal(rows(full())["architecture-fitness"].status, "present");
+   const missing = rows(full({ rigorHistory: () => [{ body: { featureId: "other", fitnessProjection: {} } }] }))["architecture-fitness"];
+diff --git a/plugins/pipeline-core/lib/design-authoring.mjs b/plugins/pipeline-core/lib/design-authoring.mjs
+index 806e557d4..5eecc9c28 100644
+--- a/plugins/pipeline-core/lib/design-authoring.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.mjs
+@@ -12,7 +12,7 @@ export function renderArchitectureDesignSkeleton() {
+     implementationSurface: ["src/application.mjs"], fitnessModel: { schema: "pipeline.fitness-model.v1",
+       profileId: "REPLACE: project fitness profile", revision: 1, allowedBoundaryCrossings: [],
+       antiFragmentationPolicy: { rejectTrivialFacades: true } } };
+-  return "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths. Split modules as needed: cut one module per separable responsibility, a part that two people could build without talking to each other, each with its own ownedPaths, publicContracts and verificationEntryPoints; a single module means no slice can run in parallel. The disposition records a proposal for the final signed design; this template grants no approval. -->\n"
++  return "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths. Split modules as needed: cut one module per separable responsibility, a part that two people could build without talking to each other, each with its own ownedPaths, publicContracts and verificationEntryPoints; a single module means no slice can run in parallel. The disposition records a proposal for the final signed design; this template grants no approval. Decisions to record: for every decision that needs an ADR, name its title, trigger and ADR path (docs/adr/NNNN-title.md) in the adrReferences of the module it concerns; classic triggers are module boundaries, data keeping, offline and error strategy, and a security trade-off. -->\n"
+     + "```pipeline-architecture-design\n" + JSON.stringify(design, null, 2) + "\n```\n";
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/design-authoring.test.mjs b/plugins/pipeline-core/lib/design-authoring.test.mjs
+index 1ac7ea77c..187ad5a33 100644
+--- a/plugins/pipeline-core/lib/design-authoring.test.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.test.mjs
+@@ -7,6 +7,7 @@ import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, has
+ import { createHash } from "node:crypto";
+ import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
+ import { devNull } from "node:os";
++import { readFileSync } from "node:fs";
+ const completionCases = [];
+ function test(name, optionsOrRun, possibleRun) {
+   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
+@@ -29,6 +30,20 @@ test("authoring skeleton uses the actual architecture contract and remains visib
+   assert.match(parsed.disposition.rationale, /Authored/u);
+   assert.match(renderDesignTraceabilitySkeleton(), /WHEN <trigger>.*SHALL/u);
+ });
++test("the skeleton asks for the decisions to record (title, trigger, ADR path) and the readiness reviewer asks about them, never blocking", () => {
++  const text = renderArchitectureDesignSkeleton();
++  assert.match(text, /decisions to record/iu);
++  for (const trigger of [/module boundaries/iu, /data keeping/iu, /offline and error strategy/iu, /security trade-off/iu]) assert.match(text, trigger);
++  assert.match(text, /title, trigger and ADR path/iu);
++  assert.match(text, /adrReferences/u);
++  assert.equal(stagingDesignNeedsAuthoring(text, ""), true);
++  const authored = text.replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/u, "").replace(/REPLACE: /gu, "Authored: ");
++  assert.deepEqual(parseArchitectureDesign(authored).modules[0].adrReferences, []);
++  const reviewer = readFileSync(new URL("../agents/readiness-reviewer.md", import.meta.url), "utf8");
++  assert.match(reviewer, /Decisions to record/u);
++  assert.match(reviewer, /architecture-decision/u);
++  assert.match(reviewer, /question[^.]*never a block/iu);
++});
+ test("compact readback retains executable recovery and digests without copying design contents", () => {
+   const action = { kind: "command", argv: ["inspect"] };
+   const result = compactActionReadback({schema:"example.v1",status:"pending",nextAction:action,
+@@ -93,7 +108,7 @@ test("staging authoring distinguishes generated placeholders from reviewed sourc
+   assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
+ });
+ 
+-if (completionCases.length !== 4) throw new Error("case completion count drift: expected 4, got " + completionCases.length);
++if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+index c16259374..91aa04364 100644
+--- a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
++++ b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+@@ -17,6 +17,13 @@ test("the happy-path guide names only scripts that ship, and the start skill loa
+   assert.match(readFileSync(SKILL, "utf8"), /\x60references\/happy-path\.md\x60 for the ordered command chain/u);
+ });
+ 
++test("the guide tells when to call the architecture-decision skill: at design promotion, for every decision the design names", () => {
++  const guide = readFileSync(GUIDE, "utf8");
++  assert.match(guide, /architecture-decision/u);
++  assert.match(guide, /decisions to record/iu);
++  assert.ok(existsSync(join(PLUGIN, "skills", "architecture-decision", "SKILL.md")));
++});
++
+ test("the guide keeps its honesty markers and holds no host path", () => {
+   const guide = readFileSync(GUIDE, "utf8");
+   assert.match(guide, /## Gaps this guide does not close/u);
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index ac253f5f0..1a752925b 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -57,7 +57,13 @@ function planSteps() {
+       id: "set-feature", script: STATE, verb: "set-feature", closed: true,
+       argv: ["set-feature", "--id", "<feature-id>", "--plan-path", "<prd-path>", "--spec-path", "<spec-path>"],
+       needs: ["the PRD and the Spec are authored in the work tree"], producer: "activeFeature in pipeline state, lifecycle draft",
+-      commit: "commit the authored PRD and Spec before submitting", next: ["submit-plan"],
++      commit: "commit the authored PRD and Spec before submitting", next: ["record-decisions", "submit-plan"],
++    }),
++    otherStep({
++      id: "record-decisions", command: "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
++      needs: ["the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"],
++      producer: "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
++      commit: "commit the ADRs with the design", next: ["submit-plan"],
+     }),
+     scriptStep({
+       id: "submit-plan", script: STATE, verb: "submit-plan", closed: true, argv: ["submit-plan", "--by", "<name>", "--profile", "<epic|feature|mini>"],
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 6903a0a9a..d26658a88 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "9dffaf4fae1c4c2eb6eabe295fa90248dc0410d2cd129c64071d1fad286462d3"
++      "sha256": "8148350e36652cc228b648ba397c36e44e1203be784fb71f02fcb0d0b9dfee4e"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index 3ceb9e898..dc8a955a4 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -47,6 +47,7 @@
+       "producer": "activeFeature in pipeline state, lifecycle draft",
+       "humanGate": false,
+       "next": [
++        "record-decisions",
+         "submit-plan"
+       ],
+       "commit": "commit the authored PRD and Spec before submitting",
+@@ -65,6 +66,22 @@
+         "closed": true
+       }
+     },
++    {
++      "id": "record-decisions",
++      "who": "agent",
++      "command": "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
++      "needs": [
++        "the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"
++      ],
++      "evidenceSchema": null,
++      "producer": "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
++      "humanGate": false,
++      "next": [
++        "submit-plan"
++      ],
++      "commit": "commit the ADRs with the design",
++      "catalogue": null
++    },
+     {
+       "id": "submit-plan",
+       "who": "agent",
+diff --git a/plugins/pipeline-core/scripts/generate-runbook.test.mjs b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+index 7107fb2f9..5494aeec2 100644
+--- a/plugins/pipeline-core/scripts/generate-runbook.test.mjs
++++ b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+@@ -201,6 +201,16 @@ test("the start, plan and implement paths hold their lifecycle steps in order",
+   assert.deepEqual(impl.filter((id) => ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"].includes(id)), ["set-phase", "dispatch-briefing", "dispatch-record-write", "verify"]);
+ });
+ 
++test("the plan path has one step at design promotion that calls the architecture-decision skill, before submit-plan", () => {
++  const steps = docOf("plan").steps;
++  const step = steps.find((s) => s.id === "record-decisions");
++  assert.ok(step, "record-decisions step");
++  assert.match(step.command, /architecture-decision/u);
++  assert.equal(step.catalogue, null);
++  assert.equal(step.who, "agent");
++  assert.ok(steps.findIndex((s) => s.id === "record-decisions") < steps.findIndex((s) => s.id === "submit-plan"));
++});
++
+ test("the push path is derived from the quick-reference table of docs/push-release-flow.md", () => {
+   const flow = readFileSync(join(REPO_ROOT, "docs/push-release-flow.md"), "utf8");
+   const table = flow.slice(flow.indexOf("## Quick reference"));
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index ac8418a0a..b1861ee10 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -19,6 +19,8 @@ command tables.
+ 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
+ 2. Review receipt and design course (agent): `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`; dispatch the
+    read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
++   Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
++   `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
+ 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9
+    (profile drift) block is a repository state and names the adoption renewal.
+    **PRD release scope (every profile but `mini`, EL-19): the design package is an unsealed DRAFT** (`inspect` -> `sealSituation.situation` is `draft`); onboarding
