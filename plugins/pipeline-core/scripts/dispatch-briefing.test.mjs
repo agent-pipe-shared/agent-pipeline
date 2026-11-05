@@ -437,6 +437,12 @@ test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder
   assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
   assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
   assert.equal(result.skeleton, undefined);
+  // A lock whose owner is provably gone is not waited for and not answered with "wait": the refusal names the heal that retires it (live on
+  // Windows: a hook killed at the host limit left a lock "dead for 37230s" and the briefing named wait and release-lock only).
+  const dead = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: unavailableObserver, snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
+    registryLock: () => heldLock({ owner: "dead", ageSeconds: 37230 }), now: () => 0, pause: () => { throw new Error("a dead owner is never waited for"); } }));
+  assert.equal(dead.code, "DBG-RULESET-LOCK-HELD", dead.message);
+  assert.match(dead.message, /the owner is gone/u); assert.match(dead.message, /session-authority-repair\.mjs heal --root <repo>/u); assert.doesNotMatch(dead.message, /session-authority-repair\.mjs wait/u);
 });
 
 test("K12 a lock that clears within the wait changes nothing: the identity is read again and the loaded one is used", async () => {

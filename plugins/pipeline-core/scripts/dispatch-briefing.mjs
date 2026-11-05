@@ -998,7 +998,9 @@ export function generateDispatchBinding(options, deps = {}) {
     while ((lock?.status === "held" && lock.owner !== "dead") && now() < deadline) { pause(50); waited = true; lock = lockOf(root); }
     if (lock?.status === "held") {
       const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
-      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: retry this command; to wait longer run \`node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120\`; if the owner is gone or cannot be judged run \`... release-lock --root <repo> --no-pipeline-running --reason "<why>"\``);
+      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: ${lock.owner === "dead"
+        ? "the owner is gone, so no wait will clear this: run `node <plugin-root>/scripts/session-authority-repair.mjs heal --root <repo>` (it retires a lock whose owner is provably gone), then retry this command"
+        : "retry this command; to wait longer run `node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120`; if the owner cannot be judged run `... release-lock --root <repo> --no-pipeline-running --reason \"<why>\"`"}`);
     }
     if (waited || observationFault === "SDC-LOCK-HELD") {
       observeOnce();
