@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { createHash } from "node:crypto";
 import { canonical } from "./po-approval-proof.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { tmpdir, devNull } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice, rollbackGovernedItemQueue } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
@@ -30,6 +31,10 @@ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHoo
 import { initializeSessionAuthorityRegistry, inspectSessionAuthorityRegistryRead, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+
+// QG-04 extension (AC-108): the governed queue's working copy lives under the Git common directory and the tracked path is only the handover copy,
+// so the cases that read the queue a dispatch wrote (or tamper with it) read and write the working copy through the module. No case is removed or weakened.
+const queueFile=root=>sliceQueueLocation({root,planDir:'specs/unit'}).workingPath;
 
 function fixture(run) {
   // Authority-domain inventory refuses writable ancestors such as /tmp.
@@ -598,22 +603,22 @@ const cases = [
     const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
     const prepare=()=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs']}));
     const created=prepare();assert.equal(created.status,'required',JSON.stringify(created));assert.equal(created.queue.slices.length,1);assert.equal(created.queue.slices[0].delivery.criteria[0],'AC-1');
-    const unchanged=readFileSync(join(root,created.path));assert.equal(prepare().sha256,created.sha256);assert.deepEqual(readFileSync(join(root,created.path)),unchanged);
-    const wrong=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,criterionLocator:{...original.criterionLocator,sourceSha256:'f'.repeat(64)}},candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(wrong.status,'refused');assert.deepEqual(readFileSync(join(root,created.path)),unchanged);
-    const basic=JSON.parse(readFileSync(join(root,created.path),'utf8'));basic.slices[0].delivery={itemId:itemDelivery.itemId,criteria:['AC-1'],baseCommit:original.candidate.commit};writeFileSync(join(root,created.path),JSON.stringify(basic));
+    const unchanged=readFileSync(queueFile(root));assert.equal(prepare().sha256,created.sha256);assert.deepEqual(readFileSync(queueFile(root)),unchanged);
+    const wrong=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,criterionLocator:{...original.criterionLocator,sourceSha256:'f'.repeat(64)}},candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(wrong.status,'refused');assert.deepEqual(readFileSync(queueFile(root)),unchanged);
+    const basic=JSON.parse(readFileSync(queueFile(root),'utf8'));basic.slices[0].delivery={itemId:itemDelivery.itemId,criteria:['AC-1'],baseCommit:original.candidate.commit};writeFileSync(join(root,created.path),JSON.stringify(basic));
     const rebound=prepare();assert.equal(rebound.status,'required',JSON.stringify(rebound));assert.equal(nativeManagedDigest(rebound.queue.slices[0].delivery.criterionLocator),nativeManagedDigest(original.criterionLocator),'actual original criterion mapping automatically rebinds old basic v2 without accepting its completed evidence');
     const legacy={schema:'pipeline.slice-queue.v1',feature:'unit',slices:[{id:'LEGACY-A',title:'Retained prior outcome',state:'ready',dependsOn:[],writeScope:['src/legacy.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light'}]};
     const oldBytes=JSON.stringify(legacy);writeFileSync(join(root,created.path),oldBytes);
     const migrated=prepare();assert.equal(migrated.status,'required',JSON.stringify(migrated));assert.equal(migrated.queue.slices[0].state,'deferred');assert.equal(migrated.queue.slices[0].delivery.status,'unbound-legacy');assert.equal(migrated.queue.slices[1].id,itemDelivery.sliceId);
-    const retained=join(root,'specs/unit',`.slice-queue-legacy-${nativeManagedDigest(oldBytes)}.json`);assert.equal(readFileSync(retained,'utf8'),oldBytes);
+    const retained=join(dirname(queueFile(root)),`.slice-queue-legacy-${nativeManagedDigest(oldBytes)}.json`);assert.equal(readFileSync(retained,'utf8'),oldBytes);
     const priorCwd=process.cwd();process.chdir(root);
     try {
       assert.equal(runCli(['validate']).exit,0,'governed consumer queue location is automatic');
       const unauthorized=runCli(['hold',itemDelivery.sliceId,'--external-reason','fixture hold']);assert.notEqual(unauthorized.exit,0,'unbranded caller cannot mutate productive queue');
       const held=runtime.run(()=>runCli(['hold',itemDelivery.sliceId,'--external-reason','fixture hold']));assert.equal(held.exit,0,JSON.stringify(held));
-      const changed=JSON.parse(readFileSync(join(root,created.path),'utf8'));changed.slices.find(row=>row.id===itemDelivery.sliceId).writeScope=['src/foreign.mjs'];
+      const changed=JSON.parse(readFileSync(queueFile(root),'utf8'));changed.slices.find(row=>row.id===itemDelivery.sliceId).writeScope=['src/foreign.mjs'];
       assert.throws(()=>runtime.run(()=>writeQueueAtomic(join(root,created.path),changed)),error=>error.code==='SQ-ITEM-QUEUE-CAS'||error.code==='SQ-ITEM-BINDING-AMENDMENT-REQUIRED');
-      assert.deepEqual(JSON.parse(readFileSync(join(root,created.path),'utf8')).slices.find(row=>row.id===itemDelivery.sliceId).writeScope,['src/change.mjs']);
+      assert.deepEqual(JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(row=>row.id===itemDelivery.sliceId).writeScope,['src/change.mjs']);
     } finally { process.chdir(priorCwd); }
 
   })},
@@ -634,7 +639,7 @@ const cases = [
     const returned={...input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:binding.model,content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:binding.dispatchId,candidateCommit:binding.candidateCommit,outcome:'succeeded',report:'Implemented the original dependency behavior.',changedPaths:['src/change.mjs']})}]}};
     const finalized=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned}));assert.equal(finalized.status,'authored-commit-recorded',JSON.stringify(finalized));
     assert.equal(finalized.delivery?.status,'integration-pending',JSON.stringify(finalized));assert.equal(finalized.delivery?.checkStatus?.verdict,'passed',JSON.stringify(finalized));
-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8'));
+    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8'));
     queue.slices.push({id:'DEPENDENT',title:'Waiting dependency fixture',state:'ready',dependsOn:[itemDelivery.sliceId],writeScope:['src/dependent.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});
     writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
     const stillHeld=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual(stillHeld.integrated,[]);
@@ -691,7 +696,7 @@ const cases = [
     const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
     const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
     const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8'));queue.slices.push({id:'OTHER',title:'Actual other live reservation',state:'ready',dependsOn:[],writeScope:['src/blocked.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
+    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8'));queue.slices.push({id:'OTHER',title:'Actual other live reservation',state:'ready',dependsOn:[],writeScope:['src/blocked.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
     const otherBinding={...makeBinding({dispatchId:'OTHER',commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:['src/blocked.mjs']};const otherInput=toolInput('claude',{root,session:'other-session',toolUseId:'other-tool',binding:otherBinding});otherInput.tool_input.prompt+='\nSlice: OTHER\nWrite scope: src/blocked.mjs\n';
     const otherPrepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input:otherInput}));assert.equal(otherPrepared.ok,true,JSON.stringify(otherPrepared));
     const prior=readFileSync(queuePath),amend=additionalPaths=>runtime.run(()=>amendNativeGoldfishItemWriteScope({root,pendingSha256:prepared.sha256,additionalPaths}));
@@ -734,7 +739,7 @@ const cases = [
     const readback=runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'}));assert.equal(readback.ok,true,JSON.stringify(readback));assert.equal(readback.sha256,first.prepared.sha256);
     // Only runtime metadata gained rows; the first item's original approved
     // criterion/checks/scope and all other untracked baseline bytes stay bound.
-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8')),tampered=structuredClone(queue);tampered.slices.find(row=>row.id==='FIRST').delivery.checks[0].dependencies=['src/alias.mjs'];writeFileSync(queuePath,JSON.stringify(tampered,null,2)+'\n');assert.equal(runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'})).ok,false);writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
+    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8')),tampered=structuredClone(queue);tampered.slices.find(row=>row.id==='FIRST').delivery.checks[0].dependencies=['src/alias.mjs'];writeFileSync(queuePath,JSON.stringify(tampered,null,2)+'\n');assert.equal(runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'})).ok,false);writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
     writeFileSync(join(root,'src/change.mjs'),"export const value='expected'; // independently delivered first item\n");
     const returned={...first.input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:first.binding.model,content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:first.binding.dispatchId,candidateCommit:first.binding.candidateCommit,outcome:'succeeded',report:'First original outcome; second admitted separately.',changedPaths:['src/change.mjs']})}]}};
     const finalized=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned}));assert.equal(finalized.status,'authored-commit-recorded',JSON.stringify(finalized));assert.equal(finalized.delivery?.checkStatus?.verdict,'passed');assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:first.prepared.sha256})).status,'integrated');
@@ -764,7 +769,7 @@ const cases = [
       assert.equal(readFileSync(join(root,`src/${items[order[1]].path}.mjs`),'utf8').includes('simultaneous author'),true,'other genuine owner dirty product remains untouched');
       const second=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned(order[1])}));assert.equal(second.status,'authored-commit-recorded',JSON.stringify(second));assert.equal(second.delivery.checkStatus.verdict,'passed');assert.equal(spawnSync('git',['-C',root,'rev-parse',`${second.commit}^`],{encoding:'utf8'}).stdout.trim(),first.commit,'second parent is actual Source-authored first return');
       for(const id of order)assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:items[id].prepared.sha256})).status,'integrated');
-      if(order[0]==='RIGHT'){assert.equal(JSON.parse(spawnSync('git',['-C',root,'show','HEAD:specs/unit/slice-queue.json'],{encoding:'utf8'}).stdout).schema,'pipeline.slice-queue.v1','host product commits never stage governed queue metadata');assert.equal(JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).schema,'pipeline.slice-queue.v2','authenticated course writer migrated tracked runtime queue in place');}
+      if(order[0]==='RIGHT'){assert.equal(JSON.parse(spawnSync('git',['-C',root,'show','HEAD:specs/unit/slice-queue.json'],{encoding:'utf8'}).stdout).schema,'pipeline.slice-queue.v1','host product commits never stage governed queue metadata');assert.equal(JSON.parse(readFileSync(queueFile(root),'utf8')).schema,'pipeline.slice-queue.v2','authenticated course writer migrated tracked runtime queue in place');}
     });
   }},
 
@@ -815,7 +820,7 @@ const cases = [
     initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
     const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
     const prepare=()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs']});
-    const sessionId='0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b',queuePath=join(root,'specs/unit/slice-queue.json');
+    const sessionId='0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b',queuePath=queueFile(root);
     try {
       // Original behavior: a hook process has no in-process requester, so admission refuses.
       const unbound=prepare();assert.equal(unbound.status,'refused',JSON.stringify(unbound));assert.equal(unbound.reason,'item-course-requester-unavailable');assert.equal(existsSync(queuePath),false);
@@ -888,6 +893,7 @@ const cases = [
     mkdirSync(join(root,'.claude'));mkdirSync(join(root,'specs/unit'),{recursive:true});
     writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\n');
     writeFileSync(join(root,'.claude/pipeline-state.json'),JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/plan.md',phase:'implementation'},planApproved:true}));
+    // QG-04 (AC-108): this case seeds a handover-only repository, so it keeps writing the tracked handover path; the read rule reads it byte-identical.
     const queuePath=join(root,'specs/unit/slice-queue.json');
     const body=JSON.stringify({schema:'pipeline.slice-queue.v2',feature:'unit',slices:[]});
     writeFileSync(queuePath,`{${' '.repeat(1024*1024+4096)}${body.slice(1)}`,{mode:0o600});
@@ -1039,7 +1045,7 @@ const cases = [
     assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json')),true,'the first governed dispatch created the registry');
     const observed=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(observed.status,'observed',JSON.stringify(observed));assert.equal(observed.nativeRegistry,'read');
     // PF-47: a rebinding whose write scope differs from the queue row is refused with that cause and the exact repair.
-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
     const drift=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs','src/change.test.mjs']}));
     assert.equal(drift.status,'refused',JSON.stringify(drift));assert.equal(drift.code,'SQ-ITEM-BINDING-DRIFT',JSON.stringify(drift));
     assert.match(drift.reason,/ITEM-AC-1 differs from its queue row in write scope/u);assert.match(drift.repair,/: src\/change\.mjs$/u);
@@ -1065,7 +1071,7 @@ const cases = [
     const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
     const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
     assert.equal(prepare('ITEM-AC-1').status,'required');
-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
     const held=prepare('ITEM-AC-2');
     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));assert.match(held.reason,/held on ITEM-AC-1 .*the queue was not written$/u);assert.match(held.repair,/slice-queue\.mjs cancel <slice id>/u);
     assert.equal(readFileSync(queuePath,'utf8'),before,'a held dependency leaves the queue untouched');
@@ -1120,7 +1126,7 @@ const cases = [
     input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-2\nWrite scope: src/change.mjs\n';
     const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
     assert.equal(prepared.ok,true,JSON.stringify(prepared));
-    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+    const row=JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
     assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
   })},
 
@@ -1168,7 +1174,7 @@ const cases = [
     const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
     assert.equal(second.ok,true,JSON.stringify(second));
     assert.equal(migrations().length,1);assert.equal(existsSync(join(abandoned,migrations()[0],'catalogue.json')),true,'the old catalogue is retained, not deleted');
-    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+    const row=JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
     assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
     const held=members();assert.ok(Object.keys(held).length>0,'the dispatch holds a registry member');
     update(1);
@@ -1268,7 +1274,7 @@ const cases = [
       input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${sliceId}\nWrite scope: src/change.mjs\n`;
       return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));};
     assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
-    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),queuePath=join(root,'specs/unit/slice-queue.json');
+    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),queuePath=queueFile(root);
     const members=()=>{const out={};const walk=dir=>{for(const name of readdirSync(dir,{withFileTypes:true})){const path=join(dir,name.name);if(name.isDirectory())walk(path);else out[path.slice(registry.length)]=readFileSync(path,'utf8');}};if(existsSync(join(registry,'members')))walk(join(registry,'members'));return out;};
     const row=sliceId=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===sliceId);
     // A dirty tracked path refuses before any member is reserved, names the path, and the queue row it prepared is removed again.
@@ -1352,7 +1358,7 @@ const cases = [
     const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
     const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
     assert.equal(prepare('ITEM-AC-1').status,'required');
-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
     const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
     const held=prepare('ITEM-AC-2');
     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));
@@ -1618,7 +1624,7 @@ const cases = [
     const delivery=(sliceId,extra={})=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}],...extra});
     const prepare=(sliceId,extra)=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId,extra),candidate:original.candidate,writeScope:['src/change.mjs']}));
     const cancel=(sliceId,cancelClass)=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'stopped',cancelClass}));
-    const queuePath=join(root,'specs/unit/slice-queue.json'),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
+    const queuePath=queueFile(root),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
     const refusedWith=(label,sliceId,predecessor,reason)=>{
       const before=readFileSync(queuePath,'utf8'),refused=prepare(sliceId,{continuationOf:predecessor});
       assert.equal(refused.status,'refused',`${label}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID',`${label}: ${JSON.stringify(refused)}`);
@@ -1718,6 +1724,89 @@ const cases = [
     assert.equal(spawnSync('git',['-C',root,'rev-parse',`${second.commit}^`],{encoding:'utf8'}).stdout.trim(),first.commit,'the second slice lands on top of the first slice\'s delivery commit');
     for(const id of ['LEFT','RIGHT'])assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:items[id].prepared.sha256})).status,'integrated');
     const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual([...readiness.integrated].sort(),['LEFT','RIGHT'],'the settled set frees both slices');
+  })},
+
+  // AC-108 (closest accepted criterion): the governed queue keeps its working copy under the Git common directory; the tracked file is the handover copy.
+  { id: "NGHS60", name: "AC-108 queue location: a repository holding only the handover copy reads it byte-identical (the digest is of the bytes read) and a read never creates the working copy", run: () => fixture((env) => {
+    const {governed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
+    const bytes=readFileSync(join(env.root,'specs/unit/slice-queue.json'));
+    assert.equal(governed.status,'required',JSON.stringify(governed));
+    assert.equal(governed.path,'specs/unit/slice-queue.json','governed.path stays the handover path, so an old pending state keeps validating');
+    assert.equal(governed.workingPath,location.workingPath);
+    assert.equal(governed.sha256,createHash('sha256').update(bytes).digest('hex'),'the seed is read byte-identical, never re-serialised');
+    assert.equal(existsSync(location.workingPath),false,'a read never writes');
+    assert.ok(location.workingPath.startsWith(realpathSync(env.commonDir)),'the working copy lives under the Git common directory');
+  })},
+
+  { id: "NGHS61", name: "AC-108 queue location: the handover copy is adopted while the working copy is unchanged since the last import, and a conflict (both changed) keeps the working copy and says so", run: () => fixture((env) => {
+    const {governed:seed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
+    const withSlice=(queue,id)=>({...queue,slices:[...queue.slices,{id,title:id,state:'ready',dependsOn:[],writeScope:[`src/${id}.mjs`],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-3',criteria:['CR-1'],baseCommit:env.commit}}]});
+    const bytesOf=queue=>Buffer.from(JSON.stringify(queue,null,2)+'\n'),sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+    const pre=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});assert.equal(pre.source,'handover');
+    const mine=bytesOf(withSlice(seed.queue,'MINE'));writeWorkingQueue(location,mine,pre);
+    const afterWrite=resolveGovernedItemQueue({root:env.root});assert.equal(afterWrite.sha256,sha(mine));assert.equal(afterWrite.handoverConflict,false);
+    const theirs=bytesOf(withSlice(seed.queue,'THEIRS'));writeFileSync(join(env.root,'specs/unit/slice-queue.json'),theirs);
+    const adopted=resolveGovernedItemQueue({root:env.root});assert.equal(adopted.sha256,sha(theirs),'another machine pushed a newer handover copy and nothing here changed the working copy');assert.equal(adopted.handoverConflict,false);
+    assert.deepEqual(readFileSync(location.workingPath),mine,'adopting is a read: the working copy is untouched');
+    // both changed: this machine writes its working copy on top of the adopted one while the handover copy moves on again
+    writeFileSync(join(env.root,'specs/unit/slice-queue.json'),bytesOf(withSlice(seed.queue,'ELSEWHERE')));
+    writeFileSync(location.workingPath,bytesOf(withSlice(withSlice(seed.queue,'THEIRS'),'MORE')));
+    const conflict=resolveGovernedItemQueue({root:env.root});assert.equal(conflict.handoverConflict,true);assert.ok(conflict.queue.slices.some(row=>row.id==='MORE'),'the working copy wins');
+    const taken=takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});assert.equal(taken.status,'taken');
+    const resolved=resolveGovernedItemQueue({root:env.root});assert.equal(resolved.handoverConflict,false);assert.ok(resolved.queue.slices.some(row=>row.id==='ELSEWHERE'));
+  })},
+
+  { id: "NGHS62", name: "AC-108 queue location: a dispatch binding writes the working copy only (git status unchanged, the handover path untouched), a branch switch keeps the queue, a rollback restores it, and a linked worktree resolves the same working copy", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+    const git=(...args)=>spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args],{encoding:'utf8'});
+    const location=sliceQueueLocation({root,planDir:'specs/unit'}),statusBefore=git('status','--porcelain').stdout;
+    const created=prepare('ITEM-AC-1');assert.equal(created.status,'required',JSON.stringify(created));
+    assert.equal(created.path,'specs/unit/slice-queue.json');assert.equal(created.workingPath,location.workingPath);
+    assert.equal(existsSync(join(root,created.path)),false,'a dispatch binding never writes the tracked handover path');
+    assert.equal(git('status','--porcelain').stdout,statusBefore,'a dispatch binding leaves the working tree exactly as it was');
+    assert.equal(createHash('sha256').update(readFileSync(location.workingPath)).digest('hex'),created.sha256);
+    assert.equal(git('switch','-q','-c','other-branch').status,0);
+    assert.equal(resolveGovernedItemQueue({root}).sha256,created.sha256,'a branch switch does not drag the queue along');
+    const linked=mkdtempSync(join(nativeContractFixtureParent(),'linked-'));
+    try{assert.equal(git('worktree','add','-q','--detach',linked).status,0);assert.equal(sliceQueueLocation({root:realpathSync(linked),planDir:'specs/unit'}).workingPath,location.workingPath,'a linked worktree resolves the same working copy');}finally{git('worktree','remove','--force',linked);rmSync(linked,{recursive:true,force:true});}
+    const rolled=rollbackGovernedItemQueue(created.written);assert.equal(rolled.code,'SQ-ROLLBACK-REMOVED',JSON.stringify(rolled));assert.equal(existsSync(location.workingPath),false,'the rollback restores the absent queue');
+  })},
+
+  { id: "NGHS63", name: "AC-108 queue location: the first write after a fresh checkout materialises the working copy from the handover bytes and leaves the handover copy as it was", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const location=sliceQueueLocation({root,planDir:'specs/unit'});
+    const created=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(created.status,'required',JSON.stringify(created));
+    // a second machine's checkout: only the handover copy (the working bytes, exported) exists
+    const handoverBytes=readFileSync(location.workingPath);writeFileSync(join(root,'specs/unit/slice-queue.json'),handoverBytes);rmSync(location.workingPath);rmSync(location.sidecarPath,{force:true});
+    const fresh=resolveGovernedItemQueue({root});assert.equal(fresh.sha256,created.sha256,'the handover copy is read byte-identical, so a pending state bound to this digest does not drift');assert.equal(existsSync(location.workingPath),false);
+    const cancelled=runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'never started',cancelClass:'superseded'}));assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));
+    assert.equal(JSON.parse(readFileSync(location.workingPath,'utf8')).slices[0].state,'cancelled','the write landed in the working copy');
+    assert.deepEqual(readFileSync(join(root,'specs/unit/slice-queue.json')),handoverBytes,'the handover copy is not touched by a dispatch-side write');
+  })},
+
+  { id: "NGHS64", name: "AC-108 slice-queue.mjs: validate reports the source and the handover conflict, and import --take-handover replaces the working copy with the handover bytes", run: () => fixture((env) => {
+    const {governed:seed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
+    const bytesOf=queue=>Buffer.from(JSON.stringify(queue,null,2)+'\n');
+    const extra=id=>({...seed.queue,slices:[...seed.queue.slices,{id,title:id,state:'ready',dependsOn:[],writeScope:[`src/${id}.mjs`],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-3',criteria:['CR-1'],baseCommit:env.commit}}]});
+    writeWorkingQueue(location,bytesOf(extra('MINE')),readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}));
+    const theirs=bytesOf(extra('THEIRS'));writeFileSync(join(env.root,'specs/unit/slice-queue.json'),theirs);writeFileSync(location.workingPath,bytesOf(extra('MORE')));
+    const priorCwd=process.cwd();process.chdir(env.root);
+    try{
+      const conflicted=runCli(['validate']);assert.equal(conflicted.exit,0,JSON.stringify(conflicted));assert.equal(conflicted.output.handoverConflict,true);assert.match(conflicted.output.repair,/import --take-handover/u);
+      assert.equal(runCli(['import']).exit,2,'import needs --take-handover');
+      const taken=runCli(['import','--take-handover']);assert.equal(taken.exit,0,JSON.stringify(taken));assert.equal(taken.output.status,'taken');
+      assert.equal(runCli(['validate']).output.handoverConflict,false);
+    }finally{process.chdir(priorCwd);}
+    assert.deepEqual(readFileSync(location.workingPath),theirs);
   })},
 
 ];

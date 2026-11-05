@@ -19,6 +19,7 @@ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feat
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { requiresPublicationReview, resolvePublicationReviewRequirement } from "../lib/publication-review-requirement.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+import { readSliceQueueSource, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
 import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
 import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
@@ -573,17 +574,16 @@ function deriveCriticAddenda(root, uncoveredIds) {
 }
 function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = false }) {
   const directory = dirname(feature.planPath);
-  const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
-  let size;
-  try { size = lstatSync(join(root, coursePath)).size; }
+  // AC-108: the course is read through the shared reader (working copy under the Git common directory, else the tracked handover copy).
+  let courseBytes;
+  try { courseBytes = readSliceQueueSource(sliceQueueLocation({ root, planDir: directory }), { maxBytes: SLICE_QUEUE_MAX_BYTES }).bytes; }
   catch (error) {
     if (error?.code === "ENOENT") return;
     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is unreadable; the Critic evidence gate fails closed");
   }
   let ids, slices, legacyCourse = false;
   try {
-    if (size > SLICE_QUEUE_MAX_BYTES) throw new Error("delivery course exceeds the slice-queue size bound");
-    const course = readJsonFile(root, coursePath, "delivery course").value;
+    const course = JSON.parse(courseBytes.toString("utf8"));
     if (!validateSliceQueue(course).ok || course.feature !== feature.id) throw new Error("delivery course is invalid or belongs to another feature");
     slices = course.slices;
     legacyCourse = course.schema === "pipeline.slice-queue.v1";

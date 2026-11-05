@@ -28,6 +28,7 @@ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
 import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
+import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
 import { fileURLToPath } from "node:url";
@@ -609,6 +610,7 @@ function authenticatedNativePendingState(stored) {
     // member/original-approval join authorizes only its current queue bytes;
     // every other prelaunch untracked file remains immutable. The queue is
     // never thereby admitted as a product write or a completed dependency.
+    // AC-108: kept for pending states bound before the queue moved under the Git common directory, whose baseline lists the tracked queue path as an untracked file that the binding itself rewrote.
     return {...state,baseline:{...state.baseline,untracked:state.baseline.untracked.map(row=>row.path===state.delivery.queuePath?{...row,sha256:governed.sha256}:row)}};
   });
 }
@@ -1025,22 +1027,24 @@ export function resolveGovernedItemQueue({ root } = {}) {
     if(state.planApproved!==true)return {status:'not-applicable',code:'SQ-NO-APPROVED-COURSE'};
     const plan = state.activeFeature.planPath;
     if (typeof plan !== "string" || !normalizeScope(plan).ok || plan.startsWith("/")) return refused("SQ-PLAN-PATH-INVALID");
-    const path = resolve(physical, dirname(plan), "slice-queue.json");
+    const location = sliceQueueLocation({ root: physical, planDir: dirname(plan) }), path = location.handoverAbs;
     if (relative(physical, path).startsWith("..")) return refused("SQ-PLAN-PATH-INVALID");
-    let bytes;
-    try { bytes = readBounded(path); }
+    let bytes, source;
+    // AC-108: the working copy under the Git common directory, else the handover copy byte-identical; a read never writes.
+    try { source = readSliceQueueSource(location, { maxBytes: SLICE_QUEUE_MAX_BYTES }); bytes = source.bytes; }
     catch (error) {
       // Only a missing file is an absent course. An unsafe, drifting or unreadable file keeps failing closed below.
       if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
         repair: "The approved feature has no delivery course yet: write its slice-queue.json through the governed course writer prepareGovernedItemQueue with the item delivery briefing (criterion locator and check paths) of the first item." };
       throw error;
     }
-    const queue = parseStrictJson(bytes);
+    const queue = parseStrictJson(bytes.toString("utf8"));
     if (queue.schema !== ITEM_QUEUE_SCHEMA) return refused("SQ-DELIVERY-MIGRATION-REQUIRED");
     const validated = validateSliceQueue(queue);
     if (!validated.ok || queue.feature !== state.activeFeature.id) return refused("SQ-DELIVERY-QUEUE-INVALID");
-    return { status: "required", code: "SQ-DELIVERY-REQUIRED", path: relative(physical, path).replaceAll("\\", "/"),
-      sha256: createHash("sha256").update(bytes).digest("hex"), queue, normalized: validated.queue };
+    return { status: "required", code: "SQ-DELIVERY-REQUIRED", path: relative(physical, path).replaceAll("\\", "/"), workingPath: location.workingPath,
+      source: source.source, handoverConflict: source.handoverConflict,
+      sha256: source.sha256, queue, normalized: validated.queue };
   } catch (error) {
     if (error?.code === "SQ-DELIVERY-QUEUE-TOO-LARGE") return { status: "refused", code: error.code,
       repair: "The delivery course or State file exceeds the slice-queue size bound; it is not truncated or edited by hand. Report it to the PO for a governed compaction." };
@@ -1158,14 +1162,17 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const sourceBytes=readFileSync(sourcePath);
       const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
       if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
-      const path=resolve(physical,dirname(state.activeFeature.planPath),'slice-queue.json');
-      if(relative(physical,path).startsWith('..')||realpathSync(dirname(path))!==dirname(path))throw nativeManagedFault('item-course-queue-path');
-      let preimage=null,raw;
-      try{const info=lstatSync(path);if(info.isSymbolicLink()||!info.isFile()||info.size>SLICE_QUEUE_MAX_BYTES)throw nativeManagedFault('item-course-queue-unsafe');preimage=readFileSync(path);raw=parseStrictJson(preimage);}catch(error){if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
+      // AC-108: the queue is read and written at its working copy under the Git common directory (the handover copy is only read, byte-identical, while no working copy exists).
+      const location=sliceQueueLocation({root:physical,planDir:dirname(state.activeFeature.planPath)}),path=location.workingPath;
+      if(relative(physical,location.handoverAbs).startsWith('..')||realpathSync(dirname(location.handoverAbs))!==dirname(location.handoverAbs))throw nativeManagedFault('item-course-queue-path');
+      let preimage=null,queueSource=null,raw;
+      try{queueSource=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});preimage=queueSource.bytes;raw=parseStrictJson(preimage.toString('utf8'));}catch(error){if(error.code==='SQ-DELIVERY-QUEUE-TOO-LARGE'||error.message==='unsafe')throw nativeManagedFault('item-course-queue-unsafe');if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
       if(!validateSliceQueue(raw).ok||raw.feature!==state.activeFeature.id)throw nativeManagedFault('item-course-queue-invalid');
       const legacy=raw.schema==='pipeline.slice-queue.v1';
       if(legacy){
+        // The legacy backup lands beside the working copy.
         const legacyHash=digest(preimage),backup=join(dirname(path),`.slice-queue-legacy-${legacyHash}.json`);
+        mkdirSync(dirname(path),{recursive:true,mode:0o700});
         let backupFd;
         try{backupFd=openSync(backup,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<preimage.length){const written=writeSync(backupFd,preimage,offset,preimage.length-offset);if(written<=0)throw nativeManagedFault('item-course-legacy-backup-write');offset+=written;}fsyncSync(backupFd);}
         catch(error){if(error.code!=='EEXIST'||lstatSync(backup).isSymbolicLink()||digest(readFileSync(backup))!==legacyHash)throw error;}
@@ -1212,9 +1219,10 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
       if(after.status!=='eligible'||after.approvalSha256!==approval.approvalSha256||after.stateSha256!==approval.stateSha256
         ||nativeManagedDigest(nativeManagedCurrentOwner(repository).association)!==nativeManagedDigest(current.association))throw nativeManagedFault('item-course-approval-cas');
-      writeGovernedQueue(path,preimage,raw);
-      // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue).
-      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,preimage:preimage?preimage.toString('base64'):null,postimageSha256:digest(readFileSync(path))}};
+      const postimageSha256=writeGovernedQueue(location,queueSource,raw);
+      // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue). A working copy that did not exist before is restored as absent.
+      const workingBefore=preimage&&!(queueSource.source==='handover'&&queueSource.workingSha256===null);
+      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256}};
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
 }
@@ -1231,25 +1239,21 @@ export function rollbackGovernedItemQueue(written) {
       let current;
       try{current=readFileSync(written.path);}catch(error){if(error.code==='ENOENT')return {status:'unchanged',code:'SQ-ROLLBACK-ABSENT'};throw error;}
       if(digest(current)!==written.postimageSha256)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
-      if(written.preimage===null){unlinkSync(written.path);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
-      const bytes=Buffer.from(written.preimage,'base64'),temp=join(dirname(written.path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
-      let fd;
-      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const count=writeSync(fd,bytes,offset,bytes.length-offset);if(count<=0)throw nativeManagedFault('item-course-queue-rollback-write');offset+=count;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,written.path);}
-      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+      const target={workingPath:written.path,sidecarPath:typeof written.sidecarPath==='string'?written.sidecarPath:null};
+      if(written.preimage===null){restoreWorkingQueue(target,null);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
+      restoreWorkingQueue(target,Buffer.from(written.preimage,'base64'));
       return {status:'restored',code:'SQ-ROLLBACK-RESTORED'};
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ROLLBACK-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
-/** Publishes a governed item queue as a fresh inode by rename, after the preimage compare-and-swap. */
-function writeGovernedQueue(path,preimage,raw) {
-  if(preimage?digest(readFileSync(path))!==digest(preimage):(()=>{try{lstatSync(path);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}})())throw nativeManagedFault('item-course-queue-cas');
-  const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n'),temp=join(dirname(path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
+/** Publishes a governed item queue as a fresh inode by rename at its working copy, after the compare-and-swap on the bytes `source` was read from
+ * (null when neither copy existed). Returns the digest of the published bytes. */
+function writeGovernedQueue(location,source,raw) {
+  const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n');
   // Never publish a course that its own readers would refuse.
   if(bytes.length>SLICE_QUEUE_MAX_BYTES)throw Object.assign(new Error('prepared delivery course exceeds the slice-queue size bound'),{code:'SQ-DELIVERY-QUEUE-TOO-LARGE'});
-  let fd;
-  try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
-  finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+  return writeWorkingQueue(location,bytes,source,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>nativeManagedFault('item-course-queue-cas')}).sha256;
 }
 
 /** PF-33 (D56 (3)): the plan approval binds the PO-gate authority (manifest, PRD) and the PO profile, so a later
@@ -1310,12 +1314,12 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
     const physical=realpathSync(resolve(root));
     const governed=resolveGovernedItemQueue({root:physical});
     if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-CANCEL-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
-    const repository=inspectSignedDescriptorCustodyRepository(physical),path=resolve(physical,governed.path);
+    const repository=inspectSignedDescriptorCustodyRepository(physical),location=sliceQueueLocation({root:physical,planDir:dirname(governed.path)});
     return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{
       entered.value=true;
       // D51 (3): no bound session is required. Cancelling only releases (nothing of the slice is
       // delivered), and neither the agent's shell nor the PO's terminal ever carries a session binding.
-      const preimage=readFileSync(path),raw=parseStrictJson(preimage);
+      const source=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),raw=parseStrictJson(source.bytes.toString('utf8'));
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
       const row=raw.slices.find(entry=>entry.id===sliceId);
       if(!row){
@@ -1334,7 +1338,7 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
           delivery:{itemId:state.delivery.itemId,criteria:[isSafeTaskId(criterionId)?criterionId:sliceId],baseCommit:state.binding?.candidateCommit}};
         raw.slices.push(orphanRow);
         if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-orphan-row-invalid');
-        writeGovernedQueue(path,preimage,raw);
+        writeGovernedQueue(location,source,raw);
         return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released:[],queuePath:governed.path,started:true,orphan:true,
           note:'the queue had no row for this started slice; it was re-created as cancelled from the dispatch state on the caller\'s word that no Goldfish runs for it, so its reservation no longer blocks and its write scope is no longer protected'};
       }
@@ -1353,11 +1357,35 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
       const released=[];
       for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
-      writeGovernedQueue(path,preimage,raw);
+      writeGovernedQueue(location,source,raw);
       return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released,queuePath:governed.path,
         ...(hasNativeState||hasAgyState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+}
+
+/** AC-108: `slice-queue.mjs import --take-handover`. The working copy is replaced by the handover copy (another machine's push, or a conflict that
+ * should be resolved their way). Refused, with the command that releases it, when a live reservation names a slice the handover copy does not contain. */
+export function importGovernedHandoverQueue({root}={}) {
+  try {
+    const physical=realpathSync(resolve(root)),governed=resolveGovernedItemQueue({root:physical});
+    if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-IMPORT-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
+    const repository=inspectSignedDescriptorCustodyRepository(physical),location=sliceQueueLocation({root:physical,planDir:dirname(governed.path)});
+    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{
+      entered.value=true;
+      let handover=null;
+      try{handover=parseStrictJson(readBoundedFile(location.handoverAbs,SLICE_QUEUE_MAX_BYTES).toString('utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+      if(handover===null)return takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});
+      if(handover.schema!==ITEM_QUEUE_SCHEMA||handover.feature!==governed.queue.feature||!validateSliceQueue(handover).ok)
+        return {status:'refused',code:'SQ-IMPORT-HANDOVER-INVALID',reason:`the handover copy ${governed.path} is not a valid v2 queue of this feature`,repair:`fix or restore ${governed.path} (git checkout -- ${governed.path} on the branch that carries it), then run the import again`};
+      const ids=new Set(handover.slices.map(row=>row.id));let reservations=[];
+      try{reservations=readNativeReservedItemScopes({repository,boundary}).reservations;}catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
+      const lost=reservations.filter(row=>row.sliceId!==null&&!ids.has(row.sliceId)).map(row=>row.sliceId);
+      if(lost.length)return {status:'refused',code:'SQ-IMPORT-LIVE-RESERVATION',reason:`the handover copy does not contain ${lost.join(', ')}, which still hold a live reservation; importing it would lose them`,
+        repair:`let each finish through its own delivery, or, when its Goldfish no longer runs, release it first: node ${SLICE_QUEUE_SCRIPT} cancel ${lost[0]} --started --reason "<why>" ${cancelClassArg()}; then run the import again`};
+      return {...takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),queuePath:governed.path};
+    }));
+  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-IMPORT-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
 const governedCheckHandles=new WeakMap();
@@ -1472,7 +1500,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
       const settled=readSettledItemSliceIds({repository,boundary,governed});
       const agyBlocking=[...latestAgy.values()].find(row=>!released.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId)&&scopesOverlap(row.value.basis.itemDelivery.writeScope,writeScope));
       if(agyBlocking)throw reservationFault('item-delivery-scope-collision',agyBlocking.value.basis.itemDelivery.sliceId);
-      const queuePath=resolve(repository.primaryRoot,governed.path),queueBytes=readFileSync(queuePath);
+      const location=sliceQueueLocation({root:repository.primaryRoot,planDir:dirname(governed.path)}),queueSource=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),queueBytes=queueSource.bytes;
       if(digest(queueBytes)!==governed.sha256)throw nativeManagedFault('native-item-scope-queue-cas');
       rawItem.writeScope=writeScope;
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('native-item-scope-queue-invalid');
@@ -1493,11 +1521,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
         scopeRef=writeExclusive(repository.commonDir,`authority-scope-${pendingSha256}-${revision}.json`,value);
         const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=refreshed.memberRef;
       }
-      const info=lstatSync(queuePath);
-      if(info.isSymbolicLink()||!info.isFile()||digest(readFileSync(queuePath))!==digest(queueBytes))throw nativeManagedFault('native-item-scope-queue-cas');
-      const temp=join(dirname(queuePath),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);let fd;
-      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<postBytes.length){const written=writeSync(fd,postBytes,offset,postBytes.length-offset);if(written<=0)throw nativeManagedFault('native-item-scope-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,queuePath);}
-      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+      writeWorkingQueue(location,postBytes,queueSource,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>nativeManagedFault('native-item-scope-queue-cas')});
       return {status:'amended',code:'NGHS-ITEM-SCOPE-AMENDED',pendingSha256,revision,scopeRef,memberRef:operation.memberRef,allowedPaths,writeScope};
     });
   }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-SCOPE-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}

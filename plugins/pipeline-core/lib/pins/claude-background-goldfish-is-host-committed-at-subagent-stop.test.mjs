@@ -45,6 +45,7 @@ import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
 import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../windows-owned-authority-backend.mjs";
 import { renderGoldfishBriefing } from "../dispatch-briefing-build.mjs";
 import { validateNativeGoldfishFinal } from "../native-goldfish-host-return.mjs";
+import { readSliceQueueSource, sliceQueueLocation } from "../slice-queue-location.mjs";
 
 const AT = "2026-10-10T10:00:00.000Z";
 const FEATURE = "e2e";
@@ -54,6 +55,12 @@ const COMPANIONS = ["specs/e2e/design.md", "specs/e2e/traceability.md"];
 const REPORT = "specs/e2e/review/design-review-1.md";
 const RECEIPT = "specs/e2e/review/design-review-receipt-1.json";
 const QUEUE = "specs/e2e/slice-queue.json";
+// QG-04 (w229): the course a dispatch writes is the working copy under the Git common directory; QUEUE stays the tracked
+// handover path. The effective bytes (working copy, else the handover copy) are read through the shared location module.
+function queueBytes(fx) {
+  try { return readSliceQueueSource(sliceQueueLocation({ root: fx.root, planDir: dirname(QUEUE) })).bytes; }
+  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
+}
 const CHECK = "tests/first-item.test.mjs";
 const SOURCE = "src/first-item.mjs";
 const SESSION = "0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b";
@@ -311,7 +318,7 @@ function assertCommittedOnceAtStop(fx, toolUseId) {
   const observed = inspectNativeGoldfishHostObservation({ root: fx.root, taskId: fx.dispatchId, record, recordBytes: nativeAuthoredRecordBytes(record) });
   assert.equal(observed.ok, true, JSON.stringify(observed));
   assert.equal(observed.assurance, STOP_ASSURANCE);
-  const slice = JSON.parse(fx.read(QUEUE)).slices.find((row) => row.id === fx.sliceId);
+  const slice = JSON.parse(queueBytes(fx).toString("utf8")).slices.find((row) => row.id === fx.sliceId);
   assert.ok(slice, "the item slice is still in the course");
   // E11: the slice queue is NOT expected to leave `ready` at the stop. What an item-governed host commit publishes is the
   // delivery outcome beside the record: the checks file binds this dispatch, this commit and the published record bytes.
@@ -422,7 +429,7 @@ test("(iv) a keyless launch with the SubagentStop route unregistered keeps today
 
 test("(vi) a launch the hook refuses after it prepared the queue row leaves the queue and the registry as they were, and names the dirty path (PF-55)", () => {
   const fx = buildConsumer("refused-after-prepare");
-  const queueBefore = existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null;
+  const queueBefore = queueBytes(fx)?.toString("base64") ?? null;
   const members = join(fx.root, ".git", "agent-pipeline", "session-authority", "members");
   const memberFiles = () => { const out = []; const walk = (dir) => { for (const entry of readdirSync(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) walk(path); else out.push(`${path}:${sha256(readFileSync(path))}`); } }; if (existsSync(members)) walk(members); return out.sort(); };
   const membersBefore = memberFiles();
@@ -431,7 +438,7 @@ test("(vi) a launch the hook refuses after it prepared the queue row leaves the 
   assert.equal(pre.status, 2, `the dirty launch is refused -- ${pre.stderr.slice(0, 600)}`);
   assert.match(pre.stderr, /AGY-HOST-BASELINE-DIRTY/u, pre.stderr.slice(0, 600));
   assert.match(pre.stderr, /Repair: commit or restore these tracked paths before dispatching: README\.md/u, pre.stderr.slice(0, 600));
-  assert.equal(existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null, queueBefore, "no phantom queue row is left behind");
+  assert.equal(queueBytes(fx)?.toString("base64") ?? null, queueBefore, "no phantom queue row is left behind");
   assert.deepEqual(pendingFiles(fx), [], "no pending state is left behind");
   assert.deepEqual(memberFiles(), membersBefore, "no reserved registry member is left behind");
   fx.gitOk("checkout", "-q", "--", "README.md");

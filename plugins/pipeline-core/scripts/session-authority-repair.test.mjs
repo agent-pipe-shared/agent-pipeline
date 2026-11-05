@@ -81,7 +81,9 @@ function course(root) {
 function governedRow(root, sliceId) {
   const governed = resolveGovernedItemQueue({ root });
   assert.equal(governed.status, "required", JSON.stringify(governed));
-  return JSON.parse(readFileSync(resolve(root, governed.path), "utf8")).slices.find((row) => row.id === sliceId);
+  // QG-04 (w229): the governed queue is written to its working copy under the Git common directory, so the row is read from
+  // `workingPath`; `path` stays the tracked handover copy, which a dispatch no longer writes.
+  return JSON.parse(readFileSync(governed.workingPath, "utf8")).slices.find((row) => row.id === sliceId);
 }
 function repair(...argv) {
   let text = "";
@@ -361,7 +363,8 @@ const cases = [
     const { original, runtime } = course(root);
     const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-0", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
     assert.equal(runtime.run(() => prepareGovernedItemQueue({ root, itemDelivery, candidate: original.candidate, writeScope: ["src/change.mjs"] })).status, "required");
-    const before = readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path));
+    // QG-04 (w229): the prepared queue lives in its working copy, not in the tracked handover path.
+    const before = readFileSync(resolveGovernedItemQueue({ root }).workingPath);
     const cwd = process.cwd();
     process.chdir(root);
     try {
@@ -372,7 +375,7 @@ const cases = [
         assert.equal(refused.exit, 2, JSON.stringify(refused.output)); assert.equal(refused.output.code, "SQ-CANCEL-CLASS");
         for (const name of CANCEL_CLASSES) assert.ok(refused.output.repair.includes(name) && refused.output.repair.includes(CANCEL_CLASS_HELP[name]), `${name} is taught: ${refused.output.repair}`);
       }
-      assert.ok(readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path)).equals(before), "a refused cancel writes nothing");
+      assert.ok(readFileSync(resolveGovernedItemQueue({ root }).workingPath).equals(before), "a refused cancel writes nothing");
       const cancelled = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", "--class", "superseded"]);
       assert.equal(cancelled.exit, 0, JSON.stringify(cancelled.output));
       assert.equal(cancelled.output.cancelClass, "superseded");

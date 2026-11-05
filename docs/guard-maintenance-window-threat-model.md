@@ -638,6 +638,7 @@ kernel authority, so a maintenance window cannot lift them:
 `plugins/pipeline-core/lib/session-power.mjs`,
 `plugins/pipeline-core/lib/session-requester-bridge.mjs`,
 `plugins/pipeline-core/lib/slice-queue.mjs`,
+`plugins/pipeline-core/lib/slice-queue-location.mjs`,
 `plugins/pipeline-core/lib/staged-observation-doc-classification.mjs`,
 `plugins/pipeline-core/lib/verify-owning-controller-route.mjs`,
 `plugins/pipeline-core/lib/verify-resume.mjs`,

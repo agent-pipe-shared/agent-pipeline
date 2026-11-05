@@ -26,6 +26,7 @@
 //   (e) a second run is `already-registered` and byte-stable.
 //   (f) the generated files' content names the Spec path and digest and nothing else from outside the package.
 import assert from "node:assert/strict";
+import { readSliceQueueSource, sliceQueueLocation } from "../slice-queue-location.mjs";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -221,6 +222,8 @@ test("(a) before registration the first item course is refused CAC-REGISTRATION-
   assert.match(refused.reason, /registers no artifact at|registration field [A-Za-z0-9]+ is/u, JSON.stringify(refused));
   assert.match(refused.repair, /register-feature-package/u, JSON.stringify(refused));
   assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "a refused admission publishes no course");
+  // QG-04 (w229): nor a working copy under the Git common directory.
+  assert.equal(existsSync(sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" }).workingPath), false, "a refused admission writes no working copy");
 });
 
 test("(b) consumer-shaped: the CLI registers and creates both missing files; after the commit a regenerated binding prepares the course", () => {
@@ -270,7 +273,11 @@ test("(b) consumer-shaped: the CLI registers and creates both missing files; aft
   assert.notEqual(regenerated.candidateCommit, state.firstBinding.candidateCommit, "the pre-registration binding carried a stale candidate");
   const prepared = prepareGovernedItemQueue({ root: fx.root, itemDelivery: regenerated.itemDelivery, candidate: fx.candidate(), writeScope: [SOURCE] });
   assert.notEqual(prepared.status, "refused", JSON.stringify(prepared));
-  const queue = JSON.parse(fx.read("specs/e2e/slice-queue.json"));
+  // QG-04 (w229): the prepared course is the working copy under the Git common directory; the tracked handover copy is
+  // written only by push-prepare, so the dispatch leaves it absent.
+  const location = sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" });
+  assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "the binding writes no tracked handover copy");
+  const queue = JSON.parse(readSliceQueueSource(location).bytes.toString("utf8"));
   const slice = queue.slices.find((row) => row.id === regenerated.itemDelivery.sliceId);
   assert.ok(slice, "the prepared course holds the item slice");
   assert.equal(slice.state, "ready");

@@ -53,6 +53,7 @@ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
@@ -753,6 +754,46 @@ export function foldPendingPushApprovalWrite(dir, deps = {}, options = {}) {
 }
 
 /**
+ * AC-108: the governed slice queue keeps its working copy under the Git common directory; the tracked
+ * `specs/<feature>/slice-queue.json` is only the handover copy. At the start of the report (next to the fold) the working copy is
+ * written to its handover path and exactly that path is committed, with the same trailer pair as the fold, so the next machine reads
+ * it. Only when the tree is otherwise clean (otherwise everything is left alone and the clean-tree check reports it), only when no
+ * recorded approval is outstanding for the current HEAD (the fold's gate: a commit would void it), and never when the handover copy
+ * moved on another machine (a conflict is left to `slice-queue.mjs import --take-handover`). A path the repository ignores is not
+ * written at all. Never throws; the git hooks and guard-push gain no refusal.
+ */
+export function exportGovernedQueueHandover(dir, deps = {}) {
+  try {
+    const context = resolveFeatureContext(dir, deps);
+    if (!context.ok || context.closedFeature === true) return { exported: false, reason: "no-active-feature" };
+    const location = sliceQueueLocation({ root: dir, planDir: dirname(context.planPath).split(sep).join("/") });
+    if (!location.shared) return { exported: false, reason: "no-git-common-dir" };
+    const status = typeof deps.gitStatus === "function" ? deps.gitStatus(dir) : rawGitStatus(dir, deps);
+    if (status === null) return { exported: false, reason: "status-unavailable" };
+    if (status.split("\n").some((line) => line !== "")) return { exported: false, reason: "other-dirty-paths" };
+    const head = resolveHeadCommit(dir, deps);
+    if (!head) return { exported: false, reason: "head-unavailable" };
+    const stateRead = (deps.readState ?? readState)(dir);
+    if (stateRead?.state?.pushApproval?.lastApproved?.forCommit === head) return { exported: false, reason: "approval-outstanding" };
+    const spawn = deps.spawn ?? spawnSync;
+    if (spawn("git", ["-C", dir, "check-ignore", "-q", "--", location.handoverPath], { encoding: "utf8" }).status === 0) return { exported: false, reason: "handover-path-ignored" };
+    const written = exportHandoverQueue(location);
+    if (written.status !== "exported") return { exported: false, reason: written.code };
+    if (!isSuccessfulSpawn(spawn("git", ["-C", dir, "add", "--", location.handoverPath], { encoding: "utf8" }))) return { exported: false, reason: "add-failed" };
+    const message = "chore(slice-queue): export the governed queue to its handover copy\n\n"
+      + "Auto-exported by push-prepare.mjs at the start of its own run (AC-108): the working copy of the\n"
+      + "approved feature's queue lives under the Git common directory, and this tracked file is the\n"
+      + "handover copy another machine reads.\n\n"
+      + "AI-Assisted: true\n"
+      + "Dispatch: stage-0 (elephant)\n";
+    if (!isSuccessfulSpawn(spawn("git", ["-C", dir, "commit", "-m", message, "--", location.handoverPath], { encoding: "utf8" }))) return { exported: false, reason: "commit-failed" };
+    return { exported: true, path: location.handoverPath };
+  } catch {
+    return { exported: false, reason: "export-unavailable" };
+  }
+}
+
+/**
  * The remedy for a missing Critic/Verify binding. A feature with registered course history is refused CCA-PARENT for the merge base:
  * the base the preflight accepts there is the last registered round's candidate (the same derivation the preflight uses).
  */
@@ -794,7 +835,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`
   // never has to be manually chased by a human/session noticing the dirty state file.
   const foldPending = deps.foldPendingApprovalWrite ?? foldPendingPushApprovalWrite;
-  if (options.foldPendingApprovalWrite !== false) foldPending(dir, deps);
+  if (options.foldPendingApprovalWrite !== false) {
+    foldPending(dir, deps);
+    // AC-108: the governed queue's handover copy is exported and committed the same way, when the tree is otherwise clean.
+    (deps.exportGovernedQueueHandover ?? exportGovernedQueueHandover)(dir, deps);
+  }
 
   const headCommit = resolveHeadCommit(dir, deps);
   // The slim profile pushes the exact checked-out branch; resolved once, for the PF-32 check and the push line.

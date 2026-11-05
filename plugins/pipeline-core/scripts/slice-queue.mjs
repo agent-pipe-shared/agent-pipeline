@@ -34,7 +34,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice } from "../lib/native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
+import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
 import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
@@ -43,7 +44,7 @@ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mj
 import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 import { sessionAuthorityRepairCommand } from "./session-authority-repair.mjs";
 import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
-import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_MAX_BYTES, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
 
 export const CLI_SCHEMA = "pipeline.slice-queue-cli.v1";
 export const EXIT = Object.freeze({ OK: 0, USAGE: 2, INVALID: 3, NOT_FOUND: 4, IO: 5 });
@@ -72,6 +73,7 @@ function queueRoot() { return invocationRoot ?? process.cwd(); }
 const LEDGER = ["session", "runner", "common-dir"];
 const VERBS = {
   validate: { positional: 0, flags: [...COMMON], repeatable: [] },
+  import: { positional: 0, flags: [...COMMON, "take-handover"], repeatable: [], booleans: ["take-handover"] },
   next: { positional: 0, flags: [...COMMON, ...LEDGER, "limit", "evidence-dir", "stale-after-minutes"], repeatable: [] },
   add: {
     positional: 0,
@@ -134,7 +136,7 @@ export function parseArguments(argv) {
     if (flags.queue !== undefined) flags.queue = resolve(requested, flags.queue);
   }
   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
-  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=resolve(queueRoot(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
+  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=governed.workingPath;else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
   return { verb, positional, flags };
 }
 
@@ -153,15 +155,33 @@ function requireText(flags, name, verb) {
 // ------------------------------------------------------------------ queue file
 
 const queuePreimages=new Map();
+/** AC-108: the governed queue of this invocation when `path` names its working copy (or its tracked handover copy), else null. Such a queue is read
+ * through the working-copy/handover read rule and written at the working copy under the Git common directory. */
+function governedTargetOf(path) {
+  const governed = resolveGovernedItemQueue({ root: queueRoot() });
+  if (governed.status !== "required") return null;
+  const target = resolve(path);
+  if (target !== resolve(governed.workingPath) && target !== resolve(queueRoot(), governed.path)) return null;
+  return { governed, location: sliceQueueLocation({ root: realpathSync(queueRoot()), planDir: dirname(governed.path) }) };
+}
+function readGovernedSource(target) {
+  try { return readSliceQueueSource(target.location, { maxBytes: SLICE_QUEUE_MAX_BYTES }); }
+  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
+}
+const CONFLICT_REPAIR = "the handover copy and the working copy both changed and the working copy wins: run push-prepare to export the working copy, or node <plugin-root>/scripts/slice-queue.mjs import --take-handover to take the handover copy instead";
 function loadRaw(path, { allowAbsent = false } = {}) {
-  const loaded = loadSliceQueue(path, { platform: process.platform });
+  const target = governedTargetOf(path);
+  const read = target === null ? null : readGovernedSource(target);
+  const loaded = loadSliceQueue(path, { platform: process.platform, ...(target === null ? {} : { readFile: () => { if (read === null) throw Object.assign(new Error("absent"), { code: "ENOENT" }); return read.bytes.toString("utf8"); } }) });
   if (loaded.status === "absent") {
     if (allowAbsent){queuePreimages.set(resolve(path),null);return null;}
     throw new CliError("SQ-NOT-FOUND", EXIT.NOT_FOUND, "slice queue file does not exist", { path: displayPath(path) });
   }
-  queuePreimages.set(resolve(path),createHash("sha256").update(readFileSync(path)).digest("hex"));
+  queuePreimages.set(resolve(path), target === null ? createHash("sha256").update(readFileSync(path)).digest("hex") : read.sha256);
+  if (target !== null && read !== null) loaded.queueSource = { source: read.source, handoverConflict: read.handoverConflict };
   return loaded;
 }
+const sourceReadback = (loaded) => (loaded.queueSource === undefined ? {} : { source: loaded.queueSource.source, handoverConflict: loaded.queueSource.handoverConflict, ...(loaded.queueSource.handoverConflict ? { repair: CONFLICT_REPAIR } : {}) });
 const displayPath = (path) => path;
 
 function invalidQueue(loaded) {
@@ -171,15 +191,16 @@ function invalidQueue(loaded) {
 /** Temp file + rename in the same directory. A failure removes the temp file. */
 export function writeQueueAtomic(path,queue) {
   if(queue.schema!=='pipeline.slice-queue.v2')return writeQueueAtomicBytes(path,queue);
-  const governed=resolveGovernedItemQueue({root:queueRoot()});
-  if(governed.status!=='required'||resolve(queueRoot(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
-  const repository=inspectSignedDescriptorCustodyRepository(queueRoot());
+  const target=governedTargetOf(path);
+  if(target===null)throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
+  const {governed,location}=target,repository=inspectSignedDescriptorCustodyRepository(queueRoot());
   return withSessionAuthorityBoundary({repository},()=>{
     if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw new CliError('SQ-ITEM-OWNER-REQUIRED',EXIT.INVALID,'An actual Source requester is required.');
-    const expected=queuePreimages.get(resolve(path)),info=lstatSync(path);
-    if(expected===undefined||info.isSymbolicLink()||!info.isFile()||realpathSync(path)!==resolve(path)||createHash('sha256').update(readFileSync(path)).digest('hex')!==expected)throw new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.');
+    const expected=queuePreimages.get(resolve(path)),source=readGovernedSource(target);
+    if(expected===undefined||source===null||source.sha256!==expected)throw new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.');
     for(const old of governed.queue.slices){const next=queue.slices.find(row=>row.id===old.id);if(!next||JSON.stringify(next.delivery)!==JSON.stringify(old.delivery)||JSON.stringify(next.writeScope)!==JSON.stringify(old.writeScope))throw new CliError('SQ-ITEM-BINDING-AMENDMENT-REQUIRED',EXIT.INVALID,'Original item binding and scope require the approved continuation.');}
-    return writeQueueAtomicBytes(path,queue);
+    try{writeWorkingQueue(location,Buffer.from(`${JSON.stringify(queue,null,2)}\n`),source,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.')});}
+    catch(error){if(error instanceof CliError)throw error;throw new CliError('SQ-IO',EXIT.IO,`could not write the slice queue (${error?.code??'error'})`);}
   });
 }
 function writeQueueAtomicBytes(path, queue) {
@@ -287,7 +308,16 @@ function deriveStatus(flags, loaded) {
 function verbValidate({ flags }) {
   const loaded = loadRaw(resolve(flags.queue));
   if (loaded.status !== "valid") throw invalidQueue(loaded);
-  return { status: "valid", errors: [], warnings: loaded.warnings, slices: loaded.queue.slices.length };
+  return { status: "valid", errors: [], warnings: loaded.warnings, slices: loaded.queue.slices.length, ...sourceReadback(loaded) };
+}
+
+// AC-108: the one import there is. The working copy becomes the handover copy (another machine's push); refused with the command that
+// releases it when a live reservation would be lost. A refused import leaves everything as it was.
+function verbImport({ flags }) {
+  if (flags["take-handover"] !== true) throw usage("import: --take-handover is required (it replaces the working copy of the governed queue with the tracked handover copy)");
+  const result = importGovernedHandoverQueue({ root: queueRoot() });
+  if (result.status === "refused") throw new CliError(result.code, EXIT.INVALID, result.reason ?? "the handover copy was not imported", result.repair ? { repair: result.repair } : {});
+  return { status: result.status, code: result.code, ...(result.sha256 ? { sha256: result.sha256 } : {}), ...(result.queuePath ? { queuePath: result.queuePath } : {}) };
 }
 
 function verbNext({ flags }) {
@@ -400,8 +430,7 @@ function verbCancel({ positional, flags }) {
   const loaded = loadRaw(path);
   if (loaded.status !== "valid") throw invalidQueue(loaded);
   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
-    const governed = resolveGovernedItemQueue({ root: queueRoot() });
-    if (governed.status !== "required" || resolve(queueRoot(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+    if (governedTargetOf(path) === null) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
     const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
@@ -495,10 +524,10 @@ function verbReport({ flags }) {
   });
   // D75: how many slices ended for which reason; a slice cancelled before classes existed is counted `unclassified`.
   const cancelClasses = Object.fromEntries([...CANCEL_CLASSES, UNCLASSIFIED_CANCEL].map((name) => [name, loaded.queue.slices.filter((entry) => entry.state === "cancelled" && entry.cancelClass === name).length]));
-  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses }, ledger };
+  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses, ...sourceReadback(loaded) }, ledger };
 }
 
-const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
+const HANDLERS = { validate: verbValidate, import: verbImport, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
 
 /** Runs the CLI; returns `{ exit, output }` (never throws, never writes). */
 export function runCli(argv) {

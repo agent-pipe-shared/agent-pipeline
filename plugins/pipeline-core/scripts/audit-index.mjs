@@ -18,6 +18,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readSliceQueueSource, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { hasPrivateTransferContent } from "../lib/bound-artifact-transfer.mjs";
@@ -135,6 +136,16 @@ function readSmallJson(rootDir, rel) {
   }
 }
 
+/** The delivery course of a plan directory through the shared queue reader; never throws. */
+function readCourseJson(rootDir, directory) {
+  try {
+    const bytes = readSliceQueueSource(sliceQueueLocation({ root: rootDir, planDir: directory }), { maxBytes: MAX_JSON_BYTES }).bytes;
+    return { status: "present", value: JSON.parse(bytes.toString("utf8")) };
+  } catch (error) {
+    return { status: error?.code === "ENOENT" || error?.code === "ENOTDIR" ? "missing" : "invalid", value: null };
+  }
+}
+
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 /**
@@ -176,7 +187,9 @@ export function collectAuditIndexInputs({ rootDir, featureId, state } = {}) {
   if (isRepoPath(planPath)) {
     const directory = dirname(planPath);
     const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
-    const course = readSmallJson(rootDir, coursePath);
+    // AC-108: read through the shared reader (working copy under the Git common directory, else the handover copy). `sources` keeps the tracked
+    // handover path: its digest in the index is the digest of that file, which equals the course read here once push-prepare exported it.
+    const course = readCourseJson(rootDir, directory);
     if (course.status === "missing") missing.push({ step: "dispatch-records", reason: "no-delivery-course" });
     else if (course.status !== "present" || !Array.isArray(course.value?.slices)) missing.push({ step: "dispatch-records", reason: "delivery-course-unreadable" });
     else if (course.value.feature !== featureId) missing.push({ step: "dispatch-records", reason: "delivery-course-foreign" });

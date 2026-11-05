@@ -35,6 +35,7 @@ import {
   checkPushThreatModel,
   checkWorkingTreeClean,
   criticalArtifactPaths,
+  exportGovernedQueueHandover,
   foldPendingPushApprovalWrite,
   isSecurityGateActive,
   parseArgs,
@@ -48,6 +49,7 @@ import {
   resolveVerifyRemedyPlan,
 } from "./push-prepare.mjs";
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { sliceQueueLocation, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
 import { resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
@@ -1760,4 +1762,46 @@ test("D4a: checkPushThreatModel on a real project refuses a missing or empty mod
     assert.equal(inactiveMissing.code, undefined);
     assert.match(inactiveMissing.remedy, /materialize-push-threat-model/u);
   } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
+});
+
+// AC-108 (closest accepted criterion): the governed queue's working copy lives under the Git common directory; push-prepare exports it to the tracked handover path.
+test("AC-108: push-prepare exports the governed queue's working copy to its handover path and commits exactly that path with the trailer pair, only on an otherwise clean tree", () => {
+  const root = foldFixtureRepo();
+  const location = sliceQueueLocation({ root, planDir: "specs/sprint-nova-epic" });
+  const queue = Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [] }, null, 2)}\n`);
+  writeWorkingQueue(location, queue, null);
+  assert.equal(gitAtFold(root, "status", "--porcelain").stdout, "", "a working copy under the Git common directory never dirties the tree");
+  // another dirty path: nothing is exported, nothing is committed
+  writeFileSync(join(root, "unrelated.txt"), "wip\n");
+  const head = gitAtFold(root, "rev-parse", "HEAD").stdout;
+  assert.deepEqual(exportGovernedQueueHandover(root), { exported: false, reason: "other-dirty-paths" });
+  assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout, head);
+  rmSync(join(root, "unrelated.txt"));
+  // clean tree: exported and committed
+  const result = exportGovernedQueueHandover(root);
+  assert.deepEqual(result, { exported: true, path: "specs/sprint-nova-epic/slice-queue.json" });
+  assert.deepEqual(readFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json")), queue, "the handover copy is the working bytes, byte-identical");
+  assert.equal(gitAtFold(root, "show", "--name-only", "--format=", "HEAD").stdout.trim(), "specs/sprint-nova-epic/slice-queue.json", "exactly that path is committed");
+  const message = gitAtFold(root, "log", "-1", "--format=%B").stdout;
+  assert.match(message, /^AI-Assisted: true$/mu);
+  assert.match(message, /^Dispatch: stage-0 \(elephant\)$/mu);
+  assert.equal(gitAtFold(root, "status", "--porcelain").stdout, "");
+  // nothing left to export
+  assert.equal(exportGovernedQueueHandover(root).exported, false);
+  // a handover copy another machine changed is never overwritten by an export
+  const theirs = Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [], note: "theirs" }, null, 2)}\n`);
+  writeFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json"), theirs);
+  gitAtFold(root, "commit", "-q", "-am", "theirs");
+  assert.equal(exportGovernedQueueHandover(root).exported, false);
+  assert.deepEqual(readFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json")), theirs);
+});
+
+test("AC-108: the export never runs while a recorded approval is outstanding for the current HEAD (a commit would void it)", () => {
+  const root = foldFixtureRepo();
+  const location = sliceQueueLocation({ root, planDir: "specs/sprint-nova-epic" });
+  writeWorkingQueue(location, Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [] }, null, 2)}\n`), null);
+  const head = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
+  const outstanding = { readState: () => ({ status: "ok", state: { activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md" }, pushApproval: { lastApproved: { forCommit: head } } } }) };
+  assert.deepEqual(exportGovernedQueueHandover(root, outstanding), { exported: false, reason: "approval-outstanding" });
+  assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout.trim(), head);
 });

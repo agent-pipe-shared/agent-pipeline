@@ -119,12 +119,27 @@ before any signing command is printed (`checkpoint-destination`), so no signatur
 is spent on a push the guard would refuse (PF-32). Adding the policy changes the
 manifest, which the plan approval binds: approve the plan again afterwards (PF-33).
 
-**A tree dirty only with the Pipeline's own files** (the governed
-`specs/<feature>/slice-queue.json` a dispatch binding writes, and a tree
-guard-override audit log an older build left; a current build writes that log under
-the common Git directory) is named by every clean-tree refusal together with
+**The governed slice queue has a working copy and a handover copy.** A dispatch
+binding, a queue amendment, a rollback, a cancel and every `slice-queue.mjs` verb
+of an approved course write the working copy under the common Git directory, so
+they never make the tree dirty and a branch switch never carries the queue along.
+The tracked `specs/<feature>/slice-queue.json` is the handover copy for another
+machine: `push-prepare` writes the working copy there and commits exactly that
+path at the start of its run, when the tree is otherwise clean and no push
+approval is outstanding for HEAD (the same gate as the push-approval fold). A
+machine without a working copy reads the handover copy byte for byte. When the
+handover copy changed (a pull) and the working copy did not, the handover copy is
+used; when both changed, the working copy wins, `slice-queue.mjs validate` shows
+`handoverConflict`, and `slice-queue.mjs import --take-handover` takes the
+handover copy. The git hooks add no refusal for a stale handover copy.
+
+**A tree dirty only with the Pipeline's own files** (a handover queue copy an older
+build wrote, and a tree guard-override audit log an older build left; a current
+build writes that log under the common Git directory) is named by every clean-tree
+refusal together with
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo> --agent`,
-which commits exactly those files and refuses if anything else is dirty
+which commits exactly those files and refuses if another tracked file is modified,
+staged or deleted; an untracked foreign file is listed as `untouched` and left alone
 (PF-31/PF-36/PF-40). The caller states who runs it: `--agent` (an agent session)
 records the GIT-03 provenance pair, `--human` (a PO terminal commit) carries no
 provenance trailers, and a call with neither is refused. The clean-tree checks
