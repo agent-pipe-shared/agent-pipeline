@@ -382,6 +382,8 @@ Windows measurement of 19g (peer session on the Claude Windows greenfield clone,
 
 Reading: the latency is the count of native operations on Windows, not a single slow step, and the registry lock is held across long multi-operation windows, so parallel launches and sibling stops still lose against it. By PO rule 4 of 2026-11-05 this is the clear finding; whether latency work continues is the PO's decision.
 
+PO decision on the measurement (2026-11-05, late): option B is built for sure. The second launch in one reply gets its lock retry at the site that actually refuses now, and the SubagentStop host commit stops losing the registry lock. The holder is not identified yet: the stop read already waits 90 s, so the fix waits for the holder evidence from the Windows peer instead of raising the wait blind. In parallel, the native operations are validated from the ground up in an open-ended analysis of alternatives. Guiding question: which protection would be given up if, for example, only directory roots were checked instead of each path? The threat model the PO states is that the pipeline confines the agent, not the human.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
