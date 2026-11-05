@@ -414,7 +414,9 @@ function run(input, root = fixture(), {
   claudeProjectDir = root,
   hookCwd = root,
   adapterScript = adapter,
-  timeoutMs = 8_000,
+  // One adapter start takes seconds even alone; the Full Verify runs many suites at once, where 8 s ended the child (status null) in
+  // cases 8 and 15 of two runs. 30 s stays below the 45 s production hook timeout, so a hung adapter is still caught.
+  timeoutMs = 30_000,
   nodeOptions = process.env.NODE_OPTIONS,
 } = {}) {
   const envelope = typeof input === "string" ? input : {
