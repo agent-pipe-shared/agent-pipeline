@@ -1,0 +1,292 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 9de3f5ff2..b78e406ea 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1354,7 +1354,11 @@
+           "SAS17",
+           "SAS18",
+           "SAS19",
+-          "SAS20"
++          "SAS20",
++          "SAS21",
++          "SAS22",
++          "SAS23",
++          "SAS24"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index bf27a6329..7bcf54663 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -259,7 +259,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",295],
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",319], // cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 7c4f73f4e..2a31f0385 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -2,9 +2,9 @@
+ // Source-owned native physical observations. This module issues no authority brand.
+ import {createHash} from 'node:crypto';
+ import {spawnSync} from 'node:child_process';
+-import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync} from 'node:fs';
++import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
+ import {fileURLToPath} from 'node:url';
+-import {dirname,isAbsolute,resolve,sep} from 'node:path';
++import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ import {assertAdmissionDeadline} from './admission-deadline.mjs';
+@@ -62,14 +62,87 @@ const MEMO_MAX=512;
+ const MEMO_READ_ONLY=new Set(['inspect','ancestor','ancestor-above-root','read','read-source','inspect-source-image']);
+ const MEMO_MUTATING=new Set(['publish','create-directory','remove']);
+ const authorityMemo=new Map();
+-const authorityMemoCounters={hits:0,misses:0};
++const authorityMemoCounters={hits:0,misses:0,persistedHits:0};
++// Cross-process layer of the same memo. Every hook is a new process, and a dispatch or a refusal runs several of them, each re-observing the
++// same unchanged installed sources, directories and records (about one PowerShell start, 0.5 to 1 s, per observation on Windows). The layer
++// keeps only what this module itself observed and validated: a READ-ONLY observation, keyed as the in-process memo is, together with the
++// object's lstat identity (device, file id, mode, links, size, mtime, ctime, birthtime). A persisted entry answers only while the object's
++// CURRENT identity is equal to the stored one (a content write, an ACL or owner change and a replacement all change one of them), exactly the
++// check every in-process hit already makes, so a stale entry is never returned; it is then only a longer-lived copy of the same trust. The
++// file lives in the user's private application-data directory (not in the repository), is size-bounded, schema- and helper-bound, validated
++// entry by entry on load (a malformed or foreign entry is dropped, never trusted), written by an atomic rename after merging what another
++// process wrote meanwhile, and ignored entirely under PIPELINE_AUTHORITY_NO_MEMO=1. Any fault reading or writing it only means "no persisted
++// answer": the observation then runs as before.
++const PERSIST_SCHEMA='pipeline.authority-observation-memo.v1';
++const PERSIST_MAX_ENTRIES=1024,PERSIST_MAX_VALUE_BASE64=24576,PERSIST_MAX_FILE_BYTES=8*1024*1024,PERSIST_FLUSH_EVERY=24;
++const BASE64=/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
++let persisted=null,persistedDirty=0,persistedExitHook=false;
++const persistedDropped=new Set();
++function persistedFile(){
++ // A test that fakes the native spawn never touches the user's real file: it persists only when it names its own.
++ if(testSeam.spawn!==undefined||testSeam.memoFile!==undefined)return testSeam.memoFile??null;
++ const base=process.env.LOCALAPPDATA;
++ return typeof base==='string'&&isAbsolute(base)&&resolve(base)===base?join(base,'agent-pipeline','authority-observation-memo.v1.json'):null;
++}
++function persistedValueShape(operation,value){
++ if(!object(value)||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts))return false;
++ if(operation==='inspect-source-image')return exact(value,['ok','facts','size','sha256','committed'])&&Number.isSafeInteger(value.size)&&value.size>=0&&value.size<=134217728&&/^[a-f0-9]{64}$/u.test(value.sha256);
++ return exact(value,['ok','facts','bytes','committed'])&&typeof value.bytes==='string'&&value.bytes.length<=PERSIST_MAX_VALUE_BASE64&&BASE64.test(value.bytes);
++}
++function persistedEntryShape(row){
++ if(!exact(row,['key','path','identity','value'])||typeof row.key!=='string'||row.key.length>34000||typeof row.path!=='string'||!isAbsolute(row.path)||typeof row.identity!=='string'||!/^[0-9:]{1,200}$/u.test(row.identity))return false;
++ let parts;try{parts=JSON.parse(row.key);}catch{return false;}
++ return Array.isArray(parts)&&parts.length===5&&MEMO_READ_ONLY.has(parts[0])&&parts[1]===row.path&&persistedValueShape(parts[0],row.value);
++}
++function readPersistedFile(file){
++ const rows=new Map();
++ try{
++  const info=lstatSync(file);if(!info.isFile()||info.isSymbolicLink()||info.size>PERSIST_MAX_FILE_BYTES)return rows;
++  const data=JSON.parse(readFileSync(file,'utf8'));
++  if(!exact(data,['schema','helperSha256','entries'])||data.schema!==PERSIST_SCHEMA||data.helperSha256!==HELPER_SHA256||!Array.isArray(data.entries))return rows;
++  for(const row of data.entries.slice(-PERSIST_MAX_ENTRIES))if(persistedEntryShape(row))rows.set(row.key,{path:row.path,identity:row.identity,value:row.value});
++ }catch{/* no persisted answer */}
++ return rows;
++}
++function loadPersisted(){
++ if(persisted!==null)return persisted;
++ const file=persistedFile();persisted=file===null?new Map():readPersistedFile(file);
++ return persisted;
++}
++/** Writes the cross-process memo (merged with what another process wrote meanwhile) by an atomic rename. Runs at process exit and every few
++ * new entries; a fault is swallowed because the memo only ever saves work. */
++export function flushWindowsOwnedAuthorityBackendMemo(){
++ if(persisted===null||persistedDirty===0)return;
++ const file=persistedFile();if(file===null)return;
++ let temp=null;
++ try{
++  const merged=new Map(readPersistedFile(file));for(const key of persistedDropped)merged.delete(key);
++  for(const [key,entry] of persisted){merged.delete(key);merged.set(key,entry);}
++  const rows=[...merged].slice(-PERSIST_MAX_ENTRIES).map(([key,entry])=>({key,path:entry.path,identity:entry.identity,value:entry.value}));
++  const text=JSON.stringify({schema:PERSIST_SCHEMA,helperSha256:HELPER_SHA256,entries:rows});
++  if(Buffer.byteLength(text)>PERSIST_MAX_FILE_BYTES)return;
++  mkdirSync(dirname(file),{recursive:true,mode:0o700});
++  temp=`${file}.${process.pid}.tmp`;writeFileSync(temp,text,{flag:'w',mode:0o600});renameSync(temp,file);temp=null;persistedDirty=0;persistedDropped.clear();
++ }catch{/* the memo only saves work */}
++ finally{if(temp!==null){try{unlinkSync(temp);}catch{/* already gone */}}}
++}
++function rememberPersisted(key,request,identity,value){
++ if(typeof value?.bytes==='string'&&value.bytes.length>PERSIST_MAX_VALUE_BASE64)return;
++ if(!persistedValueShape(request.operation,value))return;
++ const rows=loadPersisted();rows.delete(key);rows.set(key,{path:request.path,identity,value});
++ while(rows.size>PERSIST_MAX_ENTRIES)rows.delete(rows.keys().next().value);
++ persistedDirty+=1;
++ if(testSeam.memoFile===undefined&&!persistedExitHook){persistedExitHook=true;process.once('exit',flushWindowsOwnedAuthorityBackendMemo);}
++ if(persistedDirty>=PERSIST_FLUSH_EVERY)flushWindowsOwnedAuthorityBackendMemo();
++}
+ let testSeam={platform:undefined,spawn:undefined};
+ // Test seam: only an explicit import can set it; the CLI never does. Defaults to the real platform and spawn.
+-export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn};}
+-export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();}
++export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn,memoFile:seam?.memoFile};persisted=null;persistedDirty=0;persistedDropped.clear();}
++// Clears the in-process memo and forgets the loaded cross-process copy (a new process starts with neither; the file itself stays).
++export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();persisted=null;persistedDirty=0;persistedDropped.clear();}
+ export function nativeAuthorityStats(){
+  const byOperation={};for(const name of [...nativeAuthorityByOperation.keys()].sort())byOperation[name]=nativeAuthorityByOperation.get(name);
+- return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoSize:authorityMemo.size};
++ return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
+ }
+ function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
+ // A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
+@@ -80,6 +153,8 @@ function forgetMemoAround(written){
+  // Paths compare without case: a case-insensitive file system may spell one object two ways, and dropping too much is harmless.
+  const folded=written.toLowerCase(),parent=dirname(folded),below=folded.endsWith(sep)?folded:folded+sep;
+  for(const [key,entry] of authorityMemo){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below))authorityMemo.delete(key);}
++ // The cross-process copy follows (hygiene only: a hit there is identity-checked anyway, and a write changes the identity of what it touched).
++ if(persisted!==null)for(const [key,entry] of persisted){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below)){persisted.delete(key);persistedDropped.add(key);persistedDirty+=1;}}
+ }
+ function invoke(request){
+  const operation=request.operation;
+@@ -89,12 +164,18 @@ function invoke(request){
+  const before=memoIdentity(request.path);
+  const entry=authorityMemo.get(key);
+  if(entry!==undefined){if(before!==null&&entry.identity===before){authorityMemoCounters.hits+=1;return entry.value;}authorityMemo.delete(key);}
++ // Another process may have observed this very object, unchanged, a moment or hours ago: its entry answers only for the same identity.
++ const stored=before===null?undefined:loadPersisted().get(key);
++ if(stored!==undefined){
++  if(stored.identity===before&&stored.path===request.path){authorityMemoCounters.hits+=1;authorityMemoCounters.persistedHits+=1;authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value:stored.value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);return stored.value;}
++  persisted.delete(key);
++ }
+  authorityMemoCounters.misses+=1;
+  // A read-only observation is the unit of cost on Windows (one PowerShell start); the admission deadline stops a long run of them. Never on
+  // the mutating operations above: publish, remove and create-directory are the cleanup path and must always be allowed to finish.
+  assertAdmissionDeadline();
+  const value=invokeNative(request);
+- if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);}
++ if(before!==null&&memoIdentity(request.path)===before){authorityMemo.delete(key);authorityMemo.set(key,{identity:before,value,path:request.path});while(authorityMemo.size>MEMO_MAX)authorityMemo.delete(authorityMemo.keys().next().value);rememberPersisted(key,request,before,value);}
+  return value;
+ }
+ function invokeNative(request){
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 2a4b2941e..6af2d4f30 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -15,7 +15,7 @@ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+ import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
+ import * as pipelineState from "./pipeline-state.mjs";
+ import { fileURLToPath } from "node:url";
+-import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
++import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+@@ -28,8 +28,9 @@ import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+ 
+ // Memo cases (SAS09..SAS17): a fake native spawn on a real temp file; the real PowerShell exists only on Windows.
+ const MEMO_FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
+-function memoFixture(run, { hook, refuse = false, bytes = "hello" } = {}) {
++function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = false } = {}) {
+   const dir = mkdtempSync(join(tmpdir(), "authority-memo-"));
++  const memoFile = persist ? join(dir, "observation-memo.json") : undefined;
+   const calls = [];
+   const spawn = (_executable, _args, options) => {
+     const request = JSON.parse(options.input);
+@@ -39,9 +40,9 @@ function memoFixture(run, { hook, refuse = false, bytes = "hello" } = {}) {
+       : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
+     return { status: 0, signal: null, stderr: "", stdout: JSON.stringify(body) };
+   };
+-  setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn });
++  setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn, memoFile });
+   resetWindowsOwnedAuthorityBackendMemo();
+-  try { return run({ dir, calls, file: join(dir, "a.txt") }); }
++  try { return run({ dir, calls, file: join(dir, "a.txt"), memoFile }); }
+   finally { setWindowsOwnedAuthorityBackendTestSeam(undefined); resetWindowsOwnedAuthorityBackendMemo(); delete process.env.PIPELINE_AUTHORITY_NO_MEMO; rmSync(dir, { recursive: true, force: true }); }
+ }
+ 
+@@ -791,6 +792,88 @@ const cases = [
+     assert.equal(calls.at(-1), "read");
+     assert.equal(calls.length, before + 3);
+   }) },
++  // ---- cross-process layer: a later hook process answers from what an earlier one observed, only for the same object identity ----
++  { id: "SAS21", name: "authority memo (11) a new process answers an unchanged object from the persisted observation of an earlier one, with no native start", run: () => memoFixture(({ calls, file, memoFile }) => {
++    writeFileSync(file, "one");
++    const first = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.deepEqual(calls, ["read", "inspect"]);
++    flushWindowsOwnedAuthorityBackendMemo();
++    assert.equal(existsSync(memoFile), true);
++    // A new process: nothing in memory, the file stays.
++    resetWindowsOwnedAuthorityBackendMemo();
++    const before = nativeAuthorityStats();
++    const second = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.deepEqual(calls, ["read", "inspect"], "no new native start");
++    assert.deepEqual(second.bytes, first.bytes);
++    assert.equal(second.nativeFacts, first.nativeFacts);
++    assert.equal(nativeAuthorityStats().authorityMemoPersistedHits - before.authorityMemoPersistedHits, 2);
++  }, { persist: true }) },
++  { id: "SAS22", name: "authority memo (12) a persisted observation answers only for the identical identity: a changed size, mtime or a replaced file spawns again", run: () => memoFixture(({ dir, calls, file, memoFile }) => {
++    writeFileSync(file, "one");
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    writeFileSync(file, "longer content now");
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.equal(calls.length, 2, "a changed size is a miss");
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    utimesSync(file, new Date(1_000_000_000_000), new Date(1_000_000_000_000));
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.equal(calls.length, 3, "a touched mtime is a miss");
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    assert.equal(calls.length, 3, "the unchanged identity answers from the file again");
++    const kept = readFileSync(memoFile, "utf8");
++    assert.match(kept, /pipeline\.authority-observation-memo\.v1/u);
++    assert.equal(existsSync(`${memoFile}.${process.pid}.tmp`), false, "no temporary file is left behind");
++  }, { persist: true }) },
++  { id: "SAS23", name: "authority memo (13) a corrupt, foreign or tampered persisted file is ignored entry by entry and never trusted", run: () => memoFixture(({ calls, file, memoFile }) => {
++    writeFileSync(file, "one");
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    flushWindowsOwnedAuthorityBackendMemo();
++    const good = JSON.parse(readFileSync(memoFile, "utf8"));
++    const attempt = (data) => {
++      writeFileSync(memoFile, typeof data === "string" ? data : JSON.stringify(data));
++      resetWindowsOwnedAuthorityBackendMemo();
++      const before = calls.length;
++      inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++      return calls.length - before;
++    };
++    assert.equal(attempt("{ not json"), 1, "malformed JSON");
++    assert.equal(attempt({ ...good, schema: "other" }), 1, "foreign schema");
++    assert.equal(attempt({ ...good, helperSha256: "0".repeat(64) }), 1, "another helper build");
++    assert.equal(attempt({ ...good, extra: true }), 1, "an unknown top-level key");
++    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, extra: 1 } })) }), 1, "a value with an unknown key");
++    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, facts: "not-facts" } })) }), 1, "facts that are not facts");
++    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, path: `${row.path}x` })) }), 1, "a path that is not the key's path");
++    assert.equal(attempt({ ...good, entries: good.entries.map((row) => ({ ...row, key: JSON.stringify(["publish", row.path, null, null, null]) })) }), 1, "a mutating operation is never persisted");
++    // The untampered file still answers (control).
++    assert.equal(attempt(good), 0, "the valid file answers");
++  }, { persist: true }) },
++  { id: "SAS24", name: "authority memo (14) PIPELINE_AUTHORITY_NO_MEMO=1 ignores the persisted file; a write drops the persisted entries of what it touches", run: () => memoFixture(({ calls, file, memoFile }) => {
++    writeFileSync(file, "one");
++    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    process.env.PIPELINE_AUTHORITY_NO_MEMO = "1";
++    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    assert.equal(calls.length, 2, "the opt-out spawns although the file holds the observation");
++    delete process.env.PIPELINE_AUTHORITY_NO_MEMO;
++    resetWindowsOwnedAuthorityBackendMemo();
++    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    assert.equal(calls.length, 2, "without the opt-out the persisted observation answers");
++    publishWindowsOwnedAuthorityFile({ path: file, bytes: Buffer.from("x"), expectedSha256: null, expectedFacts: null });
++    flushWindowsOwnedAuthorityBackendMemo();
++    resetWindowsOwnedAuthorityBackendMemo();
++    const before = calls.length;
++    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
++    assert.equal(calls.length, before + 1, "a persisted entry of a written object is gone (and its identity changed as well)");
++    assert.equal(existsSync(memoFile), true);
++  }, { persist: true }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

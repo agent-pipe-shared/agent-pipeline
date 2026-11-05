@@ -1,0 +1,72 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 165243b6e..ca5553d01 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -38,7 +38,7 @@ const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.m
+ /** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
+  * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
+ function orphanReservationRepair(sliceId) {
+-  return `a native dispatch state still names slice ${sliceId} although the queue has no row for it (the queue file was restored or replaced after the dispatch started), so a cancel has nothing to change. If no Goldfish runs for it: node ${ROUTINE_REPAIR_SCRIPT} run heal --root <root> --reason "<why>"; when heal defers because a member is still armed, node ${ROUTINE_REPAIR_SCRIPT} run move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted)`;
++  return `a native dispatch state still names slice ${sliceId} although the queue has no row for it (the queue file was restored or replaced after the dispatch started), so a plain cancel has nothing to change. If its Goldfish no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>" ${cancelClassArg()} (${cancelClassTeaching()}). With --started you assert that no Goldfish runs for it; the missing queue row is then re-created as cancelled from the dispatch state, its reservation stops blocking and its write scope is no longer protected`;
+ }
+ // D75: every cancel names why the slice ends. The argument and the one-line teaching of each class are shared by all cancel repairs.
+ // Lazy on purpose: slice-queue.mjs and this module import each other, so the vocabulary is read at call time, never at load time.
+@@ -1314,10 +1314,24 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
+       const row=raw.slices.find(entry=>entry.id===sliceId);
+       if(!row){
+-        let named=false;
+-        try{named=readNativeManagedInventory(repository,'native-goldfish')[0].entries.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId);}
++        let named=null;
++        try{named=readNativeManagedInventory(repository,'native-goldfish')[0].entries.find(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId)??null;}
+         catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
+-        return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`,...(named?{repair:orphanReservationRepair(sliceId)}:{})};
++        if(named===null||started!==true)return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`,...(named!==null?{repair:orphanReservationRepair(sliceId)}:{})};
++        // The queue file was restored or replaced after the dispatch started: its row is gone, the dispatch state still reserves the slice, and no
++        // cancel, heal or move-aside could release that. On the caller's word that no Goldfish runs for it (--started) the missing row is
++        // re-created as a CANCELLED one from the dispatch state alone (never from the current plan approval, which may be stale), so the one
++        // settlement definition (a cancelled row of the governed queue) releases the reservation, and the trace stays in the tracked queue file.
++        const state=named.value,scope=Array.isArray(state.delivery?.writeScope)&&state.delivery.writeScope.length?state.delivery.writeScope:(state.binding?.allowedPaths??[]);
++        const criterionId=state.binding?.itemDelivery?.criterionLocator?.criterionId;
++        const orphanRow={id:sliceId,title:`orphan reservation of ${isSafeTaskId(criterionId)?criterionId:sliceId}`.slice(0,120),state:'cancelled',holdReason:reason.trim(),cancelClass:classVerdict.cancelClass,dependsOn:[],
++          writeScope:[...scope],tier:'implementor',commitMode:'host-commit',loadClass:'light',
++          delivery:{itemId:state.delivery.itemId,criteria:[isSafeTaskId(criterionId)?criterionId:sliceId],baseCommit:state.binding?.candidateCommit}};
++        raw.slices.push(orphanRow);
++        if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-orphan-row-invalid');
++        writeGovernedQueue(path,preimage,raw);
++        return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released:[],queuePath:governed.path,started:true,orphan:true,
++          note:'the queue had no row for this started slice; it was re-created as cancelled from the dispatch state on the caller\'s word that no Goldfish runs for it, so its reservation no longer blocks and its write scope is no longer protected'};
+       }
+       if(row.state==='cancelled')return {status:'refused',code:'SQ-ITEM-CANCEL-ALREADY',reason:`slice ${sliceId} is already cancelled`};
+       if(row.tier==='critic')return {status:'refused',code:'SQ-ITEM-CANCEL-CRITIC',reason:`slice ${sliceId} is the shared critic slice; it is not cancelled with this verb`};
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index ec8a41a9e..2306e16c7 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1280,10 +1280,24 @@ const cases = [
+     // to change, and the refusal must name a repair that can really be run (heal, then move-aside when heal defers), not only "not found".
+     const queueRaw=JSON.parse(readFileSync(queuePath,'utf8'));queueRaw.slices=queueRaw.slices.filter(entry=>entry.id!=='ITEM-AC-3');
+     writeFileSync(queuePath,`${JSON.stringify(queueRaw,null,2)}\n`);
+-    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
++    const orphan=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',cancelClass:'budget'});
+     assert.equal(orphan.code,'SQ-NOT-FOUND',JSON.stringify(orphan));
+-    assert.match(orphan.repair,/routine-repair\.mjs run heal --root <root>/u);assert.match(orphan.repair,/routine-repair\.mjs run move-aside --no-goldfish-running --root <root>/u);
++    // The repair names the one command that can really be run: the started cancel (heal defers while the member is armed, move-aside refuses an
++    // open item reservation), not the routine repairs.
++    assert.match(orphan.repair,/slice-queue\.mjs cancel ITEM-AC-3 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
++    assert.doesNotMatch(orphan.repair,/routine-repair\.mjs/u);
+     assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).repair,undefined,'a slice no dispatch state names gets no repair text');
++    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'NEVER-QUEUED',reason:'unknown',started:true,cancelClass:'budget'}).code,'SQ-NOT-FOUND','and nothing is re-created for it');
++    // While the orphan reservation stands, a new slice over the same write scope is refused; on the caller's word (--started) the missing row is
++    // re-created as a cancelled one from the dispatch state, and the reservation stops blocking.
++    const blocked=dispatch('ITEM-AC-4','DELIVER-AC-4','native-tool-four',candidate);
++    assert.notEqual(blocked.ok,true,JSON.stringify(blocked));
++    const released=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'its queue row is gone',started:true,cancelClass:'budget'});
++    assert.equal(released.status,'cancelled',JSON.stringify(released));assert.equal(released.orphan,true);assert.equal(released.started,true);
++    assert.equal(row('ITEM-AC-3').state,'cancelled');assert.equal(row('ITEM-AC-3').cancelClass,'budget');assert.deepEqual(row('ITEM-AC-3').writeScope,['src/change.mjs']);
++    assert.equal(cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-3',reason:'again',started:true,cancelClass:'budget'}).code,'SQ-ITEM-CANCEL-ALREADY','a second call finds the cancelled row');
++    const fourth=dispatch('ITEM-AC-4','DELIVER-AC-4','native-tool-four',candidate);
++    assert.equal(fourth.ok,true,JSON.stringify(fourth));
+   })},
+ 
+   { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {

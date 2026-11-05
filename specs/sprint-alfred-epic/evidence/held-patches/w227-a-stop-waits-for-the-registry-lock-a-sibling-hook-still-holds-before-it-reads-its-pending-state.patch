@@ -1,0 +1,88 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index b78e406ea..224e69c86 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -309,6 +309,7 @@
+           "D177-rollback-runs-under-its-own-later-deadline",
+           "D177-slow-phase-releases-lock",
+           "D177-source-digest-read-once-per-identity",
++          "D177-stop-pending-read-waits-for-a-held-registry-lock",
+           "D177-trace-progress-native-observation-sites",
+           "D177-trace-progress-survives-a-killed-hook",
+           "NGHS01",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index db737401c..9e10874ee 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -3,7 +3,7 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
+ import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld } from './native-goldfish-host-state.mjs';
++import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS } from './native-goldfish-host-state.mjs';
+ import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
+ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
+ import { parseStrictJson } from './governance-event.mjs';
+@@ -435,7 +435,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
+ 
+   // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
+-  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: 5000, ...(dependencies.lockWait ?? {}) }); }
++  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}) }); }
+   catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
+ 
+   let committed;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index ca5553d01..36cd50c1d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -416,10 +416,15 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
+ }
+ 
+ /** Read the pending Claude or Codex dispatch selected by the exact stop event. */
+-export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId } = {}) {
++// A stop reads its pending state through the registry, whose lock a sibling hook of the same dispatch (the launching hook, a guard, another stop)
++// may still hold: one lock cycle takes 60 to 100 s on Windows. Answering "the pending state is missing" at the first held lock (live on Windows
++// with 19f: NGHF-PENDING-UNAVAILABLE, reason registry-lock-held) lost a Goldfish's delivery although the pending state existed. The read waits for
++// the lock, bounded well inside the 300 s stop hook budget; only a lock still held after that is reported, with the same reason as before.
++export const NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS = 90_000;
++export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait } = {}) {
+   if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return fail("NGHS-READ-INPUT");
+   try {
+-    const stored = readPrivate(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`));
++    const stored = retryWhileSessionAuthorityLockHeld(() => read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`)), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}) });
+     const state = stored.value;
+     if (!nativeStateSchema(state.schema) || state.runner !== runner
+       || state.sessionId !== sessionId || state.toolUseId !== correlationId
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 2306e16c7..800c2d0ba 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -299,6 +299,27 @@ const cases = [
+       assert.equal(reads, 2, "a refused path reads nothing");
+     } finally { rmSync(dir, { recursive: true, force: true }); }
+   } },
++  { id: "D177-stop-pending-read-waits-for-a-held-registry-lock", name: "a stop's read of its pending state waits for a registry lock a sibling hook still holds (bounded) instead of reporting the state missing; a lock still held after the budget is reported with its reason, and any other fault is not retried", run: async () => {
++    const mod = await import("./native-goldfish-host-state.mjs");
++    const value = { schema: mod.NATIVE_GOLDFISH_HOST_STATE_SCHEMA, runner: "claude", sessionId: "s1", toolUseId: "t1", binding: { candidateCommit: "a".repeat(40) } };
++    const held = () => Object.assign(new Error("registry-lock-held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
++    const clock = (start = 0) => { let at = start; return { sleep: (ms) => { at += ms; }, now: () => at }; };
++    const input = { commonDir: "unused", runner: "claude", sessionId: "s1", correlationId: "t1" };
++    // The lock is held for the first two reads and free for the third.
++    let calls = 0;
++    const waited = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; if (calls < 3) throw held(); return { value, sha256: "b".repeat(64) }; }, lockWait: clock() });
++    assert.equal(waited.ok, true, JSON.stringify(waited));assert.equal(calls, 3, "two held reads were waited for");
++    // A lock that stays held past the budget is reported exactly as before (the code the stop-failure record names), not hidden.
++    calls = 0;
++    const stuck = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; throw held(); }, lockWait: clock() });
++    assert.equal(stuck.ok, false);assert.equal(stuck.code, "NGHS-PENDING-MISSING");assert.equal(stuck.reason, "registry-lock-held");
++    assert.ok(calls > 3, "the read was retried until the budget ended");
++    // Any other fault is not waited for.
++    calls = 0;
++    const absent = mod.readNativeGoldfishPending({ ...input, read: () => { calls += 1; throw Object.assign(new Error("gone"), { code: "ENOENT" }); }, lockWait: clock() });
++    assert.equal(absent.code, "NGHS-PENDING-MISSING");assert.equal(calls, 1, "a missing file is not retried");
++    assert.ok(mod.NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS >= 60_000 && mod.NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS < 300_000, "the wait fits inside the 300 s stop hook");
++  } },
+   { id: "D177-trace-progress-native-observation-sites", name: "D177 with the authority trace on, every native observation appends a mark with its operation, duration and the nearest callers outside the native modules (file:line only); without a writer nothing is computed", run: async () => {
+     const backend = await import("./windows-owned-authority-backend.mjs");
+     const writerKey = Symbol.for("pipeline.authority-trace-progress");

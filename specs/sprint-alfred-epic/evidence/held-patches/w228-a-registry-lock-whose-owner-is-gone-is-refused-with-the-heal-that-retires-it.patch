@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 86f36eb3a..2cf700003 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -998,7 +998,9 @@ export function generateDispatchBinding(options, deps = {}) {
+     while ((lock?.status === "held" && lock.owner !== "dead") && now() < deadline) { pause(50); waited = true; lock = lockOf(root); }
+     if (lock?.status === "held") {
+       const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
+-      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: retry this command; to wait longer run \`node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120\`; if the owner is gone or cannot be judged run \`... release-lock --root <repo> --no-pipeline-running --reason "<why>"\``);
++      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: ${lock.owner === "dead"
++        ? "the owner is gone, so no wait will clear this: run `node <plugin-root>/scripts/session-authority-repair.mjs heal --root <repo>` (it retires a lock whose owner is provably gone), then retry this command"
++        : "retry this command; to wait longer run `node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120`; if the owner cannot be judged run `... release-lock --root <repo> --no-pipeline-running --reason \"<why>\"`"}`);
+     }
+     if (waited || observationFault === "SDC-LOCK-HELD") {
+       observeOnce();
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 95c53ada1..212b4471c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -437,6 +437,12 @@ test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder
+   assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
+   assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
+   assert.equal(result.skeleton, undefined);
++  // A lock whose owner is provably gone is not waited for and not answered with "wait": the refusal names the heal that retires it (live on
++  // Windows: a hook killed at the host limit left a lock "dead for 37230s" and the briefing named wait and release-lock only).
++  const dead = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: unavailableObserver, snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
++    registryLock: () => heldLock({ owner: "dead", ageSeconds: 37230 }), now: () => 0, pause: () => { throw new Error("a dead owner is never waited for"); } }));
++  assert.equal(dead.code, "DBG-RULESET-LOCK-HELD", dead.message);
++  assert.match(dead.message, /the owner is gone/u); assert.match(dead.message, /session-authority-repair\.mjs heal --root <repo>/u); assert.doesNotMatch(dead.message, /session-authority-repair\.mjs wait/u);
+ });
+ 
+ test("K12 a lock that clears within the wait changes nothing: the identity is read again and the loaded one is used", async () => {
