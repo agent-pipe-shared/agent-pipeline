@@ -5000,11 +5000,12 @@ function consumeHumanGuardOverrideCore({
   // anything. Entering its boundary first takes the registry lock and reads the whole registry (about a hundred native process starts, two
   // minutes, on Windows) just to find an empty directory, and every refused command with no armed capability paid that before its
   // refusal could be printed. This is the same plain directory read the consumption starts with, made before the boundary instead of
-  // inside it; it creates nothing. A directory that cannot be read answers `absent` there too.
+  // inside it; it creates nothing. Only a directory that is not there answers `absent` here; a file where a directory belongs
+  // (ENOTDIR) or any other fault is a persistence anomaly and goes on to the boundary, which fails closed with its typed code.
   try {
     if (!readdirSync(join(repo.common, "agent-pipeline", "human-guard-overrides", "capabilities")).some((name) => name.endsWith(".json"))) return { status: "absent" };
   } catch (error) {
-    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return { status: "absent" };
+    if (error?.code === "ENOENT") return { status: "absent" };
   }
   return hgoConsumptionBoundary(repo, () => {
   const paths = storage(repo.common);
