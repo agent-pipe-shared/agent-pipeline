@@ -305,7 +305,12 @@
           "D177-b-member-records-once-per-admission",
           "D177-c-batch-member-records-equal-single",
           "D177-differential-settled",
+          "D177-registry-lock-vanished-between-listing-and-stat",
+          "D177-rollback-runs-under-its-own-later-deadline",
           "D177-slow-phase-releases-lock",
+          "D177-source-digest-read-once-per-identity",
+          "D177-trace-progress-native-observation-sites",
+          "D177-trace-progress-survives-a-killed-hook",
           "NGHS01",
           "NGHS02",
           "NGHS03",
@@ -1348,7 +1353,8 @@
           "SAS16",
           "SAS17",
           "SAS18",
-          "SAS19"
+          "SAS19",
+          "SAS20"
         ],
         "maxBytes": 65536
       }
@@ -2299,7 +2305,8 @@
           "GD79",
           "GD80",
           "GD81",
-          "GD82"
+          "GD82",
+          "GD83"
         ],
         "maxBytes": 65536
       },

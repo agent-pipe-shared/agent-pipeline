@@ -37,7 +37,10 @@ function withRoot(body) {
 // One row per shape of ADMITTED_GRAMMAR_SHAPES (same order). A shape the PowerShell dialect must refuse says why; the walk fails when a shape is added
 // to the Bash table without a row here, so the two dialects cannot drift apart silently.
 const SHAPE_DISPOSITION = [
-  { bashOnly: "rg, cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands; reads there are Get-Content, Get-ChildItem or the native Read, Glob and Grep tools. The git part of this shape is walked by the git cases below" },
+  // E7 (9b0935da5): the PowerShell tool admits a single read-only rg exactly like the Bash grammar, so the plain-singleton shape is admitted in both dialects.
+  // cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands; reads there are Get-Content, Get-ChildItem or the native
+  // Read, Glob and Grep tools. The git part of this shape is walked by the git cases below.
+  { bashOnly: "cat, head, tail, wc, stat and the other coreutils singletons are not PowerShell commands (a read-only rg is admitted, E7)", psExitCode: 0 },
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
@@ -50,7 +53,8 @@ test("every shape of the Bash grammar table has a disposition, and a Bash-only s
   ADMITTED_GRAMMAR_SHAPES.forEach((shape, index) => {
     assert.equal(isReadOnlyDiagnosticCommand(shape.example, root), true, `Bash admits its own example: ${shape.example}`);
     assert.equal(typeof SHAPE_DISPOSITION[index].bashOnly, "string");
-    assert.equal(ps(shape.example).exitCode, 2, `Bash-only shape stays refused: ${shape.example}`);
+    const expected = SHAPE_DISPOSITION[index].psExitCode ?? 2;
+    assert.equal(ps(shape.example).exitCode, expected, expected === 2 ? `Bash-only shape stays refused: ${shape.example}` : `shape the PowerShell dialect admits like Bash: ${shape.example}`);
   });
 }));
 
