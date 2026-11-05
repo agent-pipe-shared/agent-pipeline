@@ -119,6 +119,22 @@ Three Full Verify runs on clean single-remote clones of the chain (`--mode candi
 
 This is Linux evidence only. It says nothing about the Windows latency: the estimates in 2g stay reasoning until the peer measures a stamped build.
 
+## 2i. Measurement 3 (Windows, installed 19e `0.7.0+claude.20261105060619.eb4e31a`, 2026-11-05)
+
+Raw counters from the joint session (peer trace, pids 3412 and 11712):
+
+| Case | Result |
+|---|---|
+| Refused Bash command (`GUARD-REDIRECT-UNAPPROVED`, redirect to a scratch file) | 102.4 s, 189 native starts; `hgo-start` only at 83.9 s, then 8.5 s publish wait. The cost is the consumption attempt before the denial is recorded |
+| Allowed compound command, ordinary Read/Bash hooks | no natives, 0.5 to 1.0 s |
+| Dispatch A (probe) | no longer killed at 330 s: typed block `SDC-AUTHORITY-UNAVAILABLE` / `item-delivery-scope-collision` at about 102 s, 133 starts in 106.6 s; 61.5 s pass before `prepare-start` (one whole lock cycle, 103 starts) |
+
+Cause of the first row (confirmed by the peer's count of the capabilities directory: exactly one file, `status` consumed): w219 answered `absent` before the registry boundary only for a capabilities directory with no `*.json` file at all, but a used capability stays on disk as `consumed`. The shortcut never fired on any machine that had run a ceremony (this Linux clone holds dozens). w224 decides `absent` from plain reads: no readable file is an armed capability for the call's tool (the consumption itself skips such files before any lock). Held as 19f, applied by the PO, stamped `0.7.0+claude.20261105062725.c2c3292`; not yet measured on Windows.
+
+Dispatch A: the estimate "about 130 starts" holds (133), the time does not (106 s at about 0.5 s per start); the deadline marks (245 s, 295 s) were never reached, so w220 is still unproven in its real case. The 61.5 s before `prepare-start` and the seven lock cycles of the whole hook (`registry:305` x7, `315` x7, `349` x7) are the three-cycle design item; it is the next lever after w224.
+
+Repair cycle found in the same session (a defect of the w213 repair text, not built yet): after the peer restored the queue file (`git restore`) the slice `gf-probe-1` had no queue row but its native pending state remained. `inspect` names `slice-queue cancel gf-probe-1 --started`; that answers `SQ-NOT-FOUND` and names `routine-repair run heal` and then `move-aside`; `heal` answers `healed` but defers (`settledPending.deferred`, a member is armed); `move-aside` is refused `RR-OUTSIDE-LIST` because an open item reservation is not on its closed list. So the loop has no runnable end. `move-aside` moves only the registry aside; the pending file in `run/native-goldfish-host-commit` stays, so whether it would release the reservation is unverified. The sound fix needs the settlement of an orphaned reservation on the caller's word (`--started`), for example re-creating the missing row as a cancelled one from the pending state's delivery contract, or a recorded orphan settlement read by `settledItemSlices`; it touches the queue schema or the native namespace, so it is a designed change with a native-state fixture test, not a text edit. Workaround until then: probe slices with a write scope disjoint from the orphan's.
+
 ## 3. Measurement needed first
 
 The opt-in authority trace already counts native spawns (`nativeAuthorityStats`: count, ms, maxMs, byOperation, memo hits and misses). The Windows session starts the runner from a shell with `PIPELINE_AUTHORITY_TRACE=1` and `PIPELINE_AUTHORITY_TRACE_FILE` set (PO yes in that chat), runs ONE dispatch, and reports the `pipeline.hook-authority-trace.v1` lines, the number of reservations (`session-authority-repair.mjs inspect`), and the per-phase times. Decision rule:
