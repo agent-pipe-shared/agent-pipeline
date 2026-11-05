@@ -18,9 +18,10 @@ step2() {
   git commit --no-verify -m "$2" -m $'AI-Assisted: true\nDispatch: stage-0 (elephant)'
   echo "applied $1"
 }
-# w235 needs w233 and w234 first.
+# w235 needs w233 and w234 first. (The history is read into a variable: grep -q on a pipe would end git log early, and pipefail would read that as a failure.)
+history=$(git log --format=%s)
 for need in "fix(dispatch): the governed queue preparation of a second launch waits for a sibling's registry lock within the admission deadline" "fix(stop): a SubagentStop that meets the registry lock waits for it, the stop-failure record names the holder and the stop hooks are traced"; do
-  git log --format=%s | grep -Fxq -- "$need" || { echo "run po-apply-0.7-candidate19h.sh first (missing: $need)"; exit 2; }
+  grep -Fxq -- "$need" <<<"$history" || { echo "run po-apply-0.7-candidate19h.sh first (missing: $need)"; exit 2; }
 done
 step2 w235-the-cross-process-memo-keeps-the-byte-less-inspect-and-ancestor-observations "perf(authority): the cross-process memo keeps the byte-less inspect and ancestor observations, and the trace reports persisted hits"
 
