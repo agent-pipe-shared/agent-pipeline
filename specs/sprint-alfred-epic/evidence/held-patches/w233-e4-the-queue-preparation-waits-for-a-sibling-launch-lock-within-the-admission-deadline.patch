@@ -1,0 +1,171 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 307db0fd9..45cae878f 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -376,7 +376,9 @@
+           "NGHS62",
+           "NGHS63",
+           "NGHS64",
+-          "NGHS65"
++          "NGHS65",
++          "NGHS66",
++          "NGHS67"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index af351da53..3c2e1bb66 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -90,6 +90,8 @@ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, res
+ // run first, and on Windows loading them is part of the time the host's hook timeout counts. performance.timeOrigin is the epoch
+ // millisecond at which the process started.
+ const HOOK_ENTRY_MS = Math.round(performance.timeOrigin);
++// GD73: the one admission budget of this hook (the queue preparation and the host-state preparation share it).
++const ADMISSION_BUDGET_MS = 300000;
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+ import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
+@@ -958,7 +960,9 @@ if (isDirectInvocation(import.meta.url)) {
+     if(productive.length===1) {
+       const parsed=parseNativeGoldfishBriefing(productive[0].dispatch.prompt);
+       if(parsed.ok&&parsed.binding.itemDelivery)governed=prepareGovernedItemQueue({root:courseRoot,itemDelivery:parsed.binding.itemDelivery,
+-        candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths});
++        candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths,
++        // E4: the queue preparation waits for a sibling launch's registry lock within this hook's admission deadline.
++        admissionDeadline:{startMs:HOOK_ENTRY_MS,budgetMs:ADMISSION_BUDGET_MS}});
+       // PF-55: a dispatch refused by any later check leaves the queue as it was, never a phantom row.
+       if(governed.written){
+         const written=governed.written,sliceId=parsed.binding.itemDelivery.sliceId;
+@@ -1107,7 +1111,7 @@ if (isDirectInvocation(import.meta.url)) {
+             admissionProgress("prepare-attempt");
+             const attempt = prepareNativeGoldfishHostState({
+               root: rootDir, runner: nativeRunner, input,
+-              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
++              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: ADMISSION_BUDGET_MS },
+               subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
+             });
+             envelopeFailedPath = lastWindowsAuthorityFailedPath();
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 40edeb1b2..01a8aade4 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1168,8 +1168,12 @@ manualCheck("GD72 an unchanged retry of a refused Plan dispatch in the same sess
+ const ADMISSION_BUDGET_MS = 300000;
+ manualCheck("GD73 the admission deadline handed to the host-state preparation is 300000 ms (one literal in the guard)", () => {
+   const source = readFileSync(GUARD, "utf8");
+-  const found = [...source.matchAll(/admissionDeadline:\s*\{\s*startMs:\s*HOOK_ENTRY_MS,\s*budgetMs:\s*(\d+)\s*\}/gu)].map((match) => Number(match[1]));
+-  assert.deepEqual(found, [ADMISSION_BUDGET_MS], `admission deadline literals: ${JSON.stringify(found)}`);
++  // E4 (19g): the queue preparation shares the deadline, so the one literal is a named constant both sites read.
++  const literals = [...source.matchAll(/const ADMISSION_BUDGET_MS = (\d+);/gu)].map((match) => Number(match[1]));
++  assert.deepEqual(literals, [ADMISSION_BUDGET_MS], `admission budget constants: ${JSON.stringify(literals)}`);
++  assert.equal([...source.matchAll(/budgetMs:\s*\d+/gu)].length, 0, "no admission deadline carries its own literal");
++  const sites = [...source.matchAll(/admissionDeadline:\s*\{\s*startMs:\s*HOOK_ENTRY_MS,\s*budgetMs:\s*ADMISSION_BUDGET_MS\s*\}/gu)].length;
++  assert.equal(sites, 2, `the queue preparation and the host-state preparation both read the constant (${sites} sites)`);
+ });
+ manualCheck("GD74 the shipped hooks.json timeout of the dispatch guard is at least the admission budget plus 20 s", () => {
+   const hooks = JSON.parse(readFileSync(join(dirname(GUARD), "hooks.json"), "utf8"));
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index a8b5e555d..eb89bb0ef 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -281,7 +281,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   checkpoint("queue-resolve");
+   const deliveryQueue = binding.itemDelivery
+     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
+-      candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
++      candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths,admissionDeadline,publishRetry:dependencies.publishRetry})
+     : resolveGovernedItemQueue({ root: root ?? input.cwd ?? process.cwd() });
+   if (deliveryQueue.written) written.push(deliveryQueue.written);
+   if (deliveryQueue.status === "refused") return { ...fail(deliveryQueue.code), ...(deliveryQueue.reason ? { reason: deliveryQueue.reason } : {}), ...(deliveryQueue.repair ? { repair: deliveryQueue.repair } : {}) };
+@@ -1143,7 +1143,7 @@ export function orderAndCoverAdmittedSlice(raw,sliceId,baseCommit) {
+ /** Automatic approved-course continuation. Selection metadata cannot approve a
+  * plan or mint a requester; the Source observers and original bytes do both
+  * checks before any lifecycle write under the existing authority lock. */
+-export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope}={}) {
++export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope,admissionDeadline=null,publishRetry}={}) {
+   try {
+     // Critic F1 (PF-47): every refusal names its cause and the repair, so the guard never falls back to a transport text.
+     const regenerate='regenerate the binding at the current HEAD with dispatch-briefing.mjs binding and paste its block unchanged';
+@@ -1156,7 +1156,9 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT',reason:`the binding names candidate ${String(candidate?.commit).slice(0,12)}, HEAD is ${String(repository.candidate?.commit).slice(0,12)}, and the commits between touch its paths`,repair:regenerate};
+     if(!Array.isArray(writeScope)||!writeScope.length||writeScope.some(path=>!normalizeScope(path).ok||!itemDelivery.checks.some(check=>check.dependencies.includes(path))))
+       return {status:'refused',code:'SQ-ITEM-SCOPE-INVALID',reason:'an allowed path is missing, not repository-relative, or not a dependency of the item check',repair:regenerate};
+-    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
++    // E4 (Windows 19g measurement): a second launch in the same reply met the first launch's lock here and gave up after the 10 s default,
++    // although the admission deadline had minutes left. With an admission deadline the wait is what remains of it (retryPublishWhileLockHeld).
++    return retryPublishWhileLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+       entered.value=true;
+       const current=nativeManagedCurrentOwner(repository);
+       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
+@@ -1236,7 +1238,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue). A working copy that did not exist before is restored as absent.
+       const workingBefore=preimage&&!(queueSource.source==='handover'&&queueSource.workingSha256===null);
+       return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256}};
+-    }));
++    }),admissionDeadline,publishRetry);
+   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index c9f3ddaf8..669f72108 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { spawnSync } from "node:child_process";
++import { spawn, spawnSync } from "node:child_process";
+ import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+ import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
+ import { createHash } from "node:crypto";
+@@ -1830,6 +1830,49 @@ const cases = [
+     assert.equal(calls,1);
+   }},
+ 
++  { id: "NGHS66", name: "E4 (19g Windows measurement): the governed queue preparation of a second launch waits for the first launch's registry lock within the admission deadline instead of refusing after the 10 s default", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root});
++    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
++    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
++    const marker=join(root,'fixture-host','sibling-holds-lock');
++    // The sibling launch: another process holds the registry boundary for 12 s (longer than the old 10 s default).
++    const holder=(ms)=>{
++      rmSync(marker,{force:true});
++      const script=`import {inspectSignedDescriptorCustodyRepository} from ${JSON.stringify(new URL('./worktree-lifecycle.mjs',import.meta.url).href)};`
++        +`import {withSessionAuthorityBoundary} from ${JSON.stringify(new URL('./session-authority-registry.mjs',import.meta.url).href)};`
++        +`import {writeFileSync} from 'node:fs';const repository=inspectSignedDescriptorCustodyRepository(${JSON.stringify(root)});`
++        +`withSessionAuthorityBoundary({repository},()=>{writeFileSync(${JSON.stringify(marker)},'held');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${ms});});`;
++      const child=spawn(process.execPath,['--input-type=module','-e',script],{stdio:'ignore'});
++      const until=Date.now()+20000;while(!existsSync(marker)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);
++      assert.ok(existsSync(marker),'the sibling took the lock');
++      return child;
++    };
++    // With minutes left on the admission deadline the second launch waits the sibling out and prepares its row.
++    let child=holder(12000);
++    const started=Date.now();
++    const waited=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now(),budgetMs:300000}}));
++    assert.equal(waited.status,'required',JSON.stringify(waited));
++    assert.ok(Date.now()-started>=10000,`it waited past the old 10 s default (${Date.now()-started} ms)`);
++    child.kill();
++    // With almost nothing left of the deadline it still refuses typed, and nothing is written.
++    child=holder(12000);
++    try{
++      const refused=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-2'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now()-299500,budgetMs:300000}}));
++      assert.equal(refused.status,'refused');assert.equal(refused.code,'SDC-LOCK-HELD',JSON.stringify(refused));
++      assert.equal(resolveGovernedItemQueue({root}).queue.slices.some(row=>row.id==='ITEM-AC-2'),false,'a refused preparation writes no row');
++    }finally{child.kill();}
++  })},
++
++  { id: "NGHS67", name: "E4: both admission routes hand their deadline to the governed queue preparation (guard-dispatch and the native host-state preparation)", run: () => {
++    const guard=readFileSync(new URL('../hooks/guard-dispatch.mjs',import.meta.url),'utf8');
++    assert.match(guard,/prepareGovernedItemQueue\(\{[^)]*admissionDeadline:\{startMs:HOOK_ENTRY_MS,budgetMs:ADMISSION_BUDGET_MS\}\}\)/su);
++    const state=readFileSync(new URL('./native-goldfish-host-state.mjs',import.meta.url),'utf8');
++    assert.match(state,/writeScope:binding\.allowedPaths,admissionDeadline,publishRetry:dependencies\.publishRetry\}\)/u);
++    assert.match(state,/return retryPublishWhileLockHeld\(entered=>withSessionAuthorityBoundary\(\{repository\},\(\)=>\{\n\s*entered\.value=true;\n\s*const current=nativeManagedCurrentOwner/u);
++  }},
++
+ ];
+ 
+ /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
