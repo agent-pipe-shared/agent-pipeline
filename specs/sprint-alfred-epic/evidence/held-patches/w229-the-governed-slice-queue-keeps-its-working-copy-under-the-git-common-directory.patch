@@ -1,0 +1,1267 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index d7b33946c..ecbcf3c9c 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -638,6 +638,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/session-power.mjs`,
+ `plugins/pipeline-core/lib/session-requester-bridge.mjs`,
+ `plugins/pipeline-core/lib/slice-queue.mjs`,
++`plugins/pipeline-core/lib/slice-queue-location.mjs`,
+ `plugins/pipeline-core/lib/staged-observation-doc-classification.mjs`,
+ `plugins/pipeline-core/lib/verify-owning-controller-route.mjs`,
+ `plugins/pipeline-core/lib/verify-resume.mjs`,
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index d425ba9dc..e245fd0c8 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -119,12 +119,27 @@ before any signing command is printed (`checkpoint-destination`), so no signatur
+ is spent on a push the guard would refuse (PF-32). Adding the policy changes the
+ manifest, which the plan approval binds: approve the plan again afterwards (PF-33).
+ 
+-**A tree dirty only with the Pipeline's own files** (the governed
+-`specs/<feature>/slice-queue.json` a dispatch binding writes, and a tree
+-guard-override audit log an older build left; a current build writes that log under
+-the common Git directory) is named by every clean-tree refusal together with
++**The governed slice queue has a working copy and a handover copy.** A dispatch
++binding, a queue amendment, a rollback, a cancel and every `slice-queue.mjs` verb
++of an approved course write the working copy under the common Git directory, so
++they never make the tree dirty and a branch switch never carries the queue along.
++The tracked `specs/<feature>/slice-queue.json` is the handover copy for another
++machine: `push-prepare` writes the working copy there and commits exactly that
++path at the start of its run, when the tree is otherwise clean and no push
++approval is outstanding for HEAD (the same gate as the push-approval fold). A
++machine without a working copy reads the handover copy byte for byte. When the
++handover copy changed (a pull) and the working copy did not, the handover copy is
++used; when both changed, the working copy wins, `slice-queue.mjs validate` shows
++`handoverConflict`, and `slice-queue.mjs import --take-handover` takes the
++handover copy. The git hooks add no refusal for a stale handover copy.
++
++**A tree dirty only with the Pipeline's own files** (a handover queue copy an older
++build wrote, and a tree guard-override audit log an older build left; a current
++build writes that log under the common Git directory) is named by every clean-tree
++refusal together with
+ `node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo> --agent`,
+-which commits exactly those files and refuses if anything else is dirty
++which commits exactly those files and refuses if another tracked file is modified,
++staged or deleted; an untracked foreign file is listed as `untouched` and left alone
+ (PF-31/PF-36/PF-40). The caller states who runs it: `--agent` (an agent session)
+ records the GIT-03 provenance pair, `--human` (a PO terminal commit) carries no
+ provenance trailers, and a call with neither is refused. The clean-tree checks
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 224e69c86..caf2c0ee9 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -370,7 +370,12 @@
+           "NGHS56",
+           "NGHS57",
+           "NGHS58",
+-          "NGHS59"
++          "NGHS59",
++          "NGHS60",
++          "NGHS61",
++          "NGHS62",
++          "NGHS63",
++          "NGHS64"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index d425ba9dc..e245fd0c8 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -119,12 +119,27 @@ before any signing command is printed (`checkpoint-destination`), so no signatur
+ is spent on a push the guard would refuse (PF-32). Adding the policy changes the
+ manifest, which the plan approval binds: approve the plan again afterwards (PF-33).
+ 
+-**A tree dirty only with the Pipeline's own files** (the governed
+-`specs/<feature>/slice-queue.json` a dispatch binding writes, and a tree
+-guard-override audit log an older build left; a current build writes that log under
+-the common Git directory) is named by every clean-tree refusal together with
++**The governed slice queue has a working copy and a handover copy.** A dispatch
++binding, a queue amendment, a rollback, a cancel and every `slice-queue.mjs` verb
++of an approved course write the working copy under the common Git directory, so
++they never make the tree dirty and a branch switch never carries the queue along.
++The tracked `specs/<feature>/slice-queue.json` is the handover copy for another
++machine: `push-prepare` writes the working copy there and commits exactly that
++path at the start of its run, when the tree is otherwise clean and no push
++approval is outstanding for HEAD (the same gate as the push-approval fold). A
++machine without a working copy reads the handover copy byte for byte. When the
++handover copy changed (a pull) and the working copy did not, the handover copy is
++used; when both changed, the working copy wins, `slice-queue.mjs validate` shows
++`handoverConflict`, and `slice-queue.mjs import --take-handover` takes the
++handover copy. The git hooks add no refusal for a stale handover copy.
++
++**A tree dirty only with the Pipeline's own files** (a handover queue copy an older
++build wrote, and a tree guard-override audit log an older build left; a current
++build writes that log under the common Git directory) is named by every clean-tree
++refusal together with
+ `node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo> --agent`,
+-which commits exactly those files and refuses if anything else is dirty
++which commits exactly those files and refuses if another tracked file is modified,
++staged or deleted; an untracked foreign file is listed as `untouched` and left alone
+ (PF-31/PF-36/PF-40). The caller states who runs it: `--agent` (an agent session)
+ records the GIT-03 provenance pair, `--human` (a PO terminal commit) carries no
+ provenance trailers, and a call with neither is refused. The clean-tree checks
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index bd4592a41..b2ebfb30c 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -866,6 +866,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/session-power.mjs",
+   "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+   "plugins/pipeline-core/lib/slice-queue.mjs",
++  "plugins/pipeline-core/lib/slice-queue-location.mjs",
+   "plugins/pipeline-core/lib/verify-owning-controller-route.mjs",
+   "plugins/pipeline-core/lib/verify-resume.mjs",
+   "plugins/pipeline-core/lib/verify-suite-registration.mjs",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 36cd50c1d..6baef18c9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -28,6 +28,7 @@ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
+ import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+ import { parseDispatchSlice } from "./dispatch-policy.mjs";
+ import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
++import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+ import { isSafeTaskId } from "./dispatch-record.mjs";
+ import { fileURLToPath } from "node:url";
+@@ -609,6 +610,7 @@ function authenticatedNativePendingState(stored) {
+     // member/original-approval join authorizes only its current queue bytes;
+     // every other prelaunch untracked file remains immutable. The queue is
+     // never thereby admitted as a product write or a completed dependency.
++    // AC-108: kept for pending states bound before the queue moved under the Git common directory, whose baseline lists the tracked queue path as an untracked file that the binding itself rewrote.
+     return {...state,baseline:{...state.baseline,untracked:state.baseline.untracked.map(row=>row.path===state.delivery.queuePath?{...row,sha256:governed.sha256}:row)}};
+   });
+ }
+@@ -1025,22 +1027,24 @@ export function resolveGovernedItemQueue({ root } = {}) {
+     if(state.planApproved!==true)return {status:'not-applicable',code:'SQ-NO-APPROVED-COURSE'};
+     const plan = state.activeFeature.planPath;
+     if (typeof plan !== "string" || !normalizeScope(plan).ok || plan.startsWith("/")) return refused("SQ-PLAN-PATH-INVALID");
+-    const path = resolve(physical, dirname(plan), "slice-queue.json");
++    const location = sliceQueueLocation({ root: physical, planDir: dirname(plan) }), path = location.handoverAbs;
+     if (relative(physical, path).startsWith("..")) return refused("SQ-PLAN-PATH-INVALID");
+-    let bytes;
+-    try { bytes = readBounded(path); }
++    let bytes, source;
++    // AC-108: the working copy under the Git common directory, else the handover copy byte-identical; a read never writes.
++    try { source = readSliceQueueSource(location, { maxBytes: SLICE_QUEUE_MAX_BYTES }); bytes = source.bytes; }
+     catch (error) {
+       // Only a missing file is an absent course. An unsafe, drifting or unreadable file keeps failing closed below.
+       if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
+         repair: "The approved feature has no delivery course yet: write its slice-queue.json through the governed course writer prepareGovernedItemQueue with the item delivery briefing (criterion locator and check paths) of the first item." };
+       throw error;
+     }
+-    const queue = parseStrictJson(bytes);
++    const queue = parseStrictJson(bytes.toString("utf8"));
+     if (queue.schema !== ITEM_QUEUE_SCHEMA) return refused("SQ-DELIVERY-MIGRATION-REQUIRED");
+     const validated = validateSliceQueue(queue);
+     if (!validated.ok || queue.feature !== state.activeFeature.id) return refused("SQ-DELIVERY-QUEUE-INVALID");
+-    return { status: "required", code: "SQ-DELIVERY-REQUIRED", path: relative(physical, path).replaceAll("\\", "/"),
+-      sha256: createHash("sha256").update(bytes).digest("hex"), queue, normalized: validated.queue };
++    return { status: "required", code: "SQ-DELIVERY-REQUIRED", path: relative(physical, path).replaceAll("\\", "/"), workingPath: location.workingPath,
++      source: source.source, handoverConflict: source.handoverConflict,
++      sha256: source.sha256, queue, normalized: validated.queue };
+   } catch (error) {
+     if (error?.code === "SQ-DELIVERY-QUEUE-TOO-LARGE") return { status: "refused", code: error.code,
+       repair: "The delivery course or State file exceeds the slice-queue size bound; it is not truncated or edited by hand. Report it to the PO for a governed compaction." };
+@@ -1158,14 +1162,17 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       const sourceBytes=readFileSync(sourcePath);
+       const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
+       if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
+-      const path=resolve(physical,dirname(state.activeFeature.planPath),'slice-queue.json');
+-      if(relative(physical,path).startsWith('..')||realpathSync(dirname(path))!==dirname(path))throw nativeManagedFault('item-course-queue-path');
+-      let preimage=null,raw;
+-      try{const info=lstatSync(path);if(info.isSymbolicLink()||!info.isFile()||info.size>SLICE_QUEUE_MAX_BYTES)throw nativeManagedFault('item-course-queue-unsafe');preimage=readFileSync(path);raw=parseStrictJson(preimage);}catch(error){if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
++      // AC-108: the queue is read and written at its working copy under the Git common directory (the handover copy is only read, byte-identical, while no working copy exists).
++      const location=sliceQueueLocation({root:physical,planDir:dirname(state.activeFeature.planPath)}),path=location.workingPath;
++      if(relative(physical,location.handoverAbs).startsWith('..')||realpathSync(dirname(location.handoverAbs))!==dirname(location.handoverAbs))throw nativeManagedFault('item-course-queue-path');
++      let preimage=null,queueSource=null,raw;
++      try{queueSource=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});preimage=queueSource.bytes;raw=parseStrictJson(preimage.toString('utf8'));}catch(error){if(error.code==='SQ-DELIVERY-QUEUE-TOO-LARGE'||error.message==='unsafe')throw nativeManagedFault('item-course-queue-unsafe');if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
+       if(!validateSliceQueue(raw).ok||raw.feature!==state.activeFeature.id)throw nativeManagedFault('item-course-queue-invalid');
+       const legacy=raw.schema==='pipeline.slice-queue.v1';
+       if(legacy){
++        // The legacy backup lands beside the working copy.
+         const legacyHash=digest(preimage),backup=join(dirname(path),`.slice-queue-legacy-${legacyHash}.json`);
++        mkdirSync(dirname(path),{recursive:true,mode:0o700});
+         let backupFd;
+         try{backupFd=openSync(backup,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<preimage.length){const written=writeSync(backupFd,preimage,offset,preimage.length-offset);if(written<=0)throw nativeManagedFault('item-course-legacy-backup-write');offset+=written;}fsyncSync(backupFd);}
+         catch(error){if(error.code!=='EEXIST'||lstatSync(backup).isSymbolicLink()||digest(readFileSync(backup))!==legacyHash)throw error;}
+@@ -1212,9 +1219,10 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
+       if(after.status!=='eligible'||after.approvalSha256!==approval.approvalSha256||after.stateSha256!==approval.stateSha256
+         ||nativeManagedDigest(nativeManagedCurrentOwner(repository).association)!==nativeManagedDigest(current.association))throw nativeManagedFault('item-course-approval-cas');
+-      writeGovernedQueue(path,preimage,raw);
+-      // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue).
+-      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,preimage:preimage?preimage.toString('base64'):null,postimageSha256:digest(readFileSync(path))}};
++      const postimageSha256=writeGovernedQueue(location,queueSource,raw);
++      // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue). A working copy that did not exist before is restored as absent.
++      const workingBefore=preimage&&!(queueSource.source==='handover'&&queueSource.workingSha256===null);
++      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256}};
+     }));
+   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
+ }
+@@ -1231,25 +1239,21 @@ export function rollbackGovernedItemQueue(written) {
+       let current;
+       try{current=readFileSync(written.path);}catch(error){if(error.code==='ENOENT')return {status:'unchanged',code:'SQ-ROLLBACK-ABSENT'};throw error;}
+       if(digest(current)!==written.postimageSha256)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
+-      if(written.preimage===null){unlinkSync(written.path);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
+-      const bytes=Buffer.from(written.preimage,'base64'),temp=join(dirname(written.path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
+-      let fd;
+-      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const count=writeSync(fd,bytes,offset,bytes.length-offset);if(count<=0)throw nativeManagedFault('item-course-queue-rollback-write');offset+=count;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,written.path);}
+-      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
++      const target={workingPath:written.path,sidecarPath:typeof written.sidecarPath==='string'?written.sidecarPath:null};
++      if(written.preimage===null){restoreWorkingQueue(target,null);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
++      restoreWorkingQueue(target,Buffer.from(written.preimage,'base64'));
+       return {status:'restored',code:'SQ-ROLLBACK-RESTORED'};
+     }));
+   }catch(error){return {status:'refused',code:error.code??'SQ-ROLLBACK-UNAVAILABLE',reason:error.reason??error.message};}
+ }
+ 
+-/** Publishes a governed item queue as a fresh inode by rename, after the preimage compare-and-swap. */
+-function writeGovernedQueue(path,preimage,raw) {
+-  if(preimage?digest(readFileSync(path))!==digest(preimage):(()=>{try{lstatSync(path);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}})())throw nativeManagedFault('item-course-queue-cas');
+-  const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n'),temp=join(dirname(path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
++/** Publishes a governed item queue as a fresh inode by rename at its working copy, after the compare-and-swap on the bytes `source` was read from
++ * (null when neither copy existed). Returns the digest of the published bytes. */
++function writeGovernedQueue(location,source,raw) {
++  const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n');
+   // Never publish a course that its own readers would refuse.
+   if(bytes.length>SLICE_QUEUE_MAX_BYTES)throw Object.assign(new Error('prepared delivery course exceeds the slice-queue size bound'),{code:'SQ-DELIVERY-QUEUE-TOO-LARGE'});
+-  let fd;
+-  try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
+-  finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
++  return writeWorkingQueue(location,bytes,source,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>nativeManagedFault('item-course-queue-cas')}).sha256;
+ }
+ 
+ /** PF-33 (D56 (3)): the plan approval binds the PO-gate authority (manifest, PRD) and the PO profile, so a later
+@@ -1310,12 +1314,12 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+     const physical=realpathSync(resolve(root));
+     const governed=resolveGovernedItemQueue({root:physical});
+     if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-CANCEL-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
+-    const repository=inspectSignedDescriptorCustodyRepository(physical),path=resolve(physical,governed.path);
++    const repository=inspectSignedDescriptorCustodyRepository(physical),location=sliceQueueLocation({root:physical,planDir:dirname(governed.path)});
+     return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{
+       entered.value=true;
+       // D51 (3): no bound session is required. Cancelling only releases (nothing of the slice is
+       // delivered), and neither the agent's shell nor the PO's terminal ever carries a session binding.
+-      const preimage=readFileSync(path),raw=parseStrictJson(preimage);
++      const source=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),raw=parseStrictJson(source.bytes.toString('utf8'));
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
+       const row=raw.slices.find(entry=>entry.id===sliceId);
+       if(!row){
+@@ -1334,7 +1338,7 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+           delivery:{itemId:state.delivery.itemId,criteria:[isSafeTaskId(criterionId)?criterionId:sliceId],baseCommit:state.binding?.candidateCommit}};
+         raw.slices.push(orphanRow);
+         if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-orphan-row-invalid');
+-        writeGovernedQueue(path,preimage,raw);
++        writeGovernedQueue(location,source,raw);
+         return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released:[],queuePath:governed.path,started:true,orphan:true,
+           note:'the queue had no row for this started slice; it was re-created as cancelled from the dispatch state on the caller\'s word that no Goldfish runs for it, so its reservation no longer blocks and its write scope is no longer protected'};
+       }
+@@ -1353,13 +1357,37 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+       const released=[];
+       for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
+-      writeGovernedQueue(path,preimage,raw);
++      writeGovernedQueue(location,source,raw);
+       return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released,queuePath:governed.path,
+         ...(hasNativeState||hasAgyState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
+     }));
+   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+ }
+ 
++/** AC-108: `slice-queue.mjs import --take-handover`. The working copy is replaced by the handover copy (another machine's push, or a conflict that
++ * should be resolved their way). Refused, with the command that releases it, when a live reservation names a slice the handover copy does not contain. */
++export function importGovernedHandoverQueue({root}={}) {
++  try {
++    const physical=realpathSync(resolve(root)),governed=resolveGovernedItemQueue({root:physical});
++    if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-IMPORT-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
++    const repository=inspectSignedDescriptorCustodyRepository(physical),location=sliceQueueLocation({root:physical,planDir:dirname(governed.path)});
++    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{
++      entered.value=true;
++      let handover=null;
++      try{handover=parseStrictJson(readBoundedFile(location.handoverAbs,SLICE_QUEUE_MAX_BYTES).toString('utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
++      if(handover===null)return takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});
++      if(handover.schema!==ITEM_QUEUE_SCHEMA||handover.feature!==governed.queue.feature||!validateSliceQueue(handover).ok)
++        return {status:'refused',code:'SQ-IMPORT-HANDOVER-INVALID',reason:`the handover copy ${governed.path} is not a valid v2 queue of this feature`,repair:`fix or restore ${governed.path} (git checkout -- ${governed.path} on the branch that carries it), then run the import again`};
++      const ids=new Set(handover.slices.map(row=>row.id));let reservations=[];
++      try{reservations=readNativeReservedItemScopes({repository,boundary}).reservations;}catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
++      const lost=reservations.filter(row=>row.sliceId!==null&&!ids.has(row.sliceId)).map(row=>row.sliceId);
++      if(lost.length)return {status:'refused',code:'SQ-IMPORT-LIVE-RESERVATION',reason:`the handover copy does not contain ${lost.join(', ')}, which still hold a live reservation; importing it would lose them`,
++        repair:`let each finish through its own delivery, or, when its Goldfish no longer runs, release it first: node ${SLICE_QUEUE_SCRIPT} cancel ${lost[0]} --started --reason "<why>" ${cancelClassArg()}; then run the import again`};
++      return {...takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),queuePath:governed.path};
++    }));
++  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-IMPORT-UNAVAILABLE',reason:error.reason??error.message};}
++}
++
+ const governedCheckHandles=new WeakMap();
+ function itemCheckSnapshot(root,itemDelivery,candidate) {
+   const physical=realpathSync(resolve(root)),repository=inspectSignedDescriptorCustodyRepository(physical);
+@@ -1472,7 +1500,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
+       const settled=readSettledItemSliceIds({repository,boundary,governed});
+       const agyBlocking=[...latestAgy.values()].find(row=>!released.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId)&&scopesOverlap(row.value.basis.itemDelivery.writeScope,writeScope));
+       if(agyBlocking)throw reservationFault('item-delivery-scope-collision',agyBlocking.value.basis.itemDelivery.sliceId);
+-      const queuePath=resolve(repository.primaryRoot,governed.path),queueBytes=readFileSync(queuePath);
++      const location=sliceQueueLocation({root:repository.primaryRoot,planDir:dirname(governed.path)}),queueSource=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),queueBytes=queueSource.bytes;
+       if(digest(queueBytes)!==governed.sha256)throw nativeManagedFault('native-item-scope-queue-cas');
+       rawItem.writeScope=writeScope;
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('native-item-scope-queue-invalid');
+@@ -1493,11 +1521,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
+         scopeRef=writeExclusive(repository.commonDir,`authority-scope-${pendingSha256}-${revision}.json`,value);
+         const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=refreshed.memberRef;
+       }
+-      const info=lstatSync(queuePath);
+-      if(info.isSymbolicLink()||!info.isFile()||digest(readFileSync(queuePath))!==digest(queueBytes))throw nativeManagedFault('native-item-scope-queue-cas');
+-      const temp=join(dirname(queuePath),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);let fd;
+-      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<postBytes.length){const written=writeSync(fd,postBytes,offset,postBytes.length-offset);if(written<=0)throw nativeManagedFault('native-item-scope-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,queuePath);}
+-      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
++      writeWorkingQueue(location,postBytes,queueSource,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>nativeManagedFault('native-item-scope-queue-cas')});
+       return {status:'amended',code:'NGHS-ITEM-SCOPE-AMENDED',pendingSha256,revision,scopeRef,memberRef:operation.memberRef,allowedPaths,writeScope};
+     });
+   }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-SCOPE-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 800c2d0ba..fd4959173 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1,18 +1,19 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
++import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
+ import { createHash } from "node:crypto";
+ import { canonical } from "./po-approval-proof.mjs";
+ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
+ import { tmpdir, devNull } from "node:os";
+-import { join } from "node:path";
++import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { bindNativeCodexStart, prepareNativeGoldfishHostState,
+   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
+-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice } from "./native-goldfish-host-state.mjs";
++import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice, rollbackGovernedItemQueue } from "./native-goldfish-host-state.mjs";
+ import { createGovernanceScopeController } from "./governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+@@ -31,6 +32,10 @@ import { initializeSessionAuthorityRegistry, inspectSessionAuthorityRegistryRead
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+ 
++// QG-04 extension (AC-108): the governed queue's working copy lives under the Git common directory and the tracked path is only the handover copy,
++// so the cases that read the queue a dispatch wrote (or tamper with it) read and write the working copy through the module. No case is removed or weakened.
++const queueFile=root=>sliceQueueLocation({root,planDir:'specs/unit'}).workingPath;
++
+ function fixture(run) {
+   // Authority-domain inventory refuses writable ancestors such as /tmp.
+   const fixtureRoot=nativeContractFixtureParent();
+@@ -598,22 +603,22 @@ const cases = [
+     const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+     const prepare=()=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs']}));
+     const created=prepare();assert.equal(created.status,'required',JSON.stringify(created));assert.equal(created.queue.slices.length,1);assert.equal(created.queue.slices[0].delivery.criteria[0],'AC-1');
+-    const unchanged=readFileSync(join(root,created.path));assert.equal(prepare().sha256,created.sha256);assert.deepEqual(readFileSync(join(root,created.path)),unchanged);
+-    const wrong=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,criterionLocator:{...original.criterionLocator,sourceSha256:'f'.repeat(64)}},candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(wrong.status,'refused');assert.deepEqual(readFileSync(join(root,created.path)),unchanged);
+-    const basic=JSON.parse(readFileSync(join(root,created.path),'utf8'));basic.slices[0].delivery={itemId:itemDelivery.itemId,criteria:['AC-1'],baseCommit:original.candidate.commit};writeFileSync(join(root,created.path),JSON.stringify(basic));
++    const unchanged=readFileSync(queueFile(root));assert.equal(prepare().sha256,created.sha256);assert.deepEqual(readFileSync(queueFile(root)),unchanged);
++    const wrong=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,criterionLocator:{...original.criterionLocator,sourceSha256:'f'.repeat(64)}},candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(wrong.status,'refused');assert.deepEqual(readFileSync(queueFile(root)),unchanged);
++    const basic=JSON.parse(readFileSync(queueFile(root),'utf8'));basic.slices[0].delivery={itemId:itemDelivery.itemId,criteria:['AC-1'],baseCommit:original.candidate.commit};writeFileSync(join(root,created.path),JSON.stringify(basic));
+     const rebound=prepare();assert.equal(rebound.status,'required',JSON.stringify(rebound));assert.equal(nativeManagedDigest(rebound.queue.slices[0].delivery.criterionLocator),nativeManagedDigest(original.criterionLocator),'actual original criterion mapping automatically rebinds old basic v2 without accepting its completed evidence');
+     const legacy={schema:'pipeline.slice-queue.v1',feature:'unit',slices:[{id:'LEGACY-A',title:'Retained prior outcome',state:'ready',dependsOn:[],writeScope:['src/legacy.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light'}]};
+     const oldBytes=JSON.stringify(legacy);writeFileSync(join(root,created.path),oldBytes);
+     const migrated=prepare();assert.equal(migrated.status,'required',JSON.stringify(migrated));assert.equal(migrated.queue.slices[0].state,'deferred');assert.equal(migrated.queue.slices[0].delivery.status,'unbound-legacy');assert.equal(migrated.queue.slices[1].id,itemDelivery.sliceId);
+-    const retained=join(root,'specs/unit',`.slice-queue-legacy-${nativeManagedDigest(oldBytes)}.json`);assert.equal(readFileSync(retained,'utf8'),oldBytes);
++    const retained=join(dirname(queueFile(root)),`.slice-queue-legacy-${nativeManagedDigest(oldBytes)}.json`);assert.equal(readFileSync(retained,'utf8'),oldBytes);
+     const priorCwd=process.cwd();process.chdir(root);
+     try {
+       assert.equal(runCli(['validate']).exit,0,'governed consumer queue location is automatic');
+       const unauthorized=runCli(['hold',itemDelivery.sliceId,'--external-reason','fixture hold']);assert.notEqual(unauthorized.exit,0,'unbranded caller cannot mutate productive queue');
+       const held=runtime.run(()=>runCli(['hold',itemDelivery.sliceId,'--external-reason','fixture hold']));assert.equal(held.exit,0,JSON.stringify(held));
+-      const changed=JSON.parse(readFileSync(join(root,created.path),'utf8'));changed.slices.find(row=>row.id===itemDelivery.sliceId).writeScope=['src/foreign.mjs'];
++      const changed=JSON.parse(readFileSync(queueFile(root),'utf8'));changed.slices.find(row=>row.id===itemDelivery.sliceId).writeScope=['src/foreign.mjs'];
+       assert.throws(()=>runtime.run(()=>writeQueueAtomic(join(root,created.path),changed)),error=>error.code==='SQ-ITEM-QUEUE-CAS'||error.code==='SQ-ITEM-BINDING-AMENDMENT-REQUIRED');
+-      assert.deepEqual(JSON.parse(readFileSync(join(root,created.path),'utf8')).slices.find(row=>row.id===itemDelivery.sliceId).writeScope,['src/change.mjs']);
++      assert.deepEqual(JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(row=>row.id===itemDelivery.sliceId).writeScope,['src/change.mjs']);
+     } finally { process.chdir(priorCwd); }
+ 
+   })},
+@@ -634,7 +639,7 @@ const cases = [
+     const returned={...input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:binding.model,content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:binding.dispatchId,candidateCommit:binding.candidateCommit,outcome:'succeeded',report:'Implemented the original dependency behavior.',changedPaths:['src/change.mjs']})}]}};
+     const finalized=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned}));assert.equal(finalized.status,'authored-commit-recorded',JSON.stringify(finalized));
+     assert.equal(finalized.delivery?.status,'integration-pending',JSON.stringify(finalized));assert.equal(finalized.delivery?.checkStatus?.verdict,'passed',JSON.stringify(finalized));
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8'));
++    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8'));
+     queue.slices.push({id:'DEPENDENT',title:'Waiting dependency fixture',state:'ready',dependsOn:[itemDelivery.sliceId],writeScope:['src/dependent.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});
+     writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
+     const stillHeld=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual(stillHeld.integrated,[]);
+@@ -691,7 +696,7 @@ const cases = [
+     const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+     const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+     const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8'));queue.slices.push({id:'OTHER',title:'Actual other live reservation',state:'ready',dependsOn:[],writeScope:['src/blocked.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
++    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8'));queue.slices.push({id:'OTHER',title:'Actual other live reservation',state:'ready',dependsOn:[],writeScope:['src/blocked.mjs'],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-2',criteria:['AC-2'],baseCommit:original.candidate.commit}});writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
+     const otherBinding={...makeBinding({dispatchId:'OTHER',commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:['src/blocked.mjs']};const otherInput=toolInput('claude',{root,session:'other-session',toolUseId:'other-tool',binding:otherBinding});otherInput.tool_input.prompt+='\nSlice: OTHER\nWrite scope: src/blocked.mjs\n';
+     const otherPrepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input:otherInput}));assert.equal(otherPrepared.ok,true,JSON.stringify(otherPrepared));
+     const prior=readFileSync(queuePath),amend=additionalPaths=>runtime.run(()=>amendNativeGoldfishItemWriteScope({root,pendingSha256:prepared.sha256,additionalPaths}));
+@@ -734,7 +739,7 @@ const cases = [
+     const readback=runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'}));assert.equal(readback.ok,true,JSON.stringify(readback));assert.equal(readback.sha256,first.prepared.sha256);
+     // Only runtime metadata gained rows; the first item's original approved
+     // criterion/checks/scope and all other untracked baseline bytes stay bound.
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),queue=JSON.parse(readFileSync(queuePath,'utf8')),tampered=structuredClone(queue);tampered.slices.find(row=>row.id==='FIRST').delivery.checks[0].dependencies=['src/alias.mjs'];writeFileSync(queuePath,JSON.stringify(tampered,null,2)+'\n');assert.equal(runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'})).ok,false);writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
++    const queuePath=queueFile(root),queue=JSON.parse(readFileSync(queuePath,'utf8')),tampered=structuredClone(queue);tampered.slices.find(row=>row.id==='FIRST').delivery.checks[0].dependencies=['src/alias.mjs'];writeFileSync(queuePath,JSON.stringify(tampered,null,2)+'\n');assert.equal(runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'})).ok,false);writeFileSync(queuePath,JSON.stringify(queue,null,2)+'\n');
+     writeFileSync(join(root,'src/change.mjs'),"export const value='expected'; // independently delivered first item\n");
+     const returned={...first.input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:first.binding.model,content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:first.binding.dispatchId,candidateCommit:first.binding.candidateCommit,outcome:'succeeded',report:'First original outcome; second admitted separately.',changedPaths:['src/change.mjs']})}]}};
+     const finalized=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned}));assert.equal(finalized.status,'authored-commit-recorded',JSON.stringify(finalized));assert.equal(finalized.delivery?.checkStatus?.verdict,'passed');assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:first.prepared.sha256})).status,'integrated');
+@@ -764,7 +769,7 @@ const cases = [
+       assert.equal(readFileSync(join(root,`src/${items[order[1]].path}.mjs`),'utf8').includes('simultaneous author'),true,'other genuine owner dirty product remains untouched');
+       const second=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned(order[1])}));assert.equal(second.status,'authored-commit-recorded',JSON.stringify(second));assert.equal(second.delivery.checkStatus.verdict,'passed');assert.equal(spawnSync('git',['-C',root,'rev-parse',`${second.commit}^`],{encoding:'utf8'}).stdout.trim(),first.commit,'second parent is actual Source-authored first return');
+       for(const id of order)assert.equal(runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:items[id].prepared.sha256})).status,'integrated');
+-      if(order[0]==='RIGHT'){assert.equal(JSON.parse(spawnSync('git',['-C',root,'show','HEAD:specs/unit/slice-queue.json'],{encoding:'utf8'}).stdout).schema,'pipeline.slice-queue.v1','host product commits never stage governed queue metadata');assert.equal(JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).schema,'pipeline.slice-queue.v2','authenticated course writer migrated tracked runtime queue in place');}
++      if(order[0]==='RIGHT'){assert.equal(JSON.parse(spawnSync('git',['-C',root,'show','HEAD:specs/unit/slice-queue.json'],{encoding:'utf8'}).stdout).schema,'pipeline.slice-queue.v1','host product commits never stage governed queue metadata');assert.equal(JSON.parse(readFileSync(queueFile(root),'utf8')).schema,'pipeline.slice-queue.v2','authenticated course writer migrated tracked runtime queue in place');}
+     });
+   }},
+ 
+@@ -815,7 +820,7 @@ const cases = [
+     initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+     const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+     const prepare=()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs']});
+-    const sessionId='0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b',queuePath=join(root,'specs/unit/slice-queue.json');
++    const sessionId='0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b',queuePath=queueFile(root);
+     try {
+       // Original behavior: a hook process has no in-process requester, so admission refuses.
+       const unbound=prepare();assert.equal(unbound.status,'refused',JSON.stringify(unbound));assert.equal(unbound.reason,'item-course-requester-unavailable');assert.equal(existsSync(queuePath),false);
+@@ -888,6 +893,7 @@ const cases = [
+     mkdirSync(join(root,'.claude'));mkdirSync(join(root,'specs/unit'),{recursive:true});
+     writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\n');
+     writeFileSync(join(root,'.claude/pipeline-state.json'),JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/plan.md',phase:'implementation'},planApproved:true}));
++    // QG-04 (AC-108): this case seeds a handover-only repository, so it keeps writing the tracked handover path; the read rule reads it byte-identical.
+     const queuePath=join(root,'specs/unit/slice-queue.json');
+     const body=JSON.stringify({schema:'pipeline.slice-queue.v2',feature:'unit',slices:[]});
+     writeFileSync(queuePath,`{${' '.repeat(1024*1024+4096)}${body.slice(1)}`,{mode:0o600});
+@@ -1039,7 +1045,7 @@ const cases = [
+     assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json')),true,'the first governed dispatch created the registry');
+     const observed=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(observed.status,'observed',JSON.stringify(observed));assert.equal(observed.nativeRegistry,'read');
+     // PF-47: a rebinding whose write scope differs from the queue row is refused with that cause and the exact repair.
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
++    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
+     const drift=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs','src/change.test.mjs']}));
+     assert.equal(drift.status,'refused',JSON.stringify(drift));assert.equal(drift.code,'SQ-ITEM-BINDING-DRIFT',JSON.stringify(drift));
+     assert.match(drift.reason,/ITEM-AC-1 differs from its queue row in write scope/u);assert.match(drift.repair,/: src\/change\.mjs$/u);
+@@ -1065,7 +1071,7 @@ const cases = [
+     const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+     const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+     assert.equal(prepare('ITEM-AC-1').status,'required');
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
++    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
+     const held=prepare('ITEM-AC-2');
+     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));assert.match(held.reason,/held on ITEM-AC-1 .*the queue was not written$/u);assert.match(held.repair,/slice-queue\.mjs cancel <slice id>/u);
+     assert.equal(readFileSync(queuePath,'utf8'),before,'a held dependency leaves the queue untouched');
+@@ -1120,7 +1126,7 @@ const cases = [
+     input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-2\nWrite scope: src/change.mjs\n';
+     const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
+     assert.equal(prepared.ok,true,JSON.stringify(prepared));
+-    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
++    const row=JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+     assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
+   })},
+ 
+@@ -1168,7 +1174,7 @@ const cases = [
+     const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
+     assert.equal(second.ok,true,JSON.stringify(second));
+     assert.equal(migrations().length,1);assert.equal(existsSync(join(abandoned,migrations()[0],'catalogue.json')),true,'the old catalogue is retained, not deleted');
+-    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
++    const row=JSON.parse(readFileSync(queueFile(root),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+     assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
+     const held=members();assert.ok(Object.keys(held).length>0,'the dispatch holds a registry member');
+     update(1);
+@@ -1268,7 +1274,7 @@ const cases = [
+       input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${sliceId}\nWrite scope: src/change.mjs\n`;
+       return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));};
+     assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+-    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),queuePath=join(root,'specs/unit/slice-queue.json');
++    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),queuePath=queueFile(root);
+     const members=()=>{const out={};const walk=dir=>{for(const name of readdirSync(dir,{withFileTypes:true})){const path=join(dir,name.name);if(name.isDirectory())walk(path);else out[path.slice(registry.length)]=readFileSync(path,'utf8');}};if(existsSync(join(registry,'members')))walk(join(registry,'members'));return out;};
+     const row=sliceId=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===sliceId);
+     // A dirty tracked path refuses before any member is reserved, names the path, and the queue row it prepared is removed again.
+@@ -1352,7 +1358,7 @@ const cases = [
+     const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+     const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+     assert.equal(prepare('ITEM-AC-1').status,'required');
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
++    const queuePath=queueFile(root),before=readFileSync(queuePath,'utf8');
+     const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
+     const held=prepare('ITEM-AC-2');
+     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));
+@@ -1618,7 +1624,7 @@ const cases = [
+     const delivery=(sliceId,extra={})=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}],...extra});
+     const prepare=(sliceId,extra)=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId,extra),candidate:original.candidate,writeScope:['src/change.mjs']}));
+     const cancel=(sliceId,cancelClass)=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'stopped',cancelClass}));
+-    const queuePath=join(root,'specs/unit/slice-queue.json'),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
++    const queuePath=queueFile(root),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
+     const refusedWith=(label,sliceId,predecessor,reason)=>{
+       const before=readFileSync(queuePath,'utf8'),refused=prepare(sliceId,{continuationOf:predecessor});
+       assert.equal(refused.status,'refused',`${label}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID',`${label}: ${JSON.stringify(refused)}`);
+@@ -1720,6 +1726,89 @@ const cases = [
+     const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual([...readiness.integrated].sort(),['LEFT','RIGHT'],'the settled set frees both slices');
+   })},
+ 
++  // AC-108 (closest accepted criterion): the governed queue keeps its working copy under the Git common directory; the tracked file is the handover copy.
++  { id: "NGHS60", name: "AC-108 queue location: a repository holding only the handover copy reads it byte-identical (the digest is of the bytes read) and a read never creates the working copy", run: () => fixture((env) => {
++    const {governed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
++    const bytes=readFileSync(join(env.root,'specs/unit/slice-queue.json'));
++    assert.equal(governed.status,'required',JSON.stringify(governed));
++    assert.equal(governed.path,'specs/unit/slice-queue.json','governed.path stays the handover path, so an old pending state keeps validating');
++    assert.equal(governed.workingPath,location.workingPath);
++    assert.equal(governed.sha256,createHash('sha256').update(bytes).digest('hex'),'the seed is read byte-identical, never re-serialised');
++    assert.equal(existsSync(location.workingPath),false,'a read never writes');
++    assert.ok(location.workingPath.startsWith(realpathSync(env.commonDir)),'the working copy lives under the Git common directory');
++  })},
++
++  { id: "NGHS61", name: "AC-108 queue location: the handover copy is adopted while the working copy is unchanged since the last import, and a conflict (both changed) keeps the working copy and says so", run: () => fixture((env) => {
++    const {governed:seed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
++    const withSlice=(queue,id)=>({...queue,slices:[...queue.slices,{id,title:id,state:'ready',dependsOn:[],writeScope:[`src/${id}.mjs`],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-3',criteria:['CR-1'],baseCommit:env.commit}}]});
++    const bytesOf=queue=>Buffer.from(JSON.stringify(queue,null,2)+'\n'),sha=bytes=>createHash('sha256').update(bytes).digest('hex');
++    const pre=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});assert.equal(pre.source,'handover');
++    const mine=bytesOf(withSlice(seed.queue,'MINE'));writeWorkingQueue(location,mine,pre);
++    const afterWrite=resolveGovernedItemQueue({root:env.root});assert.equal(afterWrite.sha256,sha(mine));assert.equal(afterWrite.handoverConflict,false);
++    const theirs=bytesOf(withSlice(seed.queue,'THEIRS'));writeFileSync(join(env.root,'specs/unit/slice-queue.json'),theirs);
++    const adopted=resolveGovernedItemQueue({root:env.root});assert.equal(adopted.sha256,sha(theirs),'another machine pushed a newer handover copy and nothing here changed the working copy');assert.equal(adopted.handoverConflict,false);
++    assert.deepEqual(readFileSync(location.workingPath),mine,'adopting is a read: the working copy is untouched');
++    // both changed: this machine writes its working copy on top of the adopted one while the handover copy moves on again
++    writeFileSync(join(env.root,'specs/unit/slice-queue.json'),bytesOf(withSlice(seed.queue,'ELSEWHERE')));
++    writeFileSync(location.workingPath,bytesOf(withSlice(withSlice(seed.queue,'THEIRS'),'MORE')));
++    const conflict=resolveGovernedItemQueue({root:env.root});assert.equal(conflict.handoverConflict,true);assert.ok(conflict.queue.slices.some(row=>row.id==='MORE'),'the working copy wins');
++    const taken=takeHandoverQueue(location,{maxBytes:SLICE_QUEUE_MAX_BYTES});assert.equal(taken.status,'taken');
++    const resolved=resolveGovernedItemQueue({root:env.root});assert.equal(resolved.handoverConflict,false);assert.ok(resolved.queue.slices.some(row=>row.id==='ELSEWHERE'));
++  })},
++
++  { id: "NGHS62", name: "AC-108 queue location: a dispatch binding writes the working copy only (git status unchanged, the handover path untouched), a branch switch keeps the queue, a rollback restores it, and a linked worktree resolves the same working copy", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root});
++    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
++    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
++    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
++    const git=(...args)=>spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args],{encoding:'utf8'});
++    const location=sliceQueueLocation({root,planDir:'specs/unit'}),statusBefore=git('status','--porcelain').stdout;
++    const created=prepare('ITEM-AC-1');assert.equal(created.status,'required',JSON.stringify(created));
++    assert.equal(created.path,'specs/unit/slice-queue.json');assert.equal(created.workingPath,location.workingPath);
++    assert.equal(existsSync(join(root,created.path)),false,'a dispatch binding never writes the tracked handover path');
++    assert.equal(git('status','--porcelain').stdout,statusBefore,'a dispatch binding leaves the working tree exactly as it was');
++    assert.equal(createHash('sha256').update(readFileSync(location.workingPath)).digest('hex'),created.sha256);
++    assert.equal(git('switch','-q','-c','other-branch').status,0);
++    assert.equal(resolveGovernedItemQueue({root}).sha256,created.sha256,'a branch switch does not drag the queue along');
++    const linked=mkdtempSync(join(nativeContractFixtureParent(),'linked-'));
++    try{assert.equal(git('worktree','add','-q','--detach',linked).status,0);assert.equal(sliceQueueLocation({root:realpathSync(linked),planDir:'specs/unit'}).workingPath,location.workingPath,'a linked worktree resolves the same working copy');}finally{git('worktree','remove','--force',linked);rmSync(linked,{recursive:true,force:true});}
++    const rolled=rollbackGovernedItemQueue(created.written);assert.equal(rolled.code,'SQ-ROLLBACK-REMOVED',JSON.stringify(rolled));assert.equal(existsSync(location.workingPath),false,'the rollback restores the absent queue');
++  })},
++
++  { id: "NGHS63", name: "AC-108 queue location: the first write after a fresh checkout materialises the working copy from the handover bytes and leaves the handover copy as it was", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root});
++    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
++    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
++    const location=sliceQueueLocation({root,planDir:'specs/unit'});
++    const created=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs']}));assert.equal(created.status,'required',JSON.stringify(created));
++    // a second machine's checkout: only the handover copy (the working bytes, exported) exists
++    const handoverBytes=readFileSync(location.workingPath);writeFileSync(join(root,'specs/unit/slice-queue.json'),handoverBytes);rmSync(location.workingPath);rmSync(location.sidecarPath,{force:true});
++    const fresh=resolveGovernedItemQueue({root});assert.equal(fresh.sha256,created.sha256,'the handover copy is read byte-identical, so a pending state bound to this digest does not drift');assert.equal(existsSync(location.workingPath),false);
++    const cancelled=runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'never started',cancelClass:'superseded'}));assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));
++    assert.equal(JSON.parse(readFileSync(location.workingPath,'utf8')).slices[0].state,'cancelled','the write landed in the working copy');
++    assert.deepEqual(readFileSync(join(root,'specs/unit/slice-queue.json')),handoverBytes,'the handover copy is not touched by a dispatch-side write');
++  })},
++
++  { id: "NGHS64", name: "AC-108 slice-queue.mjs: validate reports the source and the handover conflict, and import --take-handover replaces the working copy with the handover bytes", run: () => fixture((env) => {
++    const {governed:seed}=governedRegistryFixture(env),location=sliceQueueLocation({root:env.root,planDir:'specs/unit'});
++    const bytesOf=queue=>Buffer.from(JSON.stringify(queue,null,2)+'\n');
++    const extra=id=>({...seed.queue,slices:[...seed.queue.slices,{id,title:id,state:'ready',dependsOn:[],writeScope:[`src/${id}.mjs`],tier:'implementor',commitMode:'diff-only',loadClass:'light',delivery:{itemId:'AC-3',criteria:['CR-1'],baseCommit:env.commit}}]});
++    writeWorkingQueue(location,bytesOf(extra('MINE')),readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}));
++    const theirs=bytesOf(extra('THEIRS'));writeFileSync(join(env.root,'specs/unit/slice-queue.json'),theirs);writeFileSync(location.workingPath,bytesOf(extra('MORE')));
++    const priorCwd=process.cwd();process.chdir(env.root);
++    try{
++      const conflicted=runCli(['validate']);assert.equal(conflicted.exit,0,JSON.stringify(conflicted));assert.equal(conflicted.output.handoverConflict,true);assert.match(conflicted.output.repair,/import --take-handover/u);
++      assert.equal(runCli(['import']).exit,2,'import needs --take-handover');
++      const taken=runCli(['import','--take-handover']);assert.equal(taken.exit,0,JSON.stringify(taken));assert.equal(taken.output.status,'taken');
++      assert.equal(runCli(['validate']).output.handoverConflict,false);
++    }finally{process.chdir(priorCwd);}
++    assert.deepEqual(readFileSync(location.workingPath),theirs);
++  })},
++
+ ];
+ 
+ /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index ce9b839fe..a4bbf5318 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -45,6 +45,7 @@ import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
+ import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../windows-owned-authority-backend.mjs";
+ import { renderGoldfishBriefing } from "../dispatch-briefing-build.mjs";
+ import { validateNativeGoldfishFinal } from "../native-goldfish-host-return.mjs";
++import { readSliceQueueSource, sliceQueueLocation } from "../slice-queue-location.mjs";
+ 
+ const AT = "2026-10-10T10:00:00.000Z";
+ const FEATURE = "e2e";
+@@ -54,6 +55,12 @@ const COMPANIONS = ["specs/e2e/design.md", "specs/e2e/traceability.md"];
+ const REPORT = "specs/e2e/review/design-review-1.md";
+ const RECEIPT = "specs/e2e/review/design-review-receipt-1.json";
+ const QUEUE = "specs/e2e/slice-queue.json";
++// QG-04 (w229): the course a dispatch writes is the working copy under the Git common directory; QUEUE stays the tracked
++// handover path. The effective bytes (working copy, else the handover copy) are read through the shared location module.
++function queueBytes(fx) {
++  try { return readSliceQueueSource(sliceQueueLocation({ root: fx.root, planDir: dirname(QUEUE) })).bytes; }
++  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
++}
+ const CHECK = "tests/first-item.test.mjs";
+ const SOURCE = "src/first-item.mjs";
+ const SESSION = "0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b";
+@@ -311,7 +318,7 @@ function assertCommittedOnceAtStop(fx, toolUseId) {
+   const observed = inspectNativeGoldfishHostObservation({ root: fx.root, taskId: fx.dispatchId, record, recordBytes: nativeAuthoredRecordBytes(record) });
+   assert.equal(observed.ok, true, JSON.stringify(observed));
+   assert.equal(observed.assurance, STOP_ASSURANCE);
+-  const slice = JSON.parse(fx.read(QUEUE)).slices.find((row) => row.id === fx.sliceId);
++  const slice = JSON.parse(queueBytes(fx).toString("utf8")).slices.find((row) => row.id === fx.sliceId);
+   assert.ok(slice, "the item slice is still in the course");
+   // E11: the slice queue is NOT expected to leave `ready` at the stop. What an item-governed host commit publishes is the
+   // delivery outcome beside the record: the checks file binds this dispatch, this commit and the published record bytes.
+@@ -422,7 +429,7 @@ test("(iv) a keyless launch with the SubagentStop route unregistered keeps today
+ 
+ test("(vi) a launch the hook refuses after it prepared the queue row leaves the queue and the registry as they were, and names the dirty path (PF-55)", () => {
+   const fx = buildConsumer("refused-after-prepare");
+-  const queueBefore = existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null;
++  const queueBefore = queueBytes(fx)?.toString("base64") ?? null;
+   const members = join(fx.root, ".git", "agent-pipeline", "session-authority", "members");
+   const memberFiles = () => { const out = []; const walk = (dir) => { for (const entry of readdirSync(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) walk(path); else out.push(`${path}:${sha256(readFileSync(path))}`); } }; if (existsSync(members)) walk(members); return out.sort(); };
+   const membersBefore = memberFiles();
+@@ -431,7 +438,7 @@ test("(vi) a launch the hook refuses after it prepared the queue row leaves the
+   assert.equal(pre.status, 2, `the dirty launch is refused -- ${pre.stderr.slice(0, 600)}`);
+   assert.match(pre.stderr, /AGY-HOST-BASELINE-DIRTY/u, pre.stderr.slice(0, 600));
+   assert.match(pre.stderr, /Repair: commit or restore these tracked paths before dispatching: README\.md/u, pre.stderr.slice(0, 600));
+-  assert.equal(existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null, queueBefore, "no phantom queue row is left behind");
++  assert.equal(queueBytes(fx)?.toString("base64") ?? null, queueBefore, "no phantom queue row is left behind");
+   assert.deepEqual(pendingFiles(fx), [], "no pending state is left behind");
+   assert.deepEqual(memberFiles(), membersBefore, "no reserved registry member is left behind");
+   fx.gitOk("checkout", "-q", "--", "README.md");
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index c8ecfd882..4c304a7e1 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -26,6 +26,7 @@
+ //   (e) a second run is `already-registered` and byte-stable.
+ //   (f) the generated files' content names the Spec path and digest and nothing else from outside the package.
+ import assert from "node:assert/strict";
++import { readSliceQueueSource, sliceQueueLocation } from "../slice-queue-location.mjs";
+ import { createHash, generateKeyPairSync } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+@@ -221,6 +222,8 @@ test("(a) before registration the first item course is refused CAC-REGISTRATION-
+   assert.match(refused.reason, /registers no artifact at|registration field [A-Za-z0-9]+ is/u, JSON.stringify(refused));
+   assert.match(refused.repair, /register-feature-package/u, JSON.stringify(refused));
+   assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "a refused admission publishes no course");
++  // QG-04 (w229): nor a working copy under the Git common directory.
++  assert.equal(existsSync(sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" }).workingPath), false, "a refused admission writes no working copy");
+ });
+ 
+ test("(b) consumer-shaped: the CLI registers and creates both missing files; after the commit a regenerated binding prepares the course", () => {
+@@ -270,7 +273,11 @@ test("(b) consumer-shaped: the CLI registers and creates both missing files; aft
+   assert.notEqual(regenerated.candidateCommit, state.firstBinding.candidateCommit, "the pre-registration binding carried a stale candidate");
+   const prepared = prepareGovernedItemQueue({ root: fx.root, itemDelivery: regenerated.itemDelivery, candidate: fx.candidate(), writeScope: [SOURCE] });
+   assert.notEqual(prepared.status, "refused", JSON.stringify(prepared));
+-  const queue = JSON.parse(fx.read("specs/e2e/slice-queue.json"));
++  // QG-04 (w229): the prepared course is the working copy under the Git common directory; the tracked handover copy is
++  // written only by push-prepare, so the dispatch leaves it absent.
++  const location = sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" });
++  assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "the binding writes no tracked handover copy");
++  const queue = JSON.parse(readSliceQueueSource(location).bytes.toString("utf8"));
+   const slice = queue.slices.find((row) => row.id === regenerated.itemDelivery.sliceId);
+   assert.ok(slice, "the prepared course holds the item slice");
+   assert.equal(slice.state, "ready");
+diff --git a/plugins/pipeline-core/lib/slice-queue-location.mjs b/plugins/pipeline-core/lib/slice-queue-location.mjs
+new file mode 100644
+index 000000000..e46171581
+--- /dev/null
++++ b/plugins/pipeline-core/lib/slice-queue-location.mjs
+@@ -0,0 +1,194 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Where the governed slice queue lives (AC-108, closest accepted criterion; PO decision 2026-11-05).
++ *
++ * The WORKING copy of the approved feature's queue lives under the Git common directory, so a dispatch binding, a queue
++ * amendment, a rollback, a cancel and every slice-queue.mjs verb never make the working tree dirty and a branch switch never
++ * drags the queue along. The tracked `specs/<feature>/slice-queue.json` is the HANDOVER copy: push-prepare exports the working
++ * copy to it and commits it, and a machine with no working copy reads it byte-identical.
++ *
++ * Read rule (reads never write):
++ *   working copy present        -> read it, unless the handover copy changed since the last import/export while the working
++ *                                  copy did not (another machine pushed): then the handover bytes are read (handover wins)
++ *   working copy absent         -> the handover bytes, byte-identical, never re-serialised (the digest the caller binds is the
++ *                                  digest of these bytes)
++ *   both absent                 -> an ENOENT error, as before
++ *   both changed / no sidecar   -> the working copy wins and the result says `handoverConflict: true`
++ * A writer publishes the NEW bytes as the working copy (temp file beside it + rename, after a compare-and-swap on the bytes it
++ * read), which is the materialisation of a handover-only repository.
++ *
++ * Sidecar: next to the working copy, `<name>.sync.json` records the digest of the handover copy last imported or exported and the
++ * digest of the working copy at that moment. It is the only thing that tells "the other machine pushed" from "this one wrote".
++ *
++ * Outside a Git repository (no common directory) the working copy IS the handover path: the legacy behaviour, with no sidecar.
++ * Plain node:fs only; no new registry boundary.
++ */
++import { spawnSync } from "node:child_process";
++import { createHash, randomBytes } from "node:crypto";
++import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeSync } from "node:fs";
++import { dirname, join, resolve } from "node:path";
++
++export const SLICE_QUEUE_SYNC_SCHEMA = "pipeline.slice-queue-sync.v1";
++const DEFAULT_MAX_BYTES = 16 * 1024 * 1024;
++const HEX64 = /^[0-9a-f]{64}$/u;
++export const sliceQueueDigest = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++const commonDirs = new Map();
++/** The real Git common directory of a repository root (a linked worktree has a .git FILE: git resolves it), or null. */
++function gitCommonDir(root) {
++  if (commonDirs.has(root)) return commonDirs.get(root);
++  let found = null;
++  const run = spawnSync("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8", timeout: 5000, shell: false });
++  if (run.status === 0 && typeof run.stdout === "string" && run.stdout.trim() !== "") {
++    try { found = realpathSync(resolve(root, run.stdout.trim())); } catch { found = null; }
++  }
++  if (found !== null) commonDirs.set(root, found);
++  return found;
++}
++
++/** `planDir` is the repository-relative directory of the approved plan (`.` for the root). */
++export function sliceQueueLocation({ root, planDir }) {
++  const dir = String(planDir ?? ".").replaceAll("\\", "/").replace(/^\.\/+/u, "").replace(/\/+$/u, "") || ".";
++  const handoverPath = dir === "." ? "slice-queue.json" : `${dir}/slice-queue.json`;
++  let base = resolve(root);
++  try { base = realpathSync(base); } catch { /* a root that does not exist yet keeps its given spelling */ }
++  const handoverAbs = resolve(base, handoverPath);
++  const commonDir = gitCommonDir(base);
++  if (commonDir === null) return { handoverPath, handoverAbs, workingPath: handoverAbs, sidecarPath: null, directory: dirname(handoverAbs), shared: false };
++  const slug = dir.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 60) || "root";
++  const name = `${slug}-${sliceQueueDigest(Buffer.from(dir)).slice(0, 12)}`;
++  const directory = join(commonDir, "agent-pipeline", "slice-queues");
++  return { handoverPath, handoverAbs, workingPath: join(directory, `${name}.json`), sidecarPath: join(directory, `${name}.sync.json`), directory, shared: true };
++}
++
++/** The location of an already known handover path (`governed.path`). */
++export function sliceQueueLocationOf({ root, handoverPath }) {
++  return sliceQueueLocation({ root, planDir: dirname(handoverPath) });
++}
++
++/** One bounded read of a regular, non-symlink file; throws the ENOENT error of a missing file. */
++function readBoundedFile(path, maxBytes) {
++  const info = lstatSync(path);
++  if (info.isFile() && !info.isSymbolicLink() && info.size > maxBytes) throw Object.assign(new Error("too large"), { code: "SQ-DELIVERY-QUEUE-TOO-LARGE" });
++  if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path) throw new Error("unsafe");
++  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
++  try {
++    const opened = fstatSync(fd), bytes = readFileSync(fd), after = fstatSync(fd), current = lstatSync(path);
++    for (const key of ["dev", "ino", "mode", "nlink", "size", "mtimeMs", "ctimeMs"]) if (opened[key] !== info[key] || after[key] !== opened[key] || current[key] !== opened[key]) throw new Error("drift");
++    if (bytes.length !== opened.size) throw new Error("size");
++    return bytes;
++  } finally { closeSync(fd); }
++}
++export { readBoundedFile };
++
++function readOrNull(path, maxBytes) {
++  try { return readBoundedFile(path, maxBytes); } catch (error) { if (error?.code === "ENOENT") return null; throw error; }
++}
++
++function readSidecar(location) {
++  if (location.sidecarPath === null) return null;
++  try {
++    const value = JSON.parse(readOrNull(location.sidecarPath, 4096)?.toString("utf8") ?? "null");
++    const ok = (field) => value[field] === null || (typeof value[field] === "string" && HEX64.test(value[field]));
++    return value && value.schema === SLICE_QUEUE_SYNC_SCHEMA && ok("handoverSha256") && ok("workingSha256") ? { handoverSha256: value.handoverSha256, workingSha256: value.workingSha256 } : null;
++  } catch { return null; }
++}
++
++function atomicWrite(path, bytes, mode = 0o600) {
++  const temp = join(dirname(path), `.slice-queue.${randomBytes(16).toString("hex")}.tmp`);
++  let fd;
++  try {
++    fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), mode);
++    let offset = 0;
++    while (offset < bytes.length) { const written = writeSync(fd, bytes, offset, bytes.length - offset); if (written <= 0) throw new Error("short write"); offset += written; }
++    fsyncSync(fd); closeSync(fd); fd = undefined;
++    renameSync(temp, path);
++  } finally { if (fd !== undefined) closeSync(fd); try { unlinkSync(temp); } catch { /* renamed or never created */ } }
++}
++
++function writeSidecar(location, handoverSha256, workingSha256) {
++  if (location.sidecarPath === null) return;
++  atomicWrite(location.sidecarPath, Buffer.from(`${JSON.stringify({ schema: SLICE_QUEUE_SYNC_SCHEMA, handoverSha256, workingSha256 })}\n`));
++}
++
++/**
++ * The bytes a reader must use, with where they came from. Throws an ENOENT error when neither copy exists.
++ * `{ bytes, sha256, source: 'working'|'handover', handoverConflict, handoverSha256, workingSha256 }`
++ */
++export function readSliceQueueSource(location, { maxBytes = DEFAULT_MAX_BYTES } = {}) {
++  const handover = location.shared ? readOrNull(location.handoverAbs, maxBytes) : null;
++  const working = readOrNull(location.workingPath, maxBytes);
++  if (working === null && handover === null) throw Object.assign(new Error("slice queue absent"), { code: "ENOENT" });
++  const handoverSha256 = handover === null ? null : sliceQueueDigest(handover), workingSha256 = working === null ? null : sliceQueueDigest(working);
++  const answer = (bytes, source, handoverConflict) => ({ bytes, sha256: sliceQueueDigest(bytes), source, handoverConflict, handoverSha256, workingSha256 });
++  if (!location.shared) return { ...answer(working, "working", false), handoverSha256: workingSha256 };
++  if (working === null) return answer(handover, "handover", false);
++  if (handover === null || handoverSha256 === workingSha256) return answer(working, "working", false);
++  const side = readSidecar(location);
++  if (side === null) return answer(working, "working", true);
++  const handoverChanged = handoverSha256 !== side.handoverSha256, workingChanged = workingSha256 !== side.workingSha256;
++  if (handoverChanged && !workingChanged) return answer(handover, "handover", false);
++  return answer(working, "working", handoverChanged && workingChanged);
++}
++
++/**
++ * Publishes `bytes` as the working copy after a compare-and-swap on what the caller read (`preimage`: the result of
++ * readSliceQueueSource, or null when neither copy existed). `casError` builds the error thrown on a mismatch.
++ */
++export function writeWorkingQueue(location, bytes, preimage, { maxBytes = DEFAULT_MAX_BYTES, casError } = {}) {
++  let current = null;
++  try { current = readSliceQueueSource(location, { maxBytes }); } catch (error) { if (error?.code !== "ENOENT") throw error; }
++  if ((current?.sha256 ?? null) !== (preimage?.sha256 ?? null)) throw casError ? casError() : Object.assign(new Error("the slice queue changed since its read"), { code: "SQ-QUEUE-CAS" });
++  if (location.shared) mkdirSync(location.directory, { recursive: true, mode: 0o700 });
++  const side = readSidecar(location);
++  atomicWrite(location.workingPath, bytes);
++  // A handover copy adopted by this write is now the recorded import; otherwise the record is kept, so an unresolved conflict stays visible.
++  const handoverSha256 = preimage?.source === "handover" ? preimage.handoverSha256
++    : side !== null ? side.handoverSha256
++      : preimage && preimage.handoverSha256 !== null && preimage.handoverSha256 === preimage.sha256 ? preimage.handoverSha256 : null;
++  writeSidecar(location, handoverSha256, sliceQueueDigest(bytes));
++  return { sha256: sliceQueueDigest(bytes) };
++}
++
++/** Rollback of a write: restores the exact prior working bytes, or removes the working copy (and its sidecar) when there was none. */
++export function restoreWorkingQueue({ workingPath, sidecarPath = null }, bytes) {
++  if (bytes === null) {
++    unlinkSync(workingPath);
++    if (sidecarPath !== null) { try { unlinkSync(sidecarPath); } catch { /* none recorded */ } }
++    return;
++  }
++  const location = { workingPath, sidecarPath, shared: sidecarPath !== null };
++  const side = readSidecar(location);
++  atomicWrite(workingPath, bytes);
++  writeSidecar(location, side?.handoverSha256 ?? null, sliceQueueDigest(bytes));
++}
++
++/** `import --take-handover`: the working copy becomes the handover bytes, byte-identical. The caller decides whether that may lose a live reservation. */
++export function takeHandoverQueue(location, { maxBytes = DEFAULT_MAX_BYTES } = {}) {
++  if (!location.shared) return { status: "unchanged", code: "SQ-IMPORT-NO-WORKING-COPY" };
++  const handover = readOrNull(location.handoverAbs, maxBytes);
++  if (handover === null) return { status: "refused", code: "SQ-IMPORT-NO-HANDOVER", repair: `there is no handover copy at ${location.handoverPath} in this checkout: pull or check out the branch that carries it, then run the import again` };
++  const working = readOrNull(location.workingPath, maxBytes), handoverSha256 = sliceQueueDigest(handover);
++  if (working !== null && sliceQueueDigest(working) === handoverSha256) { writeSidecar(location, handoverSha256, handoverSha256); return { status: "unchanged", code: "SQ-IMPORT-UNCHANGED", sha256: handoverSha256 }; }
++  mkdirSync(location.directory, { recursive: true, mode: 0o700 });
++  atomicWrite(location.workingPath, handover);
++  writeSidecar(location, handoverSha256, handoverSha256);
++  return { status: "taken", code: "SQ-IMPORT-TAKEN", sha256: handoverSha256 };
++}
++
++/**
++ * push-prepare's export: the working copy is written to the handover path when it is the effective queue, is not in conflict and
++ * differs from the handover copy. Never overwrites a handover copy that another machine changed (that is a conflict: left alone).
++ */
++export function exportHandoverQueue(location, { maxBytes = DEFAULT_MAX_BYTES } = {}) {
++  if (!location.shared) return { status: "skipped", code: "SQ-EXPORT-NO-WORKING-COPY" };
++  let read;
++  try { read = readSliceQueueSource(location, { maxBytes }); } catch (error) { if (error?.code === "ENOENT") return { status: "skipped", code: "SQ-EXPORT-NO-QUEUE" }; throw error; }
++  if (read.source !== "working") return { status: "skipped", code: "SQ-EXPORT-HANDOVER-CURRENT" };
++  if (read.handoverConflict) return { status: "skipped", code: "SQ-EXPORT-CONFLICT" };
++  if (read.handoverSha256 === read.sha256) { writeSidecar(location, read.sha256, read.sha256); return { status: "skipped", code: "SQ-EXPORT-UNCHANGED" }; }
++  mkdirSync(dirname(location.handoverAbs), { recursive: true });
++  atomicWrite(location.handoverAbs, read.bytes, 0o644);
++  writeSidecar(location, read.sha256, read.sha256);
++  return { status: "exported", code: "SQ-EXPORTED", path: location.handoverPath, sha256: read.sha256 };
++}
+diff --git a/plugins/pipeline-core/scripts/audit-index.mjs b/plugins/pipeline-core/scripts/audit-index.mjs
+index dbe487832..57b138c81 100644
+--- a/plugins/pipeline-core/scripts/audit-index.mjs
++++ b/plugins/pipeline-core/scripts/audit-index.mjs
+@@ -18,6 +18,7 @@
+ 
+ import { createHash } from "node:crypto";
+ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
++import { readSliceQueueSource, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
+ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { hasPrivateTransferContent } from "../lib/bound-artifact-transfer.mjs";
+@@ -135,6 +136,16 @@ function readSmallJson(rootDir, rel) {
+   }
+ }
+ 
++/** The delivery course of a plan directory through the shared queue reader; never throws. */
++function readCourseJson(rootDir, directory) {
++  try {
++    const bytes = readSliceQueueSource(sliceQueueLocation({ root: rootDir, planDir: directory }), { maxBytes: MAX_JSON_BYTES }).bytes;
++    return { status: "present", value: JSON.parse(bytes.toString("utf8")) };
++  } catch (error) {
++    return { status: error?.code === "ENOENT" || error?.code === "ENOTDIR" ? "missing" : "invalid", value: null };
++  }
++}
++
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ 
+ /**
+@@ -176,7 +187,9 @@ export function collectAuditIndexInputs({ rootDir, featureId, state } = {}) {
+   if (isRepoPath(planPath)) {
+     const directory = dirname(planPath);
+     const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
+-    const course = readSmallJson(rootDir, coursePath);
++    // AC-108: read through the shared reader (working copy under the Git common directory, else the handover copy). `sources` keeps the tracked
++    // handover path: its digest in the index is the digest of that file, which equals the course read here once push-prepare exported it.
++    const course = readCourseJson(rootDir, directory);
+     if (course.status === "missing") missing.push({ step: "dispatch-records", reason: "no-delivery-course" });
+     else if (course.status !== "present" || !Array.isArray(course.value?.slices)) missing.push({ step: "dispatch-records", reason: "delivery-course-unreadable" });
+     else if (course.value.feature !== featureId) missing.push({ step: "dispatch-records", reason: "delivery-course-foreign" });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index b1668ee64..3d468c43b 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -19,6 +19,7 @@ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feat
+ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+ import { requiresPublicationReview, resolvePublicationReviewRequirement } from "../lib/publication-review-requirement.mjs";
+ import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
++import { readSliceQueueSource, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
+ import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
+ import { collectAuditIndex, readAuditIndexEvidence, writeAuditIndexEvidence } from "./audit-index.mjs";
+ import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+@@ -573,17 +574,16 @@ function deriveCriticAddenda(root, uncoveredIds) {
+ }
+ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = false }) {
+   const directory = dirname(feature.planPath);
+-  const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
+-  let size;
+-  try { size = lstatSync(join(root, coursePath)).size; }
++  // AC-108: the course is read through the shared reader (working copy under the Git common directory, else the tracked handover copy).
++  let courseBytes;
++  try { courseBytes = readSliceQueueSource(sliceQueueLocation({ root, planDir: directory }), { maxBytes: SLICE_QUEUE_MAX_BYTES }).bytes; }
+   catch (error) {
+     if (error?.code === "ENOENT") return;
+     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is unreadable; the Critic evidence gate fails closed");
+   }
+   let ids, slices, legacyCourse = false;
+   try {
+-    if (size > SLICE_QUEUE_MAX_BYTES) throw new Error("delivery course exceeds the slice-queue size bound");
+-    const course = readJsonFile(root, coursePath, "delivery course").value;
++    const course = JSON.parse(courseBytes.toString("utf8"));
+     if (!validateSliceQueue(course).ok || course.feature !== feature.id) throw new Error("delivery course is invalid or belongs to another feature");
+     slices = course.slices;
+     legacyCourse = course.schema === "pipeline.slice-queue.v1";
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 7ded96337..6f1377bd7 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -53,6 +53,7 @@ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+ import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
+ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+@@ -752,6 +753,46 @@ export function foldPendingPushApprovalWrite(dir, deps = {}, options = {}) {
+   return { folded: true };
+ }
+ 
++/**
++ * AC-108: the governed slice queue keeps its working copy under the Git common directory; the tracked
++ * `specs/<feature>/slice-queue.json` is only the handover copy. At the start of the report (next to the fold) the working copy is
++ * written to its handover path and exactly that path is committed, with the same trailer pair as the fold, so the next machine reads
++ * it. Only when the tree is otherwise clean (otherwise everything is left alone and the clean-tree check reports it), only when no
++ * recorded approval is outstanding for the current HEAD (the fold's gate: a commit would void it), and never when the handover copy
++ * moved on another machine (a conflict is left to `slice-queue.mjs import --take-handover`). A path the repository ignores is not
++ * written at all. Never throws; the git hooks and guard-push gain no refusal.
++ */
++export function exportGovernedQueueHandover(dir, deps = {}) {
++  try {
++    const context = resolveFeatureContext(dir, deps);
++    if (!context.ok || context.closedFeature === true) return { exported: false, reason: "no-active-feature" };
++    const location = sliceQueueLocation({ root: dir, planDir: dirname(context.planPath).split(sep).join("/") });
++    if (!location.shared) return { exported: false, reason: "no-git-common-dir" };
++    const status = typeof deps.gitStatus === "function" ? deps.gitStatus(dir) : rawGitStatus(dir, deps);
++    if (status === null) return { exported: false, reason: "status-unavailable" };
++    if (status.split("\n").some((line) => line !== "")) return { exported: false, reason: "other-dirty-paths" };
++    const head = resolveHeadCommit(dir, deps);
++    if (!head) return { exported: false, reason: "head-unavailable" };
++    const stateRead = (deps.readState ?? readState)(dir);
++    if (stateRead?.state?.pushApproval?.lastApproved?.forCommit === head) return { exported: false, reason: "approval-outstanding" };
++    const spawn = deps.spawn ?? spawnSync;
++    if (spawn("git", ["-C", dir, "check-ignore", "-q", "--", location.handoverPath], { encoding: "utf8" }).status === 0) return { exported: false, reason: "handover-path-ignored" };
++    const written = exportHandoverQueue(location);
++    if (written.status !== "exported") return { exported: false, reason: written.code };
++    if (!isSuccessfulSpawn(spawn("git", ["-C", dir, "add", "--", location.handoverPath], { encoding: "utf8" }))) return { exported: false, reason: "add-failed" };
++    const message = "chore(slice-queue): export the governed queue to its handover copy\n\n"
++      + "Auto-exported by push-prepare.mjs at the start of its own run (AC-108): the working copy of the\n"
++      + "approved feature's queue lives under the Git common directory, and this tracked file is the\n"
++      + "handover copy another machine reads.\n\n"
++      + "AI-Assisted: true\n"
++      + "Dispatch: stage-0 (elephant)\n";
++    if (!isSuccessfulSpawn(spawn("git", ["-C", dir, "commit", "-m", message, "--", location.handoverPath], { encoding: "utf8" }))) return { exported: false, reason: "commit-failed" };
++    return { exported: true, path: location.handoverPath };
++  } catch {
++    return { exported: false, reason: "export-unavailable" };
++  }
++}
++
+ /**
+  * The remedy for a missing Critic/Verify binding. A feature with registered course history is refused CCA-PARENT for the merge base:
+  * the base the preflight accepts there is the last registered round's candidate (the same derivation the preflight uses).
+@@ -794,7 +835,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`
+   // never has to be manually chased by a human/session noticing the dirty state file.
+   const foldPending = deps.foldPendingApprovalWrite ?? foldPendingPushApprovalWrite;
+-  if (options.foldPendingApprovalWrite !== false) foldPending(dir, deps);
++  if (options.foldPendingApprovalWrite !== false) {
++    foldPending(dir, deps);
++    // AC-108: the governed queue's handover copy is exported and committed the same way, when the tree is otherwise clean.
++    (deps.exportGovernedQueueHandover ?? exportGovernedQueueHandover)(dir, deps);
++  }
+ 
+   const headCommit = resolveHeadCommit(dir, deps);
+   // The slim profile pushes the exact checked-out branch; resolved once, for the PF-32 check and the push line.
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 224075039..12742968d 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -35,6 +35,7 @@ import {
+   checkPushThreatModel,
+   checkWorkingTreeClean,
+   criticalArtifactPaths,
++  exportGovernedQueueHandover,
+   foldPendingPushApprovalWrite,
+   isSecurityGateActive,
+   parseArgs,
+@@ -48,6 +49,7 @@ import {
+   resolveVerifyRemedyPlan,
+ } from "./push-prepare.mjs";
+ import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
++import { sliceQueueLocation, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
+ import { resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import { run as runPipelineState } from "./pipeline-state.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+@@ -1761,3 +1763,45 @@ test("D4a: checkPushThreatModel on a real project refuses a missing or empty mod
+     assert.match(inactiveMissing.remedy, /materialize-push-threat-model/u);
+   } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
+ });
++
++// AC-108 (closest accepted criterion): the governed queue's working copy lives under the Git common directory; push-prepare exports it to the tracked handover path.
++test("AC-108: push-prepare exports the governed queue's working copy to its handover path and commits exactly that path with the trailer pair, only on an otherwise clean tree", () => {
++  const root = foldFixtureRepo();
++  const location = sliceQueueLocation({ root, planDir: "specs/sprint-nova-epic" });
++  const queue = Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [] }, null, 2)}\n`);
++  writeWorkingQueue(location, queue, null);
++  assert.equal(gitAtFold(root, "status", "--porcelain").stdout, "", "a working copy under the Git common directory never dirties the tree");
++  // another dirty path: nothing is exported, nothing is committed
++  writeFileSync(join(root, "unrelated.txt"), "wip\n");
++  const head = gitAtFold(root, "rev-parse", "HEAD").stdout;
++  assert.deepEqual(exportGovernedQueueHandover(root), { exported: false, reason: "other-dirty-paths" });
++  assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout, head);
++  rmSync(join(root, "unrelated.txt"));
++  // clean tree: exported and committed
++  const result = exportGovernedQueueHandover(root);
++  assert.deepEqual(result, { exported: true, path: "specs/sprint-nova-epic/slice-queue.json" });
++  assert.deepEqual(readFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json")), queue, "the handover copy is the working bytes, byte-identical");
++  assert.equal(gitAtFold(root, "show", "--name-only", "--format=", "HEAD").stdout.trim(), "specs/sprint-nova-epic/slice-queue.json", "exactly that path is committed");
++  const message = gitAtFold(root, "log", "-1", "--format=%B").stdout;
++  assert.match(message, /^AI-Assisted: true$/mu);
++  assert.match(message, /^Dispatch: stage-0 \(elephant\)$/mu);
++  assert.equal(gitAtFold(root, "status", "--porcelain").stdout, "");
++  // nothing left to export
++  assert.equal(exportGovernedQueueHandover(root).exported, false);
++  // a handover copy another machine changed is never overwritten by an export
++  const theirs = Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [], note: "theirs" }, null, 2)}\n`);
++  writeFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json"), theirs);
++  gitAtFold(root, "commit", "-q", "-am", "theirs");
++  assert.equal(exportGovernedQueueHandover(root).exported, false);
++  assert.deepEqual(readFileSync(join(root, "specs/sprint-nova-epic/slice-queue.json")), theirs);
++});
++
++test("AC-108: the export never runs while a recorded approval is outstanding for the current HEAD (a commit would void it)", () => {
++  const root = foldFixtureRepo();
++  const location = sliceQueueLocation({ root, planDir: "specs/sprint-nova-epic" });
++  writeWorkingQueue(location, Buffer.from(`${JSON.stringify({ schema: "pipeline.slice-queue.v2", feature: "sprint-nova-epic", slices: [] }, null, 2)}\n`), null);
++  const head = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
++  const outstanding = { readState: () => ({ status: "ok", state: { activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md" }, pushApproval: { lastApproved: { forCommit: head } } } }) };
++  assert.deepEqual(exportGovernedQueueHandover(root, outstanding), { exported: false, reason: "approval-outstanding" });
++  assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout.trim(), head);
++});
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 6af2d4f30..191f98e12 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -81,7 +81,9 @@ function course(root) {
+ function governedRow(root, sliceId) {
+   const governed = resolveGovernedItemQueue({ root });
+   assert.equal(governed.status, "required", JSON.stringify(governed));
+-  return JSON.parse(readFileSync(resolve(root, governed.path), "utf8")).slices.find((row) => row.id === sliceId);
++  // QG-04 (w229): the governed queue is written to its working copy under the Git common directory, so the row is read from
++  // `workingPath`; `path` stays the tracked handover copy, which a dispatch no longer writes.
++  return JSON.parse(readFileSync(governed.workingPath, "utf8")).slices.find((row) => row.id === sliceId);
+ }
+ function repair(...argv) {
+   let text = "";
+@@ -361,7 +363,8 @@ const cases = [
+     const { original, runtime } = course(root);
+     const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-0", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
+     assert.equal(runtime.run(() => prepareGovernedItemQueue({ root, itemDelivery, candidate: original.candidate, writeScope: ["src/change.mjs"] })).status, "required");
+-    const before = readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path));
++    // QG-04 (w229): the prepared queue lives in its working copy, not in the tracked handover path.
++    const before = readFileSync(resolveGovernedItemQueue({ root }).workingPath);
+     const cwd = process.cwd();
+     process.chdir(root);
+     try {
+@@ -372,7 +375,7 @@ const cases = [
+         assert.equal(refused.exit, 2, JSON.stringify(refused.output)); assert.equal(refused.output.code, "SQ-CANCEL-CLASS");
+         for (const name of CANCEL_CLASSES) assert.ok(refused.output.repair.includes(name) && refused.output.repair.includes(CANCEL_CLASS_HELP[name]), `${name} is taught: ${refused.output.repair}`);
+       }
+-      assert.ok(readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path)).equals(before), "a refused cancel writes nothing");
++      assert.ok(readFileSync(resolveGovernedItemQueue({ root }).workingPath).equals(before), "a refused cancel writes nothing");
+       const cancelled = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", "--class", "superseded"]);
+       assert.equal(cancelled.exit, 0, JSON.stringify(cancelled.output));
+       assert.equal(cancelled.output.cancelClass, "superseded");
+diff --git a/plugins/pipeline-core/scripts/slice-queue.mjs b/plugins/pipeline-core/scripts/slice-queue.mjs
+index bc5c338c2..92a35b1e4 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.mjs
+@@ -34,7 +34,8 @@ import { createHash, randomBytes } from "node:crypto";
+ import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+ import { basename, dirname, join, resolve } from "node:path";
+ 
+-import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice } from "../lib/native-goldfish-host-state.mjs";
++import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
++import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
+ import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+@@ -43,7 +44,7 @@ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mj
+ import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+ import { sessionAuthorityRepairCommand } from "./session-authority-repair.mjs";
+ import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
+-import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_MAX_BYTES, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
+ 
+ export const CLI_SCHEMA = "pipeline.slice-queue-cli.v1";
+ export const EXIT = Object.freeze({ OK: 0, USAGE: 2, INVALID: 3, NOT_FOUND: 4, IO: 5 });
+@@ -72,6 +73,7 @@ function queueRoot() { return invocationRoot ?? process.cwd(); }
+ const LEDGER = ["session", "runner", "common-dir"];
+ const VERBS = {
+   validate: { positional: 0, flags: [...COMMON], repeatable: [] },
++  import: { positional: 0, flags: [...COMMON, "take-handover"], repeatable: [], booleans: ["take-handover"] },
+   next: { positional: 0, flags: [...COMMON, ...LEDGER, "limit", "evidence-dir", "stale-after-minutes"], repeatable: [] },
+   add: {
+     positional: 0,
+@@ -134,7 +136,7 @@ export function parseArguments(argv) {
+     if (flags.queue !== undefined) flags.queue = resolve(requested, flags.queue);
+   }
+   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
+-  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=resolve(queueRoot(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
++  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=governed.workingPath;else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
+   return { verb, positional, flags };
+ }
+ 
+@@ -153,15 +155,33 @@ function requireText(flags, name, verb) {
+ // ------------------------------------------------------------------ queue file
+ 
+ const queuePreimages=new Map();
++/** AC-108: the governed queue of this invocation when `path` names its working copy (or its tracked handover copy), else null. Such a queue is read
++ * through the working-copy/handover read rule and written at the working copy under the Git common directory. */
++function governedTargetOf(path) {
++  const governed = resolveGovernedItemQueue({ root: queueRoot() });
++  if (governed.status !== "required") return null;
++  const target = resolve(path);
++  if (target !== resolve(governed.workingPath) && target !== resolve(queueRoot(), governed.path)) return null;
++  return { governed, location: sliceQueueLocation({ root: realpathSync(queueRoot()), planDir: dirname(governed.path) }) };
++}
++function readGovernedSource(target) {
++  try { return readSliceQueueSource(target.location, { maxBytes: SLICE_QUEUE_MAX_BYTES }); }
++  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
++}
++const CONFLICT_REPAIR = "the handover copy and the working copy both changed and the working copy wins: run push-prepare to export the working copy, or node <plugin-root>/scripts/slice-queue.mjs import --take-handover to take the handover copy instead";
+ function loadRaw(path, { allowAbsent = false } = {}) {
+-  const loaded = loadSliceQueue(path, { platform: process.platform });
++  const target = governedTargetOf(path);
++  const read = target === null ? null : readGovernedSource(target);
++  const loaded = loadSliceQueue(path, { platform: process.platform, ...(target === null ? {} : { readFile: () => { if (read === null) throw Object.assign(new Error("absent"), { code: "ENOENT" }); return read.bytes.toString("utf8"); } }) });
+   if (loaded.status === "absent") {
+     if (allowAbsent){queuePreimages.set(resolve(path),null);return null;}
+     throw new CliError("SQ-NOT-FOUND", EXIT.NOT_FOUND, "slice queue file does not exist", { path: displayPath(path) });
+   }
+-  queuePreimages.set(resolve(path),createHash("sha256").update(readFileSync(path)).digest("hex"));
++  queuePreimages.set(resolve(path), target === null ? createHash("sha256").update(readFileSync(path)).digest("hex") : read.sha256);
++  if (target !== null && read !== null) loaded.queueSource = { source: read.source, handoverConflict: read.handoverConflict };
+   return loaded;
+ }
++const sourceReadback = (loaded) => (loaded.queueSource === undefined ? {} : { source: loaded.queueSource.source, handoverConflict: loaded.queueSource.handoverConflict, ...(loaded.queueSource.handoverConflict ? { repair: CONFLICT_REPAIR } : {}) });
+ const displayPath = (path) => path;
+ 
+ function invalidQueue(loaded) {
+@@ -171,15 +191,16 @@ function invalidQueue(loaded) {
+ /** Temp file + rename in the same directory. A failure removes the temp file. */
+ export function writeQueueAtomic(path,queue) {
+   if(queue.schema!=='pipeline.slice-queue.v2')return writeQueueAtomicBytes(path,queue);
+-  const governed=resolveGovernedItemQueue({root:queueRoot()});
+-  if(governed.status!=='required'||resolve(queueRoot(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
+-  const repository=inspectSignedDescriptorCustodyRepository(queueRoot());
++  const target=governedTargetOf(path);
++  if(target===null)throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
++  const {governed,location}=target,repository=inspectSignedDescriptorCustodyRepository(queueRoot());
+   return withSessionAuthorityBoundary({repository},()=>{
+     if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw new CliError('SQ-ITEM-OWNER-REQUIRED',EXIT.INVALID,'An actual Source requester is required.');
+-    const expected=queuePreimages.get(resolve(path)),info=lstatSync(path);
+-    if(expected===undefined||info.isSymbolicLink()||!info.isFile()||realpathSync(path)!==resolve(path)||createHash('sha256').update(readFileSync(path)).digest('hex')!==expected)throw new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.');
++    const expected=queuePreimages.get(resolve(path)),source=readGovernedSource(target);
++    if(expected===undefined||source===null||source.sha256!==expected)throw new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.');
+     for(const old of governed.queue.slices){const next=queue.slices.find(row=>row.id===old.id);if(!next||JSON.stringify(next.delivery)!==JSON.stringify(old.delivery)||JSON.stringify(next.writeScope)!==JSON.stringify(old.writeScope))throw new CliError('SQ-ITEM-BINDING-AMENDMENT-REQUIRED',EXIT.INVALID,'Original item binding and scope require the approved continuation.');}
+-    return writeQueueAtomicBytes(path,queue);
++    try{writeWorkingQueue(location,Buffer.from(`${JSON.stringify(queue,null,2)}\n`),source,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.')});}
++    catch(error){if(error instanceof CliError)throw error;throw new CliError('SQ-IO',EXIT.IO,`could not write the slice queue (${error?.code??'error'})`);}
+   });
+ }
+ function writeQueueAtomicBytes(path, queue) {
+@@ -287,7 +308,16 @@ function deriveStatus(flags, loaded) {
+ function verbValidate({ flags }) {
+   const loaded = loadRaw(resolve(flags.queue));
+   if (loaded.status !== "valid") throw invalidQueue(loaded);
+-  return { status: "valid", errors: [], warnings: loaded.warnings, slices: loaded.queue.slices.length };
++  return { status: "valid", errors: [], warnings: loaded.warnings, slices: loaded.queue.slices.length, ...sourceReadback(loaded) };
++}
++
++// AC-108: the one import there is. The working copy becomes the handover copy (another machine's push); refused with the command that
++// releases it when a live reservation would be lost. A refused import leaves everything as it was.
++function verbImport({ flags }) {
++  if (flags["take-handover"] !== true) throw usage("import: --take-handover is required (it replaces the working copy of the governed queue with the tracked handover copy)");
++  const result = importGovernedHandoverQueue({ root: queueRoot() });
++  if (result.status === "refused") throw new CliError(result.code, EXIT.INVALID, result.reason ?? "the handover copy was not imported", result.repair ? { repair: result.repair } : {});
++  return { status: result.status, code: result.code, ...(result.sha256 ? { sha256: result.sha256 } : {}), ...(result.queuePath ? { queuePath: result.queuePath } : {}) };
+ }
+ 
+ function verbNext({ flags }) {
+@@ -400,8 +430,7 @@ function verbCancel({ positional, flags }) {
+   const loaded = loadRaw(path);
+   if (loaded.status !== "valid") throw invalidQueue(loaded);
+   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
+-    const governed = resolveGovernedItemQueue({ root: queueRoot() });
+-    if (governed.status !== "required" || resolve(queueRoot(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
++    if (governedTargetOf(path) === null) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+     const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
+     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
+@@ -495,10 +524,10 @@ function verbReport({ flags }) {
+   });
+   // D75: how many slices ended for which reason; a slice cancelled before classes existed is counted `unclassified`.
+   const cancelClasses = Object.fromEntries([...CANCEL_CLASSES, UNCLASSIFIED_CANCEL].map((name) => [name, loaded.queue.slices.filter((entry) => entry.state === "cancelled" && entry.cancelClass === name).length]));
+-  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses }, ledger };
++  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses, ...sourceReadback(loaded) }, ledger };
+ }
+ 
+-const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
++const HANDLERS = { validate: verbValidate, import: verbImport, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
+ 
+ /** Runs the CLI; returns `{ exit, output }` (never throws, never writes). */
+ export function runCli(argv) {
