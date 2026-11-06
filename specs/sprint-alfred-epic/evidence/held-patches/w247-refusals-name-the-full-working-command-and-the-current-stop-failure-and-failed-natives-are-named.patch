@@ -1,0 +1,354 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index dc49f08f8..8185b3bed 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -52,25 +52,33 @@ export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result
+ 
+ const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
+ 
+-/** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
+-export function readNativeGoldfishStopFailure({ commonDir } = {}) {
++/**
++ * The stop-failure diagnostic to show (PF-61), or null. Diagnostic only: any fault reads as none. With a dispatchId the record of THAT
++ * dispatch (its newest) wins over a newer record of another dispatch; without one, or without a match, the newest record wins. `others`
++ * lists up to 3 further records, newest first (dispatch id, code, stage), so a second unresolved failure is never invisible.
++ */
++export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } = {}) {
+   try {
+     if (typeof commonDir !== "string" || commonDir.length === 0) return null;
+     const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+-    let newest = null;
++    const records = [];
+     for (const name of readdirSync(directory)) {
+       if (!/^stop-failure-[0-9a-f]+\.json$/u.test(name) && !/^stop-failure-[A-Za-z0-9_-]+\.json$/u.test(name)) continue;
+       let entry;
+       try { entry = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
+       if (entry?.schema !== STOP_FAILURE_SCHEMA || typeof entry.code !== "string") continue;
+       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
+-      if (!newest || observedAt > newest.observedAt) {
+-        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
++      {
++        records.push({ code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+           stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
+-          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) };
++          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) });
+       }
+     }
+-    return newest;
++    records.sort((a, b) => (a.observedAt < b.observedAt ? 1 : a.observedAt > b.observedAt ? -1 : 0));
++    const chosen = (typeof dispatchId === "string" && dispatchId !== "" ? records.find((r) => r.dispatchId === dispatchId) : null) ?? records[0] ?? null;
++    if (!chosen) return null;
++    const others = records.filter((r) => r !== chosen).slice(0, 3).map((r) => ({ dispatchId: r.dispatchId, code: r.code, stage: r.stage }));
++    return others.length > 0 ? { ...chosen, others } : chosen;
+   } catch { return null; }
+ }
+ 
+@@ -119,6 +127,13 @@ function healSentence(reason) {
+     : "";
+ }
+ 
++/** Further unresolved stop-failure records, bounded, so a second failed dispatch is named rather than hidden behind the first. */
++function describeOthers(others) {
++  if (!Array.isArray(others) || others.length === 0) return "";
++  const text = others.map((o) => `${String(o.dispatchId ?? "unknown").slice(0, 80)} (${String(o.code).slice(0, 60)}${o.stage ? `, stage ${String(o.stage).slice(0, 60)}` : ""})`).join("; ");
++  return ` Other unresolved stop-failure records, newest first: ${text}.`;
++}
++
+ function stopFailureNotice(failure) {
+   if (!failure || typeof failure.code !== "string") return null;
+   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
+@@ -129,7 +144,7 @@ function stopFailureNotice(failure) {
+     : failure.code === "NGHF-COMMIT-EXCEPTION"
+       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
+       : "";
+-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}`;
++  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
+ }
+ 
+ export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
+@@ -190,7 +205,7 @@ if (isDirectInvocation(import.meta.url)) {
+   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
+   let stopFailure = null;
+   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
+-    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
++    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result?.dispatchId ?? null }); }
+     catch { stopFailure = null; }
+   }
+   let block = null;
+diff --git a/plugins/pipeline-core/lib/authority-trace-hook.mjs b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+index 7115d26b2..512ea817b 100644
+--- a/plugins/pipeline-core/lib/authority-trace-hook.mjs
++++ b/plugins/pipeline-core/lib/authority-trace-hook.mjs
+@@ -76,6 +76,9 @@ export async function installHookAuthorityTrace(options = {}) {
+             maxMs: Math.max(o.maxMs ?? 0, a.maxMs ?? 0),
+             failed: (o.failed ?? 0) + (a.failed ?? 0),
+             byOperation: a.byOperation ?? {},
++            // Why each failed native observation failed (shared bounded list, at most 20): operation, call site (file:line), bounded error code. No path, no value.
++            // Present only when something failed, so a clean line keeps its v1 shape.
++            ...((a.failures ?? o.failures ?? []).length ? { failures: a.failures ?? o.failures } : {}),
+           },
+           // persistedHits: the share of the hits answered from the cross-process memo (the 19g measurement could not tell it apart).
+           authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, persistedHits: a.authorityMemoPersistedHits ?? 0, size: a.authorityMemoSize ?? 0 },
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index fe644e9d2..ad3ad2915 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
+ import {lstatSync,openSync,readFileSync,readSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
+ import {fileURLToPath} from 'node:url';
+ import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
+-import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
++import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment,nativeCallSites,nativeFailureCode,nativeFailureList,recordNativeFailure} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ import {assertAdmissionDeadline} from './admission-deadline.mjs';
+ 
+@@ -38,18 +38,6 @@ export function recordNativeAuthoritySpawn(operation,ms,ok){
+ // appends one line naming the operation, its duration and the two nearest callers outside the native modules (file:line only, no path,
+ // no input). A process the host ends leaves no exit line, and one counter line cannot say which caller made 220 observations; this can.
+ // Nothing runs without the trace: the stack is only read when a writer exists.
+-const NATIVE_SITE_SKIP=/windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
+-function nativeCallSites(){
+- const limit=Error.stackTraceLimit;Error.stackTraceLimit=40;let stack='';
+- try{stack=String(new Error().stack??'');}finally{Error.stackTraceLimit=limit;}
+- const sites=[];
+- for(const line of stack.split('\n').slice(1)){
+-  const match=/([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
+-  if(match===null||NATIVE_SITE_SKIP.test(line))continue;
+-  sites.push(`${match[1]}:${match[2]}`);if(sites.length===2)break;
+- }
+- return sites.join('<');
+-}
+ function nativeSpawnMark(name,ms){
+  try{
+   const progress=globalThis[Symbol.for('pipeline.authority-trace-progress')];
+@@ -148,7 +136,7 @@ export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform
+ export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();persisted=null;persistedDirty=0;persistedDropped.clear();}
+ export function nativeAuthorityStats(){
+  const byOperation={};for(const name of [...nativeAuthorityByOperation.keys()].sort())byOperation[name]=nativeAuthorityByOperation.get(name);
+- return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
++ return {...nativeAuthorityCounters,byOperation,failures:nativeFailureList(),authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
+ }
+ function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
+ // A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
+@@ -274,8 +262,9 @@ function invokeNative(request){
+  let executable=null;if(testSeam.spawn!==undefined)executable='test-seam';else for(const candidate of WINDOWS_POWERSHELL_PATHS){try{const stat=lstatSync(candidate);if(stat.isFile()&&!stat.isSymbolicLink()&&realpathSync(candidate).toLowerCase()===candidate.toLowerCase()){executable=candidate;break;}}catch{/* fixed system locations only */}}
+  if(executable===null)fail('WIN-AUTH-SYSTEM-HELPER-UNAVAILABLE');
+  // Execute the measured source bytes, not a subsequently reopened helper pathname.
+- const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch{recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
++ const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch(thrown){recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);recordNativeFailure(request.operation,typeof thrown?.code==='string'&&/^[A-Z0-9_]{1,32}$/u.test(thrown.code)?thrown.code:'spawn-threw');fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
++ if(!isSuccessfulSpawn(result))recordNativeFailure(request.operation,nativeFailureCode(result));
+  let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
+  if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);
+diff --git a/plugins/pipeline-core/lib/windows-private-state.mjs b/plugins/pipeline-core/lib/windows-private-state.mjs
+index 10ca6dbbf..7b7526aac 100644
+--- a/plugins/pipeline-core/lib/windows-private-state.mjs
++++ b/plugins/pipeline-core/lib/windows-private-state.mjs
+@@ -178,6 +178,10 @@ export function sanitizeChildEnvironment(environment) {
+  * number, a closed token or an identifier-shaped name, so the reason can never carry a path or a localized message.
+  */
+ function childFailureReason(operation, result) {
++  const parts = nativeFailureCodeParts(result);
++  return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
++}
++function nativeFailureCodeParts(result) {
+   const parts = [];
+   if (Number.isInteger(result?.status)) parts.push(`exit ${result.status}`);
+   const code = result?.error?.code;
+@@ -186,12 +190,38 @@ function childFailureReason(operation, result) {
+   if (typeof signal === "string" && /^SIG[A-Z0-9]{1,16}$/u.test(signal)) parts.push(signal);
+   const typed = new RegExp(`^${CHILD_ERROR_TYPE_MARKER}([A-Za-z0-9_]{1,64})\\r?$`, "mu").exec(String(result?.stderr ?? ""));
+   if (typed) parts.push(typed[1]);
+-  return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
++  return parts;
++}
++/** Bounded error code of a failed native child (exit status, spawn error code, signal, thrown type name): numbers and closed tokens only, never a path or message. */
++export function nativeFailureCode(result) { const parts = nativeFailureCodeParts(result); return parts.length > 0 ? parts.join(", ").slice(0, 96) : "unknown"; }
++
++// Opt-in authority trace: the call site is file:line of the two nearest callers outside the native modules -- no path, no input.
++const NATIVE_SITE_SKIP = /windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
++export function nativeCallSites() {
++  const limit = Error.stackTraceLimit; Error.stackTraceLimit = 40;
++  let stack = "";
++  try { stack = String(new Error().stack ?? ""); } finally { Error.stackTraceLimit = limit; }
++  const sites = [];
++  for (const line of stack.split("\n").slice(1)) {
++    const match = /([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
++    if (match === null || NATIVE_SITE_SKIP.test(line)) continue;
++    sites.push(`${match[1]}:${match[2]}`); if (sites.length === 2) break;
++  }
++  return sites.join("<");
++}
++const NATIVE_FAILURE_LIMIT = 20;
++const nativeFailures = [];
++/** Remember why one native observation failed (diagnostics only; kept only while the opt-in trace writer exists, at most 20). */
++export function recordNativeFailure(operation, code) {
++  if (typeof globalThis[Symbol.for("pipeline.authority-trace-progress")] !== "function") return;
++  if (nativeFailures.length >= NATIVE_FAILURE_LIMIT) return;
++  nativeFailures.push({ operation: String(operation).replace(/[^A-Za-z0-9_.:-]/gu, "?").slice(0, 64), site: nativeCallSites(), code: String(code).slice(0, 96) });
+ }
++export function nativeFailureList() { return nativeFailures.map((entry) => ({ ...entry })); }
+ 
+ // Opt-in authority trace (diagnostics only): plain module-level counters of every native PowerShell spawn made here.
+ const nativeObservationCounters = { count: 0, ms: 0, maxMs: 0, failed: 0 };
+-export function nativeObservationStats() { return { ...nativeObservationCounters }; }
++export function nativeObservationStats() { return { ...nativeObservationCounters, failures: nativeFailureList() }; }
+ function recordNativeObservation(startedAt, succeeded) {
+   const elapsed = Date.now() - startedAt;
+   nativeObservationCounters.count += 1;
+@@ -212,6 +242,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
+     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
+   });
+   recordNativeObservation(startedAt, isSuccessfulSpawn(result));
++  if (!isSuccessfulSpawn(result)) recordNativeFailure(operation, nativeFailureCode(result));
+   if (!isSuccessfulSpawn(result)) return unavailable(childFailureReason(operation, result));
+   return result;
+ }
+diff --git a/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs b/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs
+new file mode 100644
+index 000000000..6507e5ef2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19K-W247 agent guidance (AC-108): a refusal names the full working command, the stop-failure context names the dispatch that
++// just stopped, and a failed native observation says why in the authority trace. Plain node:test; needs registration in Verify.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join, resolve } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath, pathToFileURL } from "node:url";
++import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
++import { CANCEL_CLASSES } from "../lib/slice-queue.mjs";
++
++const HERE = dirname(fileURLToPath(import.meta.url));
++const PLUGIN = resolve(HERE, "..");
++const SCRATCH = resolve(PLUGIN, "..", "..", "scratch", "W247-guidance");
++const sandboxes = [];
++function sandbox() { mkdirSync(SCRATCH, { recursive: true }); const dir = mkdtempSync(join(SCRATCH, "t-")); sandboxes.push(dir); return dir; }
++test.after(() => { for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true }); });
++
++function cli(cwd, args) {
++  const child = spawnSync(process.execPath, [join(HERE, "slice-queue.mjs"), ...args], { cwd, encoding: "utf8", timeout: 30_000 });
++  let json = null; try { json = JSON.parse(child.stdout); } catch { /* asserted by the caller */ }
++  return { status: child.status, json };
++}
++function queueFile(dir) {
++  const rel = "specs/demo/slice-queue.json";
++  mkdirSync(join(dir, "specs", "demo"), { recursive: true });
++  writeFileSync(join(dir, ...rel.split("/")), `${JSON.stringify({ schema: "pipeline.slice-queue.v1", feature: "demo", slices: [{ id: "A", title: "a", state: "ready", writeScope: ["a.mjs"], tier: "implementor", commitMode: "diff-only", loadClass: "light" }] })}\n`);
++  return rel;
++}
++
++test("W247-1 a bare cancel refusal names every required flag, the class list and --started in one message", () => {
++  const dir = sandbox();
++  const result = cli(dir, ["cancel", "A", "--queue", queueFile(dir)]);
++  assert.equal(result.status, 2);
++  const message = result.json.message;
++  for (const part of ["--reason", "--class", "[--started]", ...CANCEL_CLASSES, "Full command: cancel <id>"]) assert.ok(message.includes(part), `names ${part}`);
++});
++
++test("W247-2 a refusal that misses only --reason or only --class still carries the full command and says when --started applies", () => {
++  const dir = sandbox();
++  const rel = queueFile(dir);
++  for (const args of [["--class", "budget"], ["--reason", "x"]]) {
++    const result = cli(dir, ["cancel", "A", "--queue", rel, ...args]);
++    assert.equal(result.status, 2);
++    assert.match(result.json.message, /Full command: cancel <id> \[--started\] --reason "<why>" --class </u);
++    assert.match(result.json.message, /add --started only when the slice was already started/u);
++  }
++  const add = cli(dir, ["add", "--queue", rel]);
++  assert.match(add.json.message, /--id, --title, --write-scope are required\. Full command: add --id/u, "add names all three missing flags at once");
++});
++
++test("W247-3 with two stop-failure records the hook context names the dispatch that just stopped and lists the other", () => {
++  const dir = sandbox();
++  const diagnostics = join(dir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++  mkdirSync(diagnostics, { recursive: true });
++  const record = (id, observedAt, extra = {}) => writeFileSync(join(diagnostics, `stop-failure-${id}.json`), JSON.stringify({
++    schema: "pipeline.native-goldfish-host-stop-failure.v1", code: "SDC-AUTHORITY-UNAVAILABLE", dispatchId: id, observedAt, stage: "authority-terminal-prepare", reason: "native-managed-repository-drift", ...extra }));
++  record("gf-probe-34", "2026-11-06T09:00:00.000Z");
++  record("gf-probe-41", "2026-11-06T10:00:00.000Z");
++  const older = readNativeGoldfishStopFailure({ commonDir: dir, dispatchId: "gf-probe-34" });
++  assert.equal(older.dispatchId, "gf-probe-34", "the record of the dispatch that just stopped wins over a newer one");
++  assert.equal(older.others[0].dispatchId, "gf-probe-41");
++  const newest = readNativeGoldfishStopFailure({ commonDir: dir });
++  assert.equal(newest.dispatchId, "gf-probe-41", "without a dispatch id the newest record is shown");
++  const message = nativeGoldfishHookMessage({ status: "not-applicable" }, { stopFailure: newest });
++  for (const part of ["gf-probe-41", "SDC-AUTHORITY-UNAVAILABLE", "stage authority-terminal-prepare", "reason native-managed-repository-drift", "Other unresolved stop-failure records", "gf-probe-34"]) assert.ok(message.includes(part), `names ${part}`);
++});
++
++test("W247-4 a failed native observation appears in the trace line with operation, site and a bounded code, and no path", () => {
++  const dir = sandbox();
++  const traceFile = join(dir, "trace.jsonl");
++  const state = pathToFileURL(join(PLUGIN, "lib", "windows-private-state.mjs")).href;
++  const hook = pathToFileURL(join(PLUGIN, "lib", "authority-trace-hook.mjs")).href;
++  const body = `import { installHookAuthorityTrace } from ${JSON.stringify(hook)};
++await installHookAuthorityTrace({ hook: "w247" });
++const { recordNativeFailure } = await import(${JSON.stringify(state)});
++recordNativeFailure("publish-file", "exit 1, ETIMEDOUT");
++`;
++  const script = join(dir, "child.mjs");
++  writeFileSync(script, body);
++  const child = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 30_000, env: { ...process.env, PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: traceFile } });
++  assert.equal(child.status, 0, child.stderr);
++  const line = readFileSyncText(traceFile, "utf8").trim().split("\n").at(-1);
++  const failures = JSON.parse(line).nativeObservations.failures;
++  assert.equal(failures.length, 1);
++  assert.equal(failures[0].operation, "publish-file");
++  assert.equal(failures[0].code, "exit 1, ETIMEDOUT");
++  assert.match(failures[0].site, /^child\.mjs:\d+$/u, "file:line only");
++  assert.ok(!line.includes(dir), "the trace line carries no path");
++});
++
++import { readFileSync as readFileSyncText } from "node:fs";
+diff --git a/plugins/pipeline-core/scripts/slice-queue.mjs b/plugins/pipeline-core/scripts/slice-queue.mjs
+index 92a35b1e4..0b9d03e0f 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.mjs
+@@ -355,6 +355,8 @@ function verbAdd({ flags }) {
+     if (flags["init-feature"] !== undefined) throw usage("add: --init-feature is only for a queue that does not exist yet");
+     raw = structuredClone(loaded.raw);
+   }
++  const absent = [...["id", "title"].filter((name) => typeof flags[name] !== "string" || flags[name].trim() === ""), ...(flags["write-scope"]?.length ? [] : ["write-scope"])];
++  if (absent.length > 0) throw usage(`add: ${absent.map((name) => `--${name}`).join(", ")} ${absent.length > 1 ? "are" : "is"} required. Full command: add --id <id> --title "<title>" --write-scope <path> [--write-scope <path> ...] [other flags]`);
+   const id = requireText(flags, "id", "add");
+   const title = requireText(flags, "title", "add");
+   if (!flags["write-scope"]?.length) throw usage("add: at least one --write-scope is required");
+@@ -422,17 +424,22 @@ function verbDepend({ positional, flags }) {
+ // through the authenticated course writer; a plain queue is edited like the other declarations.
+ // D75: --class says why the slice ends (one of CANCEL_CLASSES); a later re-dispatch is decided from it. It is checked
+ // before any queue read, so a refused call touches nothing, and the refusal teaches every class from its own text.
++const CANCEL_USAGE = `Full command: cancel <id> [--started] --reason "<why>" --class <${CANCEL_CLASSES.join("|")}>; add --started only when the slice was already started (it has a native dispatch state or an AGY reservation) and its Goldfish no longer runs.`;
+ function verbCancel({ positional, flags }) {
+-  const reason = requireText(flags, "reason", "cancel");
+   const verdict = checkCancelClass(flags.class);
+-  if (!verdict.ok) throw new CliError(verdict.code, EXIT.USAGE, `cancel: --class is required. ${verdict.reason}`, { repair: verdict.repair, classes: CANCEL_CLASS_HELP });
++  const hasReason = typeof flags.reason === "string" && flags.reason.trim() !== "";
++  if (!hasReason || !verdict.ok) {
++    const missing = [...(hasReason ? [] : ["--reason"]), ...(verdict.ok ? [] : ["--class"])].join(" and ");
++    throw new CliError(verdict.ok ? "SQ-USAGE" : verdict.code, EXIT.USAGE, `cancel: ${missing} ${missing.includes("and") ? "are" : "is"} required. ${CANCEL_USAGE}${verdict.ok ? "" : ` ${verdict.reason}`}`, { ...(verdict.ok ? {} : { repair: verdict.repair }), classes: CANCEL_CLASS_HELP });
++  }
++  const reason = flags.reason.trim();
+   const path = resolve(flags.queue);
+   const loaded = loadRaw(path);
+   if (loaded.status !== "valid") throw invalidQueue(loaded);
+   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
+     if (governedTargetOf(path) === null) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+     const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
+-    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
++    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, `${result.reason ?? "the slice was not cancelled"}${result.code === "SQ-ITEM-CANCEL-STARTED" ? ` Repair: ${CANCEL_USAGE}` : ""}`, { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
+   }
+   const raw = structuredClone(loaded.raw);
+@@ -448,6 +455,8 @@ function verbCancel({ positional, flags }) {
+ 
+ function verbPause({ flags }) {
+   const by = flags.by;
++  const absent = ["by", "reason", "until"].filter((name) => typeof flags[name] !== "string" || flags[name].trim() === "");
++  if (absent.length > 0) throw usage(`pause: ${absent.map((name) => `--${name}`).join(", ")} ${absent.length > 1 ? "are" : "is"} required. Full command: pause --by <po|elephant> --reason "<why>" --until <ISO-8601 UTC timestamp, at most 4 hours ahead> --session <id>`);
+   if (by !== "po" && by !== "elephant") throw usage("pause: --by must be po or elephant");
+   const reason = requireText(flags, "reason", "pause");
+   const now = nowMs(flags);
