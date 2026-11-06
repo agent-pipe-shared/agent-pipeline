@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "35e7fd92f64f3e604e25195d9feedde85b1732f1",
-    "tree": "dd40e12d2fb21822749bba416ae67398833e9f88"
+    "commit": "13ad469873a03e461bc0b206b84e37eb2f030e65",
+    "tree": "1f7057b965a2fc973c25e6bc0a34fa13daf78f01"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -397,6 +397,7 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:custody-inspection-spawns-tests",
         "verify-phase:harness/scripts/verify.mjs:d3-signed-reconcile-commit-tests",
         "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
         "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
@@ -639,8 +640,8 @@
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-fanout-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
-        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-pair-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:native-managed-inventory-reuse-tests",
         "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
@@ -1096,10 +1097,10 @@
         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fewer-checks-tests",
-        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-leftover-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fsync-tests",
-        "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-leftover-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-repair-aside-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-lost-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
@@ -1190,7 +1191,6 @@
         "verify-phase:harness/scripts/verify.mjs:worktree-count-check-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
-        "verify-phase:harness/scripts/verify.mjs:custody-inspection-spawns-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-process-start-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-target-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
