@@ -545,6 +545,14 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   2. Windows: heal; pair A and pair B, both background, with the second stop starting during the first one's commit, so both host commits land; check that a forced or real stop failure is shown as `systemMessage`.
   3. Greenfield, then Full Verify and Critics, then PO acceptance.
 
+- PO applied (f4a0ee031 to 73d02d8d9), stamp 0acdc1980 (`0.7.0+claude.20261106164610.73d02d8`), installed on Linux and Windows.
+- Both machines refreshed their hooks once, and the heal gave `healed`. On Windows it retired gf-probe-46 to 48 and the gf-probe-48 stop-failure record, with `staleMemberMoveAside: moved-aside`.
+- **Windows pair C on 19l (gf-probe-51/52, background): both host commits landed** (9e8f647, 9c14ea2, Dispatch trailers, no stop-failure record).
+  - Stop 52 started 0.6 s before 51's commit while stop 51 still ran. It waited for the lock, re-read (a second `pending-auth` round) and committed at 18.1 s. This is the 19k pair-A case, now fixed on Windows.
+  - Admissions took 68 and 79 s, with 15 and 32 failed natives. Stops took 64.6 and 69.6 s.
+  - The w247 `failures` entries are path-free, as proven on Windows: `publish`, `session-authority-registry.mjs:146<366`, code `exit 1`, capped at 20 entries.
+  - Afterwards: registry readable, inFlight 0.
+  - Minor findings, not critical, for later: the `failures` code `exit 1` does not say why the publish failed; the preflight lock check stays `degraded` ("could not be observed") although the lock is absent, on both machines.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
