@@ -569,7 +569,7 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   - Fixes all ten reds; the details are in the w251 notes.
   - The preflight lock row: the probe passed the wrong repository shape and therefore always read `unknown`; it now reads `absent` when there is no lock.
   - The failures code now names the cause next to the exit status: the helper's `WIN-AUTH-*` code, `no-code` or `no-json`.
-  - Rehearsal `w24reh/c19m`: exit 0, registration 1183, case-completion 392, append history green (70 commits), all 14 former reds green, inventory sorted after the refresh.
+  - Rehearsal `w24reh/c19m`: exit 0, registration 1183, case-completion 392, append history green (70 commits), all 14 former reds green, inventory sorted after the refresh, gitleaks probe PASS (0 unsuppressed; the first scan only hit untracked fixture leftovers of the suite runs in that clone, removed before the rescan).
   - Open: PO apply, stamp on the PO's call, a fresh Full Verify, the Windows run, Critic, PO acceptance.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
