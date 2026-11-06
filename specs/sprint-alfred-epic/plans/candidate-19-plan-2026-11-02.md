@@ -425,6 +425,12 @@ CPU profile of one warm dispatch on Windows (19h, gf-probe-25, `NODE_OPTIONS=--c
 
 Reading: w235 and w234 did what they were built for; the dispatch itself is down about 15 s but nowhere near 60 s, and the stop hook (about 160 s, lock held) is now the largest single cost and the reason siblings lose the lock. The next E4 site is the integration readiness read (same class as w233: one boundary entry without a lock retry inside the admission deadline). Whether to continue latency work is the PO's decision.
 
+### Candidate 19i build and Linux baseline (2026-11-06)
+
+Held patches (one commit each, applied in this order by `po-apply-0.7-candidate19i.sh`): w236 (48120ddbe), w239 (9f78d1fe6), w241 (f085402ba), w238 (576c348d4, fix 925df4371), w237 (7e30a063c), w240 registration (cd56371b3); apply script f6754aab1. Rehearsal in a fresh clone of f6754aab1: exit 0, registration 1179/0 unregistered, case-completion valid (391 entries), gitleaks PASS.
+
+Linux baseline on the installed 19h (one Goldfish probe dispatch, `PIPELINE_AUTHORITY_TRACE` on, Linux trace file lines 37 to 103, rough comparison only, n = 1): admission 79.5 s (1008 custody inspections, 15 s; dispatch checks done at 16.9 s, prescan 27.6 s, lock wait 58.1 s, lock held 60.7 s, prepare done 79.8 s), PostToolUse 4.9 s, SubagentStop 129.3 s (2506 custody inspections, 21 s; commit at 99.1 s). So the git and registry costs w236 to w241 target are not Windows-only. The same probe runs after 19i is installed; the Windows measurement follows through the peer.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
