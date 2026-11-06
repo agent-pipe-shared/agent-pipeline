@@ -534,6 +534,12 @@ function nativeAuthorityScan(owner) {
       nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(entry.relativePath,operation);
     }
     if (operation.pendingSha256 && operation.pendingSha256!==entry.sourceFact.sha256) throw nativeManagedFault('native-authority-pending-drift');
+  }
+  // C19K-W245: every pending state owns its operation before any state is checked against another one. The receipt lineage below looks up the
+  // sibling pending state a receipt names; created in file-name order inside one loop, that sibling's operation did not exist yet whenever its
+  // name sorted after the receipt-bearing state, and a process with no operation from an earlier scan refused the whole registry as unowned.
+  for (const entry of pending) {
+    const state=entry.value,operation=owner.operations.get(entry.relativePath),retainedOwner=byName.get(`authority-owner-${entry.sourceFact.sha256}.json`);
     const scopes=nativeScopeAmendments(read,entry,operation);
     const terminal=byName.get(`authority-terminal-${entry.sourceFact.sha256}.json`);
     if(terminal){
