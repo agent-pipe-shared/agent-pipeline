@@ -1,0 +1,681 @@
+diff --git a/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs b/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs
+index f2e7762c6..9a6cf523d 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs
+@@ -119,7 +119,7 @@ test("C19I-W238-1 (O7) a file read in the boundary is not inspected a second tim
+   const stray = join(repository.commonDir, ROOT, "zz-unknown.json");
+   writeFileSync(stray, "{}", { mode: 0o600 });
+   calls.length = 0;
+-  assert.throws(() => enter(repository, (token) => registry.healSessionAuthorityDrift({ boundary: token })), (error) => error.reason === "unknown-registry-entry");
++  assert.throws(() => enter(repository, (token) => registry.healSessionAuthorityDrift({ boundary: token })), (error) => /^unknown-registry-entry: zz-unknown\.json \(schema none\)$/u.test(error.reason)); // C19J-W243: the same refusal, now naming the entry
+   const strays = calls.filter((c) => c.op === "inspect" && !c.directory);
+   assert.deepEqual(strays.map((c) => c.path), [stray], "a file the boundary never read is inspected natively before it is refused as unknown");
+ })));
+diff --git a/plugins/pipeline-core/lib/session-authority-registry-leftover.test.mjs b/plugins/pipeline-core/lib/session-authority-registry-leftover.test.mjs
+new file mode 100644
+index 000000000..94f1276e6
+--- /dev/null
++++ b/plugins/pipeline-core/lib/session-authority-registry-leftover.test.mjs
+@@ -0,0 +1,214 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19J-W243 (AC-108): the registry names an entry it refuses, and no writer leaves an unindexed file behind under ROOT.
++// Windows semantics run on Linux through the registry's platform seam (rename/unlink faults, a fake helper spawn that leaves its temp behind).
++//   C19J-W243-1  the refusal for an unindexed entry names the registry-relative path and the parsed schema
++//   C19J-W243-2  a member published before a producer publication that fails (rename EPERM) is moved aside, and the publish temp is not left behind
++//   C19J-W243-3  a rename that fails with EPERM once on the aside move is retried: the leftover still ends outside the walk
++//   C19J-W243-4  a leftover that cannot be moved aside is never kept silently: the refusal names its path
++//   C19J-W243-5  a Windows lock create that fails leaves no helper temp (.authority-*.tmp) behind in the registry root (the same sweep serves a failed native publish)
++//   C19J-W243-6  a move-aside that faults part-way puts every moved entry back
++import test from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import { createHash, randomBytes } from "node:crypto";
++import { devNull, hostname } from "node:os";
++import { dirname, join } from "node:path";
++import { canonical } from "./po-approval-proof.mjs";
++import { observeLinuxProcess } from "./native-platform-process-observer.mjs";
++import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
++import * as registry from "./session-authority-registry.mjs";
++import * as backend from "./windows-owned-authority-backend.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
++import { createGovernanceScopeController } from "./governance-scope.mjs";
++import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
++import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
++import { prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
++import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
++
++const { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } = registry;
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const linuxOnly = { skip: process.platform !== "linux" };
++const ROOT = "agent-pipeline/session-authority";
++const ABANDONED = "agent-pipeline/session-authority-abandoned";
++const enter = (repository, callback = () => null) => withSessionAuthorityBoundary({ repository }, callback);
++const eperm = (what) => Object.assign(new Error(`injected ${what}`), { code: "EPERM" });
++
++function fixture(run) {
++  const parent = nativeContractFixtureParent();
++  mkdirSync(parent, { recursive: true, mode: 0o700 });
++  const root = mkdtempSync(join(parent, "session-authority-leftover-"));
++  try {
++    mkdirSync(join(root, "evidence"), { mode: 0o700 });
++    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
++    for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", devNull]]) assert.equal(spawnSync("git", ["-C", root, "config", name, value]).status, 0);
++    assert.equal(spawnSync("git", ["-C", root, "commit", "--allow-empty", "-q", "-m", "fixture"]).status, 0);
++    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
++    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit course" });
++    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
++    const original = prepareApprovedItemCourseFixture({ root });
++    const repository = inspectSignedDescriptorCustodyRepository(root);
++    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
++    return run({ root, repository, original });
++  } finally { registry.setSessionAuthorityRegistryTestSeam?.(undefined); rmSync(root, { recursive: true, force: true }); }
++}
++
++const hostPrompt = (binding) => `Goldfish briefing\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}\nReturn contract follows.\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n`;
++/** One real native dispatch prepared (it reserves a registry member); the caller sets any seam fault first. */
++function dispatchOnce({ root, repository, original }) {
++  const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/original-course"), sessionId: "original-course-owner" });
++  const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-1", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
++  const binding = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: "DELIVER-AC-1", candidateCommit: original.candidate.commit, candidateTree: original.candidate.tree, runner: "claude", role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "sonnet", effort: "medium", rulesetSha: "c".repeat(64), allowedPaths: ["src/change.mjs"], itemDelivery,
++    criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" } };
++  const input = { cwd: root, session_id: "native-session-one", tool_name: "Task", tool_use_id: "native-tool-one", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: hostPrompt(binding), run_in_background: false } };
++  try { return runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input })); } catch (error) { return { ok: false, thrown: error?.reason ?? error?.message }; }
++}
++
++/** Every file under the registry root, relative to it. */
++function walk(repository, dir = join(repository.commonDir, ROOT), base = "") {
++  const out = [];
++  for (const name of readdirSync(dir).sort()) {
++    const path = join(dir, name), relative = base ? `${base}/${name}` : name;
++    if (lstatSync(path).isDirectory()) out.push(...walk(repository, path, relative)); else out.push(relative);
++  }
++  return out;
++}
++/** Files of the native-goldfish member directory that the producer record does not index (what the closure walk would refuse). */
++function unindexedMembers(repository) {
++  const common = repository.commonDir;
++  const producer = JSON.parse(readFileSync(join(common, ROOT, "producers/native-goldfish.json"), "utf8"));
++  const indexed = new Set(producer.members.map((entry) => entry.memberRef.path.split("/").pop()));
++  const dir = join(common, ROOT, "members/native-goldfish");
++  return (existsSync(dir) ? readdirSync(dir) : []).filter((name) => !indexed.has(name));
++}
++/** True for the publication of the producer record that follows a reservation's member record (an earlier heal also republishes it, so a member must exist already). */
++function producerAfterMember(repository, to) {
++  if (!String(to).endsWith("producers/native-goldfish.json")) return false;
++  const dir = join(repository.commonDir, ROOT, "members/native-goldfish");
++  return existsSync(dir) && readdirSync(dir).length > 0;
++}
++const abandonedNames = (repository, suffix) => { const dir = join(repository.commonDir, ABANDONED); return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith(suffix)) : []; };
++
++test("C19J-W243-1 the refusal for an unindexed entry names its registry-relative path and parsed schema", linuxOnly, () => fixture(({ repository }) => {
++  const dir = join(repository.commonDir, ROOT, "members/native-goldfish");
++  mkdirSync(dir, { recursive: true, mode: 0o700 });
++  writeFileSync(join(dir, "member-stray.7.json"), canonical({ schema: "pipeline.session-authority-member.v1", note: "left behind" }), { mode: 0o600 });
++  const read = registry.inspectSessionAuthorityRegistryRead({ repository });
++  assert.equal(read.status, "refused", JSON.stringify(read));
++  assert.equal(read.code, "SDC-AUTHORITY-UNAVAILABLE");
++  assert.match(read.reason, /^unknown-registry-entry\b/u, "the reason keeps the leading word the repair tools classify on");
++  assert.ok(read.reason.includes("members/native-goldfish/member-stray.7.json"), `the refusal names the entry: ${read.reason}`);
++  assert.ok(read.reason.includes("pipeline.session-authority-member.v1"), `the refusal names the parsed schema: ${read.reason}`);
++  writeFileSync(join(repository.commonDir, ROOT, "zz-plain.json"), canonical({ nothing: true }), { mode: 0o600 });
++  rmSync(join(dir, "member-stray.7.json"));
++  const plain = registry.inspectSessionAuthorityRegistryRead({ repository });
++  assert.ok(plain.reason.includes("zz-plain.json") && /schema none/u.test(plain.reason), `an entry without a schema is named too: ${plain.reason}`);
++}));
++
++test("C19J-W243-2 a member published before a producer publication that fails is moved aside, and the publish temp does not stay behind", linuxOnly, () => fixture((f) => {
++  const { repository } = f;
++  const before = walk(repository);
++  registry.setSessionAuthorityRegistryTestSeam({ rename: (from, to) => { if (producerAfterMember(repository, to)) throw eperm("rename over the producer record"); return renameSync(from, to); } });
++  const prepared = dispatchOnce(f);
++  registry.setSessionAuthorityRegistryTestSeam(undefined);
++  assert.equal(prepared.ok, false, "the dispatch is refused when its reservation cannot be indexed");
++  assert.deepEqual(unindexedMembers(repository), [], "no member record is left that the producer does not index");
++  assert.deepEqual(walk(repository).filter((name) => name.includes(".tmp-")), [], "no publish temp is left behind");
++  assert.deepEqual(walk(repository), before, "the registry holds exactly the files it held before the refused reservation");
++  const asides = abandonedNames(repository, "-unindexed-record");
++  assert.equal(asides.length, 1, "the orphan is retained aside, not deleted");
++  assert.ok(readdirSync(join(repository.commonDir, ABANDONED, asides[0], "members/native-goldfish")).length === 1);
++  assert.equal(registry.inspectSessionAuthorityRegistryRead({ repository }).reason?.startsWith("unknown-registry-entry") ?? false, false, "the read no longer refuses an unknown entry");
++}));
++
++test("C19J-W243-3 a rename that fails with EPERM once on the aside move is retried and the leftover still leaves the walk", linuxOnly, () => fixture((f) => {
++  const { repository } = f;
++  let asideFaults = 0;
++  registry.setSessionAuthorityRegistryTestSeam({ rename: (from, to) => {
++    if (producerAfterMember(repository, to)) throw eperm("rename over the producer record");
++    if (String(to).includes(`${ABANDONED}/`) && String(to).endsWith(".json") && asideFaults < 1) { asideFaults += 1; throw eperm("rename of the orphan"); }
++    return renameSync(from, to);
++  } });
++  const prepared = dispatchOnce(f);
++  registry.setSessionAuthorityRegistryTestSeam(undefined);
++  assert.equal(prepared.ok, false);
++  assert.equal(asideFaults, 1, "the aside move met its EPERM");
++  assert.deepEqual(unindexedMembers(repository), [], "the retry moved the orphan");
++}));
++
++test("C19J-W243-4 a leftover that cannot be moved aside is not kept silently: the refusal names it", linuxOnly, () => fixture((f) => {
++  const { repository } = f;
++  registry.setSessionAuthorityRegistryTestSeam({ rename: (from, to) => {
++    if (producerAfterMember(repository, to) || String(to).includes(`${ABANDONED}/`)) throw eperm("rename");
++    return renameSync(from, to);
++  } });
++  const prepared = dispatchOnce(f);
++  registry.setSessionAuthorityRegistryTestSeam(undefined);
++  assert.equal(prepared.ok, false);
++  const [orphan] = unindexedMembers(repository);
++  assert.ok(orphan, "the orphan could not be moved, so it is still there");
++  assert.ok(JSON.stringify(prepared).includes(orphan), `the refusal carries the orphan's name (${orphan}): ${JSON.stringify(prepared).slice(0, 400)}`);
++}));
++
++// ---- Windows helper: a failed lock create leaves its temp ---------------------------------------------------------------------------------------
++function factsOf(path) {
++  const s = lstatSync(path, { bigint: true });
++  if (s.isDirectory()) return [s.dev, s.ino, s.nlink, s.mode, 0, "directory", s.mtimeNs, s.ctimeNs, "directory", sha256(path)].join(":");
++  return [s.dev, s.ino, s.nlink, s.mode, 0, `0:${s.size}`, s.mtimeNs, s.ctimeNs, `0:${s.birthtimeNs}`, sha256(readFileSync(path))].join(":");
++}
++/** The helper's documented behaviour on a lost exclusive create: the temp it wrote stays when its own cleanup loses ("Keep an unverified orphan"). */
++function emulateLeavingTemp(request) {
++  const { operation, path } = request;
++  const answer = (facts, bytes, committed) => ({ ok: true, facts, bytes, committed });
++  try {
++    if (["inspect", "ancestor", "ancestor-above-root"].includes(operation)) return answer(factsOf(path), null, false);
++    if (operation === "read" || operation === "read-source") return answer(factsOf(path), readFileSync(path).toString("base64"), false);
++    if (operation === "publish") {
++      if (request.expectedSha256 === null && existsSync(path)) {
++        writeFileSync(join(dirname(path), `.authority-${randomBytes(16).toString("hex")}.tmp`), Buffer.from(request.bytes, "base64"), { mode: 0o600 });
++        return { ok: false, code: "WIN-AUTH-EXCLUSIVE-CREATE", committed: false };
++      }
++      writeFileSync(path, Buffer.from(request.bytes, "base64"), { mode: 0o600 });
++      return answer(factsOf(path), null, true);
++    }
++    if (operation === "remove") { rmSync(path); return answer("removed", null, true); }
++    if (operation === "create-directory") { mkdirSync(path, { mode: 0o700 }); return answer(factsOf(path), null, true); }
++  } catch { return { ok: false, code: "WIN-AUTH-IO", committed: false }; }
++  return { ok: false, code: "WIN-AUTH-OPERATION", committed: false };
++}
++
++test("C19J-W243-5 a Windows lock create that fails leaves no helper temp in the registry root", linuxOnly, () => fixture(({ repository }) => {
++  const own = observeLinuxProcess(process.pid);
++  const holder = { schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "d".repeat(64), owner: { pid: process.pid, hostSha256: sha256(hostname()), process: { start: own.start, bootSha256: own.bootSha256 }, acquiredAt: new Date().toISOString() } };
++  const lockFile = join(repository.commonDir, ROOT, "registry.lock");
++  writeFileSync(lockFile, canonical(holder), { mode: 0o600, flag: "wx" });
++  const spawn = (_executable, _args, options) => ({ status: 0, signal: null, stderr: "", stdout: JSON.stringify(emulateLeavingTemp(JSON.parse(options.input))) });
++  const previous = process.env.PIPELINE_AUTHORITY_NO_MEMO;
++  process.env.PIPELINE_AUTHORITY_NO_MEMO = "1";
++  backend.setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn });
++  backend.resetWindowsOwnedAuthorityBackendMemo();
++  try {
++    registry.setSessionAuthorityRegistryTestSeam({ platform: "win32" });
++    assert.throws(() => enter(repository), (error) => error.code === "SDC-LOCK-HELD", "the holder is alive, so the entry waits and is refused");
++    const temps = readdirSync(join(repository.commonDir, ROOT)).filter((name) => /^\.authority-.*\.tmp$/u.test(name));
++    assert.deepEqual(temps, [], "the helper temps of the lost creates were removed by the writer that made them");
++  } finally {
++    registry.setSessionAuthorityRegistryTestSeam(undefined);
++    backend.setWindowsOwnedAuthorityBackendTestSeam(undefined);
++    backend.resetWindowsOwnedAuthorityBackendMemo();
++    if (previous === undefined) delete process.env.PIPELINE_AUTHORITY_NO_MEMO; else process.env.PIPELINE_AUTHORITY_NO_MEMO = previous;
++  }
++}));
++
++test("C19J-W243-6 a move-aside that faults part-way puts every moved entry back", linuxOnly, () => fixture(({ repository }) => {
++  const before = walk(repository);
++  registry.setSessionAuthorityRegistryTestSeam({ rename: (from, to) => {
++    if (String(to).includes(`${ABANDONED}/`) && String(to).endsWith("-repair-move-aside/producers")) throw eperm("rename of producers");
++    return renameSync(from, to);
++  } });
++  try {
++    assert.throws(() => registry.moveSessionAuthorityRegistryAside({ repository, reason: "fixture" }), (error) => error.code === "EPERM");
++  } finally { registry.setSessionAuthorityRegistryTestSeam(undefined); }
++  assert.deepEqual(walk(repository), before, "every entry is back where it was");
++  assert.equal(registry.inspectSessionAuthorityRegistryRead({ repository }).status, "readable");
++}));
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index b19245bb7..e45500131 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -83,7 +83,14 @@ const ROOT='agent-pipeline/session-authority';
+ // it; nothing in production does. Setting it also forgets every per-process memo, as a new process would.
+ let testSeam={platform:undefined,sourceDigestMemoFile:undefined};
+ const isWin=()=>(testSeam.platform??process.platform)==='win32';
+-export function setSessionAuthorityRegistryTestSeam(seam){testSeam={platform:seam?.platform,sourceDigestMemoFile:seam?.sourceDigestMemoFile,onPlanningBaseline:seam?.onPlanningBaseline,pruneFault:seam?.pruneFault};sourceDigestMemo.clear();sourceDigestPersisted=null;installedParticipantsMemo=null;entryHealed.clear();}
++export function setSessionAuthorityRegistryTestSeam(seam){testSeam={platform:seam?.platform,sourceDigestMemoFile:seam?.sourceDigestMemoFile,onPlanningBaseline:seam?.onPlanningBaseline,pruneFault:seam?.pruneFault,rename:seam?.rename,unlink:seam?.unlink};sourceDigestMemo.clear();sourceDigestPersisted=null;installedParticipantsMemo=null;entryHealed.clear();}
++// C19J-W243: every rename and unlink of the registry's own files goes through the seam, so a test can make one fail the way Windows does (EPERM/EBUSY
++// when another process holds the file open). A move of a leftover or of a retained record is retried a few times on those codes, which are transient.
++const ABANDONED='agent-pipeline/session-authority-abandoned';
++const FS_TRANSIENT=new Set(['EPERM','EBUSY','EACCES']);
++const renameFile=(from,to)=>(testSeam.rename??renameSync)(from,to);
++const unlinkFile=path=>(testSeam.unlink??unlinkSync)(path);
++function moveFile(from,to){for(let attempt=0;;attempt+=1){try{return renameFile(from,to);}catch(error){if(attempt>=4||!FS_TRANSIENT.has(error?.code))throw error;lockSleep(25*(attempt+1));}}}
+ const SHA=/^[a-f0-9]{64}$/, ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const digest=value=>hash(canonical(value));
+@@ -129,7 +136,7 @@ function nativePublish(repo,path,abs,bytes,expected){
+     committed=observed.committed;nativeWitness(abs,observed,true);
+     const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes)||windowsRecordFacts.get(read.ref)?.nativeFacts!==observed.nativeFacts)fail('SDC-AUTHORITY-CAS','publication-readback');
+     return freeze(read.ref);
+-  }catch(error){if(committed||Object.getOwnPropertyDescriptor(error,'committed')?.value===true)retainNativePublication();throw error;}
++  }catch(error){if(committed||Object.getOwnPropertyDescriptor(error,'committed')?.value===true)retainNativePublication();else discardHelperTemps(repo,path,bytes);throw error;}
+ }
+ function nativePrivateRead(repo,path){
+   const abs=safePath(repo,path),observed=nativeWitness(abs,windowsAuthority.readWindowsOwnedAuthorityFile({path:abs,maxBytes:SESSION_AUTHORITY_LIMITS.maxRecordBytes}));
+@@ -162,6 +169,37 @@ export function syncRegistryDirectory(path,{platform=process.platform,fs:port={o
+   finally{if(fd!==undefined)port.closeSync(fd);}
+ }
+ function syncDirectory(path){return syncRegistryDirectory(path);}
++// C19J-W243: a record or temp file a writer published (or began to) under ROOT and could not index must not stay where the closure walk meets it:
++// it is moved into an aside outside ROOT (retained, never deleted), the move retried on a transient Windows code. A leftover that still cannot
++// be moved is never kept silently: the refusal names it, so `inspect` and the repair tools can.
++function retainLeftovers(repo,paths,cause){
++  const aside=`${ABANDONED}/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-unindexed-record`,kept=[];let moved=0;
++  const witnesses=(boundaryContext.getStore()??legacyControlContext.getStore())?.nativeWitnesses;
++  for(const path of paths){
++    const abs=safePath(repo,path);
++    try{lstatSync(abs);}catch(error){if(error?.code==='ENOENT')continue;kept.push(`${path.slice(ROOT.length+1)} (${error?.code??'error'})`);continue;}
++    try{const to=`${aside}/${path.slice(ROOT.length+1)}`;privateDirectories(repo,to);moveFile(abs,safePath(repo,to));witnesses?.delete(abs);moved+=1;}
++    catch(error){kept.push(`${path.slice(ROOT.length+1)} (${error?.code??'error'})`);}
++  }
++  if(kept.length)fail('SDC-AUTHORITY-UNAVAILABLE',`unindexed-record-retained: ${kept.join(', ')} could not be moved aside; ${cause}`.slice(0,480));
++  if(moved)try{writeFileSync(safePath(repo,`${aside}/leftover.json`),canonical({schema:'pipeline.session-authority-unindexed-record.v1',cause:String(cause).slice(0,240),movedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{/* the records are already moved */}
++  return aside;
++}
++/** A temp file of this writer's own failed publication: removed, or (when it cannot be) retained aside. */
++function discardTemp(repo,path){try{unlinkFile(safePath(repo,path));}catch(error){if(error?.code==='ENOENT')return;retainLeftovers(repo,[path],`a publish temp could not be removed (${error?.code??'error'})`);}}
++/** The helper writes `.authority-<guid>.tmp` beside its target and may keep it when it loses (a lost exclusive create, a refused replace): a temp holding exactly this attempt's bytes is this attempt's. */
++function discardHelperTemps(repo,path,bytes){
++  if(!isWin())return;
++  const dir=dirname(path),digest=hash(bytes);let names;
++  try{names=readdirSync(safePath(repo,dir)).filter(name=>/^\.authority-[0-9a-f]{32}\.tmp$/.test(name));}catch{return;}
++  for(const name of names){let same=false;try{same=hash(readFileSync(safePath(repo,`${dir}/${name}`)))===digest;}catch{same=false;}if(same)discardTemp(repo,`${dir}/${name}`);}
++}
++/** Of the records a failed operation published at new paths, those the producer record on disk does not index are leftovers. */
++function retainUnindexed(repo,row,paths,error){
++  const indexed=new Set([...row.record.value.members.map(e=>e.memberRef.path),...row.record.value.targetCertificates.map(e=>e.certificateRef.path)]);
++  const orphans=paths.filter(path=>!indexed.has(`.git/${path}`));
++  if(orphans.length)retainLeftovers(repo,orphans,`${error?.reason??error?.code??'a publication'} failed after the record was published`);
++}
+ function publishOriginal(repo,path,value,expected=null,record=null){
+   safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path),bytes=Buffer.from(canonical(value));
+   if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');
+@@ -182,8 +220,11 @@ function publishOriginal(repo,path,value,expected=null,record=null){
+   }
+   const temp=`${path}.tmp-${randomBytes(16).toString('hex')}`,tempAbs=safePath(repo,temp);
+   let fd=openSync(tempAbs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+-  try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
+-  check('publication-race');renameSync(tempAbs,abs);syncDirectory(dirname(abs));
++  try{
++    try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
++    check('publication-race');renameFile(tempAbs,abs);
++  }catch(error){discardTemp(repo,temp);throw error;}
++  syncDirectory(dirname(abs));
+   const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes))fail('SDC-AUTHORITY-CAS','publication-readback');
+   if(record)record({preimage,postimage:{type:'file',mode:lstatSync(abs).mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256},originalExpectedRef:expected,originalPostimageRef:read.ref});
+   return freeze(read.ref);
+@@ -324,6 +365,7 @@ function acquireRegistryLock(repo,lockSchema,heldReason){
+     let fd,nativeLock;
+     try{if(isWin())nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}
+     catch(error){
++      discardHelperTemps(repo,LOCK_PATH,bytes);
+       if(retired>=2||races>=64||(!isWin()&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
+       const observed=observeLock(repo),waitedMs=Date.now()-started;
+       if(observed.status==='absent'){races+=1;continue;}
+@@ -434,7 +476,14 @@ let installedParticipantsMemo=null;
+ function installedParticipants(){return installedParticipantsMemo??=freeze(definitions.map(participant));}
+ function moveRegistryAside(repo,aside){
+   privateDirectories(repo,`${aside}/marker`);
+-  for(const name of readdirSync(safePath(repo,ROOT)).sort())if(name!=='registry.lock')renameSync(safePath(repo,`${ROOT}/${name}`),safePath(repo,`${aside}/${name}`));
++  // C19J-W243: a move that faults part-way puts the entries it already moved back, so the registry is whole again instead of half-moved.
++  const moved=[];
++  try{for(const name of readdirSync(safePath(repo,ROOT)).sort())if(name!=='registry.lock'){moveFile(safePath(repo,`${ROOT}/${name}`),safePath(repo,`${aside}/${name}`));moved.push(name);}}
++  catch(error){
++    const stuck=[];for(const name of moved.reverse()){try{moveFile(safePath(repo,`${aside}/${name}`),safePath(repo,`${ROOT}/${name}`));}catch{stuck.push(name);}}
++    if(stuck.length)error.notRestored=stuck;
++    throw error;
++  }
+   syncDirectory(safePath(repo,ROOT));
+ }
+ /** D52 (2): the strict read every boundary operation performs, done read-only and without the boundary.
+@@ -614,12 +663,14 @@ export function statListedRegistryEntry(repo,child,lstat=lstatSync){
+   try{return lstat(safePath(repo,child));}
+   catch(error){if(error?.code==='ENOENT'&&child===`${ROOT}/registry.lock`)return null;throw error;}
+ }
+-function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){assertAdmissionDeadline();const child=`${path}/${name}`,s=statListedRegistryEntry(repo,child);if(s===null)continue;if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}if(isWin()){const native=safePath(repo,child);if(!hasNativeWitness(native))owned(s,false,native);}else owned(s,false,null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
++function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){assertAdmissionDeadline();const child=`${path}/${name}`,s=statListedRegistryEntry(repo,child);if(s===null)continue;if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}if(isWin()){const native=safePath(repo,child);if(!hasNativeWitness(native))owned(s,false,native);}else owned(s,false,null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}const printable=value=>String(value).replace(/[^\x20-\x7e]/g,'?').slice(0,100);fail('SDC-AUTHORITY-UNAVAILABLE',`unknown-registry-entry: ${printable(child.slice(ROOT.length+1))} (schema ${typeof read.value?.schema==='string'?printable(read.value.schema):'none'})`);}}walk(ROOT,0);}
+ function stateReadOnce(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
+ function saveProducer(repo,state,index,value){const row=state.rows[index];value.generation=generation(row.record.value.generation+1);row.record={value,ref:publish(repo,producerPath(value.producerId),value,row.record.ref)};const c={...state.catalogue.value,generation:generation(state.catalogue.value.generation+1),producers:state.catalogue.value.producers.map((e,i)=>i===index?{producerId:e.producerId,producerRef:row.record.ref,producerGeneration:value.generation}:e)};state.catalogue={value:c,ref:publish(repo,cataloguePath,c,state.catalogue.ref)};}
+ function sortedRefs(values){const map=new Map(values.map(v=>[v.path,v]));if(map.size!==values.length)for(const v of values)if(!equal(map.get(v.path),v))fail('SDC-AUTHORITY-CAS','conflicting-references');return [...map.values()].sort((a,b)=>a.path.localeCompare(b.path));}
+ function projection(row,t,participantSetSha256){const relevant=row.members.filter(m=>m.value.association.state==='unbound'||equal(m.value.association.target,t));const memberRefs=sortedRefs(relevant.filter(m=>m.value.phase!=='released').map(m=>m.ref));const releaseRefs=sortedRefs(relevant.filter(m=>m.release).map(m=>m.release.ref));const facts=relevant.flatMap(m=>m.value.sourceFacts);const lockFacts=row.record.value.baseline.flatMap(m=>m.sourceFacts).filter(f=>/lock/.test(f.namespaceId));for(const f of lockFacts)if(!facts.some(v=>equal(v,f)))facts.push(f);facts.sort((a,b)=>a.namespaceId.localeCompare(b.namespaceId)||a.pathSha256.localeCompare(b.pathSha256));return {target:t,producerId:row.participant.producerId,participantSetSha256,sourceSha256:row.participant.sourceSha256,memberRefs,releaseRefs,scopeFacts:facts};}
+-function refreshCertificates(repo,state,extraTarget=null){const targets=new Map();for(const row of state.rows)for(const c of row.certificates)targets.set(digest(c.value.target),c.value.target);if(extraTarget)targets.set(digest(extraTarget),extraTarget);for(let i=0;i<state.rows.length;i++){const row=state.rows[i];let changed=false;const certificates=[...row.certificates];for(const t of targets.values()){const projected=projection(row,t,state.catalogue.value.participantSetSha256);const prior=certificates.find(c=>equal(c.value.target,t));if(prior?.value.projectionSha256===digest(projected))continue;const generationValue=prior?generation(prior.value.targetGeneration+1):1;const value={schema:schema('target-certificate'),repositorySha256:repoDigest(repo),...projected,targetGeneration:generationValue,projectionSha256:digest(projected)};const written={value,ref:publish(repo,certificatePath(row.participant.producerId,t,generationValue),value)};if(prior)certificates.splice(certificates.indexOf(prior),1,written);else certificates.push(written);changed=true;}if(changed){row.certificates=certificates;const value={...row.record.value,targetCertificates:certificates.map(c=>({target:c.value.target,targetGeneration:c.value.targetGeneration,certificateRef:c.ref}))};saveProducer(repo,state,i,value);}}}
++function refreshCertificates(repo,state,extraTarget=null){const targets=new Map();for(const row of state.rows)for(const c of row.certificates)targets.set(digest(c.value.target),c.value.target);if(extraTarget)targets.set(digest(extraTarget),extraTarget);for(let i=0;i<state.rows.length;i++){const row=state.rows[i];let changed=false;const certificates=[...row.certificates],fresh=[];
++    // C19J-W243: a certificate is published at a new path before the producer record indexes it; a failure in between moves it aside.
++    try{for(const t of targets.values()){const projected=projection(row,t,state.catalogue.value.participantSetSha256);const prior=certificates.find(c=>equal(c.value.target,t));if(prior?.value.projectionSha256===digest(projected))continue;const generationValue=prior?generation(prior.value.targetGeneration+1):1;const value={schema:schema('target-certificate'),repositorySha256:repoDigest(repo),...projected,targetGeneration:generationValue,projectionSha256:digest(projected)};const path=certificatePath(row.participant.producerId,t,generationValue);const written={value,ref:publish(repo,path,value)};fresh.push(path);if(prior)certificates.splice(certificates.indexOf(prior),1,written);else certificates.push(written);changed=true;}if(changed){row.certificates=certificates;const value={...row.record.value,targetCertificates:certificates.map(c=>({target:c.value.target,targetGeneration:c.value.targetGeneration,certificateRef:c.ref}))};saveProducer(repo,state,i,value);}}catch(error){retainUnindexed(repo,row,fresh,error);throw error;}}}
+ function updateMembership(repo,state,index,m,memberRef){const row=state.rows[index];const prior=row.members.find(x=>x.value.memberId===m.memberId&&x.value.memberGeneration===m.memberGeneration);const next={value:m,ref:memberRef,release:m.releaseRef?readRef(repo,m.releaseRef):null};if(prior)row.members.splice(row.members.indexOf(prior),1,next);else row.members.push(next);const value={...row.record.value,members:row.members.map(x=>({memberId:x.value.memberId,memberGeneration:x.value.memberGeneration,memberRef:x.ref})),lastTransitionSha256:digest({memberRef,releaseRef:m.releaseRef})};value.baseline=memberships(row.port.reconcile({producerRecord:freeze(structuredClone(value)),memberRecords:freeze(row.members.map(x=>x.value)),releaseRecords:freeze(row.members.filter(x=>x.release).map(x=>x.release.value))}),row.participant);saveProducer(repo,state,index,value);refreshCertificates(repo,state);return {memberRef,producerRef:row.record.ref,catalogueRef:state.catalogue.ref};}
+ 
+ // C19I-W238: every dispatch publishes a member and a release for the native-goldfish producer and nothing ever left the walked registry
+@@ -650,10 +701,10 @@ function pruneSettledMembers(repo,state,index,keep=SESSION_AUTHORITY_SETTLED_MEM
+   try{
+     for(const m of drop)for(const from of [m.ref.path.slice(5),m.release.ref.path.slice(5)]){
+       const to=`${aside}/${from.slice(ROOT.length+1)}`;privateDirectories(repo,to);
+-      renameSync(safePath(repo,from),safePath(repo,to));moved.push([from,to]);
++      moveFile(safePath(repo,from),safePath(repo,to));moved.push([from,to]);
+     }
+   }catch(error){
+-    for(const [from,to] of moved.reverse()){try{renameSync(safePath(repo,to),safePath(repo,from));}catch{/* the registry then fails closed on the missing record; the aside copy is intact */}}
++    for(const [from,to] of moved.reverse()){try{moveFile(safePath(repo,to),safePath(repo,from));}catch{/* the registry then fails closed on the missing record; the aside copy is intact */}}
+     throw error;
+   }
+   for(const dir of new Set(moved.map(([from])=>dirname(from))))try{syncDirectory(safePath(repo,dir));}catch{/* best effort: the records are already moved */}
+@@ -662,7 +713,7 @@ function pruneSettledMembers(repo,state,index,keep=SESSION_AUTHORITY_SETTLED_MEM
+   try{testSeam.pruneFault?.('before-publication');saveProducer(repo,state,index,value);}
+   catch(error){
+     // Nothing was published (the producer record in memory is the one read): it still indexes every member, so the files go back where it says they are.
+-    if(row.record===priorRecord){row.members=priorMembers;for(const [from,to] of moved.reverse()){try{renameSync(safePath(repo,to),safePath(repo,from));}catch{/* the registry then fails closed on the missing record; the aside copy is intact */}}}
++    if(row.record===priorRecord){row.members=priorMembers;for(const [from,to] of moved.reverse()){try{moveFile(safePath(repo,to),safePath(repo,from));}catch{/* the registry then fails closed on the missing record; the aside copy is intact */}}}
+     throw error;
+   }
+   testSeam.pruneFault?.('after-producer-publication');
+@@ -685,7 +736,7 @@ export function initializeSessionAuthorityRegistry({repository:input},ports){try
+   const planned=pairs.map(pair=>{const baseline=pair.port.readBaseline();exact(baseline,['memberships','legacyOperations'],'baseline');memberships(baseline.memberships,pair.participant);if(!Array.isArray(baseline.legacyOperations)||baseline.legacyOperations.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','legacy-operation-bound');return {pair,baseline,observed:baseline.legacyOperations.map(handle=>operation(pair.port,handle,pair.participant))};});
+   // A catalogue-less registry indexes nothing and so holds no authority: fragments of an interrupted initialization are moved aside (retained, never deleted).
+   const fragments=['producers','members','releases','targets'].filter(name=>existsSync(safePath(repo,`${ROOT}/${name}`)));
+-  if(fragments.length){const aside=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}`;privateDirectories(repo,`${aside}/marker`);for(const name of fragments)renameSync(safePath(repo,`${ROOT}/${name}`),safePath(repo,`${aside}/${name}`));syncDirectory(safePath(repo,ROOT));}
++  if(fragments.length){const aside=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}`;privateDirectories(repo,`${aside}/marker`);for(const name of fragments)moveFile(safePath(repo,`${ROOT}/${name}`),safePath(repo,`${aside}/${name}`));syncDirectory(safePath(repo,ROOT));}
+   const producers=planned.map(({pair,baseline,observed:operations})=>{const members=[];for(const observed of operations){const now=new Date().toISOString();const member={schema:schema('member'),repositorySha256:repoDigest(repo),producerId:pair.participant.producerId,memberId:`member-${randomBytes(16).toString('hex')}`,memberGeneration:1,revision:1,...observed,createdAt:now,updatedAt:now,releaseRef:null};const memberRef=publish(repo,memberPath(member),member);members.push({memberId:member.memberId,memberGeneration:1,memberRef});}const value={schema:schema('producer'),repositorySha256:repoDigest(repo),producerId:pair.participant.producerId,generation:1,participantSetSha256,sourceSha256:pair.participant.sourceSha256,baseline:baseline.memberships,members,targetCertificates:[],lastTransitionSha256:digest({baseline:baseline.memberships,members})};return {producerId:value.producerId,producerRef:publish(repo,producerPath(value.producerId),value),producerGeneration:1};});const value={schema:schema('catalogue'),repositorySha256:repoDigest(repo),generation:1,participantSetSha256,participants,producers};const catalogueRef=publish(repo,cataloguePath,value);
+   // PF-53: a fresh registry that does not read back is moved aside (retained) instead of leaving a catalogue nothing can read.
+   try{stateRead(repo,pairs);}catch(error){moveRegistryAside(repo,`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-initialization-failed`);throw error;}
+@@ -694,7 +745,7 @@ export function initializeSessionAuthorityRegistry({repository:input},ports){try
+ export function registerSessionAuthorityTarget({boundary:token,descriptorHandle},ports){const repo=boundary(token);retiredRegistryAdmission(repo,'register-target');const t=target(inspectSourceOwnedDescriptorHandle({repository:repo,descriptorHandle}));const pairs=portsFor(repo,ports);boundaryBrands.get(token).ports=pairs;return withSignedDescriptorCustodyManifestLock(repo.primaryRoot,t.sessionId,()=>{const current=target(inspectSourceOwnedDescriptorHandle({repository:repo,descriptorHandle}));if(!equal(t,current))fail('SDC-DESCRIPTOR-CAS','target-descriptor-changed');const state=stateRead(repo,pairs);refreshCertificates(repo,state,t);return freeze({target:t,certificateRefs:state.rows.map(row=>row.certificates.find(c=>equal(c.value.target,t)).ref)});});}
+ function selectPort(repo,token,producerPort){const pairs=boundaryPorts(token);const index=pairs.findIndex(p=>p.port===producerPort);if(index!==-1)return {pairs,index};const found=definitions.findIndex(def=>typeof def[1][`isOwned${def[2]}AuthorityProducerPort`]==='function'&&def[1][`isOwned${def[2]}AuthorityProducerPort`](producerPort,{repository:repo})===true);if(found<0)fail('SDC-AUTHORITY-UNAVAILABLE','unowned-producer-port');pairs[found]={...pairs[found],port:producerPort};return {pairs,index:found};}
+ function descriptorGuard(repo,associationValue,callback){if(associationValue.state==='unbound')return callback();const t=associationValue.target;return withSignedDescriptorCustodyManifestLock(repo.primaryRoot,t.sessionId,()=>{const path=`agent-pipeline/session-descriptors/active/${t.sessionId}.json`;const read=readRaw(repo,path);const d=JSON.parse(read.bytes);if(read.ref.sha256!==t.descriptorSha256||typeof d.ownerNonce!=='string'||hash(d.ownerNonce)!==t.ownerNonceSha256)fail('SDC-DESCRIPTOR-CAS','bound-descriptor-changed');return callback();});}
+-export function reserveSessionAuthorityMember({boundary:token,producerPort,association:requested,operationHandle}){const repo=boundary(token);retiredRegistryAdmission(repo,'reserve');association(requested);const {pairs,index}=selectPort(repo,token,producerPort);const observed=operation(producerPort,operationHandle,pairs[index].participant);if(observed.phase!=='reserved'||!equal(observed.association,requested))fail('SDC-AUTHORITY-CAS','reservation-owner-binding');return descriptorGuard(repo,requested,()=>{const state=stateRead(repo,pairs);const now=new Date().toISOString();const m={schema:schema('member'),repositorySha256:repoDigest(repo),producerId:pairs[index].participant.producerId,memberId:`member-${randomBytes(16).toString('hex')}`,memberGeneration:generation(Math.max(0,...state.rows[index].members.map(x=>x.value.memberGeneration))+1),revision:1,...observed,createdAt:now,updatedAt:now,releaseRef:null};const memberRef=publish(repo,memberPath(m),m);const refs=updateMembership(repo,state,index,m,memberRef);const memberHandle=Object.freeze({});memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});stage('after-reservation-published-before-effects',m,memberRef);return freeze({memberHandle,...refs});});}
++export function reserveSessionAuthorityMember({boundary:token,producerPort,association:requested,operationHandle}){const repo=boundary(token);retiredRegistryAdmission(repo,'reserve');association(requested);const {pairs,index}=selectPort(repo,token,producerPort);const observed=operation(producerPort,operationHandle,pairs[index].participant);if(observed.phase!=='reserved'||!equal(observed.association,requested))fail('SDC-AUTHORITY-CAS','reservation-owner-binding');return descriptorGuard(repo,requested,()=>{const state=stateRead(repo,pairs);const now=new Date().toISOString();const m={schema:schema('member'),repositorySha256:repoDigest(repo),producerId:pairs[index].participant.producerId,memberId:`member-${randomBytes(16).toString('hex')}`,memberGeneration:generation(Math.max(0,...state.rows[index].members.map(x=>x.value.memberGeneration))+1),revision:1,...observed,createdAt:now,updatedAt:now,releaseRef:null};const memberRef=publish(repo,memberPath(m),m);let refs;try{refs=updateMembership(repo,state,index,m,memberRef);}catch(error){retainUnindexed(repo,state.rows[index],[memberPath(m)],error);throw error;}const memberHandle=Object.freeze({});memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});stage('after-reservation-published-before-effects',m,memberRef);return freeze({memberHandle,...refs});});}
+ function memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index){const brand=memberBrands.get(memberHandle);if(!brand||brand.repositorySha256!==repoDigest(repo)||brand.producerPort!==producerPort)fail('SDC-AUTHORITY-CAS','unowned-member-handle');ref(expectedMemberRef);const row=state.rows[index].members.find(x=>x.value.memberId===brand.memberId&&x.value.memberGeneration===brand.memberGeneration);if(!row||!equal(row.ref,expectedMemberRef))fail('SDC-AUTHORITY-CAS','member-preimage');return {row,brand};}
+ export function recoverSessionAuthorityMember({boundary:token,producerPort,operationHandle,expectedMemberRef}){const repo=boundary(token);retiredRegistryAdmission(repo,'recover');const {pairs,index}=selectPort(repo,token,producerPort);ref(expectedMemberRef);const state=stateRead(repo,pairs,{reconcile:false});const row=state.rows[index].members.find(m=>equal(m.ref,expectedMemberRef));if(!row||row.value.phase==='released')fail('SDC-AUTHORITY-CAS','recovery-member-preimage');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||observed.phase!==m.phase||!equal(observed.sourceFacts,m.sourceFacts))fail('SDC-AUTHORITY-CAS','recovery-owner-binding');const actual=memberships(producerPort.reconcile({producerRecord:freeze(structuredClone(state.rows[index].record.value)),memberRecords:freeze(state.rows[index].members.map(x=>x.value)),releaseRecords:freeze(state.rows[index].members.filter(x=>x.release).map(x=>x.release.value))}),pairs[index].participant);if(!equal(actual,state.rows[index].record.value.baseline))fail('SDC-AUTHORITY-CAS','recovery-namespace-drift');const memberHandle=Object.freeze({});memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});return freeze({memberHandle,memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});}
+ function advanceOwnedSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,operationHandle},refreshOnly=false){const repo=boundary(token);retiredRegistryAdmission(repo,'advance-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row,brand}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);if(brand.operationHandle!==operationHandle)fail('SDC-AUTHORITY-CAS','operation-handle-changed');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||m.phase==='released')fail('SDC-AUTHORITY-CAS','operation-binding-changed');if(refreshOnly&&(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase))fail('SDC-AUTHORITY-CAS','source-refresh-phase');if(equal(observed,{association:m.association,kinds:m.kinds,phase:m.phase,bindingSha256:m.bindingSha256,sourceFacts:m.sourceFacts}))return freeze({memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});const allowed={reserved:['armed','running','terminal-observed'],armed:['running','terminal-observed'],running:['terminal-observed'],'terminal-observed':[]};if(refreshOnly){if(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase)fail('SDC-AUTHORITY-CAS','source-refresh-phase');}else if(!allowed[m.phase]?.includes(observed.phase))fail('SDC-AUTHORITY-CAS','invalid-member-transition');return retiredRegistryDescriptorGuard(repo,m.association,()=>{const next={...m,...observed,revision:generation(m.revision+1),updatedAt:new Date().toISOString()};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-owner-effects-readback',next,memberRef);return freeze(refs);});}
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair-aside.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair-aside.test.mjs
+new file mode 100644
+index 000000000..7a631a343
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/session-authority-repair-aside.test.mjs
+@@ -0,0 +1,121 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19J-W243 (AC-108): the repair script reads a retained aside without writing, and its wait / inspect survive a host commit.
++//   C19J-W243-7  inspect-aside lists every file of one retained aside with size, mtime, schema and whether the aside's own catalogue indexes it; it writes nothing
++//   C19J-W243-8  inspect-aside refuses a missing, unsafe or unknown aside name with a typed code
++//   C19J-W243-9  a wait whose repository HEAD moves between iterations returns lock-free instead of timing out
++//   C19J-W243-10 inspect rebinds the repository once before it reports, so a HEAD that moved during the verb is not read as a changed binding
++import test from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { devNull, hostname } from "node:os";
++import { join } from "node:path";
++import { canonical } from "../lib/po-approval-proof.mjs";
++import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
++import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
++import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
++import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
++import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
++
++const linuxOnly = { skip: process.platform !== "linux" };
++const ROOT = "agent-pipeline/session-authority";
++const sha256 = (value) => createHash("sha256").update(value).digest("hex");
++
++function fixture(run) {
++  const parent = nativeContractFixtureParent();
++  mkdirSync(parent, { recursive: true, mode: 0o700 });
++  const root = mkdtempSync(join(parent, "session-authority-repair-aside-"));
++  try {
++    mkdirSync(join(root, "evidence"), { mode: 0o700 });
++    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
++    for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", devNull]]) assert.equal(spawnSync("git", ["-C", root, "config", name, value]).status, 0);
++    assert.equal(spawnSync("git", ["-C", root, "commit", "--allow-empty", "-q", "-m", "fixture"]).status, 0);
++    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
++    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit course" });
++    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
++    prepareApprovedItemCourseFixture({ root });
++    const repository = inspectSignedDescriptorCustodyRepository(root);
++    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
++    return run({ root, repository });
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++function repair(argv, deps) {
++  let text = "";
++  const code = runSessionAuthorityRepair(argv, (chunk) => { text += chunk; }, deps);
++  return { code, result: JSON.parse(text) };
++}
++const commit = (root) => assert.equal(spawnSync("git", ["-C", root, "commit", "--allow-empty", "-q", "-m", "host commit moves HEAD"]).status, 0);
++/** Every file under a directory with size and mtime, for an unchanged-tree comparison. */
++function snapshot(dir, base = "") {
++  const out = [];
++  for (const name of readdirSync(dir).sort()) {
++    const path = join(dir, name), stat = lstatSync(path), relative = base ? `${base}/${name}` : name;
++    if (stat.isDirectory()) out.push(...snapshot(path, relative)); else out.push(`${relative}:${stat.size}:${stat.mtimeMs}:${sha256(readFileSync(path))}`);
++  }
++  return out;
++}
++function liveLock(repository) {
++  const own = observeLinuxProcess(process.pid);
++  const lock = { schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "d".repeat(64), owner: { pid: process.pid, hostSha256: sha256(hostname()), process: { start: own.start, bootSha256: own.bootSha256 }, acquiredAt: new Date(Date.now() - 3600000).toISOString() } };
++  const path = join(repository.commonDir, ROOT, "registry.lock");
++  writeFileSync(path, JSON.stringify(lock), { mode: 0o600, flag: "wx" });
++  return path;
++}
++
++test("C19J-W243-7 inspect-aside lists a retained aside with size, mtime, schema and whether its own catalogue indexes each file, and writes nothing", linuxOnly, () => fixture(({ root, repository }) => {
++  writeFileSync(join(repository.commonDir, ROOT, "zz-stray.json"), canonical({ schema: "pipeline.session-authority-member.v1", note: "left behind" }), { mode: 0o600 });
++  const moved = repair(["move-aside", "--root", root, "--no-goldfish-running", "--reason", "fixture"]);
++  assert.equal(moved.code, 0, JSON.stringify(moved.result));
++  const [aside] = moved.result.retained;
++  assert.match(aside, /-repair-move-aside$/u);
++  const abandoned = join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
++  const before = snapshot(abandoned);
++  const out = repair(["inspect-aside", "--root", root, "--aside", aside]);
++  assert.equal(out.code, 0, JSON.stringify(out.result));
++  assert.equal(out.result.status, "aside-inspected");
++  assert.equal(out.result.aside, aside);
++  assert.equal(out.result.catalogue, "present");
++  const byPath = new Map(out.result.entries.map((entry) => [entry.path, entry]));
++  const catalogue = byPath.get("catalogue.json");
++  assert.ok(catalogue && catalogue.indexed === true && catalogue.schema === "pipeline.session-authority-catalogue.v1" && Number.isSafeInteger(catalogue.size) && typeof catalogue.mtime === "string", JSON.stringify(catalogue));
++  assert.equal(byPath.get("producers/native-goldfish.json")?.indexed, true, "a producer record the catalogue names is indexed");
++  const stray = byPath.get("zz-stray.json");
++  assert.ok(stray, "the stray file is listed");
++  assert.equal(stray.indexed, false);
++  assert.equal(stray.schema, "pipeline.session-authority-member.v1");
++  assert.deepEqual(out.result.unindexed, ["zz-stray.json"]);
++  assert.deepEqual(snapshot(abandoned), before, "inspect-aside wrote nothing and touched nothing");
++}));
++
++test("C19J-W243-8 inspect-aside refuses a missing, unsafe or unknown aside name with a typed code", linuxOnly, () => fixture(({ root }) => {
++  assert.equal(repair(["inspect-aside", "--root", root]).result.code, "SAR-ARGS");
++  for (const name of ["../x", "a/b", "..", "a\\b"]) assert.equal(repair(["inspect-aside", "--root", root, "--aside", name]).result.code, "SAR-ARGS", name);
++  const unknown = repair(["inspect-aside", "--root", root, "--aside", "20260101000000000-00000000-nothing"]);
++  assert.equal(unknown.code, 2);
++  assert.equal(unknown.result.code, "SAR-ASIDE");
++}));
++
++test("C19J-W243-9 a wait whose repository HEAD moves between iterations returns lock-free instead of SAR-WAIT-TIMEOUT", linuxOnly, () => fixture(({ root, repository }) => {
++  const lock = liveLock(repository);
++  let clock = 0, pauses = 0;
++  const waited = repair(["wait", "--root", root, "--timeout", "30"], { waitDeps: { now: () => clock, pause: (ms) => {
++    clock += ms; pauses += 1;
++    if (pauses === 1) { commit(root); rmSync(lock); }
++  } } });
++  assert.equal(waited.code, 0, JSON.stringify(waited.result));
++  assert.equal(waited.result.status, "lock-free");
++  assert.equal(pauses, 1, "the lock was held once, then free after the host commit");
++}));
++
++test("C19J-W243-10 inspect rebinds once before it reports, so a HEAD that moved while the verb ran is not a changed binding", linuxOnly, () => fixture(({ root, repository }) => {
++  liveLock(repository);
++  // The judge runs inside release-lock after it bound the repository; the commit moves HEAD before the closing inspect.
++  const released = repair(["release-lock", "--root", root, "--no-pipeline-running", "--reason", "fixture"], { releaseDeps: { judge: () => { commit(root); return "dead"; } } });
++  assert.equal(released.code, 0, JSON.stringify(released.result).slice(0, 600));
++  assert.equal(released.result.status, "released");
++  assert.equal(released.result.lock.status, "absent", `the report read the lock through a fresh binding: ${JSON.stringify(released.result.lock)}`);
++  assert.notEqual(released.result.registry.read.reason, "repository-binding-changed");
++}));
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index a2e3e0571..9e8973e3c 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ //
+-// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
++// session-authority-repair.mjs <inspect|inspect-aside|heal|move-aside|release-lock|wait|take-over> --root <root> [--aside <retained directory name>] [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
+ //
+ // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
+ // session, so each runs from the agent's shell and from the PO's terminal alike.
+@@ -12,6 +12,9 @@
+ //               exact next command for every finding (`next`), or none when nothing blocks.
+ //               Also reports the scratch binding of the session it runs in (D54): the session id is
+ //               PIPELINE_SCRATCH_SESSION_ID, else the session's own CLAUDE_CODE_SESSION_ID; a terminal has none.
++//   inspect-aside  C19J-W243, read-only: lists every file of one retained directory under session-authority-abandoned with size, mtime, parsed
++//               schema and whether that aside's own catalogue indexes it (the files marked `indexed: false` are what the live registry
++//               refuses as unknown-registry-entry). Writes nothing.
+ //   heal        Binds or re-anchors that scratch binding (D54), then enters the registry boundary once. That
+ //               heals every drifted producer with no armed or running bound member and migrates a catalogue
+ //               another plugin version wrote (D51 (1), PF-52), then inspects again.
+@@ -36,7 +39,7 @@
+ //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
+ //
+ // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
+-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { createHash, randomBytes } from "node:crypto";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -69,13 +72,14 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
+ 
+ // Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
+ const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running", "take-over": "no-other-session-running" };
+-const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
++const VALUES = { inspect: ["root"], "inspect-aside": ["root", "aside"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
+ const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
++const validAside = (name) => typeof name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(name) && !name.includes("..");
+ const validSession = (session) => typeof session === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(session);
+ 
+ function parse(argv) {
+   const [verb, ...rest] = argv;
+-  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root>" };
++  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|inspect-aside|heal|move-aside|release-lock|wait|take-over> --root <root>" };
+   const flags = {};
+   for (let index = 0; index < rest.length; index += 1) {
+     const name = rest[index]?.startsWith("--") ? rest[index].slice(2) : null;
+@@ -86,6 +90,7 @@ function parse(argv) {
+     flags[name] = value; index += 1;
+   }
+   if (!flags.root) return { error: "--root <root> is required" };
++  if (verb === "inspect-aside" && !validAside(flags.aside)) return { error: "inspect-aside needs --aside <the name of one retained directory under session-authority-abandoned> (a single name, no path separators); `inspect` and a move-aside print the names" };
+   if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || !validReason(flags.reason)))
+     return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"; move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh" };
+   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
+@@ -204,7 +209,84 @@ function lockStep(root, lock) {
+   return { why: `the registry lock is held by ${who} for ${lock.ageSeconds}s and that owner cannot be confirmed alive or gone; release it once no Pipeline process runs for this repository`, command: `${sessionAuthorityRepairCommand(root, "release-lock")} --no-pipeline-running --reason "<why>"` };
+ }
+ 
++// C19J-W243: the repository binding is a snapshot of HEAD; a host commit (the expected case during a wait or a long verb) moves it, and every read
++// through the old binding refuses repository-binding-changed. A report binds afresh once; a binding that cannot be made keeps the given one.
++function rebind(root, fallback) {
++  try { return inspectSignedDescriptorCustodyRepository(root); }
++  catch { return fallback; }
++}
++
++const ASIDE_ENTRY_BOUND = 4096;
++const ASIDE_DEPTH_BOUND = 6;
++const ASIDE_READ_BOUND = 1048576;
++const REGISTRY_REF_PREFIX = ".git/agent-pipeline/session-authority/";
++// Files the repair tools write at the top of an aside to say why it exists; they are not registry records.
++const ASIDE_MARKERS = new Set(["repair.json", "migration.json", "heal.json", "prune.json", "retire.json", "take-over.json", "leftover.json"]);
++const printable = (value) => String(value).replace(/[^\x20-\x7e]/gu, "?").slice(0, 100);
++
++/**
++ * C19J-W243: read-only listing of one retained aside (session-authority-abandoned/<name>). Per file: size, mtime, parsed schema and whether the
++ * aside's own catalogue indexes it (catalogue -> producer records -> member, release and certificate refs, the way the closure walk indexes a live
++ * registry). A file the aside's catalogue does not name is what the live registry refuses as unknown-registry-entry. Nothing is written or read
++ * through the registry; an aside without a catalogue (a prune, a heal) reports `indexed: null`.
++ */
++function inspectAside(repository, name) {
++  const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", name);
++  let stat;
++  try { stat = lstatSync(dir); }
++  catch (error) { return { status: "refused", code: "SAR-ASIDE", reason: `no retained aside named ${name}: ${short(error)}` }; }
++  if (stat.isSymbolicLink() || !stat.isDirectory()) return { status: "refused", code: "SAR-ASIDE", reason: `${name} is not a retained directory` };
++  const entries = [];
++  let truncated = false;
++  const walk = (current, prefix, depth) => {
++    for (const entry of readdirSync(current).sort()) {
++      const path = join(current, entry), relative = prefix ? `${prefix}/${entry}` : entry, info = lstatSync(path);
++      if (info.isDirectory() && !info.isSymbolicLink()) { if (depth < ASIDE_DEPTH_BOUND) walk(path, relative, depth + 1); else truncated = true; continue; }
++      if (entries.length >= ASIDE_ENTRY_BOUND) { truncated = true; return; }
++      let schema = null;
++      if (info.isFile() && info.size <= ASIDE_READ_BOUND) { try { const value = JSON.parse(readFileSync(path, "utf8")); if (typeof value?.schema === "string") schema = printable(value.schema); } catch { schema = null; } }
++      entries.push({ path: relative, size: info.size, mtime: new Date(info.mtimeMs).toISOString(), schema, ...(info.isSymbolicLink() ? { symlink: true } : {}) });
++    }
++  };
++  try { walk(dir, "", 0); }
++  catch (error) { return { status: "refused", code: "SAR-ASIDE", reason: `the aside could not be listed: ${short(error)}` }; }
++  const read = (relative) => { try { return JSON.parse(readFileSync(join(dir, relative), "utf8")); } catch { return null; } };
++  const local = (ref) => {
++    const path = typeof ref?.path === "string" && ref.path.startsWith(REGISTRY_REF_PREFIX) ? ref.path.slice(REGISTRY_REF_PREFIX.length) : null;
++    return path !== null && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : null;
++  };
++  const known = new Set();
++  let catalogueState = "absent";
++  if (entries.some((entry) => entry.path === "catalogue.json")) {
++    const catalogue = read("catalogue.json");
++    catalogueState = catalogue && typeof catalogue === "object" ? "present" : "unreadable";
++    if (catalogueState === "present") {
++      known.add("catalogue.json");
++      for (const entry of Array.isArray(catalogue.producers) ? catalogue.producers : []) {
++        const producerPath = local(entry?.producerRef);
++        if (producerPath === null) continue;
++        known.add(producerPath);
++        const producer = read(producerPath);
++        for (const member of Array.isArray(producer?.members) ? producer.members : []) {
++          const memberPath = local(member?.memberRef);
++          if (memberPath === null) continue;
++          known.add(memberPath);
++          const releasePath = local(read(memberPath)?.releaseRef);
++          if (releasePath !== null) known.add(releasePath);
++        }
++        for (const certificate of Array.isArray(producer?.targetCertificates) ? producer.targetCertificates : []) { const certificatePath = local(certificate?.certificateRef); if (certificatePath !== null) known.add(certificatePath); }
++      }
++    }
++  }
++  const listed = entries.map((entry) => {
++    if (!entry.path.includes("/") && ASIDE_MARKERS.has(entry.path)) return { ...entry, marker: true, indexed: null };
++    return { ...entry, indexed: catalogueState === "present" ? known.has(entry.path) : null };
++  });
++  return { status: "aside-inspected", aside: name, catalogue: catalogueState, entries: listed, unindexed: listed.filter((entry) => entry.indexed === false).map((entry) => entry.path), ...(truncated ? { truncated: true } : {}) };
++}
++
+ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
++  repository = rebind(root, repository);
+   // The strict read is what every boundary operation performs; the per-producer report explains it.
+   const lock = lockReport(repository);
+   const cleanupLocks = cleanupLockReport(root);
+@@ -248,6 +330,8 @@ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0,
+ function waitForLock(repository, root, timeoutSeconds, { now = Date.now, pause = sleep } = {}) {
+   const deadline = now() + timeoutSeconds * 1000;
+   for (;;) {
++    // C19J-W243: a host commit during the wait moves HEAD, which makes every read through the first binding refuse; each iteration binds afresh.
++    repository = rebind(root, repository);
+     const lock = lockReport(repository);
+     if (lock.status === "absent") return { status: "lock-free" };
+     if (lock.status === "held" && lock.owner === "dead") return { status: "lock-owner-gone", next: [lockStep(root, lock)] };
+@@ -295,6 +379,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
+   try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); repository = inspectSignedDescriptorCustodyRepository(root); }
+   catch (error) { return emit({ status: "refused", code: "SAR-ROOT", reason: `--root is not a Pipeline repository: ${short(error)}` }, 2); }
+   if (parsed.verb === "inspect") return emit({ status: "inspected", ...inspect(repository, root, { scratch }) }, 0);
++  if (parsed.verb === "inspect-aside") { const listing = inspectAside(repository, parsed.flags.aside); return emit(listing, listing.status === "refused" ? 2 : 0); }
+   if (parsed.verb === "wait") { const waited = waitForLock(repository, root, parsed.flags.timeout, waitDeps); return emit(waited, waited.status === "refused" ? 2 : 0); }
+   if (parsed.verb === "release-lock") {
+     // Never takes the lock it releases (FB3-PF-55); a live owner is refused with the wait command.
