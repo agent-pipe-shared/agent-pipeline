@@ -501,6 +501,16 @@ Item (2) reproduced on Linux (19i installed): two probes of one reply with track
   2. Linux pair.
   3. Windows protocol: two clean pairs including the second stop starting during the first one's commit; `routine-repair run heal --no-goldfish-running`; the trace `failures` codes; stop latency against 19i.
   4. Greenfield, then Full Verify and Critics, then PO acceptance.
+- PO applied (23a245f6e to 3490d1aa4), stamp efb347f73 (`0.7.0+claude.20261106150052.3490d1a`), installed on Linux and Windows.
+- **Linux after install:**
+  - Hooks were refreshed once.
+  - `routine-repair run heal --no-goldfish-running` (w248) gave code `healed`, `staleMemberMoveAside: moved-aside`, and retired the settled w245 to w247 pending states and two stop-failure records.
+  - Afterwards lock and registry are absent.
+- **Windows step 0 on 19k (peer):**
+  - Before: dead lock owner and `catalogue-source-closure`.
+  - The same heal gave code `healed`. It retired four settled pending states (gf-probe-41, 42, 44, 45, 17 files) and the gf-probe-41 stop-failure record from 19j, with `staleMemberMoveAside: moved-aside`.
+  - Afterwards lock and registry are absent, no reservations remain, and there is no `native-item-scope-operation-unowned`. The w245 and w248 repair path works on Windows with no human step.
+  - Steps 1 to 4 are pending.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
