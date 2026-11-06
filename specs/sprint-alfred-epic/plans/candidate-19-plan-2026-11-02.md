@@ -575,6 +575,18 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     - Re-run alone, the suite is green.
     - This is the same race class w250 covers for the terminal write, here seen at the release stage. Open, not fixed in 19m.
   - Open: PO apply, stamp on the PO's call, a fresh Full Verify, the Windows run, Critic, PO acceptance.
+- **19m installed (2026-11-06 evening), greenfield started.** Live readback: the preflight lock row reads `ready`. Greenfield findings so far, all for candidate 20:
+  - **G20-1 (P0, deadlock, Codex):** at `bootstrap-binding-required`, inspect returns `intake-spec-marker-apply` as its nextAction, and the lifecycle guard refuses exactly that command.
+    - Cause: `observedOnboardingCommandMatch` (`lib/guard/command-catalogue.mjs` line 838) requires `words[0] === action.executable`. The guard's own in-hook inspect names the hook's Node (version manager v24.22.2), while the agent's escalated-sandbox inspect named and used another Node (`~/.local/lib/node-v24.15.0`).
+    - The argv was byte-identical; only the executable differed. `plan-repair` is refused the same way.
+    - Interim route: run the same argv with the hook's Node, or run it in the PO's terminal.
+  - **G20-2 (P1, Codex):** `guard-apply-patch` gives each child guard 4 s (`CHILD_TIMEOUT_MS`).
+    - Measured: `guard-lifecycle-ready` alone takes 3.7 to 4.9 s on Linux without the sandbox, and 3.1 to 3.7 s with the 19h plugin, so this is not a 19m regression.
+    - Under load (a concurrent Full Verify) every design write timed out.
+    - Direction: a faster lifecycle guard, or a budget that matches it.
+  - **G20-3 (agy):** refusals so far look like ordinary gates: `GUARD-READ-TARGET` (inexact read path), `GUARD-READ-TARGET-MISSING`, and `GUARD-DEVPLAN-SHELL` for an opaque script write while the feature is in draft. Still to be classified once the run ends.
+  - **G20-4:** the stop-pair release race under full load (NGSP7, above).
+  - The Full Verify of the applied chain (`ff20f4c80`) was stopped so that it would not load the greenfield machine; it is rerun after the greenfield runs.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
