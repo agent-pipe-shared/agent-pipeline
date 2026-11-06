@@ -241,7 +241,7 @@ export function admissionDeadlineWindows({ startMs, budgetMs } = {}) {
   const reserve = Number.isFinite(budgetMs) && budgetMs > 2 * ROLLBACK_RESERVE_MS ? ROLLBACK_RESERVE_MS : 0;
   return { preparation: { startMs, budgetMs: budgetMs - reserve }, rollback: { startMs, budgetMs } };
 }
-const QUEUE_ROW_RETAINED_NOTICE = "the queue row it wrote could not be restored in time and stays; run the routine heal, or cancel the slice, to release it";
+const QUEUE_ROW_RETAINED_NOTICE = "the queue row it wrote could not be restored and stays; cancel the slice (slice-queue.mjs cancel), or run the routine heal, to release it";
 /** Restores every queue row a refused admission wrote, newest first, under the rollback window; returns how many rows stay unrestored. */
 export function restoreWrittenQueueRows(written, windows, rollbackFn) {
   if (written.length === 0) return 0;
@@ -249,8 +249,10 @@ export function restoreWrittenQueueRows(written, windows, rollbackFn) {
   try {
     if (windows) setAdmissionDeadline(windows.rollback);
     for (const row of written.reverse()) {
-      const outcome = rollbackFn(row);
-      if (outcome?.status === "refused" && outcome.code === "GUARD-DISPATCH-SLOW") retained += 1;
+      const outcome = rollbackFn(row, windows?.rollback ?? null);
+      // C19J-W242: every outcome that leaves the row behind is counted and named, not only the one that ran out of time (a lock that stayed held for the
+      // whole window, a row somebody changed since, a queue that no longer validates without it).
+      if (outcome?.status === "refused" || outcome?.code === "SQ-ROLLBACK-CHANGED" || outcome?.code === "SQ-ROLLBACK-INVALID") retained += 1;
     }
   } finally { if (windows) clearAdmissionDeadline(); }
   return retained;
@@ -786,17 +788,65 @@ export function inspectSourceOwnedNativeConcurrentAuthority(authority,{root}={})
   if(nativeManagedDigest(actual)!==nativeManagedDigest(held.plan))throw nativeManagedFault('native-concurrent-authority-drift');
   return actual;
 }
-export function withSourceOwnedNativeConcurrentCommit({root,pendingSha256},callback){
-  const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository);
-  return withSessionAuthorityBoundary({repository},boundary=>{
-    const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===pendingSha256&&row.relativePath.startsWith('pending-'));
-    if(!entry?.value.binding.itemDelivery)throw nativeManagedFault('native-concurrent-original-item-required');
-    if(entry.value.baseline?.schema!==NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA)throw nativeManagedFault('native-concurrent-legacy-baseline-rebind-required');
-    const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256),current=nativeManagedCurrentOwner(repository);
-    if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-concurrent-original-owner',{repository,operation,current,sliceId:entry.value.delivery?.sliceId});
-    const pending=effectiveNativePendingState(read,entry),authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,baseCommit:pending.binding.candidateCommit,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
-    try{return callback(authority);}finally{nativeConcurrentAuthorities.delete(authority);}
-  });
+// C19J-W242: acquiring the registry lock can wait for a sibling stop, and that sibling's host commit moves HEAD while this stop waits. The repository this
+// call inspected before the wait is then stale for the whole boundary it opened (the boundary re-validates it on every use), so a lock acquired after such a wait
+// is released unused and the call starts over on a fresh inspection. Nothing has run in the callback yet, so the repeat is safe; it never repeats a callback that ran.
+// The same sibling is also still finishing its own post-commit writes (observation, record, terminal) outside the lock when this stop gets the lock, so for a
+// moment its commit has no lineage proof yet and the producer namespace is ahead of its registry baseline. With a settle budget (the stop passes one) those two
+// refusals, raised before the callback ran, release the lock and are looked at again until the budget ends; without one they are raised at once, as before.
+const NATIVE_BOUNDARY_REBIND_LIMIT=8;
+/** Opens the registry boundary on a repository that was inspected, and is checked again, with the lock held. A lock acquired after a wait (a sibling's host commit
+ * moved HEAD meanwhile) is released unused and the open starts over; the callback runs only on a repository that is current, and is never repeated. */
+function withCurrentRepositoryBoundary(root,callback){
+  for(let attempt=1;;attempt+=1){
+    const repository=inspectSignedDescriptorCustodyRepository(root);nativeAuthorityOwner(repository);
+    let stale=false;
+    const result=withSessionAuthorityBoundary({repository},boundary=>{
+      if(nativeManagedDigest(inspectSignedDescriptorCustodyRepository(root))!==nativeManagedDigest(repository)){stale=true;return undefined;}
+      return callback(boundary,repository);
+    });
+    if(!stale)return result;
+    if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT)throw nativeManagedFault('native-boundary-repository-rebind-exhausted');
+  }
+}
+export function withSourceOwnedNativeConcurrentCommit({root,pendingSha256,settle=null},callback){
+  const settleNow=typeof settle?.now==='function'?settle.now:()=>Date.now(),settleSleep=typeof settle?.sleep==='function'?settle.sleep:ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
+  const settleDeadline=settleNow()+(Number.isFinite(settle?.budgetMs)?Math.max(0,settle.budgetMs):0);let settleDelay=50;
+  for(;;){
+    let entered=false,siblingInFlight=false;
+    try{return withCurrentRepositoryBoundary(root,(boundary,repository)=>{
+      const owner=nativeAuthorityOwner(repository);
+      const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===pendingSha256&&row.relativePath.startsWith('pending-'));
+      if(!entry?.value.binding.itemDelivery)throw nativeManagedFault('native-concurrent-original-item-required');
+      if(entry.value.baseline?.schema!==NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA)throw nativeManagedFault('native-concurrent-legacy-baseline-rebind-required');
+      siblingInFlight=read.entries.some(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==pendingSha256&&row.value.binding?.itemDelivery
+        &&!read.entries.some(other=>other.relativePath===`authority-terminal-${row.sourceFact.sha256}.json`));
+      const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256),current=nativeManagedCurrentOwner(repository);
+      if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-concurrent-original-owner',{repository,operation,current,sliceId:entry.value.delivery?.sliceId});
+      const pending=effectiveNativePendingState(read,entry);
+      // An advance of HEAD that touches this slice's write scope, check or dependency paths is refused here by name, whoever made it.
+      const base=pending.binding.candidateCommit;
+      if(repository.candidate?.commit!==base&&nativeCommitAdvanceTouches(root,base,repository.candidate?.commit,[...pending.binding.allowedPaths,...(pending.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])]))throw nativeManagedFault('native-concurrent-advance-touches-scope');
+      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,baseCommit:base,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
+      entered=true;
+      try{return callback(authority);}finally{nativeConcurrentAuthorities.delete(authority);}
+    });}catch(error){
+      // Only a refusal raised before the callback ran is looked at again; once it ran, Git may have changed and nothing is repeated.
+      const settling=!entered&&(error?.reason==='native-concurrent-unowned-head'&&siblingInFlight||error?.code==='SDC-AUTHORITY-CAS'&&/:namespace-drift$/u.test(String(error?.reason??'')));
+      if(!settling||settleNow()+settleDelay>settleDeadline)throw error;
+      settleSleep(settleDelay);settleDelay=Math.min(settleDelay*2,1000);
+    }
+  }
+}
+/** True only when `from` is an ancestor of `head` and a commit between them changed one of `paths`; any other shape is left to the lineage proof. */
+function nativeCommitAdvanceTouches(root,from,head,paths){
+  if(typeof from!=='string'||typeof head!=='string')return false;
+  const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
+  const ancestor=run(['merge-base','--is-ancestor',from,head]);
+  if(ancestor.error||ancestor.status!==0)return false;
+  const diff=run(['diff','--name-only','-z',from,head]);
+  if(diff.error||diff.status!==0)return false;
+  return Buffer.from(diff.stdout).toString('utf8').split('\0').filter(Boolean).some(file=>paths.some(path=>scopesOverlap(path,file)));
 }
 
 function nativeAuthorityObserve(owner,handle){
@@ -1070,17 +1120,29 @@ export function prepareNativeGoldfishAuthorityTerminal({repository,pendingSha256
   catch{forget();}
   return withSessionAuthorityBoundary({repository},recover);
 }
-export function completeNativeGoldfishAuthority({repository,terminalHandle,lockWait=null}){
+/** A lock-free scan of the native namespace on the repository as it is now; a sibling stop's host commit that lands between the inspection and the scan is read again. */
+function nativeAuthorityScanCurrent(root) {
+  for(let attempt=1;;attempt+=1){
+    const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository);
+    try{return {repository,owner,read:nativeAuthorityScan(owner)};}
+    catch(error){if(attempt>=4||error?.reason!=='native-managed-repository-drift')throw error;}
+  }
+}
+export function completeNativeGoldfishAuthority({repository:given,terminalHandle,lockWait=null}){
+  // C19J-W242: a sibling stop of the same reply may commit while this one waits for a lock or runs its checks, so the repository this call was handed is not
+  // the one it can use for long. Every boundary below is opened on a freshly inspected repository (withCurrentRepositoryBoundary), and the item checks run against
+  // this stop's own delivery commit, which stays an ancestor of HEAD after the sibling's commit lands on top of it.
+  const repository=inspectSignedDescriptorCustodyRepository(given.primaryRoot);
   // w237: the two write boundaries below wait for a lock a sibling holds (bounded, only a refusal before the callback ran), because the stop's
   // reads no longer do: the first lock the stop meets after its read phase is the one of its first write.
-  const writeBoundary=callback=>retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{entered.value=true;return callback(boundary);}),
+  const writeBoundary=callback=>retryWhileSessionAuthorityLockHeld(entered=>withCurrentRepositoryBoundary(repository.primaryRoot,(boundary,current)=>{entered.value=true;return callback(boundary,current);}),
     {budgetMs:nativeStopWaitBudgetMs(),...(lockWait??{})});
   const terminal=inspectNativeGoldfishAuthorityTerminal({repository,terminalHandle}),owner=nativeAuthorityOwner(repository);
   nativeAuthorityScan(owner);const operation=[...owner.operations.values()].find(o=>o.pendingSha256===terminal.pendingSha256);
   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
   if(!operation?.memberHandle)throw nativeManagedFault('native-authority-recovery-required');
   const port=createNativeGoldfishAuthorityProducerPort({repository});
-  const completed=writeBoundary(boundary=>{
+  const completed=writeBoundary((boundary,repository)=>{
     writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
       terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});
     operation.phase='terminal-observed';const advanced=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=advanced.memberRef;
@@ -1090,14 +1152,16 @@ export function completeNativeGoldfishAuthority({repository,terminalHandle,lockW
     return releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle});
   });
   if(completed.status!=='integration-pending')return completed;
-  const inventory=nativeAuthorityScan(owner),pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
+  const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
   if(!pending?.binding.itemDelivery)return completed;
-  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate,baseCommit:pending.binding.candidateCommit});
+  const deliveryTree=terminal.commit?git(repository.primaryRoot,['rev-parse','--verify',`${terminal.commit}^{tree}`]):null;
+  const candidate=deliveryTree?{commit:terminal.commit,tree:deliveryTree}:inspectSignedDescriptorCustodyRepository(repository.primaryRoot).candidate;
+  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate,baseCommit:pending.binding.candidateCommit});
   if(checks.status!=='observed')return {...completed,checkStatus:checks};
-  return writeBoundary(boundary=>{
+  return writeBoundary((boundary,repository)=>{
     const current=nativeManagedCurrentOwner(repository);
     if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association)||current.association.state!=='bound')throw ownerFault('native-item-check-owner',{repository,operation,current,sliceId:pending.delivery?.sliceId});
-    const evidence=inspectGovernedItemDeliveryChecks({root:repository.primaryRoot,handle:checks.handle,candidate:repository.candidate,itemDelivery:pending.binding.itemDelivery});
+    const evidence=inspectGovernedItemDeliveryChecks({root:repository.primaryRoot,handle:checks.handle,candidate,itemDelivery:pending.binding.itemDelivery});
     writeExclusive(repository.commonDir,`authority-check-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-item-check.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,evidence});
     const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});
     operation.memberRef=refreshed.memberRef;
@@ -1364,29 +1428,55 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const postimageSha256=writeGovernedQueue(location,queueSource,raw);
       // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue). A working copy that did not exist before is restored as absent.
       const workingBefore=preimage&&!(queueSource.source==='handover'&&queueSource.workingSha256===null);
-      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256}};
+      // C19J-W242: the row this admission wrote, so a queue a sibling admission has written since can still be restored row by row.
+      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256,
+        planDir:dirname(state.activeFeature.planPath),rowId:itemDelivery.sliceId,rowSha256:nativeManagedDigest(raw.slices.find(row=>row.id===itemDelivery.sliceId))}};
     }),admissionDeadline,publishRetry);
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
 /** PF-55: a dispatch refused after its queue was prepared leaves the queue as it was. The prepared
  * bytes are restored only while nothing else has changed the queue since (compare and swap on them). */
-export function rollbackGovernedItemQueue(written) {
+export function rollbackGovernedItemQueue(written,admissionDeadline=null) {
   try {
     if(!written||typeof written.root!=='string'||typeof written.path!=='string'||!SHA.test(written.postimageSha256??'')||!(written.preimage===null||typeof written.preimage==='string'))
       return {status:'refused',code:'SQ-ROLLBACK-INPUT'};
-    const repository=inspectSignedDescriptorCustodyRepository(realpathSync(written.root));
-    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+    const root=realpathSync(written.root);
+    // C19J-W242: the wait for a lock a sibling admission holds is what remains of the rollback window (like the admission's own publish), not the 10 s default.
+    return retryPublishWhileLockHeld(entered=>withCurrentRepositoryBoundary(root,()=>{
       entered.value=true;
       let current;
       try{current=readFileSync(written.path);}catch(error){if(error.code==='ENOENT')return {status:'unchanged',code:'SQ-ROLLBACK-ABSENT'};throw error;}
-      if(digest(current)!==written.postimageSha256)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
       const target={workingPath:written.path,sidecarPath:typeof written.sidecarPath==='string'?written.sidecarPath:null};
+      if(digest(current)!==written.postimageSha256)return rollbackOwnQueueRow(written,target);
       if(written.preimage===null){restoreWorkingQueue(target,null);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
       restoreWorkingQueue(target,Buffer.from(written.preimage,'base64'));
       return {status:'restored',code:'SQ-ROLLBACK-RESTORED'};
-    }));
+    }),admissionDeadline);
   }catch(error){return {status:'refused',code:error.code??'SQ-ROLLBACK-UNAVAILABLE',reason:error.reason??error.message};}
+}
+/** C19J-W242: a sibling admission wrote the queue after this one, so the whole file is no longer what this admission published. Only this admission's own row
+ * (and the edges and the shared critic row it added for it) is taken out again; every row the sibling wrote stays. A row somebody changed since stays as it is. */
+function rollbackOwnQueueRow(written,target) {
+  if(typeof written.rowId!=='string'||!SHA.test(written.rowSha256??'')||typeof written.planDir!=='string')return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
+  const location=sliceQueueLocation({root:written.root,planDir:written.planDir});
+  if(location.workingPath!==target.workingPath)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
+  const source=readSliceQueueSource(location,{maxBytes:SLICE_QUEUE_MAX_BYTES}),queue=parseStrictJson(source.bytes.toString('utf8'));
+  const row=queue.slices.find(entry=>entry.id===written.rowId);
+  if(!row)return {status:'unchanged',code:'SQ-ROLLBACK-ROW-ABSENT'};
+  if(nativeManagedDigest(row)!==written.rowSha256)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
+  const before=written.preimage===null?null:parseStrictJson(Buffer.from(written.preimage,'base64').toString('utf8')),priorIds=new Set((before?.slices??[]).map(entry=>entry.id)),priorRow=(before?.slices??[]).find(entry=>entry.id===written.rowId);
+  const next=structuredClone(queue);
+  next.slices=next.slices.flatMap(entry=>{
+    if(entry.id===written.rowId)return priorRow?[structuredClone(priorRow)]:[];
+    const edges=(entry.dependsOn??[]).filter(id=>id!==written.rowId),dropped=edges.length!==(entry.dependsOn??[]).length;
+    if(!dropped)return [entry];
+    // The shared critic row this admission created for itself goes with it; a critic that existed before (or covers another slice) only loses the edge.
+    return entry.tier==='critic'&&!priorIds.has(entry.id)&&edges.length===0?[]:[{...entry,dependsOn:edges}];
+  });
+  if(!validateSliceQueue(next).ok)return {status:'unchanged',code:'SQ-ROLLBACK-INVALID'};
+  writeWorkingQueue(location,Buffer.from(JSON.stringify(next,null,2)+'\n'),source,{maxBytes:SLICE_QUEUE_MAX_BYTES,casError:()=>nativeManagedFault('item-course-queue-cas')});
+  return {status:'restored',code:'SQ-ROLLBACK-ROW-RESTORED'};
 }
 
 /** Publishes a governed item queue as a fresh inode by rename at its working copy, after the compare-and-swap on the bytes `source` was read from
@@ -1533,7 +1623,12 @@ export function importGovernedHandoverQueue({root}={}) {
 const governedCheckHandles=new WeakMap();
 function itemCheckSnapshot(root,itemDelivery,candidate) {
   const physical=realpathSync(resolve(root)),repository=inspectSignedDescriptorCustodyRepository(physical);
-  if(nativeManagedDigest(repository.candidate)!==nativeManagedDigest(candidate)||!validateItemDeliveryBriefing(itemDelivery).ok)throw nativeManagedFault('item-check-candidate-or-contract');
+  // C19J-W242: the candidate is HEAD, or a commit HEAD has since moved past (a sibling stop's host commit landed on top of it) whose tree it still names; the
+  // bytes of every check path are compared with that commit's own bytes below, so a later commit that touched one of them is still refused.
+  const atHead=nativeManagedDigest(repository.candidate)===nativeManagedDigest(candidate);
+  const behindHead=!atHead&&typeof candidate?.commit==='string'&&/^[0-9a-f]{40,64}$/u.test(candidate.commit)&&git(physical,['rev-parse','--verify',`${candidate.commit}^{tree}`])===candidate.tree
+    &&spawnSync('git',['-C',physical,'merge-base','--is-ancestor',candidate.commit,repository.candidate.commit],{env:agyHostGitEnvironment(),shell:false,timeout:10000}).status===0;
+  if(!(atHead||behindHead)||!validateItemDeliveryBriefing(itemDelivery).ok)throw nativeManagedFault('item-check-candidate-or-contract');
   const paths=[...new Set(itemDelivery.checks.flatMap(check=>[check.path,...check.dependencies]))].sort();
   const files=paths.map(path=>{
     const absolute=resolve(physical,path);

@@ -482,7 +482,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     };
     // w237 (O10): the stop's reads no longer wait for the registry lock, so the first lock it can meet is this write's. It waits for it here (bounded, the
     // same budget and seam as the terminal prepare), and only a refusal raised before the callback ran is repeated: once the callback ran, Git may have changed.
-    committed=concurrent?retryWhileSessionAuthorityLockHeld(entered=>withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256},nativeAuthority=>{entered.value=true;commitEntered=true;return commit(nativeAuthority);}),
+    committed=concurrent?retryWhileSessionAuthorityLockHeld(entered=>withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256,settle:{budgetMs:nativeStopWaitBudgetMs(),...(dependencies.lockWait??{})}},nativeAuthority=>{entered.value=true;commitEntered=true;return commit(nativeAuthority);}),
       { budgetMs: nativeStopWaitBudgetMs(), ...(dependencies.lockWait ?? {}), onWait: () => { if (!commitWaitMarked) { commitWaitMarked = true; admissionProgress("lock-wait"); } } }):commit(null);
   } catch (error) {
     if (!commitEntered) { const failed = failAt("authority-commit-lock", error, "NGHF-AUTHORITY-RECOVERY", lockClock() - commitStartedMs); if (failed.lock) { admissionProgress("lock-held"); return failed; } }
@@ -584,5 +584,6 @@ export function inspectNativeGoldfishAuthorityTerminal({repository,terminalHandl
   let currentPendingSha256=null;
   try{const internals=nativeGoldfishHostStateInternals;currentPendingSha256=internals.readPrivate(repository.commonDir,internals.key('pending',entry.state.runner,`${entry.state.sessionId}\0${entry.state.toolUseId}`)).sha256;}catch{currentPendingSha256=null;}
   if(currentPendingSha256!==entry.pendingSha256)throw nativeManagedFault('native-terminal-pending-cas');
-  return Object.freeze({pendingSha256:entry.pendingSha256,terminalAssociationSha256:entry.terminalAssociation.sha256,observationSha256:observed.sha256,recordSha256:entry.published.sha256});
+  return Object.freeze({pendingSha256:entry.pendingSha256,terminalAssociationSha256:entry.terminalAssociation.sha256,observationSha256:observed.sha256,recordSha256:entry.published.sha256,
+    commit:Array.isArray(record.commits)&&record.commits.length===1&&typeof record.commits[0]==='string'?record.commits[0]:null});
 }
