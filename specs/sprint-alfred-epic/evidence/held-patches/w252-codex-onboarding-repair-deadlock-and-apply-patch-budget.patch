@@ -1,0 +1,184 @@
+diff --git a/plugins/pipeline-core/hooks/guard-apply-patch.mjs b/plugins/pipeline-core/hooks/guard-apply-patch.mjs
+index 56dfe3817..d0900c7e2 100644
+--- a/plugins/pipeline-core/hooks/guard-apply-patch.mjs
++++ b/plugins/pipeline-core/hooks/guard-apply-patch.mjs
+@@ -4,6 +4,7 @@
+ /** Extract apply_patch paths and run the existing write-path guards per path. */
+ import { spawn } from "node:child_process";
+ import { readFileSync } from "node:fs";
++import { basename } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -26,7 +27,12 @@ const GUARDS = [
+   { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"], lane: "repository-serial" },
+ ];
+ const MAX_PARALLEL_GUARDS = 12;
+-const CHILD_TIMEOUT_MS = 4_000;
++// C20 w252 (greenfield G20-2): the lifecycle guard alone takes about 3 to 5 s on an ordinary Linux machine (measured 3.1 to 4.9 s),
++// so a 4 s cap refused ordinary design writes as "timed out" whenever the machine was busy. Each child now gets up to 12 s; the whole
++// script stays bounded by the cap codex-pretool-guard.mjs gives it (no extra shared deadline: the lifecycle children run one per path,
++// in order, and a patch over many files legitimately needs the sum).
++const CHILD_TIMEOUT_MS = 12_000;
++const childTimeoutMs = () => CHILD_TIMEOUT_MS;
+ 
+ function killGuardProcess(child) {
+   if (child.pid === undefined) return;
+@@ -51,7 +57,7 @@ function runGuard({ path, args, input }) {
+       child.stderr.destroy();
+       killGuardProcess(child);
+       finish({ status: null, signal: "SIGKILL", timedOut: true });
+-    }, CHILD_TIMEOUT_MS);
++    }, childTimeoutMs());
+     const finish = (result) => {
+       if (settled) return;
+       settled = true;
+@@ -238,7 +244,7 @@ for (const { job, result } of results) {
+   if (result.stderr) stderr.push(result.stderr.trimEnd());
+   if (result.timedOut) {
+     exitCode = 2;
+-    stderr.push(`[guard-apply-patch] Guard timed out for ${job.filePath}.`);
++    stderr.push(`[guard-apply-patch] Guard timed out for ${job.filePath} (${basename(job.path)}, cap ${CHILD_TIMEOUT_MS / 1000} s per guard). Retry the same patch once the machine is less busy, or split it into fewer files per patch.`);
+   } else if (result.status === 2) exitCode = 2;
+   else if (result.status === 1 && exitCode === 0) exitCode = 1;
+   else if (![0, 1, 2].includes(result.status)) {
+diff --git a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+index 704290427..e8b4e998c 100644
+--- a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+@@ -171,7 +171,8 @@ const spawn = (executable, argv, options) => {
+   observed = {executable, argv, ambientClaudeCode: options.env.CLAUDECODE};
+   return childProcess.spawn(executable, argv, options);
+ };
+-const CHILD_TIMEOUT_MS = 4000;
++const CHILD_TIMEOUT_MS = 12000;
++const childTimeoutMs = () => CHILD_TIMEOUT_MS;
+ ${source.slice(start, end)}
+ ${lifecycle.slice(runnerStart, runnerEnd)}
+ (async () => {
+@@ -795,5 +796,15 @@ check("RCM04 rename facts stay within their own file operation", () => {
+   assert.deepEqual(Array.from(parsed.paths, path => path.patchContainsAcknowledgementMarker), [true, true, false, false]);
+ });
+ 
++check("GAP-BUDGET01 (C20 w252, G20-2): each child guard gets 12 s, inside the outer cap of codex-pretool-guard, and a timeout names the guard and the budget", () => {
++  const source = readFileSync(guard, "utf8");
++  assert.match(source, /^const CHILD_TIMEOUT_MS = 12_000;$/mu);
++  assert.match(source, /\}, childTimeoutMs\(\)\);/u, "the per-child timer uses the 12 s cap");
++  const pretool = readFileSync(join(hookDir, "codex-pretool-guard.mjs"), "utf8");
++  const cap = Number(/"guard-apply-patch\.mjs": \{ capMs: ([0-9_]+), reserveMs: ([0-9_]+) \}/u.exec(pretool)?.[1].replaceAll("_", ""));
++  assert.ok(Number.isSafeInteger(cap) && 12_000 * 2 < cap, `one parallel round plus one lifecycle child fit inside the outer cap (${cap} ms)`);
++  assert.match(source, /Guard timed out for \$\{job\.filePath\} \(\$\{basename\(job\.path\)\}, cap/u, "the timeout names the guard that ran out of time");
++});
++
+ if (process.exitCode) process.exit(process.exitCode);
+ process.stdout.write(`1..${passed}\n`);
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index f446e7545..26e64e603 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -807,6 +807,34 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  * whose words do not have that shape cannot equal any observed action, so it
+  * returns null without an inspection. The set of matching commands is unchanged.
+  */
++const NODE_BASENAMES = new Set(["node", "node.exe"]);
++const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCase());
++/**
++ * C20 w252 (greenfield G20-1): the observed action names the Node of the process that inspected (`process.execPath`), and the guard
++ * inspects inside the hook, whose Node can differ from the one the agent's shell resolves (a runner sandbox and a version manager
++ * each bring their own). Byte equality of the interpreter then refused the very repair the inspection returned, a deadlock.
++ * Equality stays the first rule. Besides it, only when the observed executable is itself a Node interpreter, a command may name
++ * `node` from PATH, or an absolute path whose basename is node/node.exe, that resolves to an executable regular file OUTSIDE the
++ * project root (so an agent cannot plant its own "node" in scratch/ or anywhere in the repository). The argv stays byte-exact.
++ */
++export function sameNodeInterpreter(word, executable, root, dependencies = {}) {
++  if (word === executable) return true;
++  if (typeof word !== "string" || typeof executable !== "string" || !isNodeName(executable)) return false;
++  if (word === "node") return true;
++  if (!(win32.isAbsolute(word) || posix.isAbsolute(word)) || !isNodeName(word)) return false;
++  try {
++    const real = (dependencies.realpathFn ?? realpathSync)(word);
++    let realRoot;
++    try { realRoot = (dependencies.realpathFn ?? realpathSync)(root); } catch { realRoot = resolve(root); }
++    const rel = relative(realRoot, real);
++    if (rel === "" || !(rel.startsWith("..") || isAbsolute(rel))) return false;
++    const stat = (dependencies.lstatFn ?? lstatSync)(real);
++    return stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0);
++  } catch {
++    return false;
++  }
++}
++
+ export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
+   const words = simpleWords(command, root);
+   if (!words) return null;
+@@ -835,7 +863,7 @@ export function observedOnboardingCommandMatch(command, root, dependencies = {})
+     || typeof action.mutation !== "boolean"
+     || typeof action.requiresConfirmation !== "boolean"
+     || words.length !== action.argv.length + 1
+-    || words[0] !== action.executable
++    || !sameNodeInterpreter(words[0], action.executable, root, dependencies)
+     || action.argv.some((value, index) => words[index + 1] !== value)) return null;
+   return {observed, action};
+ }
+diff --git a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+index 133338685..78ceaa767 100644
+--- a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
++++ b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
+ import { join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+-import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch } from "./command-catalogue.mjs";
++import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter } from "./command-catalogue.mjs";
+ import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
+ import { simpleWords } from "./shell-grammar.mjs";
+ 
+@@ -143,14 +143,46 @@ test("matching is identical to the pre-precondition behaviour for every producer
+       `${commandFor(words)} && ${commandFor(words)}`,
+     ];
+   };
++  // C20 w252 restatement (QG-04, same table, no case dropped): every legacy match is still returned identically; a command the
++  // legacy body refused may match now ONLY when it differs from the observed action in the interpreter word alone and
++  // sameNodeInterpreter admits that word for the observed Node executable (G20-1). Every other legacy refusal stays a refusal.
+   let matched = 0;
++  let widened = 0;
+   for (const action of actions) {
+     for (const command of commands(action)) {
+       const deps = counting(action);
+       const expected = legacyMatch(command, deps);
+-      assert.deepEqual(observedOnboardingCommandMatch(command, root, counting(action)), expected, command);
+-      if (expected !== null) matched += 1;
++      const actual = observedOnboardingCommandMatch(command, root, counting(action));
++      if (expected !== null) { assert.deepEqual(actual, expected, command); matched += 1; continue; }
++      if (actual === null) continue;
++      const words = simpleWords(command, root);
++      assert.ok(words && words.length === action.argv.length + 1 && action.argv.every((value, index) => words[index + 1] === value), `only the interpreter may differ: ${command}`);
++      assert.equal(sameNodeInterpreter(words[0], action.executable, root), true, `the interpreter must be an admitted Node: ${command}`);
++      assert.notEqual(words[0], action.executable);
++      widened += 1;
+     }
+   }
+   assert.ok(matched >= actions.length, "the table must contain real matches, not only refusals");
++  assert.ok(widened >= 1, "the table must exercise the Node-interpreter equivalence");
++});
++
++test("C20 w252 (G20-1): the repair the hook's inspection returns is admitted when the agent's shell names a different real Node", () => {
++  const action = { kind: "command", executable: GUARD_NODE, argv: [onboardingScript, "intake-spec-marker-apply", "--root", rootWord, "--plan-sha256", "c".repeat(64), "--activate", "--runner", "codex"], mutation: true, requiresConfirmation: false };
++  const realNodeElsewhere = process.execPath;
++  // The guard's own Node differs from the agent's (simulated: the observed executable is a foreign node path, the agent names this Node).
++  const observedForeign = { ...action, executable: "/opt/producer-node/bin/node" };
++  assert.ok(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(observedForeign)), "a real Node outside the project is admitted");
++  assert.ok(observedOnboardingCommandMatch(commandFor(["node", ...action.argv]), root, counting(observedForeign)), "node from PATH is admitted");
++  // End to end through the admission (the fixture root admits the observed-only planner; the marker repair's argument check needs a real root).
++  const foreignPlanner = planner("/opt/producer-node/bin/node");
++  assert.equal(isExactObservedOnboardingNextAction(commandFor([realNodeElsewhere, ...foreignPlanner.argv]), root, counting(foreignPlanner)), true);
++  // Still refused: a non-Node interpreter, a missing Node path, a Node-named file inside the project, a changed argv, and any
++  // interpreter swap when the observed executable is not itself a Node.
++  for (const word of ["/bin/sh", "/opt/missing/bin/node", join(repository, "scratch", "node"), join(repository, "package.json")]) {
++    assert.equal(observedOnboardingCommandMatch(commandFor([word, ...action.argv]), root, counting(observedForeign)), null, word);
++  }
++  assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv, "--extra"]), root, counting(observedForeign)), null);
++  const nonNode = { ...action, executable: "/usr/bin/python3" };
++  assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(nonNode)), null);
++  assert.equal(sameNodeInterpreter(join(repository, "scratch", "node"), GUARD_NODE, repository, { realpathFn: (p) => p, lstatFn: () => ({ isFile: () => true, mode: 0o755 }) }), false, "a node inside the root is refused even when it is an executable file");
+ });
