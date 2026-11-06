@@ -76,6 +76,9 @@ export async function installHookAuthorityTrace(options = {}) {
             maxMs: Math.max(o.maxMs ?? 0, a.maxMs ?? 0),
             failed: (o.failed ?? 0) + (a.failed ?? 0),
             byOperation: a.byOperation ?? {},
+            // Why each failed native observation failed (shared bounded list, at most 20): operation, call site (file:line), bounded error code. No path, no value.
+            // Present only when something failed, so a clean line keeps its v1 shape.
+            ...((a.failures ?? o.failures ?? []).length ? { failures: a.failures ?? o.failures } : {}),
           },
           // persistedHits: the share of the hits answered from the cross-process memo (the 19g measurement could not tell it apart).
           authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, persistedHits: a.authorityMemoPersistedHits ?? 0, size: a.authorityMemoSize ?? 0 },

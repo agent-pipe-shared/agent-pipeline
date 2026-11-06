@@ -355,6 +355,8 @@ function verbAdd({ flags }) {
     if (flags["init-feature"] !== undefined) throw usage("add: --init-feature is only for a queue that does not exist yet");
     raw = structuredClone(loaded.raw);
   }
+  const absent = [...["id", "title"].filter((name) => typeof flags[name] !== "string" || flags[name].trim() === ""), ...(flags["write-scope"]?.length ? [] : ["write-scope"])];
+  if (absent.length > 0) throw usage(`add: ${absent.map((name) => `--${name}`).join(", ")} ${absent.length > 1 ? "are" : "is"} required. Full command: add --id <id> --title "<title>" --write-scope <path> [--write-scope <path> ...] [other flags]`);
   const id = requireText(flags, "id", "add");
   const title = requireText(flags, "title", "add");
   if (!flags["write-scope"]?.length) throw usage("add: at least one --write-scope is required");
@@ -422,17 +424,22 @@ function verbDepend({ positional, flags }) {
 // through the authenticated course writer; a plain queue is edited like the other declarations.
 // D75: --class says why the slice ends (one of CANCEL_CLASSES); a later re-dispatch is decided from it. It is checked
 // before any queue read, so a refused call touches nothing, and the refusal teaches every class from its own text.
+const CANCEL_USAGE = `Full command: cancel <id> [--started] --reason "<why>" --class <${CANCEL_CLASSES.join("|")}>; add --started only when the slice was already started (it has a native dispatch state or an AGY reservation) and its Goldfish no longer runs.`;
 function verbCancel({ positional, flags }) {
-  const reason = requireText(flags, "reason", "cancel");
   const verdict = checkCancelClass(flags.class);
-  if (!verdict.ok) throw new CliError(verdict.code, EXIT.USAGE, `cancel: --class is required. ${verdict.reason}`, { repair: verdict.repair, classes: CANCEL_CLASS_HELP });
+  const hasReason = typeof flags.reason === "string" && flags.reason.trim() !== "";
+  if (!hasReason || !verdict.ok) {
+    const missing = [...(hasReason ? [] : ["--reason"]), ...(verdict.ok ? [] : ["--class"])].join(" and ");
+    throw new CliError(verdict.ok ? "SQ-USAGE" : verdict.code, EXIT.USAGE, `cancel: ${missing} ${missing.includes("and") ? "are" : "is"} required. ${CANCEL_USAGE}${verdict.ok ? "" : ` ${verdict.reason}`}`, { ...(verdict.ok ? {} : { repair: verdict.repair }), classes: CANCEL_CLASS_HELP });
+  }
+  const reason = flags.reason.trim();
   const path = resolve(flags.queue);
   const loaded = loadRaw(path);
   if (loaded.status !== "valid") throw invalidQueue(loaded);
   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
     if (governedTargetOf(path) === null) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
     const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
-    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, `${result.reason ?? "the slice was not cancelled"}${result.code === "SQ-ITEM-CANCEL-STARTED" ? ` Repair: ${CANCEL_USAGE}` : ""}`, { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
   }
   const raw = structuredClone(loaded.raw);
@@ -448,6 +455,8 @@ function verbCancel({ positional, flags }) {
 
 function verbPause({ flags }) {
   const by = flags.by;
+  const absent = ["by", "reason", "until"].filter((name) => typeof flags[name] !== "string" || flags[name].trim() === "");
+  if (absent.length > 0) throw usage(`pause: ${absent.map((name) => `--${name}`).join(", ")} ${absent.length > 1 ? "are" : "is"} required. Full command: pause --by <po|elephant> --reason "<why>" --until <ISO-8601 UTC timestamp, at most 4 hours ahead> --session <id>`);
   if (by !== "po" && by !== "elephant") throw usage("pause: --by must be po or elephant");
   const reason = requireText(flags, "reason", "pause");
   const now = nowMs(flags);

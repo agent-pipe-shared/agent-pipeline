@@ -52,25 +52,33 @@ export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result
 
 const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
 
-/** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
-export function readNativeGoldfishStopFailure({ commonDir } = {}) {
+/**
+ * The stop-failure diagnostic to show (PF-61), or null. Diagnostic only: any fault reads as none. With a dispatchId the record of THAT
+ * dispatch (its newest) wins over a newer record of another dispatch; without one, or without a match, the newest record wins. `others`
+ * lists up to 3 further records, newest first (dispatch id, code, stage), so a second unresolved failure is never invisible.
+ */
+export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } = {}) {
   try {
     if (typeof commonDir !== "string" || commonDir.length === 0) return null;
     const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
-    let newest = null;
+    const records = [];
     for (const name of readdirSync(directory)) {
       if (!/^stop-failure-[0-9a-f]+\.json$/u.test(name) && !/^stop-failure-[A-Za-z0-9_-]+\.json$/u.test(name)) continue;
       let entry;
       try { entry = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
       if (entry?.schema !== STOP_FAILURE_SCHEMA || typeof entry.code !== "string") continue;
       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
-      if (!newest || observedAt > newest.observedAt) {
-        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+      {
+        records.push({ code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
           stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
-          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) };
+          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) });
       }
     }
-    return newest;
+    records.sort((a, b) => (a.observedAt < b.observedAt ? 1 : a.observedAt > b.observedAt ? -1 : 0));
+    const chosen = (typeof dispatchId === "string" && dispatchId !== "" ? records.find((r) => r.dispatchId === dispatchId) : null) ?? records[0] ?? null;
+    if (!chosen) return null;
+    const others = records.filter((r) => r !== chosen).slice(0, 3).map((r) => ({ dispatchId: r.dispatchId, code: r.code, stage: r.stage }));
+    return others.length > 0 ? { ...chosen, others } : chosen;
   } catch { return null; }
 }
 
@@ -119,6 +127,13 @@ function healSentence(reason) {
     : "";
 }
 
+/** Further unresolved stop-failure records, bounded, so a second failed dispatch is named rather than hidden behind the first. */
+function describeOthers(others) {
+  if (!Array.isArray(others) || others.length === 0) return "";
+  const text = others.map((o) => `${String(o.dispatchId ?? "unknown").slice(0, 80)} (${String(o.code).slice(0, 60)}${o.stage ? `, stage ${String(o.stage).slice(0, 60)}` : ""})`).join("; ");
+  return ` Other unresolved stop-failure records, newest first: ${text}.`;
+}
+
 function stopFailureNotice(failure) {
   if (!failure || typeof failure.code !== "string") return null;
   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
@@ -129,7 +144,7 @@ function stopFailureNotice(failure) {
     : failure.code === "NGHF-COMMIT-EXCEPTION"
       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
       : "";
-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}`;
+  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
 }
 
 export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
@@ -190,7 +205,7 @@ if (isDirectInvocation(import.meta.url)) {
   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
   let stopFailure = null;
   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
-    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
+    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result?.dispatchId ?? null }); }
     catch { stopFailure = null; }
   }
   let block = null;

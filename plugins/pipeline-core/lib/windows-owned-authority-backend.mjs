@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {lstatSync,openSync,readFileSync,readSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
-import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment,nativeCallSites,nativeFailureCode,nativeFailureList,recordNativeFailure} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 import {assertAdmissionDeadline} from './admission-deadline.mjs';
 
@@ -38,18 +38,6 @@ export function recordNativeAuthoritySpawn(operation,ms,ok){
 // appends one line naming the operation, its duration and the two nearest callers outside the native modules (file:line only, no path,
 // no input). A process the host ends leaves no exit line, and one counter line cannot say which caller made 220 observations; this can.
 // Nothing runs without the trace: the stack is only read when a writer exists.
-const NATIVE_SITE_SKIP=/windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
-function nativeCallSites(){
- const limit=Error.stackTraceLimit;Error.stackTraceLimit=40;let stack='';
- try{stack=String(new Error().stack??'');}finally{Error.stackTraceLimit=limit;}
- const sites=[];
- for(const line of stack.split('\n').slice(1)){
-  const match=/([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
-  if(match===null||NATIVE_SITE_SKIP.test(line))continue;
-  sites.push(`${match[1]}:${match[2]}`);if(sites.length===2)break;
- }
- return sites.join('<');
-}
 function nativeSpawnMark(name,ms){
  try{
   const progress=globalThis[Symbol.for('pipeline.authority-trace-progress')];
@@ -148,7 +136,7 @@ export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform
 export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();persisted=null;persistedDirty=0;persistedDropped.clear();}
 export function nativeAuthorityStats(){
  const byOperation={};for(const name of [...nativeAuthorityByOperation.keys()].sort())byOperation[name]=nativeAuthorityByOperation.get(name);
- return {...nativeAuthorityCounters,byOperation,authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
+ return {...nativeAuthorityCounters,byOperation,failures:nativeFailureList(),authorityMemoHits:authorityMemoCounters.hits,authorityMemoMisses:authorityMemoCounters.misses,authorityMemoPersistedHits:authorityMemoCounters.persistedHits,authorityMemoSize:authorityMemo.size};
 }
 function memoIdentity(target){try{const s=lstatSync(target,{bigint:true});if(!s.isFile()&&!s.isDirectory())return null;return [s.dev,s.ino,s.mode,s.nlink,s.size,s.mtimeNs,s.ctimeNs,s.birthtimeNs].join(':');}catch{return null;}}
 // A write changes the object it names, the directory that lists it and everything below it (a directory removal); no other object. Every memo hit
@@ -274,8 +262,9 @@ function invokeNative(request){
  let executable=null;if(testSeam.spawn!==undefined)executable='test-seam';else for(const candidate of WINDOWS_POWERSHELL_PATHS){try{const stat=lstatSync(candidate);if(stat.isFile()&&!stat.isSymbolicLink()&&realpathSync(candidate).toLowerCase()===candidate.toLowerCase()){executable=candidate;break;}}catch{/* fixed system locations only */}}
  if(executable===null)fail('WIN-AUTH-SYSTEM-HELPER-UNAVAILABLE');
  // Execute the measured source bytes, not a subsequently reopened helper pathname.
- const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch{recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+ const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch(thrown){recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);recordNativeFailure(request.operation,typeof thrown?.code==='string'&&/^[A-Z0-9_]{1,32}$/u.test(thrown.code)?thrown.code:'spawn-threw');fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
+ if(!isSuccessfulSpawn(result))recordNativeFailure(request.operation,nativeFailureCode(result));
  let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
  if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);

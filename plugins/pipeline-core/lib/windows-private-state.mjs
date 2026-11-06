@@ -178,6 +178,10 @@ export function sanitizeChildEnvironment(environment) {
  * number, a closed token or an identifier-shaped name, so the reason can never carry a path or a localized message.
  */
 function childFailureReason(operation, result) {
+  const parts = nativeFailureCodeParts(result);
+  return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
+}
+function nativeFailureCodeParts(result) {
   const parts = [];
   if (Number.isInteger(result?.status)) parts.push(`exit ${result.status}`);
   const code = result?.error?.code;
@@ -186,12 +190,38 @@ function childFailureReason(operation, result) {
   if (typeof signal === "string" && /^SIG[A-Z0-9]{1,16}$/u.test(signal)) parts.push(signal);
   const typed = new RegExp(`^${CHILD_ERROR_TYPE_MARKER}([A-Za-z0-9_]{1,64})\\r?$`, "mu").exec(String(result?.stderr ?? ""));
   if (typed) parts.push(typed[1]);
-  return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
+  return parts;
 }
+/** Bounded error code of a failed native child (exit status, spawn error code, signal, thrown type name): numbers and closed tokens only, never a path or message. */
+export function nativeFailureCode(result) { const parts = nativeFailureCodeParts(result); return parts.length > 0 ? parts.join(", ").slice(0, 96) : "unknown"; }
+
+// Opt-in authority trace: the call site is file:line of the two nearest callers outside the native modules -- no path, no input.
+const NATIVE_SITE_SKIP = /windows-owned-authority-backend\.mjs|windows-private-state\.mjs|windows-authority-readiness\.mjs/u;
+export function nativeCallSites() {
+  const limit = Error.stackTraceLimit; Error.stackTraceLimit = 40;
+  let stack = "";
+  try { stack = String(new Error().stack ?? ""); } finally { Error.stackTraceLimit = limit; }
+  const sites = [];
+  for (const line of stack.split("\n").slice(1)) {
+    const match = /([A-Za-z0-9_.-]+\.(?:mjs|js|cjs)):(\d+):\d+\)?\s*$/u.exec(line);
+    if (match === null || NATIVE_SITE_SKIP.test(line)) continue;
+    sites.push(`${match[1]}:${match[2]}`); if (sites.length === 2) break;
+  }
+  return sites.join("<");
+}
+const NATIVE_FAILURE_LIMIT = 20;
+const nativeFailures = [];
+/** Remember why one native observation failed (diagnostics only; kept only while the opt-in trace writer exists, at most 20). */
+export function recordNativeFailure(operation, code) {
+  if (typeof globalThis[Symbol.for("pipeline.authority-trace-progress")] !== "function") return;
+  if (nativeFailures.length >= NATIVE_FAILURE_LIMIT) return;
+  nativeFailures.push({ operation: String(operation).replace(/[^A-Za-z0-9_.:-]/gu, "?").slice(0, 64), site: nativeCallSites(), code: String(code).slice(0, 96) });
+}
+export function nativeFailureList() { return nativeFailures.map((entry) => ({ ...entry })); }
 
 // Opt-in authority trace (diagnostics only): plain module-level counters of every native PowerShell spawn made here.
 const nativeObservationCounters = { count: 0, ms: 0, maxMs: 0, failed: 0 };
-export function nativeObservationStats() { return { ...nativeObservationCounters }; }
+export function nativeObservationStats() { return { ...nativeObservationCounters, failures: nativeFailureList() }; }
 function recordNativeObservation(startedAt, succeeded) {
   const elapsed = Date.now() - startedAt;
   nativeObservationCounters.count += 1;
@@ -212,6 +242,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
   });
   recordNativeObservation(startedAt, isSuccessfulSpawn(result));
+  if (!isSuccessfulSpawn(result)) recordNativeFailure(operation, nativeFailureCode(result));
   if (!isSuccessfulSpawn(result)) return unavailable(childFailureReason(operation, result));
   return result;
 }
