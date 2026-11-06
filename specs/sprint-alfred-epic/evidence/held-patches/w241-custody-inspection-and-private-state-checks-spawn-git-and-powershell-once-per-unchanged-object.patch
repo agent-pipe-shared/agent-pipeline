@@ -1,0 +1,783 @@
+diff --git a/plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs b/plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs
+new file mode 100644
+index 000000000..e35a5f5e8
+--- /dev/null
++++ b/plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs
+@@ -0,0 +1,361 @@
++// SPDX-License-Identifier: SUL-1.0
++// C19I-W241 (AC-108): the custody inspection and the Windows private-state batch start fewer git and PowerShell
++// processes WITHOUT changing an answer. Every cached answer must equal what a fresh git call (or a fresh native
++// observation) would return at that moment, so the cases below move HEAD, replace refs and replace tree objects inside
++// ONE process and compare each answer with git's own, and they count the process starts through the spawnSync seam.
++import assert from "node:assert/strict";
++import childProcess from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
++import { syncBuiltinESMExports } from "node:module";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++
++const win32 = process.platform === "win32";
++const realSpawnSync = childProcess.spawnSync;
++
++// One counting wrapper in front of the builtin, installed before the modules under test bind it.
++const gitCalls = [];
++const powershellCalls = [];
++const fake = { foreign: new Set(), failBatch: false };
++const POWERSHELL_LITERAL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
++function fakeRow(path) {
++  const extra = fake.foreign.has(path) ? ["BUILTIN\\Users"] : [];
++  return { path, currentOwner: "HOST\\me", owner: "HOST\\me", reparsePoint: false, principals: ["HOST\\me", ...extra], inheritedFlags: [false, ...extra.map(() => false)] };
++}
++childProcess.spawnSync = function countingSpawnSync(file, args, options, ...rest) {
++  if (file === "git") gitCalls.push([...(Array.isArray(args) ? args : [])]);
++  if (/powershell/iu.test(String(file))) {
++    const input = typeof options?.input === "string" ? options.input : null;
++    powershellCalls.push(input === null ? { single: options?.env?.PIPELINE_PRIVATE_STATE_PATH } : { batch: JSON.parse(Buffer.from(input.trim(), "base64").toString("utf8")) });
++    if (input !== null && fake.failBatch) return { status: 1, signal: null, stdout: "", stderr: "", error: undefined, pid: 0, output: [null, "", ""] };
++    const stdout = input === null
++      ? (() => { const { path: _path, ...facts } = fakeRow(options.env.PIPELINE_PRIVATE_STATE_PATH); return JSON.stringify(facts); })()
++      : JSON.stringify(powershellCalls.at(-1).batch.map(fakeRow));
++    return { status: 0, signal: null, stdout, stderr: "", error: undefined, pid: 0, output: [null, stdout, ""] };
++  }
++  return realSpawnSync.call(this, file, args, options, ...rest);
++};
++syncBuiltinESMExports();
++const { inspectSignedDescriptorCustodyRepository, withCustodyTopologyScope } = await import("./worktree-lifecycle.mjs");
++const { assessWindowsPrivatePath, hardenWindowsPrivateDirectory, observeWindowsPrivatePath } = await import("./windows-private-state.mjs");
++const awaitedOnboarding = await import("./onboarding-continuity.mjs");
++
++const roots = [];
++process.on("exit", () => {
++  childProcess.spawnSync = realSpawnSync;
++  for (const root of roots) rmSync(root, { recursive: true, force: true });
++});
++
++function git(cwd, args, { allowNonzero = false } = {}) {
++  const result = realSpawnSync("git", args, {
++    cwd, encoding: "utf8", shell: false,
++    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", LC_ALL: "C", GIT_AUTHOR_NAME: "F", GIT_AUTHOR_EMAIL: "f@example.invalid", GIT_COMMITTER_NAME: "F", GIT_COMMITTER_EMAIL: "f@example.invalid" },
++  });
++  if (!allowNonzero && result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
++  return result;
++}
++function fixtureDir(prefix = "custody-spawns-") {
++  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
++  roots.push(dir);
++  return dir;
++}
++function repoFixture(extraInit = []) {
++  const fixture = fixtureDir();
++  const primary = join(fixture, "repo");
++  mkdirSync(primary);
++  git(primary, ["init", "--initial-branch=main", ...extraInit]);
++  writeFileSync(join(primary, "README.md"), "fixture\n");
++  git(primary, ["add", "README.md"]);
++  git(primary, ["commit", "-m", "fixture"]);
++  return { fixture, primary };
++}
++function commit(primary, name) {
++  writeFileSync(join(primary, `${name}.txt`), `${name}\n`);
++  git(primary, ["add", `${name}.txt`]);
++  git(primary, ["commit", "-m", name]);
++}
++function truth(primary) {
++  const lines = git(primary, ["rev-parse", "HEAD", "HEAD^{tree}"]).stdout.trim().split("\n");
++  return { commit: lines[0], tree: lines[1] };
++}
++function gitStarts(operation) {
++  const before = gitCalls.length;
++  const value = operation();
++  return { value, starts: gitCalls.length - before };
++}
++function withCeiling(ceiling, operation) {
++  const before = process.env.GIT_CEILING_DIRECTORIES;
++  process.env.GIT_CEILING_DIRECTORIES = ceiling;
++  try { return operation(); } finally { if (before === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = before; }
++}
++
++test("W241-01 an unchanged HEAD is answered without a git start after the first inspection", () => {
++  const { primary } = repoFixture();
++  const root = realpathSync(primary);
++  const first = inspectSignedDescriptorCustodyRepository(root);
++  assert.deepEqual(first.candidate, truth(primary));
++  const warm = gitStarts(() => { for (let i = 0; i < 5; i += 1) assert.deepEqual(inspectSignedDescriptorCustodyRepository(root), first); });
++  assert.equal(warm.starts, 0, "five inspections of an unchanged repository start no git process");
++});
++
++test("W241-02 every HEAD move inside one process is visible to the very next inspection and equals git's own answer", () => {
++  const { primary } = repoFixture();
++  const root = realpathSync(primary);
++  const seen = [];
++  const step = (label, mutate, { expectStarts } = {}) => {
++    mutate();
++    const { value, starts } = gitStarts(() => inspectSignedDescriptorCustodyRepository(root));
++    assert.deepEqual(value.candidate, truth(primary), label);
++    if (expectStarts !== undefined) assert.equal(starts, expectStarts, `${label}: git starts`);
++    seen.push(value.candidate.commit);
++  };
++  step("initial", () => {});
++  step("a new commit", () => commit(primary, "two"), { expectStarts: 1 });
++  step("another new commit", () => commit(primary, "three"), { expectStarts: 1 });
++  step("an unchanged HEAD again", () => {}, { expectStarts: 0 });
++  step("reset --hard to the previous commit", () => git(primary, ["reset", "--hard", "HEAD~1"]), { expectStarts: 0 });
++  step("reset --hard back to the third commit", () => git(primary, ["reset", "--hard", seen[2]]), { expectStarts: 0 });
++  step("pack-refs moves the loose ref into packed-refs", () => git(primary, ["pack-refs", "--all", "--prune"]), { expectStarts: 0 });
++  assert.equal(existsSync(join(primary, ".git", "refs", "heads", "main")), false, "the branch is now only in packed-refs");
++  step("a commit over a packed ref", () => commit(primary, "four"), { expectStarts: 1 });
++  step("reset to an older commit while an older value sits in packed-refs", () => git(primary, ["reset", "--hard", seen[1]]), { expectStarts: 0 });
++  step("detached HEAD", () => git(primary, ["checkout", "--detach", seen[2]]), { expectStarts: 0 });
++  step("a commit on a detached HEAD", () => commit(primary, "five"), { expectStarts: 1 });
++  step("a branch with a slash in its name", () => git(primary, ["checkout", "-b", "feat/deep/x"]), { expectStarts: 0 });
++  step("back to main", () => git(primary, ["checkout", "main"]), { expectStarts: 0 });
++  step("amend: same tree, a new commit", () => git(primary, ["commit", "--amend", "-m", "amended"]), { expectStarts: 1 });
++  step("update-ref moves the branch", () => git(primary, ["update-ref", "refs/heads/main", seen[0]]), { expectStarts: 0 });
++  assert.equal(new Set(seen).size >= 5, true);
++});
++
++test("W241-03 a HEAD move inside one withCustodyTopologyScope boundary and between two inspections of one process", () => {
++  const { primary } = repoFixture();
++  const root = realpathSync(primary);
++  withCustodyTopologyScope(() => {
++    const before = inspectSignedDescriptorCustodyRepository(root);
++    commit(primary, "inside");
++    const after = inspectSignedDescriptorCustodyRepository(root);
++    assert.deepEqual(after.candidate, truth(primary));
++    assert.notEqual(after.candidate.commit, before.candidate.commit);
++    git(primary, ["reset", "--hard", before.candidate.commit]);
++    assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, before.candidate);
++  });
++});
++
++test("W241-04 an unusual HEAD shape falls over to git: unborn, symlinked HEAD, replace refs (loose and packed), reftable", () => {
++  // unborn
++  const unbornDir = fixtureDir();
++  const unborn = join(unbornDir, "u");
++  mkdirSync(unborn);
++  git(unborn, ["init", "--initial-branch=main"]);
++  assert.deepEqual(inspectSignedDescriptorCustodyRepository(realpathSync(unborn)).candidate, { commit: "0".repeat(40), tree: "4b825dc642cb6eb9a060e54bf8d69288fbee4904" });
++  commit(unborn, "first");
++  assert.deepEqual(inspectSignedDescriptorCustodyRepository(realpathSync(unborn)).candidate, truth(unborn));
++
++  // a legacy symlinked HEAD (HEAD -> refs/heads/main) is answered by git
++  if (!win32) {
++    const { primary } = repoFixture();
++    const root = realpathSync(primary);
++    inspectSignedDescriptorCustodyRepository(root);
++    unlinkSync(join(primary, ".git", "HEAD"));
++    symlinkSync("refs/heads/main", join(primary, ".git", "HEAD"));
++    const viaGit = gitStarts(() => inspectSignedDescriptorCustodyRepository(root));
++    assert.deepEqual(viaGit.value.candidate, truth(primary));
++  }
++
++  // replace refs: a cached tree must not outlive a replacement that changes what HEAD^{tree} answers
++  for (const pack of [false, true]) {
++    const { primary } = repoFixture();
++    const root = realpathSync(primary);
++    const original = inspectSignedDescriptorCustodyRepository(root).candidate;
++    git(primary, ["checkout", "-q", "--detach"]);
++    writeFileSync(join(primary, "other.txt"), "other\n");
++    git(primary, ["add", "other.txt"]);
++    git(primary, ["commit", "-m", "other"]);
++    const other = truth(primary).commit;
++    git(primary, ["checkout", "-q", "main"]);
++    assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, original, "before the replacement");
++    git(primary, ["replace", original.commit, other]);
++    if (pack) git(primary, ["pack-refs", "--all", "--prune"]);
++    const expected = truth(primary);
++    assert.notEqual(expected.tree, original.tree, "the replacement really changes the tree git answers");
++    assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, expected, `replace ref ${pack ? "packed" : "loose"}`);
++  }
++
++  // reftable (git >= 2.45)
++  const probe = fixtureDir();
++  const reftableInit = git(probe, ["init", "--ref-format=reftable", "--initial-branch=main", "rt"], { allowNonzero: true });
++  if (reftableInit.status === 0) {
++    const primary = join(probe, "rt");
++    commit(primary, "one");
++    const root = realpathSync(primary);
++    assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, truth(primary));
++    commit(primary, "two");
++    assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, truth(primary));
++  }
++});
++
++test("W241-05 the topology is observed once per process and still re-validated on every use", () => {
++  const { fixture, primary } = repoFixture();
++  const root = realpathSync(primary);
++  inspectSignedDescriptorCustodyRepository(root);
++  const warm = gitStarts(() => { for (let i = 0; i < 3; i += 1) inspectSignedDescriptorCustodyRepository(root); });
++  assert.equal(warm.starts, 0, "outside any boundary scope nothing is rediscovered either");
++
++  // a repository whose directories vanished is refused as before
++  withCeiling(realpathSync(fixture), () => {
++    rmSync(join(primary, ".git"), { recursive: true, force: true });
++    assert.throws(() => inspectSignedDescriptorCustodyRepository(root), "a vanished common directory is refused");
++  });
++});
++
++test("W241-06 a nested repository created below a memoized start is found, not shadowed by the memo", () => {
++  const { fixture, primary } = repoFixture();
++  const sub = join(primary, "sub");
++  mkdirSync(sub);
++  const subRoot = realpathSync(sub);
++  withCeiling(realpathSync(fixture), () => {
++    assert.equal(inspectSignedDescriptorCustodyRepository(subRoot).primaryRoot, realpathSync(primary));
++    git(sub, ["init", "--initial-branch=main"]);
++    commit(sub, "nested");
++    const after = inspectSignedDescriptorCustodyRepository(subRoot);
++    assert.equal(after.primaryRoot, subRoot);
++    assert.deepEqual(after.candidate, truth(sub));
++  });
++});
++
++test("W241-07 a repository replaced at the same path is not answered from the old topology or tree", () => {
++  const { fixture, primary } = repoFixture();
++  const root = realpathSync(primary);
++  const old = inspectSignedDescriptorCustodyRepository(root);
++  rmSync(primary, { recursive: true, force: true });
++  mkdirSync(primary);
++  git(primary, ["init", "--initial-branch=main"]);
++  writeFileSync(join(primary, "different.txt"), "different\n");
++  git(primary, ["add", "different.txt"]);
++  git(primary, ["commit", "-m", "different"]);
++  const replaced = withCeiling(realpathSync(fixture), () => inspectSignedDescriptorCustodyRepository(root));
++  assert.deepEqual(replaced.candidate, truth(primary));
++  assert.notEqual(replaced.candidate.commit, old.candidate.commit);
++});
++
++// ---- (3) the Windows private-state batch, driven through a fake fixed PowerShell on any platform --------------------
++
++function withFakePowerShell(operation) {
++  const home = fixtureDir("w241-ps-");
++  writeFileSync(join(home, POWERSHELL_LITERAL), "");
++  const cwd = process.cwd();
++  process.chdir(home);
++  try { return operation(home); } finally { process.chdir(cwd); fake.foreign.clear(); fake.failBatch = false; }
++}
++function privateTree(home, count) {
++  const root = join(home, `tree${Math.random().toString(16).slice(2)}`, ".git", "agent-pipeline");
++  mkdirSync(join(root, "members"), { recursive: true });
++  const files = [];
++  for (let i = 0; i < count; i += 1) {
++    const file = join(root, "members", `m${String(i).padStart(4, "0")}.json`);
++    writeFileSync(file, "{}");
++    files.push(file);
++  }
++  return { root, files };
++}
++function psStarts(operation) {
++  const before = powershellCalls.length;
++  const value = operation();
++  return { value, starts: powershellCalls.length - before };
++}
++
++test("W241-08 a private tree wider than the first batch window is observed in a bounded number of PowerShell starts", { skip: win32 }, () => {
++  withFakePowerShell((home) => {
++    const tree = privateTree(home, 300);
++    const run = psStarts(() => tree.files.map((file) => assessWindowsPrivatePath(file).status));
++    assert.deepEqual([...new Set(run.value)], ["secure"]);
++    assert.ok(run.starts <= 4, `300 entries cost ${run.starts} PowerShell starts (bound 4)`);
++    const again = psStarts(() => tree.files.map((file) => assessWindowsPrivatePath(file).status));
++    assert.equal(again.starts, 0, "an unchanged tree is not observed twice in one process");
++  });
++});
++
++test("W241-09 a verdict from the wide pass equals the single-path verdict, including a foreign principal outside the first window", { skip: win32 }, () => {
++  withFakePowerShell((home) => {
++    const tree = privateTree(home, 300);
++    const foreign = tree.files[250];
++    fake.foreign.add(foreign);
++    const verdicts = tree.files.map((file) => assessWindowsPrivatePath(file));
++    for (const [index, verdict] of verdicts.entries()) {
++      const expected = tree.files[index] === foreign ? "insecure" : "secure";
++      assert.equal(verdict.status, expected, tree.files[index]);
++    }
++    const single = assessWindowsPrivatePath(foreign, { fresh: true });
++    assert.equal(single.status, "insecure");
++  });
++});
++
++test("W241-10 a replaced object and a fresh request are observed again; the other entries stay cached", { skip: win32 }, () => {
++  withFakePowerShell((home) => {
++    const tree = privateTree(home, 200);
++    for (const file of tree.files) assessWindowsPrivatePath(file);
++    const donor = join(tree.root, "members", "donor.json");
++    writeFileSync(donor, "{}");
++    renameSync(donor, tree.files[7]);
++    const replaced = psStarts(() => { for (const file of tree.files) assessWindowsPrivatePath(file); });
++    assert.equal(replaced.starts, 1, "only the replaced object costs a start");
++    const fresh = psStarts(() => assessWindowsPrivatePath(tree.files[3], { fresh: true }));
++    assert.equal(fresh.starts, 1, "fresh: true observes natively, once, as the single-path route");
++    assert.ok(powershellCalls.at(-1).single !== undefined, "and not through a batch");
++  });
++});
++
++test("W241-11 a failed wide batch falls back to the single-path observation and caches nothing it did not read", { skip: win32 }, () => {
++  withFakePowerShell((home) => {
++    const tree = privateTree(home, 200);
++    assessWindowsPrivatePath(tree.files[0]);
++    fake.failBatch = true;
++    const results = [];
++    const run = psStarts(() => { for (const file of tree.files.slice(150)) results.push(assessWindowsPrivatePath(file).status); });
++    assert.deepEqual([...new Set(results)], ["secure"]);
++    assert.ok(run.starts >= 50, "with every batch failing each unread object still gets its own single-path observation");
++  });
++});
++
++test("W241-12 hardening drops the cached tree knowledge: objects are observed again afterwards", { skip: win32 }, () => {
++  withFakePowerShell((home) => {
++    const tree = privateTree(home, 20);
++    for (const file of tree.files) assessWindowsPrivatePath(file);
++    const settled = psStarts(() => { for (const file of tree.files) assessWindowsPrivatePath(file); });
++    assert.equal(settled.starts, 0);
++    hardenWindowsPrivateDirectory(join(tree.root, "members"));
++    const after = psStarts(() => { assessWindowsPrivatePath(tree.files[0]); });
++    assert.ok(after.starts <= 1, "at most one start for the hardened object");
++    assert.equal(observeWindowsPrivatePath(tree.files[1]).status, null);
++  });
++});
++
++// ---- (4) the default git spawn of onboarding-continuity.mjs: the common-directory question ------------------------------
++
++test("W241-13 the common-directory question is replayed only while the root's .git directory is the one observed", () => {
++  const onboarding = awaitedOnboarding;
++  const dir = fixtureDir();
++  git(dir, ["init", "--initial-branch=main"]);
++  const resolve = () => onboarding.resolveIntakeCheckpointPaths({ rootDir: dir });
++  const cold = gitStarts(resolve);
++  assert.equal(cold.starts, 1, "two identical questions per resolution cost one git start (it was two)");
++  const warm = gitStarts(resolve);
++  assert.equal(warm.starts, 0);
++  assert.deepEqual(warm.value, cold.value);
++
++  // the same path, a different .git directory: asked again, answered by git
++  renameSync(join(dir, ".git"), join(dir, ".git.old"));
++  git(dir, ["init", "--initial-branch=main"]);
++  const replaced = gitStarts(resolve);
++  assert.ok(replaced.starts >= 1, "a replaced .git directory is never answered from the memo");
++  assert.notDeepEqual(replaced.value, cold.value, "the intake scope is bound to the repository identity, so the replaced repository resolves to its own scope");
++  assert.equal(gitStarts(resolve).starts, 0, "and the new .git directory is memoized in turn");
++
++  // a vanished .git: the failure is git's own
++  withCeiling(realpathSync(join(dir, "..")), () => {
++    rmSync(join(dir, ".git"), { recursive: true, force: true });
++    assert.throws(resolve);
++  });
++});
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index bbc442f67..cbcdb68f6 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -1135,8 +1135,55 @@ function validateHistory(value) {
+   return true;
+ }
+ 
++// The one question this module asks over and over through the default spawn is the common directory of a root
++// (`git rev-parse --path-format=absolute --git-common-dir`, twice per private-state resolution). Its answer is a pure
++// function of the root's physical path and of the root's own `.git` DIRECTORY: it is replayed only while the root's
++// physical path, the identity (device, inode, owner) of the root, its `.git` directory, that directory's `HEAD` and the
++// ABSENCE of a `commondir` redirect are exactly those observed with the successful answer, and no GIT_* variable is
++// set. Anything else -- a `.git` file or symlink, a missing entry, an injected spawn, other arguments or options --
++// takes the real spawn, so every other git question is unchanged.
++const COMMON_DIR_ARGV = Object.freeze(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
++const commonDirAnswers = new Map();
++function commonDirEntryIdentity(path) {
++  try {
++    const info = lstatSync(path, { bigint: true });
++    return `${info.dev}:${info.ino}:${info.uid}:${info.isDirectory() ? "d" : info.isFile() ? "f" : "o"}`;
++  } catch { return "-"; }
++}
++// Variables that REDIRECT repository discovery make the question unanswerable from the directory alone (never replayed);
++// the ones that only tune discovery or configuration are part of the witness, so a change of any of them is a new witness.
++const COMMON_DIR_REDIRECTING_ENV = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"];
++const COMMON_DIR_TUNING_ENV = ["GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_EXEC_PATH"];
++function commonDirWitness(cwd) {
++  try {
++    if (COMMON_DIR_REDIRECTING_ENV.some((name) => process.env[name] !== undefined)) return null;
++    const root = realpathSync(cwd);
++    const gitDirectory = join(root, ".git");
++    const info = lstatSync(gitDirectory);
++    if (!info.isDirectory() || info.isSymbolicLink() || !lstatSync(join(gitDirectory, "HEAD")).isFile()) return null;
++    return [root, commonDirEntryIdentity(root), commonDirEntryIdentity(gitDirectory),
++      commonDirEntryIdentity(join(gitDirectory, "HEAD")), commonDirEntryIdentity(join(gitDirectory, "commondir")),
++      JSON.stringify(COMMON_DIR_TUNING_ENV.map((name) => process.env[name] ?? null))].join("|");
++  } catch { return null; }
++}
+ function defaultGitSpawn(executable, argv, options) {
+-  return spawnSync(executable, argv, options);
++  const memoable = executable === "git" && Array.isArray(argv) && argv.length === COMMON_DIR_ARGV.length
++    && argv.every((value, index) => value === COMMON_DIR_ARGV[index])
++    && typeof options?.cwd === "string" && options.env === undefined;
++  if (!memoable) return spawnSync(executable, argv, options);
++  const witness = commonDirWitness(options.cwd);
++  const key = `${options.cwd}\0${options.encoding ?? ""}`;
++  if (witness !== null) {
++    const hit = commonDirAnswers.get(key);
++    if (hit !== undefined && hit.witness === witness) return { ...hit.result, output: [...hit.result.output] };
++  }
++  const result = spawnSync(executable, argv, options);
++  if (witness !== null && result?.status === 0 && !result.error && typeof result.stdout === "string"
++    && Array.isArray(result.output) && commonDirWitness(options.cwd) === witness) {
++    if (commonDirAnswers.size >= 64) commonDirAnswers.delete(commonDirAnswers.keys().next().value);
++    commonDirAnswers.set(key, { witness, result: { ...result, output: [...result.output] } });
++  }
++  return result;
+ }
+ 
+ function resolvePrivate(root, repositoryCapability, {
+diff --git a/plugins/pipeline-core/lib/windows-private-state.mjs b/plugins/pipeline-core/lib/windows-private-state.mjs
+index 07d1b8a2e..10ca6dbbf 100644
+--- a/plugins/pipeline-core/lib/windows-private-state.mjs
++++ b/plugins/pipeline-core/lib/windows-private-state.mjs
+@@ -252,9 +252,18 @@ export function observeWindowsPrivatePath(path, options = {}) {
+ }
+ 
+ const OBSERVATION_MEMO = new Map();
+-const OBSERVATION_MEMO_LIMIT = 256;
++const OBSERVATION_MEMO_LIMIT = 1024;
+ const PREFETCH_MAX_DEPTH = 3;
+ const PREFETCH_MAX_PATHS = 128;
++// A tree wider than the first window (PREFETCH_MAX_PATHS entries, PREFETCH_MAX_DEPTH levels) is observed ONCE per
++// process in a wider pass, in bounded native chunks, instead of one native start per object outside the window.
++const PREFETCH_WIDE_DEPTH = 6;
++const PREFETCH_WIDE_PATHS = 512;
++const PREFETCH_CHUNK_PATHS = 256;
++const PREFETCH_TREE_LIMIT = 64;
++// Per private-tree root: the root's identity when the record was made, whether the first window left entries out, and
++// whether the wide pass already ran. Dropped when the root's identity changes and around this module's own DACL write.
++const PREFETCH_TREES = new Map();
+ 
+ function memoStore(path, identity, observation) {
+   if (OBSERVATION_MEMO.size >= OBSERVATION_MEMO_LIMIT && !OBSERVATION_MEMO.has(path)) OBSERVATION_MEMO.delete(OBSERVATION_MEMO.keys().next().value);
+@@ -283,11 +292,15 @@ function privateTreeRoot(path) {
+   return match === null ? null : match[1];
+ }
+ 
+-/** Existing entries of the tree, breadth-first, never following symbolic links or reparse points. */
+-function privateTreeEntries(root, limit) {
++/**
++ * Existing entries of the tree, breadth-first, never following symbolic links or reparse points. `truncated` tells
++ * whether the walk stopped at the count or depth bound with entries left, i.e. whether the tree is wider than the window.
++ */
++function privateTreeEntries(root, limit, maxDepth = PREFETCH_MAX_DEPTH) {
+   const found = [];
+   let level = [root];
+-  for (let depth = 0; depth < PREFETCH_MAX_DEPTH && level.length > 0 && found.length < limit; depth += 1) {
++  let depth = 0;
++  for (; depth < maxDepth && level.length > 0 && found.length < limit; depth += 1) {
+     const next = [];
+     for (const directory of level) {
+       let entries;
+@@ -302,7 +315,7 @@ function privateTreeEntries(root, limit) {
+     }
+     level = next;
+   }
+-  return found;
++  return { found, truncated: found.length >= limit || level.length > 0 };
+ }
+ 
+ function batchRowShapeOk(row, path) {
+@@ -324,9 +337,23 @@ function batchRowObservation(row, path) {
+  * path's observation, or null when the batch failed or that row was unusable (the caller then runs the single-path route).
+  */
+ function prefetchPrivateTree(path, identity, root) {
++  // The first miss of a root observes the first window. When that window left entries out of an unchanged root, the
++  // NEXT miss of the same root observes the rest of the tree once (a wider pass in bounded chunks) instead of paying
++  // one native start per object outside the window. The record is dropped as soon as the root's identity changes.
++  const rootIdentity = lstatIdentity(root);
++  let record = PREFETCH_TREES.get(root);
++  if (record === undefined || record.identity !== rootIdentity) {
++    if (PREFETCH_TREES.size >= PREFETCH_TREE_LIMIT) PREFETCH_TREES.delete(PREFETCH_TREES.keys().next().value);
++    record = { identity: rootIdentity, truncated: false, widened: false };
++    PREFETCH_TREES.set(root, record);
++  }
++  const wide = record.truncated && !record.widened;
++  const cap = wide ? PREFETCH_WIDE_PATHS : PREFETCH_MAX_PATHS;
++  const walk = privateTreeEntries(root, cap, wide ? PREFETCH_WIDE_DEPTH : PREFETCH_MAX_DEPTH);
++  if (wide) record.widened = true; else record.truncated = walk.truncated;
+   const identities = new Map([[path, identity]]);
+-  for (const candidate of [root, ...privateTreeEntries(root, PREFETCH_MAX_PATHS)]) {
+-    if (identities.size >= PREFETCH_MAX_PATHS) break;
++  for (const candidate of [root, ...walk.found]) {
++    if (identities.size >= cap) break;
+     if (identities.has(candidate)) continue;
+     const candidateIdentity = lstatIdentity(candidate);
+     if (candidateIdentity === null) continue;
+@@ -334,9 +361,28 @@ function prefetchPrivateTree(path, identity, root) {
+     if (hit && hit.identity === candidateIdentity) continue;
+     identities.set(candidate, candidateIdentity);
+   }
+-  const batch = [...identities.keys()];
++  const paths = [...identities.keys()];
+   const executable = fixedPowerShell();
+   if (executable === null) return null;
++  let missed = null;
++  for (let offset = 0; offset < paths.length; offset += PREFETCH_CHUNK_PATHS) {
++    const rows = observePrivateBatch(executable, paths.slice(offset, offset + PREFETCH_CHUNK_PATHS));
++    // The first chunk holds the missed path: if it fails the caller takes the single-path route. A later chunk that
++    // fails only leaves its objects unmemoized (each is observed on demand, as before).
++    if (rows === null) { if (offset === 0) return null; continue; }
++    for (const row of rows) {
++      const rowPath = row && typeof row === "object" ? row.path : undefined;
++      if (typeof rowPath !== "string" || !identities.has(rowPath)) continue;
++      const observation = batchRowObservation(row, rowPath);
++      if (observation === null) continue;
++      if (rowPath === path) missed = observation;
++      if (lstatIdentity(rowPath) === identities.get(rowPath)) memoStore(rowPath, identities.get(rowPath), observation);
++    }
++  }
++  return missed === null ? null : structuredClone(missed);
++}
++
++function observePrivateBatch(executable, batch) {
+   const batchStartedAt = Date.now();
+   const native = spawnSync(executable, [
+     "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
+@@ -351,21 +397,10 @@ function prefetchPrivateTree(path, identity, root) {
+   });
+   recordNativeObservation(batchStartedAt, isSuccessfulSpawn(native));
+   if (!isSuccessfulSpawn(native)) return null;
+-  let rows;
+   try {
+-    rows = JSON.parse(String(native.stdout).trim());
+-    if (!Array.isArray(rows)) rows = [rows];
++    const rows = JSON.parse(String(native.stdout).trim());
++    return Array.isArray(rows) ? rows : [rows];
+   } catch { return null; }
+-  let missed = null;
+-  for (const row of rows) {
+-    const rowPath = row && typeof row === "object" ? row.path : undefined;
+-    if (typeof rowPath !== "string" || !identities.has(rowPath)) continue;
+-    const observation = batchRowObservation(row, rowPath);
+-    if (observation === null) continue;
+-    if (rowPath === path) missed = observation;
+-    if (lstatIdentity(rowPath) === identities.get(rowPath)) memoStore(rowPath, identities.get(rowPath), observation);
+-  }
+-  return missed === null ? null : structuredClone(missed);
+ }
+ 
+ /** Observe one physical Windows path against the concrete current principal. */
+@@ -507,6 +542,7 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
+ export function hardenWindowsPrivateDirectory(path, options = {}) {
+   OBSERVATION_MEMO.delete(path);
+   ROOT_MEMO.clear();
++  PREFETCH_TREES.clear();
+   const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options, "hardening");
+   if (result?.status) return result;
+   return assessWindowsPrivatePath(path, options);
+diff --git a/plugins/pipeline-core/lib/worktree-lifecycle.mjs b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+index 818c923d4..910fbca8c 100644
+--- a/plugins/pipeline-core/lib/worktree-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+@@ -2176,13 +2176,102 @@ function custodyHeadIsUnborn(repo) {
+ 
+ const CUSTODY_OID_LINE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
+ 
++// HEAD is resolved from the files git itself reads (HEAD, the loose branch ref, packed-refs), so a custody inspection
++// starts git only when the commit is one this process has not seen: a commit's tree never changes, hence a per-process
++// commit -> tree map. The commit is read from the files on EVERY inspection (a host commit moves HEAD inside a
++// boundary), and every uncertain shape returns null so the caller takes the original git call: reftable, a symlinked
++// HEAD or ref, a symbolic ref chain, a branch name outside a plain safe set, any read error, and any replace ref
++// (loose or packed) because a replacement changes what `HEAD^{tree}` answers for a commit already seen.
++const CUSTODY_TREE_BY_COMMIT = new Map();
++const CUSTODY_TREE_LIMIT = 512;
++const CUSTODY_PACKED_REFS = new Map();
++const CUSTODY_LOOSE_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})\n?$/u;
++const CUSTODY_HEAD_REF = /^ref: (refs\/heads\/[A-Za-z0-9_][A-Za-z0-9._\/-]*)\n?$/u;
++
++function custodySafeBranchRef(ref) {
++  return ref.split("/").every((segment) => /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u.test(segment) && !segment.endsWith(".") && !segment.endsWith(".lock") && !segment.includes(".."));
++}
++
++// Small regular file (lstat: a symlink is not one) or null for anything else.
++function custodyRegularFileText(path) {
++  const info = lstatSync(path);
++  return info.isFile() && info.size <= 65536 ? readFileSync(path, "utf8") : null;
++}
++
++// packed-refs parsed once per observed file state (inode, size and both timestamps), re-read as soon as any of them moves.
++function custodyPackedRefs(path) {
++  let before;
++  try { before = lstatSync(path, { bigint: true }); } catch (error) {
++    if (error?.code === "ENOENT") return { refs: new Map(), replace: false };
++    return null;
++  }
++  if (!before.isFile()) return null;
++  const key = `${before.dev}:${before.ino}:${before.size}:${before.mtimeNs}:${before.ctimeNs}`;
++  const hit = CUSTODY_PACKED_REFS.get(path);
++  if (hit && hit.key === key) return hit;
++  const text = readFileSync(path, "utf8");
++  const after = lstatSync(path, { bigint: true });
++  if (`${after.dev}:${after.ino}:${after.size}:${after.mtimeNs}:${after.ctimeNs}` !== key) return null;
++  const refs = new Map();
++  let replace = false;
++  for (const line of text.split("\n")) {
++    if (line === "" || line[0] === "#" || line[0] === "^") continue;
++    const space = line.indexOf(" ");
++    if (space < 0) return null;
++    const name = line.slice(space + 1);
++    if (name.startsWith("refs/replace/")) replace = true;
++    refs.set(name, line.slice(0, space));
++  }
++  const parsed = { key, refs, replace };
++  CUSTODY_PACKED_REFS.set(path, parsed);
++  return parsed;
++}
++
++function custodyHeadFromFiles(repo) {
++  try {
++    const dir = repo.commonDir;
++    if (existsSync(join(dir, "reftable")) || existsSync(join(dir, "refs", "replace"))) return null;
++    const packed = custodyPackedRefs(join(dir, "packed-refs"));
++    if (packed === null || packed.replace) return null;
++    const head = custodyRegularFileText(join(dir, "HEAD"));
++    if (head === null) return null;
++    if (CUSTODY_LOOSE_OID.test(head)) return head.trim();
++    const match = CUSTODY_HEAD_REF.exec(head);
++    if (match === null || !custodySafeBranchRef(match[1])) return null;
++    let loose;
++    try { loose = custodyRegularFileText(join(dir, ...match[1].split("/"))); } catch (error) {
++      if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return null;
++    }
++    if (loose === undefined) {
++      const oid = packed.refs.get(match[1]);
++      return typeof oid === "string" && CUSTODY_LOOSE_OID.test(oid) ? oid : null;
++    }
++    return loose !== null && CUSTODY_LOOSE_OID.test(loose) ? loose.trim() : null;
++  } catch { return null; }
++}
++
++function custodyTreeKey(repo, commit) { return `${repo.commonDir}\0${commit}`; }
++
++function custodyRememberTree(repo, commit, tree) {
++  if (CUSTODY_TREE_BY_COMMIT.size >= CUSTODY_TREE_LIMIT) CUSTODY_TREE_BY_COMMIT.delete(CUSTODY_TREE_BY_COMMIT.keys().next().value);
++  CUSTODY_TREE_BY_COMMIT.set(custodyTreeKey(repo, commit), tree);
++}
++
+ function custodyCandidate(repo) {
++  const resolved = custodyHeadFromFiles(repo);
++  if (resolved !== null) {
++    const known = CUSTODY_TREE_BY_COMMIT.get(custodyTreeKey(repo, resolved));
++    if (known !== undefined) return { commit: resolved, tree: known };
++  }
+   // One `git rev-parse` answers both revisions (one process instead of two), so the commit and the tree it names
+   // come from the same read of HEAD. Anything but exactly two object ids -- an unborn HEAD, a failure, an
+   // unexpected shape -- takes the original pair of calls below, which keep their exact outcomes and errors.
+   try {
+     const lines = gitText(repo.primaryRoot, ["rev-parse", "HEAD", "HEAD^{tree}"]).split("\n");
+-    if (lines.length === 2 && lines.every((line) => CUSTODY_OID_LINE.test(line))) return { commit: lines[0], tree: lines[1] };
++    if (lines.length === 2 && lines.every((line) => CUSTODY_OID_LINE.test(line))) {
++      custodyRememberTree(repo, lines[0], lines[1]);
++      return { commit: lines[0], tree: lines[1] };
++    }
+   } catch { /* falls through to the unchanged sequence */ }
+   let commit;
+   try { commit = gitText(repo.primaryRoot, ["rev-parse", "HEAD"]); } catch (error) {
+@@ -2193,32 +2282,54 @@ function custodyCandidate(repo) {
+ }
+ 
+ // The repository's TOPOLOGY (physical start, common directory, primary root, object format and the primary-worktree
+-// proof) is observed once per registry boundary entry instead of on every custody inspection: the boundary callback
+-// runs synchronously under the registry lock and nothing inside it re-homes the repository, while the part that does
+-// change inside a boundary -- the HEAD commit and tree, moved by a host commit -- is read from git on EVERY
+-// inspection, never memoized. A memoized topology is re-validated against the filesystem on each use and dropped
+-// (full rediscovery, which throws as before) the moment its directories are no longer the physical ones observed.
+-let custodyTopologyScope = null;
+-export function withCustodyTopologyScope(operation) {
+-  if (custodyTopologyScope !== null) return operation();
+-  custodyTopologyScope = new Map();
+-  try { return operation(); } finally { custodyTopologyScope = null; }
++// proof) is observed once per process instead of on every custody inspection (it used to live only for one registry
++// boundary entry, and the profile of a Windows dispatch still showed hundreds of discovery starts). The part that
++// does change -- the HEAD commit and tree, moved by a host commit -- is read from the files git reads on EVERY
++// inspection (custodyCandidate), never memoized. A memoized topology is re-validated against the filesystem on each
++// use: its common directory and primary root must still be the physical directories observed, and the `.git` / `HEAD`
++// entries of every directory from the start up to the primary root must carry the identities observed (a nested
++// repository created below a memoized start changes the answer of git's upward search). Anything else drops the memo
++// and takes the full rediscovery, which throws as before.
++const custodyTopologyMemo = new Map();
++const CUSTODY_TOPOLOGY_LIMIT = 64;
++// Kept as the boundary entry point of the registry: the memo no longer ends with the scope, so it is a pass-through.
++export function withCustodyTopologyScope(operation) { return operation(); }
++
++function custodyEntryIdentity(path) {
++  try {
++    const info = lstatSync(path, { bigint: true });
++    return `${info.dev}:${info.ino}:${info.isDirectory() ? "d" : info.isFile() ? "f" : info.isSymbolicLink() ? "l" : "o"}`;
++  } catch { return "-"; }
++}
++
++function custodyTopologyWitness(start, primaryRoot) {
++  if (!isInside(primaryRoot, start)) return null;
++  const rows = [];
++  for (let directory = start; ; directory = dirname(directory)) {
++    rows.push(`${custodyEntryIdentity(directory)}|${custodyEntryIdentity(join(directory, ".git"))}|${custodyEntryIdentity(join(directory, "HEAD"))}`);
++    if (directory === primaryRoot || dirname(directory) === directory) break;
++  }
++  return rows.join("\n");
+ }
+ 
+ function custodyTopology(startPath) {
+-  const scope = custodyTopologyScope;
+-  if (scope === null) return discoverRepository(startPath);
+   const start = assertExistingDirectoryPhysical(startPath, "repository path");
+-  const memo = scope.get(start);
++  const key = `${start}\0${process.env.GIT_CEILING_DIRECTORIES ?? ""}`;
++  const memo = custodyTopologyMemo.get(key);
+   if (memo) {
+     try {
+-      assertExistingDirectoryPhysical(memo.commonDir, "git common directory");
+-      assertExistingDirectoryPhysical(memo.primaryRoot, "primary checkout");
+-      return memo;
+-    } catch { scope.delete(start); }
++      assertExistingDirectoryPhysical(memo.repo.commonDir, "git common directory");
++      assertExistingDirectoryPhysical(memo.repo.primaryRoot, "primary checkout");
++      if (custodyTopologyWitness(start, memo.repo.primaryRoot) === memo.witness) return memo.repo;
++    } catch { /* dropped below; the rediscovery decides */ }
++    custodyTopologyMemo.delete(key);
+   }
+   const repo = discoverRepository(start);
+-  scope.set(start, repo);
++  const witness = custodyTopologyWitness(start, repo.primaryRoot);
++  if (witness !== null) {
++    if (custodyTopologyMemo.size >= CUSTODY_TOPOLOGY_LIMIT) custodyTopologyMemo.delete(custodyTopologyMemo.keys().next().value);
++    custodyTopologyMemo.set(key, { repo, witness });
++  }
+   return repo;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs b/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs
+index 644399655..f8ca447ae 100644
+--- a/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs
+@@ -1957,21 +1957,22 @@ function countGitSpawns(operation) {
+   return calls;
+ }
+ 
+-check("D91-01 inside a topology scope the topology is observed once and HEAD on every custody inspection; outside one nothing is memoized", () => {
++// C19I-W241 restates D91-01 in place: the topology memo now lives for the process (re-validated on every use) and an unchanged
++// HEAD is answered from the files git reads, so the repeated starts it used to count are gone; the answers stay identical.
++check("D91-01 the topology is observed once per process and an unchanged HEAD costs no git start, inside a scope, a nested one and outside", () => {
+   const { primary } = repoFixture();
+   const root = realpathSync(primary);
+   const results = [];
++  const cold = countGitSpawns(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
++  assert.equal(cold.topology, 1, "the first inspection discovers the topology");
++  assert.equal(cold.head, 1, "and reads HEAD and its tree from git (a commit not seen before)");
+   const outside = countGitSpawns(() => { for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root)); });
+-  assert.equal(outside.topology, 3, "outside a scope every inspection discovers the topology (unchanged behaviour)");
+-  assert.equal(outside.head, 3);
++  assert.deepEqual(outside, { topology: 0, head: 0, other: 0 }, "outside a scope nothing is rediscovered and an unchanged HEAD starts no git process");
+   const inside = countGitSpawns(() => withCustodyTopologyScope(() => {
+     for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root));
+     withCustodyTopologyScope(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
+   }));
+-  assert.equal(inside.topology, 1, "inside a scope (and a nested one) the topology is observed exactly once");
+-  assert.equal(inside.head, 4, "HEAD is read on every inspection, never memoized");
+-  const after = countGitSpawns(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
+-  assert.equal(after.topology, 1, "the scope ended with the outermost operation: nothing is remembered after it");
++  assert.deepEqual(inside, { topology: 0, head: 0, other: 0 }, "inside a scope (and a nested one) the same holds");
+   for (const result of results) assert.deepEqual(result, results[0], "scoped and unscoped inspections return the same repository binding");
+ });
+ 
