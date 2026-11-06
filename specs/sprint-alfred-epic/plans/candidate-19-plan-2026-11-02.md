@@ -570,6 +570,10 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   - The preflight lock row: the probe passed the wrong repository shape and therefore always read `unknown`; it now reads `absent` when there is no lock.
   - The failures code now names the cause next to the exit status: the helper's `WIN-AUTH-*` code, `no-code` or `no-json`.
   - Rehearsal `w24reh/c19m`: exit 0, registration 1183, case-completion 392, append history green (70 commits), all 14 former reds green, inventory sorted after the refresh, gitleaks probe PASS (0 unsuppressed; the first scan only hit untracked fixture leftovers of the suite runs in that clone, removed before the rescan).
+  - Pre-apply Full Verify of the rehearsed tree (59adfe2b1, without the trace variable, 3229 s): 1184 of 1185 green.
+    - The one red was `native-goldfish-host-stop-pair-tests` NGSP7: under full load the stop landed its host commit, but the terminal release then ran into `domain-membership-race` and ended `recovery-required`.
+    - Re-run alone, the suite is green.
+    - This is the same race class w250 covers for the terminal write, here seen at the release stage. Open, not fixed in 19m.
   - Open: PO apply, stamp on the PO's call, a fresh Full Verify, the Windows run, Critic, PO acceptance.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
