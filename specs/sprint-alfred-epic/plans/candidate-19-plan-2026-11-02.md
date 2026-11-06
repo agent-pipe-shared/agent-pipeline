@@ -558,6 +558,9 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   - Afterwards: a dead lock owner and `native-authority-member-drift`. `routine-repair run heal --no-goldfish-running` gave `healed` and `moved-aside`, retired four settled pending states, and left lock and registry absent with no drift.
   - Pair D is not a usable second sample. Pair C is the clean proof of the 19k pair-A fix. No critical defect is open on 19l.
   - Minor findings, not critical, for later: the `failures` code `exit 1` does not say why the publish failed; the preflight lock check stays `degraded` ("could not be observed") although the lock is absent, on both machines.
+- **PO decision 2026-11-06 (evening) on the two minor findings** (the preflight lock check reports `degraded` for an absent lock; the `failures` code `exit 1` does not say why a publish failed):
+  - If the 19l Full Verify is green, both go into candidate 20, the candidate built from the greenfield results.
+  - If fixing 19 needs another 19 candidate anyway (for example for Full Verify reds), both are fixed in that one.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
