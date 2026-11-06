@@ -4600,6 +4600,61 @@
       "file": "plugins/pipeline-core/lib/authority-seal-plan.test.mjs",
       "invariantPinned": "The seal of a draft design package is one agent-prepared, digest-bound plan (every PRD, Spec, design-input and result digest, the capture digest, the digests each review bound, the State revision and the plan digest) that never writes State; it refuses with a typed code and exits on a stale review, a provenance difference, an already sealed package and a package outside the PRD release scope; the plan digest is an additive key of the design approval binding so that the one signature covers it and existing signed approvals verify unchanged; approve-plan applies the seal in the same transaction (digests written, sealed marker removed, one revision) and refuses on a missing, stale, unpresented or drifted plan; reopen-design voids a prepared plan and a sealed package keeps its old approval path (C19 late-binding build step 4)",
       "nonOverlapNote": "Unique cases: lib/authority-seal-plan.mjs, the prepare-seal command and the seal transaction of approve-plan; design-approval-binding tests pin the binding digest, authority-seal-readers tests pin the draft readers"
+    },
+    {
+      "name": "native-goldfish-host-parallel-admission-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs",
+      "invariantPinned": "Two and four Goldfish admissions started at once with disjoint write scopes are all admitted: every registry boundary entry of the admission, including the integration readiness read, waits for a sibling's lock within the admission deadline, and a queue changed only by a sibling's admitted disjoint slice is re-read instead of refused; a changed own row, an overlapping new row and a lock held past the deadline still refuse with nothing written (C19i w236, AC-108)",
+      "nonOverlapNote": "Unique cases: the parallel admission end to end; native-goldfish-host-state tests pin the single admission and the w233 queue preparation wait",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGPA1",
+          "NGPA2",
+          "NGPA3",
+          "NGPA4",
+          "NGPA5",
+          "NGPA6",
+          "NGPA7"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-stop-read-scope-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs",
+      "invariantPinned": "A SubagentStop reads its pending state under the lock-free read scope with a generation check, so a sibling holding the registry lock does not block the read, a generation change is detected and retried, the exclusive lock is taken only for the writes, the pending state is authenticated at most twice per stop, a first write that cannot take the lock fails typed with the holder named, and the lock waits of one stop share a 240 s ceiling (C19i w237, O10, AC-108)",
+      "nonOverlapNote": "Unique cases: the stop's read scope and lock windows; finalizer and host-state tests pin the host commit and the w234 holder fields",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGSR01",
+          "NGSR02",
+          "NGSR03",
+          "NGSR04",
+          "NGSR05",
+          "NGSR06"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "session-authority-registry-fewer-checks-tests",
+      "file": "plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs",
+      "invariantPinned": "The registry skips the second native inspect of a file read in the same boundary, skips a repeated entry heal while the first strict read that meets a drift still heals and repeats, keeps participant source digests across processes keyed on the file identity, compares only the override producer's baseline for an override refusal and prunes settled members without ever reporting a successful release as failed (C19i w238, O7, O8, O3 ii, O9, AC-108)",
+      "nonOverlapNote": "Unique cases: the reduced native checks of the registry and lib/source-digest-memo.mjs; session-authority-repair and lock-wait tests pin repair and locking"
+    },
+    {
+      "name": "windows-node-authority-reads-tests",
+      "file": "plugins/pipeline-core/lib/windows-node-authority-reads.test.mjs",
+      "invariantPinned": "On Windows private reads and inspects are answered in Node (bigint lstat identity, symlink and junction refusal, final-path equality, before and after identity and hash of a read) while create, publish and remove stay native, and the native ancestor observation runs only for the boundary roots; a symlink, a link and a changed file are still refused (C19i w239, O5c and O1a by PO decision with the protection loss accepted, AC-108)",
+      "nonOverlapNote": "Unique cases: the Node read path of the Windows backend and the root-only ancestor walk; the Windows pins and session-authority-repair tests pin the native rules that remain"
+    },
+    {
+      "name": "custody-inspection-spawns-tests",
+      "file": "plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs",
+      "invariantPinned": "The custody inspection resolves HEAD from the ref files with a per-process commit to tree map and falls back to git for every unusual shape, the repository topology is memoized per process with physical re-validation, the Windows private-state ACL batch observes an unchanged tree once, and every answer equals a fresh git or PowerShell call, including a HEAD moved inside one process (C19i w241, AC-108)",
+      "nonOverlapNote": "Unique cases: the process-start counts of worktree-lifecycle custody inspection and windows-private-state; worktree-lifecycle and windows-private-state tests pin the answers"
     }
   ]
 }

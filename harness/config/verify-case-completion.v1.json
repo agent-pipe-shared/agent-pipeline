@@ -1170,6 +1170,11 @@
       "disposition": "required"
     },
     {
+      "name": "native-goldfish-host-parallel-admission-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "native-goldfish-host-return-regression-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-return-regression.test.mjs",
       "disposition": "required"
@@ -1192,6 +1197,11 @@
     {
       "name": "native-goldfish-host-state-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "native-goldfish-host-stop-read-scope-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs",
       "disposition": "required"
     },
     {

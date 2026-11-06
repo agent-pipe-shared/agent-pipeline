@@ -234,7 +234,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["installed-plugin-attestation-inline-action-tests","plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs","top-level-assertions",28],
     ["mid-session-hook-refresh-tests","plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs","top-level-assertions",21],
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
+    ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
+    ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
     ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
@@ -291,7 +293,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 389);
+  assert.equal(result.registryCount, 391); // cand. 19i w240 (QG-04: extension only): 389 -> 391, the two new required rows of w236 and w237
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -335,7 +337,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "install-agy-inline-candidate-tests",
     "installed-bootstrap-import-closure-tests",
     "installed-plugin-attestation-inline-action-tests",
+    "native-goldfish-host-parallel-admission-tests",
     "native-goldfish-host-state-fanout-tests",
+    "native-goldfish-host-stop-read-scope-tests",
     "native-platform-process-observer-tests",
     "onboarding-greenfield-walk-tests",
     "onboarding-init-machine-plane-reason-tests",
