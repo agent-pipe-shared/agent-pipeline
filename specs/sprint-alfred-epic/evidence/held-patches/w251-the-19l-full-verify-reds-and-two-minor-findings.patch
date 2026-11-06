@@ -1,0 +1,348 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index ecbcf3c9c..6da14f545 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -639,6 +639,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/session-requester-bridge.mjs`,
+ `plugins/pipeline-core/lib/slice-queue.mjs`,
+ `plugins/pipeline-core/lib/slice-queue-location.mjs`,
++`plugins/pipeline-core/lib/source-digest-memo.mjs`,
+ `plugins/pipeline-core/lib/staged-observation-doc-classification.mjs`,
+ `plugins/pipeline-core/lib/verify-owning-controller-route.mjs`,
+ `plugins/pipeline-core/lib/verify-resume.mjs`,
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 282738d70..9b270e3c4 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -397,6 +397,7 @@
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
+         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests",
+         "verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests",
++        "verify-phase:harness/scripts/verify.mjs:custody-inspection-spawns-tests",
+         "verify-phase:harness/scripts/verify.mjs:d3-signed-reconcile-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
+@@ -639,8 +640,8 @@
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-fanout-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
+-        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-pair-tests",
++        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-managed-inventory-reuse-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
+@@ -1096,10 +1097,10 @@
+         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fewer-checks-tests",
+-        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-leftover-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fsync-tests",
+-        "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
++        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-leftover-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-repair-aside-tests",
++        "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-lost-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
+@@ -1190,7 +1191,6 @@
+         "verify-phase:harness/scripts/verify.mjs:worktree-count-check-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+-        "verify-phase:harness/scripts/verify.mjs:custody-inspection-spawns-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-process-start-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-target-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
+diff --git a/harness/scripts/check-verify-suite-append.mjs b/harness/scripts/check-verify-suite-append.mjs
+index 4dac02b5d..22226d8db 100644
+--- a/harness/scripts/check-verify-suite-append.mjs
++++ b/harness/scripts/check-verify-suite-append.mjs
+@@ -129,6 +129,18 @@ function extendsCaseList(before, after) {
+   return canonical(beforeRest) === canonical(afterRest);
+ }
+ 
++/**
++ * The row's pinned invariant only grows: the new text starts with the old text, byte for byte, and appends at least one
++ * clause. It is admitted only together with a case-list extension of the same row in the same commit, so the added
++ * clause always comes with the cases that pin it. Decision of the Elephant (candidate 19m, w251), named in the held
++ * patch notes; like every rewrite it is only admitted through an entry bound to one commit and its bytes.
++ */
++function appendsInvariant(before, after) {
++  const prior = before?.invariantPinned;
++  const next = after?.invariantPinned;
++  return typeof prior === "string" && typeof next === "string" && next.length > prior.length && next.startsWith(prior);
++}
++
+ /**
+  * A row that had NO case-completion policy gains its first one and is byte-identical otherwise: gate coverage only grows
+  * (the same direction as extending a case list). Decision of the Elephant under the PO's 2026-11-04 K143 decision,
+@@ -162,6 +174,8 @@ export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes,
+       if (canonical(row) === key) break;
+       if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
+         && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
++      if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row) && appendsInvariant(prior, row)
++        && canonical({ ...row, caseCompletion: prior.caseCompletion, invariantPinned: prior.invariantPinned }) === key) { extended += 1; break; }
+       if (row?.name === prior.name && row?.file === prior.file && addsFirstCasePolicy(prior, row)) { extended += 1; break; }
+       at += 1;
+     }
+diff --git a/harness/scripts/check-verify-suite-append.test.mjs b/harness/scripts/check-verify-suite-append.test.mjs
+index d52070b1f..63e9808cb 100644
+--- a/harness/scripts/check-verify-suite-append.test.mjs
++++ b/harness/scripts/check-verify-suite-append.test.mjs
+@@ -392,6 +392,19 @@ test("evaluateCaseListExtension also admits a first case-completion policy on a
+   assert.equal(run(before, noChange).code, "VSA-REWRITE-NO-EXTENSION");
+ });
+ 
++test("evaluateCaseListExtension admits an appended invariant clause only together with a case-list extension of the same row (C19m w251)", () => {
++  const pinned = (name, ids, text) => ({ ...kCased(name, ids), invariantPinned: text });
++  const before = registryText([kPlain("a"), pinned("b", ["B1"], "old clause")]);
++  const run = (b, a) => evaluateCaseListExtension({ entry: kEntry("b".repeat(40), "a".repeat(40), b, a), commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a });
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old clause; new clause")])).ok, true, "an appended clause with new cases is admitted");
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1"], "old clause; new clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "an appended clause without new cases is refused");
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "new clause; old clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "text placed before the old invariant is refused");
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old clauses")])).ok, true, "a byte-exact prefix is the whole rule");
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a shortened invariant is refused");
++  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "Old clause; new clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a reworded old invariant is refused");
++  assert.equal(run(before, registryText([kPlain("a"), { ...pinned("b", ["B1", "B2"], "old clause; new clause"), nonOverlapNote: "x" }])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "another field changed next to it is refused");
++});
++
+ /** Three registry commits after TP-13: an append, a first policy on a row (R1), a case-list extension (R2); returns the entries of R1 and R2. */
+ function twoRewriteHistory(f, recordedFrom) {
+   f.writeConfig([f.tp13]);
+diff --git a/harness/verify-suite-history-recovery.json b/harness/verify-suite-history-recovery.json
+index 88cbd4454..ebd59abaa 100644
+--- a/harness/verify-suite-history-recovery.json
++++ b/harness/verify-suite-history-recovery.json
+@@ -61,6 +61,16 @@
+       "owner": "Elephant",
+       "signed": false,
+       "reason": "Historical, unsigned exception recorded by the Elephant (third entry of this kind, under the PO decision of 2026-11-04): this one commit gave the existing analysis-run command admission registry row its first caseCompletion policy in place, so gate coverage only grew. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the row is otherwise unchanged."
++    },
++    {
++      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
++      "commit": "d9731d0468e3b932efb79a47749ce20f223a75f2",
++      "parent": "edf8b17f6ef0adda3edaa89895f95ee6bc672191",
++      "preimageSha256": "0e2a0df6a67d0571d2b54f30a12668cebde9105af87fce8fc6e8b2c517b8dcda",
++      "postimageSha256": "0347080d9c96b5fb939a4f1255c8b73f1c38970a8cc8dc0686130d7b30af361f",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "Historical, unsigned exception recorded by the Elephant (fourth entry of this kind, found by the candidate 19l Full Verify): this one commit (candidate 19k, w249) extended the caseCompletion case-ID list of the existing native Goldfish host stop-pair registry row by NGSP6 to NGSP9D in place and appended two clauses to the same row's pinned invariant, and inserted one row. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the old invariant text is an exact prefix of the new one and that the row is otherwise unchanged."
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index b2ebfb30c..3a23bb821 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -867,6 +867,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+   "plugins/pipeline-core/lib/slice-queue.mjs",
+   "plugins/pipeline-core/lib/slice-queue-location.mjs",
++  "plugins/pipeline-core/lib/source-digest-memo.mjs",
+   "plugins/pipeline-core/lib/verify-owning-controller-route.mjs",
+   "plugins/pipeline-core/lib/verify-resume.mjs",
+   "plugins/pipeline-core/lib/verify-suite-registration.mjs",
+diff --git a/plugins/pipeline-core/lib/local-worker-supervisor.mjs b/plugins/pipeline-core/lib/local-worker-supervisor.mjs
+index 5e82f0137..5cbdf73a1 100644
+--- a/plugins/pipeline-core/lib/local-worker-supervisor.mjs
++++ b/plugins/pipeline-core/lib/local-worker-supervisor.mjs
+@@ -64,7 +64,10 @@ export const LOCAL_WORKER_SUPERVISOR_REQUEST_VALIDATION_CONTRACT = Object.freeze
+ });
+ 
+ const FIXTURE_WORKER = realpathSync(fileURLToPath(new URL("../scripts/fixtures/local-worker-supervisor-worker.mjs", import.meta.url)));
+-const NODE_EXECUTABLE = realpathSync(process.execPath);
++// Resolved on first use, not at import: a consumer that only imports this module (for example an installed package
++// read under Node's permission model with reads limited to the package) must not need read access to the Node binary.
++let nodeExecutableMemo = null;
++const nodeExecutable = () => (nodeExecutableMemo ??= realpathSync(process.execPath));
+ const SHA256 = /^[a-f0-9]{64}$/u;
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+@@ -172,7 +175,7 @@ function validRunner(value) {
+       && ["low", "medium", "high", "xhigh"].includes(value.effort)
+       && value.fixture === null;
+   }
+-  return value.executable === NODE_EXECUTABLE
++  return value.executable === nodeExecutable()
+     && value.model === null && value.effort === null
+     && exact(value.fixture, ["delayMs", "exitCode", "behavior"])
+     && safeInteger(value.fixture.delayMs, 100, 30_000)
+@@ -448,7 +451,7 @@ function observeSource(request) {
+ 
+ function observeRunner(request) {
+   try {
+-    if (request.runner.kind === "fixture") return request.runner.executable === NODE_EXECUTABLE;
++    if (request.runner.kind === "fixture") return request.runner.executable === nodeExecutable();
+     const version = execFileSync(request.runner.executable, ["--version"], {
+       encoding: "utf8",
+       stdio: ["ignore", "pipe", "pipe"],
+diff --git a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+index 47b43dd6e..851d3a30f 100644
+--- a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+@@ -330,7 +330,9 @@ test('case D3 (structural): readRaw on win32 lstat()s the safe path before the s
+   const source = libSource('session-authority-registry.mjs');
+   const line = source.split('\n').find((candidate) => candidate.startsWith('function readRaw(repo,path){')) ?? '';
+   // The win32 branch performs the lstat on the safe path first and only then the unchanged strict native read.
+-  assert.ok(line.startsWith("function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}"), line.slice(0, 200));
++  // The platform test goes through the module's isWin() seam, which reads process.platform unless a test seam overrides it.
++  assert.ok(line.startsWith("function readRaw(repo,path){if(isWin()){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}"), line.slice(0, 200));
++  assert.match(source, /^const isWin=\(\)=>\(testSeam\.platform\?\?process\.platform\)==='win32';$/mu, "isWin() still reads process.platform when no test seam is set");
+   // The POSIX branch keeps its own lstat-first shape.
+   assert.match(line, /const abs=safePath\(repo,path\);let fd;try\{const before=lstatSync\(abs\);/u);
+ });
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index ad3ad2915..1d53a809d 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -264,8 +264,10 @@ function invokeNative(request){
+  // Execute the measured source bytes, not a subsequently reopened helper pathname.
+  const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch(thrown){recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);recordNativeFailure(request.operation,typeof thrown?.code==='string'&&/^[A-Z0-9_]{1,32}$/u.test(thrown.code)?thrown.code:'spawn-threw');fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
+- if(!isSuccessfulSpawn(result))recordNativeFailure(request.operation,nativeFailureCode(result));
+- let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
++ // C19m w251: a failed child names its cause next to the exit status -- the helper's own closed WIN-AUTH code when it wrote one, else no-json.
++ const unparsed=Symbol('unparsed');let value;try{value=JSON.parse(result.stdout);}catch{value=unparsed;}
++ if(!isSuccessfulSpawn(result)){const cause=value===unparsed?'no-json':typeof value?.code==='string'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)?value.code:'no-code';recordNativeFailure(request.operation,`${nativeFailureCode(result)}, ${cause}`);}
++ if(value===unparsed)fail('WIN-AUTH-NATIVE-UNAVAILABLE');
+  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
+  if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);
+  if(request.operation==='inspect-source-image'){if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','size','sha256','committed'])||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts)||!Number.isSafeInteger(value.size)||value.size<0||value.size>134217728||! /^[a-f0-9]{64}$/u.test(value.sha256))fail('WIN-AUTH-NATIVE-OUTPUT');const parts=value.facts.split(':');if(parts.length!==12||BigInt(parts[3])<1n||(BigInt(parts[5])<<32n)+BigInt(parts[6])!==BigInt(value.size))fail('WIN-AUTH-NATIVE-OUTPUT');return value;}
+diff --git a/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs b/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs
+index 6507e5ef2..82cb812d3 100644
+--- a/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs
++++ b/plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs
+@@ -90,4 +90,30 @@ recordNativeFailure("publish-file", "exit 1, ETIMEDOUT");
+   assert.ok(!line.includes(dir), "the trace line carries no path");
+ });
+ 
++test("W247-5 (C19m w251) a failed native authority call records why it failed next to the exit status: the helper's WIN-AUTH code, or no-json", () => {
++  const dir = sandbox();
++  const traceFile = join(dir, "trace.jsonl");
++  const backend = pathToFileURL(join(PLUGIN, "lib", "windows-owned-authority-backend.mjs")).href;
++  const hook = pathToFileURL(join(PLUGIN, "lib", "authority-trace-hook.mjs")).href;
++  const body = `import { installHookAuthorityTrace } from ${JSON.stringify(hook)};
++await installHookAuthorityTrace({ hook: "w251" });
++const backend = await import(${JSON.stringify(backend)});
++const outputs = [JSON.stringify({ ok: false, code: "WIN-AUTH-NATIVE-DENIED", committed: false }), "not json", JSON.stringify({ ok: false })];
++for (const stdout of outputs) {
++  backend.setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn: () => ({ status: 1, signal: null, stderr: "", stdout }) });
++  backend.resetWindowsOwnedAuthorityBackendMemo();
++  try { backend.inspectWindowsOwnedAuthorityPath({ path: ${JSON.stringify(join(dir, "x"))}, directory: true }); } catch { /* refused, as asserted on the trace */ }
++}
++backend.setWindowsOwnedAuthorityBackendTestSeam(undefined);
++`;
++  const script = join(dir, "child.mjs");
++  writeFileSync(script, body);
++  const child = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 30_000, env: { ...process.env, PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: traceFile } });
++  assert.equal(child.status, 0, child.stderr);
++  const line = readFileSyncText(traceFile, "utf8").trim().split("\n").at(-1);
++  const failures = JSON.parse(line).nativeObservations.failures;
++  assert.deepEqual(failures.map((entry) => entry.code), ["exit 1, WIN-AUTH-NATIVE-DENIED", "exit 1, no-json", "exit 1, no-code"]);
++  assert.ok(!line.includes(dir), "the trace line carries no path");
++});
++
+ import { readFileSync as readFileSyncText } from "node:fs";
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index d512de063..2f05e2a86 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -55,6 +55,7 @@ import {
+ import {
+   discoverRepository,
+   inspectSessionOwnerRuntime,
++  inspectSignedDescriptorCustodyRepository,
+   listActiveSessionDescriptors,
+ } from "../lib/worktree-lifecycle.mjs";
+ import { planInstall } from "./pre-push-hook-install.mjs";
+@@ -2492,8 +2493,13 @@ export function main(options = {}) {
+ }
+ 
+ /** E2: the registry lock as the capability probe sees it; any fault is `unknown`, which degrades the row and never reads as ready. */
+-function defaultRegistryLockProbe() {
+-  try { return inspectSessionAuthorityLock({ repository: discoverRepository(resolve(process.cwd())) }); }
++/**
++ * The registry takes exactly the custody repository shape ({primaryRoot, commonDir, candidate}); the wider
++ * discoverRepository() result (start, objectFormat, worktrees) was refused there, so the lock row read
++ * "could not be observed" even with no lock present (C19m w251, found on both machines in 19l).
++ */
++export function defaultRegistryLockProbe({ cwd = process.cwd(), inspect = inspectSessionAuthorityLock } = {}) {
++  try { return inspect({ repository: inspectSignedDescriptorCustodyRepository(discoverRepository(resolve(cwd)).primaryRoot) }); }
+   catch { return { status: "unknown" }; }
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 12742968d..e21dd0b34 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -1723,11 +1723,19 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and
+     assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
+     mkdirSync(join(root, "specs/unit"), { recursive: true });
+     writeFileSync(join(root, "specs/unit/slice-queue.json"), "{}\n");
++    // A TRACKED foreign change refuses; an untracked foreign file is left alone and listed (w231, asserted below).
+     writeFileSync(join(root, "other.txt"), "x\n");
++    assert.equal(git("add", "other.txt").status, 0);
++    assert.equal(git("commit", "-q", "-m", "track other").status, 0);
++    writeFileSync(join(root, "other.txt"), "changed\n");
+     const run = (...argv) => commitPipelineOwned(argv, { spawn: (command, args, options) => spawnSync(command, [args[0], args[1], ...config, ...args.slice(2)], options) });
+     const refused = run("--root", root, "--human");
+     assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["other.txt"]);
+-    rmSync(join(root, "other.txt"));
++    assert.equal(git("checkout", "--", "other.txt").status, 0);
++    writeFileSync(join(root, "loose.txt"), "y\n");
++    const loose = run("--root", root, "--human", "--dry-run");
++    assert.equal(loose.status, "dry-run", JSON.stringify(loose)); assert.deepEqual(loose.untouched, ["loose.txt"], "an untracked foreign file is listed, not committed");
++    rmSync(join(root, "loose.txt"));
+     assert.equal(run("--root", root, "--human", "--dry-run").status, "dry-run");
+     const committed = run("--root", root, "--human");
+     assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);
+diff --git a/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs b/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs
+index 40ebf67f6..1b2012f0c 100644
+--- a/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/win-authority-readiness-and-preflight.test.mjs
+@@ -128,6 +128,23 @@ test("E2: a probe that throws is reported as unknown, never swallowed into ready
+   assert.notEqual(cap.status, "ready");
+ });
+ 
++test("E2 (C19m w251): the real lock probe on a real repository with no lock reports absent, so the lock row is ready, not degraded", () => {
++  const root = mkdtempSync(join(tmpdir(), "w251-lock-"));
++  try {
++    const git = (...args) => spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
++    assert.equal(git("init", "-q").status, 0);
++    assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
++    let seen = null;
++    const spied = preflight.defaultRegistryLockProbe({ cwd: root, inspect: (input) => { seen = input; return registry.inspectSessionAuthorityLock(input); } });
++    assert.deepEqual(Object.keys(seen.repository).sort(), ["candidate", "commonDir", "primaryRoot"], "the registry receives exactly the custody repository shape");
++    assert.deepEqual(spied, { status: "absent" });
++    assert.deepEqual(preflight.defaultRegistryLockProbe({ cwd: root }), { status: "absent" });
++    const cap = preflight.observeCloseAndPushCapability({ platform: "linux", ...okProbes, lockProbe: () => preflight.defaultRegistryLockProbe({ cwd: root }) });
++    assert.equal(cap.checks.find((row) => row.id === "lock").status, "ready");
++    assert.equal(preflight.defaultRegistryLockProbe({ cwd: join(root, "missing") }).status, "unknown", "an unreadable repository still degrades, never ready");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ // --- W2: the four digest-bound bootstrap facts -----------------------------------------------------------------------------------
+ 
+ function projectWith(files) {
+diff --git a/specs/sprint-alfred-epic/evidence/native-checks-options-2026-11-05.md b/specs/sprint-alfred-epic/evidence/native-checks-options-2026-11-05.md
+index 55d3448e1..d58ca58b8 100644
+--- a/specs/sprint-alfred-epic/evidence/native-checks-options-2026-11-05.md
++++ b/specs/sprint-alfred-epic/evidence/native-checks-options-2026-11-05.md
+@@ -8,7 +8,7 @@ Evidence legend. `[R]` = I read the cited file:line this session. `[I]` = inferr
+ 
+ Scope: every per-operation native authority check that runs on Windows during (a) a Goldfish dispatch admission (`hooks/guard-dispatch.mjs` lines 1104-1119 calls `prepareNativeGoldfishHostState`; the registry part is `publishNativeAuthorityState`, `lib/native-goldfish-host-state.mjs` lines 824-921), (b) a SubagentStop host commit (`readNativeGoldfishPending`, same file lines 427-437, which for item deliveries enters a registry boundary at line 597) and (c) an override-eligible refusal (`hgoPlanningPublication`, `lib/human-guard-override.mjs` lines 6003-6026, reached from the record-denial path at lines 3949-3951).
+ 
+-Cost unit [M][R]. One native operation is one `powershell.exe` start (`lib/windows-owned-authority-backend.mjs` line 187, `spawnSync`, `-NoProfile`), about 470 ms. A warm admission runs about 145 of them (108.8 s, 110.7 s, 113.3 s); an eligible refusal about 107 (57.5 s warm, 107.5 s cold), almost all between the progress marks `hgo-publish-wait` and `hgo-publish-held` (`lib/human-guard-override.mjs` lines 3949 and 3951). Hot sites [M]: `lib/session-authority-registry.mjs` line 565 (`registryClosure`, 37 inspect calls, 18 s), line 380 (`installedSourceSha256`, 19 read-source calls, 9.5 s), `lib/session-authority-domain-owner.mjs` line 60 (`observedChain`, 15 ancestor calls, 7.5 s). Arithmetic caveat [I]: 145 x 0.47 s is about 68 s, but the warm admission took 108.8 s to 113.3 s, so about 41 s to 45 s of the admission is not explained by native spawns in the measurement. The refusal figure is consistent (107 x 0.47 s is about 50 s against 57.5 s warm).
++Cost unit [M] [R]. One native operation is one `powershell.exe` start (`lib/windows-owned-authority-backend.mjs` line 187, `spawnSync`, `-NoProfile`), about 470 ms. A warm admission runs about 145 of them (108.8 s, 110.7 s, 113.3 s); an eligible refusal about 107 (57.5 s warm, 107.5 s cold), almost all between the progress marks `hgo-publish-wait` and `hgo-publish-held` (`lib/human-guard-override.mjs` lines 3949 and 3951). Hot sites [M]: `lib/session-authority-registry.mjs` line 565 (`registryClosure`, 37 inspect calls, 18 s), line 380 (`installedSourceSha256`, 19 read-source calls, 9.5 s), `lib/session-authority-domain-owner.mjs` line 60 (`observedChain`, 15 ancestor calls, 7.5 s). Arithmetic caveat [I]: 145 x 0.47 s is about 68 s, but the warm admission took 108.8 s to 113.3 s, so about 41 s to 45 s of the admission is not explained by native spawns in the measurement. The refusal figure is consistent (107 x 0.47 s is about 50 s against 57.5 s warm).
+ 
+ Threat model, stated by the PO (German, verbatim): "Wir wollen hier nur den agenten einsperren mit der pipe nicht den human etc". In English: the pipeline confines the agent, not the human. The same rule is recorded as `guardrails/security.md` SEC-10 (lines 165-189). The agent and the human normally run as the same operating-system user on the same machine. Consequence, read into every row below: a check that compares the owner or an access-control entry with the current account passes for the agent by construction, because the agent is that account (`docs/adr/draft-windows-host-acl-boundary.md` lines 17-20 says the same: owner ACLs cannot tell a human from an agent under the same principal). A check is only protecting against the agent when some agent action can change the checked object: a tool call, a shell command, a file write through the runner, a process the agent spawns. I did not find, in the guard files I searched, a tool guard that names `.git/agent-pipeline` as a protected write path [I: the search was incomplete, see Open questions 5]. The layers I did read are the closed shell grammar (`templates/prompts/agent-obligations.md` section 1: one simple command, no redirects, no `;`) and the briefing rule that `.git/` is never a working location.
+ 
+@@ -29,7 +29,7 @@ Natives are per admission / per refusal. "Same-user" answers: does the adversary
+ | C5 | Source module read (`read-source`) and its digest binding | `lib/session-authority-registry.mjs` 376-381, 134-139, 400-411; `lib/session-authority-domain-owner.mjs` 88-95, 115 | Same open and double read as C4 but non-private (no owner or ACE gate). The SHA-256 of each participant's installed source file is bound into the catalogue; a changed source means the catalogue no longer closes and is migrated or restarted under the lock. A JS lstat before and after must equal the native volume and file index | The agent (or anything) editing the installed producer source so a weakened guard runs while the old registry still validates | 19 [M] / n/m. 12 participants name 23 distinct source files [R: lines 33-44]; the measurement saw 19 misses, the gap is unexplained [I] | Yes for the content edit (the agent can reach plugin source in a source checkout). The native op itself adds only a no-delete-share handle and the identity join; a plain `readFileSync` plus hash gives the same digest | `templates/prompts/agent-obligations.md` section 2 says that for plugin source in a source checkout the override route returns `author-repair-required`, which implies edits are guarded [I: that section lists protected test paths; the source-edit guard itself was not read] |
+ | C6 | Ancestor chain, `ancestor` / `ancestor-above-root` for every path component from the drive root | `lib/session-authority-domain-owner.mjs` 59-60, 78-87, 115, 120, 150, 153; `lib/windows-owned-authority-backend.mjs` 198-204; `lib/windows-owned-authority-native.ps1` 183-191 | Per component: JS lstat is a directory and not a symlink; native open, not a reparse point, final path equals the path, non-empty descriptor, descriptor hash in the facts. Components strictly above the repository or plugin root use the relaxed variant (PO 2026-10-17); the checks themselves are the same | A junction, mounted-folder or substituted-drive alias on any ancestor that silently redirects private state or plugin source to another place | 15 [M] / n/m. Chains run twice per namespace (lines 150 and 153) and once per file read (line 120) [R]; the in-process memo makes the repeats free [I] | Partly: needs an admitted tool that can create a reparse point (a shell `mklink`, a junction API). The closed grammar refuses ordinary shell writes [R]; other routes are not enumerated [I] | The JS lstat in the same loop (line 83) already refuses symlinks, and Node reports junctions through lstat as symlinks [I: libuv behaviour, not read here]. The native part adds short-name, case and substituted-drive aliases |
+ | C7 | Namespace membership race check, `inspect` of each producer directory before and after listing | `lib/session-authority-domain-owner.mjs` 148-155 (inspect at 151), 150, 153 | Directory facts before and after `readdir`; ancestors observed before and again after the whole namespace read; final socket CAS (POSIX only) | A concurrent writer adding, removing or replacing entries or ancestors while the 12 producers' baselines are read | n/m / n/m. Run for every namespace of every producer; an eligible refusal runs `stateRead` once with reconcile, then `planningBaseline` twice (readBaseline plus reconcile each), which is up to five namespace reads per producer [R: `lib/session-authority-registry.mjs` 626-635, 644, 665]; memo collapses unchanged repeats [I] | Mostly no: a racing writer here is a sibling hook (a dispatch or a stop), which is a correctness problem, not an agent attack | The registry lock serialises registry writers; producer namespaces are written by their own producer under it |
+-| C8 | Registry lock acquire, ownership re-read, release | `lib/session-authority-registry.mjs` 129-133, 243, 304-327, 349; `lib/windows-process-identity.mjs` 24 | Exclusive create of the lock file (a native publish), re-read of the lock to bind its bytes, a native remove with the expected hash and facts at release, `registry-lock-ownership-changed` if another process replaced it. On contention: lock observed and its owner judged, which on Windows is a separate PowerShell start (`observeWindowsProcessIdentity`) per attempt [R lines 196-200, 313, 210], not counted by the native counters [I] | Not an adversary: it serialises concurrent hooks. The ownership re-read also detects a lock stolen or replaced mid-boundary | At least 4 per boundary entry (create, read, read, remove), plus one `inspect` per lock-path directory component from `privateDirectories` (line 305), plus the identity spawn per attempt [I]. An admission enters a boundary at least twice (line 831 migrate, line 852 main), a stop once (line 597), an eligible refusal once (line 6009) [R]. Wait bound is 1.5 s (line 243) against holds of tens of seconds [M][R] | No: mutual exclusion is needed whatever the adversary; the replace-the-lock case needs a write route as in C3 | None other: this is the only mutual exclusion over the registry |
++| C8 | Registry lock acquire, ownership re-read, release | `lib/session-authority-registry.mjs` 129-133, 243, 304-327, 349; `lib/windows-process-identity.mjs` 24 | Exclusive create of the lock file (a native publish), re-read of the lock to bind its bytes, a native remove with the expected hash and facts at release, `registry-lock-ownership-changed` if another process replaced it. On contention: lock observed and its owner judged, which on Windows is a separate PowerShell start (`observeWindowsProcessIdentity`) per attempt [R lines 196-200, 313, 210], not counted by the native counters [I] | Not an adversary: it serialises concurrent hooks. The ownership re-read also detects a lock stolen or replaced mid-boundary | At least 4 per boundary entry (create, read, read, remove), plus one `inspect` per lock-path directory component from `privateDirectories` (line 305), plus the identity spawn per attempt [I]. An admission enters a boundary at least twice (line 831 migrate, line 852 main), a stop once (line 597), an eligible refusal once (line 6009) [R]. Wait bound is 1.5 s (line 243) against holds of tens of seconds [M] [R] | No: mutual exclusion is needed whatever the adversary; the replace-the-lock case needs a write route as in C3 | None other: this is the only mutual exclusion over the registry |
+ | C9 | Boundary entry migrate and heal | `lib/session-authority-registry.mjs` 349-350, 524-529, 539-553 | On every boundary entry: compare installed participants with the catalogue (C5 digests), else `healDriftedCatalogue` runs `stateRead` with reconcile off, which ends in the closure walk (C3) | A plugin update leaving a catalogue that can never close; drift between a producer's files and its recorded baseline | Part of the C3 and C5 counts: one closure walk per boundary entry before the callback does its own `stateRead` [I: I did not count calls per phase] / same | No: this is self-consistency after an update, not an attack | `stateRead` in the callback faults on the same drift (`driftFault`, line 566), so the entry heal is an availability convenience [I] |
+ | C10 | Private publication of a registry record (reserve, advance, producer, catalogue, certificates) | `lib/session-authority-registry.mjs` 110-123, 144, 155-172; `lib/windows-owned-authority-native.ps1` 201-233 | JS: directory components inspected (`privateDirectories`, line 144), prior record re-read for compare-and-swap (162 and 113), publish, read-back (120), publication image. Native publish: parent custody handle, flush probe before any bytes, temp file created with an explicit current-SID-only descriptor, written, verified, flushed, re-read, old target compared by hash and facts, parent facts compared before and after, `MoveFileEx`, re-open and verify with two byte passes, flush, final read-back | Torn or partial write, a foreign replacement of the target between compare and move, loss of the record on power failure; the explicit private descriptor keeps other accounts out | ~30 in the "reserve to done" window (14.4 s / 0.47 s) [M, I for the division] / n/m. Each record write costs a publish plus about three reads and the directory inspects [I]; a write drops the memo entries for the object, its directory and below (`forgetMemoAround`, `lib/windows-owned-authority-backend.mjs` 152-158), so the next reads miss | Crash safety and compare-and-swap: needed whatever the adversary. The other-account part of the descriptor: no. Replacement by an agent without the lock: partly, as C4 | Compare-and-swap on hash and facts is the same mechanism for any writer |
+ | C11 | Override planning: pre and post baselines of all 12 producers around one publish | `lib/session-authority-registry.mjs` 637-690; `lib/human-guard-override.mjs` 6003-6026 | Complete closure and all 12 producers' source baselines before effects; after the writer ran, catalogue and every producer record unchanged, other producers' namespaces and retained members unchanged, only the allowed namespaces and path digests changed (lines 665-687) | A code path of the override writer that writes outside its own namespace, or a registry transition inside what should be a plain request publish | n/m / most of the 107 [M] (by code order [I], the marks `hgo-publish-wait` to `hgo-publish-held` cover the lock, C9 and the first `stateRead`; the post read comes after the mark) | Mostly no: the refusal is the agent's own action, and the publish records a request the agent can cause anyway. The check guards the writer's code, not a person | Source digests (C5) already bind the writer's code to the catalogue |
