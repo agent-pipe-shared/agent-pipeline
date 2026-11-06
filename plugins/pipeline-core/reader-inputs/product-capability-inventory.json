@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "c26008fa6a49084705ec2a5501fa58dfa3377029",
-    "tree": "33c092e0dd3994215c8b858349c3c57cdd0a8c6d"
+    "commit": "d9731d0468e3b932efb79a47749ce20f223a75f2",
+    "tree": "a5fe020d20d03b1862d28f9767944707c1349dd1"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -219,6 +219,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-route-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:agent-guidance-w247-tests",
         "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:agent-pipeline-root-creation-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
