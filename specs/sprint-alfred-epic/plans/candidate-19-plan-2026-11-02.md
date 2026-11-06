@@ -511,6 +511,19 @@ Item (2) reproduced on Linux (19i installed): two probes of one reply with track
   - The same heal gave code `healed`. It retired four settled pending states (gf-probe-41, 42, 44, 45, 17 files) and the gf-probe-41 stop-failure record from 19j, with `staleMemberMoveAside: moved-aside`.
   - Afterwards lock and registry are absent, no reservations remain, and there is no `native-item-scope-operation-unowned`. The w245 and w248 repair path works on Windows with no human step.
   - Steps 1 to 4 are pending.
+- **Windows step 1 on 19k (gf-probe-46):**
+  - Host commit bfee99a with its Dispatch trailer.
+  - Admission 44.3 s, the first after the heal re-initializes the registry. PostToolUse 10.2 s. Stop 56.7 s, with the commit at 14.0 s.
+  - 0 failed natives, so the w247 `failures` key is absent, as intended. Its path-free form is still unproven on Windows.
+- **Windows step 2 on 19k (pair A, gf-probe-47/48, background launches):**
+  - Both were admitted (63.5 s and 76.9 s, 0 failed natives). 47 landed d55471f.
+  - **New defect:** the stop of 48 started 6 s after 47's commit, while stop 47 still ran. At 1.9 s it fell back from the read scope to the exclusive boundary. The registry refused `SDC-ROOT repository-binding-changed`, because the repository binding inspected at the start of the read no longer matched after the sibling's commit. `retryWhileSessionAuthorityLockHeld` retries only `SDC-LOCK-HELD` and `state-push-owner-unavailable`, so the stop ended at 2.0 s with exit 0, `NGHF-PENDING-UNAVAILABLE`, no commit, and a stop-failure record (stop-failure-1c630a90…).
+  - **Second gap:** with background launches the only PostToolUse precedes the stop, and the SubagentStop hook prints nothing for this failure, so the record was shown nowhere. The w247 surfacing does not cover this path.
+  - Recovered through `goldfish-host-commit-recover.mjs` plan/apply as 2e06d8e (`Commit-Act: orchestrator`, reservation integrated-by-commit, registry readable).
+  - Pair B held.
+- **Proposed 19l (awaiting the PO):**
+  1. The stop's pending read re-inspects and retries a `repository-binding-changed` refusal raised before the boundary was entered, within its stop budget.
+  2. A SubagentStop that leaves a stop-failure or unresolved record names it and the recover command in its own hook output.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
