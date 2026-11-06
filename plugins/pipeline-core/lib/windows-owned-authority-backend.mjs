@@ -2,7 +2,7 @@
 // Source-owned native physical observations. This module issues no authority brand.
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {lstatSync,openSync,readFileSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
+import {lstatSync,openSync,readFileSync,readSync,fstatSync,closeSync,constants,realpathSync,mkdirSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
@@ -142,7 +142,8 @@ function rememberPersisted(key,request,identity,value){
 }
 let testSeam={platform:undefined,spawn:undefined};
 // Test seam: only an explicit import can set it; the CLI never does. Defaults to the real platform and spawn.
-export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn,memoFile:seam?.memoFile};persisted=null;persistedDirty=0;persistedDropped.clear();}
+// `nodeReads` selects the Node answers for read and inspect (below); without it a seam that fakes the spawn keeps the native answers, a real run (no seam) uses Node.
+export function setWindowsOwnedAuthorityBackendTestSeam(seam){testSeam={platform:seam?.platform,spawn:seam?.spawn,memoFile:seam?.memoFile,nodeReads:seam?.nodeReads,afterFirstPass:seam?.afterFirstPass};persisted=null;persistedDirty=0;persistedDropped.clear();}
 // Clears the in-process memo and forgets the loaded cross-process copy (a new process starts with neither; the file itself stays).
 export function resetWindowsOwnedAuthorityBackendMemo(){authorityMemo.clear();persisted=null;persistedDirty=0;persistedDropped.clear();}
 export function nativeAuthorityStats(){
@@ -161,9 +162,93 @@ function forgetMemoAround(written){
  // The cross-process copy follows (hygiene only: a hit there is identity-checked anyway, and a write changes the identity of what it touched).
  if(persisted!==null)for(const [key,entry] of persisted){const at=entry.path.toLowerCase();if(at===folded||at===parent||at.startsWith(below)){persisted.delete(key);persistedDropped.add(key);persistedDirty+=1;}}
 }
+// C19I-W239 (O5c, PO decision 2026-11-06, protection loss accepted): the private read and inspect observations are answered in Node, not by one
+// PowerShell start (about 470 ms) each. Identity comes from a bigint lstat; a symlink or junction, a link count other than one, the wrong object
+// kind and a final path (realpath.native) that differs from the requested one (case-insensitively) are refused; a read compares the lstat
+// identity before and after and the SHA-256 of two passes over the bytes. The facts string keeps the native shape (volume, file id, links,
+// attributes stand-in, size, creation, write time, hash) so witnesses and the memo keep working; its last slot is a hash of the lstat identity
+// where the native one hashes the security descriptor. Node-answered operations bypass the memo (cheap, and an older persisted entry holds
+// native-shaped facts). Create, publish and remove stay native: see invokeMutating. What this gives up is listed in the held-patch notes.
+const nodeReadsEnabled=()=>testSeam.nodeReads??testSeam.spawn===undefined;
+const NODE_OPERATIONS=new Set(['inspect','read']);
+const FILETIME_EPOCH_TICKS=116444736000000000n,UINT32=0xffffffffn;
+const filetime=ns=>{const ticks=BigInt.asUintN(64,ns/100n+FILETIME_EPOCH_TICKS);return [ticks>>32n,ticks&UINT32];};
+// A directory's facts leave out size and times that change with its membership (the native ones did the same).
+const NODE_IDENTITY=['dev','ino','mode','nlink','size','mtimeNs','ctimeNs','birthtimeNs'],NODE_DIRECTORY_IDENTITY=['dev','ino','mode','birthtimeNs'];
+const sameNodeIdentity=(a,b,directory)=>(directory?NODE_DIRECTORY_IDENTITY:NODE_IDENTITY).every(key=>a[key]===b[key]);
+function nodeFacts(s,directory){
+ const ino=BigInt.asUintN(64,s.ino),created=filetime(s.birthtimeNs);
+ const stamp=digest(`pipeline.node-authority-facts.v1:${(directory?NODE_DIRECTORY_IDENTITY:NODE_IDENTITY).map(key=>s[key]).join(':')}`);
+ return [s.dev,ino>>32n,ino&UINT32,s.nlink,s.mode,...(directory?['directory']:[s.size>>32n,s.size&UINT32]),created[0],created[1],...(directory?['directory']:filetime(s.mtimeNs)),stamp].join(':');
+}
+function nodeStat(target,directory){
+ let s;try{s=lstatSync(target,{bigint:true});}catch{fail('WIN-AUTH-OPEN',false,target);}
+ if(s.isSymbolicLink()||(directory?!s.isDirectory():(!s.isFile()||s.nlink!==1n)))fail('WIN-AUTH-ALIAS');
+ return s;
+}
+function nodeFinalPath(target){
+ let real;try{real=realpathSync.native(target);}catch{fail('WIN-AUTH-FINAL-PATH');}
+ if(real.startsWith('\\\\?\\'))real=real.slice(4);
+ const fold=value=>value.replace(/[\\/]+$/u,'').toLowerCase();
+ if(fold(real)!==fold(target))fail('WIN-AUTH-ALIAS');
+}
+function nodeInspect(target,directory){
+ const first=nodeStat(target,directory);nodeFinalPath(target);const second=nodeStat(target,directory);
+ if(!sameNodeIdentity(first,second,directory))fail('WIN-AUTH-RACE');
+ return {ok:true,facts:nodeFacts(second,directory),bytes:null,committed:false};
+}
+function nodePass(fd,size){
+ const buffer=Buffer.allocUnsafe(size);let at=0;
+ while(at<size){const count=readSync(fd,buffer,at,size-at,at);if(count===0)fail('WIN-AUTH-RACE');at+=count;}
+ if(readSync(fd,Buffer.allocUnsafe(1),0,1,size)!==0)fail('WIN-AUTH-RACE');
+ return buffer;
+}
+function nodeRead(target,maxBytes){
+ const first=nodeStat(target,false);if(first.size>BigInt(maxBytes))fail('WIN-AUTH-SIZE');nodeFinalPath(target);
+ let fd;try{fd=openSync(target,constants.O_RDONLY);}catch{fail('WIN-AUTH-OPEN',false,target);}
+ let one,two;
+ try{
+  const opened=fstatSync(fd,{bigint:true});if(opened.dev!==first.dev||opened.ino!==first.ino)fail('WIN-AUTH-RACE');
+  one=nodePass(fd,Number(first.size));testSeam.afterFirstPass?.();two=nodePass(fd,Number(first.size));
+ }finally{closeSync(fd);}
+ const last=nodeStat(target,false);
+ if(!sameNodeIdentity(first,last,false)||!one.equals(two))fail('WIN-AUTH-RACE');
+ return {ok:true,facts:nodeFacts(last,false),bytes:one,committed:false};
+}
+function nodeInvoke(request){
+ if((testSeam.platform??process.platform)!=='win32')fail('WIN-AUTH-PLATFORM-UNAVAILABLE');
+ const value=request.operation==='read'?nodeRead(request.path,request.maxBytes):nodeInspect(request.path,request.directory);
+ return value.bytes===null?value:{...value,bytes:value.bytes.toString('base64')};
+}
+// Callers hold Node-shaped facts, the native helper compares its own: a compare-and-swap publish or a remove therefore (1) requires the Node
+// facts and the bytes of the current file to equal the caller's witness, (2) takes the native facts of that same file with one native read,
+// requires its bytes to match as well, (3) re-checks the Node witness, and only then hands the native facts to the native mutation, which
+// keeps every one of its own checks, custody handles and read-backs. A publish or create returns the Node facts of what it wrote, so the next
+// read agrees with it (the registry's publication read-back), after cross-checking volume and file id against the native answer.
+function invokeMutating(request){
+ const operation=request.operation;let native=request;
+ if(operation==='remove'||(operation==='publish'&&request.expectedFacts!==null)){
+  const witness=()=>{const current=nodeRead(request.path,1048576);if(digest(current.bytes)!==request.expectedSha256||current.facts!==request.expectedFacts)fail('WIN-AUTH-CAS');};
+  witness();
+  const current=invokeNative({operation:'read',path:request.path,maxBytes:1048576});
+  if(typeof current.bytes!=='string'||digest(Buffer.from(current.bytes,'base64'))!==request.expectedSha256)fail('WIN-AUTH-CAS');
+  witness();
+  native={...request,expectedFacts:current.facts};
+ }
+ const value=invokeNative(native);
+ if(operation==='remove')return value;
+ try{
+  const directory=operation==='create-directory',observed=directory?nodeInspect(request.path,true):nodeRead(request.path,1048576);
+  if(!directory&&!observed.bytes.equals(Buffer.from(request.bytes,'base64')))fail('WIN-AUTH-READBACK');
+  const reported=value.facts.split(':'),seen=observed.facts.split(':');
+  if(reported[0]!==seen[0]||reported[1]!==seen[1]||reported[2]!==seen[2])fail('WIN-AUTH-READBACK');
+  return {...value,facts:observed.facts};
+ }catch(error){error.committed=value.committed;throw error;}
+}
 function invoke(request){
  const operation=request.operation;
- if(MEMO_MUTATING.has(operation)){forgetMemoAround(request.path);try{return invokeNative(request);}finally{forgetMemoAround(request.path);}}
+ if(MEMO_MUTATING.has(operation)){forgetMemoAround(request.path);try{return nodeReadsEnabled()?invokeMutating(request):invokeNative(request);}finally{forgetMemoAround(request.path);}}
+ if(NODE_OPERATIONS.has(operation)&&nodeReadsEnabled())return nodeInvoke(request);
  if(!MEMO_READ_ONLY.has(operation)||process.env.PIPELINE_AUTHORITY_NO_MEMO==='1')return invokeNative(request);
  const key=JSON.stringify([operation,request.path,request.directory??null,request.boundaryRoot??null,request.maxBytes??null]);
  const before=memoIdentity(request.path);

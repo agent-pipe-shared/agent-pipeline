@@ -75,12 +75,22 @@ function windowsAuthorityBoundary(p){
   }
   return null;
 }
-function observedWindowsChain(p,boundaryRoot=null){
+// C19I-W239 (O1a, PO decision 2026-11-06, protection loss accepted): every component of the walked path keeps its JS lstat check (a real
+// directory, not a symlink or junction) and its row, but the native ancestor observation (one PowerShell start, about 470 ms) runs only at the
+// boundary roots: the boundary the caller derived (the repository root, or the plugin root for a source module under it) and the
+// <repository>\.git\agent-pipeline root. Intermediate directories, including those above the boundary, are no longer observed natively
+// (no alias, subst, mapped-drive or 8.3 detection there).
+const nativeAncestorSuffix=sep+'.git'+sep+'agent-pipeline';
+function nativeAncestorRoot(current,boundaryRoot){
+  const folded=current.toLowerCase();
+  return (boundaryRoot&&folded===boundaryRoot.toLowerCase())||folded.endsWith(nativeAncestorSuffix);
+}
+export function observedWindowsChain(p,boundaryRoot=null){
   if(typeof p!=='string'||!isAbsolute(p)||resolve(p)!==p)authorityOwnerFailure('domain-root-path');
   const rows=[];let current=parse(p).root;
   for(const next of [current,...relative(current,p).split(sep).filter(Boolean)]){
     if(next!==current)current=join(current,next);
-    try{const s=lstatSync(current);if(!s.isDirectory()||s.isSymbolicLink())authorityOwnerFailure('domain-ancestor-unsafe');const native=observeWindowsAuthorityAncestor(boundaryRoot?{path:current,boundaryRoot}:{path:current});rows.push({pathSha256:digest(current),identity:locatorIdentity(s),nativeFactsSha256:native.nativeFactsSha256});}
+    try{const s=lstatSync(current);if(!s.isDirectory()||s.isSymbolicLink())authorityOwnerFailure('domain-ancestor-unsafe');const native=nativeAncestorRoot(current,boundaryRoot)?observeWindowsAuthorityAncestor(boundaryRoot?{path:current,boundaryRoot}:{path:current}):null;rows.push({pathSha256:digest(current),identity:locatorIdentity(s),...(native?{nativeFactsSha256:native.nativeFactsSha256}:{})});}
     catch(e){if(e.code==='ENOENT')return {present:false,rows,firstAbsentSha256:digest(current)};throw e;}
   }
   return {present:true,rows};
