@@ -252,9 +252,18 @@ export function observeWindowsPrivatePath(path, options = {}) {
 }
 
 const OBSERVATION_MEMO = new Map();
-const OBSERVATION_MEMO_LIMIT = 256;
+const OBSERVATION_MEMO_LIMIT = 1024;
 const PREFETCH_MAX_DEPTH = 3;
 const PREFETCH_MAX_PATHS = 128;
+// A tree wider than the first window (PREFETCH_MAX_PATHS entries, PREFETCH_MAX_DEPTH levels) is observed ONCE per
+// process in a wider pass, in bounded native chunks, instead of one native start per object outside the window.
+const PREFETCH_WIDE_DEPTH = 6;
+const PREFETCH_WIDE_PATHS = 512;
+const PREFETCH_CHUNK_PATHS = 256;
+const PREFETCH_TREE_LIMIT = 64;
+// Per private-tree root: the root's identity when the record was made, whether the first window left entries out, and
+// whether the wide pass already ran. Dropped when the root's identity changes and around this module's own DACL write.
+const PREFETCH_TREES = new Map();
 
 function memoStore(path, identity, observation) {
   if (OBSERVATION_MEMO.size >= OBSERVATION_MEMO_LIMIT && !OBSERVATION_MEMO.has(path)) OBSERVATION_MEMO.delete(OBSERVATION_MEMO.keys().next().value);
@@ -283,11 +292,15 @@ function privateTreeRoot(path) {
   return match === null ? null : match[1];
 }
 
-/** Existing entries of the tree, breadth-first, never following symbolic links or reparse points. */
-function privateTreeEntries(root, limit) {
+/**
+ * Existing entries of the tree, breadth-first, never following symbolic links or reparse points. `truncated` tells
+ * whether the walk stopped at the count or depth bound with entries left, i.e. whether the tree is wider than the window.
+ */
+function privateTreeEntries(root, limit, maxDepth = PREFETCH_MAX_DEPTH) {
   const found = [];
   let level = [root];
-  for (let depth = 0; depth < PREFETCH_MAX_DEPTH && level.length > 0 && found.length < limit; depth += 1) {
+  let depth = 0;
+  for (; depth < maxDepth && level.length > 0 && found.length < limit; depth += 1) {
     const next = [];
     for (const directory of level) {
       let entries;
@@ -302,7 +315,7 @@ function privateTreeEntries(root, limit) {
     }
     level = next;
   }
-  return found;
+  return { found, truncated: found.length >= limit || level.length > 0 };
 }
 
 function batchRowShapeOk(row, path) {
@@ -324,9 +337,23 @@ function batchRowObservation(row, path) {
  * path's observation, or null when the batch failed or that row was unusable (the caller then runs the single-path route).
  */
 function prefetchPrivateTree(path, identity, root) {
+  // The first miss of a root observes the first window. When that window left entries out of an unchanged root, the
+  // NEXT miss of the same root observes the rest of the tree once (a wider pass in bounded chunks) instead of paying
+  // one native start per object outside the window. The record is dropped as soon as the root's identity changes.
+  const rootIdentity = lstatIdentity(root);
+  let record = PREFETCH_TREES.get(root);
+  if (record === undefined || record.identity !== rootIdentity) {
+    if (PREFETCH_TREES.size >= PREFETCH_TREE_LIMIT) PREFETCH_TREES.delete(PREFETCH_TREES.keys().next().value);
+    record = { identity: rootIdentity, truncated: false, widened: false };
+    PREFETCH_TREES.set(root, record);
+  }
+  const wide = record.truncated && !record.widened;
+  const cap = wide ? PREFETCH_WIDE_PATHS : PREFETCH_MAX_PATHS;
+  const walk = privateTreeEntries(root, cap, wide ? PREFETCH_WIDE_DEPTH : PREFETCH_MAX_DEPTH);
+  if (wide) record.widened = true; else record.truncated = walk.truncated;
   const identities = new Map([[path, identity]]);
-  for (const candidate of [root, ...privateTreeEntries(root, PREFETCH_MAX_PATHS)]) {
-    if (identities.size >= PREFETCH_MAX_PATHS) break;
+  for (const candidate of [root, ...walk.found]) {
+    if (identities.size >= cap) break;
     if (identities.has(candidate)) continue;
     const candidateIdentity = lstatIdentity(candidate);
     if (candidateIdentity === null) continue;
@@ -334,9 +361,28 @@ function prefetchPrivateTree(path, identity, root) {
     if (hit && hit.identity === candidateIdentity) continue;
     identities.set(candidate, candidateIdentity);
   }
-  const batch = [...identities.keys()];
+  const paths = [...identities.keys()];
   const executable = fixedPowerShell();
   if (executable === null) return null;
+  let missed = null;
+  for (let offset = 0; offset < paths.length; offset += PREFETCH_CHUNK_PATHS) {
+    const rows = observePrivateBatch(executable, paths.slice(offset, offset + PREFETCH_CHUNK_PATHS));
+    // The first chunk holds the missed path: if it fails the caller takes the single-path route. A later chunk that
+    // fails only leaves its objects unmemoized (each is observed on demand, as before).
+    if (rows === null) { if (offset === 0) return null; continue; }
+    for (const row of rows) {
+      const rowPath = row && typeof row === "object" ? row.path : undefined;
+      if (typeof rowPath !== "string" || !identities.has(rowPath)) continue;
+      const observation = batchRowObservation(row, rowPath);
+      if (observation === null) continue;
+      if (rowPath === path) missed = observation;
+      if (lstatIdentity(rowPath) === identities.get(rowPath)) memoStore(rowPath, identities.get(rowPath), observation);
+    }
+  }
+  return missed === null ? null : structuredClone(missed);
+}
+
+function observePrivateBatch(executable, batch) {
   const batchStartedAt = Date.now();
   const native = spawnSync(executable, [
     "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
@@ -351,21 +397,10 @@ function prefetchPrivateTree(path, identity, root) {
   });
   recordNativeObservation(batchStartedAt, isSuccessfulSpawn(native));
   if (!isSuccessfulSpawn(native)) return null;
-  let rows;
   try {
-    rows = JSON.parse(String(native.stdout).trim());
-    if (!Array.isArray(rows)) rows = [rows];
+    const rows = JSON.parse(String(native.stdout).trim());
+    return Array.isArray(rows) ? rows : [rows];
   } catch { return null; }
-  let missed = null;
-  for (const row of rows) {
-    const rowPath = row && typeof row === "object" ? row.path : undefined;
-    if (typeof rowPath !== "string" || !identities.has(rowPath)) continue;
-    const observation = batchRowObservation(row, rowPath);
-    if (observation === null) continue;
-    if (rowPath === path) missed = observation;
-    if (lstatIdentity(rowPath) === identities.get(rowPath)) memoStore(rowPath, identities.get(rowPath), observation);
-  }
-  return missed === null ? null : structuredClone(missed);
 }
 
 /** Observe one physical Windows path against the concrete current principal. */
@@ -507,6 +542,7 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
 export function hardenWindowsPrivateDirectory(path, options = {}) {
   OBSERVATION_MEMO.delete(path);
   ROOT_MEMO.clear();
+  PREFETCH_TREES.clear();
   const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options, "hardening");
   if (result?.status) return result;
   return assessWindowsPrivatePath(path, options);

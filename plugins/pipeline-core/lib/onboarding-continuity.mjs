@@ -1135,8 +1135,55 @@ function validateHistory(value) {
   return true;
 }
 
+// The one question this module asks over and over through the default spawn is the common directory of a root
+// (`git rev-parse --path-format=absolute --git-common-dir`, twice per private-state resolution). Its answer is a pure
+// function of the root's physical path and of the root's own `.git` DIRECTORY: it is replayed only while the root's
+// physical path, the identity (device, inode, owner) of the root, its `.git` directory, that directory's `HEAD` and the
+// ABSENCE of a `commondir` redirect are exactly those observed with the successful answer, and no GIT_* variable is
+// set. Anything else -- a `.git` file or symlink, a missing entry, an injected spawn, other arguments or options --
+// takes the real spawn, so every other git question is unchanged.
+const COMMON_DIR_ARGV = Object.freeze(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+const commonDirAnswers = new Map();
+function commonDirEntryIdentity(path) {
+  try {
+    const info = lstatSync(path, { bigint: true });
+    return `${info.dev}:${info.ino}:${info.uid}:${info.isDirectory() ? "d" : info.isFile() ? "f" : "o"}`;
+  } catch { return "-"; }
+}
+// Variables that REDIRECT repository discovery make the question unanswerable from the directory alone (never replayed);
+// the ones that only tune discovery or configuration are part of the witness, so a change of any of them is a new witness.
+const COMMON_DIR_REDIRECTING_ENV = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"];
+const COMMON_DIR_TUNING_ENV = ["GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_EXEC_PATH"];
+function commonDirWitness(cwd) {
+  try {
+    if (COMMON_DIR_REDIRECTING_ENV.some((name) => process.env[name] !== undefined)) return null;
+    const root = realpathSync(cwd);
+    const gitDirectory = join(root, ".git");
+    const info = lstatSync(gitDirectory);
+    if (!info.isDirectory() || info.isSymbolicLink() || !lstatSync(join(gitDirectory, "HEAD")).isFile()) return null;
+    return [root, commonDirEntryIdentity(root), commonDirEntryIdentity(gitDirectory),
+      commonDirEntryIdentity(join(gitDirectory, "HEAD")), commonDirEntryIdentity(join(gitDirectory, "commondir")),
+      JSON.stringify(COMMON_DIR_TUNING_ENV.map((name) => process.env[name] ?? null))].join("|");
+  } catch { return null; }
+}
 function defaultGitSpawn(executable, argv, options) {
-  return spawnSync(executable, argv, options);
+  const memoable = executable === "git" && Array.isArray(argv) && argv.length === COMMON_DIR_ARGV.length
+    && argv.every((value, index) => value === COMMON_DIR_ARGV[index])
+    && typeof options?.cwd === "string" && options.env === undefined;
+  if (!memoable) return spawnSync(executable, argv, options);
+  const witness = commonDirWitness(options.cwd);
+  const key = `${options.cwd}\0${options.encoding ?? ""}`;
+  if (witness !== null) {
+    const hit = commonDirAnswers.get(key);
+    if (hit !== undefined && hit.witness === witness) return { ...hit.result, output: [...hit.result.output] };
+  }
+  const result = spawnSync(executable, argv, options);
+  if (witness !== null && result?.status === 0 && !result.error && typeof result.stdout === "string"
+    && Array.isArray(result.output) && commonDirWitness(options.cwd) === witness) {
+    if (commonDirAnswers.size >= 64) commonDirAnswers.delete(commonDirAnswers.keys().next().value);
+    commonDirAnswers.set(key, { witness, result: { ...result, output: [...result.output] } });
+  }
+  return result;
 }
 
 function resolvePrivate(root, repositoryCapability, {

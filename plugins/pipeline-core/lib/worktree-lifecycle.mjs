@@ -2176,13 +2176,102 @@ function custodyHeadIsUnborn(repo) {
 
 const CUSTODY_OID_LINE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
 
+// HEAD is resolved from the files git itself reads (HEAD, the loose branch ref, packed-refs), so a custody inspection
+// starts git only when the commit is one this process has not seen: a commit's tree never changes, hence a per-process
+// commit -> tree map. The commit is read from the files on EVERY inspection (a host commit moves HEAD inside a
+// boundary), and every uncertain shape returns null so the caller takes the original git call: reftable, a symlinked
+// HEAD or ref, a symbolic ref chain, a branch name outside a plain safe set, any read error, and any replace ref
+// (loose or packed) because a replacement changes what `HEAD^{tree}` answers for a commit already seen.
+const CUSTODY_TREE_BY_COMMIT = new Map();
+const CUSTODY_TREE_LIMIT = 512;
+const CUSTODY_PACKED_REFS = new Map();
+const CUSTODY_LOOSE_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})\n?$/u;
+const CUSTODY_HEAD_REF = /^ref: (refs\/heads\/[A-Za-z0-9_][A-Za-z0-9._\/-]*)\n?$/u;
+
+function custodySafeBranchRef(ref) {
+  return ref.split("/").every((segment) => /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u.test(segment) && !segment.endsWith(".") && !segment.endsWith(".lock") && !segment.includes(".."));
+}
+
+// Small regular file (lstat: a symlink is not one) or null for anything else.
+function custodyRegularFileText(path) {
+  const info = lstatSync(path);
+  return info.isFile() && info.size <= 65536 ? readFileSync(path, "utf8") : null;
+}
+
+// packed-refs parsed once per observed file state (inode, size and both timestamps), re-read as soon as any of them moves.
+function custodyPackedRefs(path) {
+  let before;
+  try { before = lstatSync(path, { bigint: true }); } catch (error) {
+    if (error?.code === "ENOENT") return { refs: new Map(), replace: false };
+    return null;
+  }
+  if (!before.isFile()) return null;
+  const key = `${before.dev}:${before.ino}:${before.size}:${before.mtimeNs}:${before.ctimeNs}`;
+  const hit = CUSTODY_PACKED_REFS.get(path);
+  if (hit && hit.key === key) return hit;
+  const text = readFileSync(path, "utf8");
+  const after = lstatSync(path, { bigint: true });
+  if (`${after.dev}:${after.ino}:${after.size}:${after.mtimeNs}:${after.ctimeNs}` !== key) return null;
+  const refs = new Map();
+  let replace = false;
+  for (const line of text.split("\n")) {
+    if (line === "" || line[0] === "#" || line[0] === "^") continue;
+    const space = line.indexOf(" ");
+    if (space < 0) return null;
+    const name = line.slice(space + 1);
+    if (name.startsWith("refs/replace/")) replace = true;
+    refs.set(name, line.slice(0, space));
+  }
+  const parsed = { key, refs, replace };
+  CUSTODY_PACKED_REFS.set(path, parsed);
+  return parsed;
+}
+
+function custodyHeadFromFiles(repo) {
+  try {
+    const dir = repo.commonDir;
+    if (existsSync(join(dir, "reftable")) || existsSync(join(dir, "refs", "replace"))) return null;
+    const packed = custodyPackedRefs(join(dir, "packed-refs"));
+    if (packed === null || packed.replace) return null;
+    const head = custodyRegularFileText(join(dir, "HEAD"));
+    if (head === null) return null;
+    if (CUSTODY_LOOSE_OID.test(head)) return head.trim();
+    const match = CUSTODY_HEAD_REF.exec(head);
+    if (match === null || !custodySafeBranchRef(match[1])) return null;
+    let loose;
+    try { loose = custodyRegularFileText(join(dir, ...match[1].split("/"))); } catch (error) {
+      if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return null;
+    }
+    if (loose === undefined) {
+      const oid = packed.refs.get(match[1]);
+      return typeof oid === "string" && CUSTODY_LOOSE_OID.test(oid) ? oid : null;
+    }
+    return loose !== null && CUSTODY_LOOSE_OID.test(loose) ? loose.trim() : null;
+  } catch { return null; }
+}
+
+function custodyTreeKey(repo, commit) { return `${repo.commonDir}\0${commit}`; }
+
+function custodyRememberTree(repo, commit, tree) {
+  if (CUSTODY_TREE_BY_COMMIT.size >= CUSTODY_TREE_LIMIT) CUSTODY_TREE_BY_COMMIT.delete(CUSTODY_TREE_BY_COMMIT.keys().next().value);
+  CUSTODY_TREE_BY_COMMIT.set(custodyTreeKey(repo, commit), tree);
+}
+
 function custodyCandidate(repo) {
+  const resolved = custodyHeadFromFiles(repo);
+  if (resolved !== null) {
+    const known = CUSTODY_TREE_BY_COMMIT.get(custodyTreeKey(repo, resolved));
+    if (known !== undefined) return { commit: resolved, tree: known };
+  }
   // One `git rev-parse` answers both revisions (one process instead of two), so the commit and the tree it names
   // come from the same read of HEAD. Anything but exactly two object ids -- an unborn HEAD, a failure, an
   // unexpected shape -- takes the original pair of calls below, which keep their exact outcomes and errors.
   try {
     const lines = gitText(repo.primaryRoot, ["rev-parse", "HEAD", "HEAD^{tree}"]).split("\n");
-    if (lines.length === 2 && lines.every((line) => CUSTODY_OID_LINE.test(line))) return { commit: lines[0], tree: lines[1] };
+    if (lines.length === 2 && lines.every((line) => CUSTODY_OID_LINE.test(line))) {
+      custodyRememberTree(repo, lines[0], lines[1]);
+      return { commit: lines[0], tree: lines[1] };
+    }
   } catch { /* falls through to the unchanged sequence */ }
   let commit;
   try { commit = gitText(repo.primaryRoot, ["rev-parse", "HEAD"]); } catch (error) {
@@ -2193,32 +2282,54 @@ function custodyCandidate(repo) {
 }
 
 // The repository's TOPOLOGY (physical start, common directory, primary root, object format and the primary-worktree
-// proof) is observed once per registry boundary entry instead of on every custody inspection: the boundary callback
-// runs synchronously under the registry lock and nothing inside it re-homes the repository, while the part that does
-// change inside a boundary -- the HEAD commit and tree, moved by a host commit -- is read from git on EVERY
-// inspection, never memoized. A memoized topology is re-validated against the filesystem on each use and dropped
-// (full rediscovery, which throws as before) the moment its directories are no longer the physical ones observed.
-let custodyTopologyScope = null;
-export function withCustodyTopologyScope(operation) {
-  if (custodyTopologyScope !== null) return operation();
-  custodyTopologyScope = new Map();
-  try { return operation(); } finally { custodyTopologyScope = null; }
+// proof) is observed once per process instead of on every custody inspection (it used to live only for one registry
+// boundary entry, and the profile of a Windows dispatch still showed hundreds of discovery starts). The part that
+// does change -- the HEAD commit and tree, moved by a host commit -- is read from the files git reads on EVERY
+// inspection (custodyCandidate), never memoized. A memoized topology is re-validated against the filesystem on each
+// use: its common directory and primary root must still be the physical directories observed, and the `.git` / `HEAD`
+// entries of every directory from the start up to the primary root must carry the identities observed (a nested
+// repository created below a memoized start changes the answer of git's upward search). Anything else drops the memo
+// and takes the full rediscovery, which throws as before.
+const custodyTopologyMemo = new Map();
+const CUSTODY_TOPOLOGY_LIMIT = 64;
+// Kept as the boundary entry point of the registry: the memo no longer ends with the scope, so it is a pass-through.
+export function withCustodyTopologyScope(operation) { return operation(); }
+
+function custodyEntryIdentity(path) {
+  try {
+    const info = lstatSync(path, { bigint: true });
+    return `${info.dev}:${info.ino}:${info.isDirectory() ? "d" : info.isFile() ? "f" : info.isSymbolicLink() ? "l" : "o"}`;
+  } catch { return "-"; }
+}
+
+function custodyTopologyWitness(start, primaryRoot) {
+  if (!isInside(primaryRoot, start)) return null;
+  const rows = [];
+  for (let directory = start; ; directory = dirname(directory)) {
+    rows.push(`${custodyEntryIdentity(directory)}|${custodyEntryIdentity(join(directory, ".git"))}|${custodyEntryIdentity(join(directory, "HEAD"))}`);
+    if (directory === primaryRoot || dirname(directory) === directory) break;
+  }
+  return rows.join("\n");
 }
 
 function custodyTopology(startPath) {
-  const scope = custodyTopologyScope;
-  if (scope === null) return discoverRepository(startPath);
   const start = assertExistingDirectoryPhysical(startPath, "repository path");
-  const memo = scope.get(start);
+  const key = `${start}\0${process.env.GIT_CEILING_DIRECTORIES ?? ""}`;
+  const memo = custodyTopologyMemo.get(key);
   if (memo) {
     try {
-      assertExistingDirectoryPhysical(memo.commonDir, "git common directory");
-      assertExistingDirectoryPhysical(memo.primaryRoot, "primary checkout");
-      return memo;
-    } catch { scope.delete(start); }
+      assertExistingDirectoryPhysical(memo.repo.commonDir, "git common directory");
+      assertExistingDirectoryPhysical(memo.repo.primaryRoot, "primary checkout");
+      if (custodyTopologyWitness(start, memo.repo.primaryRoot) === memo.witness) return memo.repo;
+    } catch { /* dropped below; the rediscovery decides */ }
+    custodyTopologyMemo.delete(key);
   }
   const repo = discoverRepository(start);
-  scope.set(start, repo);
+  const witness = custodyTopologyWitness(start, repo.primaryRoot);
+  if (witness !== null) {
+    if (custodyTopologyMemo.size >= CUSTODY_TOPOLOGY_LIMIT) custodyTopologyMemo.delete(custodyTopologyMemo.keys().next().value);
+    custodyTopologyMemo.set(key, { repo, witness });
+  }
   return repo;
 }
 

@@ -1957,21 +1957,22 @@ function countGitSpawns(operation) {
   return calls;
 }
 
-check("D91-01 inside a topology scope the topology is observed once and HEAD on every custody inspection; outside one nothing is memoized", () => {
+// C19I-W241 restates D91-01 in place: the topology memo now lives for the process (re-validated on every use) and an unchanged
+// HEAD is answered from the files git reads, so the repeated starts it used to count are gone; the answers stay identical.
+check("D91-01 the topology is observed once per process and an unchanged HEAD costs no git start, inside a scope, a nested one and outside", () => {
   const { primary } = repoFixture();
   const root = realpathSync(primary);
   const results = [];
+  const cold = countGitSpawns(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
+  assert.equal(cold.topology, 1, "the first inspection discovers the topology");
+  assert.equal(cold.head, 1, "and reads HEAD and its tree from git (a commit not seen before)");
   const outside = countGitSpawns(() => { for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root)); });
-  assert.equal(outside.topology, 3, "outside a scope every inspection discovers the topology (unchanged behaviour)");
-  assert.equal(outside.head, 3);
+  assert.deepEqual(outside, { topology: 0, head: 0, other: 0 }, "outside a scope nothing is rediscovered and an unchanged HEAD starts no git process");
   const inside = countGitSpawns(() => withCustodyTopologyScope(() => {
     for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root));
     withCustodyTopologyScope(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
   }));
-  assert.equal(inside.topology, 1, "inside a scope (and a nested one) the topology is observed exactly once");
-  assert.equal(inside.head, 4, "HEAD is read on every inspection, never memoized");
-  const after = countGitSpawns(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
-  assert.equal(after.topology, 1, "the scope ended with the outermost operation: nothing is remembered after it");
+  assert.deepEqual(inside, { topology: 0, head: 0, other: 0 }, "inside a scope (and a nested one) the same holds");
   for (const result of results) assert.deepEqual(result, results[0], "scoped and unscoped inspections return the same repository binding");
 });
 
