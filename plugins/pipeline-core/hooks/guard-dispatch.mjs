@@ -90,6 +90,8 @@ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, res
 // run first, and on Windows loading them is part of the time the host's hook timeout counts. performance.timeOrigin is the epoch
 // millisecond at which the process started.
 const HOOK_ENTRY_MS = Math.round(performance.timeOrigin);
+// GD73: the one admission budget of this hook (the queue preparation and the host-state preparation share it).
+const ADMISSION_BUDGET_MS = 300000;
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
@@ -958,7 +960,9 @@ if (isDirectInvocation(import.meta.url)) {
     if(productive.length===1) {
       const parsed=parseNativeGoldfishBriefing(productive[0].dispatch.prompt);
       if(parsed.ok&&parsed.binding.itemDelivery)governed=prepareGovernedItemQueue({root:courseRoot,itemDelivery:parsed.binding.itemDelivery,
-        candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths});
+        candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths,
+        // E4: the queue preparation waits for a sibling launch's registry lock within this hook's admission deadline.
+        admissionDeadline:{startMs:HOOK_ENTRY_MS,budgetMs:ADMISSION_BUDGET_MS}});
       // PF-55: a dispatch refused by any later check leaves the queue as it was, never a phantom row.
       if(governed.written){
         const written=governed.written,sliceId=parsed.binding.itemDelivery.sliceId;
@@ -1107,7 +1111,7 @@ if (isDirectInvocation(import.meta.url)) {
             admissionProgress("prepare-attempt");
             const attempt = prepareNativeGoldfishHostState({
               root: rootDir, runner: nativeRunner, input,
-              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
+              admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: ADMISSION_BUDGET_MS },
               subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
             });
             envelopeFailedPath = lastWindowsAuthorityFailedPath();

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { createHash } from "node:crypto";
@@ -1828,6 +1828,49 @@ const cases = [
     calls=0;
     assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw Object.assign(new Error('x'),{code:'NGHS-OTHER'});},null,{sleep,now}),error=>error.code==='NGHS-OTHER');
     assert.equal(calls,1);
+  }},
+
+  { id: "NGHS66", name: "E4 (19g Windows measurement): the governed queue preparation of a second launch waits for the first launch's registry lock within the admission deadline instead of refusing after the 10 s default", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const marker=join(root,'fixture-host','sibling-holds-lock');
+    // The sibling launch: another process holds the registry boundary for 12 s (longer than the old 10 s default).
+    const holder=(ms)=>{
+      rmSync(marker,{force:true});
+      const script=`import {inspectSignedDescriptorCustodyRepository} from ${JSON.stringify(new URL('./worktree-lifecycle.mjs',import.meta.url).href)};`
+        +`import {withSessionAuthorityBoundary} from ${JSON.stringify(new URL('./session-authority-registry.mjs',import.meta.url).href)};`
+        +`import {writeFileSync} from 'node:fs';const repository=inspectSignedDescriptorCustodyRepository(${JSON.stringify(root)});`
+        +`withSessionAuthorityBoundary({repository},()=>{writeFileSync(${JSON.stringify(marker)},'held');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${ms});});`;
+      const child=spawn(process.execPath,['--input-type=module','-e',script],{stdio:'ignore'});
+      const until=Date.now()+20000;while(!existsSync(marker)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);
+      assert.ok(existsSync(marker),'the sibling took the lock');
+      return child;
+    };
+    // With minutes left on the admission deadline the second launch waits the sibling out and prepares its row.
+    let child=holder(12000);
+    const started=Date.now();
+    const waited=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now(),budgetMs:300000}}));
+    assert.equal(waited.status,'required',JSON.stringify(waited));
+    assert.ok(Date.now()-started>=10000,`it waited past the old 10 s default (${Date.now()-started} ms)`);
+    child.kill();
+    // With almost nothing left of the deadline it still refuses typed, and nothing is written.
+    child=holder(12000);
+    try{
+      const refused=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-2'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now()-299500,budgetMs:300000}}));
+      assert.equal(refused.status,'refused');assert.equal(refused.code,'SDC-LOCK-HELD',JSON.stringify(refused));
+      assert.equal(resolveGovernedItemQueue({root}).queue.slices.some(row=>row.id==='ITEM-AC-2'),false,'a refused preparation writes no row');
+    }finally{child.kill();}
+  })},
+
+  { id: "NGHS67", name: "E4: both admission routes hand their deadline to the governed queue preparation (guard-dispatch and the native host-state preparation)", run: () => {
+    const guard=readFileSync(new URL('../hooks/guard-dispatch.mjs',import.meta.url),'utf8');
+    assert.match(guard,/prepareGovernedItemQueue\(\{[^)]*admissionDeadline:\{startMs:HOOK_ENTRY_MS,budgetMs:ADMISSION_BUDGET_MS\}\}\)/su);
+    const state=readFileSync(new URL('./native-goldfish-host-state.mjs',import.meta.url),'utf8');
+    assert.match(state,/writeScope:binding\.allowedPaths,admissionDeadline,publishRetry:dependencies\.publishRetry\}\)/u);
+    assert.match(state,/return retryPublishWhileLockHeld\(entered=>withSessionAuthorityBoundary\(\{repository\},\(\)=>\{\n\s*entered\.value=true;\n\s*const current=nativeManagedCurrentOwner/u);
   }},
 
 ];

@@ -376,7 +376,9 @@
           "NGHS62",
           "NGHS63",
           "NGHS64",
-          "NGHS65"
+          "NGHS65",
+          "NGHS66",
+          "NGHS67"
         ],
         "maxBytes": 65536
       }

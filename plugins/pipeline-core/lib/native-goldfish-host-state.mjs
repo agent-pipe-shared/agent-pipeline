@@ -281,7 +281,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   checkpoint("queue-resolve");
   const deliveryQueue = binding.itemDelivery
     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
-      candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
+      candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths,admissionDeadline,publishRetry:dependencies.publishRetry})
     : resolveGovernedItemQueue({ root: root ?? input.cwd ?? process.cwd() });
   if (deliveryQueue.written) written.push(deliveryQueue.written);
   if (deliveryQueue.status === "refused") return { ...fail(deliveryQueue.code), ...(deliveryQueue.reason ? { reason: deliveryQueue.reason } : {}), ...(deliveryQueue.repair ? { repair: deliveryQueue.repair } : {}) };
@@ -1143,7 +1143,7 @@ export function orderAndCoverAdmittedSlice(raw,sliceId,baseCommit) {
 /** Automatic approved-course continuation. Selection metadata cannot approve a
  * plan or mint a requester; the Source observers and original bytes do both
  * checks before any lifecycle write under the existing authority lock. */
-export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope}={}) {
+export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope,admissionDeadline=null,publishRetry}={}) {
   try {
     // Critic F1 (PF-47): every refusal names its cause and the repair, so the guard never falls back to a transport text.
     const regenerate='regenerate the binding at the current HEAD with dispatch-briefing.mjs binding and paste its block unchanged';
@@ -1156,7 +1156,9 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT',reason:`the binding names candidate ${String(candidate?.commit).slice(0,12)}, HEAD is ${String(repository.candidate?.commit).slice(0,12)}, and the commits between touch its paths`,repair:regenerate};
     if(!Array.isArray(writeScope)||!writeScope.length||writeScope.some(path=>!normalizeScope(path).ok||!itemDelivery.checks.some(check=>check.dependencies.includes(path))))
       return {status:'refused',code:'SQ-ITEM-SCOPE-INVALID',reason:'an allowed path is missing, not repository-relative, or not a dependency of the item check',repair:regenerate};
-    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+    // E4 (Windows 19g measurement): a second launch in the same reply met the first launch's lock here and gave up after the 10 s default,
+    // although the admission deadline had minutes left. With an admission deadline the wait is what remains of it (retryPublishWhileLockHeld).
+    return retryPublishWhileLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
       entered.value=true;
       const current=nativeManagedCurrentOwner(repository);
       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
@@ -1236,7 +1238,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue). A working copy that did not exist before is restored as absent.
       const workingBefore=preimage&&!(queueSource.source==='handover'&&queueSource.workingSha256===null);
       return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256}};
-    }));
+    }),admissionDeadline,publishRetry);
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
 }
 

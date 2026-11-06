@@ -1168,8 +1168,12 @@ manualCheck("GD72 an unchanged retry of a refused Plan dispatch in the same sess
 const ADMISSION_BUDGET_MS = 300000;
 manualCheck("GD73 the admission deadline handed to the host-state preparation is 300000 ms (one literal in the guard)", () => {
   const source = readFileSync(GUARD, "utf8");
-  const found = [...source.matchAll(/admissionDeadline:\s*\{\s*startMs:\s*HOOK_ENTRY_MS,\s*budgetMs:\s*(\d+)\s*\}/gu)].map((match) => Number(match[1]));
-  assert.deepEqual(found, [ADMISSION_BUDGET_MS], `admission deadline literals: ${JSON.stringify(found)}`);
+  // E4 (19g): the queue preparation shares the deadline, so the one literal is a named constant both sites read.
+  const literals = [...source.matchAll(/const ADMISSION_BUDGET_MS = (\d+);/gu)].map((match) => Number(match[1]));
+  assert.deepEqual(literals, [ADMISSION_BUDGET_MS], `admission budget constants: ${JSON.stringify(literals)}`);
+  assert.equal([...source.matchAll(/budgetMs:\s*\d+/gu)].length, 0, "no admission deadline carries its own literal");
+  const sites = [...source.matchAll(/admissionDeadline:\s*\{\s*startMs:\s*HOOK_ENTRY_MS,\s*budgetMs:\s*ADMISSION_BUDGET_MS\s*\}/gu)].length;
+  assert.equal(sites, 2, `the queue preparation and the host-state preparation both read the constant (${sites} sites)`);
 });
 manualCheck("GD74 the shipped hooks.json timeout of the dispatch guard is at least the admission budget plus 20 s", () => {
   const hooks = JSON.parse(readFileSync(join(dirname(GUARD), "hooks.json"), "utf8"));
