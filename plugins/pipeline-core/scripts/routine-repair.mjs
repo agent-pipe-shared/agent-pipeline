@@ -6,7 +6,7 @@
 //
 // D194 / D197: the closed list of repairs the Elephant runs without asking the human. Two verbs only.
 //   list  Read-only. Prints the closed list as JSON.
-//   run   heal | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running | settled-pending-aside
+//   run   heal [--no-goldfish-running] | slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] | stop-failure-aside | move-aside --no-goldfish-running | settled-pending-aside
 //         settled-pending-aside moves aside the pending states of settled dispatches (plus their terminal and integration records and the
 //         stop-failure records that then have no unsettled pending state); heal does the same first.
 //         Each run is retained aside (never deleted) and appended to <git-common-dir>/agent-pipeline/routine-repair-ledger.jsonl.
@@ -33,11 +33,11 @@ function parseRun(argv) {
     flags[name] = value; index += 1;
   }
   if (kind === "move-aside" && flags["no-goldfish-running"] !== true) return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs)" };
-  if (kind !== "move-aside" && flags["no-goldfish-running"]) return { error: "--no-goldfish-running belongs to move-aside only" };
+  if (kind !== "move-aside" && kind !== "heal" && flags["no-goldfish-running"]) return { error: "--no-goldfish-running belongs to move-aside and heal only" };
   if (kind !== "slice-cancel" && (flags.started || flags.class !== undefined)) return { error: "--class and --started belong to slice-cancel only" };
   if (kind !== "slice-cancel" && positional.length) return { error: `unexpected argument ${positional[0].slice(0, 40)}` };
   if (kind === "slice-cancel" && positional.length !== 1) return { error: "slice-cancel needs exactly one <slice id>" };
-  return { request: { kind, root: flags.root, reason: flags.reason, sliceId: positional[0], cancelClass: flags.class, started: flags.started === true } };
+  return { request: { kind, root: flags.root, reason: flags.reason, sliceId: positional[0], cancelClass: flags.class, started: flags.started === true, noGoldfishRunning: flags["no-goldfish-running"] === true } };
 }
 
 export function runRoutineRepairCli(argv, out = (text) => process.stdout.write(text), deps = {}) {

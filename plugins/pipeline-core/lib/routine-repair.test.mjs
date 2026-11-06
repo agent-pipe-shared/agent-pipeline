@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ROUTINE_REPAIRS, classifyInspectFindings, planRoutineRepair, runRoutineRepair } from "./routine-repair.mjs";
+import { runRoutineRepairCli } from "../scripts/routine-repair.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const CLI = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
@@ -365,8 +366,9 @@ test("C19: heal with a member armed leaves the settled pending states and stop-f
   assert.match(first.result.settledPending.deferred.reason, /run heal again/u);
   // Never fully blocking: a member whose dispatch ended without a release stays armed for ever and heal never un-arms it, so "run heal again
   // when nothing is armed" alone would never come true. The deferral also names the one way out for the case that no Goldfish runs.
-  assert.match(first.result.settledPending.deferred.reason, /the way out is: node .*routine-repair\.mjs run move-aside --no-goldfish-running --root <root> --reason "<why>"/u);
-  assert.match(first.result.settledPending.deferred.next, /routine-repair\.mjs run move-aside --no-goldfish-running/u);
+  // C19K-W248 (QG-04, restated in place): the way out is now heal's own --no-goldfish-running form, an agent step (PO 2026-11-06).
+  assert.match(first.result.settledPending.deferred.reason, /run this, an agent step needing no human: node .*routine-repair\.mjs run heal --no-goldfish-running --root <root> --reason "<why>"/u);
+  assert.match(first.result.settledPending.deferred.next, /routine-repair\.mjs run heal --no-goldfish-running/u);
   const idle = stub(withProducer(idleProducer, rowOf(settled, "integrated-by-commit")));
   const second = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: idle.spawn, ...SETTLED_DEPS });
   assert.equal(second.exit, 0, JSON.stringify(second.result));
@@ -374,6 +376,50 @@ test("C19: heal with a member armed leaves the settled pending states and stop-f
   assert.deepEqual(second.result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
   assert.ok(!existsSync(join(commitDir(ap), settled.name)) && !existsSync(join(diagDir(ap), stopName)));
 }));
+
+test("C19K-W248-1: heal --no-goldfish-running with a member left armed moves the registry aside, then retires the settled pending states and heals", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-STALE", { terminal: true });
+  const stopName = writeStopFailure(ap, "6", "D-STALE");
+  const armed = stub(withProducer(armedProducer, rowOf(settled, "integrated-by-commit")));
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r", noGoldfishRunning: true }, { spawn: armed.spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(armed.calls.map((call) => call.args[0]), ["inspect", "move-aside", "inspect", "heal", "inspect"]);
+  assert.ok(armed.calls[1].args.includes("--no-goldfish-running"));
+  assert.equal(result.settledPending.deferred, undefined);
+  assert.equal(result.settledPending.staleMemberMoveAside.code, "moved-aside");
+  assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+  assert.ok(!existsSync(join(commitDir(ap), settled.name)) && !existsSync(join(diagDir(ap), stopName)));
+}));
+
+test("C19K-W248-2: without --no-goldfish-running heal still defers and moves nothing aside (a running Goldfish is never disturbed)", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-LIVE", { terminal: true });
+  const armed = stub(withProducer(armedProducer, rowOf(settled, "integrated-by-commit")));
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: armed.spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.ok(!armed.calls.some((call) => call.args[0] === "move-aside"));
+  assert.match(result.settledPending.deferred.next, /run heal --no-goldfish-running/u);
+  assert.ok(existsSync(join(commitDir(ap), settled.name)));
+}));
+
+test("C19K-W248-3: move-aside is not refused for an open item reservation, and a member left armed with nothing else wrong is moved aside", () => withRepo((root) => {
+  const open = { pending: "pending-claude-x.json", sliceId: "S-OPEN", queueState: "ready", settled: null, commit: null };
+  const armed = stub(withProducer(armedProducer, open));
+  const { exit, result } = runRoutineRepair({ kind: "move-aside", root, reason: "r" }, { spawn: armed.spawn });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(armed.calls.map((call) => call.args[0]), ["inspect", "move-aside"]);
+  const idle = stub(withProducer(idleProducer, open));
+  const nothing = runRoutineRepair({ kind: "move-aside", root, reason: "r" }, { spawn: idle.spawn });
+  assert.equal(nothing.exit, 2);
+  assert.equal(nothing.result.code, "RR-OUTSIDE-LIST");
+  assert.match(nothing.result.reason, /no blocking finding/u);
+}));
+
+test("C19K-W248-4: the CLI admits --no-goldfish-running for heal and move-aside only", () => {
+  const out = [];
+  const code = runRoutineRepairCli(["run", "stop-failure-aside", "--root", "x", "--reason", "r", "--no-goldfish-running"], (text) => out.push(text));
+  assert.equal(code, 2);
+  assert.match(JSON.parse(out[0]).reason, /belongs to move-aside and heal only/u);
+});
 
 test("C19: a deferred retirement is not 'clear' for the automatic move-aside, so a registry that still does not read is not moved aside while a dispatch runs", () => withRepo((root, ap) => {
   const settled = writeNamedPending(ap, "D-DONE2", { terminal: true });

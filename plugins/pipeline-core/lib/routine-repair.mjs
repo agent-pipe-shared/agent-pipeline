@@ -18,10 +18,10 @@ const OWNER_ROUTE = fileURLToPath(new URL("../scripts/continuity-owner-route.mjs
 
 /** The closed list (D194). Frozen; nothing registers into it at runtime. */
 export const ROUTINE_REPAIRS = Object.freeze([
-  Object.freeze({ kind: "heal", usage: "run heal --root <root> --reason \"<why>\"", does: "first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside; when its own retirement of settled pending states leaves the registry refusing with nothing open, unsettled or kept, it finishes with the retained-aside move-aside itself (code healed-by-move-aside)" }),
+  Object.freeze({ kind: "heal", usage: "run heal [--no-goldfish-running] --root <root> --reason \"<why>\"", does: "with --no-goldfish-running (you assert that no Goldfish runs; PO 2026-11-06: an agent runs this on its own) a member left armed by a cut-off dispatch no longer defers the retirement for ever: heal moves the registry aside (retained, nothing deleted), retires the settled pending states and heals again (code healed-by-move-aside); without it heal defers and names this exact command. It first releases a session-cleanup binding that an owner-route CLI call (continuity-owner-route.mjs run, D231) left behind when it was killed between bind and release, only when the binding carries an owner-route invocation record and its process is proven dead; then session-authority-repair heal: re-anchors the scratch binding, heals drifted producers with nothing in flight, retires dead locks and stop-failure records aside; when its own retirement of settled pending states leaves the registry refusing with nothing open, unsettled or kept, it finishes with the retained-aside move-aside itself (code healed-by-move-aside)" }),
   Object.freeze({ kind: "slice-cancel", usage: "run slice-cancel <slice id> --class <budget|integrated-elsewhere> [--started] --root <root> --reason \"<why>\"", does: "slice-queue cancel, restricted to the classes budget and integrated-elsewhere", classes: Object.freeze(["budget", "integrated-elsewhere"]) }),
   Object.freeze({ kind: "stop-failure-aside", usage: "run stop-failure-aside --root <root> --reason \"<why>\"", does: "moves each finalizer stop-failure record aside under session-authority-abandoned, unless its dispatch has an unsettled pending state" }),
-  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry; D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
+  Object.freeze({ kind: "move-aside", usage: "run move-aside --no-goldfish-running --root <root> --reason \"<why>\"", does: "session-authority-repair move-aside, only when inspect reports nothing but unknown-registry-entry or native-managed-unknown-native-entry, or only a member left armed (the case heal defers on); an open item reservation does not block it (move-aside does not touch reservations); D203: a producer that is reconcile-refused or drifted (with the registry read refusal naming it) is healed first, and moved aside only when it is still refused after that heal", findings: Object.freeze(["unknown-registry-entry", "native-managed-unknown-native-entry"]) }),
   Object.freeze({ kind: "settled-pending-aside", usage: "run settled-pending-aside --root <root> --reason \"<why>\"", does: "moves aside the pending states (with their authority-terminal and authority-integration siblings) of dispatches that session-authority-repair inspect reports settled (integrated, integrated-by-commit, cancelled), then the stop-failure records that no longer have an unsettled pending state; heal does the same before its delegate, except while a producer reports a bound member armed or running: it then defers the retirement and reports settledPending.deferred (count, reason); run heal again when nothing is armed" }),
 ]);
 const KINDS = new Set(ROUTINE_REPAIRS.map((row) => row.kind));
@@ -204,7 +204,7 @@ function humanStep(kind, args = {}) {
 const outside = (what, kind, args) => refuse("RR-OUTSIDE-LIST", `${what} is not on the closed routine-repair list (${ROUTINE_REPAIRS.map((row) => row.kind).join(", ")})`, `this repair is decided by the human; the original tool's own command: ${humanStep(kind, args)}`);
 
 /** Validates a request and returns the plan; mutates nothing. */
-export function planRoutineRepair({ kind, reason, root, sliceId, cancelClass, started } = {}) {
+export function planRoutineRepair({ kind, reason, root, sliceId, cancelClass, started, noGoldfishRunning } = {}) {
   if (typeof kind !== "string" || !KINDS.has(kind)) return outside(`repair kind ${JSON.stringify(String(kind).slice(0, 40))}`, kind);
   if (!validRoutineReason(reason)) return refuse("RR-REASON-REQUIRED", "a routine repair is recorded with its reason: pass --reason \"<one line, at most 500 characters>\"");
   if (typeof root !== "string" || root === "") return refuse("RR-ARGS", "--root <root> is required");
@@ -213,7 +213,7 @@ export function planRoutineRepair({ kind, reason, root, sliceId, cancelClass, st
     const allowed = ROUTINE_REPAIRS.find((row) => row.kind === kind).classes;
     if (!allowed.includes(cancelClass)) return outside(`cancel class ${JSON.stringify(String(cancelClass).slice(0, 40))}`, kind, { started });
   }
-  return { ok: true, kind, reason: reason.trim(), root, ...(kind === "slice-cancel" ? { sliceId, cancelClass, started: started === true } : {}) };
+  return { ok: true, kind, reason: reason.trim(), root, ...(kind === "slice-cancel" ? { sliceId, cancelClass, started: started === true } : {}), ...(kind === "heal" && noGoldfishRunning === true ? { noGoldfishRunning: true } : {}) };
 }
 
 /** Sorted finding names of one inspect result, each classified; used only by move-aside. */
@@ -264,6 +264,7 @@ function autoMoveAsideAdmitted({ settledPending, findings }) {
   return null;
 }
 const autoMoveAsideReason = (reason) => `heal retired settled pending states and the registry still refuses (namespace drift under an unreleased member); nothing is open or unsettled: ${reason}`.slice(0, 500);
+const healNoGoldfishNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run heal --no-goldfish-running --root <root> --reason "<why>" (only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
 const moveAsideNext = () => `node ${fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url))} run move-aside --no-goldfish-running --root <root> --reason "<why>" (D203: only when no Goldfish runs; the registry is retained aside, nothing is deleted)`;
 
 const parseJson = (stdout) => { try { return JSON.parse(String(stdout).trim().split("\n").filter(Boolean).pop()); } catch { return null; } };
@@ -376,7 +377,7 @@ function deferredSettledPending(commonDir, inspect) {
   // A member whose dispatch ended without releasing it (the hook that admitted it was ended by the host, or the child never reported) stays
   // armed for ever, and heal never un-arms a member: "run heal again when nothing is armed" would then never come true. The text therefore
   // also names the one way out for the case that no Goldfish runs, so a refusal always carries a repair that can really be run.
-  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), the way out is: " + moveAsideNext(), next: moveAsideNext() } };
+  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), run this, an agent step needing no human: " + healNoGoldfishNext(), next: healNoGoldfishNext() } };
 }
 
 /** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
@@ -405,7 +406,15 @@ function execute(plan, ctx) {
       // C19 (AC-127): while any producer reports a bound member armed or running, the retirement is deferred (it drifted the registry
       // namespace under a sibling dispatch on 2026-11-02); a later heal with nothing armed retires the same states.
       if (inspect === null) settledPending = { skipped: "session-authority-repair inspect did not report, so no pending state was classified" };
-      else if (anyMemberInFlight(inspect)) settledPending = deferredSettledPending(commonDir, inspect);
+      else if (anyMemberInFlight(inspect) && plan.noGoldfishRunning !== true) settledPending = deferredSettledPending(commonDir, inspect);
+      else if (anyMemberInFlight(inspect)) {
+        // PO 2026-11-06: the caller asserts that no Goldfish runs, so an armed member is one a cut-off dispatch left behind. The registry
+        // (with that member) is moved aside first, retained, then the settled pending states are retired on the fresh namespace.
+        const moved = delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", `heal --no-goldfish-running: a member left armed deferred the retirement; ${plan.reason}`.slice(0, 500)], root), ctx);
+        if (!moved.ok) return { ...moved, ownerRoute, staleMemberMoveAside: { attempted: true, code: moved.code } };
+        const fresh = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
+        settledPending = fresh === null ? { skipped: "session-authority-repair inspect did not report after the move-aside" } : { ...retireSettledPending(ctx, fresh), staleMemberMoveAside: { attempted: true, code: "moved-aside" } };
+      }
       else settledPending = retireSettledPending(ctx, inspect);
     } catch (error) { settledPending = { skipped: short(error) }; }
     const healed = delegated("session-authority-repair heal", spawn(SAR, ["heal", "--root", root], root), ctx);
@@ -451,7 +460,10 @@ function execute(plan, ctx) {
   const inspectRun = spawn(SAR, ["inspect", "--root", root], root);
   const inspect = parseJson(inspectRun.stdout);
   if (inspectRun.status !== 0 || inspect === null) return refuse("RR-INSPECT-FAILED", "session-authority-repair inspect did not report, so no finding can be classified", `node ${SAR} inspect --root <root>`);
-  let findings = classifyInspectFindings(inspect);
+  // PO 2026-11-06: an open item reservation is no registry finding (move-aside never touches reservations; the caller asserted that no
+  // Goldfish runs), and a member left armed with nothing else wrong is exactly the case heal defers on, so it is admitted here too.
+  let findings = classifyInspectFindings(inspect).filter((row) => row.source !== "reservation");
+  if (!findings.length && anyMemberInFlight(inspect)) return delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", plan.reason], root), ctx);
   if (!findings.length) return refuse("RR-OUTSIDE-LIST", "inspect reports no blocking finding, so there is nothing for move-aside to repair", humanStep("move-aside"));
   if (findings.some((row) => !row.allowed) && onlyReconcileRefused(findings)) {
     // D203: heal first; only a producer that heal did not resolve is moved aside.
