@@ -1200,6 +1200,11 @@
       "disposition": "required"
     },
     {
+      "name": "native-goldfish-host-stop-pair-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "native-goldfish-host-stop-read-scope-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs",
       "disposition": "required"

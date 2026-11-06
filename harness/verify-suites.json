@@ -4655,6 +4655,36 @@
       "file": "plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs",
       "invariantPinned": "The custody inspection resolves HEAD from the ref files with a per-process commit to tree map and falls back to git for every unusual shape, the repository topology is memoized per process with physical re-validation, the Windows private-state ACL batch observes an unchanged tree once, and every answer equals a fresh git or PowerShell call, including a HEAD moved inside one process (C19i w241, AC-108)",
       "nonOverlapNote": "Unique cases: the process-start counts of worktree-lifecycle custody inspection and windows-private-state; worktree-lifecycle and windows-private-state tests pin the answers"
+    },
+    {
+      "name": "native-goldfish-host-stop-pair-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs",
+      "invariantPinned": "Two real SubagentStops of one reply with disjoint scopes both land their host commits, the second rebinding to the HEAD its sibling's commit moved; an advance that touches the slice's own scope still refuses with a named cause; an admission refused after its queue row was written removes only its own row, never a sibling's, and a row it cannot remove is counted and named (C19j w242, AC-108)",
+      "nonOverlapNote": "Unique cases: the simultaneous stop pair and the row-scoped admission rollback; finalizer, host-state and parallel-admission tests pin the single stop and the admission",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGSP1",
+          "NGSP2",
+          "NGSP3",
+          "NGSP3B",
+          "NGSP4",
+          "NGSP5"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "session-authority-registry-leftover-tests",
+      "file": "plugins/pipeline-core/lib/session-authority-registry-leftover.test.mjs",
+      "invariantPinned": "An unindexed registry entry still refuses the strict read and the refusal names its registry-relative path and schema; a record or certificate published before a failed index update is moved aside by the writer that left it, the writer's own temporary files are removed, and moves retry on EPERM/EBUSY through the platform seam (C19j w243, AC-108)",
+      "nonOverlapNote": "Unique cases: leftover prevention and the named refusal; fewer-checks, fsync and lock-wait tests pin the registry reads, durability and the lock"
+    },
+    {
+      "name": "session-authority-repair-aside-tests",
+      "file": "plugins/pipeline-core/scripts/session-authority-repair-aside.test.mjs",
+      "invariantPinned": "session-authority-repair inspect-aside lists every file of one retained aside with size, mtime, schema and whether the aside's own catalogue indexes it and writes nothing; wait rebinds the repository on every iteration and inspect once, so a host commit during a wait no longer reads the lock as unreadable (C19j w243, AC-108)",
+      "nonOverlapNote": "Unique cases: the inspect-aside verb and the rebinding wait; session-authority-repair tests pin the other verbs"
     }
   ]
 }
