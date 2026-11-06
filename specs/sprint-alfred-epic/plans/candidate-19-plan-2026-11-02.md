@@ -445,6 +445,8 @@ Step 0: `session-authority-repair inspect` showed a dead lock owner and the expe
 
 Reading: the latency goals of 19i hold on Windows (admission about 40 to 44 s warm and cold, stop about 53 s, PostToolUse about 10 s). E4 (two launches of one reply both admitted) is not proven on Windows and a new defect leaves the registry unreadable after a simultaneous pair. A fix candidate (19j) needs the entry name first.
 
+Forensics: the peer could not list the registry (native Glob and Read on `.git/agent-pipeline` are refused by `GUARD-READ-TARGET`, correctly). The Elephant then proposed a scratch script shaped to pass the control-plane guard; the peer refused it as a guard circumvention and the Elephant withdrew it (EL-37). On the PO's choice the peer ran the sanctioned `session-authority-repair.mjs move-aside --no-goldfish-running` (aside `20261106101024902-47512958-repair-move-aside`, nothing deleted; the unindexed entry is retained there). Naming the entry needs a sanctioned read-only registry listing in the plugin (19j). A second clean pair is requested to check reproducibility.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
