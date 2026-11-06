@@ -3,7 +3,7 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
 import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, sessionAuthorityLockFacts } from './native-goldfish-host-state.mjs';
+import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, nativeStopWaitBudgetMs, sessionAuthorityLockFacts, withNativeStopReadMemo } from './native-goldfish-host-state.mjs';
 import { admissionProgress } from './admission-progress.mjs';
 import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
 import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
@@ -285,7 +285,11 @@ function markedStopContract(input) {
 export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
   const diagnostic = {};
   let result;
-  try { result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic); }
+  try {
+    // w237: one SubagentStop authenticates the same pending bytes against the registry once per catalogue generation, not once per step.
+    const stopRoute = args?.runner === "claude" && args?.input?.hook_event_name === "SubagentStop";
+    result = stopRoute ? withNativeStopReadMemo(() => finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic)) : finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic);
+  }
   catch (error) {
     recordSubagentStopOutcome(diagnostic, { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: null, detail: exceptionDetail(error) });
     throw error;
@@ -458,11 +462,12 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
   const lockClock = typeof dependencies.lockWait?.now === "function" ? dependencies.lockWait.now : Date.now, lockStartedMs = lockClock();
   let lockWaitMarked = false;
-  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}), onWait: () => { if (!lockWaitMarked) { lockWaitMarked = true; admissionProgress("lock-wait"); } } }); }
+  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256,lockWait:dependencies.lockWait??null}), { budgetMs: nativeStopWaitBudgetMs(), ...(dependencies.lockWait ?? {}), onWait: () => { if (!lockWaitMarked) { lockWaitMarked = true; admissionProgress("lock-wait"); } } }); }
   catch(error) { const failed = failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY", lockClock() - lockStartedMs); if (failed.lock) admissionProgress("lock-held"); return failed; }
   admissionProgress("commit");
 
-  let committed;
+  let committed, commitEntered = !concurrent, commitWaitMarked = false;
+  const commitStartedMs = lockClock();
   try {
     const commit = nativeAuthority => {
       if(nativeAuthority)admission=assessSourceOwnedNativeHostCommit({baseline:state.baseline,final:observation.final,allowedPaths:state.binding.allowedPaths,authority:nativeAuthority});
@@ -475,8 +480,14 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
         final: observation.final, allowedPaths: state.binding.allowedPaths,
         taskId: state.binding.dispatchId, priorAdmission: admission,...(nativeAuthority?{nativeAuthority}:{}) });
     };
-    committed=concurrent?withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256},commit):commit(null);
-  } catch (error) { return { ...withDetail(fail("NGHF-COMMIT-EXCEPTION"), exceptionDetail(error)), commit: "unknown" }; }
+    // w237 (O10): the stop's reads no longer wait for the registry lock, so the first lock it can meet is this write's. It waits for it here (bounded, the
+    // same budget and seam as the terminal prepare), and only a refusal raised before the callback ran is repeated: once the callback ran, Git may have changed.
+    committed=concurrent?retryWhileSessionAuthorityLockHeld(entered=>withSourceOwnedNativeConcurrentCommit({root:physical,pendingSha256:pending.sha256},nativeAuthority=>{entered.value=true;commitEntered=true;return commit(nativeAuthority);}),
+      { budgetMs: nativeStopWaitBudgetMs(), ...(dependencies.lockWait ?? {}), onWait: () => { if (!commitWaitMarked) { commitWaitMarked = true; admissionProgress("lock-wait"); } } }):commit(null);
+  } catch (error) {
+    if (!commitEntered) { const failed = failAt("authority-commit-lock", error, "NGHF-AUTHORITY-RECOVERY", lockClock() - commitStartedMs); if (failed.lock) { admissionProgress("lock-held"); return failed; } }
+    return { ...withDetail(fail("NGHF-COMMIT-EXCEPTION"), exceptionDetail(error)), commit: "unknown" };
+  }
   if (!committed?.ok) return { ...withDetail(fail(committed?.code ?? "NGHF-COMMIT-FAILED"), committed?.detail), commit: committed?.commit ?? null };
 
   let postCommitStage = "attempt-admission";
@@ -505,7 +516,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     postCommitStage = "attempt-terminal-association";
     const terminalAssociation = writeNativeGoldfishAttemptTerminalAssociation({ repoRoot: physical, record: drafted.record, attempt });
     postCommitStage = "authority-terminal-release";
-    const delivery=publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record:drafted.record});
+    const delivery=publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record:drafted.record,lockWait:dependencies.lockWait??null});
     const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256}:null;
     let checks = null;
     if (deliveryResult?.checkStatus) {
@@ -549,12 +560,12 @@ function nativeTerminalPublicRead(root,ref){
     return parseStrictJson(bytes);
   }finally{closeSync(fd);}
 }
-function publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record}){
+function publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record,lockWait=null}){
   const repository=inspectSignedDescriptorCustodyRepository(physical);
   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-terminal-repository');
   const terminalHandle=Object.freeze({});nativeAuthorityTerminals.set(terminalHandle,{repository,pendingSha256:pending.sha256,state,stored,published,terminalAssociation,record});
-  inspectNativeGoldfishAuthorityTerminal({repository,terminalHandle});
-  return completeNativeGoldfishAuthority({repository,terminalHandle});
+  // w237: no inspection here. completeNativeGoldfishAuthority makes the identical first call on the same handle with nothing written in between.
+  return completeNativeGoldfishAuthority({repository,terminalHandle,lockWait});
 }
 export function inspectNativeGoldfishAuthorityTerminal({repository,terminalHandle}){
   const entry=nativeAuthorityTerminals.get(terminalHandle);
@@ -568,7 +579,10 @@ export function inspectNativeGoldfishAuthorityTerminal({repository,terminalHandl
     ||association.terminalSha256!==entry.published.sha256||association.terminalPath!==entry.published.target)throw nativeManagedFault('native-terminal-linkage');
   const observed=readNativeGoldfishHostObservation({commonDir:repository.commonDir,taskId:record.taskId,candidateCommit:record.candidateCommit,record,recordBytes:nativeAuthoredRecordBytes(record)});
   if(!observed.ok||observed.sha256!==entry.stored.sha256)throw nativeManagedFault('native-terminal-observation-cas');
-  const pending=readNativeGoldfishPending({commonDir:repository.commonDir,runner:entry.state.runner,sessionId:entry.state.sessionId,correlationId:entry.state.toolUseId});
-  if(!pending.ok||pending.sha256!==entry.pendingSha256)throw nativeManagedFault('native-terminal-pending-cas');
+  // w237: a compare-and-swap on the pending file's bytes. The stop authenticated exactly these bytes against the registry when it read them; asking the
+  // registry again here (a lock cycle on Windows) added nothing to a digest comparison, and the lock-held writes that follow re-scan the registry.
+  let currentPendingSha256=null;
+  try{const internals=nativeGoldfishHostStateInternals;currentPendingSha256=internals.readPrivate(repository.commonDir,internals.key('pending',entry.state.runner,`${entry.state.sessionId}\0${entry.state.toolUseId}`)).sha256;}catch{currentPendingSha256=null;}
+  if(currentPendingSha256!==entry.pendingSha256)throw nativeManagedFault('native-terminal-pending-cas');
   return Object.freeze({pendingSha256:entry.pendingSha256,terminalAssociationSha256:entry.terminalAssociation.sha256,observationSha256:observed.sha256,recordSha256:entry.published.sha256});
 }

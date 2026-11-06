@@ -1896,17 +1896,27 @@ const cases = [
       assert.ok(existsSync(marker),'the sibling took the lock');
       return child;
     };
-    // (a) A lock held for a few seconds is waited out: the read succeeds instead of answering "pending state missing" at once.
+    // w237 (O10, QG-04 extension: the two original halves below are kept, now on the exclusive route they exercise): the stop's read goes through the
+    // lock-free read scope, so a sibling holding the lock does not delay it at all. The exclusive boundary (the route taken when the read scope cannot
+    // answer, e.g. a catalogue that needs the entry heal) is forced by a generation witness that throws.
+    const exclusive=lockWait=>runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'native-session-one',correlationId:'native-tool-one',generationOf:()=>{throw new Error('forced exclusive route');},...(lockWait?{lockWait}:{})}));
     let child=holder(5000);
     try{
-      const started=Date.now(),waited=read();
+      const started=Date.now(),unblocked=read();
+      assert.equal(unblocked.ok,true,JSON.stringify(unblocked));
+      assert.ok(Date.now()-started<2500,`the read did not wait for the sibling (${Date.now()-started} ms)`);
+    }finally{child.kill();}
+    // (a) On the exclusive route a lock held for a few seconds is waited out: the read succeeds instead of answering "pending state missing" at once.
+    child=holder(5000);
+    try{
+      const started=Date.now(),waited=exclusive();
       assert.equal(waited.ok,true,JSON.stringify(waited));
       assert.ok(Date.now()-started>=2500,`the read waited for the sibling (${Date.now()-started} ms)`);
     }finally{child.kill();}
-    // (b) A lock still held when the budget ends is reported with the reason AND the holder facts.
+    // (b) On the exclusive route a lock still held when the budget ends is reported with the reason AND the holder facts.
     child=holder(12000);
     try{
-      const stuck=read({budgetMs:300});
+      const stuck=exclusive({budgetMs:300});
       assert.equal(stuck.ok,false);assert.equal(stuck.code,'NGHS-PENDING-MISSING');assert.equal(stuck.reason,'registry-lock-held');
       assert.equal(stuck.lock?.errorCode,'SDC-LOCK-HELD',JSON.stringify(stuck));
       assert.equal(stuck.lock.holderPid,child.pid,'the record names the holder process');

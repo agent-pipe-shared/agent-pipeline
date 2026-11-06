@@ -444,7 +444,12 @@ export function sessionAuthorityLockFacts(error, { waitedMs = null, root = null 
   return { errorCode: slug(error.code), reason: slug(error.reason), waitedMs: whole(waitedMs), holderPid: whole(observed?.pid), acquiredAt: at,
     owner: ["live", "dead", "unknown"].includes(observed?.owner) ? observed.owner : null, ageSeconds: whole(observed?.ageSeconds) };
 }
-export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait } = {}) {
+// w237 (O10): the read is a READ. An item-delivery state is authenticated against the registry under withSessionAuthorityReadScope (the catalogue
+// generation read before and after, no exclusive lock), so a sibling hook holding the lock no longer blocks it and the stop no longer holds the lock
+// across six reads. A generation that moves during the scan is repeated within the budget; a scan the read scope cannot answer (a catalogue that
+// needs the entry heal, a budget spent on drift) falls back to the exclusive boundary of the E5 route below, which waits for the lock and heals.
+// `generationOf` is the registry's own witness seam (withSessionAuthorityReadScope), kept so a test can move the generation deterministically.
+export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait, generationOf = null } = {}) {
   if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return fail("NGHS-READ-INPUT");
   const clock = typeof lockWait?.now === "function" ? lockWait.now : Date.now, startedMs = clock();
   let stored = null, marked = false;
@@ -460,8 +465,8 @@ export function readNativeGoldfishPending({ commonDir, runner, sessionId, correl
       if (!nativeStateSchema(state.schema) || state.runner !== runner
         || state.sessionId !== sessionId || state.toolUseId !== correlationId
         || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
-      return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored, entered), sha256: stored.sha256 };
-    }, { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}), onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
+      return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored, entered, { readScope: true, generationOf, lockWait }), sha256: stored.sha256 };
+    }, { budgetMs: nativeStopWaitBudgetMs(), ...(lockWait ?? {}), onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
   } catch(error) {
     const lock = sessionAuthorityLockFacts(error, { waitedMs: clock() - startedMs, root: stored?.value?.root });
     if (lock) admissionProgress("lock-held");
@@ -624,30 +629,89 @@ function effectiveNativePendingState(read,entry) {
   const latest=nativeScopeAmendments(read,entry,operation).at(-1);
   return latest?{...entry.value,binding:{...entry.value.binding,allowedPaths:latest.value.allowedPaths},delivery:{...entry.value.delivery,writeScope:latest.value.writeScope}}:entry.value;
 }
-function authenticatedNativePendingState(stored, entered = { value: false }) {
+// w237: the authentication of an item-delivery pending state has two halves. The registry half (owner, native inventory scan, the Source member join,
+// the scope amendments) needs a registry token: the exclusive boundary or, for a read, the read scope. The queue half (the governed queue rows and the
+// plan approval, plain files) needs none, is always read fresh, and runs on the registry half's answer.
+function nativePendingRegistryState(stored,repository,boundary) {
+  const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
+  const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===stored.sha256&&row.relativePath.startsWith('pending-'));
+  if(!entry)throw nativeManagedFault('native-item-scope-pending-unowned');
+  const selected=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256);
+  inspectSourceOwnedNativeDispatchPendingRecord({boundary,producerPort:port,operationHandle:selected.handle});
+  return effectiveNativePendingState(read,entry);
+}
+function nativePendingQueueJoin(state,repository) {
+  const governed=resolveGovernedItemQueue({root:repository.primaryRoot});
+  const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===state.delivery.sliceId):null;
+  if(!item||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(state.delivery.writeScope))throw nativeManagedFault('native-item-scope-queue-recovery-required');
+  if(!state.binding.itemDelivery)return state; // retained basic legacy contract
+  const original=state.binding.itemDelivery,approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
+  if(item.delivery.itemId!==original.itemId||item.delivery.baseCommit!==state.binding.candidateCommit||approval.status!=='eligible'
+    ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)
+    ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(original.checks))throw nativeManagedFault('native-item-original-queue-binding-drift');
+  // Governed runtime metadata may gain another independent item. This Source
+  // member/original-approval join authorizes only its current queue bytes;
+  // every other prelaunch untracked file remains immutable. The queue is
+  // never thereby admitted as a product write or a completed dependency.
+  // AC-108: kept for pending states bound before the queue moved under the Git common directory, whose baseline lists the tracked queue path as an untracked file that the binding itself rewrote.
+  return {...state,baseline:{...state.baseline,untracked:state.baseline.untracked.map(row=>row.path===state.delivery.queuePath?{...row,sha256:governed.sha256}:row)}};
+}
+// w237 (O10): the stop-side registry read. withSessionAuthorityReadScope refuses a scan whose catalogue generation moved (SDC-AUTHORITY-CAS /
+// read-generation-drift); that one refusal is repeated within the budget, any other error ends the attempt so the caller can fall back to the
+// exclusive boundary (which also heals a catalogue the read scope must not migrate).
+function withStopReadScope({repository,generationOf=null,lockWait=null},callback) {
+  const now=typeof lockWait?.now==='function'?lockWait.now:()=>Date.now(),sleep=typeof lockWait?.sleep==='function'?lockWait.sleep:ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
+  const deadline=now()+(Number.isSafeInteger(lockWait?.budgetMs)?lockWait.budgetMs:nativeStopWaitBudgetMs());let delay=25;
+  for(;;){
+    try{return withSessionAuthorityReadScope({repository,generationOf},callback);}
+    catch(error){
+      const drift=error?.code==='SDC-AUTHORITY-CAS'&&error?.reason==='read-generation-drift';
+      if(!drift||now()+delay>deadline)throw error;
+      sleep(delay);delay=Math.min(delay*2,1000);
+    }
+  }
+}
+// w237: within ONE stop the registry half of an authentication is not repeated for the same pending bytes while the catalogue generation (the digest of
+// the catalogue record reference, republished by every producer or member change, this process's own advance and release included) is unchanged.
+// Armed only by the SubagentStop finalizer for the duration of one stop; outside it nothing is kept. The queue half is never reused.
+let stopReadMemo=null;
+// w237: the waits of one stop (the read, the terminal prepare, the commit, both completion writes) each used to get their own 90 s; with the reads no
+// longer waiting there are more of them after the read phase. They now share one ceiling inside the 300 s SubagentStop hook budget, counted from the
+// start of the stop, so a stop that cannot complete still has time to report the holder and write its stop-failure record before the host ends it.
+export const NATIVE_GOLDFISH_STOP_WAIT_CEILING_MS = 240_000;
+let stopWaitDeadlineMs=null;
+/** The budget one wait of the stop may use: the per-wait `requested` budget, cut to what is left of the stop's ceiling. Outside a stop it is `requested`. */
+export function nativeStopWaitBudgetMs(requested=NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS) {
+  return stopWaitDeadlineMs===null?requested:Math.max(0,Math.min(requested,stopWaitDeadlineMs-Date.now()));
+}
+export function withNativeStopReadMemo(callback) {
+  if(stopReadMemo!==null)return callback();
+  stopReadMemo=new Map();stopWaitDeadlineMs=Date.now()+NATIVE_GOLDFISH_STOP_WAIT_CEILING_MS;
+  try{return callback();}finally{stopReadMemo=null;stopWaitDeadlineMs=null;}
+}
+/** The registry half under the read scope, or null when the read scope could not answer (the caller then takes the exclusive boundary). */
+function nativePendingStateUnderReadScope(stored,repository,{generationOf=null,lockWait=null}={}) {
+  const memoKey=`${repository.commonDir}\0${stored.sha256}`,look=generationOf??(()=>readSessionAuthorityGeneration({repository}));
+  try{
+    const memo=stopReadMemo?.get(memoKey);
+    if(memo&&look()===memo.generation)return structuredClone(memo.state);
+    admissionProgress("pending-auth");
+    const {result,generation}=withStopReadScope({repository,generationOf,lockWait},boundary=>nativePendingRegistryState(stored,repository,boundary));
+    stopReadMemo?.set(memoKey,{generation,state:structuredClone(result)});
+    return result;
+  }catch{return null;}
+}
+function authenticatedNativePendingState(stored, entered = { value: false }, options = {}) {
   if(!stored.value.delivery)return stored.value;
   const repository=inspectSignedDescriptorCustodyRepository(stored.value.root);
+  if(options.readScope===true){
+    const state=nativePendingStateUnderReadScope(stored,repository,options);
+    if(state!==null)return nativePendingQueueJoin(state,repository);
+  }
+  admissionProgress("pending-auth");
   return withSessionAuthorityBoundary({repository},boundary=>{
     entered.value=true;
-    const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
-    const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===stored.sha256&&row.relativePath.startsWith('pending-'));
-    if(!entry)throw nativeManagedFault('native-item-scope-pending-unowned');
-    const selected=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256);
-    inspectSourceOwnedNativeDispatchPendingRecord({boundary,producerPort:port,operationHandle:selected.handle});
-    const state=effectiveNativePendingState(read,entry),governed=resolveGovernedItemQueue({root:repository.primaryRoot});
-    const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===state.delivery.sliceId):null;
-    if(!item||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(state.delivery.writeScope))throw nativeManagedFault('native-item-scope-queue-recovery-required');
-    if(!state.binding.itemDelivery)return state; // retained basic legacy contract
-    const original=state.binding.itemDelivery,approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
-    if(item.delivery.itemId!==original.itemId||item.delivery.baseCommit!==state.binding.candidateCommit||approval.status!=='eligible'
-      ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)
-      ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(original.checks))throw nativeManagedFault('native-item-original-queue-binding-drift');
-    // Governed runtime metadata may gain another independent item. This Source
-    // member/original-approval join authorizes only its current queue bytes;
-    // every other prelaunch untracked file remains immutable. The queue is
-    // never thereby admitted as a product write or a completed dependency.
-    // AC-108: kept for pending states bound before the queue moved under the Git common directory, whose baseline lists the tracked queue path as an untracked file that the binding itself rewrote.
-    return {...state,baseline:{...state.baseline,untracked:state.baseline.untracked.map(row=>row.path===state.delivery.queuePath?{...row,sha256:governed.sha256}:row)}};
+    return nativePendingQueueJoin(nativePendingRegistryState(stored,repository,boundary),repository);
   });
 }
 /** Current reservations are read from the real Source member, including additive
@@ -983,27 +1047,40 @@ function publishNativeCodexAuthorityAssociation(commonDir,name,association){
 function recoverNativeAuthorityOperation({repository,owner,operation,port,boundary}){
   if(operation.memberHandle)return;
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
-  const matches=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}))
+  // w237: one stateRead for all members (D182's batched form, the same rows and the same refusal for a ref that is not current) instead of one per member.
+  const matches=inspectSourceOwnedSessionAuthorityMemberRecords({boundary,producerPort:port,memberRefs:producer.record.members.map(row=>row.memberRef)})
     .filter(row=>row.record.bindingSha256===operation.bindingSha256&&row.record.phase!=='released');
   if(matches.length!==1)throw nativeManagedFault('native-authority-recovery-member');
   const recovered=recoverSessionAuthorityMember({boundary,producerPort:port,operationHandle:operation.handle,expectedMemberRef:matches[0].memberRef});
   operation.memberHandle=recovered.memberHandle;operation.memberRef=recovered.memberRef;
 }
-export function prepareNativeGoldfishAuthorityTerminal({repository,pendingSha256}){
+export function prepareNativeGoldfishAuthorityTerminal({repository,pendingSha256,generationOf=null,lockWait=null}){
   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
   const owner=nativeAuthorityOwner(repository);nativeAuthorityScan(owner);
   const operation=[...owner.operations.values()].find(o=>o.pendingSha256===pendingSha256);
   if(!operation)throw nativeManagedFault('native-authority-terminal-pending-missing');
   const port=createNativeGoldfishAuthorityProducerPort({repository});
-  return withSessionAuthorityBoundary({repository},boundary=>{recoverNativeAuthorityOperation({repository,owner,operation,port,boundary});return {status:'held'};});
+  const recover=boundary=>{recoverNativeAuthorityOperation({repository,owner,operation,port,boundary});return {status:'held'};};
+  // w237 (O10): the recovery only reads the registry and mints an in-process member handle (recoverSessionAuthorityMember writes nothing), so it runs
+  // under the read scope. The handle carries the member ref it read; the advance and the release that use it are compare-and-swap on that ref under
+  // the lock, so a registry that moved in between is refused there, as it was when this ran in its own earlier boundary. A scope that cannot answer
+  // takes the exclusive boundary as before; a handle minted by an attempt that failed is forgotten first.
+  const forget=()=>{operation.memberHandle=undefined;operation.memberRef=undefined;};
+  try{forget();return withStopReadScope({repository,generationOf,lockWait},boundary=>{forget();return recover(boundary);}).result;}
+  catch{forget();}
+  return withSessionAuthorityBoundary({repository},recover);
 }
-export function completeNativeGoldfishAuthority({repository,terminalHandle}){
+export function completeNativeGoldfishAuthority({repository,terminalHandle,lockWait=null}){
+  // w237: the two write boundaries below wait for a lock a sibling holds (bounded, only a refusal before the callback ran), because the stop's
+  // reads no longer do: the first lock the stop meets after its read phase is the one of its first write.
+  const writeBoundary=callback=>retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{entered.value=true;return callback(boundary);}),
+    {budgetMs:nativeStopWaitBudgetMs(),...(lockWait??{})});
   const terminal=inspectNativeGoldfishAuthorityTerminal({repository,terminalHandle}),owner=nativeAuthorityOwner(repository);
   nativeAuthorityScan(owner);const operation=[...owner.operations.values()].find(o=>o.pendingSha256===terminal.pendingSha256);
   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
   if(!operation?.memberHandle)throw nativeManagedFault('native-authority-recovery-required');
   const port=createNativeGoldfishAuthorityProducerPort({repository});
-  const completed=withSessionAuthorityBoundary({repository},boundary=>{
+  const completed=writeBoundary(boundary=>{
     writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
       terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});
     operation.phase='terminal-observed';const advanced=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=advanced.memberRef;
@@ -1017,7 +1094,7 @@ export function completeNativeGoldfishAuthority({repository,terminalHandle}){
   if(!pending?.binding.itemDelivery)return completed;
   const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate,baseCommit:pending.binding.candidateCommit});
   if(checks.status!=='observed')return {...completed,checkStatus:checks};
-  return withSessionAuthorityBoundary({repository},boundary=>{
+  return writeBoundary(boundary=>{
     const current=nativeManagedCurrentOwner(repository);
     if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association)||current.association.state!=='bound')throw ownerFault('native-item-check-owner',{repository,operation,current,sliceId:pending.delivery?.sliceId});
     const evidence=inspectGovernedItemDeliveryChecks({root:repository.primaryRoot,handle:checks.handle,candidate:repository.candidate,itemDelivery:pending.binding.itemDelivery});
