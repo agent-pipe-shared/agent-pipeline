@@ -25,3 +25,9 @@ test("the patch touches only plugins/pipeline-core/lib/ and plugins/pipeline-cor
   assert.ok(files.includes("plugins/pipeline-core/lib/source-digest-memo.mjs"), "the new source-digest memo module is added");
   assert.ok(files.includes("plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs"), "the new test file is added");
 });
+
+test("the patch carries the continuation: the O8 re-arm on the first strict read and the prune fault handling, each with its case", () => {
+  const text = readFileSync(PATCH, "utf8");
+  for (const needle of ["lazyHeal", "function stateReadOnce", "pruneFault", "before-publication", "C19I-W238-7", "C19I-W238-8"]) assert.ok(text.includes(needle), `missing from the patch: ${needle}`);
+  assert.ok(!/plugins\/pipeline-core\/lib\/native-goldfish-host-state\.test\.mjs/u.test(text.split("\n").filter((line) => line.startsWith("diff --git")).join("\n")), "NGHS36 and its file are untouched (QG-04)");
+});

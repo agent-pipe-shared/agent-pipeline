@@ -1,9 +1,9 @@
 diff --git a/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs b/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs
 new file mode 100644
-index 000000000..9d55f9299
+index 000000000..f2e7762c6
 --- /dev/null
 +++ b/plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,373 @@
 +// SPDX-License-Identifier: SUL-1.0
 +// C19I-W238 (AC-108, PO decision 2026-11-06): the registry makes fewer native observations without giving up a check.
 +// Windows branches run on Linux: the registry's platform seam says win32 and the backend's fake spawn emulates the helper over the real
@@ -14,6 +14,8 @@ index 000000000..9d55f9299
 +//   C19I-W238-4  O3  (ii) installedSourceSha256 reads a source file natively once across processes, and again after any identity change
 +//   C19I-W238-5  Pru settled (released) native-goldfish members older than the newest N leave the walked registry, retained under abandoned
 +//   C19I-W238-6  O9  an override refusal reads the baseline of the override producer only (the registry's test seam counts the reads)
++//   C19I-W238-7  O8  a namespace rewritten outside the registry after the process's first entry is healed by the next boundary's first strict read
++//   C19I-W238-8  Pru a fault in the prune that rides on a release never fails the release and leaves the registry readable
 +import test from "node:test";
 +import assert from "node:assert/strict";
 +import { spawnSync } from "node:child_process";
@@ -29,6 +31,10 @@ index 000000000..9d55f9299
 +import * as backend from "./windows-owned-authority-backend.mjs";
 +import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 +import { createGovernanceScopeController } from "./governance-scope.mjs";
++import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
++import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
++import { integrateNativeGoldfishItemDelivery, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
++import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 +import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
 +
 +const { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } = registry;
@@ -47,10 +53,10 @@ index 000000000..9d55f9299
 +    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
 +    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit course" });
 +    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
-+    prepareApprovedItemCourseFixture({ root });
++    const original = prepareApprovedItemCourseFixture({ root });
 +    const repository = inspectSignedDescriptorCustodyRepository(root);
 +    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
-+    return run({ root, repository });
++    return run({ root, repository, original });
 +  } finally { rmSync(root, { recursive: true, force: true }); }
 +}
 +
@@ -298,8 +304,81 @@ index 000000000..9d55f9299
 +    assert.equal(registry.inspectSessionAuthorityRegistryRead({ repository }).status, "readable", "the registry closes after the planning publication");
 +  } finally { registry.setSessionAuthorityRegistryTestSeam(undefined); rmSync(root, { recursive: true, force: true }); }
 +});
++
++// ---- O8 re-arm ----------------------------------------------------------------------------------------------------------------------------------
++test("C19I-W238-7 (O8) a namespace rewritten outside the registry after the process's first entry is healed by the next boundary's first strict read", linuxOnly, () => fixture(({ root, repository }) => {
++  const producerPort = createSessionAuthorityParticipantPorts({ repository }).find((row) => row.producerId === "onboarding-continuity").port;
++  const read = () => enter(repository, (token) => registry.inspectSourceOwnedSessionAuthorityProducerRecord({ boundary: token, producerPort }));
++  const abandoned = join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
++  const heals = () => (existsSync(abandoned) ? readdirSync(abandoned).filter((name) => name.endsWith("-drift-heal")) : []);
++  assert.equal(read().record.producerId, "onboarding-continuity", "the process's first entry heals and reads");
++  assert.equal(heals().length, 0, "no drift, no heal");
++  // Another writer's bytes for the selected state, as a fold or a git checkout leave them, between two entries of this process.
++  const statePath = join(root, ".claude/pipeline-state.json");
++  writeFileSync(statePath, `${readFileSync(statePath, "utf8")}\n`);
++  let second;
++  try { second = read(); } catch (error) { second = { refused: error?.reason ?? String(error) }; }
++  assert.equal(second.record?.producerId, "onboarding-continuity", `the second entry does not refuse the rewrite: the heal runs again (${JSON.stringify(second)})`);
++  assert.equal(heals().length, 1, "the heal retained the prior producer record under a marker");
++  const marker = JSON.parse(readFileSync(join(abandoned, heals()[0], "heal.json"), "utf8"));
++  assert.ok(marker.healed.some((row) => row.producerId === "onboarding-continuity" && row.namespaces.includes("selected-state")), JSON.stringify(marker));
++  read();
++  assert.equal(heals().length, 1, "a later entry with no further drift heals nothing");
++}));
++
++// ---- prune fault on release ---------------------------------------------------------------------------------------------------------------------
++const hostPrompt = (binding) => `Goldfish briefing\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}\nReturn contract follows.\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n`;
++/** One real native dispatch delivered, finalized and integrated (which releases its member) over a registry that already holds kept+1 settled members, with the prune faulted at `stage`. */
++function releaseWithPruneFault(stage, check) {
++  return fixture(({ root, repository, original }) => {
++    const kept = registry.SESSION_AUTHORITY_SETTLED_MEMBERS_KEPT;
++    seedNativeMembers(repository, kept + 1);
++    const memberFiles = () => readdirSync(join(repository.commonDir, ROOT, "members/native-goldfish")).length;
++    const abandoned = join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
++    const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/original-course"), sessionId: "original-course-owner" });
++    const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-1", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
++    const binding = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: "DELIVER-AC-1", candidateCommit: original.candidate.commit, candidateTree: original.candidate.tree, runner: "claude", role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "sonnet", effort: "medium", rulesetSha: "c".repeat(64), allowedPaths: ["src/change.mjs"], itemDelivery,
++      criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" } };
++    const input = { cwd: root, session_id: "native-session-one", tool_name: "Task", tool_use_id: "native-tool-one", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: hostPrompt(binding), run_in_background: false } };
++    const prepared = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input }));
++    assert.equal(prepared.ok, true, JSON.stringify(prepared));
++    assert.equal(memberFiles(), kept + 2, "the dispatch reserved one member next to the settled ones");
++    // The Goldfish delivered; the finalizer records the authored commit and the integration releases the member.
++    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // delivered\n");
++    const returned = { ...input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: binding.dispatchId, candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Delivered.", changedPaths: ["src/change.mjs"] }) }] } };
++    const finalized = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned }));
++    assert.equal(finalized.status, "authored-commit-recorded", JSON.stringify(finalized));
++    assert.equal(memberFiles(), kept + 2, "nothing is released or archived before the integration");
++    if (stage === "marker") { rmSync(abandoned, { recursive: true, force: true }); writeFileSync(abandoned, "not a directory"); }
++    else if (stage !== "none") registry.setSessionAuthorityRegistryTestSeam({ pruneFault: (at) => { if (at === stage) throw Object.assign(new Error("injected prune fault"), { code: "EIO" }); } });
++    try {
++      const integrated = runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: prepared.sha256 }));
++      assert.equal(integrated.status, "integrated", `a prune fault never reports the release as failed (${stage}): ${JSON.stringify(integrated)}`);
++    } finally { registry.setSessionAuthorityRegistryTestSeam(undefined); if (stage === "marker") rmSync(abandoned, { force: true }); }
++    const after = inspectSignedDescriptorCustodyRepository(root); // the authored commit moved HEAD, so the binding is read afresh
++    const read = registry.inspectSessionAuthorityRegistryRead({ repository: after });
++    assert.equal(read.status, "readable", `the registry stays readable (${stage}): ${JSON.stringify(read)}`);
++    return check({ repository: after, memberFiles, kept });
++  });
++}
++test("C19I-W238-8 (prune) a fault in the prune that rides on a release never fails the release and leaves the registry readable; the next prune retries", linuxOnly, () => {
++  releaseWithPruneFault("none", ({ memberFiles, kept }) => assert.equal(memberFiles(), kept, "the control: without a fault the release trims to the newest N"));
++  for (const stage of ["marker", "before-publication"]) {
++    releaseWithPruneFault(stage, ({ repository, memberFiles, kept }) => {
++      assert.equal(memberFiles(), kept + 2, `nothing was archived and every indexed record is where the producer says (${stage})`);
++      const retried = enter(repository, (token) => registry.pruneSettledSessionAuthorityMembers({ boundary: token }));
++      assert.equal(retried.status, "pruned", "the next prune finishes the work");
++      assert.equal(memberFiles(), kept);
++      assert.equal(registry.inspectSessionAuthorityRegistryRead({ repository }).status, "readable");
++    });
++  }
++  releaseWithPruneFault("after-producer-publication", ({ repository, memberFiles, kept }) => {
++    assert.equal(memberFiles(), kept, "the producer already indexes the smaller set, so the archived records stay archived");
++    assert.equal(enter(repository, (token) => registry.pruneSettledSessionAuthorityMembers({ boundary: token })).status, "nothing-to-prune");
++  });
++});
 diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
-index cd25b26b2..31e3e47c9 100644
+index cd25b26b2..b19245bb7 100644
 --- a/plugins/pipeline-core/lib/session-authority-registry.mjs
 +++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
 @@ -9,6 +9,7 @@ import { canonical } from './po-approval-proof.mjs';
@@ -319,7 +398,7 @@ index cd25b26b2..31e3e47c9 100644
 +// it; nothing in production does. Setting it also forgets every per-process memo, as a new process would.
 +let testSeam={platform:undefined,sourceDigestMemoFile:undefined};
 +const isWin=()=>(testSeam.platform??process.platform)==='win32';
-+export function setSessionAuthorityRegistryTestSeam(seam){testSeam={platform:seam?.platform,sourceDigestMemoFile:seam?.sourceDigestMemoFile,onPlanningBaseline:seam?.onPlanningBaseline};sourceDigestMemo.clear();sourceDigestPersisted=null;installedParticipantsMemo=null;entryHealed.clear();}
++export function setSessionAuthorityRegistryTestSeam(seam){testSeam={platform:seam?.platform,sourceDigestMemoFile:seam?.sourceDigestMemoFile,onPlanningBaseline:seam?.onPlanningBaseline,pruneFault:seam?.pruneFault};sourceDigestMemo.clear();sourceDigestPersisted=null;installedParticipantsMemo=null;entryHealed.clear();}
  const SHA=/^[a-f0-9]{64}$/, ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
  const digest=value=>hash(canonical(value));
@@ -382,7 +461,7 @@ index cd25b26b2..31e3e47c9 100644
  }
  
 -export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
-+export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(isWin()?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{entryHeal(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(isWin())nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
++export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(isWin()?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{data.lazyHeal=entryHeal(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(isWin())nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
  // PF-86 c2: a read path WITHOUT the registry lock. The generation is the digest of the catalogue record reference (every producer or
  // member change republishes it), read before and after the scan; a scan whose generation moved is refused, never returned. The
  // token it hands the callback is a read-only brand for the inspect* readers; it never acquires, holds or releases the lock, and it
@@ -414,7 +493,7 @@ index cd25b26b2..31e3e47c9 100644
  }
  function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));return {path,sha256:installedSourceSha256(abs,producerId)};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
  function portsFor(repo,ports){if(!Array.isArray(ports)||ports.length!==12)fail('SDC-AUTHORITY-UNAVAILABLE','complete-twelve-ports-required');return definitions.map((def,index)=>{const row=ports[index];exact(row,['producerId','port'],'participant-port');if(row.producerId!==def[0])fail('SDC-AUTHORITY-UNAVAILABLE','participant-order');const predicate=def[1][`isOwned${def[2]}AuthorityProducerPort`];if(typeof predicate!=='function'||predicate(row.port,{repository:repo})!==true)fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:unowned-port`);for(const method of ['readBaseline','observeOperation','observeTerminal','reconcile','readAssurance'])if(typeof row.port[method]!=='function')fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:missing-method`);return {port:row.port,participant:participant(def)};});}
-@@ -510,7 +533,17 @@ function driftRepair(repo,producerId,members,refusal=null){
+@@ -510,7 +533,36 @@ function driftRepair(repo,producerId,members,refusal=null){
      :`${producerId}'s namespace changed outside the registry${held?`${held}, so it is not healed`:', and no heal took it (a heal that cannot retain its marker heals nothing; heal reports why)'}`;
    return `${cause}. Run node ${REPAIR_SCRIPT} inspect --root ${repo.primaryRoot}: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal`;
  }
@@ -424,24 +503,44 @@ index cd25b26b2..31e3e47c9 100644
 + * meets is refused with the repair command exactly as before; the repair's heal verb stays unconditional. */
 +function entryHeal(repo){
 +  const migrated=migrateSourceUpdatedCatalogue(repo),key=repoDigest(repo);
-+  if(migrated){entryHealed.add(key);return;}
-+  if(!entryHealed.has(key)&&healDriftedCatalogue(repo)!==null)entryHealed.add(key);
++  if(migrated){entryHealed.add(key);return false;}
++  if(entryHealed.has(key))return true;
++  if(healDriftedCatalogue(repo)!==null)entryHealed.add(key);
++  return false;
++}
++/** C19I-W238 O8 re-armed: an entry that skipped its heal (true above) lets the FIRST strict read of that boundary heal on demand. A namespace rewritten
++ * outside the registry (push-prepare's fold, a git checkout, an expired capability) between two entries of one process shows up as exactly the
++ * `<producer>:namespace-drift` that read raises; the heal then runs once (it keeps every in-flight producer strict and writes the same marker as an
++ * entry heal) and the read is repeated. No fingerprint is needed: the registry records namespaces only as hashes, so the read itself is the cheapest
++ * detector, and an undrifted entry still costs nothing extra. Later reads of the boundary stay strict. */
++function stateRead(repo,ports,options={}){
++  const active=options.reconcile===false?undefined:boundaryContext.getStore(),lazy=active?.lazyHeal===true&&equal(active.repository,repo);
++  if(lazy)active.lazyHeal=false;
++  try{return stateReadOnce(repo,ports,options);}
++  catch(error){
++    if(!lazy||!/:namespace-drift$/u.test(String(error?.reason??'')))throw error;
++    const healed=healDriftedCatalogue(repo);
++    if(!healed?.length)throw error;
++    entryHealed.add(repoDigest(repo));
++    return stateReadOnce(repo,ports,options);
++  }
 +}
  function driftFault(repo,producerId,members){
 +  entryHealed.delete(repoDigest(repo));
    const error=new Error(`${producerId}:namespace-drift`);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-CAS';error.reason=`${producerId}:namespace-drift`;
    error.repair=driftRepair(repo,producerId,members);
    throw error;
-@@ -562,7 +595,7 @@ export function statListedRegistryEntry(repo,child,lstat=lstatSync){
+@@ -562,14 +614,70 @@ export function statListedRegistryEntry(repo,child,lstat=lstatSync){
    try{return lstat(safePath(repo,child));}
    catch(error){if(error?.code==='ENOENT'&&child===`${ROOT}/registry.lock`)return null;throw error;}
  }
 -function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){assertAdmissionDeadline();const child=`${path}/${name}`,s=statListedRegistryEntry(repo,child);if(s===null)continue;if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}owned(s,false,process.platform==='win32'?safePath(repo,child):null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
+-function stateRead(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
 +function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){assertAdmissionDeadline();const child=`${path}/${name}`,s=statListedRegistryEntry(repo,child);if(s===null)continue;if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}if(isWin()){const native=safePath(repo,child);if(!hasNativeWitness(native))owned(s,false,native);}else owned(s,false,null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
- function stateRead(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
++function stateReadOnce(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
  function saveProducer(repo,state,index,value){const row=state.rows[index];value.generation=generation(row.record.value.generation+1);row.record={value,ref:publish(repo,producerPath(value.producerId),value,row.record.ref)};const c={...state.catalogue.value,generation:generation(state.catalogue.value.generation+1),producers:state.catalogue.value.producers.map((e,i)=>i===index?{producerId:e.producerId,producerRef:row.record.ref,producerGeneration:value.generation}:e)};state.catalogue={value:c,ref:publish(repo,cataloguePath,c,state.catalogue.ref)};}
  function sortedRefs(values){const map=new Map(values.map(v=>[v.path,v]));if(map.size!==values.length)for(const v of values)if(!equal(map.get(v.path),v))fail('SDC-AUTHORITY-CAS','conflicting-references');return [...map.values()].sort((a,b)=>a.path.localeCompare(b.path));}
-@@ -570,6 +603,55 @@ function projection(row,t,participantSetSha256){const relevant=row.members.filte
+ function projection(row,t,participantSetSha256){const relevant=row.members.filter(m=>m.value.association.state==='unbound'||equal(m.value.association.target,t));const memberRefs=sortedRefs(relevant.filter(m=>m.value.phase!=='released').map(m=>m.ref));const releaseRefs=sortedRefs(relevant.filter(m=>m.release).map(m=>m.release.ref));const facts=relevant.flatMap(m=>m.value.sourceFacts);const lockFacts=row.record.value.baseline.flatMap(m=>m.sourceFacts).filter(f=>/lock/.test(f.namespaceId));for(const f of lockFacts)if(!facts.some(v=>equal(v,f)))facts.push(f);facts.sort((a,b)=>a.namespaceId.localeCompare(b.namespaceId)||a.pathSha256.localeCompare(b.pathSha256));return {target:t,producerId:row.participant.producerId,participantSetSha256,sourceSha256:row.participant.sourceSha256,memberRefs,releaseRefs,scopeFacts:facts};}
  function refreshCertificates(repo,state,extraTarget=null){const targets=new Map();for(const row of state.rows)for(const c of row.certificates)targets.set(digest(c.value.target),c.value.target);if(extraTarget)targets.set(digest(extraTarget),extraTarget);for(let i=0;i<state.rows.length;i++){const row=state.rows[i];let changed=false;const certificates=[...row.certificates];for(const t of targets.values()){const projected=projection(row,t,state.catalogue.value.participantSetSha256);const prior=certificates.find(c=>equal(c.value.target,t));if(prior?.value.projectionSha256===digest(projected))continue;const generationValue=prior?generation(prior.value.targetGeneration+1):1;const value={schema:schema('target-certificate'),repositorySha256:repoDigest(repo),...projected,targetGeneration:generationValue,projectionSha256:digest(projected)};const written={value,ref:publish(repo,certificatePath(row.participant.producerId,t,generationValue),value)};if(prior)certificates.splice(certificates.indexOf(prior),1,written);else certificates.push(written);changed=true;}if(changed){row.certificates=certificates;const value={...row.record.value,targetCertificates:certificates.map(c=>({target:c.value.target,targetGeneration:c.value.targetGeneration,certificateRef:c.ref}))};saveProducer(repo,state,i,value);}}}
  function updateMembership(repo,state,index,m,memberRef){const row=state.rows[index];const prior=row.members.find(x=>x.value.memberId===m.memberId&&x.value.memberGeneration===m.memberGeneration);const next={value:m,ref:memberRef,release:m.releaseRef?readRef(repo,m.releaseRef):null};if(prior)row.members.splice(row.members.indexOf(prior),1,next);else row.members.push(next);const value={...row.record.value,members:row.members.map(x=>({memberId:x.value.memberId,memberGeneration:x.value.memberGeneration,memberRef:x.ref})),lastTransitionSha256:digest({memberRef,releaseRef:m.releaseRef})};value.baseline=memberships(row.port.reconcile({producerRecord:freeze(structuredClone(value)),memberRecords:freeze(row.members.map(x=>x.value)),releaseRecords:freeze(row.members.filter(x=>x.release).map(x=>x.release.value))}),row.participant);saveProducer(repo,state,index,value);refreshCertificates(repo,state);return {memberRef,producerRef:row.record.ref,catalogueRef:state.catalogue.ref};}
  
@@ -480,8 +579,15 @@ index cd25b26b2..31e3e47c9 100644
 +    throw error;
 +  }
 +  for(const dir of new Set(moved.map(([from])=>dirname(from))))try{syncDirectory(safePath(repo,dir));}catch{/* best effort: the records are already moved */}
++  const priorRecord=row.record,priorMembers=row.members;
 +  row.members=remaining;
-+  saveProducer(repo,state,index,value);
++  try{testSeam.pruneFault?.('before-publication');saveProducer(repo,state,index,value);}
++  catch(error){
++    // Nothing was published (the producer record in memory is the one read): it still indexes every member, so the files go back where it says they are.
++    if(row.record===priorRecord){row.members=priorMembers;for(const [from,to] of moved.reverse()){try{renameSync(safePath(repo,to),safePath(repo,from));}catch{/* the registry then fails closed on the missing record; the aside copy is intact */}}}
++    throw error;
++  }
++  testSeam.pruneFault?.('after-producer-publication');
 +  refreshCertificates(repo,state);
 +  return freeze({status:'pruned',aside,kept:keep,pruned:drop.map(m=>({memberId:m.value.memberId,memberGeneration:m.value.memberGeneration}))});
 +}
@@ -497,19 +603,20 @@ index cd25b26b2..31e3e47c9 100644
  /** PF-52: enter and leave one registry boundary, which migrates a catalogue left by another plugin version. */
  export function migrateSourceUpdatedSessionAuthorityRegistry({repository:input}){return withSessionAuthorityBoundary({repository:input},()=>null);}
  export function initializeSessionAuthorityRegistry({repository:input},ports){try{return withSessionAuthorityBoundary({repository:input},token=>{const repo=boundary(token);retiredRegistryAdmission(repo,'initialize');const pairs=portsFor(repo,ports);boundaryBrands.get(token).ports=pairs;if(existsSync(safePath(repo,cataloguePath))){const state=stateRead(repo,pairs);return freeze({status:'already-initialized',code:null,catalogueRef:state.catalogue.ref});}onboarding.prepareOnboardingContinuityAuthorityParent({repository:repo});const participants=pairs.map(p=>p.participant),participantSetSha256=digest(participants);
-@@ -590,7 +672,10 @@ export function reserveSessionAuthorityMember({boundary:token,producerPort,assoc
+@@ -590,7 +698,11 @@ export function reserveSessionAuthorityMember({boundary:token,producerPort,assoc
  function memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index){const brand=memberBrands.get(memberHandle);if(!brand||brand.repositorySha256!==repoDigest(repo)||brand.producerPort!==producerPort)fail('SDC-AUTHORITY-CAS','unowned-member-handle');ref(expectedMemberRef);const row=state.rows[index].members.find(x=>x.value.memberId===brand.memberId&&x.value.memberGeneration===brand.memberGeneration);if(!row||!equal(row.ref,expectedMemberRef))fail('SDC-AUTHORITY-CAS','member-preimage');return {row,brand};}
  export function recoverSessionAuthorityMember({boundary:token,producerPort,operationHandle,expectedMemberRef}){const repo=boundary(token);retiredRegistryAdmission(repo,'recover');const {pairs,index}=selectPort(repo,token,producerPort);ref(expectedMemberRef);const state=stateRead(repo,pairs,{reconcile:false});const row=state.rows[index].members.find(m=>equal(m.ref,expectedMemberRef));if(!row||row.value.phase==='released')fail('SDC-AUTHORITY-CAS','recovery-member-preimage');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||observed.phase!==m.phase||!equal(observed.sourceFacts,m.sourceFacts))fail('SDC-AUTHORITY-CAS','recovery-owner-binding');const actual=memberships(producerPort.reconcile({producerRecord:freeze(structuredClone(state.rows[index].record.value)),memberRecords:freeze(state.rows[index].members.map(x=>x.value)),releaseRecords:freeze(state.rows[index].members.filter(x=>x.release).map(x=>x.release.value))}),pairs[index].participant);if(!equal(actual,state.rows[index].record.value.baseline))fail('SDC-AUTHORITY-CAS','recovery-namespace-drift');const memberHandle=Object.freeze({});memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});return freeze({memberHandle,memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});}
  function advanceOwnedSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,operationHandle},refreshOnly=false){const repo=boundary(token);retiredRegistryAdmission(repo,'advance-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row,brand}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);if(brand.operationHandle!==operationHandle)fail('SDC-AUTHORITY-CAS','operation-handle-changed');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||m.phase==='released')fail('SDC-AUTHORITY-CAS','operation-binding-changed');if(refreshOnly&&(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase))fail('SDC-AUTHORITY-CAS','source-refresh-phase');if(equal(observed,{association:m.association,kinds:m.kinds,phase:m.phase,bindingSha256:m.bindingSha256,sourceFacts:m.sourceFacts}))return freeze({memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});const allowed={reserved:['armed','running','terminal-observed'],armed:['running','terminal-observed'],running:['terminal-observed'],'terminal-observed':[]};if(refreshOnly){if(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase)fail('SDC-AUTHORITY-CAS','source-refresh-phase');}else if(!allowed[m.phase]?.includes(observed.phase))fail('SDC-AUTHORITY-CAS','invalid-member-transition');return retiredRegistryDescriptorGuard(repo,m.association,()=>{const next={...m,...observed,revision:generation(m.revision+1),updatedAt:new Date().toISOString()};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-owner-effects-readback',next,memberRef);return freeze(refs);});}
 -export function releaseSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,terminalHandle}){const repo=boundary(token);retiredRegistryAdmission(repo,'release-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);const m=row.value;if(m.phase!=='terminal-observed')fail('SDC-AUTHORITY-HELD','terminal-not-observed');const observed=producerPort.observeTerminal(terminalHandle);exact(observed,['terminal','sourceFacts'],'terminal');const value={schema:schema('release'),repositorySha256:repoDigest(repo),producerId:m.producerId,memberId:m.memberId,memberGeneration:m.memberGeneration,memberPreimageSha256:row.ref.sha256,bindingSha256:m.bindingSha256,...observed,createdAt:new Date().toISOString()};validateRelease(value,repo,m,pairs[index].participant);stage('after-terminal-readback-before-release',m,row.ref);const path=releasePath(m);let releaseRef;if(existsSync(safePath(repo,path))){const prior=readRecord(repo,path);validateRelease(prior.value,repo,m,pairs[index].participant);if(prior.value.memberPreimageSha256!==row.ref.sha256||prior.value.terminal!==observed.terminal||!equal(prior.value.sourceFacts,observed.sourceFacts))fail('SDC-AUTHORITY-CAS','release-prefix-changed');releaseRef=prior.ref;}else releaseRef=publish(repo,path,value);stage('after-release-published-before-member-update',m,row.ref,releaseRef);const next={...m,phase:'released',revision:generation(m.revision+1),updatedAt:new Date().toISOString(),releaseRef};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-member-release-published',next,memberRef,releaseRef);return freeze({releaseRef,...refs});}
 +export function releaseSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,terminalHandle}){const repo=boundary(token);retiredRegistryAdmission(repo,'release-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);const m=row.value;if(m.phase!=='terminal-observed')fail('SDC-AUTHORITY-HELD','terminal-not-observed');const observed=producerPort.observeTerminal(terminalHandle);exact(observed,['terminal','sourceFacts'],'terminal');const value={schema:schema('release'),repositorySha256:repoDigest(repo),producerId:m.producerId,memberId:m.memberId,memberGeneration:m.memberGeneration,memberPreimageSha256:row.ref.sha256,bindingSha256:m.bindingSha256,...observed,createdAt:new Date().toISOString()};validateRelease(value,repo,m,pairs[index].participant);stage('after-terminal-readback-before-release',m,row.ref);const path=releasePath(m);let releaseRef;if(existsSync(safePath(repo,path))){const prior=readRecord(repo,path);validateRelease(prior.value,repo,m,pairs[index].participant);if(prior.value.memberPreimageSha256!==row.ref.sha256||prior.value.terminal!==observed.terminal||!equal(prior.value.sourceFacts,observed.sourceFacts))fail('SDC-AUTHORITY-CAS','release-prefix-changed');releaseRef=prior.ref;}else releaseRef=publish(repo,path,value);stage('after-release-published-before-member-update',m,row.ref,releaseRef);const next={...m,phase:'released',revision:generation(m.revision+1),updatedAt:new Date().toISOString(),releaseRef};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-member-release-published',next,memberRef,releaseRef);
 +  // C19I-W238: a release is when a member becomes settled, so the walked registry is trimmed here, with the state already in memory.
-+  const trimmed=retiredRegistryScopes.getStore()?null:pruneSettledMembers(repo,state,index,SESSION_AUTHORITY_SETTLED_MEMBERS_KEPT,true);
-+  return freeze({releaseRef,...refs,...(trimmed?.status==='pruned'?{producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref}:{})});}
++  // The release is already published: whatever the prune meets (marker, a move, the producer publication) is its own problem, never the release's. The next release (or the explicit prune verb) retries it.
++  if(!retiredRegistryScopes.getStore())try{pruneSettledMembers(repo,state,index,SESSION_AUTHORITY_SETTLED_MEMBERS_KEPT,true);}catch{/* retried by the next release */}
++  return freeze({releaseRef,...refs,...(state.catalogue.ref!==refs.catalogueRef?{producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref}:{})});}
  export function releaseLostSessionAuthorityMember({boundary:token,producerId,target:requested}){const repo=boundary(token);retiredRegistryAdmission(repo,'release-lost-binding');if(!requested||typeof requested!=='object'||typeof requested.sessionId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(requested.sessionId)||requested.sessionId.includes('..'))fail('SDC-AUTHORITY-CAS','lost-member-target');sha(requested.descriptorSha256);const pairs=boundaryPorts(token),index=pairs.findIndex(p=>p.participant.producerId===producerId);if(index<0)fail('SDC-AUTHORITY-UNAVAILABLE','lost-member-producer');if(existsSync(safePath(repo,'agent-pipeline/session-descriptors/active/'+requested.sessionId+'.json')))fail('SDC-DESCRIPTOR-CAS','lost-member-descriptor-live');const state=stateRead(repo,pairs,{reconcile:false}),row=state.rows[index];const found=row.members.filter(x=>x.value.association.state==='bound'&&x.value.association.target.sessionId===requested.sessionId&&x.value.association.target.descriptorSha256===requested.descriptorSha256&&HEAL_IN_FLIGHT.has(x.value.phase));if(!found.length)return freeze({status:'none'});if(found.length>1){const error=new Error('lost-binding-members-ambiguous');error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-CAS';error.reason='lost-binding-members-ambiguous';error.repair=found.length+' in-flight '+producerId+' members name session '+requested.sessionId+': run node '+REPAIR_SCRIPT+' inspect --root '+repo.primaryRoot+', cancel the reservations that no longer run, then rerun the recovery';throw error;}const member=found[0],m=member.value;const facts=memberships(row.port.reconcile({producerRecord:freeze(structuredClone(row.record.value)),memberRecords:freeze(row.members.map(x=>x.value)),releaseRecords:freeze(row.members.filter(x=>x.release).map(x=>x.release.value))}),row.participant).flatMap(x=>x.sourceFacts);const value={schema:schema('release'),repositorySha256:repoDigest(repo),producerId:m.producerId,memberId:m.memberId,memberGeneration:m.memberGeneration,memberPreimageSha256:member.ref.sha256,bindingSha256:m.bindingSha256,terminal:'lost-binding-recovered',sourceFacts:facts,createdAt:new Date().toISOString()};validateRelease(value,repo,m,row.participant);const releaseRef=publish(repo,releasePath(m),value);const next={...m,phase:'released',revision:generation(m.revision+1),updatedAt:new Date().toISOString(),releaseRef};const memberRef=publish(repo,memberPath(next),next,member.ref);updateMembership(repo,state,index,next,memberRef);return freeze({status:'released',releaseRef,memberRef});}
  export function readSessionAuthoritySnapshot({repository:input,target:requested},ports){try{const repo=repository(input),t=target(requested),pairs=portsFor(repo,ports);const state=stateRead(repo,pairs);const certificates=state.rows.map(row=>{const c=row.certificates.find(c=>equal(c.value.target,t));if(!c||c.value.projectionSha256!==digest(projection(row,t,state.catalogue.value.participantSetSha256)))fail('SDC-AUTHORITY-CAS',`${row.participant.producerId}:stale-target-certificate`);return c;});const entries=KINDS.map(kind=>{const indexes=state.rows.map((row,i)=>row.participant.kinds.includes(kind)?i:-1).filter(i=>i>=0);const certificateRefs=sortedRefs(indexes.map(i=>certificates[i].ref)),relevantMemberRefs=sortedRefs(indexes.flatMap(i=>certificates[i].value.memberRefs)),releaseRefs=sortedRefs(indexes.flatMap(i=>certificates[i].value.releaseRefs)),scopeFacts=indexes.flatMap(i=>certificates[i].value.scopeFacts);const held=relevantMemberRefs.length>0||scopeFacts.some(f=>/lock/.test(f.namespaceId));const assurances=pairs.map(p=>p.port.readAssurance());if(assurances.some(a=>!['physical-readback','controlled-unit-method'].includes(a)))fail('SDC-AUTHORITY-UNAVAILABLE','source-assurance-unavailable');const assurance=assurances.includes('controlled-unit-method')?'controlled-unit-method':'physical-readback';return {kind,status:held?'held':releaseRefs.length?'cleared':'absent',producer:`session-authority-registry:${kind}`,sourceRefs:sortedRefs([...certificateRefs,...relevantMemberRefs,...releaseRefs]),bindingSha256:digest({target:t,certificateRefs,relevantMemberRefs,releaseRefs,scopeFacts}),assurance};});return freeze({status:'observed',catalogueRef:state.catalogue.ref,producerRefs:state.rows.map(row=>row.record.ref),entries,authoritySha256:digest(entries)});}catch{return unavailable('session-authority-registry','complete-physical-inventory-unavailable');}}
  
-@@ -624,6 +709,7 @@ function planningFacts(values,p) {
+@@ -624,6 +736,7 @@ function planningFacts(values,p) {
    return sorted;
  }
  function planningBaseline(row) {
@@ -517,7 +624,7 @@ index cd25b26b2..31e3e47c9 100644
    const baseline=row.port.readBaseline();
    exact(baseline,['memberships','legacyOperations'],'planning-baseline');
    memberships(baseline.memberships,row.participant);
-@@ -641,8 +727,11 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+@@ -641,8 +754,11 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
    if(pairs[index].participant.producerId!=='human-guard-override')fail('SDC-AUTHORITY-UNAVAILABLE','planning-owner-not-hgo');
    for(const method of ['observePlanningOperation','executePlanningOperation','observePlanningTerminal'])if(typeof producerPort[method]!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','planning-owner-method-missing');
    // Complete physical closure and all12 actual source baselines before effects.
@@ -531,7 +638,7 @@ index cd25b26b2..31e3e47c9 100644
    const plan=producerPort.observePlanningOperation(planningHandle);
    exact(plan,['entry','inputSha256','allowedNamespaces','allowedPathSha256s','sourceFacts'],'planning-operation');
    const allowedByEntry={'record-denial':['requests','audit','command-offers'],'plan-override':['plans'],'refreeze-plan':['plans','audit'],'sweep-requests':['requests','audit']};
-@@ -652,7 +741,7 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+@@ -652,7 +768,7 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
    if(!Array.isArray(plan.allowedNamespaces)||new Set(plan.allowedNamespaces).size!==plan.allowedNamespaces.length||plan.allowedNamespaces.some(ns=>!allowed.includes(ns)))fail('SDC-AUTHORITY-UNAVAILABLE','planning-namespace-scope');
    if(!Array.isArray(plan.allowedPathSha256s)||plan.allowedPathSha256s.length>64||new Set(plan.allowedPathSha256s).size!==plan.allowedPathSha256s.length)fail('SDC-AUTHORITY-UNAVAILABLE','planning-path-scope');
    plan.allowedPathSha256s.forEach(sha);
@@ -540,7 +647,7 @@ index cd25b26b2..31e3e47c9 100644
    if(!equal(planningFacts(plan.sourceFacts,p),beforeFacts))fail('SDC-AUTHORITY-CAS','planning-source-preimage');
    // The source-owned handle executes exactly its original validated writer.
    // Any throw retains the prefix and old baseline; it is never auto-certified.
-@@ -664,10 +753,9 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+@@ -664,10 +780,9 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
      ||!(Object.is(terminal.result,result)||(result!==undefined&&terminal.result!==undefined&&equal(terminal.result,result))))fail('SDC-AUTHORITY-CAS','planning-terminal-binding');
    const afterState=stateRead(repo,pairs,{reconcile:false});
    if(!equal(afterState.catalogue.ref,state.catalogue.ref)||afterState.rows.some((r,i)=>!equal(r.record.ref,state.rows[i].record.ref)))fail('SDC-AUTHORITY-CAS','planning-registry-effects');
@@ -554,7 +661,7 @@ index cd25b26b2..31e3e47c9 100644
      // All retained authority members still have their original source facts;
      // producer reconcile accounts for them without inventing new generations.
      for(const member of state.rows[i].members)if(member.value.phase!=='released'){
-@@ -675,8 +763,8 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+@@ -675,8 +790,8 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
        if(!matching||!equal(matching.value,member.value))fail('SDC-AUTHORITY-CAS','planning-member-effects');
      }
    }
@@ -565,7 +672,7 @@ index cd25b26b2..31e3e47c9 100644
    if(!equal(planningFacts(terminal.sourceFacts,p),afterFacts))fail('SDC-AUTHORITY-CAS','planning-postread-disagreement');
    for(const member of row.members)if(member.value.phase!=='released')for(const fact of member.value.sourceFacts){
      const original=beforeFacts.find(f=>f.namespaceId===fact.namespaceId&&f.pathSha256===fact.pathSha256);
-@@ -696,9 +784,8 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+@@ -696,9 +811,8 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
      if(!equal(readRaw(repo,journal.path.slice(5)).ref,journal))fail('SDC-AUTHORITY-CAS','planning-journal-preimage');
    }
    // Reobserve all physical inventories after journal reads and before CAS.
@@ -577,7 +684,7 @@ index cd25b26b2..31e3e47c9 100644
    refreshCertificates(repo,state);
    return result;
  }
-@@ -968,7 +1055,7 @@ function legacyControlTopology(input) {
+@@ -968,7 +1082,7 @@ function legacyControlTopology(input) {
  }
  function legacyCatalogue(repo) {
    try{
@@ -586,7 +693,7 @@ index cd25b26b2..31e3e47c9 100644
      // A present catalogue is not a legacy absence claim. Its canonical bytes
      // must be readable before the caller can take its normal all12 route.
      readRecord(repo,cataloguePath);return 'present';
-@@ -1005,7 +1092,7 @@ export function executeSourceOwnedLegacySessionAuthorityOperation(input,operatio
+@@ -1005,7 +1119,7 @@ export function executeSourceOwnedLegacySessionAuthorityOperation(input,operatio
        const bytes=before.isFile()?readFileSync(path):null,after=lstatSync(path);
        const identity=s=>({dev:String(s.dev),ino:String(s.ino),mode:s.mode,...(s.isFile()?{nlink:s.nlink}: {})});
        if(!equal(identity(before),identity(after))||(bytes&&!bytes.equals(readFileSync(path))))fail('SDC-AUTHORITY-CAS','legacy-control-observation-drift');
@@ -595,7 +702,7 @@ index cd25b26b2..31e3e47c9 100644
        if(bytes&&nativeObservation&&!bytes.equals(nativeObservation.bytes))fail('SDC-AUTHORITY-CAS','legacy-native-control-drift');
        return {path,identity:identity(after),sha256:bytes?hash(bytes):null,size:bytes?bytes.length:null,...(nativeObservation?{nativeFacts:nativeObservation.nativeFacts}:{})};
      };
-@@ -1038,9 +1125,9 @@ export function executeSourceOwnedLegacySessionAuthorityOperation(input,operatio
+@@ -1038,9 +1152,9 @@ export function executeSourceOwnedLegacySessionAuthorityOperation(input,operatio
    }
    const lockPath=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-legacy-lock.v2','legacy-registry-lock-held');
    const lock=readRaw(repo,lockPath).ref;
@@ -607,7 +714,7 @@ index cd25b26b2..31e3e47c9 100644
    }
  }
  
-@@ -1111,7 +1198,7 @@ export function executeSourceOwnedControlledContinuityTicketProbe(input) {
+@@ -1111,7 +1225,7 @@ export function executeSourceOwnedControlledContinuityTicketProbe(input) {
      if(matching.length!==1)fail('SDC-AUTHORITY-CAS','controlled-companion-own-successor-missing');
      targetRef=matching[0].memberRef;before=controlledContinuityRecordImage(frame.repo,targetRef);
      const path=safePath(frame.repo,targetRef.path.slice(5));
@@ -616,7 +723,7 @@ index cd25b26b2..31e3e47c9 100644
      const fd=openSync(path,constants.O_RDWR|constants.O_APPEND|constants.O_NOFOLLOW);
      try{
        const opened=fstatSync(fd);owned(opened);
-@@ -1150,7 +1237,7 @@ function companionEffectImage(repo,effect) {
+@@ -1150,7 +1264,7 @@ function companionEffectImage(repo,effect) {
    const before=lstatSync(cursor);
    const identity=s=>({dev:String(s.dev),ino:String(s.ino),mode:s.mode,nlink:s.nlink});
    const safe=s=>{if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||(typeof process.getuid==='function'&&s.uid!==process.getuid())||s.size>SESSION_AUTHORITY_LIMITS.maxSourceTotalBytes)fail('SDC-PRIVATE-PATH','companion-effect-file');};
