@@ -61,6 +61,7 @@ function nativeSpawnMark(name,ms){
 const MEMO_MAX=512;
 const MEMO_READ_ONLY=new Set(['inspect','ancestor','ancestor-above-root','read','read-source','inspect-source-image']);
 const MEMO_MUTATING=new Set(['publish','create-directory','remove']);
+const MEMO_BYTELESS=new Set(['inspect','ancestor','ancestor-above-root']);
 const authorityMemo=new Map();
 const authorityMemoCounters={hits:0,misses:0,persistedHits:0};
 // Cross-process layer of the same memo. Every hook is a new process, and a dispatch or a refusal runs several of them, each re-observing the
@@ -87,6 +88,10 @@ function persistedFile(){
 function persistedValueShape(operation,value){
  if(!object(value)||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts))return false;
  if(operation==='inspect-source-image')return exact(value,['ok','facts','size','sha256','committed'])&&Number.isSafeInteger(value.size)&&value.size>=0&&value.size<=134217728&&/^[a-f0-9]{64}$/u.test(value.sha256);
+ // w235 (19g Windows measurement): the two hottest sites, the registry closure walk (inspect) and the ancestor chain (ancestor,
+ // ancestor-above-root), return no bytes and were never kept across processes, so every hook process paid them again. They are kept
+ // under the same identity rule as every other entry: answered only while the object's current lstat identity equals the stored one.
+ if(MEMO_BYTELESS.has(operation))return exact(value,['ok','facts','bytes','committed'])&&value.bytes===null;
  return exact(value,['ok','facts','bytes','committed'])&&typeof value.bytes==='string'&&value.bytes.length<=PERSIST_MAX_VALUE_BASE64&&BASE64.test(value.bytes);
 }
 function persistedEntryShape(row){

@@ -15,7 +15,7 @@ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
 import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
 import * as pipelineState from "./pipeline-state.mjs";
 import { fileURLToPath } from "node:url";
-import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
+import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo, flushWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -28,6 +28,7 @@ import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
 
 // Memo cases (SAS09..SAS17): a fake native spawn on a real temp file; the real PowerShell exists only on Windows.
 const MEMO_FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
+const BYTELESS = new Set(["inspect", "ancestor", "ancestor-above-root"]);
 function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "authority-memo-"));
   const memoFile = persist ? join(dir, "observation-memo.json") : undefined;
@@ -37,7 +38,8 @@ function memoFixture(run, { hook, refuse = false, bytes = "hello", persist = fal
     calls.push(request.operation);
     if (hook) hook(request);
     const body = refuse ? { ok: false, code: "WIN-AUTH-ACL", committed: false }
-      : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
+      // w235: inspect, ancestor and ancestor-above-root answer with bytes null, exactly as the real helper does (windows-owned-authority-native.ps1).
+      : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: BYTELESS.has(request.operation) ? null : Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
     return { status: 0, signal: null, stderr: "", stdout: JSON.stringify(body) };
   };
   setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn, memoFile });
@@ -876,6 +878,40 @@ const cases = [
     readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
     assert.equal(calls.length, before + 1, "a persisted entry of a written object is gone (and its identity changed as well)");
     assert.equal(existsSync(memoFile), true);
+  }, { persist: true }) },
+  { id: "SAS25", name: "authority memo (15, w235) the byte-less observations the hottest sites make (inspect, ancestor) are kept across processes under the same identity rule; a byte-less operation carrying bytes in the file is never trusted", run: () => memoFixture(({ dir: base, calls, file, memoFile }) => {
+    writeFileSync(file, "one");
+    // The observed directory is not the one that holds the memo file (writing that file changes its parent's identity, a correct miss).
+    const dir = join(base, "observed");mkdirSync(dir);
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
+    observeWindowsAuthorityAncestor({ path: dir });
+    assert.deepEqual(calls, ["inspect", "inspect", "ancestor"]);
+    flushWindowsOwnedAuthorityBackendMemo();
+    // A new process answers all three from the file, with no native start.
+    resetWindowsOwnedAuthorityBackendMemo();
+    const before = nativeAuthorityStats();
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
+    observeWindowsAuthorityAncestor({ path: dir });
+    assert.equal(calls.length, 3, "no new native start");
+    assert.equal(nativeAuthorityStats().authorityMemoPersistedHits - before.authorityMemoPersistedHits, 3);
+    // A new entry in the directory changes its identity: the directory observations are misses, the unchanged file still hits.
+    flushWindowsOwnedAuthorityBackendMemo();
+    resetWindowsOwnedAuthorityBackendMemo();
+    writeFileSync(join(dir, "b.txt"), "two");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: dir, directory: true });
+    observeWindowsAuthorityAncestor({ path: dir });
+    assert.equal(calls.length, 5, "the changed directory is observed again (inspect and ancestor), the unchanged file is not");
+    // A tampered file where a byte-less operation carries bytes is dropped entry by entry.
+    flushWindowsOwnedAuthorityBackendMemo();
+    const good = JSON.parse(readFileSync(memoFile, "utf8"));
+    writeFileSync(memoFile, JSON.stringify({ ...good, entries: good.entries.map((row) => ({ ...row, value: { ...row.value, bytes: Buffer.from("x").toString("base64") } })) }));
+    resetWindowsOwnedAuthorityBackendMemo();
+    const spawned = calls.length;
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, spawned + 1, "an inspect entry with bytes is not the helper's shape and is not trusted");
   }, { persist: true }) },
 ];
 

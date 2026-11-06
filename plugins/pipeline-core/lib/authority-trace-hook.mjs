@@ -77,7 +77,8 @@ export async function installHookAuthorityTrace(options = {}) {
             failed: (o.failed ?? 0) + (a.failed ?? 0),
             byOperation: a.byOperation ?? {},
           },
-          authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, size: a.authorityMemoSize ?? 0 },
+          // persistedHits: the share of the hits answered from the cross-process memo (the 19g measurement could not tell it apart).
+          authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, persistedHits: a.authorityMemoPersistedHits ?? 0, size: a.authorityMemoSize ?? 0 },
           counters: { custody: custody !== null, observed: observed !== null, authority: authority !== null },
         };
         const line = `${JSON.stringify(trace)}\n`;

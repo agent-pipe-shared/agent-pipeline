@@ -47,7 +47,7 @@ if (process.env.PIPELINE_AUTHORITY_TRACE === "1") {
           wallMs: Math.round(performance.now()),
           custodyInspections: zero,
           nativeObservations: { ...zero, failed: 0, byOperation: {} },
-          authorityMemo: { hits: 0, misses: 0, size: 0 },
+          authorityMemo: { hits: 0, misses: 0, persistedHits: 0, size: 0 },
           counters: { custody: false, observed: false, authority: false },
         };
         const line = `${JSON.stringify(trace)}\n`;

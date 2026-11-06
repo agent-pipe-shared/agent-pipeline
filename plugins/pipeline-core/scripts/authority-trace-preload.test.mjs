@@ -50,7 +50,8 @@ test("APT2 with the switch and a file, a process that exits 2 leaves one v1 line
   assert.deepEqual(trace.counters, { custody: true, observed: true, authority: true }, "the three counter modules must load");
   assert.deepEqual(trace.custodyInspections, { count: 0, ms: 0, maxMs: 0 });
   assert.deepEqual(trace.nativeObservations, { count: 0, ms: 0, maxMs: 0, failed: 0, byOperation: {} });
-  assert.deepEqual(trace.authorityMemo, { hits: 0, misses: 0, size: 0 });
+  // w235: the share answered from the cross-process memo is reported too.
+  assert.deepEqual(trace.authorityMemo, { hits: 0, misses: 0, persistedHits: 0, size: 0 });
 });
 
 test("APT4 a COPY of the file elsewhere reads the counters of the plugin named by PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT, and none without it", () => {
