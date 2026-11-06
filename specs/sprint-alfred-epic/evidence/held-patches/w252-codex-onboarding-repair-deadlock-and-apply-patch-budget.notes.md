@@ -33,4 +33,16 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
 - **Tests:** `guard-apply-patch.test.mjs` 29/29. The extracted `runGuard` harness gets the 12 s value and the new `childTimeoutMs`.
   New GAP-BUDGET01 pins the value, the timer use, the fit inside the outer cap and the message.
 
-Not yet: live greenfield retest of both, Full Verify, Critic, PO acceptance.
+## G20-3 (P2, Antigravity): a guessed plugin path was refused as a credential problem
+
+- **Seen:** in one agy greenfield run, seven native Reads of plugin files were refused with `GUARD-READ-TARGET: use an exact passive path
+  outside protected credential roots`. All seven paths were inside the agy runner view (the registered plugin root) and none of them exists
+  (for example `lib/architecture-design-package.mjs`, `PIPELINE_FLOW.md`, `templates/architecture/adr-template.md`). No skill names them.
+  The agent had guessed, and the refusal sent it looking for a credential or root problem.
+- **Fix:** `readToolScopeVerdict` (`lib/guard/read-scope.mjs`) names a Read of a missing file lexically inside a registered plugin root
+  as `GUARD-READ-TARGET-MISSING`, with the relative plugin path and the nearest existing plugin directory to list with Glob. The read stays
+  refused. The credential-labelled refusal (K105) keeps precedence, and missing paths outside the plugin root keep their label.
+- **Tests:** the registered-plugin read test in `guard-lifecycle-ready.test.mjs` is extended. The full suite is green (427 pass, 0 fail,
+  3 skipped).
+
+Not yet: live greenfield retest of all three, Full Verify, Critic, PO acceptance.
