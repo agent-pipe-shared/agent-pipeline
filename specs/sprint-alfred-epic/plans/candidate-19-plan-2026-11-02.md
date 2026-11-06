@@ -451,6 +451,8 @@ Reproducibility run (peer): the never-started gf-probe-28 still held the probe c
 
 Status of the 19i goal on Windows: latency goals hold (admission 40 to 46 s single, 61 to 76 s in a simultaneous pair; stop 52 to 57 s; PostToolUse about 10 s, against 94 to 97 s, 159 to 165 s and 34 to 36 s on 19h). E4 is admitted on Windows in one of two clean pairs; the other left the registry unreadable. Open for 19j: (1) the intermittent unindexed registry entry under a simultaneous pair on Windows, with a sanctioned read-only registry listing to name it; (2) the second stop of a simultaneous pair must land its host commit when its sibling's commit moved HEAD, or leave a stop-failure record; (3) `session-authority-repair wait` reads a lock as `unreadable` after a host commit; (4) a refused, never-started probe slice blocks its successors until cancelled.
 
+PO decision on the Windows measurement of 19i (2026-11-06): build candidate 19j with the fixes for all four items above.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
