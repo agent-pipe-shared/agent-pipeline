@@ -552,6 +552,11 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   - Admissions took 68 and 79 s, with 15 and 32 failed natives. Stops took 64.6 and 69.6 s.
   - The w247 `failures` entries are path-free, as proven on Windows: `publish`, `session-authority-registry.mjs:146<366`, code `exit 1`, capped at 20 entries.
   - Afterwards: registry readable, inFlight 0.
+- **Windows pair D on 19l (gf-probe-53/54):** 54 landed 8127c56.
+  - The stop of 53 froze inside one native publish for 6160 s (17:02 to 18:44 UTC). Every native call has a 15 s spawn timeout, and the PO confirmed the laptop was closed from about 18:00 to 19:50 local time. So this was standby, not a product defect.
+  - 53 was recovered through `goldfish-host-commit-recover.mjs` as a1c7a2e. The stop left no record, because the process was killed.
+  - Afterwards: a dead lock owner and `native-authority-member-drift`. `routine-repair run heal --no-goldfish-running` gave `healed` and `moved-aside`, retired four settled pending states, and left lock and registry absent with no drift.
+  - Pair D is not a usable second sample. Pair C is the clean proof of the 19k pair-A fix. No critical defect is open on 19l.
   - Minor findings, not critical, for later: the `failures` code `exit 1` does not say why the publish failed; the preflight lock check stays `degraded` ("could not be observed") although the lock is absent, on both machines.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
