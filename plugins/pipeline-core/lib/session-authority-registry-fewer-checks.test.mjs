@@ -119,7 +119,7 @@ test("C19I-W238-1 (O7) a file read in the boundary is not inspected a second tim
   const stray = join(repository.commonDir, ROOT, "zz-unknown.json");
   writeFileSync(stray, "{}", { mode: 0o600 });
   calls.length = 0;
-  assert.throws(() => enter(repository, (token) => registry.healSessionAuthorityDrift({ boundary: token })), (error) => error.reason === "unknown-registry-entry");
+  assert.throws(() => enter(repository, (token) => registry.healSessionAuthorityDrift({ boundary: token })), (error) => /^unknown-registry-entry: zz-unknown\.json \(schema none\)$/u.test(error.reason)); // C19J-W243: the same refusal, now naming the entry
   const strays = calls.filter((c) => c.op === "inspect" && !c.directory);
   assert.deepEqual(strays.map((c) => c.path), [stray], "a file the boundary never read is inspected natively before it is refused as unknown");
 })));

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
+// session-authority-repair.mjs <inspect|inspect-aside|heal|move-aside|release-lock|wait|take-over> --root <root> [--aside <retained directory name>] [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
 //
 // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
 // session, so each runs from the agent's shell and from the PO's terminal alike.
@@ -12,6 +12,9 @@
 //               exact next command for every finding (`next`), or none when nothing blocks.
 //               Also reports the scratch binding of the session it runs in (D54): the session id is
 //               PIPELINE_SCRATCH_SESSION_ID, else the session's own CLAUDE_CODE_SESSION_ID; a terminal has none.
+//   inspect-aside  C19J-W243, read-only: lists every file of one retained directory under session-authority-abandoned with size, mtime, parsed
+//               schema and whether that aside's own catalogue indexes it (the files marked `indexed: false` are what the live registry
+//               refuses as unknown-registry-entry). Writes nothing.
 //   heal        Binds or re-anchors that scratch binding (D54), then enters the registry boundary once. That
 //               heals every drifted producer with no armed or running bound member and migrates a catalogue
 //               another plugin version wrote (D51 (1), PF-52), then inspects again.
@@ -36,7 +39,7 @@
 //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
 //
 // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,13 +72,14 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
 
 // Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
 const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running", "take-over": "no-other-session-running" };
-const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
+const VALUES = { inspect: ["root"], "inspect-aside": ["root", "aside"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
 const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
+const validAside = (name) => typeof name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(name) && !name.includes("..");
 const validSession = (session) => typeof session === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(session);
 
 function parse(argv) {
   const [verb, ...rest] = argv;
-  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root>" };
+  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|inspect-aside|heal|move-aside|release-lock|wait|take-over> --root <root>" };
   const flags = {};
   for (let index = 0; index < rest.length; index += 1) {
     const name = rest[index]?.startsWith("--") ? rest[index].slice(2) : null;
@@ -86,6 +90,7 @@ function parse(argv) {
     flags[name] = value; index += 1;
   }
   if (!flags.root) return { error: "--root <root> is required" };
+  if (verb === "inspect-aside" && !validAside(flags.aside)) return { error: "inspect-aside needs --aside <the name of one retained directory under session-authority-abandoned> (a single name, no path separators); `inspect` and a move-aside print the names" };
   if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || !validReason(flags.reason)))
     return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"; move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh" };
   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
@@ -204,7 +209,84 @@ function lockStep(root, lock) {
   return { why: `the registry lock is held by ${who} for ${lock.ageSeconds}s and that owner cannot be confirmed alive or gone; release it once no Pipeline process runs for this repository`, command: `${sessionAuthorityRepairCommand(root, "release-lock")} --no-pipeline-running --reason "<why>"` };
 }
 
+// C19J-W243: the repository binding is a snapshot of HEAD; a host commit (the expected case during a wait or a long verb) moves it, and every read
+// through the old binding refuses repository-binding-changed. A report binds afresh once; a binding that cannot be made keeps the given one.
+function rebind(root, fallback) {
+  try { return inspectSignedDescriptorCustodyRepository(root); }
+  catch { return fallback; }
+}
+
+const ASIDE_ENTRY_BOUND = 4096;
+const ASIDE_DEPTH_BOUND = 6;
+const ASIDE_READ_BOUND = 1048576;
+const REGISTRY_REF_PREFIX = ".git/agent-pipeline/session-authority/";
+// Files the repair tools write at the top of an aside to say why it exists; they are not registry records.
+const ASIDE_MARKERS = new Set(["repair.json", "migration.json", "heal.json", "prune.json", "retire.json", "take-over.json", "leftover.json"]);
+const printable = (value) => String(value).replace(/[^\x20-\x7e]/gu, "?").slice(0, 100);
+
+/**
+ * C19J-W243: read-only listing of one retained aside (session-authority-abandoned/<name>). Per file: size, mtime, parsed schema and whether the
+ * aside's own catalogue indexes it (catalogue -> producer records -> member, release and certificate refs, the way the closure walk indexes a live
+ * registry). A file the aside's catalogue does not name is what the live registry refuses as unknown-registry-entry. Nothing is written or read
+ * through the registry; an aside without a catalogue (a prune, a heal) reports `indexed: null`.
+ */
+function inspectAside(repository, name) {
+  const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", name);
+  let stat;
+  try { stat = lstatSync(dir); }
+  catch (error) { return { status: "refused", code: "SAR-ASIDE", reason: `no retained aside named ${name}: ${short(error)}` }; }
+  if (stat.isSymbolicLink() || !stat.isDirectory()) return { status: "refused", code: "SAR-ASIDE", reason: `${name} is not a retained directory` };
+  const entries = [];
+  let truncated = false;
+  const walk = (current, prefix, depth) => {
+    for (const entry of readdirSync(current).sort()) {
+      const path = join(current, entry), relative = prefix ? `${prefix}/${entry}` : entry, info = lstatSync(path);
+      if (info.isDirectory() && !info.isSymbolicLink()) { if (depth < ASIDE_DEPTH_BOUND) walk(path, relative, depth + 1); else truncated = true; continue; }
+      if (entries.length >= ASIDE_ENTRY_BOUND) { truncated = true; return; }
+      let schema = null;
+      if (info.isFile() && info.size <= ASIDE_READ_BOUND) { try { const value = JSON.parse(readFileSync(path, "utf8")); if (typeof value?.schema === "string") schema = printable(value.schema); } catch { schema = null; } }
+      entries.push({ path: relative, size: info.size, mtime: new Date(info.mtimeMs).toISOString(), schema, ...(info.isSymbolicLink() ? { symlink: true } : {}) });
+    }
+  };
+  try { walk(dir, "", 0); }
+  catch (error) { return { status: "refused", code: "SAR-ASIDE", reason: `the aside could not be listed: ${short(error)}` }; }
+  const read = (relative) => { try { return JSON.parse(readFileSync(join(dir, relative), "utf8")); } catch { return null; } };
+  const local = (ref) => {
+    const path = typeof ref?.path === "string" && ref.path.startsWith(REGISTRY_REF_PREFIX) ? ref.path.slice(REGISTRY_REF_PREFIX.length) : null;
+    return path !== null && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : null;
+  };
+  const known = new Set();
+  let catalogueState = "absent";
+  if (entries.some((entry) => entry.path === "catalogue.json")) {
+    const catalogue = read("catalogue.json");
+    catalogueState = catalogue && typeof catalogue === "object" ? "present" : "unreadable";
+    if (catalogueState === "present") {
+      known.add("catalogue.json");
+      for (const entry of Array.isArray(catalogue.producers) ? catalogue.producers : []) {
+        const producerPath = local(entry?.producerRef);
+        if (producerPath === null) continue;
+        known.add(producerPath);
+        const producer = read(producerPath);
+        for (const member of Array.isArray(producer?.members) ? producer.members : []) {
+          const memberPath = local(member?.memberRef);
+          if (memberPath === null) continue;
+          known.add(memberPath);
+          const releasePath = local(read(memberPath)?.releaseRef);
+          if (releasePath !== null) known.add(releasePath);
+        }
+        for (const certificate of Array.isArray(producer?.targetCertificates) ? producer.targetCertificates : []) { const certificatePath = local(certificate?.certificateRef); if (certificatePath !== null) known.add(certificatePath); }
+      }
+    }
+  }
+  const listed = entries.map((entry) => {
+    if (!entry.path.includes("/") && ASIDE_MARKERS.has(entry.path)) return { ...entry, marker: true, indexed: null };
+    return { ...entry, indexed: catalogueState === "present" ? known.has(entry.path) : null };
+  });
+  return { status: "aside-inspected", aside: name, catalogue: catalogueState, entries: listed, unindexed: listed.filter((entry) => entry.indexed === false).map((entry) => entry.path), ...(truncated ? { truncated: true } : {}) };
+}
+
 function inspect(repository, root, { afterHeal = false, scratch } = {}) {
+  repository = rebind(root, repository);
   // The strict read is what every boundary operation performs; the per-producer report explains it.
   const lock = lockReport(repository);
   const cleanupLocks = cleanupLockReport(root);
@@ -248,6 +330,8 @@ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 
 function waitForLock(repository, root, timeoutSeconds, { now = Date.now, pause = sleep } = {}) {
   const deadline = now() + timeoutSeconds * 1000;
   for (;;) {
+    // C19J-W243: a host commit during the wait moves HEAD, which makes every read through the first binding refuse; each iteration binds afresh.
+    repository = rebind(root, repository);
     const lock = lockReport(repository);
     if (lock.status === "absent") return { status: "lock-free" };
     if (lock.status === "held" && lock.owner === "dead") return { status: "lock-owner-gone", next: [lockStep(root, lock)] };
@@ -295,6 +379,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); repository = inspectSignedDescriptorCustodyRepository(root); }
   catch (error) { return emit({ status: "refused", code: "SAR-ROOT", reason: `--root is not a Pipeline repository: ${short(error)}` }, 2); }
   if (parsed.verb === "inspect") return emit({ status: "inspected", ...inspect(repository, root, { scratch }) }, 0);
+  if (parsed.verb === "inspect-aside") { const listing = inspectAside(repository, parsed.flags.aside); return emit(listing, listing.status === "refused" ? 2 : 0); }
   if (parsed.verb === "wait") { const waited = waitForLock(repository, root, parsed.flags.timeout, waitDeps); return emit(waited, waited.status === "refused" ? 2 : 0); }
   if (parsed.verb === "release-lock") {
     // Never takes the lock it releases (FB3-PF-55); a live owner is refused with the wait command.
