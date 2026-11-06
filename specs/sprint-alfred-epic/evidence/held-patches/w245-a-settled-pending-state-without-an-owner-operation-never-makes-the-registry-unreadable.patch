@@ -1,0 +1,171 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 177301761..bd8b2a695 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -534,6 +534,12 @@ function nativeAuthorityScan(owner) {
+       nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(entry.relativePath,operation);
+     }
+     if (operation.pendingSha256 && operation.pendingSha256!==entry.sourceFact.sha256) throw nativeManagedFault('native-authority-pending-drift');
++  }
++  // C19K-W245: every pending state owns its operation before any state is checked against another one. The receipt lineage below looks up the
++  // sibling pending state a receipt names; created in file-name order inside one loop, that sibling's operation did not exist yet whenever its
++  // name sorted after the receipt-bearing state, and a process with no operation from an earlier scan refused the whole registry as unowned.
++  for (const entry of pending) {
++    const state=entry.value,operation=owner.operations.get(entry.relativePath),retainedOwner=byName.get(`authority-owner-${entry.sourceFact.sha256}.json`);
+     const scopes=nativeScopeAmendments(read,entry,operation);
+     const terminal=byName.get(`authority-terminal-${entry.sourceFact.sha256}.json`);
+     if(terminal){
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+index e5d397f43..23702631a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+@@ -4,7 +4,8 @@
+ // (B) a refused admission leaves the governed queue exactly as it was, whatever a sibling wrote meanwhile.
+ import assert from "node:assert/strict";
+ import { spawn, spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { createHash } from "node:crypto";
++import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { devNull } from "node:os";
+ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+@@ -86,6 +87,18 @@ function siblingRow(root, id, scope) {
+ }
+ const realGit = (root, args) => { const run = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); return run.error || run.status !== 0 ? null : run.stdout.trim(); };
+ 
++// C19K-W245: the registry as a LATER, separate process reads it (the inspect and heal commands each start with no in-memory operations).
++const SAR = new URL("../scripts/session-authority-repair.mjs", import.meta.url).pathname, ROUTINE = new URL("../scripts/routine-repair.mjs", import.meta.url).pathname;
++const runCli = (script, args) => { const r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" }); let json = null; try { json = JSON.parse(r.stdout); } catch { /* reported with the stderr below */ } return { status: r.status, json, text: `${r.stdout.slice(0, 1500)} ${r.stderr.slice(0, 600)}` }; };
++const inspectRegistry = (root) => runCli(SAR, ["inspect", "--root", root]);
++const registryProblems = (inspect) => (inspect.json?.registry?.producers ?? []).filter((row) => row.status !== "ok");
++/** Two admitted launches that both land their host commits, one after the other in the given order (the second one lands on top of the first's commit). */
++function landPair(runtime, root, pair) {
++  for (const one of pair) { const admitted = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })); assert.equal(admitted.ok, true, `${one.id} admitted: ${JSON.stringify(admitted).slice(0, 900)}`); }
++  for (const one of pair) writeFileSync(join(root, one.file), one.content);
++  return pair.map((one) => { const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned })); assert.equal(result.status, "authored-commit-recorded", `${one.id}: ${JSON.stringify(result)}`); return result; });
++}
++
+ /** One real stop in its own process: own controlled-method runtime, admits its own launch, waits for the start gate, then stops. Both stops of a pair wait for
+  * each other after the terminal preparation and then reach the commit lock together; the commit is held 300 ms inside the lock so the second one meets it. */
+ function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
+@@ -98,8 +111,9 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
+     + `import {commitAdmittedNativeGoldfishReturn} from ${url("./agy-host-commit-execution.mjs")};`
+     + `const root=${JSON.stringify(root)},dir=${JSON.stringify(dir)},tag=${JSON.stringify(tag)},other=${JSON.stringify(other)};`
+     + `const wait=(path,ms)=>{const until=Date.now()+ms;while(!existsSync(path)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);};`
+-    + `const repository=inspectSignedDescriptorCustodyRepository(root);if(tag!=='t0')wait(join(dir,'runtime-t0'),60000);`
+-    + `const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/stop-pair-'+tag),sessionId:'stop-pair-'+tag+'-owner'});if(tag==='t0')writeFileSync(join(dir,'runtime-t0'),'1');`
++    + `const lead=tag.slice(0,-1)+'0';` // the first stop of a round ("t0", or "r2t0" in a later round) creates its runtime first
++    + `const repository=inspectSignedDescriptorCustodyRepository(root);if(tag!==lead)wait(join(dir,'runtime-'+lead),60000);`
++    + `const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/stop-pair-'+tag),sessionId:'stop-pair-'+tag+'-owner'});if(tag===lead)writeFileSync(join(dir,'runtime-'+lead),'1');`
+     + `const launch=JSON.parse(readFileSync(${JSON.stringify(launchPath)},'utf8')),returned=JSON.parse(readFileSync(${JSON.stringify(returnedPath)},'utf8'));`
+     + `let result;try{`
+     + `const admitted=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input:launch}));if(admitted.ok!==true)throw new Error('admission '+JSON.stringify(admitted));`
+@@ -112,26 +126,32 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
+   return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "ignore", openSync(join(dir, `stderr-${tag}.log`), "w")] });
+ }
+ 
++/** Both launches stop for real, each in its own process (see stopChild); `round` keeps the runtimes of a later pair apart from an earlier one's. Returns both results. */
++async function concurrentPair(root, launches, round = "") {
++  // The markers live outside the repository: the host-commit admission compares the working tree to its baseline and must not see them.
++  const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
++  const children = launches.map((one, index) => {
++    writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
++    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`) });
++  });
++  const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
++  try {
++    const until = Date.now() + 120000;
++    while (!tags.every((tag) => existsSync(join(dir, `admitted-${tag}`))) && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
++    assert.ok(tags.every((tag) => existsSync(join(dir, `admitted-${tag}`))), `both launches were admitted: ${tags.map((tag) => existsSync(join(dir, `out-${tag}.json`)) ? readFileSync(join(dir, `out-${tag}.json`), "utf8") : "no result").join(" | ")} stderr: ${tags.map((tag) => readFileSync(join(dir, `stderr-${tag}.log`), "utf8").slice(0, 600)).join(" | ")}`);
++    for (const one of launches) writeFileSync(join(root, one.file), one.content);
++    writeFileSync(join(dir, "go"), "go");
++    await Promise.all(exits);
++  } finally { for (const child of children) child.kill(); }
++  const results = tags.map((tag) => existsSync(join(dir, `out-${tag}.json`)) ? JSON.parse(readFileSync(join(dir, `out-${tag}.json`), "utf8")) : { thrown: "no result written" });
++  rmSync(dir, { recursive: true, force: true });
++  return results;
++}
++
+ const cases = [
+   { id: "NGSP1", name: "C19J-W242 (A): two real stops of one reply with disjoint scopes both land their host commits, the second on top of the first even though the first moved HEAD while the second waited for the commit lock", run: () => fixture(async ({ root }) => {
+     const { repository, launch, original } = setup(root, { ownRuntime: false });
+-    // The markers live outside the repository: the host-commit admission compares the working tree to its baseline and must not see them.
+-    const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), launches = [launch(0), launch(1)];
+-    const children = launches.map((one, index) => {
+-      writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
+-      return stopChild({ root, tag: `t${index}`, dir, other: `t${1 - index}`, launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`) });
+-    });
+-    const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
+-    try {
+-      const until = Date.now() + 120000;
+-      while (!launches.every((_, index) => existsSync(join(dir, `admitted-t${index}`))) && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+-      assert.ok(launches.every((_, index) => existsSync(join(dir, `admitted-t${index}`))), `both launches were admitted: ${launches.map((_, index) => existsSync(join(dir, `out-t${index}.json`)) ? readFileSync(join(dir, `out-t${index}.json`), "utf8") : "no result").join(" | ")} stderr: ${launches.map((_, index) => readFileSync(join(dir, `stderr-t${index}.log`), "utf8").slice(0, 600)).join(" | ")}`);
+-      for (const one of launches) writeFileSync(join(root, one.file), one.content);
+-      writeFileSync(join(dir, "go"), "go");
+-      await Promise.all(exits);
+-    } finally { for (const child of children) child.kill(); }
+-    const results = launches.map((_, index) => existsSync(join(dir, `out-t${index}.json`)) ? JSON.parse(readFileSync(join(dir, `out-t${index}.json`), "utf8")) : { thrown: "no result written" });
+-    rmSync(dir, { recursive: true, force: true });
++    const results = await concurrentPair(root, [launch(0), launch(1)]);
+     for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results));
+     const first = results.find((result) => git(root, "rev-parse", `${result.commit}^`) === original.candidate.commit), second = results.find((result) => result !== first);
+     assert.ok(first && second, "one stop landed on the original candidate and the other on top of it");
+@@ -200,6 +220,58 @@ const cases = [
+     assert.equal(retained, 3, "the lock, changed and invalid outcomes leave a row behind; a restored row and an already absent row do not");
+     assert.equal(seen.every((deadline) => deadline === window), true, "every rollback receives the rollback window to wait within");
+   } },
++
++  // C19K-W245 (AC-108): the receipt of the second stop of a pair names its sibling's pending state. A registry read in a process that holds no operation
++  // yet used to look that sibling up before the scan had reached it, so whether the registry stayed readable depended on the order of two file names.
++  // Both orders of one pair run, so exactly one of them has the receipt-bearing state ahead of its sibling's.
++  { id: "NGSP6", name: "C19K-W245: after a pair whose second stop landed on its sibling's commit, a later process reads the registry, in either order of the two pending states", run: () => {
++    for (const order of [[0, 1], [1, 0]]) fixture(({ root }) => {
++      const { runtime, launch } = setup(root), launches = [launch(0), launch(1)];
++      landPair(runtime, root, order.map((index) => launches[index]));
++      const inspect = inspectRegistry(root);
++      assert.equal(inspect.status, 0, `order ${order}: ${inspect.text}`);
++      assert.deepEqual(registryProblems(inspect), [], `order ${order}: the registry stays readable after the pair: ${inspect.text}`);
++    });
++  } },
++
++  { id: "NGSP7", name: "C19K-W245: with no registry member left for the settled pending states of a pair (registry initialized anew) a later admission is not refused, and the ordinary heal keeps the registry readable across another pair", run: () => fixture(async ({ root }) => {
++      const { launch, repository } = setup(root, { ownRuntime: false });
++      for (const result of await concurrentPair(root, [launch(0), launch(1)], "a")) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
++      // The settled pending states stay while the registry holds no member for them: it is initialized anew, as after a move-aside.
++      const registry = join(repository.commonDir, "agent-pipeline/session-authority");
++      rmSync(registry, { recursive: true, force: true });
++      const current = inspectSignedDescriptorCustodyRepository(root); // HEAD moved with the pair
++      initializeSessionAuthorityRegistry({ repository: current }, createSessionAuthorityParticipantPorts({ repository: current }));
++      const empty = inspectRegistry(root);
++      assert.deepEqual(registryProblems(empty), [], `a registry without members for the settled pending states reads: ${empty.text}`);
++      // A second pair over the leftovers: each later pair is bound to the commit the earlier one left.
++      const next = () => ({ candidate: { commit: git(root, "rev-parse", "HEAD"), tree: git(root, "rev-parse", "HEAD^{tree}") } });
++      for (const result of await concurrentPair(root, [launch(2, next()), launch(3, next())], "b")) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
++      const over = inspectRegistry(root);
++      assert.deepEqual(registryProblems(over), [], `readable after a pair over the leftover settled pending states: ${over.text}`);
++      // The ordinary heal retires the settled pending states on its own, and the registry stays readable across one more pair.
++      const healed = runCli(ROUTINE, ["run", "heal", "--root", root, "--reason", "C19K-W245 heal after pairs"]);
++      assert.equal(healed.status, 0, healed.text);
++      assert.ok((healed.json?.settledPending?.retiredPending ?? []).length >= 4, `heal retired the settled pending states: ${healed.text}`);
++      assert.deepEqual(registryProblems(inspectRegistry(root)), [], "readable after the ordinary heal");
++      for (const result of await concurrentPair(root, [launch(0, { id: "SLICE-0C", ...next() }), launch(1, { id: "SLICE-1C", ...next() })], "c")) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
++      const after = inspectRegistry(root);
++      assert.deepEqual(registryProblems(after), [], `readable after the heal and another pair: ${after.text}`);
++  }) },
++
++  // The lineage check is the one the scan runs for a receipt that names a sibling: a receipt whose sibling pending state is gone still refuses by name.
++  { id: "NGSP8", name: "C19K-W245: a receipt that names a sibling pending state which is not there still refuses the registry read by name (the check is not weakened)", run: () => fixture(({ root }) => {
++    const { runtime, launch, repository } = setup(root);
++    landPair(runtime, root, [launch(0), launch(1)]);
++    const dir = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit"), names = readdirSync(dir);
++    const proof = names.filter((name) => name.startsWith("observation-")).map((name) => JSON.parse(readFileSync(join(dir, name), "utf8"))).flatMap((row) => row.foreignCommits ?? [])[0];
++    assert.ok(proof, "the second stop's receipt names its sibling");
++    const sibling = names.filter((name) => name.startsWith("pending-")).find((name) => createHash("sha256").update(readFileSync(join(dir, name))).digest("hex") === proof.pendingSha256);
++    assert.ok(sibling, "the sibling's pending state is on disk");
++    for (const name of names) if (name === sibling || (name.startsWith("authority-") && name.includes(proof.pendingSha256))) rmSync(join(dir, name));
++    const inspect = inspectRegistry(root);
++    assert.deepEqual(registryProblems(inspect).map((row) => [row.producerId, row.reason]), [["native-goldfish", "native-concurrent-receipt-lineage"]], inspect.text);
++  }) },
+ ];
+ 
+ const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
