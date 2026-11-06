@@ -561,6 +561,16 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
 - **PO decision 2026-11-06 (evening) on the two minor findings** (the preflight lock check reports `degraded` for an absent lock; the `failures` code `exit 1` does not say why a publish failed):
   - If the 19l Full Verify is green, both go into candidate 20, the candidate built from the greenfield results.
   - If fixing 19 needs another 19 candidate anyway (for example for Full Verify reds), both are fixed in that one.
+- **19l Full Verify (clone at 3e1dea1e1): red, 14 suites.**
+  - Four were caused by this session's environment: `PIPELINE_AUTHORITY_TRACE=1` was set, and the trace line on stderr breaks CLI tests. Run without it, they are green.
+  - The remaining ten have real causes: a doc reference, the append-history witness (w249 appended to a row's pinned invariant), the kernel closure (`source-digest-memo.mjs`), the inventory order, two stale tests after intended changes (D3 after O5c, PF-36 after w231), and an import of the Node binary path that Node's permission model denies (red at the 19h base too).
+  - So a 19m is needed, and per the PO decision it carries both minor findings.
+- **Candidate 19m (w251, Elephant, held patch 306b04f36, script `po-apply-0.7-candidate19m.sh`):**
+  - Fixes all ten reds; the details are in the w251 notes.
+  - The preflight lock row: the probe passed the wrong repository shape and therefore always read `unknown`; it now reads `absent` when there is no lock.
+  - The failures code now names the cause next to the exit status: the helper's `WIN-AUTH-*` code, `no-code` or `no-json`.
+  - Rehearsal `w24reh/c19m`: exit 0, registration 1183, case-completion 392, append history green (70 commits), all 14 former reds green, inventory sorted after the refresh.
+  - Open: PO apply, stamp on the PO's call, a fresh Full Verify, the Windows run, Critic, PO acceptance.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
