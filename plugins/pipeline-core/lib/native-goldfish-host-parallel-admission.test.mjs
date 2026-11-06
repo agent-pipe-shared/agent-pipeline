@@ -1,0 +1,205 @@
+// SPDX-License-Identifier: SUL-1.0
+// C19I-W236-ADMIT (AC-108): two Goldfish launches of one reply are both admitted. Every registry boundary entry on the admission
+// path waits for a sibling's lock within the admission deadline, and an admission that meets a queue changed only by a sibling's
+// admitted, disjoint slice continues instead of refusing item-delivery-queue-drift.
+import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { devNull } from "node:os";
+import { join } from "node:path";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { prepareNativeGoldfishHostState, resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness } from "./native-goldfish-host-state.mjs";
+import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
+import { captureAgyHostCommitBaseline } from "./agy-host-commit-admission.mjs";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
+import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue } from "./slice-queue-location.mjs";
+import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const FILES = ["change", "second", "third", "fourth"];
+const CRITERIA = [["AC-2", "second"], ["AC-3", "third"], ["AC-4", "fourth"]];
+
+function fixture(run) {
+  const fixtureRoot = nativeContractFixtureParent();
+  mkdirSync(fixtureRoot, { recursive: true, mode: 0o700 });
+  const root = mkdtempSync(join(fixtureRoot, "native-goldfish-parallel-"));
+  const cleanup = () => rmSync(root, { recursive: true, force: true });
+  let out;
+  try {
+    mkdirSync(join(root, "evidence"), { mode: 0o700 });
+    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0, "actual Git topology required by the Source authority observer");
+    for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", devNull]]) assert.equal(spawnSync("git", ["-C", root, "config", name, value]).status, 0);
+    assert.equal(spawnSync("git", ["-C", root, "commit", "--allow-empty", "-q", "-m", "fixture"]).status, 0);
+    out = run({ root });
+  } catch (error) { cleanup(); throw error; }
+  if (typeof out?.then === "function") return out.finally(cleanup);
+  cleanup();
+  return out;
+}
+
+/** An enrolled, approved item course with four disjoint original criteria (AC-1..AC-4) and an initialized registry. */
+function setup(root, { admit = [] } = {}) {
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") }), plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit original course" });
+  assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  mkdirSync(join(root, "src"), { recursive: true });
+  for (const name of FILES.slice(1)) {
+    writeFileSync(join(root, `src/${name}.mjs`), "export const value='expected';\n");
+    writeFileSync(join(root, `src/${name}.test.mjs`), `import test from 'node:test';import assert from 'node:assert/strict';import {value} from './${name}.mjs';test('${name} original criterion',()=>assert.equal(value,'expected'));\n`);
+  }
+  const original = prepareApprovedItemCourseFixture({ root, additionalCriteria: CRITERIA.map(([id]) => ({ id, text: `The independent ${id} dependency returns expected bytes.` })) });
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/parallel-original"), sessionId: "parallel-original-owner" });
+  initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+  const item = (index) => {
+    const id = `SLICE-${index}`, path = FILES[index], locator = index === 0 ? original.criterionLocator : original.criterionLocators[CRITERIA[index - 1][0]];
+    const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: id, itemId: id, criterionLocator: locator, checks: [{ id: "original-criterion", path: `src/${path}.test.mjs`, dependencies: [`src/${path}.mjs`, `src/${path}.test.mjs`] }] };
+    const binding = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: id, candidateCommit: original.candidate.commit, candidateTree: original.candidate.tree, runner: "claude",
+      role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "sonnet", effort: "medium", rulesetSha: "c".repeat(64), allowedPaths: [`src/${path}.mjs`],
+      criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" }, itemDelivery };
+    const text = `Goldfish briefing\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}\nReturn contract follows.\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;
+    const input = { cwd: root, session_id: `session-${id}`, tool_name: "Task", tool_use_id: `tool-${id}`, tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: text, run_in_background: false } };
+    return { id, input };
+  };
+  const launches = [0, 1, 2, 3].map(item);
+  const results = admit.map((index) => runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[index].input })));
+  for (const result of results) assert.equal(result.ok, true, JSON.stringify(result));
+  return { original, repository, runtime, launches };
+}
+
+const queueLocation = (root) => sliceQueueLocation({ root, planDir: "specs/unit" });
+/** Rewrites the working queue the way a sibling writer would (compare-and-swap on what was read). */
+function rewriteQueue(root, mutate) {
+  const location = queueLocation(root), source = readSliceQueueSource(location), queue = JSON.parse(source.bytes.toString("utf8"));
+  mutate(queue);
+  writeWorkingQueue(location, Buffer.from(JSON.stringify(queue)), source);
+}
+const rowIds = (root) => resolveGovernedItemQueue({ root }).queue.slices.map((row) => row.id);
+const pendingFiles = (repository) => { const dir = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit"); return existsSync(dir) ? readdirSync(dir).filter((name) => name.startsWith("pending-")) : []; };
+
+/** Another process holds the registry boundary for `ms` (the sibling launch). The caller kills it. */
+function holder(root, markerDir, ms) {
+  const marker = join(markerDir, `held-${Date.now()}`);
+  const script = `import {inspectSignedDescriptorCustodyRepository} from ${JSON.stringify(new URL("./worktree-lifecycle.mjs", import.meta.url).href)};`
+    + `import {withSessionAuthorityBoundary} from ${JSON.stringify(new URL("./session-authority-registry.mjs", import.meta.url).href)};`
+    + `import {writeFileSync} from 'node:fs';const repository=inspectSignedDescriptorCustodyRepository(${JSON.stringify(root)});`
+    + `withSessionAuthorityBoundary({repository},()=>{writeFileSync(${JSON.stringify(marker)},'held');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${ms});});`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: "ignore" });
+  const until = Date.now() + 20000; while (!existsSync(marker) && Date.now() < until) sleep(25);
+  assert.ok(existsSync(marker), "the sibling took the lock");
+  return child;
+}
+
+/** One real admission in its own process: own controlled-method runtime, waits for the start gate, writes its result. */
+function admissionChild({ root, inputPath, tag, gate, ready, out }) {
+  const url = (name) => JSON.stringify(new URL(name, import.meta.url).href);
+  const script = `import {existsSync,readFileSync,writeFileSync} from 'node:fs';import {join} from 'node:path';`
+    + `import {inspectSignedDescriptorCustodyRepository} from ${url("./worktree-lifecycle.mjs")};`
+    + `import {createControlledMethodRuntimeFixture} from ${url("./session-requester-bridge.mjs")};`
+    + `import {prepareNativeGoldfishHostState} from ${url("./native-goldfish-host-state.mjs")};`
+    + `const root=${JSON.stringify(root)},repository=inspectSignedDescriptorCustodyRepository(root);`
+    + `const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/'+${JSON.stringify(tag)}),sessionId:${JSON.stringify(`${tag}-owner`)}});`
+    + `writeFileSync(${JSON.stringify(ready)},'ready');while(!existsSync(${JSON.stringify(gate)}))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);`
+    + `const input=JSON.parse(readFileSync(${JSON.stringify(inputPath)},'utf8'));`
+    + `let result;try{result=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input,admissionDeadline:{startMs:Date.now(),budgetMs:300000}}));}catch(error){result={ok:false,thrown:String(error?.code??error?.message)};}`
+    + `writeFileSync(${JSON.stringify(out)},JSON.stringify(result));`;
+  return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: "ignore" });
+}
+
+/** Starts `count` real admissions of one reply at the same instant and returns their results. */
+async function admitTogether(root, launches) {
+  const dir = mkdtempSync(join(root, "fixture-host", "parallel-"));
+  const gate = join(dir, "gate"), children = launches.map((launch, index) => {
+    const inputPath = join(dir, `input-${index}.json`), ready = join(dir, `ready-${index}`), out = join(dir, `out-${index}.json`);
+    writeFileSync(inputPath, JSON.stringify(launch.input));
+    return { ready, out, process: admissionChild({ root, inputPath, tag: `child-${index}`, gate, ready, out }) };
+  });
+  const exits = children.map((child) => new Promise((resolve) => child.process.once("exit", resolve)));
+  const until = Date.now() + 120000;
+  while (children.some((child) => !existsSync(child.ready)) && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(children.every((child) => existsSync(child.ready)), "every admission child finished its setup");
+  writeFileSync(gate, "go");
+  await Promise.all(exits);
+  return children.map((child) => existsSync(child.out) ? JSON.parse(readFileSync(child.out, "utf8")) : { ok: false, thrown: "no result written" });
+}
+
+const cases = [
+  { id: "NGPA1", name: "C19I-W236 (AC-108): an admission that meets a queue changed only by a sibling's admitted, disjoint slice continues; both launches are admitted", run: () => fixture(({ root }) => {
+    const { runtime, launches } = setup(root);
+    let sibling = null;
+    // The sibling launch of the same reply runs its whole admission between this launch's queue preparation and its registry publish.
+    const left = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[0].input }, {
+      captureBaseline: (args) => { sibling ??= runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[1].input })); return captureAgyHostCommitBaseline(args); } }));
+    assert.equal(sibling?.ok, true, JSON.stringify(sibling));
+    assert.equal(left.ok, true, JSON.stringify(left));
+    assert.deepEqual(rowIds(root).filter((id) => id.startsWith("SLICE-")).sort(), ["SLICE-0", "SLICE-1"]);
+  }) },
+
+  { id: "NGPA2", name: "C19I-W236: a queue change to the admission's own row still refuses item-delivery-queue-drift and leaves no pending state", run: () => fixture(({ root }) => {
+    const { runtime, repository, launches } = setup(root);
+    const left = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[0].input }, {
+      captureBaseline: (args) => { rewriteQueue(root, (queue) => { queue.slices.find((row) => row.id === "SLICE-0").title = "changed under the admission"; }); return captureAgyHostCommitBaseline(args); } }));
+    assert.equal(left.ok, false, JSON.stringify(left));
+    assert.match(JSON.stringify(left), /item-delivery-queue-drift/u);
+    assert.deepEqual(pendingFiles(repository), []);
+  }) },
+
+  { id: "NGPA3", name: "C19I-W236: a sibling row whose write scope overlaps the admission's still refuses item-delivery-queue-drift", run: () => fixture(({ root }) => {
+    const { runtime, repository, launches } = setup(root);
+    const left = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[0].input }, {
+      captureBaseline: (args) => { rewriteQueue(root, (queue) => { const mine = queue.slices.find((row) => row.id === "SLICE-0"); queue.slices.push({ ...structuredClone(mine), id: "SLICE-OVERLAP", title: "SLICE-OVERLAP", dependsOn: ["SLICE-0"], writeScope: [...mine.writeScope] }); }); return captureAgyHostCommitBaseline(args); } }));
+    assert.equal(left.ok, false, JSON.stringify(left));
+    assert.match(JSON.stringify(left), /item-delivery-queue-drift/u);
+    assert.deepEqual(pendingFiles(repository), []);
+  }) },
+
+  { id: "NGPA4", name: "C19I-W236: the dependency readiness read of an admission waits for a sibling's registry lock within the admission deadline; with the deadline spent it refuses SDC-LOCK-HELD", run: () => fixture(({ root }) => {
+    const { runtime } = setup(root, { admit: [0, 1] });
+    const dir = join(root, "fixture-host");
+    let child = holder(root, dir, 5000);
+    const started = Date.now();
+    const waited = runtime.run(() => observeGovernedItemIntegrationReadiness({ root, admissionDeadline: { startMs: Date.now(), budgetMs: 300000 } }));
+    assert.equal(waited.status, "observed", JSON.stringify(waited));
+    assert.ok(Date.now() - started >= 2500, `it waited for the sibling (${Date.now() - started} ms)`);
+    child.kill();
+    child = holder(root, dir, 5000);
+    try {
+      const refused = runtime.run(() => observeGovernedItemIntegrationReadiness({ root, admissionDeadline: { startMs: Date.now() - 299900, budgetMs: 300000 } }));
+      assert.equal(refused.status, "refused", JSON.stringify(refused));
+      assert.equal(refused.code, "SDC-LOCK-HELD", JSON.stringify(refused));
+    } finally { child.kill(); }
+  }) },
+
+  { id: "NGPA5", name: "C19I-W236: a registry lock held past the admission deadline still refuses SDC-LOCK-HELD at the publish and writes no pending state", run: () => fixture(({ root }) => {
+    const { runtime, repository, launches } = setup(root);
+    let child = null;
+    try {
+      const refused = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launches[0].input, admissionDeadline: { startMs: Date.now(), budgetMs: 6000 } }, {
+        captureBaseline: (args) => { child = holder(root, join(root, "fixture-host"), 9000); return captureAgyHostCommitBaseline(args); } }));
+      assert.equal(refused.ok, false, JSON.stringify(refused));
+      assert.match(JSON.stringify(refused), /SDC-LOCK-HELD/u);
+      assert.deepEqual(pendingFiles(repository), []);
+    } finally { child?.kill(); }
+  }) },
+
+  { id: "NGPA6", name: "C19I-W236 (AC-108): two real admissions of one reply started at the same time, two disjoint write scopes, are both admitted", run: () => fixture(async ({ root }) => {
+    const { repository, launches } = setup(root);
+    const results = await admitTogether(root, launches.slice(0, 2));
+    assert.deepEqual(results.map((result) => result.ok), [true, true], JSON.stringify(results));
+    assert.equal(pendingFiles(repository).length, 2, "two pending host states, one per launch");
+    assert.deepEqual(rowIds(root).filter((id) => id.startsWith("SLICE-")).sort(), ["SLICE-0", "SLICE-1"]);
+  }) },
+
+  { id: "NGPA7", name: "C19I-W236 (AC-108): four real admissions of one reply started at the same time, four disjoint write scopes, are all admitted", run: () => fixture(async ({ root }) => {
+    const { repository, launches } = setup(root);
+    const results = await admitTogether(root, launches);
+    assert.deepEqual(results.map((result) => result.ok), [true, true, true, true], JSON.stringify(results));
+    assert.equal(pendingFiles(repository).length, 4);
+  }) },
+];
+
+const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases, fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

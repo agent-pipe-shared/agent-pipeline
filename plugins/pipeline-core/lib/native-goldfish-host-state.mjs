@@ -291,7 +291,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
-    if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+    if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd(),admissionDeadline,publishRetry:dependencies.publishRetry});
       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
@@ -333,7 +333,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   try {
     // E4: a sibling launch in the same reply holds the registry lock for a whole cycle; one bounded 1.5 s wait refused both.
     // The publish is retried while the lock is held and nothing has been written yet, within the admission deadline.
-    stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered), admissionDeadline, dependencies.publishRetry);
+    stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered, deliveryQueue.normalized?.slices), admissionDeadline, dependencies.publishRetry);
   }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
@@ -855,7 +855,16 @@ export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options
     :10000;
   return retryWhileSessionAuthorityLockHeld(attempt,{budgetMs:remaining,now,...(typeof options.sleep==='function'?{sleep:options.sleep}:{})});
 }
-function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null,entered={value:false}){
+/** C19I-W236: the queue moved after this admission prepared it (a sibling launch of the same reply admitted its own slice). The admission
+ * continues on the fresh queue only when its own row is unchanged and no row new or changed since overlaps its write scope; the registry
+ * collision checks under the lock then judge it against the siblings that already published. */
+function queueMovedBySiblingOnly(governed,state,admittedSlices){
+  if(!Array.isArray(admittedSlices))return false;
+  const before=new Map(admittedSlices.map(row=>[row.id,nativeManagedDigest(row)])),own=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
+  if(!own||before.get(own.id)!==nativeManagedDigest(own))return false;
+  return governed.normalized.slices.every(row=>row.id===own.id||before.get(row.id)===nativeManagedDigest(row)||!scopesOverlap(row.writeScope??[],state.delivery.writeScope));
+}
+function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null,entered={value:false},admittedSlices=null){
   const checkpoint=createAdmissionCheckpoint(admissionDeadline);
   checkpoint('repository-inspect');
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
@@ -869,6 +878,8 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
     // dispatch in a real repository creates it here (idempotent), then continues on the registry path.
     checkpoint('registry-init');
     const initialized=initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    // C19I-W236: initializeSessionAuthorityRegistry turns a lock a sibling holds into status 'unavailable'; rethrown as the transient lock fault, the surrounding retry waits for it (nothing was written yet).
+    if(initialized.status==='unavailable'&&initialized.reason==='SDC-LOCK-HELD: registry-lock-held')throw Object.assign(new Error('registry-lock-held'),{code:'SDC-LOCK-HELD',reason:'registry-lock-held'});
     if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault(`item-delivery-registry-initialization-failed (${initialized.reason??initialized.status})`);
   }
   checkpoint('owner');
@@ -889,7 +900,11 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
     if(state.delivery){
       const governed=resolveGovernedItemQueue({root:state.root});
-      if(governed.status!=='required'||governed.sha256!==state.delivery.queueSha256)throw nativeManagedFault('item-delivery-queue-drift');
+      if(governed.status!=='required')throw nativeManagedFault('item-delivery-queue-drift');
+      if(governed.sha256!==state.delivery.queueSha256){
+        if(!queueMovedBySiblingOnly(governed,state,admittedSlices))throw nativeManagedFault('item-delivery-queue-drift');
+        state.delivery.queueSha256=governed.sha256;
+      }
       adoptPrescanInBoundary({boundary,repository,governed,prescan});
       adoptAdmissionFacts({boundary,repository,governed,facts});
       if(current.association.state!=='bound')throw nativeManagedFault('item-delivery-owner-unbound');
@@ -1700,14 +1715,15 @@ export function integrateNativeGoldfishItemDelivery({root,pendingSha256}={}) {
 const itemReadinessHandles=new WeakMap();
 /** Opaque readiness observation consumed by the pure queue projection. A
  * serialized integratedIds/PASS object cannot promote v2 dependencies. */
-export function observeGovernedItemIntegrationReadiness({root}={}) {
+export function observeGovernedItemIntegrationReadiness({root,admissionDeadline=null,publishRetry}={}) {
   try {
     const governed=resolveGovernedItemQueue({root});if(governed.status!=='required')return governed;
     const repository=inspectSignedDescriptorCustodyRepository(root);
     // PF-41: a repository whose session-authority registry was never created holds no native
     // integration record, so commit evidence alone decides; every other registry fault still refuses.
     let native,nativeRegistry='read';
-    try{native=withSessionAuthorityBoundary({repository},boundary=>readNativeIntegratedSlices({governed,repository,boundary}).integrated);}
+    // C19I-W236: the admission's readiness read waits for a sibling launch's registry lock within the admission deadline (only a lock met before the read ran is retried).
+    try{native=retryPublishWhileLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{entered.value=true;return readNativeIntegratedSlices({governed,repository,boundary}).integrated;}),admissionDeadline,publishRetry);}
     catch(error){if(!sessionAuthorityRegistryAbsent(error))throw error;native=[];nativeRegistry='absent';}
     const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
     const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
