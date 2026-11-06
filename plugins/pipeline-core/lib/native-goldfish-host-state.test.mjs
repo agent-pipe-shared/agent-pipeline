@@ -1873,6 +1873,49 @@ const cases = [
     assert.match(state,/return retryPublishWhileLockHeld\(entered=>withSessionAuthorityBoundary\(\{repository\},\(\)=>\{\n\s*entered\.value=true;\n\s*const current=nativeManagedCurrentOwner/u);
   }},
 
+  { id: "NGHS68", name: "E5: a stop's read of an item-delivery pending state waits for a registry lock a sibling holds (the authenticating boundary is inside the wait); a lock still held is reported with holder pid, acquiredAt, owner, error code, waitedMs", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root}),repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    const read=lockWait=>runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'native-session-one',correlationId:'native-tool-one',...(lockWait?{lockWait}:{})}));
+    assert.equal(read().ok,true,'with no sibling the item-delivery pending state reads');
+    const marker=join(root,'fixture-host','sibling-holds-lock-stop');
+    // The sibling hook of the same dispatch: another process holds the registry boundary.
+    const holder=ms=>{
+      rmSync(marker,{force:true});
+      const script=`import {inspectSignedDescriptorCustodyRepository} from ${JSON.stringify(new URL('./worktree-lifecycle.mjs',import.meta.url).href)};`
+        +`import {withSessionAuthorityBoundary} from ${JSON.stringify(new URL('./session-authority-registry.mjs',import.meta.url).href)};`
+        +`import {writeFileSync} from 'node:fs';const repository=inspectSignedDescriptorCustodyRepository(${JSON.stringify(root)});`
+        +`withSessionAuthorityBoundary({repository},()=>{writeFileSync(${JSON.stringify(marker)},'held');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${ms});});`;
+      const child=spawn(process.execPath,['--input-type=module','-e',script],{stdio:'ignore'});
+      const until=Date.now()+20000;while(!existsSync(marker)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);
+      assert.ok(existsSync(marker),'the sibling took the lock');
+      return child;
+    };
+    // (a) A lock held for a few seconds is waited out: the read succeeds instead of answering "pending state missing" at once.
+    let child=holder(5000);
+    try{
+      const started=Date.now(),waited=read();
+      assert.equal(waited.ok,true,JSON.stringify(waited));
+      assert.ok(Date.now()-started>=2500,`the read waited for the sibling (${Date.now()-started} ms)`);
+    }finally{child.kill();}
+    // (b) A lock still held when the budget ends is reported with the reason AND the holder facts.
+    child=holder(12000);
+    try{
+      const stuck=read({budgetMs:300});
+      assert.equal(stuck.ok,false);assert.equal(stuck.code,'NGHS-PENDING-MISSING');assert.equal(stuck.reason,'registry-lock-held');
+      assert.equal(stuck.lock?.errorCode,'SDC-LOCK-HELD',JSON.stringify(stuck));
+      assert.equal(stuck.lock.holderPid,child.pid,'the record names the holder process');
+      assert.match(stuck.lock.acquiredAt,/^\d{4}-\d{2}-\d{2}T/u);
+      assert.equal(stuck.lock.owner,'live');
+      assert.ok(Number.isSafeInteger(stuck.lock.waitedMs)&&stuck.lock.waitedMs>=0,'waitedMs is a measured integer');
+    }finally{child.kill();}
+  })},
+
 ];
 
 /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */

@@ -378,7 +378,8 @@
           "NGHS64",
           "NGHS65",
           "NGHS66",
-          "NGHS67"
+          "NGHS67",
+          "NGHS68"
         ],
         "maxBytes": 65536
       }
@@ -644,7 +645,9 @@
           "NGHF37",
           "NGHF38",
           "NGHF39",
-          "NGHF40"
+          "NGHF40",
+          "NGHF41",
+          "NGHF42"
         ],
         "maxBytes": 65536
       }

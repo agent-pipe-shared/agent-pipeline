@@ -3,7 +3,7 @@ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativ
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
 import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
 import { admissionProgress } from './admission-progress.mjs';
-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord, inspectSessionAuthorityLock } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 /** Private runner-hook correlation state for native Goldfish host commits. */
@@ -424,16 +424,49 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
 // with 19f: NGHF-PENDING-UNAVAILABLE, reason registry-lock-held) lost a Goldfish's delivery although the pending state existed. The read waits for
 // the lock, bounded well inside the 300 s stop hook budget; only a lock still held after that is reported, with the same reason as before.
 export const NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS = 90_000;
+/**
+ * E5 (19g Windows measurement): the registry lock a stop met, as bounded facts that carry no path. `error.lock` (set by the registry's own
+ * lock refusal: owner status, pid, acquiredAt, age) is preferred; a lock refusal without it (the closure walk outside a boundary) is observed
+ * read-only through `inspectSessionAuthorityLock` when a root is known. `waitedMs` is the caller's own measure of the whole wait.
+ * Any other error is not a lock and answers null. Diagnostic only; it never changes an admission.
+ */
+export function sessionAuthorityLockFacts(error, { waitedMs = null, root = null } = {}) {
+  const held = error?.code === "SDC-LOCK-HELD" || (error?.code === "SDC-AUTHORITY-UNAVAILABLE" && error?.reason === "state-push-owner-unavailable");
+  if (!held) return null;
+  let observed = error.lock !== null && typeof error.lock === "object" ? error.lock : null;
+  if (!observed && typeof root === "string") {
+    try { const seen = inspectSessionAuthorityLock({ repository: inspectSignedDescriptorCustodyRepository(root) }); if (seen.status === "held") observed = seen; }
+    catch { /* the holder stays unnamed */ }
+  }
+  const whole = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+  const slug = (value) => (typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(value) ? value : null);
+  const at = typeof observed?.acquiredAt === "string" && Number.isFinite(Date.parse(observed.acquiredAt)) && observed.acquiredAt.length <= 40 ? observed.acquiredAt : null;
+  return { errorCode: slug(error.code), reason: slug(error.reason), waitedMs: whole(waitedMs), holderPid: whole(observed?.pid), acquiredAt: at,
+    owner: ["live", "dead", "unknown"].includes(observed?.owner) ? observed.owner : null, ageSeconds: whole(observed?.ageSeconds) };
+}
 export function readNativeGoldfishPending({ commonDir, runner, sessionId, correlationId, read = readPrivate, lockWait } = {}) {
   if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return fail("NGHS-READ-INPUT");
+  const clock = typeof lockWait?.now === "function" ? lockWait.now : Date.now, startedMs = clock();
+  let stored = null, marked = false;
+  admissionProgress("pending-read");
   try {
-    const stored = retryWhileSessionAuthorityLockHeld(() => read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`)), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}) });
-    const state = stored.value;
-    if (!nativeStateSchema(state.schema) || state.runner !== runner
-      || state.sessionId !== sessionId || state.toolUseId !== correlationId
-      || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
-    return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored), sha256: stored.sha256 };
-  } catch(error) { return { ...fail("NGHS-PENDING-MISSING"), reason:error.reason??error.message }; }
+    // E5 root cause: the authenticating boundary of an item-delivery state (authenticatedNativePendingState) takes the registry lock too, and it
+    // used to run AFTER this wait, so a sibling hook holding the lock turned into "pending state missing" at once. Read and authentication are
+    // now one attempt inside the wait. Only a refusal raised before the boundary callback ran is retried (`entered`, set as the callback's first
+    // statement): once the boundary is open its entry may have healed the catalogue, so a later lock refusal is reported, not repeated.
+    return retryWhileSessionAuthorityLockHeld((entered) => {
+      stored = read(commonDir, key("pending", runner, `${sessionId}\0${correlationId}`));
+      const state = stored.value;
+      if (!nativeStateSchema(state.schema) || state.runner !== runner
+        || state.sessionId !== sessionId || state.toolUseId !== correlationId
+        || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
+      return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored, entered), sha256: stored.sha256 };
+    }, { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(lockWait ?? {}), onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
+  } catch(error) {
+    const lock = sessionAuthorityLockFacts(error, { waitedMs: clock() - startedMs, root: stored?.value?.root });
+    if (lock) admissionProgress("lock-held");
+    return { ...fail("NGHS-PENDING-MISSING"), reason:error.reason??error.message, ...(lock ? { lock } : {}) };
+  }
 }
 
 /** Resolve Codex's SubagentStop only through its write-once agent-start binding. */
@@ -591,10 +624,11 @@ function effectiveNativePendingState(read,entry) {
   const latest=nativeScopeAmendments(read,entry,operation).at(-1);
   return latest?{...entry.value,binding:{...entry.value.binding,allowedPaths:latest.value.allowedPaths},delivery:{...entry.value.delivery,writeScope:latest.value.writeScope}}:entry.value;
 }
-function authenticatedNativePendingState(stored) {
+function authenticatedNativePendingState(stored, entered = { value: false }) {
   if(!stored.value.delivery)return stored.value;
   const repository=inspectSignedDescriptorCustodyRepository(stored.value.root);
   return withSessionAuthorityBoundary({repository},boundary=>{
+    entered.value=true;
     const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
     const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.sourceFact.sha256===stored.sha256&&row.relativePath.startsWith('pending-'));
     if(!entry)throw nativeManagedFault('native-item-scope-pending-unowned');
@@ -1068,7 +1102,7 @@ export function resolveGovernedItemQueue({ root } = {}) {
 
 /** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
  * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
-export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now()}={}) {
+export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null}={}) {
   const deadline=now()+budgetMs;let delay=25;
   for(;;){
     const entered={value:false};
@@ -1077,6 +1111,7 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
       // C18-1C: a sibling stop holding the registry also surfaces as SDC-AUTHORITY-UNAVAILABLE / state-push-owner-unavailable.
       const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable');
       if(!transient||entered.value||now()+delay>deadline)throw error;
+      if(typeof onWait==='function'){try{onWait(error,delay);}catch{/* a diagnostic never changes the wait */}}
       sleep(delay);delay=Math.min(delay*2,1000);
     }
   }

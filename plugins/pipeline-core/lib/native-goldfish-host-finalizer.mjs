@@ -3,7 +3,8 @@ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_CO
 import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
-import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS } from './native-goldfish-host-state.mjs';
+import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal, retryWhileSessionAuthorityLockHeld, NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, sessionAuthorityLockFacts } from './native-goldfish-host-state.mjs';
+import { admissionProgress } from './admission-progress.mjs';
 import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
 import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
 import { parseStrictJson } from './governance-event.mjs';
@@ -26,7 +27,11 @@ import { inspectNativeGoldfishDispatchAttempt, bindNativeGoldfishDispatchAttempt
 function fail(code, status = "recovery-required") { return { status, code, commit: null, record: null }; }
 // PF-70: a thrown refusal carries its slug reason (e.g. selected-state-invalid-json); only that bounded slug travels, never a message or path.
 function causeReason(error) { return typeof error?.reason === "string" && /^[a-z0-9][a-z0-9.-]{0,95}$/u.test(error.reason) ? error.reason : null; }
-function failAt(stage, error, fallback) { return { ...fail(error?.code ?? fallback), stage, causeReason: causeReason(error) }; }
+// E5: when the cause is a held registry lock, the bounded holder facts travel with the failure (and into the stop-failure record).
+function failAt(stage, error, fallback, waitedMs = null) {
+  const lock = sessionAuthorityLockFacts(error, { waitedMs: waitedMs ?? error?.lock?.waitedMs ?? null });
+  return { ...fail(error?.code ?? fallback), stage, causeReason: causeReason(error), ...(lock ? { lock } : {}) };
+}
 function physicalRoot(value) {
   try { return realpathSync(resolve(value)); } catch { return null; }
 }
@@ -92,7 +97,7 @@ function readSubagentStopPending({ commonDir, input }) {
   const toolUseId = resolveSubagentStopToolUseId(input);
   if (toolUseId === null) return { ok: false, code: "NGHF-STOP-UNRESOLVED" };
   const pending = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: input.session_id, correlationId: toolUseId });
-  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending) };
+  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE", reason: pendingReadReason(pending), ...(pending.lock ? { lock: pending.lock } : {}) };
   if (pending.state.completionRoute !== NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
     || pending.state.binding?.agentType !== agentType) return { ok: false, code: "NGHF-NOT-SUBAGENT-STOP-ROUTE" };
   return { ok: true, pending };
@@ -184,7 +189,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
       stopMkdir(directory, { recursive: true, mode: 0o700 });
       stopWrite(join(directory, `stop-failure-${key}.json`), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
         dispatchId: unresolved.dispatchId, toolUseId: null, status: result?.status ?? null, code: result?.code ?? null, stage: null,
-        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+        reason: typeof unresolved.reason === "string" ? unresolved.reason : null, commit: null,
+        ...(sanitizeStopFailureLock(unresolved.lock) ? { lock: sanitizeStopFailureLock(unresolved.lock) } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
       return;
     }
     if (result?.status === "authored-commit-recorded") {
@@ -213,7 +219,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
       dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
       code: result?.code ?? null, stage: typeof result?.stage === "string" ? result.stage : null,
       reason: typeof result?.causeReason === "string" ? result.causeReason : null, commit: result?.commit ?? null,
-      ...(detail ? { detail } : {}), observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+      ...(detail ? { detail } : {}), ...(sanitizeStopFailureLock(result?.lock) ? { lock: sanitizeStopFailureLock(result.lock) } : {}),
+      observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
   } catch { /* diagnostic only */ }
 }
 
@@ -242,6 +249,20 @@ export function sanitizeStopFailureDetail(detail) {
   for (const key of DETAIL_LIST_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailSlug).slice(0, 5); if (list.length > 0) out[key] = list; }
   for (const key of DETAIL_PATH_KEYS) if (Array.isArray(detail[key])) { const list = detail[key].filter(detailPath).slice(0, 5); if (list.length > 0) out[key] = list; }
   for (const key of DETAIL_COUNT_KEYS) if (Number.isSafeInteger(detail[key]) && detail[key] >= 0 && detail[key] <= 1_000_000) out[key] = detail[key];
+  return Object.keys(out).length > 0 ? out : null;
+}
+/**
+ * E5: the closed, bounded `lock` of a stop-failure result and record: the error code and reason slugs, the measured wait, the holder's pid,
+ * acquiredAt, owner status and age. Anything else is dropped, so no path and no raw exception text can travel. Exported for the hook reader.
+ * @returns {object|null}
+ */
+export function sanitizeStopFailureLock(lock) {
+  if (lock === null || typeof lock !== "object" || Array.isArray(lock)) return null;
+  const out = {};
+  for (const key of ["errorCode", "reason"]) if (detailSlug(lock[key])) out[key] = lock[key];
+  for (const key of ["waitedMs", "holderPid", "ageSeconds"]) if (Number.isSafeInteger(lock[key]) && lock[key] >= 0 && lock[key] <= 2 ** 31) out[key] = lock[key];
+  if (typeof lock.acquiredAt === "string" && lock.acquiredAt.length <= 40 && Number.isFinite(Date.parse(lock.acquiredAt))) out.acquiredAt = lock.acquiredAt;
+  if (["live", "dead", "unknown"].includes(lock.owner)) out.owner = lock.owner;
   return Object.keys(out).length > 0 ? out : null;
 }
 const withDetail = (result, detail) => { const clean = sanitizeStopFailureDetail(detail); return clean ? { ...result, detail: clean } : result; };
@@ -391,7 +412,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
       if (stop.code === "NGHF-STOP-UNRESOLVED" || stop.code === "NGHF-PENDING-UNAVAILABLE") {
         const marked = markedStopContract(input);
         if (marked) diagnostic.unresolved = { commonDir, sessionId: input.session_id, agentId: input.agent_id, dispatchId: marked.dispatchId,
-          reason: typeof stop.reason === "string" ? stop.reason : null };
+          reason: typeof stop.reason === "string" ? stop.reason : null, lock: stop.lock ?? null };
       }
       return fail(stop.code, "not-applicable");
     }
@@ -435,8 +456,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   catch (error) { return failAt("attempt-inspection", error, "NGHF-ATTEMPT-ADMISSION"); }
 
   // C18-1C: a registry lock held by a live sibling stop is waited for (bounded, injectable clock) before the typed refusal.
-  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}) }); }
-  catch(error) { return failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY"); }
+  const lockClock = typeof dependencies.lockWait?.now === "function" ? dependencies.lockWait.now : Date.now, lockStartedMs = lockClock();
+  let lockWaitMarked = false;
+  try { retryWhileSessionAuthorityLockHeld(() => (dependencies.prepareTerminal ?? prepareNativeGoldfishAuthorityTerminal)({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}), { budgetMs: NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS, ...(dependencies.lockWait ?? {}), onWait: () => { if (!lockWaitMarked) { lockWaitMarked = true; admissionProgress("lock-wait"); } } }); }
+  catch(error) { const failed = failAt("authority-terminal-prepare", error, "NGHF-AUTHORITY-RECOVERY", lockClock() - lockStartedMs); if (failed.lock) admissionProgress("lock-held"); return failed; }
+  admissionProgress("commit");
 
   let committed;
   try {

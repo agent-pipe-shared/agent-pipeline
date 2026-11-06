@@ -7,12 +7,15 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail } from "../lib/native-goldfish-host-finalizer.mjs";
+import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+import { admissionProgress } from "../lib/admission-progress.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+// E5: the same opt-in authority trace the guard hooks write (progress marks while running, the tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
+if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
 
 
 /** Called by the original Elephant host return adapter after actual checks.
@@ -64,7 +67,7 @@ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
       if (!newest || observedAt > newest.observedAt) {
         newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
           stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
-          detail: sanitizeStopFailureDetail(entry.detail) };
+          detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) };
       }
     }
     return newest;
@@ -87,6 +90,17 @@ function describeFailureDetail(detail) {
   if (clean.errorMessage) parts.push(`message "${clean.errorMessage}"`);
   if (clean.reason) parts.push(`reason ${clean.reason}`);
   return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+}
+
+/** E5: one short sentence naming the registry lock holder a failed stop met, or "" when the failure was not a lock. */
+function describeLock(lock) {
+  const clean = sanitizeStopFailureLock(lock);
+  if (!clean) return "";
+  const parts = [];
+  if (clean.errorCode) parts.push(`error ${clean.errorCode}`);
+  if (clean.waitedMs !== undefined) parts.push(`waited ${clean.waitedMs} ms`);
+  if (clean.holderPid !== undefined) parts.push(`held by pid ${clean.holderPid}${clean.owner ? ` (${clean.owner})` : ""}${clean.acquiredAt ? ` since ${clean.acquiredAt}` : ""}`);
+  return parts.length > 0 ? ` Registry lock: ${parts.join("; ")}.` : "";
 }
 
 /** E1: the one recovery sentence every failed host commit names -- the helper that verifies, commits and records in one step. */
@@ -115,7 +129,7 @@ function stopFailureNotice(failure) {
     : failure.code === "NGHF-COMMIT-EXCEPTION"
       ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
       : "";
-  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeFailureDetail(failure.detail)}`;
+  return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}`;
 }
 
 export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
@@ -157,6 +171,10 @@ if (isDirectInvocation(import.meta.url)) {
   let input;
   try { input = JSON.parse(readFileSync(0, "utf8")); }
   catch { process.exit(0); }
+  // E5: progress marks of the opt-in authority trace (no-ops without it): entry here, pending-read / lock-wait / lock-held / commit inside the
+  // finalizer, exit on every way out.
+  admissionProgress(`hook-entry:${typeof input?.hook_event_name === "string" ? input.hook_event_name.slice(0, 32) : "unknown"}`);
+  process.once("exit", () => admissionProgress("exit"));
   // T6-A: bind this Claude hook process to its own hook-observed session owner.
   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
   let result;

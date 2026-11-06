@@ -8,7 +8,8 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
-import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
+import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
+import { sessionAuthorityLockFacts } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
 import { nativeGoldfishHookMessage, readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
@@ -803,6 +804,40 @@ const cases = [
     const reseal = (r) => { const { receiptSha256, ...subject } = r; return { ...subject, receiptSha256: createHash("sha256").update(canonicalizeJson(subject)).digest("hex") }; };
     check({ receipt, root, binding, facts, git, reseal, validate: validateNativeGoldfishHostObservation });
   }, "claude", 1, "goldfish-implementor", { background: true }) })),
+  // NGHF41-NGHF42 -- E5 (19g Windows measurement): a stop that meets a held registry lock names the holder in its failure, its record and its hook message.
+  { id: "NGHF41", name: "E5: a registry lock held beyond the bound leaves the holder pid, acquiredAt, owner, error code and waited ms in the result, the stop-failure record and the hook message", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    let clock = 0;
+    const lock = Object.freeze({ owner: "live", pid: 4242, acquiredAt: "2026-11-05T10:00:00.000Z", ageSeconds: 61, waitedMs: 1500, waitBoundMs: 1500 });
+    const held = { ...dependencies, lockWait: { budgetMs: 300, now: () => clock, sleep: (ms) => { clock += ms; } }, prepareTerminal: () => {
+      throw Object.assign(new Error("held"), { code: "SDC-LOCK-HELD", reason: "registry-lock-held", lock }); } };
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, held);
+    assert.equal(failed.code, "SDC-LOCK-HELD", JSON.stringify(failed));
+    assert.deepEqual(failed.lock, { errorCode: "SDC-LOCK-HELD", reason: "registry-lock-held", waitedMs: clock, holderPid: 4242, acquiredAt: "2026-11-05T10:00:00.000Z", owner: "live", ageSeconds: 61 });
+    assert.ok(clock > 0 && clock <= 300, "the wait was measured on the injected clock");
+    const text = readFileSync(join(diagDir(commonDir), diagEntries(commonDir)[0]), "utf8");
+    assert.deepEqual(JSON.parse(text).lock, failed.lock);
+    assert.equal(text.includes(root), false);
+    const notice = nativeGoldfishHookMessage(null, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
+    assert.match(notice, /held by pid 4242 \(live\) since 2026-11-05T10:00:00\.000Z/u);
+    assert.match(notice, /error SDC-LOCK-HELD/u);
+    assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF42", name: "E5: a failure that is not a lock carries no lock facts, and a hostile lock value is reduced to its closed bounded fields", run: () => {
+    assert.equal(sanitizeStopFailureLock(null), null);
+    assert.equal(sanitizeStopFailureLock([]), null);
+    assert.deepEqual(sanitizeStopFailureLock({ errorCode: "SDC-LOCK-HELD", waitedMs: 12, holderPid: -3, acquiredAt: "not a date", owner: "root", path: "/home/x/y", reason: "a/b" }), { errorCode: "SDC-LOCK-HELD", waitedMs: 12 });
+    assert.equal(sessionAuthorityLockFacts(Object.assign(new Error("x"), { code: "NGHS-OTHER" })), null);
+    assert.equal(sessionAuthorityLockFacts(Object.assign(new Error("x"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "other" })), null);
+    const sourcePin = (name) => readFileSync(new URL(`../hooks/${name}`, import.meta.url), "utf8");
+    // Both stop-side hooks and the SubagentStart hook install the same authority trace as the guard hooks, with progress marks.
+    for (const name of ["native-goldfish-host.mjs", "subagent-start-receipt.mjs"]) {
+      const text = sourcePin(name);
+      assert.match(text, /PIPELINE_AUTHORITY_TRACE === "1"[^\n]*installHookAuthorityTrace\(\)/u, `${name} installs the authority trace`);
+      assert.match(text, /admissionProgress\(`?"?hook-entry/u, `${name} marks its entry`);
+      assert.match(text, /process\.once\("exit", \(\) => admissionProgress\("exit"\)\)/u, `${name} marks its exit`);
+    }
+  } },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

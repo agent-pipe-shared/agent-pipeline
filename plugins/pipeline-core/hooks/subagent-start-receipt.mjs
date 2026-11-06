@@ -32,6 +32,10 @@ import { resolve } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { lifecycleSubagentIdentity, recordBootstrapPreflightReceipt } from "../lib/guard/bootstrap-receipt.mjs";
+import { admissionProgress } from "../lib/admission-progress.mjs";
+
+// E5: the same opt-in authority trace the guard hooks write (progress marks, tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
+if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isDirectInvocation(import.meta.url)) await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
 
 function plainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -72,6 +76,8 @@ if (isDirectInvocation(import.meta.url)) {
   let input;
   try { input = JSON.parse(readFileSync(0, "utf8")); }
   catch { process.exit(0); }
-  try { recordSubagentStartReceipt(input); }
+  admissionProgress("hook-entry:SubagentStart");
+  process.once("exit", () => admissionProgress("exit"));
+  try { admissionProgress("receipt-write"); recordSubagentStartReceipt(input); }
   catch { /* SubagentStart is non-blocking; no receipt just means the step-0 fallback applies. */ }
 }
