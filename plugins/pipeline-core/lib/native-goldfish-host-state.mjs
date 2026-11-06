@@ -740,12 +740,12 @@ export function readNativeReservedItemScopes({repository,boundary}={}) {
 }
 
 const nativeConcurrentAuthorities=new WeakMap();
-function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPendingSha256,expectedRef}) {
+function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPendingSha256,expectedRef,scopePaths=allowedPaths}) {
   const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository}),current=nativeManagedCurrentOwner(repository);
   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
   const members=new Map(inspectNativeMemberRecords({boundary,port,producer}).map(member=>[member.record.bindingSha256,member.record]));
-  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
+  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
@@ -753,7 +753,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
     // known below, so a commit it already landed is still recognised as foreign (NGHS17).
     if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
     // Literal, retained original item scopes are the only foreign dirty paths.
-    if(member.phase!=='released')for(const path of pending.binding.allowedPaths)foreignPaths.add(path);
+    if(member.phase!=='released')for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}
     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
     if(terminal){const observed=read.entries.find(row=>row.sourceFact.sha256===terminal.value.observationSha256);
       if(!observed||!observed.value.changedPaths.every(path=>pending.binding.allowedPaths.includes(path)))throw nativeManagedFault('native-concurrent-foreign-observation');
@@ -775,14 +775,21 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   const commits=git(repository.primaryRoot,['rev-list','--reverse','--first-parent',`${baseCommit}..${head}`]);
   if(commits===null)throw nativeManagedFault('native-concurrent-head-unavailable');
   if(commits.split('\n').filter(Boolean).length>64)throw nativeManagedFault('native-concurrent-lineage-record-bound');
-  let parent=baseCommit;const lineage=[];
+  let parent=baseCommit,unproven=false;const lineage=[];
   for(const commit of commits.split('\n').filter(Boolean)){
     const parents=git(repository.primaryRoot,['rev-list','--parents','-n','1',commit])?.split(' '),proof=foreignCommits.find(row=>row.commit===commit);
-    if(!proof||parents?.length!==2||parents[1]!==parent)throw nativeManagedFault('native-concurrent-unowned-head');
+    if(parents?.length!==2||parents[1]!==parent)throw nativeManagedFault('native-concurrent-unowned-head');
+    // C19K-W246: a linear commit that is no sibling's proven host commit (an ordinary commit of the orchestrator) is accepted when it touches none of this slice's
+    // write scope, check or dependency paths, exactly as a disjoint advance of the briefing's base is; one that touches them is refused by name, as before.
+    // It must also touch no path of a sibling still in flight: such a commit may be that sibling's host commit whose proof is not written yet, and is then
+    // refused here so that the settle loop waits for the proof and the receipt keeps its sibling lineage.
+    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes]))throw nativeManagedFault('native-concurrent-unowned-head');parent=commit;unproven=true;continue;}
     const observed=read.entries.find(row=>row.sourceFact.sha256===proof.observationSha256);
     if(observed.value.parent!==parent)throw nativeManagedFault('native-concurrent-parent-proof');
     lineage.push(proof);parent=commit;
   }
+  // The receipt of a commit made on a mix of ordinary and sibling commits has no shape yet: that mix is still refused (and settled while a sibling is in flight).
+  if(unproven&&lineage.length)throw nativeManagedFault('native-concurrent-unowned-head');
   return {root:repository.primaryRoot,reference,baseCommit,parentCommit:head,foreignPaths:[...foreignPaths].sort(),foreignCommits:lineage};
 }
 function mintNativeConcurrentAuthority(input){const handle=Object.freeze({});nativeConcurrentAuthorities.set(handle,{input,plan:nativeConcurrentPlan(input)});return handle;}
@@ -833,7 +840,7 @@ export function withSourceOwnedNativeConcurrentCommit({root,pendingSha256,settle
       // An advance of HEAD that touches this slice's write scope, check or dependency paths is refused here by name, whoever made it.
       const base=pending.binding.candidateCommit;
       if(repository.candidate?.commit!==base&&nativeCommitAdvanceTouches(root,base,repository.candidate?.commit,[...pending.binding.allowedPaths,...(pending.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])]))throw nativeManagedFault('native-concurrent-advance-touches-scope');
-      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,baseCommit:base,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
+      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,scopePaths:[...pending.binding.allowedPaths,...(pending.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])],baseCommit:base,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
       entered=true;
       try{return callback(authority);}finally{nativeConcurrentAuthorities.delete(authority);}
     });}catch(error){
@@ -1110,7 +1117,26 @@ function recoverNativeAuthorityOperation({repository,owner,operation,port,bounda
   const recovered=recoverSessionAuthorityMember({boundary,producerPort:port,operationHandle:operation.handle,expectedMemberRef:matches[0].memberRef});
   operation.memberHandle=recovered.memberHandle;operation.memberRef=recovered.memberRef;
 }
-export function prepareNativeGoldfishAuthorityTerminal({repository,pendingSha256,generationOf=null,lockWait=null}){
+// C19K-W246: a sibling stop's host commit can move HEAD between the repository this call was handed and its first read of it (the second stop of a pair starts
+// while its sibling is inside the commit). Nothing has been written then, so it is looked at again on a fresh inspection, unless the advance touches this
+// slice's write scope, check or dependency paths: that is refused by name, as at the commit.
+export function prepareNativeGoldfishAuthorityTerminal(input){
+  let {repository}=input;
+  for(let attempt=1;;attempt+=1){
+    try{return prepareNativeGoldfishAuthorityTerminalOnce({...input,repository});}
+    catch(error){
+      if(error?.reason!=='native-managed-repository-drift'||attempt>=NATIVE_BOUNDARY_REBIND_LIMIT)throw error;
+      const root=repository.primaryRoot,fresh=inspectSignedDescriptorCustodyRepository(root),read=nativeAuthorityScan(nativeAuthorityOwner(fresh));
+      const entry=read.entries.find(row=>row.sourceFact.sha256===input.pendingSha256&&row.relativePath.startsWith('pending-'));
+      if(entry){
+        const binding=effectiveNativePendingState(read,entry).binding;
+        if(nativeCommitAdvanceTouches(root,binding.candidateCommit,fresh.candidate?.commit,[...binding.allowedPaths,...(binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])]))throw nativeManagedFault('native-concurrent-advance-touches-scope');
+      }
+      repository=fresh;
+    }
+  }
+}
+function prepareNativeGoldfishAuthorityTerminalOnce({repository,pendingSha256,generationOf=null,lockWait=null}){
   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
   const owner=nativeAuthorityOwner(repository);nativeAuthorityScan(owner);
   const operation=[...owner.operations.values()].find(o=>o.pendingSha256===pendingSha256);
@@ -1151,11 +1177,17 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
   const completed=writeBoundary((boundary,repository)=>{
     writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
       terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});
-    operation.phase='terminal-observed';const advanced=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=advanced.memberRef;
+    // C19K-W246: a sibling stop writing its own post-commit files while this one advances or releases changes the registry domain under the read
+    // (domain-membership-race) or makes this process's view of the sibling's operation stale (native-authority-member-drift). Both are refused before this
+    // call commits anything, so the view is re-read and the call repeated a bounded number of times; a real conflict still ends in the same named refusal.
+    const reread=call=>{for(let attempt=1;;attempt+=1){try{return call();}catch(error){
+      if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT||!['native-authority-member-drift','domain-membership-race'].includes(error?.reason))throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50*attempt);nativeAuthorityScan(owner);}}};
+    operation.phase='terminal-observed';const advanced=reread(()=>advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle}));operation.memberRef=advanced.memberRef;
     const [inventory]=readNativeManagedInventory(repository,'native-goldfish');
     if(inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value.delivery)
       return {status:'integration-pending',code:'NGHS-ITEM-RESERVATION-HELD',memberRef:operation.memberRef};
-    return releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle});
+    return reread(()=>releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle}));
   });
   if(completed.status!=='integration-pending')return completed;
   const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;

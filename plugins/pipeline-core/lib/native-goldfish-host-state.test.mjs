@@ -786,8 +786,11 @@ const cases = [
     assert.throws(()=>inspectSourceOwnedNativeConcurrentAuthority(expired,{root}),'the borrowed authority expires when its actual boundary returns');
     const originalRef=spawnSync('git',['-C',root,'symbolic-ref','HEAD'],{encoding:'utf8'}).stdout.trim();assert.equal(spawnSync('git',['-C',root,'update-ref','refs/heads/aliased-primary',original.candidate.commit]).status,0);assert.equal(spawnSync('git',['-C',root,'symbolic-ref','HEAD','refs/heads/aliased-primary']).status,0);
     assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-reference-drift','an alias branch with equal commit cannot replace the admitted primary ref');assert.equal(spawnSync('git',['-C',root,'symbolic-ref','HEAD',originalRef]).status,0);
-    writeFileSync(join(root,'unowned.txt'),'unauthenticated HEAD change');assert.equal(spawnSync('git',['-C',root,'add','unowned.txt']).status,0);assert.equal(spawnSync('git',['-C',root,'commit','-qm','unauthenticated foreign change']).status,0);
-    assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-unowned-head','HEAD ancestry alone cannot substitute for a genuine Source return');
+    // C19K-W246 (QG-04, restated in place): an unproven commit on a path outside the slice's scope, checks and dependencies is now accepted
+    // as a disjoint advance (NGSP9B pins that); the unauthenticated foreign change therefore touches the slice's own write scope here, which
+    // must still refuse, now by the more specific reason the rebind route names (native-concurrent-advance-touches-scope).
+    writeFileSync(join(root,'src','change.mjs'),'export const unauthenticated = true;\n');assert.equal(spawnSync('git',['-C',root,'add','src/change.mjs']).status,0);assert.equal(spawnSync('git',['-C',root,'commit','-qm','unauthenticated foreign change']).status,0);
+    assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-advance-touches-scope','HEAD ancestry alone cannot substitute for a genuine Source return on the slice\'s own paths');
   })},
 
 

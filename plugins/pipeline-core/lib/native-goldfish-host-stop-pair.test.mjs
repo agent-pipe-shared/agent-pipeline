@@ -92,6 +92,12 @@ const SAR = new URL("../scripts/session-authority-repair.mjs", import.meta.url).
 const runCli = (script, args) => { const r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" }); let json = null; try { json = JSON.parse(r.stdout); } catch { /* reported with the stderr below */ } return { status: r.status, json, text: `${r.stdout.slice(0, 1500)} ${r.stderr.slice(0, 600)}` }; };
 const inspectRegistry = (root) => runCli(SAR, ["inspect", "--root", root]);
 const registryProblems = (inspect) => (inspect.json?.registry?.producers ?? []).filter((row) => row.status !== "ok");
+/** C19K-W246: the receipt of the later stop of a pair names the earlier stop's host commit as its sibling proof (the settle keeps the lineage). */
+function assertSiblingProof(repository, commit) {
+  const dir = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
+  const proofs = readdirSync(dir).filter((name) => name.startsWith("observation-")).map((name) => JSON.parse(readFileSync(join(dir, name), "utf8"))).flatMap((row) => row.foreignCommits ?? []);
+  assert.ok(proofs.some((row) => row.commit === commit), `a receipt names the first stop's commit as foreign: ${JSON.stringify(proofs)}`);
+}
 /** Two admitted launches that both land their host commits, one after the other in the given order (the second one lands on top of the first's commit). */
 function landPair(runtime, root, pair) {
   for (const one of pair) { const admitted = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })); assert.equal(admitted.ok, true, `${one.id} admitted: ${JSON.stringify(admitted).slice(0, 900)}`); }
@@ -101,7 +107,14 @@ function landPair(runtime, root, pair) {
 
 /** One real stop in its own process: own controlled-method runtime, admits its own launch, waits for the start gate, then stops. Both stops of a pair wait for
  * each other after the terminal preparation and then reach the commit lock together; the commit is held 300 ms inside the lock so the second one meets it. */
-function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
+function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sync" }) {
+  // C19K-W246 (A): mode "early" stops without waiting for the other and marks its host commit; mode "late" starts its terminal preparation (on the repository the
+  // finalizer inspected before) only once the early stop has finished (its host commit moved HEAD), so it holds a repository inspected before that commit. Waiting for the early stop's own post-commit writes keeps this case off the separate authority-terminal-release race (see the notes).
+  const prepareTerminal = mode === "late" || mode === "late-sim" ? `args=>{wait(join(dir,${mode === "late" ? "'out-'+other+'.json'" : "'committed-'+other"}),60000);return prepareNativeGoldfishAuthorityTerminal(args);}`
+    : mode === "early" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
+    : `args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;}`;
+  const commit = mode === "early" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
+    : `request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}`;
   const url = (name) => JSON.stringify(new URL(name, import.meta.url).href);
   const script = `import {existsSync,readFileSync,writeFileSync} from 'node:fs';import {join} from 'node:path';`
     + `import {inspectSignedDescriptorCustodyRepository} from ${url("./worktree-lifecycle.mjs")};`
@@ -119,20 +132,20 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
     + `const admitted=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input:launch}));if(admitted.ok!==true)throw new Error('admission '+JSON.stringify(admitted));`
     + `writeFileSync(join(dir,'admitted-'+tag),'1');wait(join(dir,'go'),120000);`
     + `result=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned},{`
-    + `prepareTerminal:args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;},`
-    + `commit:request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}}));`
+    + `prepareTerminal:${prepareTerminal},`
+    + `commit:${commit}}));`
     + `}catch(error){result={thrown:String(error?.code??error?.message)};}`
     + `writeFileSync(join(dir,'out-'+tag+'.json'),JSON.stringify(result));`;
   return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "ignore", openSync(join(dir, `stderr-${tag}.log`), "w")] });
 }
 
 /** Both launches stop for real, each in its own process (see stopChild); `round` keeps the runtimes of a later pair apart from an earlier one's. Returns both results. */
-async function concurrentPair(root, launches, round = "") {
+async function concurrentPair(root, launches, round = "", { staged = false } = {}) {
   // The markers live outside the repository: the host-commit admission compares the working tree to its baseline and must not see them.
   const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
   const children = launches.map((one, index) => {
     writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
-    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`) });
+    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
   });
   const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
   try {
@@ -158,7 +171,7 @@ const cases = [
     assert.equal(git(root, "rev-parse", `${first.commit}^`), original.candidate.commit, "the first stop landed on the original candidate");
     assert.equal(git(root, "rev-parse", `${second.commit}^`), first.commit, "the second stop landed on top of the first's host commit");
     assert.equal(git(root, "rev-parse", "HEAD"), second.commit);
-    void repository;
+    assertSiblingProof(repository, first.commit);
   }) },
 
   { id: "NGSP2", name: "C19J-W242 (A): a sibling advance that touches this slice's own scope is still refused, and the stop-failure result names the cause", run: () => fixture(({ root }) => {
@@ -271,6 +284,54 @@ const cases = [
     for (const name of names) if (name === sibling || (name.startsWith("authority-") && name.includes(proof.pendingSha256))) rmSync(join(dir, name));
     const inspect = inspectRegistry(root);
     assert.deepEqual(registryProblems(inspect).map((row) => [row.producerId, row.reason]), [["native-goldfish", "native-concurrent-receipt-lineage"]], inspect.text);
+  }) },
+
+  // C19K-W246 (AC-108): a HEAD advance that touches none of the slice's write scope, check or dependency paths is accepted wherever it comes from.
+  { id: "NGSP9", name: "C19K-W246 (A): a second stop whose terminal preparation holds a repository inspected before the first stop's host commit moved HEAD rebinds and lands its own host commit on top", run: () => fixture(async ({ root }) => {
+    const { launch, original } = setup(root, { ownRuntime: false });
+    const results = await concurrentPair(root, [launch(0), launch(1)], "", { staged: true });
+    for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results));
+    assert.equal(git(root, "rev-parse", `${results[0].commit}^`), original.candidate.commit, "the early stop landed on the original candidate");
+    assert.equal(git(root, "rev-parse", `${results[1].commit}^`), results[0].commit, "the late stop landed on top of the early stop's host commit");
+    assert.equal(git(root, "rev-parse", "HEAD"), results[1].commit);
+  }) },
+
+  { id: "NGSP9B", name: "C19K-W246 (B): an ordinary commit on another path between the slice's base and its stop (not a Goldfish host commit) does not stop the host commit", run: () => fixture(({ root }) => {
+    const { runtime, launch, original } = setup(root);
+    const one = launch(0);
+    assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true);
+    writeFileSync(join(root, "plan-note.txt"), "an ordinary orchestrator commit\n"); git(root, "add", "--", "plan-note.txt"); git(root, "commit", "-q", "-m", "plan document");
+    const advanced = git(root, "rev-parse", "HEAD");
+    writeFileSync(join(root, one.file), one.content);
+    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
+    assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
+    assert.equal(git(root, "rev-parse", `${result.commit}^`), advanced, "the host commit sits on the advanced HEAD");
+    assert.notEqual(advanced, original.candidate.commit);
+    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after a host commit on an advanced HEAD without sibling proof");
+  }) },
+
+  { id: "NGSP9C", name: "C19K-W246 (B): an ordinary commit that touches the slice's check path still refuses with a named stop-failure record, and commits nothing", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const one = launch(0);
+    assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true);
+    writeFileSync(join(root, "src/change.test.mjs"), "// an ordinary commit on the slice's check\n"); git(root, "add", "--", "src/change.test.mjs"); git(root, "commit", "-q", "-m", "ordinary commit on the check");
+    const head = git(root, "rev-parse", "HEAD");
+    writeFileSync(join(root, one.file), one.content);
+    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
+    assert.notEqual(result.status, "authored-commit-recorded", JSON.stringify(result));
+    assert.equal(result.detail?.reason, "native-concurrent-advance-touches-scope", JSON.stringify(result));
+    assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the advance");
+  }) },
+
+  // The real Windows case: the second stop starts its terminal preparation while the first stop is inside, and then finishing, its host commit.
+  { id: "NGSP9D", name: "C19K-W246 (A): simultaneous: a second stop whose terminal preparation starts once the first stop's host commit moved HEAD, while that stop is still writing, lands its own host commit with the first one as its sibling proof", run: () => fixture(async ({ root }) => {
+    const { repository, launch, original } = setup(root, { ownRuntime: false });
+    const results = await concurrentPair(root, [launch(0), launch(1)], "", { staged: "simultaneous" });
+    for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results));
+    assert.equal(git(root, "rev-parse", `${results[0].commit}^`), original.candidate.commit);
+    assert.equal(git(root, "rev-parse", `${results[1].commit}^`), results[0].commit, "the late stop landed on top of the early stop's host commit");
+    assertSiblingProof(repository, results[0].commit);
+    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the simultaneous pair");
   }) },
 ];
 

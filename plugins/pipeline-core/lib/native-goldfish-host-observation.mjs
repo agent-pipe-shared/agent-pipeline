@@ -117,7 +117,7 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
     return fail("NGHO-DRAFT-INPUT");
   }
   const version = state.binding.adapterVersion === 2 ? 2 : 1;
-  let shared=null;try{if(nativeAdmission){const plan=inspectSourceOwnedNativeConcurrentAdmission(nativeAdmission);if(plan.baseCommit!==state.binding.candidateCommit||plan.parentCommit!==commitReadback.parent)return fail("NGHO-SHARED-PARENT");if(plan.foreignCommits.length)shared=plan;}}catch{return fail("NGHO-SHARED-AUTHORITY");}
+  let shared=null;try{if(nativeAdmission){const plan=inspectSourceOwnedNativeConcurrentAdmission(nativeAdmission);if(plan.baseCommit!==state.binding.candidateCommit||plan.parentCommit!==commitReadback.parent)return fail("NGHO-SHARED-PARENT");if(plan.foreignCommits.length)shared=plan;else if(plan.parentCommit!==plan.baseCommit&&!movedHead)movedHead={admittedHead:plan.parentCommit,baselineCommit:plan.baseCommit};}}catch{return fail("NGHO-SHARED-AUTHORITY");}
   const subject = { ...(shared?{adapterVersion:version,foreignCommits:shared.foreignCommits}:movedHead?{movedHead:{admittedHead:movedHead.admittedHead,baselineCommit:movedHead.baselineCommit}}:{}),schema: shared?NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA:version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
     runner: state.runner, dispatchId: state.binding.dispatchId, sessionId: state.sessionId,
     toolUseId: state.toolUseId, agentId: state.agentId,
