@@ -524,6 +524,27 @@ Item (2) reproduced on Linux (19i installed): two probes of one reply with track
 - **Proposed 19l (awaiting the PO):**
   1. The stop's pending read re-inspects and retries a `repository-binding-changed` refusal raised before the boundary was entered, within its stop budget.
   2. A SubagentStop that leaves a stop-failure or unresolved record names it and the recover command in its own hook output.
+## Candidate 19l build record (2026-11-06, PO: "Baue alle fixes für einen stabilen Kandidaten ein")
+
+PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is stability only, the stop latency is a separate later topic.
+
+- **w250** (Elephant, held patch 9886754a4):
+  - The stop's pending read retries `repository-binding-changed` raised before the boundary opened.
+  - The terminal write boundary is repeated on a fresh boundary, at most 8 rounds, on sibling races. This covers the NGSP7 and NGSP9D release flake.
+  - An unresolved marked stop names its own record as `systemMessage` and on stderr.
+  - Tests extended (NGFO01, NGHF29, NGHF30); VCR01 fanout pin 52 to 67 (QG-04, restated in place).
+- Apply script `po-apply-0.7-candidate19l.sh` (base = the stamped 19k efb347f73). Rehearsal in a fresh clone of 9886754a4:
+  - exit 0, one patch commit plus one derived-files commit.
+  - Registration 1183; case-completion 392; gitleaks PASS (148 ignored).
+- Suites:
+  - Rehearsal clone: fanout, finalizer and VCR 90/90.
+  - Slice clone: host-state 79/79; stop-read-scope, finalizer regression and background pin 28/28; commit execution and guard-dispatch 90/90; stop-pair alone 13/13.
+  - Stop-pair together with host-state, the load under which the flake appeared: 3/3.
+- Next:
+  1. PO applies, then stamps on PO call, then installs.
+  2. Windows: heal; pair A and pair B, both background, with the second stop starting during the first one's commit, so both host commits land; check that a forced or real stop failure is shown as `systemMessage`.
+  3. Greenfield, then Full Verify and Critics, then PO acceptance.
+
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
