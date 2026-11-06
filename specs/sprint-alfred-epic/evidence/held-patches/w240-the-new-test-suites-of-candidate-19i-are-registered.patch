@@ -1,0 +1,169 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index fc2ef2884..871a22c21 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -632,11 +632,13 @@
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-commit-execution-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-tests",
++        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-parallel-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-return-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-return-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-fanout-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
++        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-managed-inventory-reuse-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
+@@ -1091,6 +1093,7 @@
+         "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
+         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
++        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fewer-checks-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fsync-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+@@ -1174,6 +1177,7 @@
+         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-native-type-cache-tests",
++        "verify-phase:harness/scripts/verify.mjs:windows-node-authority-reads-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-observation-memo-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+         "verify-phase:harness/scripts/verify.mjs:wire-dispatch-budget-hook-tests",
+@@ -1182,6 +1186,7 @@
+         "verify-phase:harness/scripts/verify.mjs:worktree-count-check-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
++        "verify-phase:harness/scripts/verify.mjs:custody-inspection-spawns-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-process-start-tests",
+         "verify-phase:harness/scripts/verify.mjs:worktree-target-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 305df5c0d..8ed012963 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1169,6 +1169,11 @@
+       "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "native-goldfish-host-parallel-admission-tests",
++      "path": "plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "native-goldfish-host-return-regression-tests",
+       "path": "plugins/pipeline-core/lib/native-goldfish-host-return-regression.test.mjs",
+@@ -1194,6 +1199,11 @@
+       "path": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "native-goldfish-host-stop-read-scope-tests",
++      "path": "plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "native-platform-process-observer-tests",
+       "path": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 188693dca..4ff1769d2 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -234,7 +234,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["installed-plugin-attestation-inline-action-tests","plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs","top-level-assertions",28],
+     ["mid-session-hook-refresh-tests","plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs","top-level-assertions",21],
+     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
++    ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
+     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
++    ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
+     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
+     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
+     ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
+@@ -291,7 +293,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
+   assert.equal(classified.length, result.vulnerableCount,
+     "all classified Verify registrations must have a completion-registry row");
+-  assert.equal(result.registryCount, 389);
++  assert.equal(result.registryCount, 391); // cand. 19i w240 (QG-04: extension only): 389 -> 391, the two new required rows of w236 and w237
+   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
+   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
+   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
+@@ -335,7 +337,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "install-agy-inline-candidate-tests",
+     "installed-bootstrap-import-closure-tests",
+     "installed-plugin-attestation-inline-action-tests",
++    "native-goldfish-host-parallel-admission-tests",
+     "native-goldfish-host-state-fanout-tests",
++    "native-goldfish-host-stop-read-scope-tests",
+     "native-platform-process-observer-tests",
+     "onboarding-greenfield-walk-tests",
+     "onboarding-init-machine-plane-reason-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 025600360..27f0ed811 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4600,6 +4600,61 @@
+       "file": "plugins/pipeline-core/lib/authority-seal-plan.test.mjs",
+       "invariantPinned": "The seal of a draft design package is one agent-prepared, digest-bound plan (every PRD, Spec, design-input and result digest, the capture digest, the digests each review bound, the State revision and the plan digest) that never writes State; it refuses with a typed code and exits on a stale review, a provenance difference, an already sealed package and a package outside the PRD release scope; the plan digest is an additive key of the design approval binding so that the one signature covers it and existing signed approvals verify unchanged; approve-plan applies the seal in the same transaction (digests written, sealed marker removed, one revision) and refuses on a missing, stale, unpresented or drifted plan; reopen-design voids a prepared plan and a sealed package keeps its old approval path (C19 late-binding build step 4)",
+       "nonOverlapNote": "Unique cases: lib/authority-seal-plan.mjs, the prepare-seal command and the seal transaction of approve-plan; design-approval-binding tests pin the binding digest, authority-seal-readers tests pin the draft readers"
++    },
++    {
++      "name": "native-goldfish-host-parallel-admission-tests",
++      "file": "plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs",
++      "invariantPinned": "Two and four Goldfish admissions started at once with disjoint write scopes are all admitted: every registry boundary entry of the admission, including the integration readiness read, waits for a sibling's lock within the admission deadline, and a queue changed only by a sibling's admitted disjoint slice is re-read instead of refused; a changed own row, an overlapping new row and a lock held past the deadline still refuse with nothing written (C19i w236, AC-108)",
++      "nonOverlapNote": "Unique cases: the parallel admission end to end; native-goldfish-host-state tests pin the single admission and the w233 queue preparation wait",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "NGPA1",
++          "NGPA2",
++          "NGPA3",
++          "NGPA4",
++          "NGPA5",
++          "NGPA6",
++          "NGPA7"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "native-goldfish-host-stop-read-scope-tests",
++      "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs",
++      "invariantPinned": "A SubagentStop reads its pending state under the lock-free read scope with a generation check, so a sibling holding the registry lock does not block the read, a generation change is detected and retried, the exclusive lock is taken only for the writes, the pending state is authenticated at most twice per stop, a first write that cannot take the lock fails typed with the holder named, and the lock waits of one stop share a 240 s ceiling (C19i w237, O10, AC-108)",
++      "nonOverlapNote": "Unique cases: the stop's read scope and lock windows; finalizer and host-state tests pin the host commit and the w234 holder fields",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "NGSR01",
++          "NGSR02",
++          "NGSR03",
++          "NGSR04",
++          "NGSR05",
++          "NGSR06"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "session-authority-registry-fewer-checks-tests",
++      "file": "plugins/pipeline-core/lib/session-authority-registry-fewer-checks.test.mjs",
++      "invariantPinned": "The registry skips the second native inspect of a file read in the same boundary, skips a repeated entry heal while the first strict read that meets a drift still heals and repeats, keeps participant source digests across processes keyed on the file identity, compares only the override producer's baseline for an override refusal and prunes settled members without ever reporting a successful release as failed (C19i w238, O7, O8, O3 ii, O9, AC-108)",
++      "nonOverlapNote": "Unique cases: the reduced native checks of the registry and lib/source-digest-memo.mjs; session-authority-repair and lock-wait tests pin repair and locking"
++    },
++    {
++      "name": "windows-node-authority-reads-tests",
++      "file": "plugins/pipeline-core/lib/windows-node-authority-reads.test.mjs",
++      "invariantPinned": "On Windows private reads and inspects are answered in Node (bigint lstat identity, symlink and junction refusal, final-path equality, before and after identity and hash of a read) while create, publish and remove stay native, and the native ancestor observation runs only for the boundary roots; a symlink, a link and a changed file are still refused (C19i w239, O5c and O1a by PO decision with the protection loss accepted, AC-108)",
++      "nonOverlapNote": "Unique cases: the Node read path of the Windows backend and the root-only ancestor walk; the Windows pins and session-authority-repair tests pin the native rules that remain"
++    },
++    {
++      "name": "custody-inspection-spawns-tests",
++      "file": "plugins/pipeline-core/lib/custody-inspection-spawns.test.mjs",
++      "invariantPinned": "The custody inspection resolves HEAD from the ref files with a per-process commit to tree map and falls back to git for every unusual shape, the repository topology is memoized per process with physical re-validation, the Windows private-state ACL batch observes an unchanged tree once, and every answer equals a fresh git or PowerShell call, including a HEAD moved inside one process (C19i w241, AC-108)",
++      "nonOverlapNote": "Unique cases: the process-start counts of worktree-lifecycle custody inspection and windows-private-state; worktree-lifecycle and windows-private-state tests pin the answers"
+     }
+   ]
+ }
