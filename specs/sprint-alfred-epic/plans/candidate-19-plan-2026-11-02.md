@@ -473,6 +473,36 @@ Item (2) reproduced on Linux (19i installed): two probes of one reply with track
 - **Follow-ups found while operating 19j (PO 2026-11-06):** (a) move-aside is a heal step an agent runs on its own when no Goldfish runs; `routine-repair run heal` names `routine-repair run move-aside --no-goldfish-running` as the way out, but `routine-repair run move-aside` then refuses `RR-OUTSIDE-LIST` for a stale reservation finding: a contradiction against never-fully-blocking; heal should un-arm or move aside stale members automatically. (b) Help texts need agent guidance that works the first time: `slice-queue cancel` needed four attempts (`--reason`, then `--class`, then `--started`, each revealed only by the previous refusal); a refusal should name the full working command in one step. (c) The Linux move-aside was done through `session-authority-repair move-aside --no-goldfish-running` after cancelling the superseded slice C19I-LINUX-PROBE-19I (`--started --class superseded`).
 - Open: Linux pair re-run (both host commits land); Windows peer protocol (inspect-aside on the retained aside, two clean pairs, second stop lands after the sibling's commit, `wait` after a host commit returns, a refused admission leaves no row); Full Verify, Critic review and PO acceptance; then the greenfield test.
 
+## Candidate 19k build record (2026-11-06, PO: "okay bitte alle für den nächsten kandidaten beheben")
+
+- **w245** (Goldfish deep, recovered as an orchestrator commit 0150cf1d): a settled pending state without an owner operation never makes the registry read or initialization fail; the owner operations are created before the checking loop, and the routine heal retires such states.
+- **w246** (Goldfish deep, completed by the Elephant, 7f33ff928, applies on w245):
+  - The terminal prepare rebinds after a disjoint sibling advance.
+  - A disjoint unproven commit is accepted, while an advance touching the slice scope still refuses with `native-concurrent-advance-touches-scope` (NGHS18 restated in place on the slice path).
+  - A release race gets a bounded re-read.
+- **w247** (Goldfish, completed by the Elephant, b73abcd7b):
+  - `slice-queue cancel` refusals name the full working command.
+  - The hook context names the current stop-failure record.
+  - Failed native observations are traced with operation, site and bounded code, and no path.
+- **w248** (Elephant, 8facd8fe6): `routine-repair run heal --no-goldfish-running` moves a stale armed member aside and then heals, with no human. `routine-repair run move-aside` admits the stale reservation finding heal names, and the deferral names the heal command.
+- **w249** (Elephant, c9301d1c8):
+  - `agent-guidance-w247-tests` registered.
+  - Stop-pair row caseIds NGSP1 to NGSP9D.
+  - VCR01 stop-pair pin 32 to 66 (QG-04, restated in place).
+- Apply script `po-apply-0.7-candidate19k.sh` (c3e66a467, base = the stamped 19j b2c0bdb15). Rehearsal in a fresh clone of c3e66a467:
+  - exit 0, five patch commits plus one derived-files commit.
+  - Registration 1183, 0 unregistered; case-completion valid, 392 entries; gitleaks PASS (148 ignored).
+- Suites on the rehearsal clone:
+  - routine repair, agent guidance w247, VCR and slice-queue: 103/103.
+  - stop-pair together with host-state: one run 91/92, then 92/92.
+- **Open flake, not resolved:** NGSP7 (w245 pair case) failed occasionally, each time only while running in parallel with another heavy suite (on the chain clone, then once on the rehearsal clone). The failure seen on the chain clone was at release, `native-managed-unknown-native-entry`. It is green when run alone and on most parallel re-runs. The PO decided not to hunt it further (token cost); it stays open for Full Verify and the Windows protocol.
+- Next:
+  1. PO applies, then stamps on PO call, then installs.
+  2. Linux pair.
+  3. Windows protocol: two clean pairs including the second stop starting during the first one's commit; `routine-repair run heal --no-goldfish-running`; the trace `failures` codes; stop latency against 19i.
+  4. Greenfield, then Full Verify and Critics, then PO acceptance.
+- **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
