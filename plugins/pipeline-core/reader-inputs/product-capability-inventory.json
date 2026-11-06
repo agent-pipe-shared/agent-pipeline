@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "7f4d8cfb7a4aa07ee687abd26b574d84673b3aba",
-    "tree": "ee00029f8be3a8e0a34dddf53894a680a122f995"
+    "commit": "c26008fa6a49084705ec2a5501fa58dfa3377029",
+    "tree": "33c092e0dd3994215c8b858349c3c57cdd0a8c6d"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -639,6 +639,7 @@
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
         "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-read-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-stop-pair-tests",
         "verify-phase:harness/scripts/verify.mjs:native-managed-inventory-reuse-tests",
         "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
@@ -1094,8 +1095,10 @@
         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fewer-checks-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-authority-registry-leftover-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-registry-fsync-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-repair-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-authority-repair-aside-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-lost-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
