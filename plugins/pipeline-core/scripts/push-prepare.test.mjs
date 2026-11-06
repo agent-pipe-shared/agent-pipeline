@@ -1723,11 +1723,19 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and 
     assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
     mkdirSync(join(root, "specs/unit"), { recursive: true });
     writeFileSync(join(root, "specs/unit/slice-queue.json"), "{}\n");
+    // A TRACKED foreign change refuses; an untracked foreign file is left alone and listed (w231, asserted below).
     writeFileSync(join(root, "other.txt"), "x\n");
+    assert.equal(git("add", "other.txt").status, 0);
+    assert.equal(git("commit", "-q", "-m", "track other").status, 0);
+    writeFileSync(join(root, "other.txt"), "changed\n");
     const run = (...argv) => commitPipelineOwned(argv, { spawn: (command, args, options) => spawnSync(command, [args[0], args[1], ...config, ...args.slice(2)], options) });
     const refused = run("--root", root, "--human");
     assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["other.txt"]);
-    rmSync(join(root, "other.txt"));
+    assert.equal(git("checkout", "--", "other.txt").status, 0);
+    writeFileSync(join(root, "loose.txt"), "y\n");
+    const loose = run("--root", root, "--human", "--dry-run");
+    assert.equal(loose.status, "dry-run", JSON.stringify(loose)); assert.deepEqual(loose.untouched, ["loose.txt"], "an untracked foreign file is listed, not committed");
+    rmSync(join(root, "loose.txt"));
     assert.equal(run("--root", root, "--human", "--dry-run").status, "dry-run");
     const committed = run("--root", root, "--human");
     assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);

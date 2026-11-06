@@ -128,6 +128,23 @@ test("E2: a probe that throws is reported as unknown, never swallowed into ready
   assert.notEqual(cap.status, "ready");
 });
 
+test("E2 (C19m w251): the real lock probe on a real repository with no lock reports absent, so the lock row is ready, not degraded", () => {
+  const root = mkdtempSync(join(tmpdir(), "w251-lock-"));
+  try {
+    const git = (...args) => spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
+    assert.equal(git("init", "-q").status, 0);
+    assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
+    let seen = null;
+    const spied = preflight.defaultRegistryLockProbe({ cwd: root, inspect: (input) => { seen = input; return registry.inspectSessionAuthorityLock(input); } });
+    assert.deepEqual(Object.keys(seen.repository).sort(), ["candidate", "commonDir", "primaryRoot"], "the registry receives exactly the custody repository shape");
+    assert.deepEqual(spied, { status: "absent" });
+    assert.deepEqual(preflight.defaultRegistryLockProbe({ cwd: root }), { status: "absent" });
+    const cap = preflight.observeCloseAndPushCapability({ platform: "linux", ...okProbes, lockProbe: () => preflight.defaultRegistryLockProbe({ cwd: root }) });
+    assert.equal(cap.checks.find((row) => row.id === "lock").status, "ready");
+    assert.equal(preflight.defaultRegistryLockProbe({ cwd: join(root, "missing") }).status, "unknown", "an unreadable repository still degrades, never ready");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // --- W2: the four digest-bound bootstrap facts -----------------------------------------------------------------------------------
 
 function projectWith(files) {

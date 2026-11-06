@@ -55,6 +55,7 @@ import {
 import {
   discoverRepository,
   inspectSessionOwnerRuntime,
+  inspectSignedDescriptorCustodyRepository,
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
 import { planInstall } from "./pre-push-hook-install.mjs";
@@ -2492,8 +2493,13 @@ export function main(options = {}) {
 }
 
 /** E2: the registry lock as the capability probe sees it; any fault is `unknown`, which degrades the row and never reads as ready. */
-function defaultRegistryLockProbe() {
-  try { return inspectSessionAuthorityLock({ repository: discoverRepository(resolve(process.cwd())) }); }
+/**
+ * The registry takes exactly the custody repository shape ({primaryRoot, commonDir, candidate}); the wider
+ * discoverRepository() result (start, objectFormat, worktrees) was refused there, so the lock row read
+ * "could not be observed" even with no lock present (C19m w251, found on both machines in 19l).
+ */
+export function defaultRegistryLockProbe({ cwd = process.cwd(), inspect = inspectSessionAuthorityLock } = {}) {
+  try { return inspect({ repository: inspectSignedDescriptorCustodyRepository(discoverRepository(resolve(cwd)).primaryRoot) }); }
   catch { return { status: "unknown" }; }
 }
 

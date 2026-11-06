@@ -61,6 +61,16 @@
       "owner": "Elephant",
       "signed": false,
       "reason": "Historical, unsigned exception recorded by the Elephant (third entry of this kind, under the PO decision of 2026-11-04): this one commit gave the existing analysis-run command admission registry row its first caseCompletion policy in place, so gate coverage only grew. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the row is otherwise unchanged."
+    },
+    {
+      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
+      "commit": "d9731d0468e3b932efb79a47749ce20f223a75f2",
+      "parent": "edf8b17f6ef0adda3edaa89895f95ee6bc672191",
+      "preimageSha256": "0e2a0df6a67d0571d2b54f30a12668cebde9105af87fce8fc6e8b2c517b8dcda",
+      "postimageSha256": "0347080d9c96b5fb939a4f1255c8b73f1c38970a8cc8dc0686130d7b30af361f",
+      "owner": "Elephant",
+      "signed": false,
+      "reason": "Historical, unsigned exception recorded by the Elephant (fourth entry of this kind, found by the candidate 19l Full Verify): this one commit (candidate 19k, w249) extended the caseCompletion case-ID list of the existing native Goldfish host stop-pair registry row by NGSP6 to NGSP9D in place and appended two clauses to the same row's pinned invariant, and inserted one row. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the old invariant text is an exact prefix of the new one and that the row is otherwise unchanged."
     }
   ]
 }

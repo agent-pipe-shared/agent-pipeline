@@ -64,7 +64,10 @@ export const LOCAL_WORKER_SUPERVISOR_REQUEST_VALIDATION_CONTRACT = Object.freeze
 });
 
 const FIXTURE_WORKER = realpathSync(fileURLToPath(new URL("../scripts/fixtures/local-worker-supervisor-worker.mjs", import.meta.url)));
-const NODE_EXECUTABLE = realpathSync(process.execPath);
+// Resolved on first use, not at import: a consumer that only imports this module (for example an installed package
+// read under Node's permission model with reads limited to the package) must not need read access to the Node binary.
+let nodeExecutableMemo = null;
+const nodeExecutable = () => (nodeExecutableMemo ??= realpathSync(process.execPath));
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -172,7 +175,7 @@ function validRunner(value) {
       && ["low", "medium", "high", "xhigh"].includes(value.effort)
       && value.fixture === null;
   }
-  return value.executable === NODE_EXECUTABLE
+  return value.executable === nodeExecutable()
     && value.model === null && value.effort === null
     && exact(value.fixture, ["delayMs", "exitCode", "behavior"])
     && safeInteger(value.fixture.delayMs, 100, 30_000)
@@ -448,7 +451,7 @@ function observeSource(request) {
 
 function observeRunner(request) {
   try {
-    if (request.runner.kind === "fixture") return request.runner.executable === NODE_EXECUTABLE;
+    if (request.runner.kind === "fixture") return request.runner.executable === nodeExecutable();
     const version = execFileSync(request.runner.executable, ["--version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],

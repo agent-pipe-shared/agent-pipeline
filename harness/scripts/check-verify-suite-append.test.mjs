@@ -392,6 +392,19 @@ test("evaluateCaseListExtension also admits a first case-completion policy on a 
   assert.equal(run(before, noChange).code, "VSA-REWRITE-NO-EXTENSION");
 });
 
+test("evaluateCaseListExtension admits an appended invariant clause only together with a case-list extension of the same row (C19m w251)", () => {
+  const pinned = (name, ids, text) => ({ ...kCased(name, ids), invariantPinned: text });
+  const before = registryText([kPlain("a"), pinned("b", ["B1"], "old clause")]);
+  const run = (b, a) => evaluateCaseListExtension({ entry: kEntry("b".repeat(40), "a".repeat(40), b, a), commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a });
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old clause; new clause")])).ok, true, "an appended clause with new cases is admitted");
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1"], "old clause; new clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "an appended clause without new cases is refused");
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "new clause; old clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "text placed before the old invariant is refused");
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old clauses")])).ok, true, "a byte-exact prefix is the whole rule");
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "old")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a shortened invariant is refused");
+  assert.equal(run(before, registryText([kPlain("a"), pinned("b", ["B1", "B2"], "Old clause; new clause")])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "a reworded old invariant is refused");
+  assert.equal(run(before, registryText([kPlain("a"), { ...pinned("b", ["B1", "B2"], "old clause; new clause"), nonOverlapNote: "x" }])).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED", "another field changed next to it is refused");
+});
+
 /** Three registry commits after TP-13: an append, a first policy on a row (R1), a case-list extension (R2); returns the entries of R1 and R2. */
 function twoRewriteHistory(f, recordedFrom) {
   f.writeConfig([f.tp13]);

@@ -264,8 +264,10 @@ function invokeNative(request){
  // Execute the measured source bytes, not a subsequently reopened helper pathname.
  const script=source();let result;const spawnStartedAt=Date.now();try{result=(testSeam.spawn??spawnSync)(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch(thrown){recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);recordNativeFailure(request.operation,typeof thrown?.code==='string'&&/^[A-Z0-9_]{1,32}$/u.test(thrown.code)?thrown.code:'spawn-threw');fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
  recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
- if(!isSuccessfulSpawn(result))recordNativeFailure(request.operation,nativeFailureCode(result));
- let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+ // C19m w251: a failed child names its cause next to the exit status -- the helper's own closed WIN-AUTH code when it wrote one, else no-json.
+ const unparsed=Symbol('unparsed');let value;try{value=JSON.parse(result.stdout);}catch{value=unparsed;}
+ if(!isSuccessfulSpawn(result)){const cause=value===unparsed?'no-json':typeof value?.code==='string'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)?value.code:'no-code';recordNativeFailure(request.operation,`${nativeFailureCode(result)}, ${cause}`);}
+ if(value===unparsed)fail('WIN-AUTH-NATIVE-UNAVAILABLE');
  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
  if(exact(value,['ok','code','committed','path'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code)&&failedPathValue(value.path))fail(value.code,value.committed,value.path);
  if(request.operation==='inspect-source-image'){if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','size','sha256','committed'])||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts)||!Number.isSafeInteger(value.size)||value.size<0||value.size>134217728||! /^[a-f0-9]{64}$/u.test(value.sha256))fail('WIN-AUTH-NATIVE-OUTPUT');const parts=value.facts.split(':');if(parts.length!==12||BigInt(parts[3])<1n||(BigInt(parts[5])<<32n)+BigInt(parts[6])!==BigInt(value.size))fail('WIN-AUTH-NATIVE-OUTPUT');return value;}

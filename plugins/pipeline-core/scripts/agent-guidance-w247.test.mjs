@@ -90,4 +90,30 @@ recordNativeFailure("publish-file", "exit 1, ETIMEDOUT");
   assert.ok(!line.includes(dir), "the trace line carries no path");
 });
 
+test("W247-5 (C19m w251) a failed native authority call records why it failed next to the exit status: the helper's WIN-AUTH code, or no-json", () => {
+  const dir = sandbox();
+  const traceFile = join(dir, "trace.jsonl");
+  const backend = pathToFileURL(join(PLUGIN, "lib", "windows-owned-authority-backend.mjs")).href;
+  const hook = pathToFileURL(join(PLUGIN, "lib", "authority-trace-hook.mjs")).href;
+  const body = `import { installHookAuthorityTrace } from ${JSON.stringify(hook)};
+await installHookAuthorityTrace({ hook: "w251" });
+const backend = await import(${JSON.stringify(backend)});
+const outputs = [JSON.stringify({ ok: false, code: "WIN-AUTH-NATIVE-DENIED", committed: false }), "not json", JSON.stringify({ ok: false })];
+for (const stdout of outputs) {
+  backend.setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn: () => ({ status: 1, signal: null, stderr: "", stdout }) });
+  backend.resetWindowsOwnedAuthorityBackendMemo();
+  try { backend.inspectWindowsOwnedAuthorityPath({ path: ${JSON.stringify(join(dir, "x"))}, directory: true }); } catch { /* refused, as asserted on the trace */ }
+}
+backend.setWindowsOwnedAuthorityBackendTestSeam(undefined);
+`;
+  const script = join(dir, "child.mjs");
+  writeFileSync(script, body);
+  const child = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 30_000, env: { ...process.env, PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: traceFile } });
+  assert.equal(child.status, 0, child.stderr);
+  const line = readFileSyncText(traceFile, "utf8").trim().split("\n").at(-1);
+  const failures = JSON.parse(line).nativeObservations.failures;
+  assert.deepEqual(failures.map((entry) => entry.code), ["exit 1, WIN-AUTH-NATIVE-DENIED", "exit 1, no-json", "exit 1, no-code"]);
+  assert.ok(!line.includes(dir), "the trace line carries no path");
+});
+
 import { readFileSync as readFileSyncText } from "node:fs";

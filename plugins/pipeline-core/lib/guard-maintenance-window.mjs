@@ -867,6 +867,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/session-requester-bridge.mjs",
   "plugins/pipeline-core/lib/slice-queue.mjs",
   "plugins/pipeline-core/lib/slice-queue-location.mjs",
+  "plugins/pipeline-core/lib/source-digest-memo.mjs",
   "plugins/pipeline-core/lib/verify-owning-controller-route.mjs",
   "plugins/pipeline-core/lib/verify-resume.mjs",
   "plugins/pipeline-core/lib/verify-suite-registration.mjs",

@@ -130,6 +130,18 @@ function extendsCaseList(before, after) {
 }
 
 /**
+ * The row's pinned invariant only grows: the new text starts with the old text, byte for byte, and appends at least one
+ * clause. It is admitted only together with a case-list extension of the same row in the same commit, so the added
+ * clause always comes with the cases that pin it. Decision of the Elephant (candidate 19m, w251), named in the held
+ * patch notes; like every rewrite it is only admitted through an entry bound to one commit and its bytes.
+ */
+function appendsInvariant(before, after) {
+  const prior = before?.invariantPinned;
+  const next = after?.invariantPinned;
+  return typeof prior === "string" && typeof next === "string" && next.length > prior.length && next.startsWith(prior);
+}
+
+/**
  * A row that had NO case-completion policy gains its first one and is byte-identical otherwise: gate coverage only grows
  * (the same direction as extending a case list). Decision of the Elephant under the PO's 2026-11-04 K143 decision,
  * named as such in the held patch notes; it is still only admitted through an entry bound to one commit and its bytes.
@@ -162,6 +174,8 @@ export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, 
       if (canonical(row) === key) break;
       if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
         && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
+      if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row) && appendsInvariant(prior, row)
+        && canonical({ ...row, caseCompletion: prior.caseCompletion, invariantPinned: prior.invariantPinned }) === key) { extended += 1; break; }
       if (row?.name === prior.name && row?.file === prior.file && addsFirstCasePolicy(prior, row)) { extended += 1; break; }
       at += 1;
     }

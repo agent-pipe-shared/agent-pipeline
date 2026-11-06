@@ -330,7 +330,9 @@ test('case D3 (structural): readRaw on win32 lstat()s the safe path before the s
   const source = libSource('session-authority-registry.mjs');
   const line = source.split('\n').find((candidate) => candidate.startsWith('function readRaw(repo,path){')) ?? '';
   // The win32 branch performs the lstat on the safe path first and only then the unchanged strict native read.
-  assert.ok(line.startsWith("function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}"), line.slice(0, 200));
+  // The platform test goes through the module's isWin() seam, which reads process.platform unless a test seam overrides it.
+  assert.ok(line.startsWith("function readRaw(repo,path){if(isWin()){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}"), line.slice(0, 200));
+  assert.match(source, /^const isWin=\(\)=>\(testSeam\.platform\?\?process\.platform\)==='win32';$/mu, "isWin() still reads process.platform when no test seam is set");
   // The POSIX branch keeps its own lstat-first shape.
   assert.match(line, /const abs=safePath\(repo,path\);let fd;try\{const before=lstatSync\(abs\);/u);
 });
