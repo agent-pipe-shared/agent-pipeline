@@ -1,0 +1,262 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-observation.mjs b/plugins/pipeline-core/lib/native-goldfish-host-observation.mjs
+index b9ada65fc..6842d8589 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-observation.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-observation.mjs
+@@ -117,7 +117,7 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
+     return fail("NGHO-DRAFT-INPUT");
+   }
+   const version = state.binding.adapterVersion === 2 ? 2 : 1;
+-  let shared=null;try{if(nativeAdmission){const plan=inspectSourceOwnedNativeConcurrentAdmission(nativeAdmission);if(plan.baseCommit!==state.binding.candidateCommit||plan.parentCommit!==commitReadback.parent)return fail("NGHO-SHARED-PARENT");if(plan.foreignCommits.length)shared=plan;}}catch{return fail("NGHO-SHARED-AUTHORITY");}
++  let shared=null;try{if(nativeAdmission){const plan=inspectSourceOwnedNativeConcurrentAdmission(nativeAdmission);if(plan.baseCommit!==state.binding.candidateCommit||plan.parentCommit!==commitReadback.parent)return fail("NGHO-SHARED-PARENT");if(plan.foreignCommits.length)shared=plan;else if(plan.parentCommit!==plan.baseCommit&&!movedHead)movedHead={admittedHead:plan.parentCommit,baselineCommit:plan.baseCommit};}}catch{return fail("NGHO-SHARED-AUTHORITY");}
+   const subject = { ...(shared?{adapterVersion:version,foreignCommits:shared.foreignCommits}:movedHead?{movedHead:{admittedHead:movedHead.admittedHead,baselineCommit:movedHead.baselineCommit}}:{}),schema: shared?NATIVE_GOLDFISH_SHARED_HOST_OBSERVATION_SCHEMA:version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
+     runner: state.runner, dispatchId: state.binding.dispatchId, sessionId: state.sessionId,
+     toolUseId: state.toolUseId, agentId: state.agentId,
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index bd8b2a695..82e10d6fd 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -740,12 +740,12 @@ export function readNativeReservedItemScopes({repository,boundary}={}) {
+ }
+ 
+ const nativeConcurrentAuthorities=new WeakMap();
+-function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPendingSha256,expectedRef}) {
++function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPendingSha256,expectedRef,scopePaths=allowedPaths}) {
+   const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository}),current=nativeManagedCurrentOwner(repository);
+   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
+   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
+   const members=new Map(inspectNativeMemberRecords({boundary,port,producer}).map(member=>[member.record.bindingSha256,member.record]));
+-  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
++  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
+   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
+     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
+     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
+@@ -753,7 +753,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
+     // known below, so a commit it already landed is still recognised as foreign (NGHS17).
+     if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
+     // Literal, retained original item scopes are the only foreign dirty paths.
+-    if(member.phase!=='released')for(const path of pending.binding.allowedPaths)foreignPaths.add(path);
++    if(member.phase!=='released')for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}
+     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
+     if(terminal){const observed=read.entries.find(row=>row.sourceFact.sha256===terminal.value.observationSha256);
+       if(!observed||!observed.value.changedPaths.every(path=>pending.binding.allowedPaths.includes(path)))throw nativeManagedFault('native-concurrent-foreign-observation');
+@@ -775,14 +775,21 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
+   const commits=git(repository.primaryRoot,['rev-list','--reverse','--first-parent',`${baseCommit}..${head}`]);
+   if(commits===null)throw nativeManagedFault('native-concurrent-head-unavailable');
+   if(commits.split('\n').filter(Boolean).length>64)throw nativeManagedFault('native-concurrent-lineage-record-bound');
+-  let parent=baseCommit;const lineage=[];
++  let parent=baseCommit,unproven=false;const lineage=[];
+   for(const commit of commits.split('\n').filter(Boolean)){
+     const parents=git(repository.primaryRoot,['rev-list','--parents','-n','1',commit])?.split(' '),proof=foreignCommits.find(row=>row.commit===commit);
+-    if(!proof||parents?.length!==2||parents[1]!==parent)throw nativeManagedFault('native-concurrent-unowned-head');
++    if(parents?.length!==2||parents[1]!==parent)throw nativeManagedFault('native-concurrent-unowned-head');
++    // C19K-W246: a linear commit that is no sibling's proven host commit (an ordinary commit of the orchestrator) is accepted when it touches none of this slice's
++    // write scope, check or dependency paths, exactly as a disjoint advance of the briefing's base is; one that touches them is refused by name, as before.
++    // It must also touch no path of a sibling still in flight: such a commit may be that sibling's host commit whose proof is not written yet, and is then
++    // refused here so that the settle loop waits for the proof and the receipt keeps its sibling lineage.
++    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes]))throw nativeManagedFault('native-concurrent-unowned-head');parent=commit;unproven=true;continue;}
+     const observed=read.entries.find(row=>row.sourceFact.sha256===proof.observationSha256);
+     if(observed.value.parent!==parent)throw nativeManagedFault('native-concurrent-parent-proof');
+     lineage.push(proof);parent=commit;
+   }
++  // The receipt of a commit made on a mix of ordinary and sibling commits has no shape yet: that mix is still refused (and settled while a sibling is in flight).
++  if(unproven&&lineage.length)throw nativeManagedFault('native-concurrent-unowned-head');
+   return {root:repository.primaryRoot,reference,baseCommit,parentCommit:head,foreignPaths:[...foreignPaths].sort(),foreignCommits:lineage};
+ }
+ function mintNativeConcurrentAuthority(input){const handle=Object.freeze({});nativeConcurrentAuthorities.set(handle,{input,plan:nativeConcurrentPlan(input)});return handle;}
+@@ -833,7 +840,7 @@ export function withSourceOwnedNativeConcurrentCommit({root,pendingSha256,settle
+       // An advance of HEAD that touches this slice's write scope, check or dependency paths is refused here by name, whoever made it.
+       const base=pending.binding.candidateCommit;
+       if(repository.candidate?.commit!==base&&nativeCommitAdvanceTouches(root,base,repository.candidate?.commit,[...pending.binding.allowedPaths,...(pending.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])]))throw nativeManagedFault('native-concurrent-advance-touches-scope');
+-      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,baseCommit:base,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
++      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,scopePaths:[...pending.binding.allowedPaths,...(pending.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])],baseCommit:base,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
+       entered=true;
+       try{return callback(authority);}finally{nativeConcurrentAuthorities.delete(authority);}
+     });}catch(error){
+@@ -1110,7 +1117,26 @@ function recoverNativeAuthorityOperation({repository,owner,operation,port,bounda
+   const recovered=recoverSessionAuthorityMember({boundary,producerPort:port,operationHandle:operation.handle,expectedMemberRef:matches[0].memberRef});
+   operation.memberHandle=recovered.memberHandle;operation.memberRef=recovered.memberRef;
+ }
+-export function prepareNativeGoldfishAuthorityTerminal({repository,pendingSha256,generationOf=null,lockWait=null}){
++// C19K-W246: a sibling stop's host commit can move HEAD between the repository this call was handed and its first read of it (the second stop of a pair starts
++// while its sibling is inside the commit). Nothing has been written then, so it is looked at again on a fresh inspection, unless the advance touches this
++// slice's write scope, check or dependency paths: that is refused by name, as at the commit.
++export function prepareNativeGoldfishAuthorityTerminal(input){
++  let {repository}=input;
++  for(let attempt=1;;attempt+=1){
++    try{return prepareNativeGoldfishAuthorityTerminalOnce({...input,repository});}
++    catch(error){
++      if(error?.reason!=='native-managed-repository-drift'||attempt>=NATIVE_BOUNDARY_REBIND_LIMIT)throw error;
++      const root=repository.primaryRoot,fresh=inspectSignedDescriptorCustodyRepository(root),read=nativeAuthorityScan(nativeAuthorityOwner(fresh));
++      const entry=read.entries.find(row=>row.sourceFact.sha256===input.pendingSha256&&row.relativePath.startsWith('pending-'));
++      if(entry){
++        const binding=effectiveNativePendingState(read,entry).binding;
++        if(nativeCommitAdvanceTouches(root,binding.candidateCommit,fresh.candidate?.commit,[...binding.allowedPaths,...(binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])]))throw nativeManagedFault('native-concurrent-advance-touches-scope');
++      }
++      repository=fresh;
++    }
++  }
++}
++function prepareNativeGoldfishAuthorityTerminalOnce({repository,pendingSha256,generationOf=null,lockWait=null}){
+   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
+   const owner=nativeAuthorityOwner(repository);nativeAuthorityScan(owner);
+   const operation=[...owner.operations.values()].find(o=>o.pendingSha256===pendingSha256);
+@@ -1151,11 +1177,17 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
+   const completed=writeBoundary((boundary,repository)=>{
+     writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
+       terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});
+-    operation.phase='terminal-observed';const advanced=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=advanced.memberRef;
++    // C19K-W246: a sibling stop writing its own post-commit files while this one advances or releases changes the registry domain under the read
++    // (domain-membership-race) or makes this process's view of the sibling's operation stale (native-authority-member-drift). Both are refused before this
++    // call commits anything, so the view is re-read and the call repeated a bounded number of times; a real conflict still ends in the same named refusal.
++    const reread=call=>{for(let attempt=1;;attempt+=1){try{return call();}catch(error){
++      if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT||!['native-authority-member-drift','domain-membership-race'].includes(error?.reason))throw error;
++      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50*attempt);nativeAuthorityScan(owner);}}};
++    operation.phase='terminal-observed';const advanced=reread(()=>advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle}));operation.memberRef=advanced.memberRef;
+     const [inventory]=readNativeManagedInventory(repository,'native-goldfish');
+     if(inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value.delivery)
+       return {status:'integration-pending',code:'NGHS-ITEM-RESERVATION-HELD',memberRef:operation.memberRef};
+-    return releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle});
++    return reread(()=>releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle}));
+   });
+   if(completed.status!=='integration-pending')return completed;
+   const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index c7008da01..47a479f65 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -786,8 +786,11 @@ const cases = [
+     assert.throws(()=>inspectSourceOwnedNativeConcurrentAuthority(expired,{root}),'the borrowed authority expires when its actual boundary returns');
+     const originalRef=spawnSync('git',['-C',root,'symbolic-ref','HEAD'],{encoding:'utf8'}).stdout.trim();assert.equal(spawnSync('git',['-C',root,'update-ref','refs/heads/aliased-primary',original.candidate.commit]).status,0);assert.equal(spawnSync('git',['-C',root,'symbolic-ref','HEAD','refs/heads/aliased-primary']).status,0);
+     assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-reference-drift','an alias branch with equal commit cannot replace the admitted primary ref');assert.equal(spawnSync('git',['-C',root,'symbolic-ref','HEAD',originalRef]).status,0);
+-    writeFileSync(join(root,'unowned.txt'),'unauthenticated HEAD change');assert.equal(spawnSync('git',['-C',root,'add','unowned.txt']).status,0);assert.equal(spawnSync('git',['-C',root,'commit','-qm','unauthenticated foreign change']).status,0);
+-    assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-unowned-head','HEAD ancestry alone cannot substitute for a genuine Source return');
++    // C19K-W246 (QG-04, restated in place): an unproven commit on a path outside the slice's scope, checks and dependencies is now accepted
++    // as a disjoint advance (NGSP9B pins that); the unauthenticated foreign change therefore touches the slice's own write scope here, which
++    // must still refuse, now by the more specific reason the rebind route names (native-concurrent-advance-touches-scope).
++    writeFileSync(join(root,'src','change.mjs'),'export const unauthenticated = true;\n');assert.equal(spawnSync('git',['-C',root,'add','src/change.mjs']).status,0);assert.equal(spawnSync('git',['-C',root,'commit','-qm','unauthenticated foreign change']).status,0);
++    assert.throws(()=>runtime.run(()=>withSourceOwnedNativeConcurrentCommit({root,pendingSha256:prepared.sha256},()=>{})),error=>error.reason==='native-concurrent-advance-touches-scope','HEAD ancestry alone cannot substitute for a genuine Source return on the slice\'s own paths');
+   })},
+ 
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+index 23702631a..9e5bd2502 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+@@ -92,6 +92,12 @@ const SAR = new URL("../scripts/session-authority-repair.mjs", import.meta.url).
+ const runCli = (script, args) => { const r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" }); let json = null; try { json = JSON.parse(r.stdout); } catch { /* reported with the stderr below */ } return { status: r.status, json, text: `${r.stdout.slice(0, 1500)} ${r.stderr.slice(0, 600)}` }; };
+ const inspectRegistry = (root) => runCli(SAR, ["inspect", "--root", root]);
+ const registryProblems = (inspect) => (inspect.json?.registry?.producers ?? []).filter((row) => row.status !== "ok");
++/** C19K-W246: the receipt of the later stop of a pair names the earlier stop's host commit as its sibling proof (the settle keeps the lineage). */
++function assertSiblingProof(repository, commit) {
++  const dir = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
++  const proofs = readdirSync(dir).filter((name) => name.startsWith("observation-")).map((name) => JSON.parse(readFileSync(join(dir, name), "utf8"))).flatMap((row) => row.foreignCommits ?? []);
++  assert.ok(proofs.some((row) => row.commit === commit), `a receipt names the first stop's commit as foreign: ${JSON.stringify(proofs)}`);
++}
+ /** Two admitted launches that both land their host commits, one after the other in the given order (the second one lands on top of the first's commit). */
+ function landPair(runtime, root, pair) {
+   for (const one of pair) { const admitted = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })); assert.equal(admitted.ok, true, `${one.id} admitted: ${JSON.stringify(admitted).slice(0, 900)}`); }
+@@ -101,7 +107,14 @@ function landPair(runtime, root, pair) {
+ 
+ /** One real stop in its own process: own controlled-method runtime, admits its own launch, waits for the start gate, then stops. Both stops of a pair wait for
+  * each other after the terminal preparation and then reach the commit lock together; the commit is held 300 ms inside the lock so the second one meets it. */
+-function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
++function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sync" }) {
++  // C19K-W246 (A): mode "early" stops without waiting for the other and marks its host commit; mode "late" starts its terminal preparation (on the repository the
++  // finalizer inspected before) only once the early stop has finished (its host commit moved HEAD), so it holds a repository inspected before that commit. Waiting for the early stop's own post-commit writes keeps this case off the separate authority-terminal-release race (see the notes).
++  const prepareTerminal = mode === "late" || mode === "late-sim" ? `args=>{wait(join(dir,${mode === "late" ? "'out-'+other+'.json'" : "'committed-'+other"}),60000);return prepareNativeGoldfishAuthorityTerminal(args);}`
++    : mode === "early" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
++    : `args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;}`;
++  const commit = mode === "early" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
++    : `request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}`;
+   const url = (name) => JSON.stringify(new URL(name, import.meta.url).href);
+   const script = `import {existsSync,readFileSync,writeFileSync} from 'node:fs';import {join} from 'node:path';`
+     + `import {inspectSignedDescriptorCustodyRepository} from ${url("./worktree-lifecycle.mjs")};`
+@@ -119,20 +132,20 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath }) {
+     + `const admitted=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input:launch}));if(admitted.ok!==true)throw new Error('admission '+JSON.stringify(admitted));`
+     + `writeFileSync(join(dir,'admitted-'+tag),'1');wait(join(dir,'go'),120000);`
+     + `result=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned},{`
+-    + `prepareTerminal:args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;},`
+-    + `commit:request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}}));`
++    + `prepareTerminal:${prepareTerminal},`
++    + `commit:${commit}}));`
+     + `}catch(error){result={thrown:String(error?.code??error?.message)};}`
+     + `writeFileSync(join(dir,'out-'+tag+'.json'),JSON.stringify(result));`;
+   return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "ignore", openSync(join(dir, `stderr-${tag}.log`), "w")] });
+ }
+ 
+ /** Both launches stop for real, each in its own process (see stopChild); `round` keeps the runtimes of a later pair apart from an earlier one's. Returns both results. */
+-async function concurrentPair(root, launches, round = "") {
++async function concurrentPair(root, launches, round = "", { staged = false } = {}) {
+   // The markers live outside the repository: the host-commit admission compares the working tree to its baseline and must not see them.
+   const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
+   const children = launches.map((one, index) => {
+     writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
+-    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`) });
++    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
+   });
+   const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
+   try {
+@@ -158,7 +171,7 @@ const cases = [
+     assert.equal(git(root, "rev-parse", `${first.commit}^`), original.candidate.commit, "the first stop landed on the original candidate");
+     assert.equal(git(root, "rev-parse", `${second.commit}^`), first.commit, "the second stop landed on top of the first's host commit");
+     assert.equal(git(root, "rev-parse", "HEAD"), second.commit);
+-    void repository;
++    assertSiblingProof(repository, first.commit);
+   }) },
+ 
+   { id: "NGSP2", name: "C19J-W242 (A): a sibling advance that touches this slice's own scope is still refused, and the stop-failure result names the cause", run: () => fixture(({ root }) => {
+@@ -272,6 +285,54 @@ const cases = [
+     const inspect = inspectRegistry(root);
+     assert.deepEqual(registryProblems(inspect).map((row) => [row.producerId, row.reason]), [["native-goldfish", "native-concurrent-receipt-lineage"]], inspect.text);
+   }) },
++
++  // C19K-W246 (AC-108): a HEAD advance that touches none of the slice's write scope, check or dependency paths is accepted wherever it comes from.
++  { id: "NGSP9", name: "C19K-W246 (A): a second stop whose terminal preparation holds a repository inspected before the first stop's host commit moved HEAD rebinds and lands its own host commit on top", run: () => fixture(async ({ root }) => {
++    const { launch, original } = setup(root, { ownRuntime: false });
++    const results = await concurrentPair(root, [launch(0), launch(1)], "", { staged: true });
++    for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results));
++    assert.equal(git(root, "rev-parse", `${results[0].commit}^`), original.candidate.commit, "the early stop landed on the original candidate");
++    assert.equal(git(root, "rev-parse", `${results[1].commit}^`), results[0].commit, "the late stop landed on top of the early stop's host commit");
++    assert.equal(git(root, "rev-parse", "HEAD"), results[1].commit);
++  }) },
++
++  { id: "NGSP9B", name: "C19K-W246 (B): an ordinary commit on another path between the slice's base and its stop (not a Goldfish host commit) does not stop the host commit", run: () => fixture(({ root }) => {
++    const { runtime, launch, original } = setup(root);
++    const one = launch(0);
++    assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true);
++    writeFileSync(join(root, "plan-note.txt"), "an ordinary orchestrator commit\n"); git(root, "add", "--", "plan-note.txt"); git(root, "commit", "-q", "-m", "plan document");
++    const advanced = git(root, "rev-parse", "HEAD");
++    writeFileSync(join(root, one.file), one.content);
++    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
++    assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
++    assert.equal(git(root, "rev-parse", `${result.commit}^`), advanced, "the host commit sits on the advanced HEAD");
++    assert.notEqual(advanced, original.candidate.commit);
++    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after a host commit on an advanced HEAD without sibling proof");
++  }) },
++
++  { id: "NGSP9C", name: "C19K-W246 (B): an ordinary commit that touches the slice's check path still refuses with a named stop-failure record, and commits nothing", run: () => fixture(({ root }) => {
++    const { runtime, launch } = setup(root);
++    const one = launch(0);
++    assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true);
++    writeFileSync(join(root, "src/change.test.mjs"), "// an ordinary commit on the slice's check\n"); git(root, "add", "--", "src/change.test.mjs"); git(root, "commit", "-q", "-m", "ordinary commit on the check");
++    const head = git(root, "rev-parse", "HEAD");
++    writeFileSync(join(root, one.file), one.content);
++    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
++    assert.notEqual(result.status, "authored-commit-recorded", JSON.stringify(result));
++    assert.equal(result.detail?.reason, "native-concurrent-advance-touches-scope", JSON.stringify(result));
++    assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the advance");
++  }) },
++
++  // The real Windows case: the second stop starts its terminal preparation while the first stop is inside, and then finishing, its host commit.
++  { id: "NGSP9D", name: "C19K-W246 (A): simultaneous: a second stop whose terminal preparation starts once the first stop's host commit moved HEAD, while that stop is still writing, lands its own host commit with the first one as its sibling proof", run: () => fixture(async ({ root }) => {
++    const { repository, launch, original } = setup(root, { ownRuntime: false });
++    const results = await concurrentPair(root, [launch(0), launch(1)], "", { staged: "simultaneous" });
++    for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results));
++    assert.equal(git(root, "rev-parse", `${results[0].commit}^`), original.candidate.commit);
++    assert.equal(git(root, "rev-parse", `${results[1].commit}^`), results[0].commit, "the late stop landed on top of the early stop's host commit");
++    assertSiblingProof(repository, results[0].commit);
++    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the simultaneous pair");
++  }) },
+ ];
+ 
+ const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
