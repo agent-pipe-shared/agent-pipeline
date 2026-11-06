@@ -1,0 +1,67 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 5348cd9e2..571228899 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -219,6 +219,7 @@
+         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+         "verify-phase:harness/scripts/verify.mjs:advisory-route-selection-tests",
++        "verify-phase:harness/scripts/verify.mjs:agent-guidance-w247-tests",
+         "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
+         "verify-phase:harness/scripts/verify.mjs:agent-pipeline-root-creation-tests",
+         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 4476b1b07..e3aaeffe8 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -236,7 +236,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
+     ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
+     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
+-    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",32], // cand. 19j w242/w244 (QG-04: extension only): new suite, measured with the unchanged classifier
++    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",66], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
+     ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
+     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
+     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 254d223dc..2fb3d0500 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3647,6 +3647,12 @@
+       "invariantPinned": "The routine-repair verb runs only the closed D194 list (heal, slice-cancel for budget or integrated-elsewhere, stop-failure-aside, move-aside for two named findings), records every run in the ledger, refuses everything else with RR-OUTSIDE-LIST and the original tool's command, and never deletes",
+       "nonOverlapNote": "Unique suite for lib/routine-repair.mjs and scripts/routine-repair.mjs (D194, D197); session-authority-repair-tests keeps the delegated heal and move-aside behaviour"
+     },
++    {
++      "name": "agent-guidance-w247-tests",
++      "file": "plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs",
++      "invariantPinned": "A slice-queue cancel refusal names every missing flag, the full working command and when --started applies in one message; the native Goldfish hook context names the stop-failure record of the dispatch that just stopped; a failed native observation appears in the authority trace with operation, file:line site and a bounded code and no path (C19k w247, AC-108)",
++      "nonOverlapNote": "Unique cross-cutting guidance cases; slice-queue, native-goldfish-host hook and authority-trace-preload suites keep their own behaviour"
++    },
+     {
+       "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
+       "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
+@@ -4659,7 +4665,7 @@
+     {
+       "name": "native-goldfish-host-stop-pair-tests",
+       "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs",
+-      "invariantPinned": "Two real SubagentStops of one reply with disjoint scopes both land their host commits, the second rebinding to the HEAD its sibling's commit moved; an advance that touches the slice's own scope still refuses with a named cause; an admission refused after its queue row was written removes only its own row, never a sibling's, and a row it cannot remove is counted and named (C19j w242, AC-108)",
++      "invariantPinned": "Two real SubagentStops of one reply with disjoint scopes both land their host commits, the second rebinding to the HEAD its sibling's commit moved; an advance that touches the slice's own scope still refuses with a named cause; an admission refused after its queue row was written removes only its own row, never a sibling's, and a row it cannot remove is counted and named (C19j w242, AC-108); a settled pending state without an owner operation never makes the registry unreadable (C19k w245); a stop lands its host commit after any disjoint HEAD advance, also during its terminal prepare and while its sibling still releases (C19k w246)",
+       "nonOverlapNote": "Unique cases: the simultaneous stop pair and the row-scoped admission rollback; finalizer, host-state and parallel-admission tests pin the single stop and the admission",
+       "caseCompletion": {
+         "schema": "pipeline.verify-case-completion-policy.v1",
+@@ -4669,7 +4675,14 @@
+           "NGSP3",
+           "NGSP3B",
+           "NGSP4",
+-          "NGSP5"
++          "NGSP5",
++          "NGSP6",
++          "NGSP7",
++          "NGSP8",
++          "NGSP9",
++          "NGSP9B",
++          "NGSP9C",
++          "NGSP9D"
+         ],
+         "maxBytes": 65536
+       }
