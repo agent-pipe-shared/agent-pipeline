@@ -3648,6 +3648,12 @@
       "nonOverlapNote": "Unique suite for lib/routine-repair.mjs and scripts/routine-repair.mjs (D194, D197); session-authority-repair-tests keeps the delegated heal and move-aside behaviour"
     },
     {
+      "name": "agent-guidance-w247-tests",
+      "file": "plugins/pipeline-core/scripts/agent-guidance-w247.test.mjs",
+      "invariantPinned": "A slice-queue cancel refusal names every missing flag, the full working command and when --started applies in one message; the native Goldfish hook context names the stop-failure record of the dispatch that just stopped; a failed native observation appears in the authority trace with operation, file:line site and a bounded code and no path (C19k w247, AC-108)",
+      "nonOverlapNote": "Unique cross-cutting guidance cases; slice-queue, native-goldfish-host hook and authority-trace-preload suites keep their own behaviour"
+    },
+    {
       "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
       "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
@@ -4659,7 +4665,7 @@
     {
       "name": "native-goldfish-host-stop-pair-tests",
       "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs",
-      "invariantPinned": "Two real SubagentStops of one reply with disjoint scopes both land their host commits, the second rebinding to the HEAD its sibling's commit moved; an advance that touches the slice's own scope still refuses with a named cause; an admission refused after its queue row was written removes only its own row, never a sibling's, and a row it cannot remove is counted and named (C19j w242, AC-108)",
+      "invariantPinned": "Two real SubagentStops of one reply with disjoint scopes both land their host commits, the second rebinding to the HEAD its sibling's commit moved; an advance that touches the slice's own scope still refuses with a named cause; an admission refused after its queue row was written removes only its own row, never a sibling's, and a row it cannot remove is counted and named (C19j w242, AC-108); a settled pending state without an owner operation never makes the registry unreadable (C19k w245); a stop lands its host commit after any disjoint HEAD advance, also during its terminal prepare and while its sibling still releases (C19k w246)",
       "nonOverlapNote": "Unique cases: the simultaneous stop pair and the row-scoped admission rollback; finalizer, host-state and parallel-admission tests pin the single stop and the admission",
       "caseCompletion": {
         "schema": "pipeline.verify-case-completion-policy.v1",
@@ -4669,7 +4675,14 @@
           "NGSP3",
           "NGSP3B",
           "NGSP4",
-          "NGSP5"
+          "NGSP5",
+          "NGSP6",
+          "NGSP7",
+          "NGSP8",
+          "NGSP9",
+          "NGSP9B",
+          "NGSP9C",
+          "NGSP9D"
         ],
         "maxBytes": 65536
       }

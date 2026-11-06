@@ -219,6 +219,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-route-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:agent-guidance-w247-tests",
         "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:agent-pipeline-root-creation-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
