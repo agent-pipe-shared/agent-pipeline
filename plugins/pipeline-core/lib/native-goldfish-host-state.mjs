@@ -468,7 +468,7 @@ export function readNativeGoldfishPending({ commonDir, runner, sessionId, correl
         || state.sessionId !== sessionId || state.toolUseId !== correlationId
         || !state.binding || !OID.test(state.binding.candidateCommit ?? "")) return fail("NGHS-READ-BINDING");
       return { ok: true, code: "NGHS-PENDING-READ", state: authenticatedNativePendingState(stored, entered, { readScope: true, generationOf, lockWait }), sha256: stored.sha256 };
-    }, { budgetMs: nativeStopWaitBudgetMs(), ...(lockWait ?? {}), onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
+    }, { budgetMs: nativeStopWaitBudgetMs(), ...(lockWait ?? {}), retryBindingChange: true, onWait: () => { if (!marked) { marked = true; admissionProgress("lock-wait"); } } });
   } catch(error) {
     const lock = sessionAuthorityLockFacts(error, { waitedMs: clock() - startedMs, root: stored?.value?.root });
     if (lock) admissionProgress("lock-held");
@@ -808,6 +808,20 @@ export function inspectSourceOwnedNativeConcurrentAuthority(authority,{root}={})
 // moment its commit has no lineage proof yet and the producer namespace is ahead of its registry baseline. With a settle budget (the stop passes one) those two
 // refusals, raised before the callback ran, release the lock and are looked at again until the budget ends; without one they are raised at once, as before.
 const NATIVE_BOUNDARY_REBIND_LIMIT=8;
+/** C19L-W251: the refusals a sibling stop's own post-commit writes and release raise against this stop's terminal boundary. */
+export const NATIVE_TERMINAL_SIBLING_RACES=Object.freeze(['domain-membership-race','domain-native-membership-race','native-authority-member-drift','reference-preimage-changed','native-managed-unknown-native-entry']);
+/** C19L-W251: runs `round` (one whole write boundary) and repeats it on a fresh boundary, at most NATIVE_BOUNDARY_REBIND_LIMIT times with a growing
+ * pause, while it fails with a sibling race; `refresh` re-reads this process's view between rounds. Any other refusal, or the last one, is raised. */
+export function nativeBoundaryRounds(round,refresh=()=>{},{limit=NATIVE_BOUNDARY_REBIND_LIMIT,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
+  for(let attempt=1;;attempt+=1){
+    try{return round();}
+    catch(error){
+      if(attempt>=limit||!NATIVE_TERMINAL_SIBLING_RACES.includes(error?.reason))throw error;
+      pause(100*attempt);
+      try{refresh();}catch(refreshError){if(!NATIVE_TERMINAL_SIBLING_RACES.includes(refreshError?.reason))throw refreshError;}
+    }
+  }
+}
 /** Opens the registry boundary on a repository that was inspected, and is checked again, with the lock held. A lock acquired after a wait (a sibling's host commit
  * moved HEAD meanwhile) is released unused and the open starts over; the callback runs only on a repository that is current, and is never repeated. */
 function withCurrentRepositoryBoundary(root,callback){
@@ -1174,21 +1188,27 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
   if(!nativeManagedRegistryPresent(repository))return {status:'legacy-unregistered'};
   if(!operation?.memberHandle)throw nativeManagedFault('native-authority-recovery-required');
   const port=createNativeGoldfishAuthorityProducerPort({repository});
-  const completed=writeBoundary((boundary,repository)=>{
-    writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
-      terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});
+  // C19L-W251: the in-boundary re-read (w246) repeats a call against the SAME boundary, whose snapshot a sibling's release can leave stale, so a
+  // pair still ended in NGHF-AUTHORITY-TERMINAL-RELEASE-EXCEPTION (domain-membership-race, reference-preimage-changed, an unknown sibling entry)
+  // after both commits had landed. The whole write boundary is now repeated a bounded number of times on a fresh boundary; what an earlier round
+  // already did is not repeated (the terminal file is written once, the member is advanced once and its new reference kept).
+  let terminalWritten=false,advancedRef=null;
+  const completed=nativeBoundaryRounds(()=>writeBoundary((boundary,repository)=>{
+    if(!terminalWritten){writeExclusive(repository.commonDir,`authority-terminal-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-authority-terminal.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,
+      terminalAssociationSha256:terminal.terminalAssociationSha256,observationSha256:terminal.observationSha256,recordSha256:terminal.recordSha256});terminalWritten=true;}
     // C19K-W246: a sibling stop writing its own post-commit files while this one advances or releases changes the registry domain under the read
     // (domain-membership-race) or makes this process's view of the sibling's operation stale (native-authority-member-drift). Both are refused before this
     // call commits anything, so the view is re-read and the call repeated a bounded number of times; a real conflict still ends in the same named refusal.
     const reread=call=>{for(let attempt=1;;attempt+=1){try{return call();}catch(error){
       if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT||!['native-authority-member-drift','domain-membership-race'].includes(error?.reason))throw error;
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50*attempt);nativeAuthorityScan(owner);}}};
-    operation.phase='terminal-observed';const advanced=reread(()=>advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle}));operation.memberRef=advanced.memberRef;
+    if(advancedRef===null){operation.phase='terminal-observed';const advanced=reread(()=>advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle}));operation.memberRef=advanced.memberRef;advancedRef=advanced.memberRef;}
+    else operation.memberRef=advancedRef;
     const [inventory]=readNativeManagedInventory(repository,'native-goldfish');
     if(inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value.delivery)
       return {status:'integration-pending',code:'NGHS-ITEM-RESERVATION-HELD',memberRef:operation.memberRef};
     return reread(()=>releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle}));
-  });
+  }),()=>nativeAuthorityScan(owner));
   if(completed.status!=='integration-pending')return completed;
   const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
   if(!pending?.binding.itemDelivery)return completed;
@@ -1296,14 +1316,18 @@ export function resolveGovernedItemQueue({ root } = {}) {
 
 /** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
  * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
-export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null}={}) {
+export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null,retryBindingChange=false}={}) {
   const deadline=now()+budgetMs;let delay=25;
   for(;;){
     const entered={value:false};
     try{return attempt(entered);}
     catch(error){
       // C18-1C: a sibling stop holding the registry also surfaces as SDC-AUTHORITY-UNAVAILABLE / state-push-owner-unavailable.
-      const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable');
+      // C19L-W250: a sibling's host commit that moves HEAD between this attempt's repository inspection and its boundary entry makes the registry
+      // refuse SDC-ROOT repository-binding-changed before the boundary opened. Opted in by the stop's pending read only: every attempt inspects the
+      // repository afresh, so the retry binds the moved HEAD; a refusal after the boundary opened (`entered`) is still reported, not repeated.
+      const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable')
+        ||(retryBindingChange===true&&error?.code==='SDC-ROOT'&&error?.reason==='repository-binding-changed');
       if(!transient||entered.value||now()+delay>deadline)throw error;
       if(typeof onWait==='function'){try{onWait(error,delay);}catch{/* a diagnostic never changes the wait */}}
       sleep(delay);delay=Math.min(delay*2,1000);

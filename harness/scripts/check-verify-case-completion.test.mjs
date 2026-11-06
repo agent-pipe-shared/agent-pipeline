@@ -235,7 +235,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["mid-session-hook-refresh-tests","plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs","top-level-assertions",21],
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
     ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
-    ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
+    ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",67], // cand. 19l w250 (QG-04: extension only): NGFO01 gained the binding-change retry and terminal-round cases, measured with the unchanged classifier
     ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",66], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
     ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],

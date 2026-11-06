@@ -208,6 +208,13 @@ if (isDirectInvocation(import.meta.url)) {
     try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result?.dispatchId ?? null }); }
     catch { stopFailure = null; }
   }
+  // C19L-W250: a stop that just left an unresolved stop-failure record names it here, only when the newest record is that dispatch's own.
+  if (input.hook_event_name === "SubagentStop" && typeof result?.unresolvedStop?.dispatchId === "string") {
+    try {
+      const own = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result.unresolvedStop.dispatchId });
+      stopFailure = own?.dispatchId === result.unresolvedStop.dispatchId ? own : null;
+    } catch { stopFailure = null; }
+  }
   let block = null;
   try { block = nativeGoldfishCheckpointBlock({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), input, runner, result }); }
   catch { block = null; }
@@ -224,6 +231,11 @@ if (isDirectInvocation(import.meta.url)) {
   } else {
     // Claude and Codex SubagentStop have no documented context-injection field. Keep the hook
     // non-blocking (exit 0 always) and surface the exact status through its command stderr channel.
+    // C19L-W250: stderr of an exit-0 hook is not shown to the operator; a Claude SubagentStop that has just left an unresolved stop-failure
+    // record also prints that notice as the common `systemMessage` field (never `decision`, so the stop is never blocked). Every other stop
+    // keeps its empty stdout, which the checkpoint contract reads as "allowed".
+    if (runner === "claude" && input.hook_event_name === "SubagentStop" && stopFailure && typeof result?.unresolvedStop?.dispatchId === "string")
+      process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
     process.stderr.write(`${message}\n`);
   }
   process.exit(0);

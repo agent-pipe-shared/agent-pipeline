@@ -680,12 +680,24 @@ const cases = [
     assert.equal(JSON.stringify(unavailable).includes(root), false, "no host path travels");
     assert.equal(readNativeGoldfishStopFailure({ commonDir }).reason === unavailable.reason || diagEntries(commonDir).length === 2, true);
     assert.equal(facts.commits, 0);
+    // C19L-W250 (QG-04, extension only): both unresolved marked stops carry the dispatch whose record they just wrote, so the stop hook names that
+    // record at this stop (a background pair has no later PostToolUse); the message names the code, the dispatch and the recover command.
+    assert.deepEqual(result.unresolvedStop, { dispatchId: binding.dispatchId });
+    assert.deepEqual(orphan.unresolvedStop, { dispatchId: binding.dispatchId });
+    const own = readNativeGoldfishStopFailure({ commonDir, dispatchId: binding.dispatchId });
+    assert.equal(own.dispatchId, binding.dispatchId);
+    const shown = nativeGoldfishHookMessage(orphan, { stopFailure: own });
+    assert.match(shown, new RegExp(`for ${binding.dispatchId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"));
+    assert.match(shown, /goldfish-host-commit-recover\.mjs plan/u);
+    assert.equal(shown.includes(root), false, "no host path in the stop message");
   }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF30", name: "A stop of an unmarked or non-Goldfish child writes no diagnostic at all", run: () => fixture(({ root, commonDir, binding, dependencies, writeMeta, stopInput }) => {
     const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
     const before = snapshot(commonDir);
     assert.equal(finalize(stopInput(binding, "Done, nothing to hand back.")).status, "not-applicable");
+    assert.equal(finalize(stopInput(binding, "Done, nothing to hand back.")).unresolvedStop, undefined, "C19L-W250: an unmarked stop names no record");
     assert.equal(finalize(stopInput(binding, finalText(binding), { agent_type: "general-purpose" })).status, "not-applicable");
+    assert.equal(finalize(stopInput(binding, finalText(binding), { agent_type: "general-purpose" })).unresolvedStop, undefined, "C19L-W250: a non-Goldfish stop names no record");
     assert.equal(finalize(stopInput(binding, finalText(binding), { agent_id: "agent-other", session_id: "session-other" })).status, "not-applicable");
     writeMeta("agent-nometa-text", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
     assert.equal(finalize(stopInput(binding, "A plain closing text.", { agent_id: "agent-nometa-text" })).status, "not-applicable");

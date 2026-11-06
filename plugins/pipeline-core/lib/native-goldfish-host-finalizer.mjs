@@ -295,6 +295,10 @@ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
     throw error;
   }
   recordSubagentStopOutcome(diagnostic, result);
+  // C19L-W250: a marked stop whose pending state could not be resolved returns not-applicable (the hook stays non-blocking) but has just left a
+  // stop-failure record; the hook names that record at this very stop instead of only at a later PostToolUse that a background pair never has.
+  if (diagnostic.unresolved && result?.status === "not-applicable" && typeof diagnostic.unresolved.dispatchId === "string")
+    return { ...result, unresolvedStop: { dispatchId: diagnostic.unresolved.dispatchId } };
   return result;
 }
 

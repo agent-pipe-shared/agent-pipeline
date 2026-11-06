@@ -10,7 +10,7 @@ import { devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
-import { candidateAdvancedDisjointly, orderAndCoverAdmittedSlice, retryWhileSessionAuthorityLockHeld } from "./native-goldfish-host-state.mjs";
+import { candidateAdvancedDisjointly, NATIVE_TERMINAL_SIBLING_RACES, nativeBoundaryRounds, orderAndCoverAdmittedSlice, retryWhileSessionAuthorityLockHeld } from "./native-goldfish-host-state.mjs";
 import { ITEM_QUEUE_SCHEMA, validateSliceQueue } from "./slice-queue.mjs";
 
 const BASE = "a".repeat(40);
@@ -70,6 +70,36 @@ const cases = [
     assert.ok(clock <= 10000);
     const other = () => { const e = new Error("x"); e.code = "OTHER"; throw e; };
     assert.throws(() => retryWhileSessionAuthorityLockHeld(other, { sleep: () => {} }), error => error.code === "OTHER");
+    // C19L-W250 (QG-04, extension only): a sibling commit moving HEAD between inspection and boundary entry is retried only when the caller opts in
+    // (the stop's pending read), only while the boundary was not entered, and stays a refusal for every other caller.
+    const bindingChanged = () => { const e = new Error("moved"); e.code = "SDC-ROOT"; e.reason = "repository-binding-changed"; throw e; };
+    let moves = 0;
+    assert.equal(retryWhileSessionAuthorityLockHeld(() => { moves += 1; if (moves < 3) bindingChanged(); return "rebound"; }, { sleep: () => {}, retryBindingChange: true }), "rebound");
+    assert.equal(moves, 3, "each attempt re-inspects; the third binds the moved HEAD");
+    assert.throws(() => retryWhileSessionAuthorityLockHeld(bindingChanged, { sleep: () => {} }), error => error.code === "SDC-ROOT" && error.reason === "repository-binding-changed", "without the opt-in a binding change is still refused at once");
+    let enteredMoves = 0;
+    assert.throws(() => retryWhileSessionAuthorityLockHeld((entered) => { enteredMoves += 1; entered.value = true; bindingChanged(); }, { sleep: () => {}, retryBindingChange: true }), error => error.reason === "repository-binding-changed");
+    assert.equal(enteredMoves, 1, "a refusal after the boundary opened is reported, not repeated");
+    let bindingClock = 0;
+    assert.throws(() => retryWhileSessionAuthorityLockHeld(bindingChanged, { sleep: ms => { bindingClock += ms; }, now: () => bindingClock, retryBindingChange: true }), error => error.reason === "repository-binding-changed");
+    assert.ok(bindingClock <= 10000, "the opt-in retry stays inside the budget");
+    const otherRoot = () => { const e = new Error("root"); e.code = "SDC-ROOT"; e.reason = "repository-root-changed"; throw e; };
+    assert.throws(() => retryWhileSessionAuthorityLockHeld(otherRoot, { sleep: () => {}, retryBindingChange: true }), error => error.reason === "repository-root-changed", "only the binding change is retried, no other SDC-ROOT reason");
+    // C19L-W251 (QG-04, extension only): the terminal write boundary is repeated on a fresh boundary while a sibling race refuses it, with a refresh
+    // between rounds, bounded; any other refusal and the last race are raised unchanged.
+    const race = (reason) => () => { const e = new Error(reason); e.code = reason === "reference-preimage-changed" ? "SDC-AUTHORITY-CAS" : "SDC-AUTHORITY-UNAVAILABLE"; e.reason = reason; throw e; };
+    for (const reason of NATIVE_TERMINAL_SIBLING_RACES) {
+      let rounds = 0, refreshes = 0;
+      assert.equal(nativeBoundaryRounds(() => { rounds += 1; if (rounds < 3) race(reason)(); return "released"; }, () => { refreshes += 1; }, { pause: () => {} }), "released", reason);
+      assert.equal(rounds, 3, reason);
+      assert.equal(refreshes, 2, `${reason}: the view is re-read between rounds`);
+    }
+    let bounded = 0;
+    assert.throws(() => nativeBoundaryRounds(() => { bounded += 1; race("domain-membership-race")(); }, () => {}, { pause: () => {}, limit: 4 }), error => error.reason === "domain-membership-race");
+    assert.equal(bounded, 4, "the rounds are bounded");
+    let foreign = 0;
+    assert.throws(() => nativeBoundaryRounds(() => { foreign += 1; race("native-authority-recovery-required")(); }, () => {}, { pause: () => {} }), error => error.reason === "native-authority-recovery-required");
+    assert.equal(foreign, 1, "a refusal that is not a sibling race is raised at once");
   } },
   { id: "NGFO02", name: "overlapping admitted slice is ordered after the live overlap instead of refused", run: () => {
     const raw = queueOf(itemSlice("ITEM-A", "AC-1", ["src/change.mjs"]), itemSlice("ITEM-OLD", "AC-9", ["src/change.mjs"], { state: "cancelled", holdReason: "superseded" }));
