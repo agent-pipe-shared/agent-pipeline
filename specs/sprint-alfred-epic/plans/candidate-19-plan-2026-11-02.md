@@ -744,6 +744,18 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
         submit-plan, so the coordinator demands the audit route before the close; whether that Critic is carried across the
         close commits to the push is the open question (follow-up slice).
       - Q9 (D55) in `human-guard-override.test.mjs` is environmental: it passes with an owner-only TMPDIR, the scratch runner used /tmp.
+      - w265 G20-35b (checkpoint): the walk now starts on the sanctioned feature course (submit/present/approve with a fixture
+        signature, plan-approval v9, register-feature-package), runs the course Critic round, asserts the close's
+        `CLOSE-QUALIFICATION-REQUIRED` and passes the Critic-bound candidate Verify on all three runner identities. Product break
+        fixed: a Critic export committed as ONE commit (export files, lineage record, manifest entry, the way the export leaves the
+        tree) was refused `VEP-CVL-CARRY-CONTENT-CHANGED`; `criticExportOnlyCommit` now admits exactly that commit with the manifest
+        recomputed, tamper forms still refused (N23). Still NOT proven: the audit route through the close, the carry across the
+        close's own commits, the push gate and the release preflight.
+      - Elephant fix: w263 wrote the materialization commit hint as prose into `nextAction`, so the guided onboarding driver
+        stopped with `unsupported-next-action`; the hint is now `commitStep`, `nextAction` stays the executable action.
+      - Integrated in w252 and green there: guard-lifecycle-ready 430/427/0 fail, onboarding-continuity 327, project-onboarding-v3,
+        project-onboarding-e2e, pipeline-state-inspect, push-prepare, push-init, critic-course-admission 85, critic-verify-lifecycle 30,
+        kernel closure, suite registration.
   - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; an OS-level sandbox for
     the AI observation boundary (node scripts read outside the repository). (AC journeys, vertical-first slicing, durable evidence
     and forensics pagination moved into candidate 20 above.)
@@ -751,6 +763,12 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     wait") stopped the M4c measurement in the non-pipeline probe repository at its first turn (15:28), so nothing ran for hours.
     Proposal for a PO decision: when the first message is an explicit task unrelated to installing the Pipeline, do the task and
     ask the install question once alongside. Not built.
+    G20-38 time sink: with a registered feature package the Result bootstrap ends `reconciliation-pending`, and its only repair is
+    a PO-signed `feature-package-reconcile` (ALWAYS_REQUIRED_KINDS), so every consumer feature close costs one extra PO signature
+    after the design approval. Options: keep it, or let the reconcile of an unchanged approved package run agent-side with a
+    readback. Not changed.
+    Info: submit-plan records a plan-submission rigor row deriving `feature` even for `--profile mini` (unavailable inputs), so
+    the close demands the Critic audit route for practically every consumer close; consistent with the floor design.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## Moved from docs/state.md (2026-11-07, size cap): candidate 18/19 verification line, verbatim
