@@ -305,6 +305,29 @@ export function boundedCopySafeCommand({ executable, argv, forceCopyCommand = fa
 }
 
 /**
+ * C20 (greenfield G20-16, all three runners): the PO's own terminal step was rendered as one 260-361 character line (agy, Codex) or as
+ * mixed POSIX and PowerShell blocks (Claude on Windows). Pasted into PowerShell, the agy line ran Linux paths and opened the Node REPL;
+ * the Claude PO pasted both blocks at once and got dozens of parser errors. This renders the step for the PO's actual terminal:
+ * - native Windows host: one PowerShell block;
+ * - Linux inside WSL (WSL_DISTRO_NAME): a block for the WSL terminal and a PowerShell block that runs the SAME argv through
+ *   `wsl.exe -d <distro> --` (Linux paths only ever reach Linux), under a line telling the PO to copy exactly one block;
+ * - any other host: one POSIX block.
+ * The argv is unchanged in every block; only the wrapper and quoting differ.
+ */
+export function renderPoTerminalCommand({ label, executable, argv, env = process.env, hostPlatform = process.platform } = {}) {
+  if (hostPlatform === "win32") {
+    return renderHumanCopySafeCommand({ label: `${label} (PowerShell)`, executable, argv, platform: "powershell" });
+  }
+  const distro = typeof env?.WSL_DISTRO_NAME === "string" && /^[A-Za-z0-9._-]{1,64}$/u.test(env.WSL_DISTRO_NAME) ? env.WSL_DISTRO_NAME : null;
+  if (distro === null) return renderHumanCopySafeCommand({ label, executable, argv, platform: "posix" });
+  const linux = renderHumanCopySafeCommand({ label: `${label}, option A: WSL terminal`, executable, argv, platform: "posix" });
+  const windows = renderHumanCopySafeCommand({ label: `${label}, option B: Windows PowerShell`,
+    executable: "wsl.exe", argv: ["-d", distro, "--", executable, ...argv], platform: "powershell" });
+  const text = ["Copy exactly ONE of the two blocks below, into the terminal it names.", linux.text, windows.text].join("\n");
+  return { ...linux, text, options: { wsl: linux.text, powershell: windows.text } };
+}
+
+/**
  * The default human hand-off form. It always emits bounded POSIX and
  * PowerShell blocks and emits cmd.exe only when the exact argv is representable
  * without cmd-specific ambiguity. The unbounded `command` remains available to

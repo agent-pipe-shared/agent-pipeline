@@ -28,6 +28,7 @@ import {
   forcedQuote,
   placeholder,
   renderHumanCopySafeCommand,
+  renderPoTerminalCommand,
 } from "./copy-safe-command.mjs";
 
 test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation", () => {
@@ -440,6 +441,40 @@ test("renderHumanCopySafeCommand emits bounded POSIX and PowerShell blocks by de
   );
   assert.ok(rendered.command.length > rendered.copyCommand.maxColumns, "fixture must exercise a wrapped command");
   assert.equal(rendered.text.includes(rendered.command), false, "the unsafe unbounded primary line must not be printed");
+});
+
+test("G20-16: renderPoTerminalCommand renders one block for the PO's terminal, and wraps the WSL argv through wsl.exe for PowerShell", () => {
+  const argv = ["/home/po/plugin/scripts/po-human-approval.mjs", "sign-intent", "--repo-root", "/home/po/src/project", "--request", `/home/po/src/project/scratch/${"r".repeat(90)}.json`];
+  const bounded = (text, max) => text.split(/\r?\n/u).every((line) => line.length <= max);
+  const windows = renderPoTerminalCommand({ label: "sign", executable: "C:\\Program Files\\nodejs\\node.exe",
+    argv: ["D:\\plugin\\po-human-approval.mjs", "sign-intent"], env: {}, hostPlatform: "win32" });
+  assert.match(windows.text, /^Step: sign \(PowerShell\)\nPowerShell:\n/u);
+  assert.doesNotMatch(windows.text, /POSIX:|cmd\.exe:/u);
+  const linux = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: {}, hostPlatform: "linux" });
+  assert.match(linux.text, /^Step: sign\nPOSIX:\n/u);
+  assert.doesNotMatch(linux.text, /PowerShell:|cmd\.exe:/u);
+  assert.ok(bounded(linux.text, linux.copyCommand.maxColumns), linux.text);
+  assert.equal(linux.text.includes(linux.command), false, "never the unbounded single line");
+  const wsl = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu" }, hostPlatform: "linux" });
+  assert.match(wsl.text, /^Copy exactly ONE of the two blocks below, into the terminal it names\.\n/u);
+  assert.match(wsl.options.wsl, /option A: WSL terminal\nPOSIX:\n/u);
+  assert.match(wsl.options.powershell, /option B: Windows PowerShell\nPowerShell:\n/u);
+  assert.match(wsl.options.powershell.replace(/\n/gu, ""), /wsl\.exe/u);
+  assert.match(wsl.options.powershell.replace(/\n/gu, ""), /Ubuntu/u);
+  assert.ok(bounded(wsl.text, wsl.copyCommand.maxColumns), wsl.text);
+  // An odd distro name is never interpolated; the plain POSIX form is used instead.
+  const odd = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu; rm -rf /" }, hostPlatform: "linux" });
+  assert.doesNotMatch(odd.text, /PowerShell:|rm -rf/u);
+});
+
+test("G20-16: the WSL-terminal block reproduces the exact Linux argv (with spaces) in a real bash", () => {
+  const argv = ["/home/po/plugin/scripts/po-human-approval.mjs", "sign-intent", "--repo-root", "/home/po/src/my project", "--request", `/home/po/src/my project/scratch/${"r".repeat(90)}.json`];
+  const wsl = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu" }, hostPlatform: "linux" });
+  const posixBlock = wsl.options.wsl.split("\n").slice(2).join("\n");
+  const script = `${posixBlock.replace(/eval "\$CMD"\s*$/u, "")}\nprintf '%s\\0' $CMD >/dev/null; eval "set -- $CMD"; printf '%s\\n' "$@"`;
+  const out = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  if (out.error?.code === "ENOENT") return;
+  assert.deepEqual(out.stdout.trimEnd().split("\n"), ["/usr/bin/node", ...argv]);
 });
 
 test("renderHumanCopySafeCommand preserves exact argv through every real shell available on this host", () => {

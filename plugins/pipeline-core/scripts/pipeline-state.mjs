@@ -472,7 +472,7 @@ import {
   verifyDesignWorkflowPackageApproval,
 } from "../lib/design-workflow-approval.mjs";
 import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
-import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { boundedCopySafeCommand, placeholder, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
 import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
 import {
   applyLegacyV2RevocationRecovery,
@@ -12201,7 +12201,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.log(JSON.stringify(approvalReview, null, 2));
         console.log(`Exact PO request: ${approvalRequestPath}.`);
         const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
-        if (mode?.mode === "signature") console.log(`node "${fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url))}" sign-intent --repo-root "${resolve(dir)}" --request "${resolve(dir, approvalRequestPath)}"`);
+        // G20-16: the PO's step is rendered for the PO's own terminal, bounded, never as one long line.
+        if (mode?.mode === "signature") console.log((deps.renderPoTerminalCommand ?? renderPoTerminalCommand)({ label: "PO signs the design approval",
+          executable: process.execPath,
+          argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, approvalRequestPath)] }).text);
         else console.log(`Next: approve-plan --by <name> --design-approval-request ${approvalRequestPath}`);
         console.log("The request is pending only; it does not approve the package or unlock implementation.");
       } else {
