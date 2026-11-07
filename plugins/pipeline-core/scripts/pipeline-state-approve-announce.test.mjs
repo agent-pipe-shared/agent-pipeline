@@ -187,3 +187,34 @@ test("approve-plan success output announces the required set-phase --phase imple
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+function approveWithDesignStatus(featureId, status) {
+  const dir = freshDir();
+  try {
+    const planPath = `.claude/plans/${featureId}.md`;
+    authorPlanSources(dir, planPath);
+    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir, now: FIXED_NOW }), 0);
+    assert.equal(initializeLifecycleContinuity(dir, featureId, planPath), 0);
+    assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDeps(dir, planPath)), 0);
+    assert.equal(run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, planPath)), 0);
+    const deps = { ...lifecycleDeps(dir, planPath), architectureDesignAfterApproval: () => ({ ok: true, status }) };
+    const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], deps));
+    assert.equal(approved.value, 0);
+    return approved.text;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("G20-32: an approved greenfield design names materialize-architecture first, with no PO step and no adoption route", () => {
+  const text = approveWithDesignStatus("approve-materialize", "materialization-required");
+  const next = text.split("\n").find((line) => line.startsWith("Next"));
+  assert.match(next, /^Next \(agent, no PO step\): run `pipeline-state\.mjs materialize-architecture`, then `set-phase --phase implementation`\./u);
+  assert.match(next, /never take the architecture-adoption route/u);
+});
+
+test("G20-32 control: a design that needs no materialization keeps the plain set-phase line", () => {
+  const text = approveWithDesignStatus("approve-materialized", "materialized");
+  assert.match(text, /^Next: implementation writes remain refused until you run `set-phase --phase implementation`/mu);
+  assert.doesNotMatch(text, /materialize-architecture/u);
+});

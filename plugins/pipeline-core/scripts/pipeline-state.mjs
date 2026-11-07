@@ -12691,7 +12691,22 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
-      console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
+      // G20-32 (Claude greenfield): this line named only set-phase. set-phase then refused with an adoption text, and the session took
+      // the brownfield adoption route (signatures, two override ceremonies, about eight PO terminal commands). An approved greenfield
+      // design package is materialized by the agent first; say so here, with no PO step in between.
+      let approvedDesignStatus = null;
+      try {
+        approvedDesignStatus = (deps.architectureDesignAfterApproval ?? ((root) => inspectArchitectureDesign(root, undefined, {
+          gitCandidate: deps.gitCandidate,
+          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+          verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
+        })))(dir)?.status ?? null;
+      } catch { approvedDesignStatus = null; }
+      if (approvedDesignStatus === "materialization-required") {
+        console.log('Next (agent, no PO step): run `pipeline-state.mjs materialize-architecture`, then `set-phase --phase implementation`. The approved design package is the architecture decision; never take the architecture-adoption route for it.');
+      } else {
+        console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
+      }
       // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): the
       // gate presentation shows the same closed-vocabulary briefing derived
       // and persisted at submit-plan time -- never raw digests/paths alone --
