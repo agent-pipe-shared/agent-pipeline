@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { machinePlaneFilePath } from '../lib/machine-plane.mjs';
 import { fileURLToPath } from 'node:url';
-import { sessionStartDecision } from './codex-session-start-hint.mjs';
+import { intakeVerbatimContextLines, sessionStartDecision } from './codex-session-start-hint.mjs';
 import { armAntigravityBootstrapSession } from './antigravity-bootstrap-lock.mjs';
 import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
 import { nativeHookSessionId } from '../lib/native-hook-failure-memory.mjs';
@@ -164,7 +164,11 @@ function main() {
     // barrier; repeated ready inference hooks do not re-arm the session.
     const armed = armAntigravityBootstrapSession(sessionDir, version);
     if (armed?.status === 'already-armed') {
-      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: AGY_SESSION_CONTINUATION_NOTE(sessionId) }] }) + '\n');
+      // The answered intake values and the verbatim material input stay on every turn (whether Antigravity keeps an
+      // ephemeral step of an earlier turn in context is not measured; dropping them would turn into re-asking, G20-30).
+      // Only the bootstrap instruction is replaced.
+      const continuation = [AGY_SESSION_CONTINUATION_NOTE(sessionId), ...intakeVerbatimContextLines(rootDir)].join(' ');
+      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: continuation }] }) + '\n');
       return;
     }
   } catch (e) {

@@ -59,7 +59,7 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
 
 // The intake checkpoint is the lossless, private authority store. Its material input is
 // independent of a resume card and is therefore surfaced on every governed SessionStart.
-function intakeVerbatimContextLines(root) {
+export function intakeVerbatimContextLines(root) {
   // The private checkpoint is Git-owned state. A governed fixture or project without
   // Git cannot have one, so avoid asking its resolver to discover private storage.
   if (!existsSync(join(root, ".git"))) return [];
