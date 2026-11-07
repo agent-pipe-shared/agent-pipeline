@@ -1,0 +1,438 @@
+diff --git a/plugins/pipeline-core/config/runner-profiles-v3.json b/plugins/pipeline-core/config/runner-profiles-v3.json
+index dacc3538c..5ab85421b 100644
+--- a/plugins/pipeline-core/config/runner-profiles-v3.json
++++ b/plugins/pipeline-core/config/runner-profiles-v3.json
+@@ -267,9 +267,9 @@
+         "state": "unavailable",
+         "selector": {
+           "kind": "model-id",
+-          "value": "gemini-3.8-flash-medium"
++          "value": "gemini-3.8-flash-low"
+         },
+-        "effort": "medium",
++        "effort": "low",
+         "unavailable": "defer",
+         "evidence": "dispatch-receipt"
+       }
+@@ -362,8 +362,8 @@
+       "antigravity": {
+         "state": "unavailable",
+         "selector": {
+-          "kind": "model-id",
+-          "value": "gemini-3.8-flash-high"
++          "kind": "alias",
++          "value": "inherit"
+         },
+         "effort": "high",
+         "unavailable": "defer",
+@@ -394,8 +394,8 @@
+       "antigravity": {
+         "state": "unavailable",
+         "selector": {
+-          "kind": "model-id",
+-          "value": "gemini-3.1-pro-high"
++          "kind": "alias",
++          "value": "inherit"
+         },
+         "effort": "high",
+         "unavailable": "defer",
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 036ced328..c20658378 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -630,6 +630,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
+   const nativeChild = evaluateNativeChildCall(input);
+   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
++  // G20-43: a resolved model that differs from the registry cell is recorded in the verdict and noticed here (one stderr line), never denied.
++  if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty });
+   // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
+   // only effect and one diagnostic line says what became of it when it was applicable.
+   if (input?.toolCall?.name === "send_message") {
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 8744e7523..37fea08a0 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -127,8 +127,9 @@ function prepareNative(root, nativeSubagents) {
+   for (const entry of nativeSubagents) {
+     if (entry.Model !== undefined) continue;
+     const type = String(entry.TypeName ?? "").replace(/^pipeline-core:/u, "");
+-    if (["goldfish-deep", "critic", "consult-advisor"].includes(type)) entry.Model = "pro";
+-    else if (["goldfish-implementor", "goldfish-mechanic", "readiness-reviewer"].includes(type)) entry.Model = "flash";
++    // G20-43 (PO 2026-11-07): the Critic inherits the session model and passes NO Model; the three Goldfish roles pass `flash`.
++    if (["consult-advisor"].includes(type)) entry.Model = "pro";
++    else if (["goldfish-deep", "goldfish-implementor", "goldfish-mechanic", "readiness-reviewer"].includes(type)) entry.Model = "flash";
+   }
+   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+   const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+@@ -1578,8 +1579,9 @@ check("Antigravity pretool guard blocks a critic dispatch carrying prose at inde
+ check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
+   const root = nativeFixture();
+   const nativeSubagents = [
+-    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
+-    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
++    // G20-43: the Critic inherits the session model, so it passes no Model (was Model "pro").
++    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
++    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+   ];
+   prepareNative(root, nativeSubagents);
+   const res = decision(run({
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+index ea69611e2..9b705ae7b 100644
+--- a/plugins/pipeline-core/lib/agy-native-goldfish.mjs
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -9,9 +9,12 @@
+ //   * the host writes <brain root>/<parentId>/.system_generated/subagents/<childId>.json = { conversationId, subagentDescriptor {typeName,
+ //     role}, state, spawnStepIndex, workspaceUris }; the brain root is the parent directory of the payload's artifactDirectoryPath. A child
+ //     is BOUND when exactly one parent directory holds a descriptor named after its id;
+-//   * the alias (Model) is only in the parent's call; every child call carries the RESOLVED modelName, and flash and pro resolved to the
+-//     SAME model on the measured host, so the child's modelName is compared with the model the dispatch selection resolved for its role
+-//     (the registry's Antigravity cell for that duty), never with the alias;
++//   * the alias (Model) is only in the parent's call; every child call carries the RESOLVED modelName. MEASURED (M4c/M10, 2026-11-07): the
++//     alias does NOT select a model -- `flash` AND `pro` both resolved to `gemini-3.8-flash-tiered`, and a child launched WITHOUT a Model
++//     inherits the main session's model (`gemini-4-argon-medium`). The child's modelName is therefore only COMPARED with the registry's
++//     Antigravity cell for its duty and RECORDED (G20-43, PO 2026-11-07: record instead of refuse); a mismatch is never a denial. The routing
++//     is: goldfish-implementor flash medium, goldfish-deep flash high, goldfish-mechanic flash low (all Model `flash`), the Critic inherits
++//     (no Model);
+ //   * invoke_subagent args are FLAT (TypeName, Role, Prompt, Model, Workspace) and may be JSON-string-encoded ("\"flash\"").
+ //
+ // Measured by the M4b run (scratch/agy-m4b-findings.md, specs/sprint-alfred-epic/evidence/held-patches/w258-c20-agy-native-isolation.notes.md):
+@@ -24,7 +27,7 @@
+ //     and carries no governance marker, so it is resolved to its repository here (resolveNativeChildGovernance) and governed like the parent;
+ //   * a finished child's descriptor STAYS SUBAGENT_STATE_ALIVE, so no rule may count ALIVE children.
+ //
+-// NOT measured, so not assumed: the exact spelling of modelName (the w255 model check is kept as is), the descriptor state of a killed or
++// NOT measured, so not assumed: the exact spelling of modelName beyond the two values above, the descriptor state of a killed or
+ // failed child, descriptor timing, a hook at a child's end.
+ 
+ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+@@ -102,7 +105,10 @@ export function expectedNativeModel(type, routeSource = registeredFunctionalTask
+ 
+ const deny = (code, reason) => ({ ok: false, code, reason: `${code}: ${reason}` });
+ 
+-/** A hook call from a native child: attribute it to its parent and check the model it actually resolved to (goldfish roles only). */
++/**
++ * A hook call from a native child: attribute it to its parent and RECORD the model it actually resolved to next to the registry cell
++ * (goldfish roles only; G20-43: a model mismatch is reported in `modelCheck` and one `notice` line, never a denial).
++ */
+ export function evaluateNativeChildCall(input, { routeSource } = {}) {
+   const bound = bindNativeChild(input);
+   if (bound.status === "not-a-child") return { ok: true, attributed: null };
+@@ -119,10 +125,15 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
+   if (!isNativeCodeWriterType(bound.typeName)) return { ok: true, attributed };
+   const expected = expectedNativeModel(bound.typeName, routeSource);
+   if (expected === null) return { ok: true, attributed, modelCheck: "no-opinion" };
+-  if (normalizeModel(input?.modelName) !== normalizeModel(expected.value)) {
+-    return deny("AGY-NATIVE-CHILD-MODEL-MISMATCH", `child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(input?.modelName ?? null)}, but the dispatch selection for it (duty.${expected.duty}, Antigravity cell) is ${JSON.stringify(expected.value)}. The host maps the aliases flash and pro to models of its own and they may be the same model, so the alias in the parent call does not select the model. Repair: stop this child with manage_subagents (kill) and dispatch it again with a Model alias that resolves to ${JSON.stringify(expected.value)}; if no alias does on this host, stop and report that to the PO (the PO can set the registry's Antigravity cell for duty.${expected.duty} in config/runner-profiles-v3.json to the model the host really resolves). Do not implement in the parent session instead.`);
+-  }
+-  return { ok: true, attributed };
++  // G20-43: the resolved model is RECORDED next to the expected registry cell and never refused. The host's Model alias does not select a
++  // model (measured), so a refusal here only blocked every happy-path child with a repair nobody could run.
++  const resolved = input?.modelName ?? null;
++  const modelCheck = { status: normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : "mismatch", resolved, expected };
++  if (modelCheck.status === "match") return { ok: true, attributed, modelCheck };
++  return {
++    ok: true, attributed, modelCheck,
++    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,
++  };
+ }
+ 
+ /** Tracked files with uncommitted changes (staged or not) in a git working tree; [] when git cannot say, since this is a hygiene check. */
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index 4b7d0bef0..817f9c39a 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -16,6 +16,8 @@ const ENFORCED_RUNNERS = Object.freeze(["claude"]);
+ /** The Antigravity native Model aliases (the one list: the briefing generator imports it instead of copying it). */
+ export const ANTIGRAVITY_NATIVE_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
+ const ANTIGRAVITY_MODELS = ANTIGRAVITY_NATIVE_MODELS;
++/** The route tier of a duty that passes no Model and runs on the session's model (G20-43: the Critic). Not an alias, so not in the list above. */
++const INHERIT_TIER = "inherit";
+ 
+ /** The approved Antigravity native alias the registry projects for a duty task route (e.g. `duty.implement`), or null when none is registered. */
+ export function antigravityNativeTierForTaskRoute(taskRoute, routeSource = registeredFunctionalTaskRoutes()) {
+@@ -59,6 +61,19 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+       }] };
+       return { ok: true, findings: [], skipped: "agent-type-not-governed" };
+     }
++    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
++      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity"
++        && duties.includes(route.taskRoute.startsWith("duty.") ? route.taskRoute.slice("duty.".length) : "")
++        && (ANTIGRAVITY_MODELS.includes(route.nativeTier) || route.nativeTier === INHERIT_TIER)) : [];
++    const expected = [...new Set(routes.map((route) => route.nativeTier))];
++    // G20-43 (PO 2026-11-07): a duty whose route is `inherit` (the Critic) passes NO Model and runs on the session's model; an explicit alias
++    // would only select a model of the host's own choosing (measured), so it is refused with the repair "omit Model".
++    if (expected.length > 0 && expected.every((tier) => tier === INHERIT_TIER)) {
++      const omitted = model === undefined || model === null || model === "" || model === "inherit";
++      return omitted ? { ok: true, findings: [], skipped: null } : { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-DUTY-MISMATCH",
++        message: `Antigravity Subagents[].Model for ${subagentType} must be omitted: its configured duty route inherits the session model. Re-issue that entry with no Model (omit Model).`,
++      }] };
++    }
+     if (!ANTIGRAVITY_MODELS.includes(model)) {
+       return { ok: false, skipped: null, findings: [{
+         code: model === undefined || model === null || model === "" || model === "inherit"
+@@ -66,11 +81,6 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+         message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
+       }] };
+     }
+-    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
+-      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity"
+-        && duties.includes(route.taskRoute.startsWith("duty.") ? route.taskRoute.slice("duty.".length) : "")
+-        && ANTIGRAVITY_MODELS.includes(route.nativeTier)) : [];
+-    const expected = [...new Set(routes.map((route) => route.nativeTier))];
+     if (expected.length === 0) {
+       return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-ROUTE-UNAVAILABLE",
+         message: `No approved Antigravity native tier is registered for ${subagentType}; do not infer one from a concrete V3 model ID.`,
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index c5e864ece..4e5ce1e40 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -118,10 +118,31 @@ test("DME12 approved Antigravity tiers are projected beside, not substituted for
+   assert.equal(source.ok, true);
+   const routes = source.taskRoutes.filter((route) => route.runner === "antigravity" && route.taskRoute.startsWith("duty."));
+   assert.equal(routes.find((route) => route.taskRoute === "duty.implement").nativeTier, "flash");
+-  assert.equal(routes.find((route) => route.taskRoute === "duty.deep").nativeTier, "pro");
+-  assert.equal(routes.find((route) => route.taskRoute === "duty.critic_normal").nativeTier, "pro");
++  // G20-43 (PO 2026-11-07, measured: the alias does not select a model on the host): the three Goldfish roles pass `flash`, the Critic
++  // passes no Model and inherits the session's model (was: deep "pro", critic_normal "pro").
++  assert.equal(routes.find((route) => route.taskRoute === "duty.deep").nativeTier, "flash");
++  assert.equal(routes.find((route) => route.taskRoute === "duty.critic_normal").nativeTier, "inherit");
+   assert.equal(routes.find((route) => route.taskRoute === "duty.advisory").nativeTier, "pro");
+   assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "consult-advisor", model: "pro", routeSource: source }).ok, true);
+   assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "plan-verifier", model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-ROUTE-UNAVAILABLE");
+   assert.notEqual(routes.find((route) => route.taskRoute === "duty.implement").selector.value, "flash");
+ });
++
++test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no Model (it inherits the session model)", () => {
++  const source = registeredFunctionalTaskRoutes();
++  for (const subagentType of ["goldfish-implementor", "goldfish-mechanic", "goldfish-deep"]) {
++    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "flash", routeSource: source }).ok, true, subagentType);
++    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH", subagentType);
++    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].code, "DISPATCH-MODEL-MISSING", subagentType);
++  }
++  for (const subagentType of ["critic", "pipeline-core:critic"]) {
++    for (const model of [undefined, "", "inherit"]) {
++      assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model, routeSource: source }).ok, true, `${subagentType}/${String(model)}`);
++    }
++    // An explicit alias would only pick a model of the host's own choosing; the repair is to omit it.
++    const refused = evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source });
++    assert.equal(refused.ok, false);
++    assert.equal(refused.findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH");
++    assert.match(dispatchModelRefusalText(refused), /omit Model/u);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/model-family-authority.mjs b/plugins/pipeline-core/lib/model-family-authority.mjs
+index 57dc34a15..0ee47b581 100644
+--- a/plugins/pipeline-core/lib/model-family-authority.mjs
++++ b/plugins/pipeline-core/lib/model-family-authority.mjs
+@@ -47,7 +47,7 @@ function sourceProjection(routeSource) {
+   for (const t of routeSource.taskRoutes) {
+     // Antigravity rows carry its native tier (dc8204a28); the key is admitted only there and only with a closed value.
+     const hasTier = t !== null && typeof t === "object" && Object.hasOwn(t, "nativeTier");
+-    if (hasTier && (t.runner !== "antigravity" || ![undefined, "pro", "flash"].includes(t.nativeTier))) return null;
++    if (hasTier && (t.runner !== "antigravity" || ![undefined, "pro", "flash", "inherit"].includes(t.nativeTier))) return null;
+     if (!own(t, hasTier
+       ? ["taskRoute", "runner", "role", "effort", "state", "selector", "nativeTier"]
+       : ["taskRoute", "runner", "role", "effort", "state", "selector"])
+diff --git a/plugins/pipeline-core/lib/model-role-route-source.mjs b/plugins/pipeline-core/lib/model-role-route-source.mjs
+index be659ca87..c60f512d1 100644
+--- a/plugins/pipeline-core/lib/model-role-route-source.mjs
++++ b/plugins/pipeline-core/lib/model-role-route-source.mjs
+@@ -32,16 +32,17 @@ const DUTY_ROLES = Object.freeze({
+   read: ["efficient", "efficient", "efficient"],
+ });
+ // Antigravity's native Model enum is independent of the concrete V3 model IDs.
+-// This PO-approved projection is explicit and never treats inherit as a route.
++// This PO-approved projection is explicit. G20-43 (PO 2026-11-07; measured: the alias does not select a model on the host): the three Goldfish
++// duties pass Model `flash`; the Critic duties are the one place `inherit` IS the route -- they pass NO Model and run on the session's model.
+ const AGY_NATIVE_TIERS = Object.freeze({
+   "profile.frontier": "pro",
+   "profile.worker": "flash",
+   "duty.implement": "flash",
+   "duty.mechanic": "flash",
+-  "duty.deep": "pro",
++  "duty.deep": "flash",
+   "duty.test_author": "flash",
+-  "duty.critic_normal": "pro",
+-  "duty.critic_high_risk": "pro",
++  "duty.critic_normal": "inherit",
++  "duty.critic_high_risk": "inherit",
+   "duty.readiness": "flash",
+   "duty.advisory": "pro",
+   "duty.read": "flash",
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 25075e7f5..2598d5e12 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -164,27 +164,64 @@ test("a child hook call is bound to its parent through the host-written descript
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
+-test("a child whose resolved modelName differs from the selected model is refused with a typed code that names the repair", async () => {
++// G20-43 restatement (QG-04, restated in place; every other assertion of this file is kept). MEASURED on Antigravity (M4c/M10): the
++// subagent Model alias does not select a model -- `flash` and `pro` both resolved to gemini-3.8-flash-tiered, and a child launched without a
++// Model inherits the session's model. A native child whose resolved modelName differs from the registry cell was therefore refused on the
++// happy path with a repair only the PO could run. PO decision 2026-11-07: record instead of refuse. The former case pinned the denial
++// (AGY-NATIVE-CHILD-MODEL-MISMATCH, exit 2); it now pins that the mismatch is ADMITTED, RECORDED next to the expected cell, and NOTICED once.
++test("G20-43: a child whose resolved modelName differs from the selected model is admitted, recorded next to the expected cell and noticed, never refused", async () => {
+   const fx = brainFixture();
+   try {
+     descriptor(fx, CHILD, "goldfish-implementor");
++    writeFileSync(join(fx.workspace, "x.txt"), "x\n");
+     const { evaluateNativeChildCall } = await loadModule();
+-    const childCall = { name: "view_file", args: { Path: join(fx.workspace, "x.txt") } };
++    const childCall = { name: "view_file", args: { AbsolutePath: join(fx.workspace, "x.txt") } };
+     const wrong = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: "some-other-model", toolCall: childCall });
+     const verdict = evaluateNativeChildCall(wrong);
+-    assert.equal(verdict.ok, false);
+-    assert.equal(verdict.code, "AGY-NATIVE-CHILD-MODEL-MISMATCH");
+-    assert.ok(verdict.reason.includes("some-other-model") && verdict.reason.includes(selectedModel("implement")), verdict.reason);
+-    assert.match(verdict.reason, /repair/iu);
+-    // The adapter denies the child's call, verbatim and typed.
++    assert.equal(verdict.ok, true, JSON.stringify(verdict));
++    assert.equal(verdict.attributed.parentConversationId, PARENT, "binding is unchanged");
++    assert.equal(verdict.modelCheck.status, "mismatch");
++    assert.equal(verdict.modelCheck.resolved, "some-other-model");
++    assert.deepEqual(verdict.modelCheck.expected, { duty: "implement", value: selectedModel("implement") });
++    assert.ok(verdict.notice.includes("some-other-model") && verdict.notice.includes(selectedModel("implement")), verdict.notice);
++    assert.equal(verdict.notice.includes("\n"), false, "one notice line");
++    // The adapter admits the child's call and prints the one notice line; no MODEL-MISMATCH denial any more.
+     const res = runAdapter(fx, wrong);
+-    assert.equal(res.status, 2, `${res.stdout}${res.stderr}`);
+-    assert.match(res.stdout, /AGY-NATIVE-CHILD-MODEL-MISMATCH/u);
++    assert.equal(res.status, 0, `${res.stdout}${res.stderr}`);
++    assert.doesNotMatch(res.stdout, /AGY-NATIVE-CHILD-MODEL-MISMATCH/u);
++    const notices = res.stderr.split("\n").filter((line) => line.includes("agy-native-child-model-mismatch"));
++    assert.equal(notices.length, 1, res.stderr);
++    assert.ok(notices[0].includes("some-other-model") && notices[0].includes(selectedModel("implement")), notices[0]);
++    // The expected model resolves: recorded as a match, no notice.
+     const right = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement"), toolCall: childCall });
+-    assert.equal(evaluateNativeChildCall(right).ok, true);
++    const matched = evaluateNativeChildCall(right);
++    assert.equal(matched.ok, true);
++    assert.equal(matched.modelCheck.status, "match");
++    assert.equal(matched.notice, undefined);
++    assert.doesNotMatch(runAdapter(fx, right).stderr, /agy-native-child-model-mismatch/u);
++    // Every other check still governs: an ambiguous binding is still refused whatever the model.
++    mkdirSync(join(fx.brain, "44444444-dddd-4ddd-8ddd-000000000004"), { recursive: true });
++    descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_ALIVE", "44444444-dddd-4ddd-8ddd-000000000004");
++    assert.equal(evaluateNativeChildCall(wrong).ok, false);
++    assert.equal(evaluateNativeChildCall(wrong).code, "AGY-NATIVE-CHILD-BINDING-AMBIGUOUS");
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
++// G20-43 routing (PO 2026-11-07): the Critic inherits the session model (no Model parameter); implementor = flash medium, deep = flash high,
++// mechanic = flash low. The Model alias exists only for the three Goldfish roles and is always `flash`.
++test("G20-43: the registry routes implementor flash-medium, deep flash-high, mechanic flash-low and the Critic to the session model", async () => {
++  const route = (duty) => registeredFunctionalTaskRoutes().taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === `duty.${duty}`);
++  const cell = (duty) => ({ selector: route(duty).selector ?? route(duty).cell.selector, effort: route(duty).effort ?? route(duty).cell.effort });
++  assert.deepEqual([cell("implement").selector.value, cell("implement").effort], ["gemini-3.8-flash-medium", "medium"]);
++  assert.deepEqual([cell("deep").selector.value, cell("deep").effort], ["gemini-3.8-flash-high", "high"]);
++  assert.deepEqual([cell("mechanic").selector.value, cell("mechanic").effort], ["gemini-3.8-flash-low", "low"]);
++  for (const duty of ["implement", "deep", "mechanic"]) assert.equal(route(duty).nativeTier, "flash", duty);
++  for (const duty of ["critic_normal", "critic_high_risk"]) {
++    assert.equal(cell(duty).selector.value, "inherit", duty);
++    assert.equal(route(duty).nativeTier, "inherit", duty);
++  }
++});
++
+ // M4b restatement of the former serialization case ("a second code-writing child while one is alive is refused ..."). Measured instead
+ // (scratch/agy-m4b-findings.md): Workspace "branch" in a git workspace gives every code writer its own worktree and branch, two writers run in
+ // parallel without conflict, and a finished child's descriptor STAYS SUBAGENT_STATE_ALIVE -- so counting ALIVE writers would refuse every
+diff --git a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+index de2f09bd4..7b767254b 100644
+--- a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+@@ -96,15 +96,16 @@ const cases = [
+       "advisory.antigravity": "gemini-3.1-pro-high / high",
+       "advisory.claude.consult": "opus / max",
+       "critic-high-risk.codex": "gpt-6-sol / max", "critic-high-risk.claude": "opus / max",
+-      "critic-high-risk.antigravity": "gemini-3.1-pro-high / high",
++      // G20-43 (PO 2026-11-07): the Antigravity Critic inherits the session model (no Model alias selects a model on the host).
++      "critic-high-risk.antigravity": "inherit / high",
+       "critic-normal.codex": "gpt-6-sol / medium", "critic-normal.claude": "opus / medium",
+-      "critic-normal.antigravity": "gemini-3.8-flash-high / high",
++      "critic-normal.antigravity": "inherit / high",
+       "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / medium",
+       "deep.antigravity": "gemini-3.8-flash-high / high",
+       "implement.codex": "gpt-6-luna / high", "implement.claude": "sonnet / medium",
+       "implement.antigravity": "gemini-3.8-flash-medium / medium",
+       "mechanic.codex": "gpt-6-luna / high", "mechanic.claude": "haiku / high",
+-      "mechanic.antigravity": "gemini-3.8-flash-medium / medium",
++      "mechanic.antigravity": "gemini-3.8-flash-low / low", // G20-43: mechanic = flash low (was flash medium)
+       "readiness.codex": "gpt-6-luna / high", "readiness.claude": "sonnet / high",
+       "readiness.antigravity": "gemini-3.8-flash-high / high",
+       "read.codex": "gpt-6-luna / medium", "read.claude": "haiku / medium",
+@@ -172,11 +173,12 @@ const cases = [
+     assert.equal(codexRoute.effort, "medium");
+ 
+     const agyRoute = registry.duties.critic_normal.antigravity;
+-    assert.equal(agyRoute.selector.value, "gemini-3.8-flash-high");
++    // G20-43: the Antigravity Critic cells say inherit (the session's model); the effort is the session's too and is kept as it was.
++    assert.equal(agyRoute.selector.value, "inherit");
+     assert.equal(agyRoute.effort, "high");
+ 
+     const agyHighRisk = registry.duties.critic_high_risk.antigravity;
+-    assert.equal(agyHighRisk.selector.value, "gemini-3.1-pro-high");
++    assert.equal(agyHighRisk.selector.value, "inherit");
+     assert.equal(agyHighRisk.effort, "high");
+   }],
+   ["keep-awake accepts only its explicit boolean and legacy V3 absence remains compatible", () => {
+diff --git a/plugins/pipeline-core/scripts/check-routing-projections.test.mjs b/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+index a9e4bf4ac..7e7753c28 100644
+--- a/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
++++ b/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+@@ -212,9 +212,10 @@ check("RP38 current V3 Antigravity duties keep Pro design and distinct Flash-hig
+   v3Registry.profiles.epic.design_phase.antigravity.selector.value === "gemini-3.1-pro-high"
+   && v3Registry.duties.implement.antigravity.selector.value === "gemini-3.8-flash-medium"
+   && v3Registry.duties.implement.antigravity.effort === "medium"
+-  && v3Registry.duties.mechanic.antigravity.selector.value === "gemini-3.8-flash-medium"
+-  && v3Registry.duties.mechanic.antigravity.effort === "medium"
+-  && v3Registry.duties.critic_normal.antigravity.selector.value === "gemini-3.8-flash-high"
++  // G20-43 (PO 2026-11-07): mechanic = flash low (was flash medium); the Antigravity Critic inherits the session model (was gemini-3.8-flash-high).
++  && v3Registry.duties.mechanic.antigravity.selector.value === "gemini-3.8-flash-low"
++  && v3Registry.duties.mechanic.antigravity.effort === "low"
++  && v3Registry.duties.critic_normal.antigravity.selector.value === "inherit"
+ );
+ check("RP39 Antigravity aliases resolve accurately",
+   projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 9c5835fd2..55f4eb11e 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -24,7 +24,7 @@ Measured shape of the host tool (`w252-agy-native-subagent-measurement.md`): `in
+ and `Prompt` required, `Model` one of `inherit|flash_lite|flash|pro`, `Workspace` one of `inherit|branch|share`; there is no `Subagents`
+ array. In a hook payload the arguments may be JSON-string-encoded (`Model` arrives as the string `"flash"` with its quotes); the guard
+ decodes one level. Build the call from the briefing the generator produced (`dispatch-briefing.mjs build --runner antigravity`, a native
+-alias as the model id) and set `Model` to the alias the dispatch selection names for the role.
++alias as the model id) and set `Model` to `flash` for the three Goldfish roles (a Critic dispatch passes no `Model`).
+ 
+ - **Admission** is the one Claude uses: the generated briefing route, the selected model and the write-capable carrier are judged by
+   `guard-dispatch`. There is no per-dispatch PO consent and no signature, and no prepare step for these three roles (the prepared
+@@ -35,10 +35,13 @@ alias as the model id) and set `Model` to the alias the dispatch selection names
+   of the payload's `artifactDirectoryPath`. A child is bound when exactly one parent directory holds a descriptor named after it
+   (`lib/agy-native-goldfish.mjs`). The guard refuses agent writes under the Antigravity brain and config directories
+   (`AGY-NATIVE-BRAIN-WRITE`).
+-- **Model.** The alias exists only in the parent call; every child call carries the RESOLVED `modelName`, and `flash` and `pro` resolved to the
+-  same model on the measured host. The guard compares the child's `modelName` with the model the dispatch selection resolved for its role
+-  (the registry's Antigravity cell for that duty), never with the alias, and refuses a mismatch with `AGY-NATIVE-CHILD-MODEL-MISMATCH`
+-  naming both values and the repair.
++- **Model (measured M4c/M10, G20-43).** The alias exists only in the parent call and does NOT select a model on the host: `flash` AND `pro`
++  both resolved to `gemini-3.8-flash-tiered` (the child's hook payload `modelName`), and a child launched WITHOUT a Model inherits the main
++  session's model (`gemini-4-argon-medium` measured). Routing (PO 2026-11-07): `goldfish-implementor` = flash medium, `goldfish-deep` =
++  flash high, `goldfish-mechanic` = flash low, all dispatched with `Model: "flash"`; the Critic inherits (pass NO `Model`; an explicit
++  alias on a Critic is refused by guard-dispatch with the repair "omit Model"). The guard compares the child's `modelName` with the
++  registry's Antigravity cell for its duty and RECORDS the result (`modelCheck` in the verdict) with one stderr notice line
++  (`agy-native-child-model-mismatch`) on a mismatch; it never denies for a model mismatch.
+ - **Isolation (measured, M4b).** A code-writing child is dispatched with `Workspace: "branch"` (every other value, absent included, is
+   refused: `AGY-NATIVE-WORKSPACE-NOT-ISOLATED`). The host then creates a real git worktree of the project below
+   `<home>/.gemini/antigravity-cli/worktrees/<parentConversationId>/subagent-<...>` on a new branch of the same name, cut from the parent's
+@@ -65,7 +68,7 @@ alias as the model id) and set `Model` to the alias the dispatch selection names
+   reaches it verbatim. The child commits on its own branch; the Elephant's commit is the take-over above followed by the existing
+   `scripts/goldfish-host-commit-recover.mjs` plan/apply route. There is no Antigravity-only commit mechanism and no in-session
+   implementation by the Elephant as a sanctioned route.
+-- **Not measured, so not assumed.** The spelling of `modelName` (the model check above is kept as it was), the descriptor state of a killed or
++- **Not measured, so not assumed.** The spelling of `modelName` beyond the two values above, the descriptor state of a killed or
+   failed child, descriptor timing, a hook at a child's end, and whether a global (Pipeline) hook install fires once or twice per child tool call.
+ 
+ ### Legacy route (Codex-to-Antigravity)
