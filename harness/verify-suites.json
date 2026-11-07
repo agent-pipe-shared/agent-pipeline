@@ -3498,6 +3498,18 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs"
     },
     {
+      "name": "pin-durable-evidence-survives-a-fresh-clone-tests",
+      "file": "plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs"
+    },
+    {
+      "name": "pin-acceptance-criteria-are-examined-as-whole-user-journeys-tests",
+      "file": "plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs"
+    },
+    {
       "name": "pin-declared-product-criteria-need-matching-acceptance-evidence-tests",
       "file": "plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
