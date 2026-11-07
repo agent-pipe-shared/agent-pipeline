@@ -396,7 +396,10 @@ configured scanner reads as one of four states — `passed`, `failed`,
 configured scanners (`baseline-security`). Under a critical calibration
 (`stakes` critical, high, kritisch or hoch) a scanner that did not execute
 blocks with `SEC-CLOSE-SCANNER-NOT-EXECUTED`; any other calibration admits it
-but still reports it as `not executed`. A typed
+but still reports it as `not executed`. A critical project with no security
+gate configured is refused at Verify, close and push with
+`SEC-CLOSE-GATE-NOT-CONFIGURED`, naming the one command that configures the
+gate. A typed
 unavailable runner capability stops that capability honestly; it is not an
 invitation to weaken permissions, invent evidence or change runner/model.
 

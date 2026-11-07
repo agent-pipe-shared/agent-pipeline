@@ -178,6 +178,7 @@ function projectCalibrationRelPath(rootDir) {
   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+import { securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
@@ -2590,6 +2591,12 @@ try {
         carryForward: (evidenceCommit) => carryDecisionFor("security", { commit: evidenceCommit }),
       }),
     );
+  } else {
+    // C20 G20-25 (PO decision 2026-11-07): a project calibrated critical with no security gate (absent or mode off) is refused at push
+    // too, with the one command that configures the gate; any other calibration keeps the gate optional. Dispatched as a blocking
+    // security failure below (no gate means no warn mode).
+    const gateRefusal = securityGateNotConfiguredRefusal(evidenceProjectDir, "this push");
+    if (gateRefusal !== null) securityFailures.push(gateRefusal);
   }
 
   // Methodological Agent Guard: Block push if there are uncommitted files in specs/, docs/, or backlog/

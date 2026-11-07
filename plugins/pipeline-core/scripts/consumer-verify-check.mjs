@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal } from "../lib/security-close-status.mjs";
+import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
@@ -19,6 +19,8 @@ export function runSecurityCloseCheck(root, env = process.env) {
   const loaded = loadManifest(root);
   const gate = gateConfig(loaded.manifest, "security");
   if (loaded.status === "absent" || !gate || gate.mode === "off") {
+    const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
+    if (refusal) { console.error(refusal); return 1; }
     console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
     return 0;
   }

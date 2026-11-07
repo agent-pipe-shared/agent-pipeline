@@ -39,7 +39,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, securityCloseElements,
+  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, securityCloseElements, securityGateNotConfiguredRefusal,
 } from "../lib/security-close-status.mjs";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
@@ -82,11 +82,11 @@ if (isDirectInvocation(import.meta.url)) {
   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const result = checkCloseSecurityCompleteness(root);
   if (result.skipped) {
-    // Nothing configured is "not applicable", said out loud: a silent exit 0 here read like a passed security check.
-    const hint = isCriticalStakes(readCalibrationStakes(root))
-      ? " This project is calibrated critical: configure the security gate (gates.security mode: blocking) in the project manifest."
-      : "";
-    console.log(`CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).${hint}`);
+    // A critical calibration without a gate is blocked and names the repair command (G20-25); any other calibration is "not applicable",
+    // said out loud: a silent exit 0 here read like a passed security check.
+    const refusal = securityGateNotConfiguredRefusal(root, "the close chain");
+    if (refusal) { console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${refusal}`); process.exit(2); }
+    console.log("CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).");
     process.exit(0);
   }
   for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);

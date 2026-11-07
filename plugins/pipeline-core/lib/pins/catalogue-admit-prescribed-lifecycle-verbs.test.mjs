@@ -688,6 +688,24 @@ test("C20 w256 bind-adr-proposals: the closed shape is admitted, every near-miss
   });
 });
 
+// ---- C20 w257 (G20-25): `security-gate-configure.mjs`, the repair a critical project's refusal names, in its one closed shape ----
+test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "security-gate-configure.mjs");
+    bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
+    for (const [label, action] of [
+      ["foreign root", scriptAction(script, "--root", join(f.root, ".."))],
+      ["relative root", scriptAction(script, "--root", ".")],
+      ["no root", scriptAction(script)],
+      ["root flag without a value", scriptAction(script, "--root")],
+      ["extra flag", scriptAction(script, "--root", f.root, "--force")],
+      ["extra positional", scriptAction(script, "--root", f.root, "extra")],
+      ["repeated root", scriptAction(script, "--root", f.root, "--root", f.root)],
+      ["flag before root", scriptAction(script, "--force", "--root", f.root)],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
 test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
   withFixture("feature", f => {
     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made

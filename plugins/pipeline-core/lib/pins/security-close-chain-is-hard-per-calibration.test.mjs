@@ -12,6 +12,14 @@
 //      the calibration does not configure is "not applicable", a configured one without a run is "not executed" (also with no
 //      evidence at all);
 //   C6 security-scan.mjs accepts --out-dir under scratch/ for an analysis run and refuses any other target without writing.
+//   C9  (PO decision 2026-11-07, "muss in die Meldung wie es geht") a critical project whose manifest configures no security gate (no
+//       manifest, no gates.security, or mode off) is blocked at the close entry and at Verify with a typed refusal that names the exact
+//       repair argv;
+//   C10 running that argv configures gates.security (blocking, automated) in the tier the loader reads, every other byte unchanged
+//       (comments, CRLF, other gates), a second run is a no-op, and the same Verify run then reaches the scanners;
+//   C11 standard, absent and unrecognised stakes + no gate stay "not applicable" and admitted;
+//   C12 a refused repair (invalid manifest, a shape it cannot edit byte-safely) leaves every byte and the directory unchanged; a twin
+//       manifest pair stays byte-identical; the block is the one onboarding writes.
 // The scanner observation is injected as evidence files (no scanner is spawned, nothing is downloaded).
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
@@ -21,6 +29,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { checkSecurityCompleteness } from "../security-completeness-gate.mjs";
+import { gateConfig, loadManifest } from "../manifest.mjs";
 import {
   SECURITY_STATES, isCriticalStakes, readCalibrationStakes, securityCloseElements, formatSecurityCloseStatus,
 } from "../security-close-status.mjs";
@@ -209,4 +218,125 @@ test("C6 security-scan.mjs --out-dir under scratch/ writes there; any other targ
   assert.match(refused.stderr, /scratch/u);
   assert.equal(existsSync(join(root, "evidence")), false);
   assert.deepEqual(readdirSync(root).sort(), ["project", "scratch"].filter((name) => existsSync(join(root, name))).sort());
+});
+
+// ---- C9-C12 (G20-25, gate repair): the critical project without a security gate, and the one command that configures it ----
+const gateScript = resolve(here, "../../scripts/security-gate-configure.mjs");
+// The argv is the END of the message line: nothing may follow the root, so a copied line is exactly the one argv the guard admits.
+const REPAIR_RE = /node (\S+security-gate-configure\.mjs) --root (\S+)\s*$/mu;
+const BLOCK = (eol = "\n") => ["  security:", "    mode: blocking", "    type: automated", ""].join(eol);
+const HEADER = "schema: pipeline.manifest.v0\n";
+const WITHOUT_SECURITY = `${HEADER}gates:\n  # human plan approval\n  dev-plan:\n    mode: blocking\n    type: human\n  push:\n    mode: blocking\n    type: human\n`;
+const MODE_OFF = `${HEADER}gates:\n  dev-plan:\n    mode: blocking\n    type: human\n  security:\n    mode: off   # not yet\n    type: automated\n  push:\n    mode: blocking\n    type: human\n`;
+function put(dir, rel, text) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); }
+function verifyCheck(root) {
+  return (async () => {
+    const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
+    const lines = [];
+    const log = console.log; const error = console.error;
+    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
+    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
+  })();
+}
+function listing(dir) { return readdirSync(dir, { recursive: true }).sort().join("\n"); }
+const runArgv = (text) => {
+  const match = REPAIR_RE.exec(text);
+  assert.ok(match, `the refusal names the repair argv:\n${text}`);
+  assert.equal(match[1], gateScript, "the argv names the physical plugin script");
+  return { root: match[2], run: () => spawnSync(process.execPath, [match[1], "--root", match[2]], { encoding: "utf8", timeout: 20_000 }) };
+};
+
+test("C9 critical + no security gate (no manifest, no gates.security, mode off) is a typed block at Verify and at the close entry, naming the repair argv", async () => {
+  const variants = { "no manifest": null, "no gates.security": WITHOUT_SECURITY, "mode off": MODE_OFF };
+  for (const [label, manifest] of Object.entries(variants)) {
+    const dir = project("critical");
+    if (manifest !== null) put(dir, ".claude/pipeline.yaml", manifest);
+    const verify = await verifyCheck(dir);
+    assert.equal(verify.code, 1, label);
+    assert.match(verify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
+    assert.equal(runArgv(verify.text).root, dir, label);
+
+    const fixture = closeFixture({ stakes: "critical" });
+    if (manifest !== null) { put(fixture.dir, ".claude/pipeline.yaml", manifest); }
+    const closed = runClose(fixture.dir);
+    assert.equal(closed.status, 2, `${label}: ${closed.stdout}${closed.stderr}`);
+    assert.match(closed.stderr, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
+    assert.equal(runArgv(closed.stderr).root, fixture.dir, label);
+  }
+});
+
+test("C10 the repair argv configures the gate, changes no other byte, is a no-op the second time, and the same Verify then reaches the scanners", async () => {
+  const cases = [
+    ["no manifest", null, `${HEADER}gates:\n${BLOCK()}`],
+    ["gates without security", WITHOUT_SECURITY, `${WITHOUT_SECURITY}${BLOCK()}`],
+    ["security mode off", MODE_OFF, MODE_OFF.replace("    mode: off   # not yet\n", "    mode: blocking   # not yet\n")],
+    ["no gates block, trailing comment", `${HEADER}language:\n  human_facing: en\n# end\n`, `${HEADER}language:\n  human_facing: en\n# end\ngates:\n${BLOCK()}`],
+    ["CRLF file", WITHOUT_SECURITY.replace(/\n/gu, "\r\n"), `${WITHOUT_SECURITY.replace(/\n/gu, "\r\n")}${BLOCK("\r\n")}`],
+    ["no final newline", WITHOUT_SECURITY.trimEnd(), `${WITHOUT_SECURITY}${BLOCK()}`],
+  ];
+  for (const [label, before, after] of cases) {
+    const dir = project("critical");
+    if (before !== null) put(dir, ".claude/pipeline.yaml", before);
+    const { run } = runArgv((await verifyCheck(dir)).text);
+    const first = run();
+    assert.equal(first.status, 0, `${label}: ${first.stdout}${first.stderr}`);
+    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), after, label);
+    const loaded = loadManifest(dir);
+    assert.equal(loaded.status, "ok", `${label}: ${JSON.stringify(loaded.errors)}`);
+    assert.deepEqual([gateConfig(loaded.manifest, "security").mode, gateConfig(loaded.manifest, "security").type], ["blocking", "automated"], label);
+    const second = run();
+    assert.equal(second.status, 0, label);
+    assert.match(second.stdout, /already configured/u, label);
+    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), after, `${label}: second run changed bytes`);
+    const reverify = await verifyCheck(dir);
+    assert.doesNotMatch(reverify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
+    assert.match(reverify.text, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u, `${label}: the scanner chain now runs`);
+  }
+});
+
+test("C11 standard, absent and unrecognised stakes with no gate stay not applicable and admitted (Verify and close entry)", async () => {
+  for (const stakes of ["standard", undefined, "whatever"]) {
+    const verify = await verifyCheck(project(stakes));
+    assert.equal(verify.code, 0, String(stakes));
+    assert.match(verify.text, /not applicable/u, String(stakes));
+    assert.doesNotMatch(verify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, String(stakes));
+    const fixture = closeFixture({ stakes });
+    const closed = runClose(fixture.dir);
+    assert.equal(closed.status, 0, `${stakes}: ${closed.stderr}`);
+    assert.match(closed.stdout, /not applicable/u, String(stakes));
+  }
+});
+
+test("C12 a refused repair leaves every byte and the directory unchanged; twin manifests stay identical; the block is the one onboarding writes", async () => {
+  const refused = {
+    "unparseable yaml": `${HEADER}gates: [\n`,
+    "flow-style gates": `${HEADER}gates: {}\n`,
+    "flow-style security": `${HEADER}gates:\n  security: {mode: off, type: automated}\n`,
+    "schema violation": `${HEADER}gates:\n  security:\n    mode: off\n`,
+  };
+  for (const [label, text] of Object.entries(refused)) {
+    const dir = project("critical");
+    put(dir, ".claude/pipeline.yaml", text);
+    const before = listing(dir);
+    const result = spawnSync(process.execPath, [gateScript, "--root", dir], { encoding: "utf8", timeout: 20_000 });
+    assert.equal(result.status, 1, `${label}: ${result.stdout}${result.stderr}`);
+    assert.ok(result.stderr.length > 0, label);
+    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), text, label);
+    assert.equal(listing(dir), before, `${label}: a refused repair leaves no state`);
+  }
+  for (const argv of [[], ["--root"], ["--root", "relative/path"], ["--root", project("critical"), "--extra"]]) {
+    const result = spawnSync(process.execPath, [gateScript, ...argv], { encoding: "utf8", timeout: 20_000 });
+    assert.equal(result.status, 1, argv.join(" "));
+  }
+  const twin = project("critical");
+  put(twin, ".claude/pipeline.yaml", WITHOUT_SECURITY);
+  put(twin, "project/pipeline.yaml", WITHOUT_SECURITY);
+  assert.equal(spawnSync(process.execPath, [gateScript, "--root", twin], { encoding: "utf8", timeout: 20_000 }).status, 0);
+  const [neutral, legacy] = ["project/pipeline.yaml", ".claude/pipeline.yaml"].map((rel) => readFileSync(join(twin, rel), "utf8"));
+  assert.equal(neutral, legacy, "the twin pair must not drift (PA-MANIFEST-DRIFT)");
+  assert.equal(neutral, `${WITHOUT_SECURITY}${BLOCK()}`);
+  const { freshGateChapter } = await import("../project-onboarding-v3.mjs");
+  assert.ok(freshGateChapter().endsWith(BLOCK()), "the security block is the one onboarding writes for a new project");
+  const { SECURITY_GATE_BLOCK } = await import("../../scripts/security-gate-configure.mjs");
+  assert.equal(SECURITY_GATE_BLOCK, BLOCK());
 });

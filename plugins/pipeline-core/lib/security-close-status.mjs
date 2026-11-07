@@ -13,6 +13,7 @@
 // any other value, or an absent field, keeps today's behaviour (admitted, status "not executed"). Pure and offline: no scanner is spawned.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
 export const SECURITY_ELEMENTS = Object.freeze(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
@@ -98,6 +99,20 @@ export function elementsOfCompletedScan(scanners) {
 
 export function formatSecurityCloseStatus(elements) {
   return elements.map(({ element, state, reason }) => `${element}: ${state}${reason ? ` -- ${reason}` : ""}`);
+}
+
+/**
+ * The typed refusal of a critical calibration whose manifest configures no security gate (no manifest, no gates.security, or mode off),
+ * or null for any other calibration (those keep reading "not applicable"). It names the exact repair argv: the physical plugin script
+ * with this root, which the guard admits without a ceremony and which sets gates.security to the block onboarding writes.
+ */
+export const GATE_NOT_CONFIGURED_CODE = "SEC-CLOSE-GATE-NOT-CONFIGURED";
+const word = (value) => (/^[\w@%+=:,./\\-]+$/u.test(value) ? value : JSON.stringify(value));
+export function securityGateNotConfiguredRefusal(root, where = "this check") {
+  if (!isCriticalStakes(readCalibrationStakes(root))) return null;
+  const script = fileURLToPath(new URL("../scripts/security-gate-configure.mjs", import.meta.url));
+  return `${GATE_NOT_CONFIGURED_CODE}: the security gate is not configured (${where}: no manifest, no gates.security, or mode off) and this project is `
+    + `calibrated critical (stakes in the project calibration). Run this command to configure it, then run this check again: node ${word(script)} --root ${word(root)}`;
 }
 
 /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
