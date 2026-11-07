@@ -90,6 +90,23 @@ test('AC-207 point 1 control: continuity near-misses stay refused', () => {
   for (const [name, command] of Object.entries(nears)) assert.equal(admittedByClosedArgv(command), false, name);
 });
 
+test('G20-17: a sanctioned lifecycle command spelled with another absolute Node outside the root is admitted; a planted one is not', async () => {
+  const { symlinkSync, mkdtempSync: mkTemp } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const outside = mkTemp(join(tmpdir(), 'g20-17-node-'));
+  try {
+    const foreignNode = join(outside, 'node');
+    symlinkSync(process.execPath, foreignNode);
+    assert.equal(admittedByClosedArgv(`${q(foreignNode)} ${q(state)} inspect`), true, 'version-manager style node outside the root');
+    mkdirSync(join(root, 'scratch', 'bin2'), { recursive: true });
+    const planted = join(root, 'scratch', 'bin2', 'node');
+    writeFileSync(planted, '#!/bin/sh\n', { mode: 0o755 });
+    assert.equal(admittedByClosedArgv(`${q(planted)} ${q(state)} inspect`), false, 'planted node inside the root');
+    assert.equal(admittedByClosedArgv(`${q(join(outside, 'python3'))} ${q(state)} inspect`), false, 'not a node basename');
+    assert.equal(admittedByClosedArgv(`${q(join(outside, 'missing', 'node'))} ${q(state)} inspect`), false, 'nonexistent node');
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
 test('AC-207 point 2: exactly `node scratch/<name>.mjs` is admitted in the draft lifecycle', () => {
   assert.equal(refused('node scratch/forensics.mjs'), false);
   assert.equal(refused('node scratch/a-b_c.1.mjs'), false);

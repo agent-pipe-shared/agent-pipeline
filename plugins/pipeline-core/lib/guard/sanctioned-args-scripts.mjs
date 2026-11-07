@@ -751,12 +751,42 @@ export function sanctionedHumanOverrideArgs(args, root) {
  * identified `script` path and its `args`, exactly as `isSanctionedLifecycleCommand`
  * itself used to compute them inline.
  */
+/**
+ * C20 (greenfield G20-17, Claude on Windows; same class as G20-1): the catalogue matched the interpreter only as `node` or the
+ * guard's own `process.execPath`. The Windows session typed `"C:/Program Files/nodejs/node.exe"` (forward slashes) and every
+ * sanctioned human-override preparation step (`plan`, `prepare-for-signature`) was refused as an opaque script, so the PO had to run
+ * them by hand. An agent on Antigravity or Codex likewise names its own version-manager Node. Admitted here, besides the two exact
+ * forms: an absolute path whose basename is node/node.exe and that resolves to an executable regular file OUTSIDE the project root
+ * (an agent cannot plant its own "node" in the repository). Bare `node` from PATH is already admitted, so this widens no authority:
+ * every script/argv rule below still applies unchanged.
+ */
+function foreignNodeInterpreter(word, root, options = {}) {
+  if (typeof word !== "string" || typeof root !== "string" || root === "") return false;
+  const isAbs = /^[A-Za-z]:[\\/]/u.test(word) || word.startsWith("/") || word.startsWith("\\\\");
+  if (!isAbs || !["node", "node.exe"].includes(basename(word.replace(/\\/gu, "/")).toLowerCase())) return false;
+  try {
+    const realpathFn = options.realpathFn ?? realpathSync;
+    const real = realpathFn(word);
+    let realRoot;
+    try { realRoot = realpathFn(root); } catch { realRoot = resolve(root); }
+    const inside = (options.platform ?? process.platform) === "win32"
+      ? (real.toLowerCase() === realRoot.toLowerCase() || real.toLowerCase().startsWith(`${realRoot.toLowerCase().replace(/[\\/]+$/u, "")}\\`))
+      : (real === realRoot || real.startsWith(`${realRoot.replace(/\/+$/u, "")}/`));
+    if (inside) return false;
+    const stat = (options.lstatFn ?? lstatSync)(real);
+    return stat.isFile() && ((options.platform ?? process.platform) === "win32" || (stat.mode & 0o111) !== 0);
+  } catch {
+    return false;
+  }
+}
+
 export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   const words = simpleWords(command, root, options);
   const platform = options.platform ?? process.platform;
   const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
   const trustedNode = options.processExecPath ?? process.execPath;
-  if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return null;
+  if (!words || words.length < 2) return null;
+  if (![...directNode, trustedNode].includes(words[0]) && !foreignNodeInterpreter(words[0], root, options)) return null;
   const [script, ...args] = words.slice(1);
   // Windows accepts either separator spelling of this one trusted script identity.
   // Keep every other script lexical and preserve case, roots, segments and argv.
