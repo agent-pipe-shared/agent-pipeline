@@ -506,11 +506,22 @@ describe("ADOPT-SIGN-T: adoption request file for the signing ceremony", () => {
     for (const args of [without, prepareArgs().map((value) => (value === "2026-01-01T00:00:00.000Z" ? "2026-01-01" : value))]) {
       const refused = spawnSync(process.execPath, [script, "prepare", ...args, "--out", target], { encoding: "utf8" });
       assert.equal(refused.status, 1, refused.stdout + refused.stderr);
-      assert.match(refused.stderr, /prepare needs --decided-at <UTC instant/u);
+      assert.match(refused.stderr, /prepare needs --decided-at now \(recommended\) or a UTC instant/u);
       assert.doesNotMatch(refused.stderr, /TypeError|canonical ISO-8601 at/u);
       assert.equal(refused.stdout, "", "no request is printed");
       assert.equal(fs.existsSync(target), false, "no request file is written");
     }
+  });
+
+  it("G20-18: prepare --decided-at now signs the instant it was prepared at, in canonical form", () => {
+    const before = Date.now();
+    const args = prepareArgs().map((value) => (value === "2026-01-01T00:00:00.000Z" ? "now" : value));
+    const printed = spawnSync(process.execPath, [script, "prepare", ...args], { encoding: "utf8" });
+    const after = Date.now();
+    assert.equal(printed.status, 0, printed.stderr);
+    const decidedAt = JSON.parse(printed.stdout).subject.decidedAt;
+    assert.equal(new Date(decidedAt).toISOString(), decidedAt, "the signed instant is canonical");
+    assert.ok(Date.parse(decidedAt) >= before - 1000 && Date.parse(decidedAt) <= after + 1000, decidedAt);
   });
 
   it("ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing", () => {

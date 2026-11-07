@@ -617,8 +617,10 @@ function runCli() {
       }
       // Toolbox D10: the missing or malformed instant used to end in a TypeError from the authority module. It is part of the signed request,
       // so name the flag and the exact form here, before anything is built or written.
+      // G20-18: the agent has no admitted way to read the clock (node -e is refused), so `now` is resolved here, once, into the signed instant.
+      if (decidedAt === "now") decidedAt = new Date().toISOString();
       if (typeof decidedAt !== "string" || !Number.isFinite(Date.parse(decidedAt)) || new Date(decidedAt).toISOString() !== decidedAt) {
-        console.error("Error: prepare needs --decided-at <UTC instant in the form new Date().toISOString() prints, for example 2026-11-01T10:00:00.000Z>. It is part of the request the PO signs; apply reads it back from that request file, so it is given once, here.");
+        console.error("Error: prepare needs --decided-at now (recommended) or a UTC instant in the form new Date().toISOString() prints, for example 2026-11-01T10:00:00.000Z. It is part of the request the PO signs; apply reads it back from that request file, so it is given once, here.");
         process.exit(1);
       }
       const request = prepareAdoptionAuthority({ rootDir, decision, scope, rationale, expiresAt: expires, reviewDate, decidedAt, decisionRef });
