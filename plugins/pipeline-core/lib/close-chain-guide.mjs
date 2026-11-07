@@ -135,12 +135,12 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
   },
   {
     id: "reconcile-signature", who: "po-only", mayRefuseWith: [],
-    command: "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
+    command: "ONLY when the bootstrap completion's preview.requiredAuthority is \"po\" (a plan that also changes a non-result entry; a result-only plan prints no signatureCommand and needs no signature, G20-38): the signatureCommand it prints (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
     source: "close-feature SKILL, Continuity route step 4",
   },
   {
     id: "reconcile", who: "agent", mayRefuseWith: [],
-    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
+    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); result-only plan (requiredAuthority \"agent\"): run it as printed, no proof flags; PO route: it needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
     source: "close-feature SKILL, Continuity route step 5",
   },
 ]);

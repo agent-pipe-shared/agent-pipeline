@@ -413,6 +413,16 @@ export function reconcileNoDriftOk(preimageValue, postimageValue, options = {}) 
 }
 
 /**
+ * G20-38: is this recomputed reconcile preview the unchanged-approved-package case, i.e. a `reconcile-preview` whose
+ * every change is a `result`-class entry? Decided from the plan object alone (never from a caller flag): a legacy Result
+ * repair plan, a rejected or noop plan and any plan that also moves a non-result entry are all `false`.
+ */
+export function reconcilePlanIsResultOnly(plan) {
+  return plan?.status === "reconcile-preview" && plan.requiredAuthority === "agent" && Array.isArray(plan.changes)
+    && plan.changes.length > 0 && plan.changes.every((change) => change?.class === "result");
+}
+
+/**
  * Checks the Result fence's three independently-typed preconditions, each with its own
  * refusal so evidence can tell them apart:
  *  - `reconcile-result-unbound`: the current Result (this artifact's path, at its CURRENT
@@ -517,7 +527,11 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
     from: checked.receipt.state,
     to: checked.receipt.state,
     changes,
-    requiredAuthority: "po",
+    // G20-38 (PO decision 2026-11-07): a plan that moves ONLY `result`-class entries (their fence-proven digest, and the
+    // N29 authority lift of the sole Result entry Continuity binds) leaves every other artifact at the digest the approved
+    // manifest pins -- the approved package is unchanged, so the agent runs it. The classification is derived here from the
+    // plan's own changes and is part of the plan digest; nothing a caller passes can change it.
+    requiredAuthority: changes.every((change) => change.class === "result") ? "agent" : "po",
     preimage: value,
     postimage: nextValue,
   };

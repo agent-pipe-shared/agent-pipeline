@@ -438,6 +438,7 @@ import {
   externalPushLedgerGate,
 } from "../lib/external-push-ledger.mjs";
 import {
+  AGENT_RESULT_ONLY_RECONCILE_BASIS,
   isCriticalProofConsumedPrivately,
   readLastPrivateApproval,
   resolveCriticalApprovalCommonDir,
@@ -502,6 +503,7 @@ import {
   planFeaturePackageBootstrap,
   planFeaturePackageReconcile,
   planFeaturePackageTransition,
+  reconcilePlanIsResultOnly,
   validateFeaturePackage,
 } from "../lib/feature-package-topology.mjs";
 import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
@@ -6188,6 +6190,15 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
   } catch (error) { return unavailable(`the signing command could not be rendered (${error?.message ?? "invalid input"})`); }
 }
 
+/** G20-38: the follow-on command for a result-only plan. It carries no proof inputs: the agent runs it as printed. */
+function agentReconcileCommand(dir, manifest, planSha256) {
+  return {
+    executable: process.execPath,
+    argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", planSha256],
+    requiredInputs: [], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl",
+  };
+}
+
 function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
   const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
   if (packageBinding === null) {
@@ -6209,7 +6220,11 @@ function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
   const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
     ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
   const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
-  const signing = pending ? reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps) : {};
+  // G20-38: a result-only plan leaves the approved package unchanged, so the agent runs it: no signing route, no proof inputs.
+  const agentRun = reconcilePlanIsResultOnly(preview);
+  const signing = !pending ? {}
+    : agentRun ? { reconcileCommand: agentReconcileCommand(dir, manifest, sha256CanonicalJson(preview)) }
+      : reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps);
   return {
     scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
     manifest, preview,
@@ -6217,6 +6232,7 @@ function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
     ...signing,
     nextAction: preview.status === "legacy-repair-preview"
       ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair; signatureCommand prints the signing command with its subject digest and reconcileCommand the command to run afterwards"
+      : agentRun ? `this plan moves only the Result entry (its fence-proven digest${preview.changes.some((change) => change.authority !== undefined) ? " and the authority lift of the one Result entry Continuity binds" : ""}); every other artifact keeps the digest the approved manifest pins, so the approved package is unchanged and the agent runs the reconcile itself, with no PO signature and no proof flags: run reconcileCommand (feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}); it prints the receipt with the before and after digests as the readback; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start, and the whole close order is in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"`
       : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start; the signing command and its subject digest are printed in signatureCommand (the PO runs it in their own terminal), the reconcile command to run afterwards in reconcileCommand, and the whole close order in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"` : "resolve package drift through authenticated recovery",
     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
@@ -9377,6 +9393,9 @@ function runFeaturePackageReconcileCommand(argv, deps) {
       candidate: { commit: observedCandidate.commit, tree: observedCandidate.tree },
       holderLock: lock,
       holderRoot: root,
+      // G20-38: computed here from the freshly recomputed plan, never read from the caller. A test double that destructures
+      // only the older fields never sees it; the default closure offers the agent route only when this is true.
+      agentRunnable: reconcilePlanIsResultOnly(plan),
     });
     if (!approvalCheck?.ok) {
       // F3 (Critic pac08-fb-critic-review-5420c5e7.md): a replayed proof already verified
@@ -9468,6 +9487,8 @@ function runFeaturePackageReconcileCommand(argv, deps) {
       changes: postimage.changes,
       planSha256,
       manifestSha256: postimage.postSha256,
+      // G20-38: an agent-run result-only reconcile says on its face that no PO proof backed it.
+      ...(approvalCheck.agentRun === true ? { approval: { basis: AGENT_RESULT_ONLY_RECONCILE_BASIS, poProof: false } } : {}),
       commitCapability,
     }, null, 2));
     return exit;
@@ -9560,11 +9581,26 @@ function runFeaturePackageRecoverCommand(argv, deps) {
  * still correctly refused -- see PS44Vc, which this design deliberately leaves intact.
  */
 export function defaultFeaturePackageReconcileApproval(argv, deps) {
-  return ({ manifest, planSha256, candidate, holderLock, holderRoot }) => {
+  return ({ manifest, planSha256, candidate, holderLock, holderRoot, agentRunnable = false }) => {
     const dir = deps.dir ?? projectDir();
     const kind = "feature-package-reconcile";
     const parsedArgv = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
     const flags = parsedArgv.ok ? parsedArgv.value : {};
+    // G20-38 (PO decision 2026-11-07, "Agent bei unveraendertem Paket"): when the recomputed plan moves only the Result entry the
+    // approved package is unchanged, and a call that carries no attribution and no proof flag is the agent's own run. It records an
+    // agent-run, result-only reconcile in the same private ledger, labelled on its face as carrying no PO proof the way a waived proof
+    // is, and never as a PO approval. A caller that DOES pass --by or any proof flag keeps the PO-bound route below exactly as before.
+    if (agentRunnable === true && [flags.by, flags["proof-request"], flags["proof-authority"], flags.proof].every(isBlank)) {
+      const agentNow = (deps.now ?? (() => new Date().toISOString()))();
+      const agentCommon = resolveCriticalApprovalCommonDir(dir);
+      if (agentCommon === null) return { ok: false, code: "CRITICAL-APPROVAL-STORE-UNAVAILABLE" };
+      const agentStored = writeCriticalApproval({ gitCommonDir: agentCommon, kind, consumedAt: agentNow, approval: {
+        approvedBy: "agent", approvedAt: agentNow, forCommit: candidate.commit, criticalProof: null,
+        criticalProofWaiver: { mode: AGENT_RESULT_ONLY_RECONCILE_BASIS, kind, planSha256, manifest },
+      } });
+      if (!agentStored.ok) return { ok: false, code: agentStored.code };
+      return { ok: true, mode: "agent", proofSha256: null, agentRun: true };
+    }
     const configured = criticalProofWaiverFor(dir, kind);
     if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
     const waived = configured.waived === true;

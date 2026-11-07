@@ -704,7 +704,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       const checked = validateFeaturePackage(root, registeredManifest);
       if (!checked.ok) {
         const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
-        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the PO-bound feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256), then plan this transition again on the same lifecycle` : ""}`);
+        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}`);
       }
       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
       for (const [kind, path, digest] of [

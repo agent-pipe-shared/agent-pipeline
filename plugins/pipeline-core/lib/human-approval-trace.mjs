@@ -19,7 +19,7 @@ import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
-import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readPrivateCriticalConsumption, resolveCriticalApprovalCommonDir } from "./critical-action-authorization.mjs";
+import { AGENT_RESULT_ONLY_RECONCILE_BASIS, CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readPrivateCriticalConsumption, resolveCriticalApprovalCommonDir } from "./critical-action-authorization.mjs";
 import { canonical, criticalActionAuthority, object, SHA256, trustAnchorsFor, validCandidate } from "./critical-action-authorization-read.mjs";
 import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -36,6 +36,8 @@ const proofDigest = (proof) => createHash("sha256").update(canonical(proof)).dig
 const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
 const isChat = (record) => (object(record?.criticalProofWaiver) && /chat/u.test(String(record.criticalProofWaiver.mode ?? "chat")))
   || (object(record?.humanApproval) && /chat/u.test(String(record.humanApproval.mode ?? "")));
+
+const isAgentResultOnly = (record) => object(record?.criticalProofWaiver) && record.criticalProofWaiver.mode === AGENT_RESULT_ONLY_RECONCILE_BASIS;
 
 function readTraceState(root) {
   for (const path of ["project/pipeline-state.json", ".claude/pipeline-state.json"]) {
@@ -132,6 +134,8 @@ export function traceHumanApprovals({ repositoryRoot, candidate, state, machineP
     if (approval.forCommit !== audited.commit) { outOfCandidate += 1; continue; }
     const recorded = approval.criticalProof;
     if (recorded === null || recorded === undefined) {
+      // G20-38: an agent-run, result-only reconcile states on its face that no PO proof backed it; it is reported as such, not as a missing proof.
+      if (isAgentResultOnly(approval)) { rows.push({ ...baseRow({ kind: entry.kind, source: entry.source, approval, mode: "agent" }), verdict: "attribution-only" }); continue; }
       const row = baseRow({ kind: entry.kind, source: entry.source, approval, mode: isChat(approval) ? "chat" : "none" });
       if (isChat(approval)) rows.push({ ...row, verdict: "attribution-only" }); else rows.push({ ...row, break: "PROOF-MISSING" });
       continue;

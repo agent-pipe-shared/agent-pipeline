@@ -127,6 +127,16 @@ test("a chat-mode approval is labelled attribution-only and never as proof", () 
   assert.equal(result.status, "attribution-only"); assert.equal(row(result).verdict, "attribution-only"); assert.equal(row(result).proofSha256, null);
 });
 
+test("G20-38: an agent-run, result-only reconcile record is labelled attribution-only (mode agent), never a missing proof and never a PO proof", () => {
+  const repo = repository({ anchors: [] });
+  const approval = { approvedBy: "agent", approvedAt: NOW, forCommit: repo.candidate.commit, criticalProof: null,
+    criticalProofWaiver: { mode: "agent-result-only-reconcile-no-po-proof", kind: "feature-package-reconcile", planSha256: "a".repeat(64), manifest: "specs/demo/lifecycle.json" } };
+  assert.equal(writeCriticalApproval({ gitCommonDir: repo.common, kind: "feature-package-reconcile", approval }).ok, true);
+  const result = trace(repo);
+  const reconcile = row(result, "feature-package-reconcile");
+  assert.equal(reconcile.verdict, "attribution-only"); assert.equal(reconcile.mode, "agent"); assert.equal(reconcile.break, null); assert.equal(reconcile.proofSha256, null);
+});
+
 test("a candidate with no approval record at all is untraceable, not silently clean", () => {
   const repo = repository({ anchors: [] });
   const result = trace(repo);

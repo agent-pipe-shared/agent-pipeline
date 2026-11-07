@@ -359,18 +359,29 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
       const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
       const bootstrapApplied = step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
-      // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound, and the sanctioned repair is a PO-signed
-      // `feature-package-reconcile` (always a human proof). The fixture signs it with its own test key, the way the Result bootstrap suite does.
+      // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound. G20-38 (PO decision 2026-11-07), restated
+      // from the w265 walk, which signed this reconcile with the fixture's own test key: the plan moves only the Result entry, so every other
+      // artifact keeps the digest the approved manifest pins and the agent runs the reconcile itself, with no proof flags and no signature.
       const completion = JSON.parse(bootstrapApplied.stdout).completion;
       assert.equal(completion.state, "reconciliation-pending");
-      const signing = completion.signatureCommand;
-      assert.equal(signing.kind, "feature-package-reconcile");
-      const proofFiles = fx.signProof({ kind: signing.kind, subjectSha256: signing.subjectSha256, candidate: signing.candidate, expiresAt: signing.expiresAt });
-      const reconcileArgv = completion.reconcileCommand.argv.map((entry) => {
-        const hit = completion.reconcileCommand.placeholders.find((placeholder) => placeholder.token === entry);
-        return hit === undefined ? entry : { "--by": "Fixture PO", "--proof-request": proofFiles.request, "--proof-authority": proofFiles.authority, "--proof": proofFiles.proof }[hit.flag];
-      });
-      step(log, `${identity.runner}: feature-package-reconcile (fixture-signed)`, completion.reconcileCommand.executable, reconcileArgv, { cwd: fx.root });
+      assert.equal(completion.preview.requiredAuthority, "agent");
+      assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
+      assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
+      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
+      const manifestRel = completion.manifest;
+      const driftEntry = JSON.parse(readFileSync(join(fx.root, manifestRel), "utf8")).artifacts.find((entry) => !["result", "prd", "spec"].includes(entry.class));
+      assert.ok(driftEntry, "the registered package holds a non-result, non-authority artifact to drift");
+      const driftPath = join(fx.root, driftEntry.path); const driftOriginal = readFileSync(driftPath);
+      writeFileSync(driftPath, Buffer.concat([driftOriginal, Buffer.from("\ndrifted after the approval\n")]));
+      const mixed = json(stateWriter("continuity-result-bootstrap-plan (a non-result entry also drifted)", "continuity-result-bootstrap-plan"));
+      assert.equal(mixed.preview.requiredAuthority, "po");
+      assert.equal(mixed.signatureCommand.kind, "feature-package-reconcile", "the PO-signed route still prints its signing command");
+      const unsigned = step(log, `${identity.runner}: feature-package-reconcile without a proof is refused when a non-result entry drifted`, process.execPath,
+        [script("pipeline-state.mjs"), "feature-package-reconcile", "--root", fx.root, "--manifest", manifestRel, "--plan-sha256", mixed.planSha256], { cwd: fx.root, expectedStatus: 2 });
+      assert.match(unsigned.stderr, /FTP-RECONCILE-APPROVAL-REJECTED/);
+      writeFileSync(driftPath, driftOriginal); // the approved bytes are back: the plan is the result-only one again
+      const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
+      assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
       const bound = JSON.parse(readFileSync(statePath, "utf8"));
       // review -> close through the sanctioned Result-close verb (plan, then the action it returns); no hand edit of the Continuity state

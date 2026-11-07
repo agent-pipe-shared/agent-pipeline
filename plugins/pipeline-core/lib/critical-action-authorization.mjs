@@ -191,6 +191,8 @@ function pinTrustAnchorOnFirstUse(anchorDir, policy, kind, signer) {
  * pure relocation of this block.
  */
 export const CRITICAL_APPROVAL_STORE_SCHEMA = "pipeline.critical-approval-record.v1";
+/** G20-38: the label on the reconcile record the agent writes for a result-only plan; it states on its face that no PO proof backed it. */
+export const AGENT_RESULT_ONLY_RECONCILE_BASIS = "agent-result-only-reconcile-no-po-proof";
 export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-consumption.v1";
 /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
 const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval" });

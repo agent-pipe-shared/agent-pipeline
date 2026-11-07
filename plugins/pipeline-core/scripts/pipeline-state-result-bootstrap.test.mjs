@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { readLastPrivateApproval, resolveCriticalApprovalCommonDir } from "../lib/critical-action-authorization.mjs";
 import { afterEach, test } from "node:test";
 import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { observeNativePlatformProcess } from "../lib/native-platform-process-observer.mjs";
@@ -575,7 +576,10 @@ test("N29 anchor: a package whose Result entry has authority:false closes from c
   assert.equal(completion.state, "reconciliation-pending"); assert.equal(completion.preview.status, "reconcile-preview");
   assert.equal(completion.preview.changes.length, 1);
   assert.equal(completion.preview.changes[0].class, "result"); assert.deepEqual(completion.preview.changes[0].authority, { from: false, to: true });
-  assert.equal(completion.preview.requiredAuthority, "po");
+  // G20-38 (PO decision 2026-11-07), restated in place: this plan moves only the Result entry (digest and authority lift), so every other
+  // artifact keeps the digest the approved manifest pins and the preview names the agent, not the PO. A plan that also changes a
+  // non-result entry still names "po": see the G20-38 cases at the end of this file.
+  assert.equal(completion.preview.requiredAuthority, "agent");
   assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
   const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
   assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
@@ -616,9 +620,15 @@ test("N30 anchor: the completion prints the signing command with the subject dig
   const gitDeps = { gitCandidate: () => ({ ok: true, ...candidate }) };
   const p = plan(f);
   const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
-  const completion = JSON.parse(applied.out).completion;
+  // G20-38 (PO decision 2026-11-07), restated in place: a result-only plan needs no signature and prints no signing route, so this case now
+  // proves the signing route on a plan that ALSO changes a non-result entry (the candidate evidence drifts after the approval). Every
+  // assertion below is unchanged; only the plan they are made on needs the PO.
+  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
+  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
+  assert.equal(reread.preview.requiredAuthority, "po");
+  const completion = { state: "reconciliation-pending", planSha256: reread.planSha256, signatureCommand: reread.signatureCommand, reconcileCommand: reread.reconcileCommand };
   assert.equal(completion.state, "reconciliation-pending");
-  const expectedSubject = { manifest: manifestPath, planSha256: completion.planSha256, candidate };
+  const expectedSubject ={ manifest: manifestPath, planSha256: completion.planSha256, candidate };
   const expectedDigest = criticalActionSubjectSha256({ kind: "feature-package-reconcile", candidate, subject: expectedSubject });
   const signature = completion.signatureCommand;
   assert.equal(signature.kind, "feature-package-reconcile");
@@ -677,7 +687,12 @@ test("N30: without a readable candidate the completion says why it has no signin
   const f = fixture("n30-nocandidate"); registerPackageWithoutResultAuthority(f);
   const p = plan(f);
   const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: false, error: "no commit" }) }); assert.equal(applied.status, 0, applied.err);
-  const completion = JSON.parse(applied.out).completion;
+  // G20-38, restated in place: a result-only plan prints no signing route at all, so the "why there is no signing command" message is proven
+  // on a plan that also changes a non-result entry (the PO route); the completion is read again after the drift.
+  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
+  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: false, error: "no commit" }) }).out);
+  assert.equal(reread.preview.requiredAuthority, "po");
+  const completion = { state: "reconciliation-pending", signatureCommand: reread.signatureCommand, signatureUnavailable: reread.signatureUnavailable, nextAction: reread.nextAction };
   assert.equal(completion.state, "reconciliation-pending");
   assert.equal(completion.signatureCommand, null);
   assert.match(completion.signatureUnavailable, /candidate/u);
@@ -693,7 +708,11 @@ test("N31r: a read-only bootstrap plan after the apply prints the pending reconc
   const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
   const p = plan(f);
   const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
-  const completion = JSON.parse(applied.out).completion;
+  // G20-38, restated in place: both commands this case compares exist only for a plan that needs the PO (a result-only plan prints no
+  // signing command), so the plan also changes a non-result entry and the first read of it stands in for the apply's completion.
+  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
+  const completion = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
+  assert.equal(completion.preview.requiredAuthority, "po");
   const before = readFileSync(f.statePath); const manifestBefore = readFileSync(join(f.root, manifestPath));
   const reread = invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps);
   assert.equal(reread.status, 0, reread.err);
@@ -713,7 +732,9 @@ test("N31r: the reconcile command marks --by as the PO's own value and names whe
   const p = plan(f);
   const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) });
   assert.equal(applied.status, 0, applied.err);
-  const placeholders = JSON.parse(applied.out).completion.reconcileCommand.placeholders;
+  // G20-38, restated in place: the placeholders exist only on the PO route, i.e. for a plan that also changes a non-result entry.
+  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
+  const placeholders = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) }).out).reconcileCommand.placeholders;
   const by = placeholders.find((entry) => entry.flag === "--by");
   assert.equal(by.token, "<po-name>");
   assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
@@ -1007,4 +1028,71 @@ test("N29: the reconcile plan lifts authority only on the Result entry Continuit
   assert.equal(reconcileNoDriftOk(before, other, { liftResultAuthorityPath: "r" }), false, "no other key moves");
   const state = structuredClone(lifted); state.state = "verifying";
   assert.equal(reconcileNoDriftOk(before, state, { liftResultAuthorityPath: "r" }), false, "no manifest key moves");
+});
+
+// ---- G20-38 (PO decision 2026-11-07, "Agent bei unveraendertem Paket"): a reconcile that moves ONLY the fence-proven Result digest
+// (and the N29 authority lift of the sole Result entry) leaves every other artifact at the digest the approved manifest pins, so the
+// approved package is unchanged: the agent runs it, with no proof flags, and the receipt is the readback. Any other plan keeps the
+// PO-signed route. "Unchanged" is decided from the recomputed plan itself, never from a flag the caller passes. ----
+
+const AGENT_BASIS = "agent-result-only-reconcile-no-po-proof";
+
+function bootstrappedPending(name, deps = {}) {
+  const f = fixture(name); const { manifestPath } = registerPackageWithoutResultAuthority(f);
+  const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }), ...deps };
+  const p = plan(f);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
+  return { f, manifestPath, gitDeps, completion: JSON.parse(applied.out).completion };
+}
+
+test("G20-38: a result-only preview names the agent as the authority, prints no signing route and no proof inputs", () => {
+  const { completion } = bootstrappedPending("g2038-preview");
+  assert.equal(completion.state, "reconciliation-pending");
+  assert.equal(completion.preview.requiredAuthority, "agent");
+  assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
+  assert.equal(completion.signatureUnavailable, undefined);
+  assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
+  assert.equal(completion.reconcileCommand.placeholders, undefined);
+  assert.equal(completion.reconcileCommand.argv.includes("--by"), false);
+  assert.equal(completion.reconcileCommand.argv.includes("--proof"), false);
+  assert.match(completion.nextAction, /no PO signature/u); assert.doesNotMatch(completion.nextAction, /obtain the PO-bound/u);
+});
+
+test("G20-38: the agent runs a result-only reconcile with no proof flags; the receipt is the readback and the ledger says no PO proof backed it", () => {
+  const { f, manifestPath, gitDeps, completion } = bootstrappedPending("g2038-agent-run");
+  const before = JSON.parse(readFileSync(join(f.root, manifestPath)));
+  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], gitDeps);
+  assert.equal(reconciled.status, 0, reconciled.err);
+  const receipt = JSON.parse(reconciled.out);
+  assert.equal(receipt.status, "applied"); assert.equal(receipt.planSha256, completion.planSha256);
+  assert.deepEqual(receipt.approval, { basis: AGENT_BASIS, poProof: false });
+  assert.equal(receipt.changes.length, 1); assert.equal(receipt.changes[0].class, "result");
+  assert.equal(receipt.changes[0].from, before.artifacts.find((entry) => entry.class === "result").sha256);
+  assert.equal(receipt.changes[0].to, hash(readFileSync(f.resultPath)));
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
+  const after = JSON.parse(readFileSync(join(f.root, manifestPath)));
+  for (const entry of after.artifacts.filter((candidate) => candidate.class !== "result")) {
+    assert.deepEqual(entry, before.artifacts.find((old) => old.path === entry.path), `${entry.class} keeps the digest the approved manifest pins`);
+  }
+  const record = readLastPrivateApproval(resolveCriticalApprovalCommonDir(f.root), "feature-package-reconcile");
+  assert.equal(record.approval.criticalProof, null, "no proof backed it");
+  assert.equal(record.approval.criticalProofWaiver.mode, AGENT_BASIS, "labelled on its face, the way a waived proof is");
+  assert.equal(record.approval.forCommit, "a".repeat(40));
+  assert.notEqual(record.approval.approvedBy, "PO", "never recorded as a PO approval");
+});
+
+test("G20-38: when a non-result entry also drifted the preview names the PO, prints the signing route, and the command without a proof is refused with zero mutation", () => {
+  const { f, manifestPath, gitDeps, completion } = bootstrappedPending("g2038-non-result");
+  assert.equal(completion.preview.requiredAuthority, "agent");
+  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
+  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
+  assert.equal(reread.status, "reconcile-preview"); assert.equal(reread.preview.changes.length, 2, "the Result and the changed candidate evidence");
+  assert.equal(reread.preview.requiredAuthority, "po");
+  assert.equal(typeof reread.signatureCommand?.subjectSha256, "string", "the PO-signed route prints its signing command");
+  assert.deepEqual(reread.reconcileCommand.requiredInputs, ["by", "proof-request", "proof-authority", "proof"]);
+  const manifestBefore = readFileSync(join(f.root, manifestPath));
+  const refused = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", reread.planSha256], gitDeps);
+  assert.equal(refused.status, 2, refused.err); assert.match(refused.err, /FTP-RECONCILE-APPROVAL-REJECTED/);
+  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBefore, "zero mutation");
+  assert.equal(readLastPrivateApproval(resolveCriticalApprovalCommonDir(f.root), "feature-package-reconcile"), null, "no ledger record");
 });
