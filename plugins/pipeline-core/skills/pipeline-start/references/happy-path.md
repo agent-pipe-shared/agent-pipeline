@@ -107,6 +107,14 @@ Owner: `docs/push-release-flow.md`.
 3. `pipeline-state.mjs approve-push --by <name> --remote <remote> --destination refs/heads/<branch>` with the proof flags in signature mode.
 4. `git push <remote> <branch>:refs/heads/<branch>` (full refspec; never force). A stop at the runner's own prompt is the runner's gate, not a Pipeline refusal.
 
+## 6. Release (a consumer project: one version tag, the last step)
+
+Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A consumer's release is the annotated tag `v<VERSION>` on the closed, pushed feature.
+
+1. Before the Critic round, with the feature: `RELEASE-NOTES.md` gets a `## v<VERSION>` entry (closed feature id, title, acceptance criteria met). `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project: `release-preflight-cli.mjs --init-version --root <repo>`, then commit).
+2. `node "${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs" --root <repo> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`. It stops at the first missing step (feature not closed, notes, Verify/Critic/security evidence, push approval, push) and prints the repair command. In `signature` mode it prints the PO's exact signing command for this subject (`RPC-CONSUMER-PO-APPROVAL`); in `chat` mode the run records the release approval. This is the one release approval of the whole path.
+3. The `nextActions` it prints: `git tag -a v<VERSION> -m "version tag" <commit>`, then `git push <remote> refs/tags/v<VERSION>` (the push guard admits exactly that tag).
+
 ## What differs per runner (only rows with a source)
 
 | Topic | Claude | Codex | Antigravity |

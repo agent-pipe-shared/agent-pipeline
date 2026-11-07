@@ -55,7 +55,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { closeSync, existsSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V3, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { fsyncDirectoryDurable } from "./fs-durability.mjs";
@@ -197,7 +198,9 @@ export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-
 /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
 const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval",
   // G20-39: the PO acknowledgement of a caller-authored Critic (lib/critic-acknowledgement.mjs); read per packet, not through the slot overlay.
-  "acknowledge-caller-authored-critic": "criticAcknowledgement" });
+  "acknowledge-caller-authored-critic": "criticAcknowledgement",
+  // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
+  "release-preflight": "releasePreflightApproval" });
 
 export function criticalApprovalStoreRoot(gitCommonDir) {
   return join(resolve(gitCommonDir), "agent-pipeline", "critical-approvals");
@@ -512,6 +515,52 @@ export function authorizeRecordedChatPush({
     return { authorized: false, code: `${prefix}-THREAT-MODEL` };
   }
   return { authorized: true, code: "PUSH-PROOF-WAIVED", mode: waiver.waiver.mode };
+}
+
+/**
+ * G20-42: the consumer release tag. A consumer project's release is a version tag (PO decision 2026-11-07); it is decided from the project's
+ * shape, never from a caller claim: a Pipeline source checkout carries the plugin manifests below, a consumer project never does.
+ */
+const PIPELINE_SOURCE_MANIFESTS = Object.freeze([
+  "plugins/pipeline-core/.codex-plugin/plugin.json", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugins/pipeline-core/plugin.json",
+]);
+export function isConsumerReleaseProject(projectDir) {
+  return typeof projectDir === "string" && projectDir !== "" && existsSync(projectDir) && PIPELINE_SOURCE_MANIFESTS.every((path) => !existsSync(join(projectDir, path)));
+}
+
+/**
+ * Admits the push of exactly one release tag for a consumer project: the tag is annotated, names a version the release preflight approved,
+ * and peels to the commit that approval is bound to. The approval is the private `release-preflight` record the consumer release preflight
+ * writes only for a `ready` record (release-preflight-cli.mjs); a signature-mode project additionally demands the consumed proof it carries.
+ * @returns {{ok: true} | {ok: false, code: string, message: string, repair: string}}
+ */
+export function authorizeRecordedReleaseTag({ projectDir, anchorDir = projectDir, tagRef, commit } = {}) {
+  const script = fileURLToPath(new URL("../scripts/release-preflight-cli.mjs", import.meta.url));
+  const refuse = (code, message, repair) => ({ ok: false, code, message, repair });
+  const name = typeof tagRef === "string" && tagRef.startsWith("refs/tags/") ? tagRef.slice("refs/tags/".length) : "";
+  const command = `node ${JSON.stringify(script)} --root ${JSON.stringify(projectDir)} --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`;
+  if (name === "" || typeof commit !== "string" || commit === "") return refuse("RELEASE-TAG-INPUT-INVALID", "the release tag push is not one tag at one commit", "push exactly one release tag: git push origin refs/tags/v<VERSION>");
+  const kind = spawnSync("git", ["-C", projectDir, "cat-file", "-t", tagRef], { encoding: "utf8", timeout: 5000 });
+  if (kind.status !== 0 || String(kind.stdout).trim() !== "tag") {
+    return refuse("RELEASE-TAG-NOT-ANNOTATED", `${name} is not an annotated tag`, `git tag -a ${name} -m "version tag" ${commit}`);
+  }
+  const common = resolveCriticalApprovalCommonDir(projectDir);
+  const approval = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
+  if (!object(approval)) {
+    return refuse("RELEASE-APPROVAL-MISSING", `no release approval is recorded for ${name}; a consumer release needs the one PO release approval`, command);
+  }
+  if (approval.forCommit !== commit || approval.tag !== name || name !== `v${approval.version}`) {
+    return refuse("RELEASE-APPROVAL-MISMATCH", `the recorded release approval binds ${approval.tag ?? "another tag"} at ${String(approval.forCommit).slice(0, 12)}, not ${name} at ${commit.slice(0, 12)}`, command);
+  }
+  let waiver;
+  try { waiver = criticalProofWaiverFor(anchorDir, "release-preflight"); } catch { waiver = { waived: false }; }
+  if (waiver?.waived !== true) {
+    const proof = object(approval.criticalProof) ? approval.criticalProof.proofSha256 : null;
+    if (approval.mode !== "signature" || !SHA256.test(proof ?? "") || !isCriticalProofConsumedPrivately(common, proof)) {
+      return refuse("RELEASE-APPROVAL-PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof", command);
+    }
+  }
+  return { ok: true };
 }
 
 /**

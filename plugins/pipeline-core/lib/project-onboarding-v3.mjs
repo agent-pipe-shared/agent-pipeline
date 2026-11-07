@@ -9,6 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
+import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
@@ -6120,6 +6121,9 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   // already owns a `.gitignore` is never touched -- it simply gets no such target.
   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
   const seedsProjectAttributes = !(inspected.entries ?? []).includes(".gitattributes");
+  // G20-42: the consumer release is a version tag, so the project carries a tracked VERSION from its first commit. Create-only like the ignore
+  // seed: a project that already owns a VERSION keeps it, and an already-onboarded one gets it from `release-preflight-cli.mjs --init-version`.
+  const seedsProjectVersion = !(inspected.entries ?? []).includes("VERSION");
   // Both scaffold producers answer only to a fresh classification. An `existing-unmanaged`
   // root that the bounded walk proves code-free is presented to them as `fresh`, so the
   // bytes stay identical to what the PRD gate and the design inspection compare against.
@@ -6139,6 +6143,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     { path: CONSUMER_VERIFY_ADAPTER_PATH, bytes: CONSUMER_VERIFY_ADAPTER },
     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
     ...(seedsProjectAttributes ? [{ path: ".gitattributes", bytes: PROJECT_ATTRIBUTES_SEED }] : []),
+    ...(seedsProjectVersion ? [{ path: "VERSION", bytes: `${CONSUMER_VERSION_INITIAL}\n` }] : []),
   ].sort((left, right) => {
     // Publish the physical map before its root entry pointer. The remaining
     // scaffold retains deterministic path order; apply uses this same array.
@@ -6150,8 +6155,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     // The project entry and ignore file are not compiled V3 runtime targets.
     kind: target.path === SOURCE
       ? "source"
-      : (target.path === ".gitignore" || target.path === ".gitattributes"
-        ? (target.path === ".gitignore" ? "project-ignore" : "project-attributes")
+      : (target.path === ".gitignore" || target.path === ".gitattributes" || target.path === "VERSION"
+        ? (target.path === ".gitignore" ? "project-ignore" : (target.path === "VERSION" ? "project-version" : "project-attributes"))
         : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
           : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
     before: describe(null),

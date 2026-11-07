@@ -213,6 +213,41 @@ const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + wa
   );
 }
 
+// ---- G20-42 -- the same shape as TAGPROV3d with an ANNOTATED release tag in a consumer-shaped project: the consumer release check judges it and
+// refuses it by name (no release approval recorded), naming the release command. A lightweight tag (TAGPROV3d) keeps the general gate. -----------
+{
+  const { dir, head } = freshRepo("annotated-consumer-release-tag");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", head);
+  check(
+    "G20-42b block  an annotated release tag in a consumer project needs the release approval (named refusal with the release command)",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["RELEASE-APPROVAL-MISSING", "release-preflight-cli.mjs"] },
+  );
+}
+
+// ---- G20-42 -- the same shape, but a Pipeline SOURCE checkout (the plugin manifests are present): the consumer release check does not apply,
+// and the original downstream approval gate still blocks an annotated tag with its original message, unchanged. -------------------------------
+{
+  const { dir, head } = freshRepo("no-origin-main-approval-required-source");
+  for (const manifest of ["plugins/pipeline-core/.codex-plugin/plugin.json", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugins/pipeline-core/plugin.json"]) {
+    writeEvidence(dir, manifest, { name: "pipeline-core", version: "1.0.0" });
+  }
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", head);
+  check(
+    "G20-42a block  a Pipeline source checkout keeps the general approval gate for a release tag (the consumer release check does not apply)",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["release-tag ancestry check was skipped", "Push approval missing"] },
+  );
+}
+
 // ---- AC-3 -- with refs/remotes/origin/main PRESENT, an unreachable release tag is still --
 // refused exactly as before -- the new early-return above must not affect this path. --------
 {

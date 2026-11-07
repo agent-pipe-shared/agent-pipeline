@@ -232,6 +232,15 @@ The close request is one JSON file in the repository, schema `pipeline.continuit
 The usual choice is the combined Verify/Critic receipt of the feature. The State must also be close-ready: queue head `nextAction`
 `close`, no dispatch, no blocker, no decision transaction.
 
+## After the close and the push: the release (a consumer project's last step)
+
+A consumer project's release is the annotated version tag `v<VERSION>` on the closed, pushed feature. Write the `RELEASE-NOTES.md` entry
+(`## v<VERSION>`: closed feature id, title, acceptance criteria met) WITH the feature, before the Critic round, so the Critic reviews it and the
+Critic-bound push Verify carries it; a notes commit after the review is a content change the carry refuses. After the push run
+`release-preflight-cli.mjs --root <repo> --base <base> --lifecycle specs/<feature>/lifecycle.json`: it stops at the first missing step with its
+repair command, records the PO's one release approval (chat) or prints the PO's signing command (signature), and prints the tag and tag-push
+commands. Owner: `docs/push-release-flow.md`, "Releasing a consumer project".
+
 ## Command signatures
 
 Spellings are taken from each script's own parser or help; `<...>` is a value.

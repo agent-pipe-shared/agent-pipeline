@@ -131,6 +131,8 @@ function consumerFixture(log, identity) {
   assert.equal(realpathSync(root), root);
   write("README.md", "# Consumer fixture\n");
   write(".gitignore", "scratch/\n/evidence/\nproject/pipeline-state.json\n.claude/pipeline-state.json\n");
+  // G20-42: onboarding creates the tracked VERSION file (0.1.0) in its sanctioned commit route; the fixture stands in for that route.
+  write("VERSION", "0.1.0\n");
   const calibration = buildRootProjectCalibrationIdentity({ rootDir: root });
   const baseline = { schema: "pipeline.project.v1", project: basename(root), verify: 'node -e "process.exit(0)"', autonomy: "gated", handover: "docs/state.md",
     projectIdentity: { schema: calibration.schema, kind: calibration.kind, rootSha256: calibration.rootSha256 } };
@@ -262,6 +264,9 @@ test("G20-35: the close path from implementation to release preflight is walked 
       // 1 implementation commit, then the authored dispatch record of the slice that produced it
       mkdirSync(join(fx.root, "src"), { recursive: true });
       writeFileSync(join(fx.root, "src", "index.mjs"), "export const value = 'expected';\n");
+      // G20-42 (3): the release-notes entry is written with the feature, so it is part of the Critic-reviewed candidate (a later non-evidence commit
+      // would not be carried by the Critic-bound push Verify). The entry names the closed feature id, its title, the criteria met and the version.
+      writeFileSync(join(fx.root, "RELEASE-NOTES.md"), `# Release notes\n\n## v0.1.0\n\n- Feature ${FEATURE_ID}: Synthetic Test PRD\n  - AC-1: The package must receive a PASS verdict from an independent Critic before acceptance.\n`);
       const implementation = commit(log, fx.root, "feat: implementation");
       const taskId = `g2035-${identity.runner}`;
       mkdirSync(join(fx.root, "evidence"), { recursive: true });
@@ -524,7 +529,10 @@ test("G20-35: the close path from implementation to release preflight is walked 
       // 5 push boundary. push-prepare's own remedy (N24): a Critic-bound push Verify is produced with --mode release plus the Critic inputs, as
       // evidence/verify-latest.json. It carries the Critic bound at the reviewed candidate across the close's own commits to the pushed commit
       // (criticCloseCommit admits the close commit; w266 finding 2 is the Verify evidence path that used to break exactly this).
-      git(log, fx.root, ["remote", "add", "origin", "https://example.invalid/g2035-consumer.git"]);
+      // G20-42: a local bare repository stands in for origin (no network), so the push really happens and refs/remotes/origin/main exists.
+      const bareRemote = join(fx.parent, "origin.git");
+      step(log, `${identity.runner}: bare remote`, "git", ["init", "-q", "--bare", "-b", "main", bareRemote]);
+      git(log, fx.root, ["remote", "add", "origin", bareRemote]);
       const pushVerify = step(log, `${identity.runner}: push-boundary verify (release mode, Critic-bound)`, process.execPath,
         [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "release", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", "evidence/verify-latest.json"], { cwd: fx.root });
       assert.equal(pushVerify.status, 0);
@@ -540,6 +548,13 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const pushCommand = "git push origin HEAD:refs/heads/main";
       const before = guardPush(pushCommand);
       assert.equal(before.status, 2, `${identity.runner}: the guard blocks the push before any approval is recorded\n${before.stderr}`);
+      // G20-42: the consumer release preflight refuses until its prerequisites exist, each refusal naming the one missing step and leaving no record.
+      const releaseArgs = [script("release-preflight-cli.mjs"), "--root", fx.root, "--base", base, "--lifecycle", MANIFEST];
+      const releasePreflight = () => spawnSync(process.execPath, releaseArgs, { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+      const noApproval = releasePreflight();
+      assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
+      assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
+      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
       const admitted5 = guardPush(pushCommand);
@@ -547,16 +562,34 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const elsewhere = guardPush("git push origin HEAD:refs/heads/other");
       assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
 
-      // 6 release preflight (shape of scripts/release-preflight-cli.test.mjs). MEASURED (w266 finding 3): the release preflight is the Pipeline's
-      // own publication gate, not a consumer step. It observes the Pipeline's version surfaces (VERSION and the plugin manifests under
-      // plugins/pipeline-core/) and, in the source checkout, the source reader binding; a consumer project has none of them, so the first
-      // observation refuses with RPC-INPUT and writes nothing. The walk pins that precise refusal; a consumer release route, when one exists,
-      // replaces this assertion with a `ready` record.
-      const releasePreflight = spawnSync(process.execPath, [script("release-preflight-cli.mjs"), "--root", fx.root, "--preflight-id", "g2035-preflight", "--base", base,
-        "--lifecycle", MANIFEST, "--retention-policy", "a".repeat(64), "--out", "evidence/release-preflight.json"], { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
-      assert.equal(releasePreflight.status, 2, `${identity.runner}: ${releasePreflight.stdout}${releasePreflight.stderr}`);
-      assert.match(releasePreflight.stderr, /RPC-INPUT: VERSION is unavailable/u, `${identity.runner}: ${releasePreflight.stderr}`);
-      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
+      // 5b the approved push really happens (the local bare repository is origin), which creates refs/remotes/origin/main: the published channel.
+      const unpushed = releasePreflight();
+      assert.equal(unpushed.status, 2, `${identity.runner}: ${unpushed.stdout}${unpushed.stderr}`);
+      assert.match(unpushed.stderr, /RPC-CONSUMER-NOT-PUSHED.*git push origin HEAD:refs\/heads\/main/u, `${identity.runner}: ${unpushed.stderr}`);
+      step(log, `${identity.runner}: the approved push`, "git", ["-C", fx.root, "push", "-q", "origin", "HEAD:refs/heads/main"]);
+
+      // 6 consumer release (G20-42, PO decision 2026-11-07: a release is a version tag). w266 finding 3 measured that the release preflight was the
+      // Pipeline's own publication gate and refused a consumer with RPC-INPUT; the consumer mode of the same route is decided from the project's
+      // shape (no Pipeline plugin manifests) and is `ready` only for a closed, pushed, approved, Critic-carried, Verify-green candidate.
+      const tag = "v0.1.0";
+      step(log, `${identity.runner}: annotated version tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", tag, "-m", "version tag"]);
+      const tagPush = `git push origin refs/tags/${tag}`;
+      const tagBefore = guardPush(tagPush);
+      assert.equal(tagBefore.status, 2, `${identity.runner}: the guard refuses the release tag before the release approval\n${tagBefore.stderr}`);
+      assert.match(tagBefore.stderr, /release-preflight-cli\.mjs/u, `${identity.runner}: the refusal names the release command\n${tagBefore.stderr}`);
+      const released = releasePreflight();
+      assert.equal(released.status, 0, `${identity.runner}: ${released.stdout}${released.stderr}`);
+      const releaseResult = JSON.parse(released.stdout);
+      assert.equal(releaseResult.status, "ready", released.stdout);
+      assert.equal(releaseResult.tag, tag);
+      assert.equal(JSON.parse(readFileSync(join(fx.root, "evidence", "release-preflight.json"), "utf8")).candidate.commit, git(log, fx.root, ["rev-parse", "HEAD"]));
+      const tagAdmitted = guardPush(tagPush);
+      assert.equal(tagAdmitted.status, 0, `${identity.runner}: the guard admits exactly the approved version tag\n${tagAdmitted.stderr}`);
+      step(log, `${identity.runner}: another annotated tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", "v9.9.9", "-m", "version tag"]);
+      const otherTag = guardPush("git push origin refs/tags/v9.9.9");
+      assert.equal(otherTag.status, 2, `${identity.runner}: any other release tag stays refused\n${otherTag.stderr}`);
+      step(log, `${identity.runner}: the version tag push`, "git", ["-C", fx.root, "push", "-q", "origin", `refs/tags/${tag}`]);
+      assert.match(git(log, fx.root, ["ls-remote", "--tags", "origin"]), /refs\/tags\/v0\.1\.0\^\{\}/u, `${identity.runner}: the tag reached the remote`);
     } finally {
       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
     }

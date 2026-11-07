@@ -61,6 +61,12 @@ import { prepareAuthorizeCriticalLine } from "./po-human-approval.mjs";
 import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { isConsumerReleaseProject, resolveCriticalApprovalCommonDir, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
+import {
+  CONSUMER_RELEASE_PREFLIGHT_ID, CONSUMER_RELEASE_RECORD_PATH, CONSUMER_RETENTION_POLICY_SHA256, CONSUMER_VERSION_INITIAL,
+  consumerManifestDocuments, consumerVersionRepair, firstConsumerReleaseBlocker, readConsumerVersion,
+} from "../lib/consumer-release.mjs";
+import { pushPrepareReport } from "./push-prepare.mjs";
 
 const DOCUMENTS = Object.freeze(["prd", "spec", "acceptance", "result"]);
 const FINAL_GATES = Object.freeze(["verify", "security", "critic", "remote", "human"]);
@@ -265,7 +271,12 @@ function observeRepository(root) {
  * reading the file twice would risk the two reads disagreeing on a dirty tree, and
  * would just be a second definition of the same observation.
  */
-function observeVersion(root, consent, candidateVersion) {
+function observeVersion(root, consent, candidateVersion, consumer = false) {
+  // G20-42: a consumer project has one version surface, VERSION; the Pipeline's plugin manifests belong to the Pipeline's own release.
+  if (consumer) {
+    return { candidateVersion, targetVersion: candidateVersion, decisionId: consent.decisionId, decisionSha256: consent.authoritySha256,
+      surfaces: [{ path: "VERSION", version: candidateVersion }], agreed: true };
+  }
   const manifests = VERSION_SURFACES.slice(1).map((path) => {
     const value = readJson(root, path, path)?.version;
     if (typeof value !== "string") fail("RPC-VERSION", `${path} carries no string version`);
@@ -284,10 +295,13 @@ function observeVersion(root, consent, candidateVersion) {
   };
 }
 
-function observeDocumentation(root, lifecycle) {
+function observeDocumentation(root, lifecycle, consumer = false) {
   const documentation = {};
+  // G20-42: a consumer's documents are the artifacts of its registered feature package (the lifecycle manifest), by class.
+  const consumerDocuments = consumer ? consumerManifestDocuments(lifecycle) : null;
+  if (consumerDocuments !== null && !consumerDocuments.ok) fail("RPC-INPUT", `the feature package manifest has no ${consumerDocuments.kind} artifact`);
   for (const kind of DOCUMENTS) {
-    const path = lifecycle.documents?.[kind];
+    const path = consumer ? consumerDocuments.documents[kind] : lifecycle.documents?.[kind];
     if (typeof path !== "string") fail("RPC-INPUT", `lifecycle.documents.${kind} is missing`);
     documentation[kind] = { path, sha256: sha256(readFileSync(repoFile(root, path, `documentation.${kind}`))) };
   }
@@ -543,10 +557,24 @@ function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, reten
   const candidate = { commit: repository.headCommit, tree: repository.headTree };
   const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
   const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
-  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
+  const consumer = isConsumerReleaseProject(root);
+  let consumerVersion = null;
+  // The registered feature package names its feature as manifest.feature.id (the Pipeline's own lifecycle input carries featureId directly).
+  if (consumer && lifecycleInput.featureId === undefined) lifecycleInput.featureId = lifecycleInput.feature?.id;
+  if (consumer) {
+    // G20-42: the consumer route refuses at the FIRST missing step, naming the command that supplies it; nothing is written by a refusal.
+    const read = readConsumerVersion(root);
+    if (!read.ok) fail(read.code, `${read.message}; repair: ${read.repair}`);
+    consumerVersion = read.version;
+    const pushReport = pushPrepareReport(["--by", "release", "--remote", "origin", "--destination", "refs/heads/main"], { dir: root }, { foldPendingApprovalWrite: false });
+    const blocker = firstConsumerReleaseBlocker({ root, featureId: lifecycleInput.featureId, version: read.version, candidate, pushReport: pushReport.report });
+    if (blocker !== null) fail(blocker.code, `${blocker.message}; repair: ${blocker.repair}`);
+  } else {
+    requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
+  }
   const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
   const manifestSha256 = sha256(readFileSync(manifestAbsolute));
-  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
+  const candidateVersion = consumer ? consumerVersion : readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
   const subject = {
     schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
     version: candidateVersion,
@@ -554,7 +582,7 @@ function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, reten
     lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
     retentionPolicySha256,
   };
-  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject };
+  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject, consumer };
 }
 
 /**
@@ -589,13 +617,25 @@ export function buildReleasePreflight({
   // compares the source to HEAD and therefore cannot be activated by a working
   // tree edit.
   const humanApproval = globalChatAttribution(root);
-  if (consentPath === null && proofRequestPath === null && humanApproval === null) {
+  const consumerProject = isConsumerReleaseProject(root);
+  // A consumer project learns what is missing in step order first; the PO's approval step is printed once everything before it holds.
+  if (consentPath === null && proofRequestPath === null && humanApproval === null && !consumerProject) {
     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
   }
+  if (consumerProject) retentionPolicySha256 ??= CONSUMER_RETENTION_POLICY_SHA256;
+  preflightId ??= CONSUMER_RELEASE_PREFLIGHT_ID;
 
   const {
-    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject,
+    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject, consumer,
   } = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
+  if (consumer && consentPath === null && proofRequestPath === null && humanApproval === null) {
+    // G20-42 (4): signature mode. Every prerequisite holds; the PO approves this one subject, and the exact signing command is printed.
+    const documents = consumerManifestDocuments(lifecycleInput);
+    if (!documents.ok) fail("RPC-INPUT", `the feature package manifest has no ${documents.kind} artifact`);
+    const prepared = prepareReleasePreflightAuthorizeLine({ rootDir: root, baseCommit, lifecyclePath, retentionPolicySha256, plan: documents.documents.prd, spec: documents.documents.spec, now });
+    fail("RPC-CONSUMER-PO-APPROVAL", `all release prerequisites hold; the release needs the PO's one approval of exactly subject ${prepared.subjectSha256} (version ${candidateVersion}, candidate ${candidate.commit.slice(0, 12)}). `
+      + `PO step, in the PO's own terminal: ${prepared.command} -- then run this command again with --proof-request <request file> --proof <proof file> (both outside the repository).`);
+  }
   const consent = consentPath !== null
     ? resolveHandSuppliedConsent(root, consentPath)
     : proofRequestPath !== null
@@ -605,8 +645,8 @@ export function buildReleasePreflight({
     })
       : resolveConsentFromGlobalChat({ candidate, subject, now });
 
-  const version = observeVersion(root, consent, candidateVersion);
-  const documentation = observeDocumentation(root, lifecycleInput);
+  const version = observeVersion(root, consent, candidateVersion, consumer);
+  const documentation = observeDocumentation(root, lifecycleInput, consumer);
 
   const input = {
     preflightId,
@@ -642,7 +682,28 @@ export function buildReleasePreflight({
 
   const record = createReleasePreflight(input);
   validateReleasePreflight(record);
-  return { record, versionSurfaces: version.surfaces, versionAgreed: version.agreed };
+  return { record, versionSurfaces: version.surfaces, versionAgreed: version.agreed, consumer, consent, proofBacked: proofRequestPath !== null, humanApproval, now };
+}
+
+/**
+ * G20-42 (4): the consumer release approval. A `ready` record whose consent is approved is the one PO release approval; it is stored privately
+ * (the same store as the push approval) bound to the tag, the version and exactly this commit, which is what the push guard admits the tag by.
+ * A signature-backed record carries the consumed proof's digest; replay of the same proof is refused by the store.
+ */
+function recordConsumerReleaseApproval(root, built) {
+  const { record } = built;
+  if (!built.consumer || record.status !== "ready" || record.consent.status !== "approved") return null;
+  const common = resolveCriticalApprovalCommonDir(root);
+  if (common === null) fail("RPC-APPROVAL-STORE", "the git common directory could not be resolved, so no release approval can be recorded");
+  const mode = built.proofBacked ? "signature" : (built.humanApproval !== null ? built.humanApproval.mode : "waiver");
+  const approval = {
+    schema: "pipeline.consumer-release-approval.v1", forCommit: record.candidate.commit, tree: record.candidate.tree, version: record.version.targetVersion,
+    tag: `v${record.version.targetVersion}`, preflightId: record.preflightId, recordSha256: record.recordSha256, mode,
+    criticalProof: built.proofBacked ? { proofSha256: record.consent.authoritySha256 } : null, approvedAt: built.now,
+  };
+  const stored = writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval, consumedAt: built.now });
+  if (!stored.ok) fail("RPC-APPROVAL-STORE", `the release approval was not recorded (${stored.code}); no release record was written`);
+  return approval;
 }
 
 const USAGE = "Usage: release-preflight-cli.mjs --preflight-id <id> --base <commit> (--consent <repo-path> | --proof-request <external-path> --proof <external-path>) --lifecycle <path> --retention-policy <sha256> --out <path> [--gg03 <path>] [--root <repo>]";
@@ -657,7 +718,10 @@ function parseArgs(argv) {
     }
     value[flag] = next;
   }
-  for (const required of ["--preflight-id", "--base", "--lifecycle", "--retention-policy", "--out"]) {
+  // G20-42: a consumer project (decided from its shape) needs only the base and the feature package; the id, the retention digest and the
+  // record path have fixed consumer values, which the push guard's release approval and the docs name.
+  const consumerRoot = isConsumerReleaseProject(resolve(value["--root"] ?? process.cwd()));
+  for (const required of consumerRoot ? ["--base", "--lifecycle"] : ["--preflight-id", "--base", "--lifecycle", "--retention-policy", "--out"]) {
     if (!value[required]) fail("RPC-USAGE", `${required} is required`);
   }
   // ADR-0064 Decision 5: --consent (hand-supplied) and --proof-request/--proof
@@ -668,7 +732,7 @@ function parseArgs(argv) {
   if (Boolean(value["--proof-request"]) !== Boolean(value["--proof"])) fail("RPC-USAGE", "--proof-request and --proof must be supplied together");
   if (value["--consent"] && value["--proof-request"]) fail("RPC-USAGE", "--consent and --proof-request/--proof are mutually exclusive");
   const rootDir = value["--root"] ?? process.cwd();
-  if (!value["--consent"] && !value["--proof-request"] && globalChatAttribution(resolve(rootDir)) === null) {
+  if (!consumerRoot && !value["--consent"] && !value["--proof-request"] && globalChatAttribution(resolve(rootDir)) === null) {
     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
   }
   return {
@@ -681,7 +745,7 @@ function parseArgs(argv) {
     lifecyclePath: value["--lifecycle"],
     retentionPolicySha256: value["--retention-policy"],
     gg03Path: value["--gg03"] ?? null,
-    outPath: value["--out"],
+    outPath: value["--out"] ?? CONSUMER_RELEASE_RECORD_PATH,
   };
 }
 
@@ -716,14 +780,35 @@ function runPrintAuthorizeCritical(argv) {
   process.stdout.write(`${JSON.stringify({ command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: prepared.expiresAt }, null, 2)}\n`);
 }
 
+/**
+ * G20-42 (1): the named repair for an already-onboarded project without a VERSION file. Create-only: an existing file is never touched, and
+ * the Pipeline's own source checkout is refused (its VERSION is its release decision). The agent commits the new file.
+ */
+function runInitVersion(argv) {
+  const index = argv.indexOf("--root");
+  const root = resolve(index >= 0 && argv[index + 1] ? argv[index + 1] : process.cwd());
+  if (!isConsumerReleaseProject(root)) fail("RPC-USAGE", "--init-version applies to a consumer project; the Pipeline's own VERSION is its release decision");
+  const path = join(root, "VERSION");
+  let created = true;
+  try { writeFileSync(path, `${CONSUMER_VERSION_INITIAL}\n`, { flag: "wx" }); } catch (error) { if (error.code !== "EEXIST") throw error; created = false; }
+  process.stdout.write(`${JSON.stringify({ status: created ? "version-created" : "version-exists", path: "VERSION", version: readFileSync(path, "utf8").trim(),
+    next: created ? "commit VERSION, then continue with the release preflight" : null }, null, 2)}\n`);
+}
+
 if (isDirectInvocation(import.meta.url)) {
   try {
     if (process.argv.slice(2).includes(PRINT_FLAG)) {
       runPrintAuthorizeCritical(process.argv.slice(2));
       process.exit(0);
     }
-    const options = parseArgs(process.argv.slice(2));
+    const rawArgs = process.argv.slice(2);
+    if (rawArgs.includes("--init-version")) {
+      runInitVersion(rawArgs);
+      process.exit(0);
+    }
+    const options = parseArgs(rawArgs);
     const built = buildReleasePreflight(options);
+    const approval = recordConsumerReleaseApproval(resolve(options.rootDir), built);
     writeOutput(options.rootDir, options.outPath, built.record);
     process.stdout.write(`${JSON.stringify({
       status: built.record.status,
@@ -731,6 +816,11 @@ if (isDirectInvocation(import.meta.url)) {
       recordSha256: built.record.recordSha256,
       versionSurfacesAgree: built.versionAgreed,
       writtenTo: options.outPath,
+      ...(approval === null ? {} : {
+        tag: approval.tag,
+        // The agent's last two steps; the push guard admits exactly this annotated tag at exactly this commit.
+        nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`, `git push origin refs/tags/${approval.tag}`],
+      }),
     }, null, 2)}\n`);
   } catch (error) {
     const code = error instanceof ReleasePreflightCliError ? error.code : (error?.code ?? "RPC-ERROR");

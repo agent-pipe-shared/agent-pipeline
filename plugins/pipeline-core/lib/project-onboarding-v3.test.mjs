@@ -2968,7 +2968,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
       "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-      "project/pipeline.json", "project/pipeline.yaml",
+      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
     ]);
   } finally { dispose(path); }
 });
@@ -7808,7 +7808,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
       plan.targets.map((target) => target.path),
       [
         "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-        "project/pipeline.json", "project/pipeline.yaml",
+        "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
       ],
       "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
     );
@@ -7974,7 +7974,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
       "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-      "project/pipeline.json", "project/pipeline.yaml",
+      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");

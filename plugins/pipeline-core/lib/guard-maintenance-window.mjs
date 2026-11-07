@@ -828,6 +828,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
   "plugins/pipeline-core/lib/critic-source-return.mjs",
   "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
+  // C20 G20-42 (GMWKC01): the consumer release route project-onboarding-v3.mjs imports (VERSION target, release preflight,
+  // annotated version tag). Its first-party imports are already listed.
+  "plugins/pipeline-core/lib/consumer-release.mjs",
   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",

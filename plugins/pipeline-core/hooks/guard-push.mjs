@@ -136,7 +136,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
-import { authorizeRecordedDeploy, authorizeRecordedPush, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
+import { authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
 import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -1951,6 +1951,29 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
     "BLOCKED (guard-push destination policy): the explicit checkpoint policy is malformed or unrecognized.",
     "Fix the manifest policy before pushing; no partially parsed policy can select the lower-rigor lane.",
   ]);
+}
+
+// G20-42: for a CONSUMER project (decided from its shape: no Pipeline plugin manifests) a release tag v<n>.<n>.<n> is its release. The tag
+// publishes nothing new (its commit was pushed under the push approval and the ancestry rule above holds), so what it needs is the one release
+// approval bound to exactly this annotated tag and commit; any other release tag, or one with no approval, is refused with the command that
+// records it. The Pipeline's own source checkout is not a consumer project and keeps its full gate below, unchanged.
+{
+  const releaseTagRef = resolvePushedTagRef(pushBinding);
+  if (releaseTagRef !== null && RELEASE_TAG_REF.test(releaseTagRef) && isConsumerReleaseProject(pushBinding.projectDir)) {
+    const release = authorizeRecordedReleaseTag({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), tagRef: releaseTagRef, commit: sourceCommit });
+    if (release.ok) {
+      if (invalidityNote) emit(1, [invalidityNote]);
+      allowExit();
+    }
+    // A LIGHTWEIGHT release tag is not a consumer release: it falls through to the full gate below, unchanged (Verify evidence and a push approval
+    // bound to the tag destination), which still refuses it. Only an annotated release tag is judged here.
+    if (release.code !== "RELEASE-TAG-NOT-ANNOTATED") {
+      emit(2, [
+        `BLOCKED (guard-push consumer release tag, plugin pipeline-core): ${release.code}: ${release.message}.`,
+        `Fix: ${release.repair}`,
+      ]);
+    }
+  }
 }
 
 // N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes

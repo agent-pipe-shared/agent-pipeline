@@ -95,6 +95,10 @@ const INVENTORY = Object.freeze([
  * recognise, a Critic that returned no schema-shaped verdict, several open packets of one runner, a killed or failed child); the
  * limit is that the Antigravity route is proven by fixtures shaped like the measured payload, not by a genuine installed host run.
  */
+// G20-42 (honest accounting, no case changed): a consumer project's release (the version tag after close and push) takes ONE PO release approval
+// per RELEASE, not per feature: it is the existing `release-preflight` critical kind recorded by `release-preflight-cli.mjs` (chat run, or the PO's
+// signature of the printed `authorize-critical --kind release-preflight` line). It adds no pipeline-state verb, so nothing here classifies it, and
+// the per-feature count of the feature course stays two (plan approval, push approval); the release is a separate, last, per-release interaction.
 const OFF_HAPPY_PATH_VERBS = Object.freeze([
   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
   "approve-residual-acceptance", "approve-critic-acknowledgement",
