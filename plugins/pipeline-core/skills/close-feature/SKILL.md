@@ -59,7 +59,9 @@ consumer without an organization policy, the shipped name `pipeline-core-baselin
 (floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
 The package must be `completed` with a candidate equal to HEAD and a registered
 passing Verify evidence. Package side, nothing committed in between: produce the
-evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`,
+evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`
+(under `evidence/`: the registered course reads candidate evidence only from there, and an evidence file
+elsewhere under `specs/<feature>/` is refused `FPR-VERIFY-PATH` at registration),
 register it with `register-feature-package.mjs --root <root> --add-verify-evidence
 <path>`, then run `pipeline-state.mjs feature-package-plan` and `feature-package-apply`
 with `--next-state verifying` (this binds the candidate to HEAD, refused without a

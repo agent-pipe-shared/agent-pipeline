@@ -87,7 +87,7 @@ command tables.
 
 Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
 
-1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
+1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
    then `pipeline-state.mjs feature-package-plan` / `feature-package-apply` with `--next-state verifying`, and again with `--next-state completed` (one step at a time).
 2. `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, apply the returned action, then
    `plan-transition` / `apply-transition` through `checkpointed`, `feature-close-prepared`, `tracked-close-finalized`, `candidate-frozen`, `final-verify-green`,

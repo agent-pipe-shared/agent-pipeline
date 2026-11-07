@@ -175,7 +175,7 @@ function auditFixture() {
   const root = mkdtempSync(join(tmpdir(), "vc-pkg-"));
   gitIn(root, ["init", "-q"]);
   const base = `specs/${AUDIT_ID}`;
-  mkdirSync(join(root, base), { recursive: true });
+  mkdirSync(join(root, base, "evidence"), { recursive: true });
   const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "mutable"], ["acceptance", "acceptance.md", false, "mutable"], ["result", "result.md", false, "mutable"], ["candidate-evidence", "envelope.json", false, "immutable"]].map(([klass, name, authority, mutability]) => {
     const bytes = `${klass} of ${AUDIT_ID}\n`;
     writeFileSync(join(root, base, name), bytes);
@@ -188,11 +188,13 @@ function auditFixture() {
   gitIn(root, ["add", "-A"]);
   gitIn(root, ["commit", "-qm", "work"]);
   const head = () => ({ commit: gitIn(root, ["rev-parse", "HEAD"]), tree: gitIn(root, ["rev-parse", "HEAD^{tree}"]) });
-  const evidence = (name, overrides = {}) => {
+  // w266 (G20-35): registered candidate evidence lives under specs/<feature>/evidence/ (every reader of the registered course requires it,
+  // CCA-REGISTRATION-SHAPE), so valid Verify evidence is written there by default; `dir` names another directory for the refusal case.
+  const evidence = (name, overrides = {}, dir = `${base}/evidence`) => {
     const candidate = head();
     const value = { schema: "pipeline.verify-evidence.v0", ...candidate, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }), ...overrides };
-    writeFileSync(join(root, base, name), JSON.stringify(value));
-    return `${base}/${name}`;
+    writeFileSync(join(root, dir, name), JSON.stringify(value));
+    return `${dir}/${name}`;
   };
   const readManifest = () => readFileSync(join(root, manifestRel), "utf8");
   return { root, base, manifestRel, manifest, head, evidence, readManifest, state: { activeFeature: { id: AUDIT_ID } } };
@@ -221,8 +223,11 @@ test("Verify evidence registration refuses what cannot qualify a candidate and n
     const bad = { commit: "f".repeat(40), tree: "e".repeat(40) };
     const cases = [
       ["outside the package directory", () => { writeFileSync(join(f.root, "loose.json"), "{}"); return "loose.json"; }, "FPR-VERIFY-PATH"],
-      ["missing file", () => `${f.base}/absent.json`, "FPR-VERIFY-PATH"],
-      ["not JSON", () => { writeFileSync(join(f.root, f.base, "text.json"), "no"); return `${f.base}/text.json`; }, "FPR-VERIFY-SCHEMA"],
+      // w266 (G20-35): a VALID passing evidence directly under the package directory (the path the skill and the usage text used to prescribe)
+      // registered fine and then broke the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE); it is refused at registration now.
+      ["directly under the package directory, outside evidence/", () => f.evidence("direct.json", {}, f.base), "FPR-VERIFY-PATH"],
+      ["missing file", () => `${f.base}/evidence/absent.json`, "FPR-VERIFY-PATH"],
+      ["not JSON", () => { writeFileSync(join(f.root, f.base, "evidence", "text.json"), "no"); return `${f.base}/evidence/text.json`; }, "FPR-VERIFY-SCHEMA"],
       ["another schema", () => f.evidence("schema.json", { schema: "pipeline.verify-evidence.v9" }), "FPR-VERIFY-SCHEMA"],
       ["a failed run", () => f.evidence("failed.json", { exitCode: 1 }), "FPR-VERIFY-NOT-PASSING"],
       ["a candidate no commit of this repository has", () => f.evidence("ghost.json", { ...bad, candidate: bad }), "FPR-VERIFY-CANDIDATE"],

@@ -494,7 +494,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
  * Registers a passing candidate-bound Verify evidence file (`--add-verify-evidence <path>`) as an immutable, non-authority
  * `candidate-evidence` entry of the feature manifest. The feature-close audit route needs such an entry (and a package candidate
  * the next `feature-package-plan --next-state verifying` derives from it); no other verb writes it. The file, produced by
- * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/...`, must already exist under `specs/<feature>/`; it must be a
+ * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/...`, must already exist under `specs/<feature>/evidence/`; it must be a
  * `pipeline.verify-evidence.v0` with `exitCode` 0 whose candidate commit and tree resolve in this repository. Nothing else of the
  * manifest changes, and a path registered with other bytes is refused, never replaced.
  */
@@ -516,7 +516,10 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
     return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
   }
-  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(packageDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${packageDir}; produce the evidence with verify-evidence-producer.mjs --out under ${packageDir}`, { manifestPath, path: evidenceRel });
+  // Registered candidate evidence is read back by the course history (CCA-REGISTRATION-SHAPE requires specs/<feature>/evidence/), so a path
+  // directly under the package directory would register here and then end the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE).
+  const evidenceDir = `${packageDir}evidence/`;
+  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(evidenceDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${evidenceDir}; produce the evidence with verify-evidence-producer.mjs --out ${evidenceDir}<name>.json (the registered course reads candidate evidence only from there), then register it`, { manifestPath, path: evidenceRel });
   const seen = inspect(root, evidenceRel);
   if (seen.kind !== "file") return refused("FPR-VERIFY-PATH", `${evidenceRel} is missing or is not a regular file`, { manifestPath, path: evidenceRel });
   try { if (realpathSync(join(root, evidenceRel)) !== join(root, evidenceRel)) return refused("FPR-VERIFY-PATH", `${evidenceRel} resolves through a link`, { manifestPath, path: evidenceRel }); } catch { return refused("FPR-VERIFY-PATH", `${evidenceRel} does not resolve`, { manifestPath, path: evidenceRel }); }

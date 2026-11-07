@@ -15,24 +15,27 @@
  *   4 close: close-coordinator chain to final-verify-green, then the State writer's close-feature
  *   5 push gate decision for the candidate commit (guard-push), then release-preflight (createReleasePreflight over the facts of the walk)
  *
- * STATUS (budget checkpoint 2): steps 1-4 are GREEN on all three runner identities, through closed-local and the drive quality readback (security-scan
- * and critic-report-file rows present). Step 5 (push gate decision with a fixture approval, release preflight) is NOT written yet; the walk contains
- * no assertion for it. The close walked is a mini-profile (rigor 0) course: the rigor >= 1 candidate-bound Critic/Verify audit route is not walked.
+ * STATUS (w266): the whole walk is GREEN on all three runner identities. The course is the sanctioned feature course (rigor >= 1): Critic on the
+ * feature course, the audit route (Verify evidence registered under specs/<feature>/evidence/, package to verifying and completed, audit request,
+ * feature-close-prepared with --audit-request and --critic-verify-lifecycle), the close to closed-local, the Critic-bound push Verify, push-prepare
+ * `ready`, the push guard (blocked before approve-push, admitted after, bound to its destination), and the release preflight, which is the
+ * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). One fixture stand-in is declared at
+ * the finalize call: the Source return record that no runner issues yet (w266 finding 1).
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after } from "node:test";
 import { runSecurityScan } from "./security-scan.mjs";
+import { runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
 import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
-import { classifyRegisteredEvidenceOnlyCommits } from "../lib/critic-course-admission.mjs";
 import { prepareConsumerVerify } from "../lib/consumer-verify.mjs";
 import { buildRootProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
 import { readState, run } from "./pipeline-state.mjs";
@@ -53,6 +56,7 @@ export const RUNNER_IDENTITIES = Object.freeze([
 ]);
 
 const FEATURE_ID = "e2e";
+const GUARD_PUSH = fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url));
 const RUNNER_MARKERS = Object.freeze({
   claude: { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "11111111-aaaa-bbbb-cccc-222222222222" },
   codex: { CODEX_THREAD_ID: "33333333-aaaa-bbbb-cccc-444444444444" },
@@ -139,7 +143,8 @@ function consumerFixture(log, identity) {
   write("pipeline.user.yaml", "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\ngates:\n  human_approval: chat\n");
   gitOk("add", "--", "pipeline.user.yaml");
   gitOk("commit", "-q", "-m", "selected approval mode");
-  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+  // The push gate is configured from the start (the PO-gate profile receipt below binds these exact bytes): blocking, human, approval required.
+  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
   write(NEUTRAL_MANIFEST, read(".claude/pipeline.yaml"));
   for (const target of initialGreenfieldMapTargets("fresh")) write(target.path, target.bytes);
   const pointer = initialGreenfieldAgentEntryTarget("fresh");
@@ -164,6 +169,9 @@ function consumerFixture(log, identity) {
   const keyPair = generateKeyPairSync("ed25519");
   const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
   write("project/critical-human-proof.json", `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-key", publicKeySha256: sha256(publicKeyPem) }] }, null, 2)}\n`);
+  // The push approval is active (the manifest above), so submit-plan refuses PUSH-THREAT-MODEL-MISSING until the sanctioned verb
+  // materializes the threat model; its repair names it, and it must be in the same draft commit (before the item binding).
+  lifecycle(["materialize-push-threat-model"]);
   gitOk("add", ".");
   gitOk("commit", "-q", "-m", "finished design");
   // The public lifecycle route, in order; each step is the real verb. No lifecycle.json and no State is written by hand.
@@ -280,6 +288,25 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const finalizer = (verb, request) => {
         mkdirSync(join(fx.root, "scratch"), { recursive: true });
         writeJson(join(fx.root, "scratch", `${verb}-request.json`), request);
+        if (verb === "finalize") {
+          // w266 finding 1: since G20-24 every finalize without a Source return record is labelled caller-authored-fallback, and the close
+          // gate (close-coordinator.mjs assertCriticIndependenceForClose) refuses that label at rigor >= 1 or high risk. No runner issues a
+          // Source return record (the CLI's reader is unavailableOriginalSourceReader), so on today's product no rigor >= 1 close is reachable.
+          // The walk stands in for the missing producer through the finalizer's own dependency, exactly as session-critic-finalizer.test.mjs
+          // does, run in-process under the runner identity's markers; the close gate itself is NOT weakened.
+          const savedEnv = { ...process.env };
+          for (const key of Object.keys(process.env)) delete process.env[key];
+          Object.assign(process.env, walkEnv);
+          let outcome;
+          try {
+            outcome = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", `scratch/${verb}-request.json`], {
+              readOriginalSourceReturnFn: (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId, packetDigest: query.packetDigest,
+                claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000 }),
+            });
+          } finally { for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, savedEnv); }
+          assert.equal(outcome.exitCode, 0, `${identity.runner}: in-process finalize: ${JSON.stringify(outcome.output).slice(0, 600)}`);
+          return { status: 0, stdout: JSON.stringify(outcome.output), stderr: "" };
+        }
         return step(log, `${identity.runner}: critic ${verb}`, process.execPath,
           [script("session-critic-finalizer.mjs"), verb, "--root", fx.root, "--request", `scratch/${verb}-request.json`], { cwd: fx.root });
       };
@@ -363,23 +390,31 @@ test("G20-35: the close path from implementation to release preflight is walked 
       assert.equal(json(bare).code, "CLOSE-QUALIFICATION-REQUIRED", bare.stdout);
       // The audit route (close-feature skill, Step 2): candidate Verify bound to the Critic packet (records the Critic/Verify lifecycle), registered into
       // the package, the package driven to verifying and completed for exactly HEAD, then the audit request.
-      const verifyPath = `specs/${FEATURE_ID}/verify-candidate.json`;
-      let lifecycleVerify;
-      try {
-        lifecycleVerify = step(log, `${identity.runner}: candidate verify bound to the Critic packet`, process.execPath,
-          [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "candidate", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", verifyPath], { cwd: fx.root });
-      } catch (error) {
-        let classified;
-        try { const range = classifyRegisteredEvidenceOnlyCommits({ repoRoot: fx.root, featureId: FEATURE_ID, baseCommit: candidate, candidateCommit: git(log, fx.root, ["rev-parse", "HEAD"]), admitCriticExports: true });
-          classified = JSON.stringify({ correction: range.correctionCommits, evidenceOnly: range.evidenceOnlyCommits, administration: range.administrationDocumentationCommits, range: range.rangeCommits }); }
-        catch (inner) { classified = `classifier threw ${inner.code} ${inner.message}`; }
-        throw new Error(`${error.message}\nCLASSIFIED ${classified}\nRANGE ${git(log, fx.root, ["log", "--format=%H %s", `${candidate}..HEAD`])}`);
-      }
+      const verifyPath = `specs/${FEATURE_ID}/evidence/verify-candidate.json`;
+      // The Verify evidence goes under specs/<feature>/evidence/ (w266 finding 2): the registered course reads candidate evidence only from there.
+      const lifecycleVerify = step(log, `${identity.runner}: candidate verify bound to the Critic packet`, process.execPath,
+        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "candidate", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", verifyPath], { cwd: fx.root });
       // The carry-forward from the Critic-reviewed candidate to HEAD held across the evidence, lineage and reconcile commits (w265 finding 4).
       assert.equal(lifecycleVerify.status, 0);
       assert.ok(existsSync(join(fx.root, verifyPath)), `${identity.runner}: the Critic-bound candidate Verify evidence was written`);
-      if (process.env.G2035_STOP_AT_AUDIT !== "0") continue; // CHECKPOINT: the audit route below is the next step (w265 notes)
-      const prepared = transition("feature-close-prepared", ["--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+      // Package side, nothing committed in between (close-feature skill, Step 2): register the Verify evidence, then drive the package to
+      // verifying and completed for exactly HEAD with the sanctioned plan/apply pair.
+      step(log, `${identity.runner}: register the candidate Verify evidence`, process.execPath,
+        [script("register-feature-package.mjs"), "--root", fx.root, "--add-verify-evidence", verifyPath], { cwd: fx.root });
+      for (const nextState of ["verifying", "completed"]) {
+        const planned = json(step(log, `${identity.runner}: feature-package-plan ${nextState}`, process.execPath,
+          [script("pipeline-state.mjs"), "feature-package-plan", "--root", fx.root, "--manifest", MANIFEST, "--next-state", nextState], { cwd: fx.root }));
+        assert.match(String(planned.planSha256), /^[a-f0-9]{64}$/u, JSON.stringify(planned).slice(0, 500));
+        step(log, `${identity.runner}: feature-package-apply ${nextState}`, process.execPath,
+          [script("pipeline-state.mjs"), "feature-package-apply", "--root", fx.root, "--manifest", MANIFEST, "--next-state", nextState, "--plan-sha256", planned.planSha256], { cwd: fx.root });
+      }
+      // The Critic/Verify lifecycle receipt the candidate Verify recorded privately (its file name is the lifecycle id), then the audit request.
+      const lifecycleDir = join(fx.root, ".git", "agent-pipeline", "critic-verify-lifecycle");
+      const lifecycleIds = readdirSync(lifecycleDir).filter((name) => /^[a-f0-9]{64}\.json$/u.test(name)).map((name) => name.slice(0, -5));
+      assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
+      writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
+        packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
+      const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
       assert.equal(prepared.phase, "feature-close-prepared");
       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
       // The State writer prints a plain sentence, not JSON.
@@ -417,6 +452,43 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const rowStatus = Object.fromEntries(readback.qualityReadback.map((row) => [row.id, row.status]));
       assert.equal(rowStatus["security-scan"], "present", JSON.stringify(readback.qualityReadback));
       assert.equal(rowStatus["critic-report-file"], "present", JSON.stringify(readback.qualityReadback));
+
+      // 5 push boundary. push-prepare's own remedy (N24): a Critic-bound push Verify is produced with --mode release plus the Critic inputs, as
+      // evidence/verify-latest.json. It carries the Critic bound at the reviewed candidate across the close's own commits to the pushed commit
+      // (criticCloseCommit admits the close commit; w266 finding 2 is the Verify evidence path that used to break exactly this).
+      git(log, fx.root, ["remote", "add", "origin", "https://example.invalid/g2035-consumer.git"]);
+      const pushVerify = step(log, `${identity.runner}: push-boundary verify (release mode, Critic-bound)`, process.execPath,
+        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "release", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", "evidence/verify-latest.json"], { cwd: fx.root });
+      assert.equal(pushVerify.status, 0);
+      const spawned = spawnSync(process.execPath, [script("push-prepare.mjs"), "--root", fx.root, "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
+        { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+      const pushPrepared = JSON.parse(spawned.stdout);
+      assert.equal(pushPrepared.ready, true, JSON.stringify(pushPrepared.checks.filter((c) => c.ok !== true)).slice(0, 3000));
+      // The push guard as the runner's hook runs it (a child process fed the tool call on stdin). The push gate is configured `approval: required`
+      // in the fixture manifest, so a push with no recorded approval is blocked; then the approval route push-prepare printed (chat mode: the
+      // fixture's pipeline.user.yaml selects chat) records the approval for exactly this commit, and the same push is admitted.
+      const guardPush = (command) => spawnSync(process.execPath, [GUARD_PUSH], { input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+        encoding: "utf8", cwd: fx.root, env: walkEnv, timeout: 60_000 });
+      const pushCommand = "git push origin HEAD:refs/heads/main";
+      const before = guardPush(pushCommand);
+      assert.equal(before.status, 2, `${identity.runner}: the guard blocks the push before any approval is recorded\n${before.stderr}`);
+      step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
+        [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
+      const admitted5 = guardPush(pushCommand);
+      assert.equal(admitted5.status, 0, `${identity.runner}: the guard admits the push of the final candidate\n${admitted5.stderr}`);
+      const elsewhere = guardPush("git push origin HEAD:refs/heads/other");
+      assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
+
+      // 6 release preflight (shape of scripts/release-preflight-cli.test.mjs). MEASURED (w266 finding 3): the release preflight is the Pipeline's
+      // own publication gate, not a consumer step. It observes the Pipeline's version surfaces (VERSION and the plugin manifests under
+      // plugins/pipeline-core/) and, in the source checkout, the source reader binding; a consumer project has none of them, so the first
+      // observation refuses with RPC-INPUT and writes nothing. The walk pins that precise refusal; a consumer release route, when one exists,
+      // replaces this assertion with a `ready` record.
+      const releasePreflight = spawnSync(process.execPath, [script("release-preflight-cli.mjs"), "--root", fx.root, "--preflight-id", "g2035-preflight", "--base", base,
+        "--lifecycle", MANIFEST, "--retention-policy", "a".repeat(64), "--out", "evidence/release-preflight.json"], { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+      assert.equal(releasePreflight.status, 2, `${identity.runner}: ${releasePreflight.stdout}${releasePreflight.stderr}`);
+      assert.match(releasePreflight.stderr, /RPC-INPUT: VERSION is unavailable/u, `${identity.runner}: ${releasePreflight.stderr}`);
+      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
     } finally {
       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
     }
