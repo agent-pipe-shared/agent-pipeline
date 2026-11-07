@@ -111,6 +111,7 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 // SHARED absent-key default both consumers use) -- see that function's own doc comment for
 // why "blocking" was chosen and why it moved rather than staying duplicated here.
 import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+import { deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
@@ -548,48 +549,8 @@ function scannerEntry(adapter, result, executableSha256 = null) {
   return entry;
 }
 
-/**
- * NVA-B-SCANNER (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project,
- * Direction 2): normalizes every per-scanner entry's existing {status, classification} pair
- * into one of five reader-facing labels -- "passed", "findings", "not-configured",
- * "tool-unavailable", "not-applicable" -- plus "error" for the (already unambiguous) ERROR
- * status, added for completeness. PURELY ADDITIVE: this never replaces `status`/
- * `classification`, and every existing consumer that matches on those two fields directly
- * (e.g. `observedApplicabilityInputs` below, which checks
- * `sca.classification === "success"` + a reason prefix) keeps doing so unchanged.
- *
- * WHY THIS EXISTS: before this field, "classification: success" was reused for three
- * genuinely different meanings -- a real completed clean scan (status PASS), a project that
- * configured no policy at all (license-check SKIPPED), and a project with nothing of that
- * kind to scan (osv-scanner SKIPPED "no package sources") -- all indistinguishable without
- * reading the free-text `reason` string. That is exactly the ambiguity the backlog item
- * names: "an empty rule set must never read like a successful deep scan".
- *
- * Applied to every entry in the `scanners` array AFTER the run loop below, regardless of
- * which code path built it (adapter-run entries via `scannerEntry()` above, or the
- * hand-built authorityBlocked/candidate_snapshot/execution_environment/
- * manifest_config_invalid/catch-block entries elsewhere in this file) -- so no entry shape
- * is silently left unlabeled.
- */
-function deriveReportStatus({ tool, status, classification }) {
-  if (status === "PASS") return "passed";
-  if (status === "FINDINGS") return "findings";
-  if (status === "ERROR") return "error";
-  if (status !== "SKIPPED") return null;
-  // license-check has no binary at all (isInstalled() always reports installed); every one
-  // of its SKIPPED results means "this project configured no policy/declaration" (see its own
-  // header comment) -- there is no other SKIPPED shape it can produce.
-  if (tool === "license-check") return "not-configured";
-  // osv-scanner's ONE non-binary_missing SKIPPED shape is its own "no package sources in
-  // project" honest signal (classification "success") -- a project state, not a broken tool.
-  if (tool === "osv-scanner" && classification === "success") return "not-applicable";
-  // Every other SKIPPED shape for a binary-backed scanner means the tool itself could not be
-  // used -- absent from PATH/trusted locations (classification "binary_missing") or rejected
-  // as untrusted by assessTrustedExecutablePath/resolveTrustedSystemExecutable (any other
-  // classification string those may report). Both read the same to a project: no working
-  // scan happened, and it is not this project's own "nothing to scan here" signal.
-  return "tool-unavailable";
-}
+// NVA-B-SCANNER's `deriveReportStatus` (the reader-facing label of every scanner entry, applied to all entries after the run loop below)
+// lives in ../lib/security-close-status.mjs since G20-25, so the scan and the close chain share one mapping.
 
 // =============================================================================================
 // CYB-2E -- additive `pipeline.security-evidence.v2` emission (EXIT-NEUTRAL; Option B / D9).
@@ -904,6 +865,9 @@ export async function runSecurityScan({
   // "snapshot" scans HEAD's committed bytes from a disposable detached worktree and leaves
   // the caller's dirty tree untouched; the evidence still binds HEAD's commit and tree.
   scanMode = "shared-tree",
+  // G20-25: an analysis run writes its evidence under this directory (already checked to lie under <root>/scratch/ by the CLI)
+  // instead of the project's evidence/, so a reviewer can run the scan without touching the delivery evidence.
+  evidenceOutDir = null,
 } = {}) {
   const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
   const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
@@ -1088,7 +1052,7 @@ export async function runSecurityScan({
   };
   const evidence = { ...evidenceCore, payloadSha256: sha256(canonicalJson(evidenceCore)) };
 
-  const evidenceRoot = resolveEvidenceRoot(rootDir);
+  const evidenceRoot = evidenceOutDir ?? resolveEvidenceRoot(rootDir);
   const evidenceDir = join(evidenceRoot, "evidence");
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(join(evidenceDir, "security-latest.json"), JSON.stringify(evidence, null, 2) + "\n");
@@ -1186,6 +1150,10 @@ function printSummary(evidence) {
   for (const s of evidence.scanners) {
     console.log(formatScannerLine(s));
   }
+  // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
+  // reads like a passed scan next to a "policy exit 0".
+  console.log("Security close status:");
+  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners))) console.log(`  ${line}`);
   const verdict = deriveSummaryVerdict(evidence);
   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
   if (evidence.candidate?.destination === "local-only") {
@@ -1212,6 +1180,9 @@ function parseArgs(argv) {
       if (opts.scanMode !== "snapshot" && opts.scanMode !== "shared-tree") {
         throw new Error(`--scan-mode must be "snapshot" or "shared-tree", got: ${opts.scanMode}`);
       }
+    } else if (a === "--out-dir") {
+      opts.outDir = argv[++i];
+      if (!opts.outDir || opts.outDir.startsWith("-")) throw new Error("--out-dir requires a directory under scratch/");
     } else if (a === "--remote") {
       opts.remoteName = argv[++i];
       if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
@@ -1242,16 +1213,31 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  let outDir = null;
+  if (opts.outDir !== undefined) {
+    // An analysis run: lexically strictly beneath <root>/scratch/ (no "..", no absolute escape); refused before anything is written.
+    const scratchRoot = join(rootDir, "scratch");
+    outDir = resolve(rootDir, opts.outDir);
+    if (!outDir.startsWith(scratchRoot + sep)) {
+      process.stderr.write(`error: --out-dir must be a directory under scratch/ of the root (${scratchRoot}); got: ${opts.outDir}. `
+        + "Omit --out-dir to write the delivery evidence to evidence/.\n");
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
     rootDir,
     timeoutMs: opts.timeoutMs,
     remoteName: opts.remoteName ?? null,
     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
+    ...(outDir ? { evidenceOutDir: outDir } : {}),
   });
   printSummary(evidence);
-  console.log(`Evidence written: ${join(rootDir, "evidence", "security-latest.json")}`);
+  const evidenceBase = outDir ?? rootDir;
+  console.log(`Evidence written: ${join(evidenceBase, "evidence", "security-latest.json")}`);
   if (evidenceV2) {
-    console.log(`v2 evidence written: ${join(rootDir, "evidence", "security-latest.v2.json")}`);
+    console.log(`v2 evidence written: ${join(evidenceBase, "evidence", "security-latest.v2.json")}`);
     const b = verdictV2?.verdict;
     console.log(
       `v2 policy-complete verdict (reporting-only, does NOT affect exit ${exitCode}): ` +

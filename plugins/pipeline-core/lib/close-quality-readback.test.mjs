@@ -43,6 +43,16 @@ test("AC-239 security-scan: present with the envelope path, missing with the sca
   assert.equal(unknown.status, "unknown");
 });
 
+test("G20-25 security-scan: a readable scan result puts the four-state reading in the evidence, never a bare present for a skipped scanner", () => {
+  const scan = JSON.stringify({ scanners: [{ tool: "gitleaks", status: "SKIPPED", classification: "binary_missing" }, { tool: "semgrep", status: "PASS", classification: "success" }] });
+  const row = rows(full({ readBytes: (p) => { if (p !== "evidence/security-latest.json") throw new Error("unexpected"); return Buffer.from(scan); } }))["security-scan"];
+  assert.equal(row.status, "present");
+  assert.match(row.evidence, /gitleaks: not executed/u);
+  assert.match(row.evidence, /semgrep: passed/u);
+  assert.match(row.evidence, /osv-scanner: not applicable/u);
+  assert.equal(rows(full({ readBytes: () => Buffer.from("not json") }))["security-scan"].evidence, SEC); // unreadable result: the bare path
+});
+
 test("AC-239 adr-decision: present, not-applicable when no decision qualifies, missing when claimed but absent, unknown without a signal", () => {
   assert.equal(rows(full())["adr-decision"].status, "present");
   assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");

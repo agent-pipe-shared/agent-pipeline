@@ -14,6 +14,7 @@
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
 import { createHash } from "node:crypto";
+import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
 export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
@@ -22,6 +23,7 @@ export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
 
 export const SECURITY_ENVELOPE_PATH = "evidence/security-latest.v2.json";
 export const SECURITY_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
+const SECURITY_SCAN_PATH = "evidence/security-latest.json";
 const ADR_DIR = "docs/adr";
 const DECISION_IMPACTS = new Set(["architecture-decision-added", "architecture-decision-superseded"]);
 const NO_DECISION_IMPACTS = new Set(["architecture-conforms", "architecture-summary-updated", "no-architecture-impact"]);
@@ -39,7 +41,18 @@ function securityRow(readers) {
   const envelope = call(readers.exists, SECURITY_ENVELOPE_PATH);
   const verdict = call(readers.exists, SECURITY_VERDICT_PATH);
   if (!envelope.ok || !verdict.ok) return unknown(id, remedy);
-  return envelope.value === true && verdict.value === true ? row(id, "present", SECURITY_ENVELOPE_PATH) : row(id, "missing", null, remedy);
+  if (envelope.value !== true || verdict.value !== true) return row(id, "missing", null, remedy);
+  // G20-25: "present" only says the evidence files exist, never that every scanner ran. When the scan result is readable the evidence
+  // text carries the four-state reading of each element (the closed row shape has no field for it), so a skipped scanner never reads
+  // like a passed scan; when it is not readable the evidence stays the bare path (the readback never claims what it cannot read).
+  const scan = call(readers.readBytes, SECURITY_SCAN_PATH);
+  if (scan.ok) {
+    try {
+      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners)).map((line) => line.split(" -- ")[0]);
+      return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${states.join("; ")})`);
+    } catch { /* unreadable scan result: fall through to the bare path */ }
+  }
+  return row(id, "present", SECURITY_ENVELOPE_PATH);
 }
 
 function adrRow(readers) {

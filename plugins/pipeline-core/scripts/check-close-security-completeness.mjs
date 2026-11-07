@@ -35,6 +35,12 @@
  * VERIFY: node plugins/pipeline-core/scripts/check-close-security-completeness.test.mjs
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, securityCloseElements,
+} from "../lib/security-close-status.mjs";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
@@ -65,18 +71,32 @@ export function checkCloseSecurityCompleteness(root) {
   const tree = headTree.status === 0 ? headTree.stdout.trim() : null;
 
   const failures = checkSecurityCompleteness({ projectDir: root, commit, tree, subjectLabel: "the sealed HEAD commit" });
-  return { skipped: false, commit, failures };
+  // G20-25: the four-state status of every security element, read from the scan evidence the completeness check just bound.
+  let scanners = null;
+  try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* no readable scan evidence: every configured element reads "not executed" */ }
+  const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
+  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled }) };
 }
 
 if (isDirectInvocation(import.meta.url)) {
   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const result = checkCloseSecurityCompleteness(root);
-  if (!result.skipped) {
-    if (result.failures.length > 0) {
-      for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
-      process.exit(2);
-    }
-    console.log(`CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`);
+  if (result.skipped) {
+    // Nothing configured is "not applicable", said out loud: a silent exit 0 here read like a passed security check.
+    const hint = isCriticalStakes(readCalibrationStakes(root))
+      ? " This project is calibrated critical: configure the security gate (gates.security mode: blocking) in the project manifest."
+      : "";
+    console.log(`CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).${hint}`);
+    process.exit(0);
   }
+  for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);
+  if (result.failures.length > 0) {
+    for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
+    process.exit(2);
+  }
+  const notExecuted = result.elements.filter((e) => e.state === "not executed").map((e) => e.element);
+  console.log(notExecuted.length === 0
+    ? `CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`
+    : `CLOSE SECURITY COMPLETENESS ADMITTED, NOT COMPLETE: HEAD ${result.commit} is bound; not executed: ${notExecuted.join(", ")} (this calibration is not critical, so it does not block). Run: ${SECURITY_RUN_COMMAND}`);
   process.exit(0);
 }

@@ -193,10 +193,12 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
     assert.deepEqual(result.evidence.verifyRun, createPublicVerifyRunEvidence({
       ...result.evidence.verifyRun,
       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
-      registeredSuiteCount: 5, terminalReceiptCount: 5, terminalStatus: "passed",
+      // Restated in place (QG-04, G20-25): the standard baseline gained the "baseline-security" suite, so one more suite is registered and
+      // receipted (5 -> 6); nothing is weakened, the exact suite list below pins the new member.
+      registeredSuiteCount: 6, terminalReceiptCount: 6, terminalStatus: "passed",
       receiptReuse: "allowed",
     }));
-    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
     assert.equal(result.evidence.coverage, "project-calibrated");
     assert.equal(result.evidence.selection.mode, "candidate");
     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
@@ -692,7 +694,7 @@ test("real product assertions stay fresh while eligible baselines resume with du
     assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
     const runs = join(root, ".git/agent-pipeline/verify/runs");
     const run = join(runs, second.evidence.verifyRun.runId);
-    assert.equal(readdirSync(join(run, "receipts")).length, 5);
+    assert.equal(readdirSync(join(run, "receipts")).length, 6); // restated in place (QG-04, G20-25): 5 -> 6 with the "baseline-security" suite
     assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
     assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
     writeFileSync(join(root, ".git/fail-product"), "fail");

@@ -82,6 +82,7 @@ import { join } from "node:path";
 
 import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
 import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
+import { isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
 
 const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
 const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
@@ -305,6 +306,16 @@ export function checkSecurityCompleteness({
       failures.push(
         `${verdictPath}: required capability ${offender?.capabilityId} did not reach an accepted state (outcome=${offender?.outcome})`,
       );
+    }
+  }
+  // G20-25: a critical calibration is hard -- a scanner that did not execute blocks even where the plan marks it optional. Any other
+  // calibration keeps the verdict above as the whole decision (its status line still reads "not executed", see security-close-status.mjs).
+  if (isCriticalStakes(readCalibrationStakes(projectDir))) {
+    for (const c of envelope.capabilities) {
+      const element = c?.tool?.name;
+      if (securityScannerState({ tool: element, status: c?.status, classification: c?.classification }) === "not executed") {
+        failures.push(scannerNotExecutedRefusal(element, envelopePath));
+      }
     }
   }
   return failures;

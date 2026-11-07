@@ -490,6 +490,9 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
     { name: "baseline-repository", file, args: [CONSUMER_VERIFY_DISPATCHER, "repository-baseline"] },
     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
+    // G20-25: the configured security scanners run in the normal delivery path (not applicable when the project configures no gate).
+    // The attempt token makes the scan always re-run: a cached result for an unchanged tree would hide a scanner that is now missing.
+    { name: "baseline-security", file, args: [CONSUMER_VERIFY_DISPATCHER, "security", attempt] },
   ];
   const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
   const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));
