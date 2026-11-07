@@ -654,6 +654,27 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     - G20-32 (Claude, architecture back-and-forth): from `approve-plan` to `set-phase implementation` the happy path needs zero PO
       terminal commands — `approve-plan` names (or runs) `materialize-architecture`, and no adoption or override ceremony can be
       reached on a greenfield design package. Measured by a fixture walking approve → materialize → set-phase with no human step.
+    - **Separator sweep (PO 2026-11-07, "Check über den gesamten Code … nur Backslash-Vergleiche"):** one shared helper
+      `lib/path-spelling.mjs` (win32: separator, drive-letter case, MSYS, trailing separator; darwin: NFC and a measured
+      case-insensitive volume; Linux byte-exact) wired into the guard interpreter rule, `canonicalRootSpelling` (now also paths
+      below the root), the observed-action lanes, the resume-hint lanes, po-commands, gate-strength, rebase recovery, guard-git
+      (`-F`, `-C`, GG-22 pathspec), clean-candidate-run and the strict-root scripts (`normalizeRootArgument`). Audit and status:
+      `specs/sprint-alfred-epic/evidence/held-patches/w252-separator-sweep-audit.md`. **macOS: live proof open** until a run on a Mac;
+      the rules are unit-tested with an injected platform only.
+    - G20-33 (Antigravity, time sink, measured in the greenfield transcript): the PreInvocation start hint fired on every turn
+      (`invocationNum` restarts per turn; each PO reply and each delivered subagent message starts one), so the full "run
+      pipeline-start" context arrived 21 times in one session and the agent re-bootstrapped repeatedly; in a repository without
+      Pipeline the optional onboarding offer repeated likewise ("fragt immer, ob installiert werden soll"). Fixed in w252: full
+      context once per native session, a one-line no-re-bootstrap note on later turns, the optional offer once per session
+      (marker in the machine plane, never in the repository).
+    - G20-34 (guard, observed 2026-11-07): a read-only `git -C <other repository> log` is refused as GUARD-CROSS-REPO-MUTATION.
+      Read-only git subcommands against another path should take the read-scope rule, not the mutation rule.
+    - G20-8 B measurement returned (`specs/sprint-alfred-epic/evidence/held-patches/w252-agy-native-subagent-measurement.md`):
+      native `invoke_subagent` works, our hooks govern children, a host-written descriptor binds child to parent, the resolved model
+      is in every child payload (`pro` and `flash` resolve to the same model). In the greenfield run the implementation spawn was
+      refused BY DESIGN (`AGY-NATIVE-IMPLEMENTATION-…`: no authenticated parent identity) — not an install question; the descriptor
+      is that missing identity. Isolation (`Workspace: branch/share` in a git workspace) is re-measured as M4b
+      (`scratch/agy-subagent-measurement-m4b.md`). Assumption until then: code writers serialized through the shared tree.
   - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
     vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
     clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
