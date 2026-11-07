@@ -7439,6 +7439,17 @@ test("registered plugin diagnostic scope admits bounded reads but rejects privat
     dirLink(pluginRoot, symlinkRoot);
     const aliasedRootDeps = { ...deps, registeredPluginReadScopeRootsFn: () => [symlinkRoot] };
     assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path: symlinkRoot } }, aliasedRootDeps).exitCode, 2);
+    // C20 w252 (G20-3): a guessed plugin path that does not exist is still refused, now named as missing with the nearest existing plugin
+    // directory to list; missing paths outside the plugin root and the credential-labelled refusals keep their own labels.
+    const guessed = read(join(realpathSync(pluginRoot), "hooks", "absent", "guessed.mjs"));
+    assert.equal(guessed.exitCode, 2);
+    assert.match(guessed.stderr, /GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin \(hooks\/absent\/guessed\.mjs\)/u);
+    assert.ok(guessed.stderr.includes(`path ${join(realpathSync(pluginRoot), "hooks")}, pattern *`), guessed.stderr);
+    const outsideMissing = read(join(outside, "absent.md"));
+    assert.equal(outsideMissing.exitCode, 2);
+    assert.doesNotMatch(outsideMissing.stderr, /does not exist in the Pipeline plugin/u);
+    assert.equal(read(join(realpathSync(pluginRoot), "hooks", "..", "..", "absent.md")).exitCode, 2);
+    assert.doesNotMatch(read(join(realpathSync(pluginRoot), "hooks", "..", "..", "absent.md")).stderr, /does not exist in the Pipeline plugin/u);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(pluginRoot, { recursive: true, force: true });

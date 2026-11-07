@@ -496,6 +496,27 @@ function registeredPluginReadPathStatus(raw, projectRoot, pluginRoots) {
   return matched ? true : null;
 }
 
+/** A Read target that lies lexically inside a registered plugin root, carries no dot-segment and does not exist: its relative path and the
+ * nearest existing directory inside the plugin root (never outside it). Null for anything else, so every other refusal keeps its label. */
+function missingRegisteredPluginTarget(raw, projectRoot, pluginRoots) {
+  if (typeof raw !== "string" || raw === "" || raw.includes("\0")) return null;
+  let lexical;
+  try { lexical = resolve(passiveCandidate(raw, projectRoot)); } catch { return null; }
+  for (const pluginRoot of pluginRoots) {
+    if (!isPathWithinRoot(lexical, pluginRoot) || lexical === pluginRoot) continue;
+    const rel = relative(pluginRoot, lexical);
+    if (rel.split(sep).some((segment) => segment === "." || segment === "..")) return null;
+    try { lstatSync(lexical); return null; } catch (error) { if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return null; }
+    let dir = dirname(lexical);
+    while (dir !== pluginRoot && isPathWithinRoot(dir, pluginRoot)) {
+      try { if (lstatSync(dir).isDirectory()) break; } catch {}
+      dir = dirname(dir);
+    }
+    return { relative: rel.split(sep).join("/"), listDirectory: dir };
+  }
+  return null;
+}
+
 function isSafeRegisteredPluginDirectory(raw, root, extraRoots, pluginPathStatus) {
   if (pluginPathStatus !== true || !isAllowedPassiveReadTarget(raw, {
     rootDir: root, recursive: true, directoryListing: true, additionalRecursiveRoots: extraRoots,
@@ -738,6 +759,15 @@ export function readToolScopeVerdict(input, root, dependencies) {
   // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the
   // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
   if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
+  // C20 w252 (greenfield G20-3, Antigravity): a Read of a file that does not exist inside the registered plugin root used to fall through to
+  // the generic "outside protected credential roots" refusal, which sent the agent looking for a credential problem while it had only
+  // guessed a plugin path (seven times in one run). Name the real cause and the nearest existing plugin directory to list instead.
+  const pluginMissing = toolName === "Read" ? missingRegisteredPluginTarget(path, root, pluginRoots) : null;
+  if (pluginMissing !== null) {
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
+      + `(${pluginMissing.relative}); nothing to read at that path. List the nearest existing plugin directory with Glob (path ${pluginMissing.listDirectory}, pattern *) `
+      + "and read an exact file it shows; a skill names the references it uses in its own SKILL.md.\n");
+  }
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
     + (toolName === "Glob"
