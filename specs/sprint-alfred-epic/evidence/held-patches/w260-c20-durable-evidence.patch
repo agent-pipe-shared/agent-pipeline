@@ -1,0 +1,667 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-record.mjs b/plugins/pipeline-core/lib/dispatch-record.mjs
+index a4617cda7..8b166f701 100644
+--- a/plugins/pipeline-core/lib/dispatch-record.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record.mjs
+@@ -53,7 +53,7 @@ export function validateDurableDispatchReportText(value) {
+   if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", "report.text contains a private absolute path");
+   return value;
+ }
+-function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
++export function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
+   if (typeof value === "string") {
+     if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", `${label} contains a private absolute path`);
+     return;
+diff --git a/plugins/pipeline-core/lib/durable-evidence.mjs b/plugins/pipeline-core/lib/durable-evidence.mjs
+new file mode 100644
+index 000000000..7d9a4fb90
+--- /dev/null
++++ b/plugins/pipeline-core/lib/durable-evidence.mjs
+@@ -0,0 +1,307 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Durable, data-sparse audit mirror (Candidate 20, G20-29, AC-108).
++ *
++ * The places the Pipeline writes its evidence to are private by design: the onboarding seed git-ignores /evidence/ (dispatch
++ * records, the work-verify result) and /scratch/ (briefings), and a signed approval proof lives in the private approval store
++ * under the Git common directory. A fresh clone therefore holds none of it. This module projects each completed dispatch, the
++ * work-verify result of a candidate and each approval's PUBLIC proof reference into small tracked files under `audit/`, plus one
++ * auditor index (`audit/index.json`), so that a fresh clone plus the index reaches every record without any private agent store.
++ *
++ * Data-sparse by construction: every entry is built from a closed list of fields (digests, ids, labels, counts, repository-relative
++ * paths). Report prose, transcripts, prompts, absolute host paths and private keys have no field to land in, and `check` scans
++ * every tracked file for them again. The signed payload is never touched: the entry only copies the public proof object (schema,
++ * signed-payload digest, key reference, PUBLIC key, signature) and records its digest.
++ *
++ * `sync` is idempotent and write-ahead: it plans every entry first and refuses (writing nothing) when an existing entry would
++ * change, because a mirrored entry is evidence, not a cache. `check` is read-only, works on a fresh clone, and gives every finding
++ * a code and a runnable repair. Neither signs, consumes a proof, or runs git beyond `ls-files`.
++ */
++import { createHash, verify as cryptoVerify } from "node:crypto";
++import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { denyPrivateAbsolutePaths, isTerminalOutcome, validateDispatchRecord } from "./dispatch-record.mjs";
++import { traceHumanApprovals } from "./human-approval-trace.mjs";
++import { canonical } from "./po-approval-proof.mjs";
++
++export const AUDIT_HOME = "audit";
++export const AUDIT_INDEX_PATH = `${AUDIT_HOME}/index.json`;
++export const AUDIT_INDEX_SCHEMA = "pipeline.audit-index.v1";
++export const DURABLE_ENTRY_SCHEMAS = Object.freeze({
++  dispatch: "pipeline.durable-dispatch-evidence.v1",
++  verify: "pipeline.durable-verify-evidence.v1",
++  approval: "pipeline.durable-approval-reference.v1",
++});
++export const DURABLE_EVIDENCE_SCRIPT = fileURLToPath(new URL("../scripts/durable-evidence.mjs", import.meta.url));
++
++const FULL_COMMIT = /^[a-f0-9]{40}$/u;
++const SHA256 = /^[a-f0-9]{64}$/u;
++const ENTRY_PATH = /^audit\/[A-Za-z0-9._-]+\.json$/u;
++const APPROVAL_KINDS = new Set(["push", "feature-package-reconcile", "deploy", "plan-approval"]);
++const BRIEFING_BLOCK = /<!-- pipeline-native-goldfish-host-commit:[^\n]*\n([\s\S]*?)\n-->/u;
++const PRIVATE_KEY_PEM = /-----BEGIN [A-Z ]*PRIVATE KEY-----/u;
++const PRIVATE_FIELD = /^(?:report|text|transcript|prompt|privateKey|secret|token|password)$/iu;
++const MAX_FILES = 2000;
++const MAX_BYTES = 2 * 1024 * 1024;
++
++function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
++const sha = (value) => createHash("sha256").update(value).digest("hex");
++/** Digest over LF-normalised bytes, so a checkout with core.autocrlf=true reads the same digest the writer produced. */
++const lfSha = (bytes) => sha(Buffer.from(bytes.toString("utf8").replace(/\r\n/gu, "\n"), "utf8"));
++const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
++const text = (value) => (typeof value === "string" && value !== "" && !/[\0\r\n]/u.test(value) ? value : null);
++const digest = (value) => (typeof value === "string" && SHA256.test(value) ? value : null);
++const commit = (value) => (typeof value === "string" && FULL_COMMIT.test(value) ? value : null);
++const syncRepair = (root) => `node ${DURABLE_EVIDENCE_SCRIPT} sync --root ${root}`;
++
++function readBounded(path) {
++  const info = lstatSync(path);
++  if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_BYTES) fail("AUDIT-SOURCE-INVALID", "not a bounded regular file");
++  return readFileSync(path);
++}
++function listNames(dir, pattern) {
++  try { return readdirSync(dir).filter((name) => pattern.test(name)).sort().slice(0, MAX_FILES); } catch { return []; }
++}
++
++// ---- projections (pure) ----------------------------------------------------------------------------------------------------------
++
++export function dispatchEntry(record, source, briefing) {
++  const kind = record.outcomeClassification?.kind ?? null;
++  return {
++    schema: DURABLE_ENTRY_SCHEMAS.dispatch, taskId: record.taskId, recordSchema: record.schema, runner: record.runner ?? null,
++    agentType: record.agentType, model: record.model, effort: record.effort, rulesetSha: record.rulesetSha, dispatcher: record.dispatcher,
++    candidateCommit: record.candidateCommit, commits: [...record.commits], outcome: record.outcome, outcomeKind: kind,
++    // The label is a projection of what the writer already enforced: a v4 authored-commit record is only publishable through the
++    // host-observed route; the attested kind only through the orchestrator route; a v3 record carries no such label.
++    assurance: record.schema === "pipeline.dispatch-record.v4" ? (kind === "authored-commit" ? "host-observed" : kind) : "recorded-unlabelled",
++    resultSha256: record.resultSha256 ?? null, changedFiles: [...(record.report?.changedFiles ?? [])],
++    criticDisposition: record.criticRequired ? "required" : record.criticSkip ? "skipped" : null,
++    briefing, source,
++  };
++}
++
++export function verifyEntry(bytes, source) {
++  let value;
++  try { value = JSON.parse(bytes.toString("utf8")); } catch { fail("AUDIT-SOURCE-INVALID", "the work-verify result is not JSON"); }
++  if (value?.schema !== "pipeline.verify-evidence.v0" || commit(value.commit) === null || !Array.isArray(value.steps)) fail("AUDIT-SOURCE-INVALID", "the work-verify result is not a pipeline.verify-evidence.v0 record bound to a commit");
++  const failedSteps = value.steps.filter((step) => step?.exitCode !== 0).map((step) => text(step?.name) ?? "?").slice(0, 50);
++  let command = text(value.command);
++  try { denyPrivateAbsolutePaths(command, "command"); } catch { command = null; }
++  return {
++    schema: DURABLE_ENTRY_SCHEMAS.verify, commit: value.commit, tree: commit(value.tree),
++    project: /^[A-Za-z0-9._-]{1,128}$/u.test(value.project ?? "") ? value.project : null, command,
++    binding: text(value.candidate?.binding), startedAt: text(value.startedAt), finishedAt: text(value.finishedAt),
++    stepCount: value.steps.length, failedSteps, passed: value.steps.length > 0 && failedSteps.length === 0, source,
++  };
++}
++
++/** `row` is one row of the read-only human-approval trace; the trace's own verdict is deliberately not copied (it changes with trust anchors). */
++export function approvalEntry(row) {
++  if (!APPROVAL_KINDS.has(row?.kind)) return null;
++  const proof = row.proof !== null && typeof row.proof === "object" ? structuredClone(row.proof) : null;
++  if (proof !== null && (sha(canonical(proof)) !== row.proofSha256 || proof.intentSha256 !== row.intentSha256)) fail("AUDIT-PROOF-INCONSISTENT", `the ${row.kind} proof does not hash to the digest the approval record names`);
++  return {
++    schema: DURABLE_ENTRY_SCHEMAS.approval, kind: row.kind, mode: text(row.mode), forCommit: commit(row.forCommit), approvedAt: text(row.approvedAt), approvedBy: text(row.by),
++    intentSha256: digest(row.intentSha256), proofSha256: digest(row.proofSha256), keyReference: text(row.keyReference), publicKeySha256: digest(row.publicKeySha256), proof,
++  };
++}
++
++/** The index row a file projects to (shared by the index rebuild and the check), or null for a file that is not a recognised entry. */
++function rowFor(path, value, bytes) {
++  const stem = path.slice(AUDIT_HOME.length + 1, -".json".length);
++  const common = { path, sha256: sha(bytes) };
++  if (value?.schema === DURABLE_ENTRY_SCHEMAS.dispatch) return { kind: "dispatch", id: value.taskId, ...common, commit: value.candidateCommit };
++  if (value?.schema === DURABLE_ENTRY_SCHEMAS.verify) return { kind: "verify", id: stem, ...common, commit: value.commit };
++  if (value?.schema === DURABLE_ENTRY_SCHEMAS.approval) return { kind: "approval", id: stem, ...common, commit: value.forCommit };
++  return null;
++}
++
++// ---- sources ---------------------------------------------------------------------------------------------------------------------
++
++function readDispatchSources(root) {
++  const completed = []; const skipped = [];
++  for (const name of listNames(join(root, "evidence"), /^dispatch-record-[A-Za-z0-9._-]+\.json$/u)) {
++    const path = `evidence/${name}`;
++    try {
++      const bytes = readBounded(join(root, path));
++      const parsed = JSON.parse(bytes.toString("utf8"));
++      if (!isTerminalOutcome(parsed?.outcome)) continue;
++      completed.push({ path, bytes, record: validateDispatchRecord(parsed) });
++    } catch (error) { skipped.push({ path, reason: error?.code ?? "AUDIT-SOURCE-INVALID" }); }
++  }
++  return { completed, skipped };
++}
++
++/** Briefings are git-ignored scratch files; only their digest is durable. A briefing is bound to a dispatch by the id in its own marker block. */
++function scanBriefings(root) {
++  const found = new Map();
++  for (const name of listNames(join(root, "scratch"), /\.md$/u)) {
++    try {
++      const bytes = readBounded(join(root, "scratch", name));
++      const block = BRIEFING_BLOCK.exec(bytes.toString("utf8"));
++      const id = block ? JSON.parse(block[1])?.dispatchId : null;
++      if (typeof id === "string") found.set(id, [...(found.get(id) ?? []), { sha256: sha(bytes), path: `scratch/${name}` }]);
++    } catch { /* an unreadable or foreign scratch file is simply not a briefing */ }
++  }
++  return found;
++}
++function briefingFor(record, scanned) {
++  if (digest(record.attestation?.briefingSha256) !== null) return { sha256: record.attestation.briefingSha256, path: null, source: "attestation" };
++  const hits = scanned.get(record.taskId) ?? [];
++  if (hits.length === 1) return { sha256: hits[0].sha256, path: hits[0].path, source: "scratch-briefing" };
++  return { sha256: null, path: null, source: hits.length > 1 ? "ambiguous" : "none" };
++}
++
++function readVerifySource(root) {
++  try {
++    const bytes = readBounded(join(root, "evidence/verify-latest.json"));
++    const entry = verifyEntry(bytes, { path: "evidence/verify-latest.json", sha256: sha(bytes) });
++    return { name: `verify-${entry.commit.slice(0, 12)}-${entry.source.sha256.slice(0, 12)}.json`, entry };
++  } catch (error) { return error?.code === "ENOENT" ? null : { skipped: { path: "evidence/verify-latest.json", reason: error?.code ?? "AUDIT-SOURCE-INVALID" } }; }
++}
++
++const defaultTrace = (root) => traceHumanApprovals({ repositoryRoot: root });
++
++// ---- sync ------------------------------------------------------------------------------------------------------------------------
++
++function publishAtomically(dir, name, bytes) {
++  const temporary = join(dir, `.${name}.${process.pid}.tmp`);
++  try { writeFileSync(temporary, bytes, { flag: "wx" }); renameSync(temporary, join(dir, name)); }
++  catch (error) { rmSync(temporary, { force: true }); throw error; }
++}
++
++export function syncDurableEvidence({ root: rootArgument, trace = defaultTrace } = {}) {
++  const root = resolve(rootArgument ?? "");
++  const planned = new Map(); const skipped = []; const notes = [];
++  const sources = readDispatchSources(root); skipped.push(...sources.skipped);
++  const briefings = scanBriefings(root);
++  for (const { path, bytes, record } of sources.completed) planned.set(`dispatch-${record.taskId}.json`, dispatchEntry(record, { path, sha256: sha(bytes) }, briefingFor(record, briefings)));
++  const verify = readVerifySource(root);
++  if (verify?.entry) planned.set(verify.name, verify.entry); else if (verify?.skipped) skipped.push(verify.skipped);
++  try {
++    for (const row of trace(root).rows ?? []) {
++      try {
++        const entry = approvalEntry(row);
++        if (entry !== null) planned.set(`approval-${entry.kind}-${(entry.forCommit ?? "none").slice(0, 12)}-${sha(canonical(entry)).slice(0, 12)}.json`, entry);
++      } catch (error) { skipped.push({ path: `approval:${row?.kind ?? "?"}`, reason: error?.code ?? "AUDIT-PROOF-INCONSISTENT" }); }
++    }
++  } catch (error) { notes.push(`no approval was mirrored: the approval trace was unavailable (${error?.code ?? "error"}); run sync again from a repository with a valid HEAD`); }
++
++  const dir = join(root, AUDIT_HOME);
++  const write = []; const unchanged = []; const conflicts = [];
++  for (const [name, entry] of planned) {
++    let existing = null;
++    try { existing = readFileSync(join(dir, name)); } catch { /* not mirrored yet */ }
++    let bytes = jsonBytes(entry);
++    if (existing === null) { write.push([name, bytes]); continue; }
++    if (entry.schema === DURABLE_ENTRY_SCHEMAS.dispatch && entry.briefing.sha256 === null) {
++      // A briefing found earlier is never forgotten because the ignored scratch file is gone now.
++      try { bytes = jsonBytes({ ...entry, briefing: JSON.parse(existing.toString("utf8")).briefing }); } catch { /* compared as is */ }
++    }
++    if (lfSha(existing) === sha(bytes)) unchanged.push(name); else conflicts.push(name);
++  }
++  if (conflicts.length > 0) {
++    const first = conflicts[0];
++    fail("AUDIT-ENTRY-DIFFERS", `the mirrored ${conflicts.map((name) => `${AUDIT_HOME}/${name}`).join(", ")} differ from what the sources project now; an entry is immutable evidence, so nothing was written. Repair: review the difference, then remove ${AUDIT_HOME}/${first} (git rm if it is committed) and run: ${syncRepair(root)}`);
++  }
++  mkdirSync(dir, { recursive: true });
++  const written = [];
++  for (const [name, bytes] of write) { publishAtomically(dir, name, bytes); written.push(`${AUDIT_HOME}/${name}`); }
++
++  const rows = [];
++  for (const name of listNames(dir, /^(?!index\.json$)[A-Za-z0-9._-]+\.json$/u)) {
++    const path = `${AUDIT_HOME}/${name}`; const bytes = readFileSync(join(dir, name));
++    let value = null; try { value = JSON.parse(bytes.toString("utf8")); } catch { /* left out of the index; check reports it */ }
++    const row = rowFor(path, value, bytes); if (row !== null) rows.push(row);
++  }
++  rows.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
++  const indexBytes = jsonBytes({ schema: AUDIT_INDEX_SCHEMA, entries: rows });
++  let currentIndex = null; try { currentIndex = readFileSync(join(dir, "index.json")); } catch { /* first sync */ }
++  if (currentIndex === null || lfSha(currentIndex) !== sha(indexBytes)) { publishAtomically(dir, "index.json", indexBytes); written.push(AUDIT_INDEX_PATH); }
++  return { written, unchanged: unchanged.map((name) => `${AUDIT_HOME}/${name}`), skipped, notes,
++    index: { path: AUDIT_INDEX_PATH, sha256: sha(indexBytes), entries: rows.length } };
++}
++
++// ---- check -----------------------------------------------------------------------------------------------------------------------
++
++function scanPrivate(value, path = "") {
++  if (typeof value === "string") {
++    if (PRIVATE_KEY_PEM.test(value)) return `${path || "value"} holds private key material`;
++    try { denyPrivateAbsolutePaths(value, path || "value"); } catch { return `${path || "value"} holds an absolute host path`; }
++    return null;
++  }
++  if (value === null || typeof value !== "object") return null;
++  for (const [key, entry] of Object.entries(value)) {
++    if (PRIVATE_FIELD.test(key)) return `${path}.${key} is a field this mirror never carries`;
++    const found = scanPrivate(entry, `${path}.${key}`); if (found !== null) return found;
++  }
++  return null;
++}
++function proofFinding(entry) {
++  if (entry.proof === null) return null;
++  if (sha(canonical(entry.proof)) !== entry.proofSha256 || entry.proof.intentSha256 !== entry.intentSha256) return "the stored proof does not hash to the digest the entry names";
++  try {
++    if (!cryptoVerify(null, Buffer.from(entry.intentSha256, "utf8"), entry.proof.publicKey, Buffer.from(entry.proof.signatureBase64, "base64"))) return "the stored signature does not verify over the signed-payload digest";
++  } catch { return "the stored proof is not a verifiable Ed25519 signature"; }
++  return null;
++}
++
++export function checkDurableEvidence({ root: rootArgument, requireTracked = true } = {}) {
++  const root = resolve(rootArgument ?? "");
++  const findings = [];
++  const add = (code, path, message, repair) => findings.push({ code, path, message, repair });
++  const repairSync = syncRepair(root);
++  let tracked = null;
++  if (requireTracked) {
++    const listing = spawnSync("git", ["-C", root, "ls-files", "--", AUDIT_HOME], { encoding: "utf8", timeout: 10000, shell: false });
++    if (listing.status === 0) tracked = new Set(listing.stdout.split("\n").filter(Boolean));
++    else add("AUDIT-GIT-UNAVAILABLE", AUDIT_HOME, "git could not list the tracked files, so durability cannot be shown", "run the check inside a Git working tree, or pass no tracking requirement");
++  }
++  const trackingFinding = (path) => { if (tracked !== null && !tracked.has(path)) add("AUDIT-NOT-TRACKED", path, `${path} exists but is not tracked, so a fresh clone would not have it`, `git add -- ${path}, then commit it`); };
++
++  let index = null;
++  try {
++    const bytes = readBounded(join(root, AUDIT_INDEX_PATH));
++    index = JSON.parse(bytes.toString("utf8"));
++    if (index?.schema !== AUDIT_INDEX_SCHEMA || !Array.isArray(index.entries)) fail("AUDIT-INDEX-INVALID", "not an index");
++    trackingFinding(AUDIT_INDEX_PATH);
++  } catch (error) {
++    const missing = error?.code === "ENOENT";
++    add(missing ? "AUDIT-INDEX-MISSING" : "AUDIT-INDEX-INVALID", AUDIT_INDEX_PATH, missing ? "there is no auditor index" : "the auditor index is not a valid index", missing ? repairSync : `remove ${AUDIT_INDEX_PATH}, then run: ${repairSync}`);
++    index = null;
++  }
++
++  const entries = []; const listed = new Set();
++  for (const row of index?.entries ?? []) {
++    const path = typeof row?.path === "string" ? row.path : "";
++    if (!ENTRY_PATH.test(path) || path === AUDIT_INDEX_PATH || !Object.hasOwn(DURABLE_ENTRY_SCHEMAS, row.kind) || digest(row.sha256) === null) { add("AUDIT-INDEX-INVALID", path || AUDIT_INDEX_PATH, "an index row is malformed", `remove ${AUDIT_INDEX_PATH}, then run: ${repairSync}`); continue; }
++    listed.add(path);
++    let bytes;
++    try { bytes = readBounded(join(root, path)); } catch { add("AUDIT-ENTRY-MISSING", path, `${path} is listed in the index but is not in this tree`, `git checkout -- ${path} (or, if it was never committed, run: ${repairSync})`); continue; }
++    trackingFinding(path);
++    if (lfSha(bytes) !== row.sha256) add("AUDIT-DIGEST-MISMATCH", path, `${path} no longer matches the digest the index names`, `git checkout -- ${path} to restore the committed bytes; if the entry was replaced on purpose, remove it and run: ${repairSync}`);
++    let value = null;
++    try { value = JSON.parse(bytes.toString("utf8")); } catch { add("AUDIT-ENTRY-INVALID", path, `${path} is not JSON`, `git checkout -- ${path}`); continue; }
++    const projected = rowFor(path, value, Buffer.from(bytes.toString("utf8").replace(/\r\n/gu, "\n"), "utf8"));
++    if (projected === null || projected.kind !== row.kind || projected.id !== row.id || projected.commit !== row.commit) add("AUDIT-ENTRY-INVALID", path, `${path} is not the ${row.kind} entry the index describes`, `remove ${AUDIT_INDEX_PATH}, then run: ${repairSync}`);
++    const privateFinding = scanPrivate(value);
++    if (privateFinding !== null) add("AUDIT-PRIVATE-CONTENT", path, `${path}: ${privateFinding}`, `remove ${path} and the private content's source, then run: ${repairSync}`);
++    const proof = value?.schema === DURABLE_ENTRY_SCHEMAS.approval ? proofFinding(value) : null;
++    if (proof !== null) add("AUDIT-PROOF-INVALID", path, `${path}: ${proof}`, `git checkout -- ${path}; if the proof was never valid, the approval must be signed again`);
++    entries.push({ kind: row.kind, id: row.id, path, sha256: row.sha256, commit: row.commit });
++  }
++  for (const name of listNames(join(root, AUDIT_HOME), /^(?!index\.json$)[A-Za-z0-9._-]+\.json$/u)) {
++    const path = `${AUDIT_HOME}/${name}`;
++    if (!listed.has(path)) add("AUDIT-INDEX-STALE", path, `${path} is in audit/ but not in the index`, `${repairSync} (it rederives the index; a file that is not a recognised entry must be removed first)`);
++  }
++  // A completed dispatch whose private record is on this machine but not mirrored is the exact gap this module closes.
++  const mirrored = new Set(entries.filter((entry) => entry.kind === "dispatch").map((entry) => entry.id));
++  for (const { path, record } of readDispatchSources(root).completed) {
++    if (!mirrored.has(record.taskId)) add("AUDIT-UNSYNCED", path, `the completed dispatch ${record.taskId} has no tracked mirror`, repairSync);
++  }
++  const verify = readVerifySource(root);
++  if (verify?.entry && !listed.has(`${AUDIT_HOME}/${verify.name}`)) add("AUDIT-UNSYNCED", "evidence/verify-latest.json", "the work-verify result has no tracked mirror", repairSync);
++  return { ok: findings.length === 0, findings, entries };
++}
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 7d6d6883b..b63cc33d5 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
++import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -664,6 +664,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+   // C20 w257 (G20-25): exactly `--root <this root>`; the script validates the manifest itself and refuses without writing.
+   if (script === SECURITY_GATE_CONFIGURE_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
++  // C20 w260 (G20-29): exactly `sync|check --root <this root>`; sync writes only under audit/ and never overwrites an entry.
++  if (script === DURABLE_EVIDENCE_SCRIPT) return ["sync", "check"].includes(args[0]) && exactRoot(args, root, 1) && args.length === 3;
+   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+   if (script === PRE_PUSH_HOOK_INSTALL_SCRIPT) return args[0] === "--install" && args.length === 1;
+   // ALF-C-P8-02B (AC-167): a freshly reset clone in `draft` must be able to run the two mandatory-hook
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 9c4dc48cf..1c3fdb1e9 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -204,6 +204,8 @@ export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr
+ export const BIND_ADR_PROPOSALS_SCRIPT = fileURLToPath(new URL("../../scripts/bind-adr-proposals.mjs", import.meta.url));
+ // C20 w257 (G20-25): the one command that configures a missing security gate (the repair a critical project's refusal names); exact `--root <root>` shape.
+ export const SECURITY_GATE_CONFIGURE_SCRIPT = fileURLToPath(new URL("../../scripts/security-gate-configure.mjs", import.meta.url));
++// C20 w260 (G20-29): the durable audit mirror (`sync|check --root <root>`), the repair every AUDIT-* finding names; closed argv grammar in command-catalogue.mjs.
++export const DURABLE_EVIDENCE_SCRIPT = fileURLToPath(new URL("../../scripts/durable-evidence.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+ // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 204432a6c..6ed4f6d3c 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -706,6 +706,24 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
+   });
+ });
+ 
++// ---- C20 w260 (G20-29): `durable-evidence.mjs`, the repair every AUDIT-* finding names, in its two closed shapes ----
++test("C20 w260 durable-evidence: exactly `sync|check --root <this root>` is admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "durable-evidence.mjs");
++    for (const verb of ["sync", "check"]) bothAdmit(scriptAction(script, verb, "--root", f.root), f, `${verb} exact root`);
++    for (const [label, action] of [
++      ["foreign root", scriptAction(script, "sync", "--root", join(f.root, ".."))],
++      ["relative root", scriptAction(script, "sync", "--root", ".")],
++      ["no verb", scriptAction(script, "--root", f.root)],
++      ["unknown verb", scriptAction(script, "publish", "--root", f.root)],
++      ["verb without a root", scriptAction(script, "check")],
++      ["extra flag", scriptAction(script, "sync", "--root", f.root, "--force")],
++      ["extra positional", scriptAction(script, "check", "--root", f.root, "extra")],
++      ["root before verb", scriptAction(script, "--root", f.root, "sync")],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
+   withFixture("feature", f => {
+     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+diff --git a/plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs b/plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs
+new file mode 100644
+index 000000000..c0da78a45
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs
+@@ -0,0 +1,226 @@
++// SPDX-License-Identifier: SUL-1.0
++// Pin for Candidate 20, G20-29 (AC-108): dispatch records, briefing digests, the work-verify result and the signed approval
++// proof reference survive a fresh clone. The private places (the git-ignored /evidence/ and /scratch/, the private approval store)
++// are exactly what a clone does not have; the tracked audit/ mirror and its index are what it must have.
++// Real modules, no mocks of the behaviour under test. The approval source is injected through the module's documented `trace`
++// seam with a REAL Ed25519 proof (generated here), so the stored proof is cryptographically checkable; the default source
++// (the read-only human-approval trace) is exercised on a fixture that has no approvals.
++import assert from "node:assert/strict";
++import { createHash, generateKeyPairSync, sign } from "node:crypto";
++import { execFileSync, spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { reportSha256, validateDispatchRecord } from "../dispatch-record.mjs";
++import { canonical } from "../po-approval-proof.mjs";
++import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
++import { writeDispatchRecordObject, writeOrchestratorAttestedDispatchRecord } from "../../scripts/dispatch-record-write.mjs";
++
++const here = dirname(fileURLToPath(import.meta.url));
++const CLI = join(here, "..", "..", "scripts", "durable-evidence.mjs");
++const sha = (value) => createHash("sha256").update(value).digest("hex");
++const load = () => import("../durable-evidence.mjs");
++const SENTINEL = "PRIVATE-REPORT-SENTINEL-do-not-persist";
++
++const trigger = { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } };
++const skip = { schema: CRITIC_SKIP_SCHEMA, trigger: { ...trigger, rigorLevel: 0 }, appliedRow: "T5", reason: "fast path" };
++const required = { schema: CRITIC_REQUIRED_SCHEMA, trigger, appliedRow: "T3" };
++const AUTHORED_KIND = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" };
++const ATTESTED_KIND = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" };
++const ATT_COMMIT = "c".repeat(40);
++const v3 = (overrides = {}) => ({ schema: "pipeline.dispatch-record.v3", taskId: "FIX-V3", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
++  rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)],
++  log: [{ phase: "done", toolUseCount: 4 }], report: { text: `Done. ${SENTINEL}`, changedFiles: ["src/x.mjs"] }, criticSkip: skip, ...overrides });
++function hostObserved() {
++  const text = `Authored. ${SENTINEL}`;
++  const { criticSkip: _skip, ...rest } = v3({ taskId: "FIX-HOST", candidateCommit: "e".repeat(40), commits: ["e".repeat(40)] });
++  return { ...rest, schema: "pipeline.dispatch-record.v4", runner: "claude", resultSha256: reportSha256(text), report: { text, changedFiles: ["src/y.mjs"] }, criticRequired: required, outcomeClassification: AUTHORED_KIND };
++}
++function attested() {
++  const text = `Orchestrator hand-back. ${SENTINEL}`;
++  const { criticSkip: _skip, ...rest } = v3({ taskId: "FIX-ATT", candidateCommit: ATT_COMMIT, commits: [ATT_COMMIT] });
++  return { ...rest, schema: "pipeline.dispatch-record.v4", outcome: "completed-orchestrator-attested", resultSha256: reportSha256(text), report: { text, changedFiles: ["src/z.mjs"] },
++    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], criticRequired: required, outcomeClassification: ATTESTED_KIND,
++    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "e".repeat(64), handbackSha256: "f".repeat(64) } };
++}
++const gitReaders = () => ({
++  readCommitMessage: () => "feat(x): delivered\n\nDispatch: FIX-ATT (goldfish)\nAI-Assisted: true\n",
++  readChangedPaths: () => ["src/z.mjs"], readParents: () => ["9".repeat(40)] });
++
++const git = (root, ...args) => execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args], { encoding: "utf8" }).trim();
++function signedRow(head) {
++  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
++  const publicPem = publicKey.export({ type: "spki", format: "pem" });
++  const intentSha256 = sha("fixture-signed-payload");
++  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "fixture-key", publicKey: publicPem,
++    signatureBase64: sign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
++  return { privateBody: privateKey.export({ type: "pkcs8", format: "pem" }).split("\n")[1], proof,
++    row: { kind: "push", source: "private-store:push/0001-abc.json", mode: "signature", forCommit: head, approvedAt: "2026-11-07T10:00:00.000Z", by: "PO",
++      intentSha256, proofSha256: sha(canonical(proof)), keyReference: "fixture-key", publicKeySha256: sha(publicPem), proof, verdict: "traced", break: null } };
++}
++
++/** A project shaped like an onboarded consumer: /evidence/ and /scratch/ are git-ignored, everything else is tracked. */
++function project() {
++  const root = mkdtempSync(join(tmpdir(), "durable-evidence-"));
++  execFileSync("git", ["init", "-q", root]);
++  writeFileSync(join(root, ".gitignore"), "/scratch/\n/evidence/\n/project/pipeline-state.json\n");
++  writeFileSync(join(root, "README.md"), "fixture\n");
++  git(root, "add", "--", ".gitignore", "README.md");
++  git(root, "commit", "-q", "-m", "chore: seed");
++  mkdirSync(join(root, "evidence")); mkdirSync(join(root, "scratch"));
++  writeDispatchRecordObject({ repoRoot: root, target: "evidence/dispatch-record-FIX-V3.json", record: v3() });
++  writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-FIX-ATT.json", record: attested() }, gitReaders());
++  writeFileSync(join(root, "evidence/dispatch-record-FIX-HOST.json"), `${JSON.stringify(validateDispatchRecord(hostObserved()), null, 2)}\n`);
++  writeFileSync(join(root, "evidence/dispatch-record-FIX-OPEN.json"), `${JSON.stringify(v3({ taskId: "FIX-OPEN", outcome: "in-progress", commits: [], log: [], report: null, resultSha256: null }), null, 2)}\n`);
++  writeFileSync(join(root, "evidence/verify-latest.json"), `${JSON.stringify({ schema: "pipeline.verify-evidence.v0", project: "fixture", command: "node harness/scripts/verify.mjs --mode candidate",
++    commit: git(root, "rev-parse", "HEAD"), tree: git(root, "rev-parse", "HEAD^{tree}"), candidate: { binding: "exact" }, startedAt: "2026-11-07T09:00:00.000Z", finishedAt: "2026-11-07T09:05:00.000Z",
++    steps: [{ name: "unit", exitCode: 0, durationMs: 5, reused: false }, { name: "lint", exitCode: 0, durationMs: 2, reused: false }] }, null, 2)}\n`);
++  writeFileSync(join(root, "scratch/briefing-host.md"), `# Briefing\n\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify({ dispatchId: "FIX-HOST", runner: "claude" })}\n-->\nbody\n`);
++  const signed = signedRow(git(root, "rev-parse", "HEAD"));
++  return { root, ...signed, trace: () => ({ rows: [signed.row] }) };
++}
++const cleanup = (...roots) => { for (const root of roots) rmSync(root, { recursive: true, force: true }); };
++const auditFiles = (root) => readdirSync(join(root, "audit")).filter((name) => name.endsWith(".json"));
++const codes = (result) => result.findings.map((finding) => finding.code);
++
++test("D1 sync projects every completed dispatch, the work-verify and the approval into tracked audit/ files with the assurance label", async () => {
++  const { syncDurableEvidence } = await load();
++  const fixture = project();
++  try {
++    const result = syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    assert.equal(result.index.entries, 5, JSON.stringify(result));
++    const read = (name) => JSON.parse(readFileSync(join(fixture.root, "audit", name), "utf8"));
++    const host = read("dispatch-FIX-HOST.json");
++    assert.equal(host.assurance, "host-observed"); assert.equal(host.runner, "claude"); assert.equal(host.model, "claude-sonnet-5");
++    assert.equal(host.effort, "medium"); assert.equal(host.candidateCommit, "e".repeat(40)); assert.deepEqual(host.commits, ["e".repeat(40)]);
++    assert.equal(host.outcome, "completed"); assert.equal(host.source.sha256, sha(readFileSync(join(fixture.root, "evidence/dispatch-record-FIX-HOST.json"))));
++    assert.equal(host.briefing.sha256, sha(readFileSync(join(fixture.root, "scratch/briefing-host.md"))), "a briefing found for the dispatch id is digest-bound");
++    assert.deepEqual(host.changedFiles, ["src/y.mjs"]);
++    const att = read("dispatch-FIX-ATT.json");
++    assert.equal(att.assurance, "orchestrator-attested"); assert.equal(att.briefing.sha256, "e".repeat(64)); assert.equal(att.briefing.source, "attestation");
++    const legacy = read("dispatch-FIX-V3.json");
++    assert.equal(legacy.assurance, "recorded-unlabelled"); assert.equal(legacy.briefing.sha256, null);
++    assert.equal(existsSync(join(fixture.root, "audit/dispatch-FIX-OPEN.json")), false, "an in-progress record is not a completed dispatch");
++    const verify = auditFiles(fixture.root).find((name) => name.startsWith("verify-"));
++    const entry = read(verify);
++    assert.equal(entry.commit, git(fixture.root, "rev-parse", "HEAD")); assert.equal(entry.passed, true); assert.equal(entry.stepCount, 2); assert.deepEqual(entry.failedSteps, []);
++    assert.equal(entry.source.sha256, sha(readFileSync(join(fixture.root, "evidence/verify-latest.json"))));
++    const approval = read(auditFiles(fixture.root).find((name) => name.startsWith("approval-")));
++    assert.equal(approval.kind, "push"); assert.equal(approval.proofSha256, fixture.row.proofSha256); assert.equal(approval.intentSha256, fixture.row.intentSha256);
++    assert.equal(approval.proof.signatureBase64, fixture.proof.signatureBase64);
++    const index = JSON.parse(readFileSync(join(fixture.root, "audit/index.json"), "utf8"));
++    assert.deepEqual(index.entries.map((e) => e.kind).sort(), ["approval", "dispatch", "dispatch", "dispatch", "verify"]);
++  } finally { cleanup(fixture.root); }
++});
++
++test("D2 a fresh clone plus the auditor index reaches every record and the proof reference; the private places are absent there", async () => {
++  const { syncDurableEvidence, checkDurableEvidence } = await load();
++  const fixture = project();
++  const clone = `${fixture.root}-clone`;
++  try {
++    syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    const before = checkDurableEvidence({ root: fixture.root });
++    assert.ok(codes(before).includes("AUDIT-NOT-TRACKED"), "uncommitted audit files are not durable yet");
++    assert.ok(before.findings.every((finding) => /\S/u.test(finding.repair)), "every finding names a runnable repair");
++    git(fixture.root, "add", "--", "audit");
++    git(fixture.root, "commit", "-q", "-m", "docs(audit): mirror the dispatch evidence");
++    execFileSync("git", ["clone", "-q", fixture.root, clone]);
++    assert.equal(existsSync(join(clone, "evidence")), false, "the clone has no git-ignored evidence/");
++    assert.equal(existsSync(join(clone, "scratch")), false);
++    const result = checkDurableEvidence({ root: clone });
++    assert.deepEqual(result.findings, []); assert.equal(result.ok, true);
++    assert.deepEqual(result.entries.map((e) => e.kind).sort(), ["approval", "dispatch", "dispatch", "dispatch", "verify"]);
++    for (const entry of result.entries) assert.equal(sha(readFileSync(join(clone, entry.path))), entry.sha256);
++    const approval = result.entries.find((e) => e.kind === "approval");
++    const stored = JSON.parse(readFileSync(join(clone, approval.path), "utf8"));
++    assert.equal(stored.proofSha256, fixture.row.proofSha256);
++    assert.equal(sha(canonical(stored.proof)), stored.proofSha256, "the tracked public proof hashes to the referenced digest");
++  } finally { cleanup(fixture.root, clone); }
++});
++
++test("D3 nothing private is in the tracked files: no report text, no absolute host path, no private key, no transcript field", async () => {
++  const { syncDurableEvidence } = await load();
++  const fixture = project();
++  try {
++    syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    for (const name of [...auditFiles(fixture.root)]) {
++      const text = readFileSync(join(fixture.root, "audit", name), "utf8");
++      assert.ok(!text.includes(SENTINEL), `${name} carries report prose`);
++      assert.ok(!text.includes(fixture.root) && !text.includes(tmpdir()), `${name} carries an absolute host path`);
++      assert.ok(!text.includes(fixture.privateBody) && !/PRIVATE KEY/u.test(text), `${name} carries private key material`);
++      assert.ok(!/"(report|text|transcript|prompt|privateKey)"/u.test(text), `${name} carries a private field`);
++    }
++  } finally { cleanup(fixture.root); }
++});
++
++test("D4 check names the exact code and a runnable repair for each way the mirror breaks", async () => {
++  const { syncDurableEvidence, checkDurableEvidence } = await load();
++  const fixture = project();
++  try {
++    syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    git(fixture.root, "add", "--", "audit"); git(fixture.root, "commit", "-q", "-m", "docs(audit): mirror");
++    const clean = checkDurableEvidence({ root: fixture.root }); assert.deepEqual(clean.findings, []);
++    const attPath = join(fixture.root, "audit/dispatch-FIX-ATT.json");
++    const original = readFileSync(attPath, "utf8");
++    writeFileSync(attPath, original.replace('"FIX-ATT"', '"FIX-ATT" '));
++    assert.ok(codes(checkDurableEvidence({ root: fixture.root })).includes("AUDIT-DIGEST-MISMATCH"));
++    writeFileSync(attPath, original);
++    rmSync(attPath);
++    assert.ok(codes(checkDurableEvidence({ root: fixture.root })).includes("AUDIT-ENTRY-MISSING"));
++    writeFileSync(attPath, original);
++    const verifyName = auditFiles(fixture.root).find((name) => name.startsWith("verify-"));
++    writeFileSync(join(fixture.root, "audit", verifyName), readFileSync(join(fixture.root, "audit", verifyName), "utf8").replace('"node harness', '"node /home/someone/harness'));
++    const polluted = checkDurableEvidence({ root: fixture.root });
++    assert.ok(codes(polluted).includes("AUDIT-PRIVATE-CONTENT") || codes(polluted).includes("AUDIT-DIGEST-MISMATCH"));
++    git(fixture.root, "checkout", "-q", "--", "audit");
++    const approvalName = auditFiles(fixture.root).find((name) => name.startsWith("approval-"));
++    const approvalPath = join(fixture.root, "audit", approvalName);
++    const stored = JSON.parse(readFileSync(approvalPath, "utf8"));
++    stored.proof.signatureBase64 = Buffer.from("not-the-signature").toString("base64");
++    writeFileSync(approvalPath, `${JSON.stringify(stored, null, 2)}\n`);
++    assert.ok(codes(checkDurableEvidence({ root: fixture.root })).some((code) => ["AUDIT-DIGEST-MISMATCH", "AUDIT-PROOF-INVALID"].includes(code)));
++    git(fixture.root, "checkout", "-q", "--", "audit");
++    writeFileSync(join(fixture.root, "audit/dispatch-STRAY.json"), "{}\n");
++    assert.ok(codes(checkDurableEvidence({ root: fixture.root })).includes("AUDIT-INDEX-STALE"));
++    rmSync(join(fixture.root, "audit/dispatch-STRAY.json"));
++    writeFileSync(join(fixture.root, "evidence/dispatch-record-FIX-LATE.json"), `${JSON.stringify(v3({ taskId: "FIX-LATE" }), null, 2)}\n`);
++    const unsynced = checkDurableEvidence({ root: fixture.root });
++    const gap = unsynced.findings.find((finding) => finding.code === "AUDIT-UNSYNCED");
++    assert.ok(gap, "a completed dispatch with no mirror is a gap"); assert.match(gap.repair, /durable-evidence\.mjs sync --root /u);
++    rmSync(join(fixture.root, "audit/index.json"));
++    assert.ok(codes(checkDurableEvidence({ root: fixture.root })).includes("AUDIT-INDEX-MISSING"));
++  } finally { cleanup(fixture.root); }
++});
++
++test("D5 sync is idempotent, never rewrites an existing entry, and a conflicting entry refuses before any write", async () => {
++  const { syncDurableEvidence } = await load();
++  const fixture = project();
++  try {
++    const first = syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    const second = syncDurableEvidence({ root: fixture.root, trace: fixture.trace });
++    assert.deepEqual(second.written, []); assert.equal(second.unchanged.length, first.written.length - 1, "every entry file is unchanged; only the index is rederived");
++    const before = Object.fromEntries(auditFiles(fixture.root).map((name) => [name, readFileSync(join(fixture.root, "audit", name), "utf8")]));
++    writeFileSync(join(fixture.root, "evidence/dispatch-record-FIX-LATE.json"), `${JSON.stringify(v3({ taskId: "FIX-LATE" }), null, 2)}\n`);
++    writeFileSync(join(fixture.root, "audit/dispatch-FIX-V3.json"), `${JSON.stringify({ ...JSON.parse(before["dispatch-FIX-V3.json"]), model: "other" }, null, 2)}\n`);
++    assert.throws(() => syncDurableEvidence({ root: fixture.root, trace: fixture.trace }),
++      (error) => error?.code === "AUDIT-ENTRY-DIFFERS" && /remove audit\/dispatch-FIX-V3\.json/u.test(error.message));
++    assert.equal(existsSync(join(fixture.root, "audit/dispatch-FIX-LATE.json")), false, "a refused sync leaves no new file");
++    assert.deepEqual(readdirSync(join(fixture.root, "audit")).filter((name) => name.startsWith(".")), [], "and no temporary file");
++  } finally { cleanup(fixture.root); }
++});
++
++test("D6 the CLI syncs and checks from the project root with a typed exit and a repair on stderr", async () => {
++  await load();
++  const fixture = project();
++  try {
++    const run = (...args) => spawnSync(process.execPath, [CLI, ...args, "--root", fixture.root], { encoding: "utf8" });
++    const bare = run("check");
++    assert.equal(bare.status, 2, bare.stderr); assert.match(bare.stderr, /AUDIT-INDEX-MISSING/u); assert.match(bare.stderr, /repair: .*durable-evidence\.mjs sync --root /u);
++    const synced = run("sync");
++    assert.equal(synced.status, 0, synced.stderr); assert.equal(JSON.parse(synced.stdout).index.entries >= 4, true, "dispatches and the verify result are mirrored; no approval is invented");
++    const refused = spawnSync(process.execPath, [CLI, "frobnicate", "--root", fixture.root], { encoding: "utf8" });
++    assert.equal(refused.status, 2); assert.match(refused.stderr, /usage: durable-evidence\.mjs/u);
++  } finally { cleanup(fixture.root); }
++});
+diff --git a/plugins/pipeline-core/scripts/durable-evidence.mjs b/plugins/pipeline-core/scripts/durable-evidence.mjs
+new file mode 100644
+index 000000000..53e157242
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/durable-evidence.mjs
+@@ -0,0 +1,39 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Durable audit mirror (Candidate 20, G20-29). Two verbs, one closed shape each:
++ *   durable-evidence.mjs sync  --root <absolute project root>   mirror completed dispatches, the work-verify result and the approval
++ *                                                               proof references into tracked audit/ files plus audit/index.json
++ *   durable-evidence.mjs check --root <absolute project root>   read-only: does this tree (a fresh clone included) reach every record
++ * Both print one JSON object on stdout. A finding or a refusal exits 2 and prints `CODE: message; repair: <runnable command>` on stderr.
++ * `sync` writes only under audit/ and never overwrites an existing entry; commit the result with the ordinary exact-path route.
++ */
++import { resolve } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { checkDurableEvidence, syncDurableEvidence } from "../lib/durable-evidence.mjs";
++
++const USAGE = "usage: durable-evidence.mjs (sync|check) --root <absolute project root>";
++
++export function parseArgs(argv) {
++  if (argv.length !== 3 || !["sync", "check"].includes(argv[0]) || argv[1] !== "--root" || !argv[2]) {
++    const error = new Error(USAGE); error.code = "usage"; throw error;
++  }
++  return { verb: argv[0], root: resolve(argv[2]) };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  try {
++    const { verb, root } = parseArgs(process.argv.slice(2));
++    if (verb === "sync") {
++      process.stdout.write(`${JSON.stringify(syncDurableEvidence({ root }))}\n`);
++    } else {
++      const result = checkDurableEvidence({ root });
++      process.stdout.write(`${JSON.stringify({ ok: result.ok, findings: result.findings, entries: result.entries.length })}\n`);
++      for (const finding of result.findings) process.stderr.write(`${finding.code}: ${finding.message}; repair: ${finding.repair}\n`);
++      if (!result.ok) process.exitCode = 2;
++    }
++  } catch (error) {
++    process.stderr.write(`${error.code === "usage" ? "" : `${error.code ?? "DURABLE-EVIDENCE-FAILED"}: `}${error.message}\n`);
++    process.exitCode = 2;
++  }
++}
