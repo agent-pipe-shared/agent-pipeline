@@ -3480,6 +3480,24 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs"
     },
     {
+      "name": "pin-antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding-tests",
+      "file": "plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs"
+    },
+    {
+      "name": "pin-read-only-git-c-on-another-repository-is-not-a-mutation-tests",
+      "file": "plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs"
+    },
+    {
+      "name": "pin-security-close-chain-is-hard-per-calibration-tests",
+      "file": "plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs"
+    },
+    {
       "name": "pin-declared-product-criteria-need-matching-acceptance-evidence-tests",
       "file": "plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
@@ -3802,6 +3820,12 @@
       "file": "plugins/pipeline-core/lib/root-argument.test.mjs",
       "invariantPinned": "A win32 root argument typed with forward slashes is rewritten to backslashes before the strict physical-path checks and nothing else changes (other platforms, non-strings, .., trailing separators), and the three raw-root entries normalise before comparing",
       "nonOverlapNote": "Unique cases: lib/root-argument.mjs with an injected platform; the entries' own suites pin their other refusals"
+    },
+    {
+      "name": "path-spelling-tests",
+      "file": "plugins/pipeline-core/lib/path-spelling.test.mjs",
+      "invariantPinned": "sameNativePath is exact on Linux and accepts only an equivalent spelling on win32/darwin; typedRootSpelling maps an equivalent spelling of the cwd to the cwd (C20 separator sweep)",
+      "nonOverlapNote": "Unique cases: lib/path-spelling.mjs helpers with an injected platform; the guard lanes pin their own use of them"
     },
     {
       "name": "pin-happy-path-guide-names-only-existing-scripts-tests",
