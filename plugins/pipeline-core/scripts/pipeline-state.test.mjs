@@ -1463,8 +1463,11 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: featureId, verify: null }, null, 2)}\n`);
   const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
   assert.equal(submitted.result, 0, `a null verify command must warn, not refuse submit-plan: ${submitted.lines.join(" ")}`);
-  assert.ok(submitted.lines.some((line) => line.includes("configure-verify --verify-command <project verify command>")),
-    `submit-plan must name the sanctioned configure-verify route: ${submitted.lines.join(" ")}`);
+  // Restated 2026-11-07 (candidate 20, G20-19, QG-04): the named route must be one the lifecycle guard admits at that point;
+  // configure-verify was refused while awaiting approval. Same strictness: the exact admitted command is named.
+  assert.ok(submitted.lines.some((line) => line.includes("set-phase --phase implementation --verify-command \"<project verify command>\"")),
+    `submit-plan must name the admitted set-phase verify route: ${submitted.lines.join(" ")}`);
+  assert.ok(!submitted.lines.some((line) => line.includes("configure-verify")), "the refused route is no longer named");
 }
 
 // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE

@@ -11909,7 +11909,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
       const submitVerifyStatus = readCalibrationVerifyStatus(dir);
       if (submitVerifyStatus.status !== "configured") {
-        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it before implementation with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (never edit project/pipeline.json directly; GS-10 refuses it). The submission continues.`);
+        // G20-19 (Claude greenfield): this line used to name `configure-verify`, which the lifecycle guard refuses while the plan awaits
+        // approval; the agent tried it and was blocked. The admitted route sets it together with the phase change after approval.
+        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it when implementation starts, in the same step: node <plugin-root>/scripts/pipeline-state.mjs set-phase --phase implementation --verify-command "<project verify command>" (never edit project/pipeline.json directly; GS-10 refuses it). Nothing to do before approval. The submission continues.`);
       }
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedPlanSha256 = authority.value.planSha256;

@@ -116,7 +116,8 @@ test("AC1: submit-plan never emits a content-acknowledgement stop on a clean pla
   // Restated 2026-11-02 (candidate 18, C18-2, QG-04, own hunk; intent kept: a clean submission emits no stop and no acknowledgement request):
   // a project without a verify command now gets one informational line naming configure-verify (a warning, the submission continues). The
   // fixture has no verify command, so exactly that line may appear; every other stderr byte is still refused.
-  const noVerifyCommand = /^Warning: submit-plan: the project verify command is missing\. [^\n]*configure-verify[^\n]*$/mu;
+  // G20-19: the line now names the admitted `set-phase ... --verify-command` route instead of configure-verify.
+  const noVerifyCommand = /^Warning: submit-plan: the project verify command is missing\. [^\n]*set-phase --phase implementation --verify-command[^\n]*$/mu;
   assert.equal(result.err.replace(noVerifyCommand, "").trim(), "");
   assert.ok(!result.out.includes("pipeline.submit-plan-stop.v1"));
   assert.ok(!result.out.includes("PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"));
