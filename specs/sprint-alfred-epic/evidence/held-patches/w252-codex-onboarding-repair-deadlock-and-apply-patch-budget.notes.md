@@ -134,4 +134,18 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
   cap, the budget ending the rounds without overrun, and no retry of a foreign refusal. 8/8; `native-goldfish-host-stop-pair.test.mjs` 13/13
   alone. The load case itself is shown only by the next Full Verify.
 
+## G20-11 (P1, Codex Critic path): reader-review reports were bound as Critic source
+
+- **Seen:** the first independent Critic of the Codex greenfield stopped before any substantive review with a briefing violation: the
+  correction-input bindings listed the retained reader-review reports (`specs/<feature>/evidence/reader-review/phase-one/2.md`, `phase-two/2.md`)
+  as source paths. `pass: false`, no findings; the session recorded the blocked review and stopped.
+- **Cause:** `RETAINED_PATTERN` in `lib/critic-correction-input-bindings.mjs` knew only the Critic's own result layout. The reader-review skill
+  writes its reports under `specs/<feature-id>/evidence/reader-review/` (`skills/reader-review/SKILL.md`, `lib/doc-reader-plan-scope.mjs`).
+- **Fix:** that layout is a retained prior result: exclusion-bound by exact path, blob digest and mode, never read as source.
+- **Tests:** `critic-dispatch-preflight.test.mjs` new CCI (2d) with look-alikes (a sibling `.md`, a non-evidence folder, a near-miss folder
+  name, a root `docs/` path) that stay source. CCI cases 20/20.
+- **Noted, not changed:** `finalize` then refused with `SCF-ORIGINAL-SOURCE-UNAVAILABLE`. The text already names
+  `--allow-caller-authored-fallback`, and the session rightly did not take the weaker marker on its own. No runner issues a Source return
+  record yet, so every finalize meets this refusal first; whether the labelled fallback should be the default is a PO decision.
+
 Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.
