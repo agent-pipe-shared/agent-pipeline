@@ -204,6 +204,8 @@ export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr
 export const BIND_ADR_PROPOSALS_SCRIPT = fileURLToPath(new URL("../../scripts/bind-adr-proposals.mjs", import.meta.url));
 // C20 w257 (G20-25): the one command that configures a missing security gate (the repair a critical project's refusal names); exact `--root <root>` shape.
 export const SECURITY_GATE_CONFIGURE_SCRIPT = fileURLToPath(new URL("../../scripts/security-gate-configure.mjs", import.meta.url));
+// C20 w260 (G20-29): the durable audit mirror (`sync|check --root <root>`), the repair every AUDIT-* finding names; closed argv grammar in command-catalogue.mjs.
+export const DURABLE_EVIDENCE_SCRIPT = fileURLToPath(new URL("../../scripts/durable-evidence.mjs", import.meta.url));
 // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
 export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
 // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).

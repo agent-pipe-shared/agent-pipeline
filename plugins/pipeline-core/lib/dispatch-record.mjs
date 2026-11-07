@@ -53,7 +53,7 @@ export function validateDurableDispatchReportText(value) {
   if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", "report.text contains a private absolute path");
   return value;
 }
-function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
+export function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
   if (typeof value === "string") {
     if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", `${label} contains a private absolute path`);
     return;

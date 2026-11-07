@@ -706,6 +706,24 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
   });
 });
 
+// ---- C20 w260 (G20-29): `durable-evidence.mjs`, the repair every AUDIT-* finding names, in its two closed shapes ----
+test("C20 w260 durable-evidence: exactly `sync|check --root <this root>` is admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "durable-evidence.mjs");
+    for (const verb of ["sync", "check"]) bothAdmit(scriptAction(script, verb, "--root", f.root), f, `${verb} exact root`);
+    for (const [label, action] of [
+      ["foreign root", scriptAction(script, "sync", "--root", join(f.root, ".."))],
+      ["relative root", scriptAction(script, "sync", "--root", ".")],
+      ["no verb", scriptAction(script, "--root", f.root)],
+      ["unknown verb", scriptAction(script, "publish", "--root", f.root)],
+      ["verb without a root", scriptAction(script, "check")],
+      ["extra flag", scriptAction(script, "sync", "--root", f.root, "--force")],
+      ["extra positional", scriptAction(script, "check", "--root", f.root, "extra")],
+      ["root before verb", scriptAction(script, "--root", f.root, "sync")],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
 test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
   withFixture("feature", f => {
     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
