@@ -607,6 +607,50 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     - Direction for the PO: either measure and wire the native consent route end to end (descriptor registration, consent ceremony, `invoke_subagent` admission), or make in-session implementation with an independent Critic the sanctioned Antigravity route, so it is no longer a stop-and-ask. Not fixed in w252.
   - **G20-6 (P2, Claude on Windows):** the preflight reported `WIN-AUTH-OPEN` for `project/` (inherited ACL under `D:\Dev`), and the PO had to run `icacls … /inheritance:r` by hand. This is a single documented PO step, not a loop; noted as a happy-path cost.
   - The Full Verify of the applied chain (`ff20f4c80`) was stopped so that it would not load the greenfield machine; it is rerun after the greenfield runs.
+- **Greenfield analysis reports (PO 2026-11-07): candidate 20 is reopened.** The PO handed the three runner reports (each project's
+  `docs/pipeline-analyse-greenfield_<project>.md`) with "bitte alles in kandidat 20 fixen". The earlier decision line for the w252-only
+  candidate is void. Mapping of every report finding:
+  - **Already in w252:** Claude P1-1/P1-2 (G20-5, incl. `apply` reading scope/rationale/ref from the signed request and the admitted
+    signed `apply` shape), Claude P1-3 (G20-12), agy read refusals of guessed plugin files (G20-3), agy ADR `--validate`/`--format`
+    (G20-7), Codex reader reports bound as Critic source (G20-11), Codex resume-hint patch timeouts (G20-2, 12 s child budget).
+  - **New, built into candidate 20 (no decision needed):**
+    - G20-14 (agy P5): `model-role-dispatch-select.mjs` exits 13 on an unsettled top-level await from importing `model-role-bootstrap.mjs`.
+    - G20-15 (agy P2): ADR sidecar validity is first checked at `set-phase implementation`, after the PO signature, which forced
+      `reopen-design` and a second signature. Every check that can refuse `set-phase` must run before `present-plan`.
+    - G20-16 (agy P3, Codex P2, Claude P2-1): PO-facing sign and override commands are long single lines or mixed POSIX/PowerShell
+      blocks; pastes into PowerShell against a WSL repository broke. Render the bounded copy form per detected shell, incl. WSL-from-PowerShell.
+    - G20-17 (Claude P2-1, PO decision "signing parity" 2026-11-02): the agent may not run the read-only human-override `plan` or
+      `prepare-for-signature`; the PO had to run three commands per ceremony. The agent runs all preparation, the PO only signs.
+    - G20-18 (Claude P2-4): `architecture-adoption.mjs prepare --decided-at` needs an ISO time the agent cannot obtain; accept `now`.
+    - G20-19 (Claude P2-2): `configure-verify` is refused in `awaiting-approval` although `submit-plan` asks for it before implementation.
+    - G20-20 (Claude P2-3): after the ACL repair `update-public-handover` keeps failing `WIN-AUTH-OPEN`, and the diagnosis the error
+      names (`session-authority-repair.mjs inspect`) is refused by the guard.
+    - G20-21 (agy P4, Claude P3): `git status`/`git diff` refused in `awaiting-approval`; `node <abs root>/scratch/x.mjs` refused while the
+      relative form is admitted; `--help` admitted in PowerShell, refused in Bash; GIT-03 refusal of several `-m` flags names no `-F` route.
+    - G20-22 (agy P6): `references/antigravity-native-dispatch.md` documents a request shape the prepare script rejects.
+    - G20-23 (all three): ADRs stay `proposed` after the signed plan approval; check whether any step accepts them.
+  - **PO decisions (tiles, 2026-11-07):**
+    - G20-24 SCF: drop the Source-return requirement from `session-critic-finalizer.mjs` ("können wir das nicht einfach aus dem
+      finalizer streichen?"). Finalization completes with an honest origin label; no `SCF-ORIGINAL-SOURCE-UNAVAILABLE` refusal.
+    - G20-25 security close chain: hard per calibration. A critical calibration blocks on a missing required scanner; the standard
+      calibration stays non-blocking, but the status reads "not executed", never like a passed scan.
+    - G20-26 ADR: ship a `create-adr` generator (Markdown plus JSON sidecar) and the sidecar schema.
+    - G20-8 agy route: **B** — wire real native Goldfish subagent dispatch under Antigravity (same role split as Claude and Codex),
+      measured end to end; no in-session implementation fallback as the sanctioned route.
+  - **Scope widened (PO 2026-11-07):** "alle blocker / major themen müssen rein also alle wichtigen findings! nicht nur die blocker. Zb
+    dieses ewige hin und her bei claude mit architektur und 5x terminal muss aufhören". The deferred list above moves into candidate 20
+    except items that are not pipeline defects (bugs in the TabletApp product code itself) and the OS-level sandbox:
+    - G20-27 (Codex P0): AC journey coverage — the briefing and Critic check whole user journeys and state transitions, not only units.
+    - G20-28 (Codex P1): vertical-first slicing — the planner proposes a thin end-to-end slice before horizontal modules.
+    - G20-29 (Codex P1): dispatch records, briefings and work-verify evidence survive a fresh clone (tracked, data-sparse).
+    - G20-30 (Codex P2): answered intake values are never re-asked after a restart; the signed proof is imported without a PO reply.
+    - G20-31 (Codex P1): forensics reader paginates and separates "metadata complete" from "all events read".
+    - G20-32 (Claude, architecture back-and-forth): from `approve-plan` to `set-phase implementation` the happy path needs zero PO
+      terminal commands — `approve-plan` names (or runs) `materialize-architecture`, and no adoption or override ceremony can be
+      reached on a greenfield design package. Measured by a fixture walking approve → materialize → set-phase with no human step.
+  - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
+    vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
+    clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## End note: derived files
