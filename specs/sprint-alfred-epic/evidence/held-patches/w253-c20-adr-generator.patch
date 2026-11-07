@@ -1,0 +1,828 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 938286807..0b5f26cab 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+@@ -323,6 +323,29 @@ function sanctionedArchitectureBaselineArgs(args, root) {
+   return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
+ }
+ 
++// C20 w253 (G20-26): scripts/create-adr.mjs writes exactly docs/adr/draft-<slug>.md and .json (status `proposed`; it has no output flag,
++// no status flag and no path flag) or, with --refresh, recomputes that sidecar's digest. Two closed argv shapes bound to this root; the
++// script validates its own inputs again and refuses with a repair. Slug/modules/supersedes are path-safe tokens, the title is free text
++// without control characters, so none of them can name a file outside docs/adr.
++const CREATE_ADR_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
++const CREATE_ADR_MODULES = /^[a-z][a-z0-9-]{0,79}(?:,[a-z][a-z0-9-]{0,79}){0,31}$/u;
++const CREATE_ADR_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length > 0 && value.length <= 160
++  && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
++function sanctionedCreateAdrArgs(args, root) {
++  const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
++  if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
++  return matchFlagSpec(args, {
++    requiredValue: { ...rooted, "--title": CREATE_ADR_TITLE },
++    optionalValue: {
++      "--scope": (value) => value === "project" || value === "global",
++      "--modules": (value) => CREATE_ADR_MODULES.test(value),
++      "--supersedes": (value) => CREATE_ADR_ID.test(value),
++      "--date": (value) => /^\d{4}-\d{2}-\d{2}$/u.test(value),
++    },
++  });
++}
++
+ // AC-245 (D139): scripts/dispatch-recovery.mjs keeps ONE bounded recovery state file per dispatch under
+ // <root>/evidence (it validates its own inputs and refuses with a repair). Admitted as exactly three argv shapes,
+ // all bound to this root; the packet and result are repository-relative regular .json paths without a dot segment.
+@@ -559,6 +582,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
+   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
++  if (script === CREATE_ADR_SCRIPT) return sanctionedCreateAdrArgs(args, root);
+   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
+   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
+   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index a7ca317e0..51171774e 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -198,6 +198,8 @@ export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/
+ export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
+ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
+ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
++// C20 w253 (G20-26): the one way an ADR proposal is created (docs/adr/draft-<slug>.md + .json); closed argv grammar in command-catalogue.mjs.
++export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+ // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 99c212a72..106df4857 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -617,6 +617,44 @@ test("C20 w252 architecture baseline --validate: one ADR sidecar under docs/adr
+   });
+ });
+ 
++// ---- C20 w253 (G20-26): `create-adr.mjs`, the sanctioned ADR proposal generator, in its two closed shapes ----
++test("C20 w253 create-adr: the create and refresh shapes are admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "create-adr.mjs");
++    const make = (...rest) => scriptAction(script, "--root", f.root, ...rest);
++    bothAdmit(make("--slug", "storage-adapter", "--title", "Use a storage adapter"), f, "minimal create");
++    bothAdmit(make("--slug", "s", "--title", "A title, with: punctuation", "--scope", "global", "--supersedes", "0003-old", "--date", "2026-11-07"), f, "create with scope, supersedes and date");
++    bothAdmit(make("--slug", "s", "--title", "T", "--modules", "alpha,beta-2"), f, "create with modules");
++    bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
++    bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
++    for (const [label, action] of [
++      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
++      ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],
++      ["no root", scriptAction(script, "--slug", "s", "--title", "T")],
++      ["no title", make("--slug", "s")],
++      ["no slug", make("--title", "T")],
++      ["slug with a separator", make("--slug", "a/b", "--title", "T")],
++      ["slug with a dot segment", make("--slug", "..", "--title", "T")],
++      ["upper-case slug", make("--slug", "Abc", "--title", "T")],
++      ["overlong slug", make("--slug", "a".repeat(65), "--title", "T")],
++      ["empty title", make("--slug", "s", "--title", "")],
++      ["title with a control character", make("--slug", "s", "--title", "a\u0007b")],
++      ["title with leading space", make("--slug", "s", "--title", " T")],
++      ["scope module", make("--slug", "s", "--title", "T", "--scope", "module")],
++      ["modules with an upper-case id", make("--slug", "s", "--title", "T", "--modules", "Alpha")],
++      ["modules with an empty id", make("--slug", "s", "--title", "T", "--modules", "alpha,")],
++      ["supersedes with a separator", make("--slug", "s", "--title", "T", "--supersedes", "../x")],
++      ["date that is not a date", make("--slug", "s", "--title", "T", "--date", "tomorrow")],
++      ["unknown flag", make("--slug", "s", "--title", "T", "--out", "x")],
++      ["repeated flag", make("--slug", "s", "--title", "T", "--slug", "t")],
++      ["refresh with a title", make("--slug", "s", "--title", "T", "--refresh")],
++      ["refresh without a slug", make("--refresh")],
++      ["refresh with a value", make("--slug", "s", "--refresh", "x")],
++      ["extra positional", make("--slug", "s", "--title", "T", "extra")],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
+   withFixture("feature", f => {
+     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+diff --git a/plugins/pipeline-core/schemas/pipeline.architecture-decision.v1.json b/plugins/pipeline-core/schemas/pipeline.architecture-decision.v1.json
+new file mode 100644
+index 000000000..d55db4fd9
+--- /dev/null
++++ b/plugins/pipeline-core/schemas/pipeline.architecture-decision.v1.json
+@@ -0,0 +1,87 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "pipeline.architecture-decision.v1",
++  "title": "Architecture Decision Record (pipeline.architecture-decision.v1)",
++  "description": "Schema for architecture decision records and sidecars (Issue #99, WP-D1).",
++  "type": "object",
++  "required": [
++    "schema",
++    "id",
++    "title",
++    "status",
++    "digest",
++    "scope",
++    "date"
++  ],
++  "additionalProperties": false,
++  "properties": {
++    "schema": {
++      "type": "string",
++      "enum": [
++        "pipeline.architecture-decision.v1"
++      ]
++    },
++    "id": {
++      "type": "string",
++      "pattern": "^[A-Za-z0-9._-]+$"
++    },
++    "title": {
++      "type": "string",
++      "minLength": 1
++    },
++    "status": {
++      "type": "string",
++      "enum": [
++        "proposed",
++        "accepted",
++        "superseded",
++        "waived"
++      ]
++    },
++    "digest": {
++      "type": "string",
++      "pattern": "^[a-f0-9]{64}$"
++    },
++    "scope": {
++      "type": "string",
++      "enum": [
++        "project",
++        "module",
++        "global"
++      ]
++    },
++    "supersedes": {
++      "type": "string"
++    },
++    "exception": {
++      "type": "object",
++      "required": [
++        "authority",
++        "rationale",
++        "scope",
++        "expiry"
++      ],
++      "additionalProperties": false,
++      "properties": {
++        "authority": {
++          "type": "string",
++          "minLength": 1
++        },
++        "rationale": {
++          "type": "string",
++          "minLength": 1
++        },
++        "scope": {
++          "type": "string",
++          "minLength": 1
++        },
++        "expiry": {
++          "type": "string"
++        }
++      }
++    },
++    "date": {
++      "type": "string"
++    }
++  }
++}
+diff --git a/plugins/pipeline-core/schemas/pipeline.architecture-decision.v2.json b/plugins/pipeline-core/schemas/pipeline.architecture-decision.v2.json
+new file mode 100644
+index 000000000..68c833450
+--- /dev/null
++++ b/plugins/pipeline-core/schemas/pipeline.architecture-decision.v2.json
+@@ -0,0 +1,45 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "pipeline.architecture-decision.v2",
++  "title": "Explicit module-scoped Architecture Decision Record",
++  "description": "An exact OKF module-applicability record for an ADR. An accepted record is effective only after its Markdown digest and every named module ID are validated against the physical map. Historical v1 sidecars remain readable without inferred module authority.",
++  "type": "object",
++  "required": [
++    "schema",
++    "id",
++    "title",
++    "status",
++    "digest",
++    "scope",
++    "moduleIds",
++    "date"
++  ],
++  "additionalProperties": false,
++  "properties": {
++    "schema": { "const": "pipeline.architecture-decision.v2" },
++    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
++    "title": { "type": "string", "minLength": 1 },
++    "status": { "enum": ["proposed", "accepted", "superseded", "waived"] },
++    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
++    "scope": { "const": "module" },
++    "moduleIds": {
++      "type": "array",
++      "minItems": 1,
++      "uniqueItems": true,
++      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,79}$" }
++    },
++    "date": { "type": "string", "format": "date" },
++    "supersedes": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
++    "exception": {
++      "type": "object",
++      "required": ["authority", "rationale", "scope", "expiry"],
++      "additionalProperties": false,
++      "properties": {
++        "authority": { "type": "string", "minLength": 1 },
++        "rationale": { "type": "string", "minLength": 1 },
++        "scope": { "type": "string", "minLength": 1 },
++        "expiry": { "type": "string", "format": "date" }
++      }
++    }
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.mjs b/plugins/pipeline-core/scripts/architecture-baseline.mjs
+index db48d90ff..07d43a523 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.mjs
+@@ -12,10 +12,12 @@ import path from "node:path";
+ import { createHash } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+-import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
++import { fileURLToPath } from "node:url";
++import { inspectEffectiveArchitectureDecisions, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
+ 
+ export const SCHEMA_BASELINE_RESULT = "pipeline.architecture-baseline-result.v1";
+ export const SCHEMA_DECISION = "pipeline.architecture-decision.v1";
++export const SCHEMA_DECISION_V2 = "pipeline.architecture-decision.v2";
+ export const SCHEMA_DECISION_SUMMARY = "pipeline.architecture-decisions-summary.v1";
+ 
+ export const STATUS_INITIAL_ADR_REQUIRED = "initial-adr-required";
+@@ -477,18 +479,15 @@ export function compileDecisionSummary(root, options = {}) {
+ export function validateArchitectureDecision(record, schema) {
+   let activeSchema = schema;
+   if (!activeSchema) {
+-    const defaultSchemaPath = path.join(
+-      path.dirname(import.meta.url.replace(/^file:\/\//, "")),
+-      "../../..",
+-      "schemas",
+-      "pipeline.architecture-decision.v1.json"
+-    );
+-    if (fs.existsSync(defaultSchemaPath)) {
+-      try {
+-        activeSchema = JSON.parse(fs.readFileSync(defaultSchemaPath, "utf8"));
+-      } catch {
+-        // fallback
+-      }
++    // C20 G20-26: both sidecar schemas ship in the plugin (schemas/, byte-pinned to the repository copies), so a consumer
++    // validates against the same closed shape as this repository. The path comes from fileURLToPath: the earlier
++    // string surgery on the file URL was wrong on Windows and only reached the repository root's schemas/.
++    const version = record?.schema === SCHEMA_DECISION_V2 ? "v2" : "v1";
++    try {
++      activeSchema = JSON.parse(fs.readFileSync(
++        fileURLToPath(new URL(`../schemas/pipeline.architecture-decision.${version}.json`, import.meta.url)), "utf8"));
++    } catch {
++      // fallback: the structural checks below still apply
+     }
+   }
+ 
+@@ -502,8 +501,8 @@ export function validateArchitectureDecision(record, schema) {
+     return { valid: false, errors };
+   }
+ 
+-  if (record.schema && record.schema !== SCHEMA_DECISION) {
+-    errors.push("schema must be " + SCHEMA_DECISION);
++  if (record.schema && record.schema !== SCHEMA_DECISION && record.schema !== SCHEMA_DECISION_V2) {
++    errors.push("schema must be " + SCHEMA_DECISION + " or " + SCHEMA_DECISION_V2);
+   }
+   if (record.digest !== undefined && (typeof record.digest !== "string" || !/^[a-f0-9]{64}$/u.test(record.digest))) {
+     errors.push("$.digest: digest must be a 64-character lowercase SHA-256 hex string");
+@@ -511,6 +510,11 @@ export function validateArchitectureDecision(record, schema) {
+   if (record.id !== undefined && (typeof record.id !== "string" || !/^[A-Za-z0-9._-]+$/u.test(record.id))) {
+     errors.push("$.id: id must match pattern ^[A-Za-z0-9._-]+$");
+   }
++  // schema-lite does not evaluate const / pattern / minItems / uniqueItems / format, so the closed shape that submit-plan and the
++  // effective-decision reader enforce is applied here too: a record that passes `--validate` also passes the structural ADR check.
++  if (errors.length === 0 && !validateArchitectureDecisionSidecar(record)) {
++    errors.push("$: record fails the structural sidecar check (date YYYY-MM-DD, scope/schema agreement, sorted unique moduleIds for v2, closed keys)");
++  }
+ 
+   return { valid: errors.length === 0, errors };
+ }
+@@ -586,6 +590,13 @@ export function main(argv = process.argv.slice(2)) {
+     try {
+       const record = JSON.parse(fs.readFileSync(options.validatePath, "utf8"));
+       const result = validateArchitectureDecision(record);
++      // The digest binds the sibling Markdown (skill capability 7); a sidecar whose digest drifted fails here, not at submit-plan.
++      const sibling = options.validatePath.replace(/\.json$/u, ".md");
++      if (result.valid && sibling !== options.validatePath && fs.existsSync(sibling)
++        && createHash("sha256").update(fs.readFileSync(sibling)).digest("hex") !== record.digest) {
++        result.valid = false;
++        result.errors.push("$.digest: digest does not match the SHA-256 of " + path.basename(sibling));
++      }
+       if (result.valid) {
+         console.log("Validation PASSED: " + options.validatePath);
+         process.exit(0);
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 38b3484fa..abe6d9fc1 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -5,8 +5,8 @@ import fs from "node:fs";
+ import path from "node:path";
+ import os from "node:os";
+ import { createHash } from "node:crypto";
+-import { execFileSync } from "node:child_process";
+-import { pathToFileURL } from "node:url";
++import { execFileSync, spawnSync } from "node:child_process";
++import { fileURLToPath, pathToFileURL } from "node:url";
+ import {
+   evaluateSignificanceAxes,
+   checkBaselineAdrs,
+@@ -21,6 +21,8 @@ import {
+   SCHEMA_DECISION
+ } from "./architecture-baseline.mjs";
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
++import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
++import { inspectProspectiveArchitectureManifest } from "../lib/architecture-prospective-materialization.mjs";
+ 
+ const DECISION_SCHEMA_PATH = path.join(
+   path.dirname(import.meta.url.replace(/^file:\/\//, "")),
+@@ -377,4 +379,224 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+         "the fixture contradicts the valid ADR; only a semantic review may call this nonconformant");
+     });
+   });
++
++  // C20 G20-26 / G20-23: the sidecar schemas ship in the plugin, `--validate` accepts both schema versions, and the
++  // sanctioned `create-adr.mjs` writes a proposal the existing prospective materialization (draft- files, status proposed) accepts.
++  describe("7. Shipped decision schemas and the create-adr generator (C20 G20-26)", () => {
++    const here = path.dirname(fileURLToPath(import.meta.url));
++    const CREATE_ADR = path.join(here, "create-adr.mjs");
++    const BASELINE = path.join(here, "architecture-baseline.mjs");
++    const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
++    const tempRoots = [];
++    const makeRoot = () => {
++      const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "create-adr-")));
++      tempRoots.push(root);
++      return root;
++    };
++    const makeMap = (root, ids) => {
++      const mapDir = path.join(root, "architecture", "map");
++      fs.mkdirSync(mapDir, { recursive: true });
++      fs.writeFileSync(path.join(mapDir, "index.md"),
++        `# Map\n\nOKF v0.1 concept bundle.\n\n${ids.map((id) => `- [${id}](${id}.md)`).join("\n")}\n`);
++      for (const id of ids) {
++        fs.writeFileSync(path.join(mapDir, `${id}.md`), `---\ntype: Governed Module\nid: ${id}\nresponsibility: Own ${id}\nnonResponsibilities: []\nownedPaths:\n  - ${id}/**\npublicContracts: []\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n# ${id}\n`);
++      }
++    };
++    const create = (root, ...args) => spawnSync(process.execPath, [CREATE_ADR, "--root", root, ...args], { encoding: "utf8" });
++    const validate = (file) => spawnSync(process.execPath, [BASELINE, "--validate", file], { encoding: "utf8" });
++    after(() => { for (const root of tempRoots) fs.rmSync(root, { recursive: true, force: true }); });
++
++    it("7.1 ships both sidecar schemas in the plugin, byte-identical to the repository copies", () => {
++      for (const name of ["pipeline.architecture-decision.v1.json", "pipeline.architecture-decision.v2.json"]) {
++        const shipped = fs.readFileSync(path.join(here, "..", "schemas", name));
++        const canonical = fs.readFileSync(path.join(here, "..", "..", "..", "schemas", name));
++        assert.ok(shipped.equals(canonical), `${name}: plugin copy differs from the repository schemas/ copy`);
++      }
++    });
++
++    it("7.2 validates a v2 module record against the shipped schema and keeps rejecting malformed ones", () => {
++      const base = { schema: "pipeline.architecture-decision.v2", id: "draft-x", title: "T", status: "proposed",
++        digest: "a".repeat(64), scope: "module", moduleIds: ["a-b", "c"], date: "2026-11-07" };
++      assert.equal(validateArchitectureDecision(base).valid, true, JSON.stringify(validateArchitectureDecision(base).errors));
++      for (const bad of [{ ...base, scope: "project" }, { ...base, moduleIds: [] }, { ...base, moduleIds: ["c", "a-b"] },
++        { ...base, moduleIds: ["A"] }, { ...base, extra: 1 }, { ...base, schema: "pipeline.architecture-decision.v3" }]) {
++        assert.equal(validateArchitectureDecision(bad).valid, false, JSON.stringify(bad));
++      }
++      const v1 = { ...base, schema: SCHEMA_DECISION, scope: "project" };
++      delete v1.moduleIds;
++      assert.equal(validateArchitectureDecision(v1).valid, true);
++      assert.equal(validateArchitectureDecision({ ...v1, moduleIds: ["a"] }).valid, false);
++    });
++
++    it("7.3 reads the default schema from the plugin copy through fileURLToPath, never through the repository root", () => {
++      const source = fs.readFileSync(BASELINE, "utf8");
++      const body = source.slice(source.indexOf("export function validateArchitectureDecision"), source.indexOf("function parseArgs"));
++      assert.match(body, /fileURLToPath\(new URL\(`?"?\.\.\/schemas\//u);
++      assert.doesNotMatch(body, /import\.meta\.url\.replace/u);
++      assert.doesNotMatch(body, /"\.\.\/\.\.\/\.\."/u);
++    });
++
++    it("7.4 --validate accepts a v2 sidecar and refuses a digest that does not match the sibling Markdown", () => {
++      const root = makeRoot();
++      const dir = path.join(root, "docs", "adr");
++      fs.mkdirSync(dir, { recursive: true });
++      const body = "# T\n";
++      const record = { schema: "pipeline.architecture-decision.v2", id: "ADR-v2", title: "T", status: "proposed",
++        digest: sha(body), scope: "module", moduleIds: ["a"], date: "2026-11-07" };
++      fs.writeFileSync(path.join(dir, "ADR-v2.md"), body);
++      fs.writeFileSync(path.join(dir, "ADR-v2.json"), `${JSON.stringify(record)}\n`);
++      assert.equal(validate(path.join(dir, "ADR-v2.json")).status, 0);
++      fs.writeFileSync(path.join(dir, "ADR-v2.json"), `${JSON.stringify({ ...record, digest: "b".repeat(64) })}\n`);
++      const drifted = validate(path.join(dir, "ADR-v2.json"));
++      assert.equal(drifted.status, 1);
++      assert.match(drifted.stderr, /digest/u);
++    });
++
++    it("7.5 create-adr writes the draft pair: proposed, id = file stem, digest of the exact Markdown bytes", () => {
++      const root = makeRoot();
++      const out = create(root, "--slug", "storage-adapter", "--title", "Use a storage adapter", "--date", "2026-11-07");
++      assert.equal(out.status, 0, out.stderr);
++      const result = JSON.parse(out.stdout);
++      assert.equal(result.markdown, "docs/adr/draft-storage-adapter.md");
++      assert.equal(result.sidecar, "docs/adr/draft-storage-adapter.json");
++      const markdown = fs.readFileSync(path.join(root, result.markdown));
++      const record = JSON.parse(fs.readFileSync(path.join(root, result.sidecar), "utf8"));
++      assert.deepEqual(record, { schema: "pipeline.architecture-decision.v1", id: "draft-storage-adapter",
++        title: "Use a storage adapter", status: "proposed", digest: sha(markdown), scope: "project", date: "2026-11-07" });
++      assert.match(markdown.toString("utf8"), /^# Use a storage adapter\n/u);
++      assert.doesNotMatch(markdown.toString("utf8"), /^\s*(?:\*\*)?status/imu, "the status lives in the sidecar only");
++      assert.equal(validate(path.join(root, result.sidecar)).status, 0);
++      const authoring = inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "project" });
++      assert.deepEqual(authoring.findings, [], JSON.stringify(authoring));
++    });
++
++    it("7.6 create-adr names the next free number and ignores draft files when counting", () => {
++      const root = makeRoot();
++      fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
++      for (const name of ["0001-first.md", "0007-seventh.md", "draft-other.md", "README.md"]) fs.writeFileSync(path.join(root, "docs", "adr", name), "# x\n");
++      const result = JSON.parse(create(root, "--slug", "next", "--title", "Next", "--date", "2026-11-07").stdout);
++      assert.equal(result.nextFreeNumber, "0008");
++      assert.equal(result.acceptedIdAfterApproval, "0008-next");
++    });
++
++    it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
++      const root = makeRoot();
++      makeMap(root, ["alpha", "beta"]);
++      const refused = create(root, "--slug", "mod", "--title", "Mod", "--modules", "alpha,gamma", "--date", "2026-11-07");
++      assert.notEqual(refused.status, 0);
++      assert.match(refused.stderr, /gamma/u);
++      assert.match(refused.stderr, /alpha, beta/u);
++      assert.equal(fs.existsSync(path.join(root, "docs", "adr", "draft-mod.md")), false, "a refused request leaves no file");
++      const ok = create(root, "--slug", "mod", "--title", "Mod", "--modules", "beta,alpha,beta", "--date", "2026-11-07");
++      assert.equal(ok.status, 0, ok.stderr);
++      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-mod.json"), "utf8"));
++      assert.equal(record.schema, "pipeline.architecture-decision.v2");
++      assert.equal(record.scope, "module");
++      assert.deepEqual(record.moduleIds, ["alpha", "beta"]);
++      assert.equal(validate(path.join(root, "docs", "adr", "draft-mod.json")).status, 0);
++      const authoring = inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "project" });
++      assert.deepEqual(authoring.findings, [], JSON.stringify(authoring));
++    });
++
++    it("7.8 create-adr records scope global and a supersedes id that names an existing ADR", () => {
++      const root = makeRoot();
++      fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
++      fs.writeFileSync(path.join(root, "docs", "adr", "0003-old.md"), "# ADR-0003: Old\n");
++      const missing = create(root, "--slug", "new", "--title", "New", "--supersedes", "0009-none", "--date", "2026-11-07");
++      assert.notEqual(missing.status, 0);
++      assert.match(missing.stderr, /0009-none/u);
++      const ok = create(root, "--slug", "new", "--title", "New", "--scope", "global", "--supersedes", "0003-old", "--date", "2026-11-07");
++      assert.equal(ok.status, 0, ok.stderr);
++      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-new.json"), "utf8"));
++      assert.equal(record.scope, "global");
++      assert.equal(record.supersedes, "0003-old");
++    });
++
++    it("7.10 --refresh recomputes only the digest of an edited proposal and refuses anything that is not a draft proposal", () => {
++      const root = makeRoot();
++      assert.equal(create(root, "--slug", "edit", "--title", "Edit me", "--date", "2026-11-07").status, 0);
++      const markdownPath = path.join(root, "docs", "adr", "draft-edit.md"), sidecarPath = path.join(root, "docs", "adr", "draft-edit.json");
++      const before = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
++      fs.writeFileSync(markdownPath, "# Edit me\n\n## Decision\n\nWe use a file adapter.\n");
++      assert.equal(validate(sidecarPath).status, 1, "an edited Markdown makes the digest stale until --refresh");
++      const refreshed = spawnSync(process.execPath, [CREATE_ADR, "--root", root, "--slug", "edit", "--refresh"], { encoding: "utf8" });
++      assert.equal(refreshed.status, 0, refreshed.stderr);
++      const after = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
++      assert.deepEqual({ ...after, digest: before.digest }, before, "only the digest changes");
++      assert.equal(after.digest, sha(fs.readFileSync(markdownPath)));
++      assert.equal(validate(sidecarPath).status, 0);
++      // never a path to `accepted`: a record that is not a proposal for this draft id is refused and left untouched
++      for (const tampered of [{ ...after, status: "accepted" }, { ...after, id: "draft-other" }]) {
++        fs.writeFileSync(sidecarPath, `${JSON.stringify(tampered, null, 2)}\n`);
++        const bytes = fs.readFileSync(sidecarPath);
++        const refused = spawnSync(process.execPath, [CREATE_ADR, "--root", root, "--slug", "edit", "--refresh"], { encoding: "utf8" });
++        assert.notEqual(refused.status, 0, JSON.stringify(tampered));
++        assert.ok(fs.readFileSync(sidecarPath).equals(bytes));
++      }
++      assert.notEqual(spawnSync(process.execPath, [CREATE_ADR, "--root", root, "--slug", "absent", "--refresh"], { encoding: "utf8" }).status, 0);
++    });
++
++    it("7.11 the real prospective manifest inspector accepts a create-adr proposal and activates it as the next numbered ADR", () => {
++      // The consumer is lib/architecture-prospective-materialization.mjs (what `materialize-architecture` publishes from). The rows are
++      // built with the formulas of its own fixture, so this proves the generator output satisfies the consumer's proposal predicate.
++      const root = makeRoot();
++      fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
++      fs.writeFileSync(path.join(root, "docs", "adr", "0004-earlier.md"), "# ADR-0004: Earlier\n");
++      const out = JSON.parse(create(root, "--slug", "egm", "--title", "Item-owned EGM", "--date", "2026-11-07").stdout);
++      const files = new Map();
++      const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
++      const add = (rel, content) => {
++        const bytes = Buffer.from(content);
++        files.set(rel, { path: rel, bytes, text: bytes.toString("utf8"), sha256: sha(bytes) });
++        return { path: rel, sha256: sha(bytes) };
++      };
++      const markdown = add(out.markdown, fs.readFileSync(path.join(root, out.markdown)));
++      const sidecar = add(out.sidecar, fs.readFileSync(path.join(root, out.sidecar)));
++      const proposed = JSON.parse(files.get(out.sidecar).text);
++      const originValue = { selections: [{ topic: "ownership", text: "One owner performs the work." }] };
++      const origin = add("specs/x/original.json", jsonText(originValue));
++      const choice = { schema: "pipeline.architecture-prospective-chat-selection.v1", id: proposed.id, decision: "selected",
++        markdownSha256: markdown.sha256, sidecarSha256: sidecar.sha256, scope: proposed.scope, moduleIds: [], supersedes: null,
++        attributedTo: "PO chat selection", origin, selections: originValue.selections };
++      const chatSelection = add("specs/x/selection.json", jsonText(choice));
++      const id = `${out.nextFreeNumber}-egm`;
++      assert.equal(id, out.acceptedIdAfterApproval);
++      const acceptedMarkdown = `# ADR-${id}: ${proposed.title}\n\nAccepted through the canonical aggregate design approval.\n\n## Approved proposal, preserved verbatim\n\n${files.get(out.markdown).text}`;
++      const acceptedSidecar = { ...proposed, id, status: "accepted", digest: sha(acceptedMarkdown) };
++      const { origin: _origin, selections: _selections, ...selected } = choice;
++      const acceptedChoice = { ...selected, schema: "pipeline.design-decision-chat-selection.v1", id, decision: "accepted",
++        markdownSha256: sha(acceptedMarkdown), sidecarSha256: sha(jsonText(acceptedSidecar)) };
++      const row = { id, proposedMarkdown: markdown, proposedSidecar: sidecar, chatSelection, predecessor: null,
++        outputs: { markdown: { path: `docs/adr/${id}.md`, sha256: sha(acceptedMarkdown) }, sidecar: { path: `docs/adr/${id}.json`, sha256: sha(jsonText(acceptedSidecar)) },
++          chatSelection: { path: `project/architecture-chat-selections/${id}.json`, sha256: sha(jsonText(acceptedChoice)) } } };
++      const manifest = add("specs/x/manifest.json", jsonText({ schema: "pipeline.architecture-prospective-materialization.v1", decisions: [row] }));
++      const sources = { prd: add("specs/x/prd.md", "# prd\n"), spec: add("specs/x/spec.md", "# spec\n"), companions: [markdown, sidecar, origin, chatSelection, manifest] };
++      const inspected = inspectProspectiveArchitectureManifest({ manifest, sources, read: (name) => files.get(name), existing: () => null });
++      assert.equal(inspected.materialized, false);
++      assert.deepEqual(inspected.targets.map((target) => target.path).sort(), [`docs/adr/${id}.json`, `docs/adr/${id}.md`, `project/architecture-chat-selections/${id}.json`]);
++      assert.equal(inspected.decisions[0].record.status, "accepted");
++      assert.equal(files.get(out.sidecar).sha256, sidecar.sha256, "the signed proposal bytes are never rewritten");
++      assert.equal(JSON.parse(files.get(out.sidecar).text).status, "proposed");
++    });
++
++    it("7.9 create-adr refuses unsafe or ambiguous input without writing and never overwrites", () => {
++      const root = makeRoot();
++      const args = (...rest) => ["--title", "T", "--date", "2026-11-07", ...rest];
++      for (const bad of [["--slug", "../x"], ["--slug", "A_b"], ["--slug", "-x"], ["--slug", "x/y"], ["--slug", ""], ["--slug", "a".repeat(80)]]) {
++        assert.notEqual(create(root, ...args(...bad)).status, 0, JSON.stringify(bad));
++      }
++      for (const bad of [["--title", ""], ["--title", "a\nb"], ["--title", "a\u0007b"] /* NUL cannot reach an argv at all; BEL is the control character a shell can pass */, ["--date", "2026-02-30"], ["--date", "tomorrow"],
++        ["--scope", "module"], ["--scope", "galaxy"], ["--bogus", "1"], ["--modules", "A"], ["--slug", "ok", "--slug", "again"]]) {
++        const list = ["--slug", "ok", "--title", "T", "--date", "2026-11-07"];
++        assert.notEqual(create(root, ...list, ...bad).status, 0, JSON.stringify(bad));
++      }
++      assert.notEqual(spawnSync(process.execPath, [CREATE_ADR, "--root", "relative/dir", "--slug", "ok", "--title", "T"], { encoding: "utf8" }).status, 0);
++      assert.equal(fs.existsSync(path.join(root, "docs", "adr")) ? fs.readdirSync(path.join(root, "docs", "adr")).length : 0, 0);
++      assert.equal(create(root, "--slug", "ok", "--title", "T", "--date", "2026-11-07").status, 0);
++      const before = fs.readFileSync(path.join(root, "docs", "adr", "draft-ok.md"));
++      const again = create(root, "--slug", "ok", "--title", "Other", "--date", "2026-11-07");
++      assert.notEqual(again.status, 0);
++      assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-ok.md")).equals(before));
++    });
++  });
+ });
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+new file mode 100644
+index 000000000..03b10f185
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -0,0 +1,177 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * create-adr.mjs -- the sanctioned way to create an Architecture Decision Record proposal (C20 G20-26, greenfield finding G20-23).
++ *
++ * Usage:
++ *   create-adr.mjs --root <root> --slug <slug> --title <title> [--scope project|global | --modules <id[,id...]>]
++ *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
++ *   create-adr.mjs --root <root> --slug <slug> --refresh
++ *
++ * Writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json: a PROPOSAL (status `proposed`, schema
++ * pipeline.architecture-decision.v1, or .v2 when module ids are named) whose `digest` is already the SHA-256 of the Markdown bytes.
++ * `--refresh` recomputes that digest after the Markdown was edited, so nobody hashes by hand.
++ *
++ * Why `draft-<slug>` and not `NNNN-<slug>`: the sanctioned materializer (`pipeline-state.mjs materialize-architecture`, through
++ * lib/architecture-prospective-materialization.mjs) accepts only proposals named `docs/adr/draft-*` and writes the ACCEPTED record to
++ * a different file `docs/adr/NNNN-<slug>` whose bytes the signed manifest pre-binds. An in-place proposed -> accepted flip would
++ * change the very digests the PO's design signature covers. The authoritative status lives in the sidecar only; the Markdown carries
++ * no status line. This script never writes `accepted`, `superseded` or `waived`: no agent write grants those statuses.
++ */
++import { createHash } from "node:crypto";
++import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeSync } from "node:fs";
++import { isAbsolute, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
++
++const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
++const MODULE_ID = /^[a-z][a-z0-9-]{0,79}$/u;
++const ADR_ID = /^[A-Za-z0-9._-]+$/u;
++const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh"]);
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++class Refusal extends Error {}
++const refuse = (message) => { throw new Refusal(message); };
++
++function parseArgs(argv) {
++  const values = new Map();
++  for (let index = 0; index < argv.length; index += 1) {
++    const flag = argv[index];
++    if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
++    if (values.has(flag)) refuse(`${flag} may be given only once`);
++    if (flag === "--refresh") { values.set(flag, true); continue; }
++    const value = argv[index + 1];
++    if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
++    values.set(flag, value);
++    index += 1;
++  }
++  return values;
++}
++
++function adrDirectory(root, create) {
++  const docs = join(root, "docs"), dir = join(docs, "adr");
++  for (const path of [docs, dir]) {
++    if (existsSync(path)) {
++      const stat = lstatSync(path);
++      if (!stat.isDirectory() || stat.isSymbolicLink()) refuse(`${path.slice(root.length + 1)} must be a real directory (not a link) inside the project`);
++    } else if (create) mkdirSync(path);
++  }
++  return dir;
++}
++
++function nextFreeNumber(dir) {
++  const numbers = existsSync(dir) ? readdirSync(dir).map((name) => /^(\d{4})-/u.exec(name)?.[1]).filter(Boolean).map(Number) : [];
++  return String(Math.max(0, ...numbers) + 1).padStart(4, "0");
++}
++
++function validDate(value) {
++  return /^\d{4}-\d{2}-\d{2}$/u.test(value) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
++}
++
++function template(title) {
++  const section = (heading, hint) => `## ${heading}\n\nREPLACE: ${hint}\n`;
++  return [`# ${title}\n`,
++    section("Context", "the forces and constraints that make this decision necessary."),
++    section("Decision", "the decision, stated so that it can be checked against the implementation."),
++    section("Consequences", "what becomes easier, what becomes harder, what is now fixed."),
++    section("Affected Contracts", "the public contracts, modules or paths this decision constrains, or `none`.")].join("\n");
++}
++
++function refreshDigest(root, slug) {
++  const dir = adrDirectory(root, false), id = `draft-${slug}`;
++  const markdownPath = join(dir, `${id}.md`), sidecarPath = join(dir, `${id}.json`);
++  if (!existsSync(markdownPath) || !existsSync(sidecarPath)) refuse(`docs/adr/${id}.md and docs/adr/${id}.json must both exist (create the proposal first)`);
++  let record;
++  try { record = JSON.parse(readFileSync(sidecarPath, "utf8")); } catch { refuse(`docs/adr/${id}.json is not valid JSON`); }
++  if (!validateArchitectureDecisionSidecar(record) || record.id !== id || record.status !== "proposed") {
++    refuse(`docs/adr/${id}.json is not a valid proposal for ${id} (status must be proposed); --refresh changes the digest only`);
++  }
++  const digest = sha256(readFileSync(markdownPath));
++  if (digest === record.digest) return { ok: true, id, sidecar: `docs/adr/${id}.json`, digest, changed: false };
++  // Same key order as the creation; only `digest` changes.
++  const fd = openSync(sidecarPath, "w");
++  try { writeSync(fd, `${JSON.stringify({ ...record, digest }, null, 2)}\n`); } finally { closeSync(fd); }
++  return { ok: true, id, sidecar: `docs/adr/${id}.json`, digest, changed: true };
++}
++
++function createProposal(root, values) {
++  const slug = values.get("--slug");
++  const title = values.get("--title");
++  if (typeof title !== "string" || title.trim() === "" || title !== title.trim() || title.length > 160 || /[\u0000-\u001f\u007f]/u.test(title)) {
++    refuse("--title must be 1 to 160 characters, without leading/trailing space or control characters");
++  }
++  const date = values.get("--date") ?? new Date().toISOString().slice(0, 10);
++  if (!validDate(date)) refuse(`--date must be a real calendar date YYYY-MM-DD, got ${JSON.stringify(date)}`);
++  let scope = values.get("--scope") ?? "project";
++  if (!["project", "global"].includes(scope)) refuse("--scope must be project or global (name module ids with --modules instead)");
++  let moduleIds = null;
++  if (values.has("--modules")) {
++    if (values.has("--scope")) refuse("--modules and --scope exclude each other (named modules make the record module-scoped)");
++    const listed = values.get("--modules").split(",");
++    if (listed.some((id) => !MODULE_ID.test(id))) refuse("--modules must be a comma-separated list of lower-case module ids");
++    moduleIds = [...new Set(listed)].sort();
++    const map = loadPhysicalArchitectureMap(root);
++    if (!map) refuse("--modules needs the physical architecture map (architecture/map); it does not exist yet. Draft a project- or global-scope proposal, or create the proposal after the map is materialized");
++    const known = new Set(map.modules.map((module) => module.id));
++    const unknown = moduleIds.filter((id) => !known.has(id));
++    if (unknown.length) refuse(`module ids not in architecture/map: ${unknown.join(", ")}; known: ${[...known].sort().join(", ")}`);
++    scope = "module";
++  }
++  const supersedes = values.get("--supersedes");
++  const dir = adrDirectory(root, false);
++  if (supersedes !== undefined) {
++    if (!ADR_ID.test(supersedes)) refuse("--supersedes must be an ADR id such as 0003-storage");
++    if (!existsSync(join(dir, `${supersedes}.md`))) refuse(`--supersedes names ${supersedes}, but docs/adr/${supersedes}.md does not exist`);
++  }
++  const id = `draft-${slug}`;
++  if (existsSync(join(dir, `${id}.md`)) || existsSync(join(dir, `${id}.json`))) refuse(`docs/adr/${id}.md or .json already exists; ADRs are immutable history, pick another slug (edit the Markdown and use --refresh to update the digest)`);
++  const markdown = Buffer.from(template(title), "utf8");
++  const record = {
++    schema: moduleIds ? "pipeline.architecture-decision.v2" : "pipeline.architecture-decision.v1",
++    id, title, status: "proposed", digest: sha256(markdown), scope,
++    ...(moduleIds ? { moduleIds } : {}), ...(supersedes === undefined ? {} : { supersedes }), date,
++  };
++  if (!validateArchitectureDecisionSidecar(record)) refuse("internal: the generated sidecar failed the structural check");
++  const free = nextFreeNumber(dir);
++  adrDirectory(root, true);
++  const written = [];
++  try {
++    for (const [name, bytes] of [[`${id}.md`, markdown], [`${id}.json`, Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8")]]) {
++      const fd = openSync(join(dir, name), "wx", 0o644);
++      written.push(join(dir, name));
++      try { writeSync(fd, bytes); } finally { closeSync(fd); }
++    }
++  } catch (error) {
++    for (const path of written) { try { unlinkSync(path); } catch { /* best effort */ } }
++    throw error;
++  }
++  return { ok: true, id, schema: record.schema, status: "proposed", digest: record.digest, markdown: `docs/adr/${id}.md`, sidecar: `docs/adr/${id}.json`,
++    nextFreeNumber: free, acceptedIdAfterApproval: `${free}-${slug}`,
++    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh to recompute the digest, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`." };
++}
++
++export function main(argv = process.argv.slice(2)) {
++  try {
++    const values = parseArgs(argv);
++    const rootValue = values.get("--root");
++    // The guard hands this script the root in whichever separator spelling the shell typed; resolve() normalizes it, so a
++    // forward-slash Windows spelling is not refused here after the guard admitted it.
++    if (typeof rootValue !== "string" || !isAbsolute(rootValue) || !existsSync(rootValue) || !lstatSync(rootValue).isDirectory()) {
++      refuse("--root must be the absolute project root directory");
++    }
++    const root = resolve(rootValue);
++    const slug = values.get("--slug");
++    if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
++    const refresh = values.has("--refresh");
++    if (refresh && values.size !== 3) refuse("--refresh takes only --root and --slug");
++    const result = refresh ? refreshDigest(root, slug) : createProposal(root, values);
++    console.log(JSON.stringify(result, null, 2));
++    return 0;
++  } catch (error) {
++    if (!(error instanceof Refusal)) console.error(`create-adr: ${error?.message ?? error}`);
++    else console.error(`create-adr refused: ${error.message}`);
++    return 1;
++  }
++}
++
++if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main());
+diff --git a/plugins/pipeline-core/skills/architecture-decision/SKILL.md b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+index 6acf61b9c..57c201061 100644
+--- a/plugins/pipeline-core/skills/architecture-decision/SKILL.md
++++ b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+@@ -71,16 +71,23 @@ node plugins/pipeline-core/scripts/architecture-baseline.mjs --root "$PWD" [--di
+ - `no-material-architecture-decision`: Changes are purely routine or localized implementation details.
+ 
+ ### 2. Draft Concise ADR from Governed Evidence
+-When an architectural decision is required, draft a concise ADR in `docs/adr/`:
+-- Filename convention: `docs/adr/XXXX-<slug>.md` (e.g. `docs/adr/0064-storage-adapter-migration.md`).
+-- Companion sidecar JSON: `docs/adr/XXXX-<slug>.json` adhering to
+-  `pipeline.architecture-decision.v1` for project/global scope, or `.v2` for
+-  an explicit module scope. A v2 record must name sorted, unique module IDs
+-  present in the physical OKF map. Bind its selected scope and digests to the
+-  common design approval where required; do not treat `status: "accepted"`
+-  as that proof or request a separate normal activation signature.
+-- Compute the SHA-256 digest of the markdown content and record it in `digest`.
+-- Include standard ADR sections: Title, Status, Date, Context, Decision, Consequences, and Affected Contracts.
++When an architectural decision is required, create the proposal with the one sanctioned script, never by hand:
++```bash
++node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<title>" [--scope global | --modules <id[,id...]>] [--supersedes <adr-id>] [--date YYYY-MM-DD]
++```
++- It writes `docs/adr/draft-<slug>.md` and the sidecar `docs/adr/draft-<slug>.json` (`pipeline.architecture-decision.v1` for
++  project/global scope, `.v2` with `--modules`; module IDs must exist in the physical OKF map), status `proposed`, the digest already
++  computed. It prints the next free ADR number: the accepted record will be `docs/adr/NNNN-<slug>`.
++- The file is `draft-<slug>`, not `NNNN-<slug>`, on purpose: the sanctioned materializer writes the ACCEPTED record to a different
++  file whose bytes the signed design package pre-binds, so approval never changes a digest it covers. Never rename a draft, never
++  write `accepted`, `superseded` or `waived` yourself, and do not request a separate activation signature.
++- Fill each `REPLACE:` section of the Markdown (Context, Decision, Consequences, Affected Contracts), then run the same script with
++  `--root "$PWD" --slug <slug> --refresh` to recompute the digest; never hash by hand. The status and date live in the sidecar only,
++  the Markdown carries no status line.
++- Check one sidecar with `node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/draft-<slug>.json` (both sidecar
++  schemas ship in the plugin; the digest is compared with the sibling Markdown). `submit-plan` runs the same structural check.
++- Bind the proposal to the common design approval where required (v2 `pipeline-design-decision-bindings` block with the
++  prospective-architecture manifest and the chat selection, see section 5); do not treat `status: "accepted"` as that proof.
+ 
+ ### 3. Identify Applicable Inherited Decisions
+ Resolve effective architecture decisions through authority layering:
+@@ -120,11 +127,16 @@ When a project requires a deliberate deviation from an inherited decision or rul
+ ### 5. Supersede Rather than Rewrite
+ Architecture decisions are immutable history. When reversing or replacing a decision:
+ - Never overwrite or rewrite the previous ADR file.
+-- Draft the replacement with `status: "proposed"` and `supersedes: "<previous-id>"`.
++- Draft the replacement with `create-adr.mjs ... --supersedes <previous-id>` (status `proposed`, `supersedes` recorded).
+ - Include the replacement and its historical lineage in the common design
+   package. Only after its required aggregate approval may the sanctioned
+   consumer materialize the replacement as `accepted` and the former record as
+   `superseded`; the agent must not grant those statuses by itself.
++- How the statuses change, and why no digest breaks: `pipeline-state.mjs materialize-architecture` (an agent step, after
++  `approve-plan`) publishes the targets the SIGNED prospective-architecture manifest lists: the accepted record
++  `docs/adr/NNNN-<slug>.md/.json` (a new file; its Markdown wraps the approved draft verbatim) and, for `supersedes`, the superseded
++  predecessor sidecar. The draft files stay `proposed` and untouched. A draft that is not bound in the approved package is never
++  accepted.
+ - Preserve the complete lineage and historical context.
+ 
+ ### 6. Update Living Summary and References
