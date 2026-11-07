@@ -231,6 +231,12 @@
       "disposition": "required"
     },
     {
+      "name": "close-path-e2e-tests",
+      "path": "plugins/pipeline-core/scripts/close-path-e2e.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
       "name": "codex-advisor-execution-tests",
       "path": "plugins/pipeline-core/lib/codex-advisor-execution.test.mjs",
       "disposition": "required"
