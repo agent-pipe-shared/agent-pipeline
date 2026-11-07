@@ -3510,6 +3510,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs"
     },
     {
+      "name": "close-path-e2e-tests",
+      "file": "plugins/pipeline-core/scripts/close-path-e2e.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/close-path-e2e.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/close-path-e2e.test.mjs"
+    },
+    {
       "name": "pin-declared-product-criteria-need-matching-acceptance-evidence-tests",
       "file": "plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",

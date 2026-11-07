@@ -1,0 +1,315 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * G20-35 (candidate 20): the path from a finished implementation to the release preflight is walked end to end, once per runner identity
+ * (claude, codex, antigravity), through the real sanctioned commands of a consumer project fixture. No network, no real key: the scanner
+ * observation is injected the way the security pins do it, approvals use the existing test signing fixtures.
+ *
+ * Source finding (Codex greenfield report): "a real end-to-end test must enable start -> independent return evidence -> consume ->
+ * identical readback -> release". No greenfield run reached that part, so it was unproven on every runner.
+ *
+ * Walk (each step asserts exit code and the typed output the next step consumes):
+ *   1 fixture consumer project + implementation commit
+ *   2 work Verify (verify-evidence-producer.mjs, baseline-security included)
+ *   3 Critic: register-batch, admit, finalize (consume + identical readback), export
+ *   4 close: close-coordinator chain to final-verify-green, then the State writer's close-feature
+ *   5 push gate decision for the candidate commit (guard-push), then release-preflight (createReleasePreflight over the facts of the walk)
+ *
+ * STATUS (budget checkpoint 2): steps 1-4 are GREEN on all three runner identities, through closed-local and the drive quality readback (security-scan
+ * and critic-report-file rows present). Step 5 (push gate decision with a fixture approval, release preflight) is NOT written yet; the walk contains
+ * no assertion for it. The close walked is a mini-profile (rigor 0) course: the rigor >= 1 candidate-bound Critic/Verify audit route is not walked.
+ */
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import test, { after } from "node:test";
+import { runSecurityScan } from "./security-scan.mjs";
+import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+
+import { createHash } from "node:crypto";
+import { prepareConsumerVerify } from "../lib/consumer-verify.mjs";
+import { approveSubmittedPlan, derivePlanLifecycle, enterPlanImplementation, sha256CanonicalJson, submitPlan } from "../lib/plan-spec-state-v2.mjs";
+import { buildRootProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+
+const SCRIPTS = fileURLToPath(new URL(".", import.meta.url));
+const script = (name) => join(SCRIPTS, name);
+
+export const RUNNER_IDENTITIES = Object.freeze([
+  Object.freeze({ runner: "claude", provider: "anthropic", adapter: "session-functional-equivalent" }),
+  Object.freeze({ runner: "codex", provider: "openai", adapter: "session-functional-equivalent" }),
+  Object.freeze({ runner: "antigravity", provider: "google", adapter: "session-functional-equivalent" }),
+]);
+
+const FEATURE_ID = "g2035-feature";
+const RUNNER_MARKERS = Object.freeze({
+  claude: { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "11111111-aaaa-bbbb-cccc-222222222222" },
+  codex: { CODEX_THREAD_ID: "33333333-aaaa-bbbb-cccc-444444444444" },
+  antigravity: { ANTIGRAVITY_AGENT: "1" },
+});
+/** The ambient environment of one runner: its own markers only, never another runner's, and the project dir the State writer reads. */
+function runnerEnv(runner, root) {
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: root };
+  for (const key of ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "ANTIGRAVITY_AGENT", "AI_AGENT", "NODE_TEST_CONTEXT"]) delete env[key];
+  return { ...env, ...RUNNER_MARKERS[runner] };
+}
+let walkEnv = process.env;
+
+/** Run one real command and keep its transcript so a failing step reports the exact command, code and output. */
+function step(log, label, executable, args, { cwd, env = walkEnv, expectedStatus = 0 } = {}) {
+  const result = spawnSync(executable, args, { cwd, env, encoding: "utf8", shell: false, windowsHide: true, maxBuffer: 1 << 26 });
+  log.push({ label, command: [basename(executable), ...args.map((a) => String(a).replaceAll(tmpdir(), "<tmp>"))].join(" "), status: result.status });
+  assert.equal(result.status, expectedStatus, `${label}: exit ${result.status} (expected ${expectedStatus})\n${result.stdout}\n${result.stderr}`);
+  return result;
+}
+const json = (result) => {
+  try { return JSON.parse(result.stdout); } catch { return JSON.parse(result.stdout.trim().split("\n").filter(Boolean).at(-1)); }
+};
+const git = (log, root, args) => step(log, `git ${args[0]}`, "git", ["-C", root, ...args]).stdout.trim();
+function commit(log, root, message) {
+  git(log, root, ["add", "."]);
+  git(log, root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+  return git(log, root, ["rev-parse", "HEAD"]);
+}
+const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+
+const h = (c) => c.repeat(64);
+/** An approved plan in implementation, derived through the library transitions with the feature's real PRD and Spec bytes. */
+function approvedImplementationState(root) {
+  const sha = (path) => createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+  const prdPath = `specs/${FEATURE_ID}/prd_${FEATURE_ID}.md`; const specPath = `specs/${FEATURE_ID}/spec.md`;
+  const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: h("4"), runtimeSha256: h("5"), receiptSha256: h("6"),
+    repositoryFingerprint: h("7"), planPath: prdPath, planSha256: sha(prdPath), specPath, specSha256: sha(specPath) };
+  const draft = {
+    schema: "pipeline.state.v0", activeFeature: { id: FEATURE_ID, planPath: prdPath, phase: "design" }, planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0", featureId: FEATURE_ID, revision: 20,
+      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+      authority: { prd: { path: prdPath, sha256: authority.planSha256 }, spec: { path: specPath, sha256: authority.specSha256 }, result: null },
+      queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 20, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+      closeTransition: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    },
+    updatedAt: "2026-07-31T11:00:00.000Z",
+  };
+  const submitted = submitPlan({ state: draft, expectedStateSha256: sha256CanonicalJson(draft), poGateAuthority: authority, profile: "mini", profileSha256: h("3"),
+    by: "Coordinator", at: "2026-07-31T11:05:00.000Z" });
+  assert.equal(submitted.ok, true);
+  const approved = approveSubmittedPlan({ state: submitted.state, expectedStateSha256: sha256CanonicalJson(submitted.state),
+    expectedSubmissionSha256: derivePlanLifecycle(submitted.state).submissionSha256, poGateAuthority: authority, profileSha256: h("3"), by: "PO",
+    at: "2026-07-31T11:10:00.000Z", designAdvisorAdmissionSha256: h("8"),
+    // mini profile: no design workflow package (a rigor-0 course; the rigor >= 1 audit route is not walked here)
+    designWorkflowPackagePath: null, designWorkflowPackageSha256: null, designWorkflowApproval: null });
+  assert.equal(approved.ok, true);
+  const implementation = enterPlanImplementation({ state: approved.state, expectedStateSha256: sha256CanonicalJson(approved.state), at: "2026-07-31T11:12:00.000Z" });
+  assert.equal(implementation.ok, true);
+  return { ...implementation.state, updatedAt: "2026-07-31T11:15:00.000Z" };
+}
+
+/** A consumer project: calibration naming its own verify command, the prepared Verify adapter, a spec and a review unit at the base. */
+function consumerFixture(log, identity) {
+  const root = mkdtempSync(join(tmpdir(), `g2035-${identity.runner}-`));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, "specs"), { recursive: true });
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  const calibration = buildRootProjectCalibrationIdentity({ rootDir: root });
+  writeJson(join(root, ".claude", "pipeline.json"), {
+    project: basename(root),
+    projectIdentity: { schema: calibration.schema, kind: calibration.kind, rootSha256: calibration.rootSha256 },
+    verify: 'node -e "process.exit(0)"',
+  });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "README.md"), "# Consumer fixture\n");
+  writeFileSync(join(root, ".gitignore"), "/evidence/\n/scratch/\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+  writeJson(join(root, "specs", "review-unit.json"), {
+    schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Close the consumer fixture delivery",
+    specPath: "specs/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+    deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null,
+  });
+  // The control catalog the v2 security envelope sources its capability plan from (seeded the way the security integration suite seeds it).
+  mkdirSync(join(root, "governance", "security-controls"), { recursive: true });
+  writeFileSync(join(root, "governance", "security-controls", "catalog.json"),
+    readFileSync(new URL("../../../governance/security-controls/catalog.json", import.meta.url), "utf8"));
+  // The feature the close ends: PRD, Spec and Result bytes plus the State that tracks it (the start state of the walk, as the course left it).
+  mkdirSync(join(root, "specs", FEATURE_ID), { recursive: true });
+  for (const [name, bytes] of [[`prd_${FEATURE_ID}.md`, "# PRD\n"], ["spec.md", "# Spec\n"], ["result.md", "# Result\n"]]) writeFileSync(join(root, "specs", FEATURE_ID, name), bytes);
+  // The approved-plan start state is built with the library's own submit/approve/enter-implementation transitions (the design course and the
+  // PO's approval ceremony are outside this path); everything from the implementation commit on runs through the real commands.
+  writeJson(join(root, ".claude", "pipeline-state.json"), approvedImplementationState(root));
+  prepareConsumerVerify({ rootDir: root });
+  git(log, root, ["init", "-q", "--initial-branch=main"]);
+  const base = commit(log, root, "base");
+  return { root, base };
+}
+
+/** The authored dispatch record a Critic review binds to (shape of the record the host commit route persists). */
+function dispatchRecord(taskId, commitSha) {
+  return {
+    schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "fixture-model", effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed",
+    commits: [commitSha], candidateCommit: commitSha, resultSha256: "a".repeat(64), log: [{ phase: "verify", toolUseCount: 1 }],
+    report: { text: "done", changedFiles: ["specs/spec.md"] },
+    criticRequired: { schema: "pipeline.critic-required-decision.v1",
+      trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" },
+  };
+}
+
+// Injected scanner observation (no network, no real scanner): fixture binaries reached through PIPELINE_<TOOL>_PATH, the trust assessment mocked,
+// exactly as scripts/security-scan-v2-integration.test.mjs does it. The spawned Verify CLI cannot take the trust mock, so the frozen candidate's
+// scan runs in-process through the same exported engine the security-scan CLI wraps.
+const SCANNER_DIR = mkdtempSync(join(tmpdir(), "g2035-scanners-"));
+after(() => rmSync(SCANNER_DIR, { recursive: true, force: true }));
+function scannerBinary(name, body) {
+  const path = join(SCANNER_DIR, name);
+  writeFileSync(path, `#!/usr/bin/env node\n${body}`);
+  chmodSync(path, 0o755);
+  return path;
+}
+const scannerEnv = {
+  PIPELINE_GITLEAKS_PATH: scannerBinary("gitleaks-clean", `import { writeFileSync } from "node:fs";\nconst a = process.argv.slice(2);\nwriteFileSync(a[a.indexOf("--report-path") + 1], "[]");\n`),
+  PIPELINE_OSV_SCANNER_PATH: scannerBinary("osv-clean", `if (process.argv.includes("--version")) { process.stdout.write("osv-scanner version: 2.0.3\\n"); process.exit(0); }\nprocess.stdout.write(JSON.stringify({ results: [] }));\n`),
+  PIPELINE_SEMGREP_PATH: scannerBinary("semgrep-clean", `process.stdout.write(JSON.stringify({ results: [] }));\n`),
+};
+const scannerSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, shell: false });
+const assessScannerFixture = (path) => (typeof path === "string" && path.startsWith(SCANNER_DIR) ? { ok: true, path } : { ok: false, status: "untrusted_path" });
+
+test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 300_000 }, async () => {
+  for (const identity of RUNNER_IDENTITIES) {
+    const log = [];
+    const fx = consumerFixture(log, identity);
+    walkEnv = runnerEnv(identity.runner, fx.root);
+    try {
+      // 1 implementation commit, then the authored dispatch record of the slice that produced it
+      writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nimplemented\n");
+      const implementation = commit(log, fx.root, "feat: implementation");
+      const taskId = `g2035-${identity.runner}`;
+      writeJson(join(fx.root, "evidence", `dispatch-record-${taskId}.json`), dispatchRecord(taskId, implementation));
+      // evidence/ is ignored in the fixture; the record is committed by force like the host commit route does for its record.
+      git(log, fx.root, ["add", "-f", `evidence/dispatch-record-${taskId}.json`]);
+      git(log, fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "chore: persist the dispatch record"]);
+      const candidate = git(log, fx.root, ["rev-parse", "HEAD"]);
+      const tree = git(log, fx.root, ["rev-parse", `${candidate}^{tree}`]);
+      assert.match(candidate, /^[a-f0-9]{40}$/u);
+      assert.match(tree, /^[a-f0-9]{40}$/u);
+
+      // 2 work Verify, baseline-security included
+      const verify = step(log, `${identity.runner}: work verify`, process.execPath,
+        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "work", "--out", "evidence/verify-work.json"], { cwd: fx.root });
+      const evidence = JSON.parse(readFileSync(join(fx.root, "evidence", "verify-work.json"), "utf8"));
+      assert.equal(evidence.candidate.commit, candidate, `${identity.runner}: work Verify binds the candidate`);
+      assert.ok(evidence.steps.some((s) => s.name === "baseline-security" && s.exitCode === 0), `${identity.runner}: baseline-security ran green`);
+      assert.equal(verify.status, 0);
+
+      // 3 Critic: Verify evidence for the reviewed range, register-batch, admit, finalize (consume + identical readback), export
+      step(log, `${identity.runner}: critic verify evidence`, process.execPath,
+        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "critic", "--base", fx.base, "--out", "evidence/critic-candidate.json"], { cwd: fx.root });
+      const finalizer = (verb, request) => {
+        mkdirSync(join(fx.root, "scratch"), { recursive: true });
+        writeJson(join(fx.root, "scratch", `${verb}-request.json`), request);
+        return step(log, `${identity.runner}: critic ${verb}`, process.execPath,
+          [script("session-critic-finalizer.mjs"), verb, "--root", fx.root, "--request", `scratch/${verb}-request.json`], { cwd: fx.root });
+      };
+      const registered = json(finalizer("register-batch", {
+        schema: "pipeline.critic-generic-batch-registration-request.v2",
+        declaration: { taskId, baseCommit: fx.base, candidateCommit: candidate, logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md",
+          guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" },
+      }));
+      const packetId = "1".repeat(32);
+      const finalizeRequest = {
+        schema: "pipeline.session-critic-finalization-request.v3", taskId, projectId: "consumer-fixture", sessionId: `${identity.runner}-critic-1`, packetId, trigger: "T1",
+        route: { routeId: "session-critic", runner: identity.runner, adapter: identity.adapter, provider: identity.provider, modelTier: "higher-capability", effortTier: "xhigh" },
+        review: { base: fx.base, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/critic-candidate.json"],
+          priorCriticEvidencePath: null, genericBatchRef: { ...registered.batchRef, memberSha256: registered.memberSha256 } },
+        verdictPath: "evidence/critic-verdict.json", event: null,
+      };
+      const admitted = json(finalizer("admit", finalizeRequest));
+      assert.equal(admitted.packetId, packetId);
+      writeJson(join(fx.root, "evidence", "critic-verdict.json"), { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
+        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true });
+      const finalized = json(finalizer("finalize", finalizeRequest));
+      assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
+      assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
+      const featureId = "g2035-feature";
+      writeFileSync(join(fx.root, "evidence", "critic-report.md"), "# Critic report\n\nNo findings.\n");
+      const exported = json(finalizer("export", {
+        schema: "pipeline.session-critic-export-request.v1", packetId, reportPath: "evidence/critic-report.md", outDir: `specs/${featureId}/evidence/critic/${packetId}`,
+      }));
+      assert.equal(exported.status, "exported");
+
+      // 4 close: the coordinator chain through the real CLI, the State writer action the coordinator returns, no hand-written close state
+      const exportCommit = commit(log, fx.root, "docs: exported Critic evidence");
+      assert.notEqual(exportCommit, candidate, "the exported evidence follows the reviewed candidate");
+      const lifecycle = `close-${identity.runner}`;
+      const coordinator = (verb, extra) => json(step(log, `${identity.runner}: close-coordinator ${verb}`, process.execPath,
+        [script("close-coordinator.mjs"), verb, "--root", fx.root, "--lifecycle", lifecycle, ...extra], { cwd: fx.root }));
+      const runAction = (label, action) => json(step(log, `${identity.runner}: ${label}`, action.executable, action.argv, { cwd: fx.root }));
+      const started = coordinator("plan-start", ["--actor", "PO", "--close-intent", "durable-stop"]);
+      const startedApplied = runAction("apply-start", started.nextAction);
+      assert.equal(startedApplied.status, "applied");
+      const transition = (phase, extra = []) => runAction(`apply ${phase}`, coordinator("plan-transition", ["--actor", "PO", "--phase", phase, ...extra]).nextAction);
+      transition("checkpointed");
+      // The Result is bound to the Continuity state and the queue head says close (the work package's own output); the close request names the
+      // exported Critic receipt as its close evidence, which the skill names as the usual choice.
+      const statePath = join(fx.root, ".claude", "pipeline-state.json");
+      const fileSha = (rel) => createHash("sha256").update(readFileSync(join(fx.root, rel))).digest("hex");
+      const resultPath = `specs/${FEATURE_ID}/result.md`;
+      const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
+      const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
+      step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
+      const bound = JSON.parse(readFileSync(statePath, "utf8"));
+      // review -> close through the sanctioned Result-close verb (plan, then the action it returns); no hand edit of the Continuity state
+      const closePlan = json(stateWriter("continuity-result-close-plan", "continuity-result-close-plan", ["--feature-id", FEATURE_ID,
+        "--expected-revision", String(bound.continuity.revision), "--result-path", bound.continuity.authority.result.path, "--result-sha256", bound.continuity.authority.result.sha256]));
+      step(log, `${identity.runner}: continuity-result-close-apply (the action the plan returned)`, closePlan.applyAction.executable, closePlan.applyAction.argv, { cwd: fx.root });
+      const workState = JSON.parse(readFileSync(statePath, "utf8"));
+      assert.equal(workState.continuity.queueHead.nextAction, "close");
+      const receiptPath = `specs/${FEATURE_ID}/evidence/critic/${packetId}/receipt.json`;
+      writeJson(join(fx.root, "evidence", "close-request.json"), { schema: "pipeline.continuity-close.v0", featureId: FEATURE_ID,
+        expectedRevision: workState.continuity.revision, result: workState.continuity.authority.result, closeEvidence: { path: receiptPath, sha256: fileSha(receiptPath) } });
+      const prepared = transition("feature-close-prepared", ["--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+      assert.equal(prepared.phase, "feature-close-prepared");
+      assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
+      // The State writer prints a plain sentence, not JSON.
+      const closed = step(log, `${identity.runner}: close-feature (State writer action returned by the coordinator)`, prepared.nextAction.executable, prepared.nextAction.argv, { cwd: fx.root });
+      assert.match(closed.stdout, /^Feature "/u, closed.stdout);
+      const closedState = JSON.parse(readFileSync(statePath, "utf8"));
+      assert.equal(closedState.closedFeatures.at(-1).id, FEATURE_ID);
+
+      // 4d tracked close effects with the real digests, one final commit, then the freeze
+      const emptySha = createHash("sha256").update("").digest("hex");
+      writeJson(join(fx.root, "evidence", "tracked.json"), { schema: "pipeline.close-tracked-effects.v1", resultSha256: fileSha(resultPath), backlogSha256: emptySha,
+        handoverSha256: emptySha, historySha256: emptySha, telemetrySha256: emptySha, retrospectiveSha256: emptySha, pipelineStateSha256: fileSha(".claude/pipeline-state.json") });
+      transition("tracked-close-finalized", ["--evidence", "evidence/tracked.json"]);
+      const closeCommit = commit(log, fx.root, "chore: final tracked close");
+      transition("candidate-frozen");
+      const frozenTree = git(log, fx.root, ["rev-parse", `${closeCommit}^{tree}`]);
+      assert.match(frozenTree, /^[a-f0-9]{40}$/u);
+
+      // 4e candidate Verify, injected security observation, final Verify evidence built from the producers' own output
+      step(log, `${identity.runner}: candidate verify`, process.execPath,
+        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "candidate", "--out", "evidence/verify-candidate.json"], { cwd: fx.root });
+      const candidateVerify = JSON.parse(readFileSync(join(fx.root, "evidence", "verify-candidate.json"), "utf8"));
+      assert.equal(candidateVerify.candidate.commit, closeCommit, `${identity.runner}: candidate Verify binds the frozen candidate`);
+      const scan = await runSecurityScan({ rootDir: fx.root, env: scannerEnv, spawnFn: scannerSpawn, timeoutMs: 5000, assessTrustedExecutablePath: assessScannerFixture });
+      assert.equal(scan.exitCode, 0, `${identity.runner}: the injected clean scanners pass the frozen candidate`);
+      assert.equal(scan.verdictV2.verdict.blocking, false);
+      const finalEvidence = join(startedApplied.evidenceDirectory, "final-verification.json");
+      writePrivateJsonAtomic(finalEvidence, { schema: "pipeline.close-final-verification.v1", candidateOid: closeCommit, candidateTree: frozenTree,
+        verifyStatus: "green", verifySha256: fileSha("evidence/verify-candidate.json"), securityStatus: "green", securitySha256: fileSha("evidence/security-latest.v2.verdict.json") });
+      transition("final-verify-green", ["--evidence", finalEvidence]);
+      const driven = coordinator("drive", ["--actor", "PO", "--phase", "cleanup-complete", "--apply"]);
+      assert.equal(driven.status, "applied", JSON.stringify(driven).slice(0, 600));
+      transition("closed-local");
+      const readback = coordinator("drive", ["--actor", "PO"]);
+      const rowStatus = Object.fromEntries(readback.qualityReadback.map((row) => [row.id, row.status]));
+      assert.equal(rowStatus["security-scan"], "present", JSON.stringify(readback.qualityReadback));
+      assert.equal(rowStatus["critic-report-file"], "present", JSON.stringify(readback.qualityReadback));
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  }
+});
