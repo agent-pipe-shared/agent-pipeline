@@ -1,0 +1,366 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 11dc517fa..a2a523cce 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Explicit architecture content in the PO-approved design, never inferred from a repository. */
+ import { createHash } from "node:crypto";
++import { spawnSync } from "node:child_process";
+ import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { readAuthoritySeal } from "./authority-seal-reader.mjs";
+@@ -538,6 +539,21 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
+   return { ok: true, inspected, prospective, approvalBasis: subset.approvalBasis ?? null, targets, sealedTargets };
+ }
+ 
++/**
++ * G20-36 (AC-108): the materialized architecture must reach the audit trail. The writer publishes files, it does not commit; this reads the
++ * working tree back (`git status`, repository-relative paths) and names the exact stage-and-commit step while any of it is uncommitted.
++ */
++export function architectureCommitStep(rootDir, extraPaths = []) {
++  const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", "architecture", ...extraPaths],
++    { cwd: resolve(rootDir), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
++  if (status.status !== 0 || status.error) {
++    return { uncommittedPaths: [], nextAction: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
++  }
++  const uncommittedPaths = status.stdout.split("\0").filter(Boolean).map(entry => entry.slice(3)).sort();
++  if (uncommittedPaths.length === 0) return { uncommittedPaths, nextAction: null };
++  return { uncommittedPaths, nextAction: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
++}
++
+ export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {
+   const root = resolve(rootDir);
+   try {
+diff --git a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+index 1fe974844..d378f50d1 100644
+--- a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+@@ -6,7 +6,7 @@ import { join } from 'node:path';
+ import test from 'node:test';
+ import * as fixture from './architecture-prospective-materialization.fixture.mjs';
+ import { inspectArchitectureEntryReadiness } from './architecture-entry-readiness.mjs';
+-import { inspectArchitectureDesign } from './architecture-design.mjs';
++import { architectureCommitStep, inspectArchitectureDesign } from './architecture-design.mjs';
+ 
+ const readiness = f => inspectArchitectureEntryReadiness({ rootDir: f.dir, taskScope: fixture.PLAN,
+   deps: { readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }) } });
+@@ -97,6 +97,21 @@ test('G27-PUBLIC-006 rebinding approved State to a different physical root is re
+   assert.equal(existsSync(join(target.dir, 'architecture/design-materialization.json')), false);
+ });
+ 
++test('G20-36 materialize-architecture names the exact commit step while the materialized architecture is uncommitted', () => {
++  const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
++  const executed = fixture.invoke(f, ['materialize-architecture']);
++  assert.equal(executed.status, 0, executed.text);
++  const output = JSON.parse(executed.text);
++  assert.equal(output.status, 'materialized');
++  assert(output.uncommittedPaths.includes('architecture/design-materialization.json'), JSON.stringify(output.uncommittedPaths));
++  assert(output.uncommittedPaths.every(path => !path.includes('\\')), 'repository-relative paths');
++  assert.match(output.nextAction, /git add -- .*architecture\/design-materialization\.json/u);
++  assert.match(output.nextAction, /commit/u);
++  fixture.git(f, 'add', '--', ...output.uncommittedPaths);
++  fixture.git(f, 'commit', '-q', '-m', 'docs(architecture): commit the materialized architecture\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
++  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], nextAction: null });
++});
++
+ test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {
+   const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+   const wrongRoot = join(f.dir, 'scratch', 'wrong-root');
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 7315f3983..deb3d0ea5 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -32,7 +32,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
+ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { loadMapBundle, pathMatchesPattern } from "./module-inventory.mjs";
+-import { extractJsImports } from "./architecture-fitness.mjs";
++import { evaluateSizeBudgets, extractJsImports, loadFitnessModel } from "./architecture-fitness.mjs";
++import { CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+ 
+ export const BOUNDARY_CHECK_SCHEMA = "pipeline.architecture-boundary-check.v1";
+ export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1";
+@@ -126,6 +127,8 @@ function observe(root, modules, policy, listed, readFile, extensions) {
+   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
+   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
+   const violations = [];
++  const usage = new Map(); // module id -> { files, lines } of its source files
++  const edges = new Map(); // module id -> Set of module ids its source files really import (allowed or not)
+   for (const file of sources) {
+     const owners = owningModules(file, modules);
+     if (owners.length === 0) {
+@@ -137,6 +140,10 @@ function observe(root, modules, policy, listed, readFile, extensions) {
+     let text;
+     try { text = readFile(path.join(root, file)); } catch { continue; }
+     const lines = lineCount(text);
++    if (owners.length === 1) {
++      const row = usage.get(owners[0].id) ?? { files: 0, lines: 0 };
++      usage.set(owners[0].id, { files: row.files + 1, lines: row.lines + lines });
++    }
+     if (lines > policy.lineBound) {
+       violations.push({ file, module: owners.length === 1 ? owners[0].id : null, rule: "over-line-bound", lines,
+         detail: `${file} has ${lines} lines, over the bound of ${policy.lineBound}` });
+@@ -152,12 +159,15 @@ function observe(root, modules, policy, listed, readFile, extensions) {
+         continue;
+       }
+       const targetOwners = owningModules(target, modules);
+-      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id || allowed.includes(targetOwners[0].id)) continue;
++      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id) continue;
++      if (!edges.has(caller.id)) edges.set(caller.id, new Set());
++      edges.get(caller.id).add(targetOwners[0].id);
++      if (allowed.includes(targetOwners[0].id)) continue;
+       violations.push({ file, module: caller.id, rule: "forbidden-dependency", target,
+         detail: `module ${caller.id} imports ${target} of module ${targetOwners[0].id}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
+     }
+   }
+-  return { sources, violations: violations.sort(order) };
++  return { sources, violations: violations.sort(order), usage, edges };
+ }
+ 
+ /**
+@@ -178,7 +188,7 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
+   const listed = (deps.listFiles ?? trackedFiles)(root);
+   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
+   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
+-  const { sources, violations: observed } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
++  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
+ 
+   const accepted = new Map(policy.exceptions.map((entry) => [exceptionKey(entry.rule, entry.path, entry.target ?? null), entry]));
+   const used = new Set();
+@@ -211,6 +221,49 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
+     violations,
+     staleExceptions,
+     _observed: observed,
++    _measured: { modules: bundle.modules, usage, edges },
++  };
++}
++
++// G20-36 (AC-108): what the Verify path measures on top of the check -- the real cross-module imports and the size of every
++// module, next to the observation budgets. Files the Pipeline itself keeps in a consumer project belong to no module.
++export const ARCHITECTURE_MEASUREMENT_SCHEMA = "pipeline.architecture-measurement.v1";
++const MANAGED_EXCLUSIONS = Object.freeze([
++  { pattern: CONSUMER_VERIFY_ADAPTER_PATH, reason: "the Pipeline's consumer Verify adapter, not project source" },
++  { pattern: ".claude/**", reason: "Pipeline runtime files, not project source" },
++]);
++
++export function measureArchitecture({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
++  const readPolicy = deps.readPolicy ?? readBoundaryPolicy;
++  const withManaged = (root) => {
++    const read = readPolicy(root);
++    return read.ok ? { ok: true, policy: { ...read.policy, excludedPaths: [...read.policy.excludedPaths, ...MANAGED_EXCLUSIONS] } } : read;
++  };
++  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, { ...deps, readPolicy: withManaged });
++  const measured = result._measured;
++  const publicOut = publicResult(result);
++  if (!measured) return publicOut;
++  const root = path.resolve(rootDir);
++  const fitnessModel = loadFitnessModel(root);
++  const advisory = evaluateSizeBudgets({ rootDir: root, inventory: measured.modules, fitnessModel });
++  const bySize = (a, b) => (a.scope === b.scope ? 0 : a.scope === "file" ? -1 : 1) || String(a.path).localeCompare(String(b.path));
++  const budget = { maxFileLines: advisory.budgets.maxFileLines, maxModuleLines: advisory.budgets.maxModuleLines };
++  return {
++    ...publicOut,
++    measurement: {
++      schema: ARCHITECTURE_MEASUREMENT_SCHEMA,
++      budgets: { ...budget, source: fitnessModel?.sizeBudgets && typeof fitnessModel.sizeBudgets === "object" ? "fitness-model" : "default" },
++      modules: measured.modules.map((mod) => ({
++        id: mod.id,
++        ownedPaths: mod.ownedPaths ?? [],
++        sourceFiles: measured.usage.get(mod.id)?.files ?? 0,
++        sourceLines: measured.usage.get(mod.id)?.lines ?? 0,
++        measuredDependencies: [...(measured.edges.get(mod.id) ?? [])].sort(),
++        allowedDependencies: [...(mod.allowedDependencies ?? [])].sort(),
++        budget,
++        overBudget: advisory.overBudget.filter((entry) => entry.module === mod.id).map(({ scope, path: file, lines, budget: limit }) => ({ scope, path: file, lines, budget: limit })).sort(bySize),
++      })),
++    },
+   };
+ }
+ 
+@@ -238,10 +291,27 @@ export function exitCodeForBoundaryCheck(result) {
+ }
+ 
+ function publicResult(result) {
+-  const { _observed, ...rest } = result;
++  const { _observed, _measured, ...rest } = result;
+   return rest;
+ }
+ 
++// G20-36 (AC-108): the dispatcher the generated Verify adapter imports for the `baseline-architecture` suite (the producer passes this
++// module's URL; no kernel file imports it). Every real cross-module import and every file outside the module that owns it is a finding with
++// its module and file; the observation budgets are reported per module (advisory). A project without an architecture map is not applicable.
++export function runConsumerVerifyCheck(check) {
++  if (check !== "architecture") { console.error(`unknown architecture Verify check: ${check}`); return 1; }
++  const result = measureArchitecture({ rootDir: process.cwd() });
++  console.log(JSON.stringify(result));
++  for (const violation of result.violations ?? []) console.error(`[${violation.rule}] ${violation.detail}`);
++  for (const line of result.errors ?? []) console.error(line);
++  if (result.reason && result.status !== "not-applicable") console.error(result.reason);
++  const code = exitCodeForBoundaryCheck(result);
++  if (code !== 0) {
++    console.error(`architecture check ${result.status}: fix the code or declare the module, path or dependency in architecture/map; an existing, accepted state is recorded once with: node ${fileURLToPath(import.meta.url)} --root . --write-policy`);
++  }
++  return code === 0 ? 0 : 1;
++}
++
+ function runCli(argv) {
+   let rootDir = process.cwd();
+   let json = false;
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index 12ccc0003..36fdb98c7 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -15,6 +15,7 @@ import {
+   DEFAULT_LINE_BOUND,
+   checkArchitectureBoundaries,
+   exitCodeForBoundaryCheck,
++  measureArchitecture,
+   owningModules,
+ } from "./architecture-boundary-check.mjs";
+ 
+@@ -179,3 +180,32 @@ test("ABC09 the CLI writes a first policy once, accepting the current violations
+   assert.equal(cli("--bogus").status, 2);
+   assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), true);
+ });
++
++// G20-36 (AC-108): the map is measured against the implemented code, with the observation budgets reported per module.
++test("ABC10 the measurement names the module and file of a forbidden import and reports each module's real dependencies and size", () => {
++  const root = fixture({ deps: { app: [] }, files: { "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(3) } });
++  const result = measureArchitecture({ rootDir: root });
++  assert.equal(result.status, "findings");
++  assert.equal(exitCodeForBoundaryCheck(result), 1);
++  assert.deepEqual(result.violations.map((violation) => [violation.rule, violation.module, violation.file, violation.target]), [["forbidden-dependency", "app", "src/app/main.mjs", "src/lib/x.mjs"]]);
++  assert.equal(result.measurement.schema, "pipeline.architecture-measurement.v1");
++  assert.deepEqual(result.measurement.budgets, { maxFileLines: 500, maxModuleLines: 2500, source: "default" });
++  const app = result.measurement.modules.find((entry) => entry.id === "app");
++  assert.deepEqual([app.measuredDependencies, app.allowedDependencies, app.sourceFiles, app.sourceLines], [["lib"], [], 1, 1]);
++  assert.deepEqual(app.budget, { maxFileLines: 500, maxModuleLines: 2500 });
++  assert.equal(result.measurement.modules.find((entry) => entry.id === "lib").sourceLines, 3);
++  assert.equal(Object.hasOwn(result, "_observed"), false);
++  assert.equal(measureArchitecture({ rootDir: fixture({ map: false, files: { "src/x.mjs": "export {};\n" } }) }).status, "not-applicable");
++});
++
++test("ABC11 budgets carried by the fitness model are reported per module and stay advisory", () => {
++  const model = JSON.stringify({ schema: "pipeline.fitness-model.v1", profileId: "p", revision: 1, modules: ["app", "lib"], allowedBoundaryCrossings: [], sizeBudgets: { maxFileLines: 3, maxModuleLines: 4 } });
++  const root = fixture({ files: { "architecture/fitness-model.json": model, "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(5) } });
++  const result = measureArchitecture({ rootDir: root });
++  assert.equal(result.status, "pass", "an over-budget file is reported, never a boundary finding");
++  assert.deepEqual(result.measurement.budgets, { maxFileLines: 3, maxModuleLines: 4, source: "fitness-model" });
++  const lib = result.measurement.modules.find((entry) => entry.id === "lib");
++  assert.deepEqual(lib.budget, { maxFileLines: 3, maxModuleLines: 4 });
++  assert.deepEqual(lib.overBudget, [{ scope: "file", path: "src/lib/x.mjs", lines: 5, budget: 3 }, { scope: "module", path: null, lines: 5, budget: 4 }]);
++  assert.deepEqual(result.measurement.modules.find((entry) => entry.id === "app").overBudget, []);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 93b2f4904..5d5297b96 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -471,7 +471,7 @@ import {
+   validateDesignWorkflowPackageApprovalRequest,
+   verifyDesignWorkflowPackageApproval,
+ } from "../lib/design-workflow-approval.mjs";
+-import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
++import { architectureCommitStep, materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
+ import { boundedCopySafeCommand, placeholder, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
+ import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
+ import {
+@@ -11581,8 +11581,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
+           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
++        // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
++        const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
+         console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+-          code: result.code ?? null, receipt: result.receipt ?? null }));
++          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.nextAction ? commitStep : {}) }));
+         return result.ok && result.status === "materialized" ? 0 : 2;
+       } finally { releaseContinuityLock(lock); }
+     }
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index fb0c8b8fd..25c99e86b 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -490,6 +490,9 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
+     { name: "baseline-repository", file, args: [CONSUMER_VERIFY_DISPATCHER, "repository-baseline"] },
+     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
++    // G20-36: the implemented modules are measured against the architecture map in the normal delivery path (not applicable without a map).
++    // The dispatcher is the measurement module itself (a URL, not an import edge), so the kernel closure of consumer-verify-check.mjs is unchanged.
++    { name: "baseline-architecture", file, args: [new URL("./architecture-boundary-check.mjs", import.meta.url).href, "architecture"] },
+     // G20-25: the configured security scanners run in the normal delivery path (not applicable when the project configures no gate).
+     // The attempt token makes the scan always re-run: a cached result for an unchanged tree would hide a scanner that is now missing.
+     { name: "baseline-security", file, args: [CONSUMER_VERIFY_DISPATCHER, "security", attempt] },
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 50a8737a9..2fe20d01f 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -195,10 +195,11 @@ test("a passing verify produces a consumable artifact bound to the exact commit
+       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
+       // Restated in place (QG-04, G20-25): the standard baseline gained the "baseline-security" suite, so one more suite is registered and
+       // receipted (5 -> 6); nothing is weakened, the exact suite list below pins the new member.
+-      registeredSuiteCount: 6, terminalReceiptCount: 6, terminalStatus: "passed",
++      // Restated again in place (QG-04, G20-36): the standard baseline gained "baseline-architecture" (6 -> 7).
++      registeredSuiteCount: 7, terminalReceiptCount: 7, terminalStatus: "passed",
+       receiptReuse: "allowed",
+     }));
+-    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
++    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-architecture", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+     assert.equal(result.evidence.coverage, "project-calibrated");
+     assert.equal(result.evidence.selection.mode, "candidate");
+     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
+@@ -207,6 +208,41 @@ test("a passing verify produces a consumable artifact bound to the exact commit
+   });
+ });
+ 
++// G20-36 (AC-108): the normal Verify measures the implemented modules against the architecture map, not only at set-phase.
++const architectureConcept = (id, owned, allowed) => `---\ntype: Governed Module\nid: ${id}\nresponsibility: ${id} module\nnonResponsibilities: []\nownedPaths:\n  - ${owned}\nallowedDependencies:${allowed.length ? `\n${allowed.map((value) => `  - ${value}`).join("\n")}` : " []"}\npublicContracts: []\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n\n# ${id}\n`;
++function commitArchitecture(root, allowed) {
++  const files = { "architecture/map/index.md": "# Map\n", "architecture/map/app.md": architectureConcept("app", "src/app/**", allowed),
++    "architecture/map/lib.md": architectureConcept("lib", "src/lib/**", []),
++    "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\nexport const y = x;\n', "src/lib/x.mjs": "export const x = 1;\n" };
++  for (const [name, text] of Object.entries(files)) { mkdirSync(join(root, name, ".."), { recursive: true }); writeFileSync(join(root, name), text); }
++  git(root, ["add", "."]);
++  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "implement against the map"]);
++}
++const suiteLog = (root, runId, suite) => readFileSync(join(root, ".git/agent-pipeline/verify/runs", runId, "logs", `${verifySuiteArtifactName(suite)}.log`), "utf8");
++
++test("G20-36 the normal Verify reports a module that imports across a forbidden boundary with module and file, and the observation budgets", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    commitArchitecture(root, []);
++    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }),
++      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"baseline-architecture","exitCode":1/u.test(error.message));
++    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false, "a boundary finding leaves no Verify evidence");
++    const runs = join(root, ".git/agent-pipeline/verify/runs");
++    const failedLog = suiteLog(root, readdirSync(runs)[0], "baseline-architecture");
++    assert.match(failedLog, /\[forbidden-dependency\] module app imports src\/lib\/x\.mjs of module lib/u);
++    assert.match(failedLog, /architecture-boundary-check\.mjs --root \. --write-policy/u, "the refusal names the runnable repair");
++    // The repair: declare the dependency in the map; the same Verify then passes and carries the measurement.
++    writeFileSync(join(root, "architecture/map/app.md"), architectureConcept("app", "src/app/**", ["lib"]));
++    git(root, ["add", "."]);
++    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "declare the dependency"]);
++    const passed = await produceVerifyEvidence({ rootDir: root });
++    assert.equal(passed.status, "passed");
++    const log = suiteLog(root, passed.evidence.verifyRun.runId, "baseline-architecture");
++    const measurement = JSON.parse(log.split("\n").find((line) => line.startsWith("{")));
++    assert.equal(measurement.measurement.budgets.source, "default");
++    assert.deepEqual(measurement.measurement.modules.find((entry) => entry.id === "app").measuredDependencies, ["lib"]);
++  });
++});
++
+ test("a failing verify command produces no artifact at all", async () => {
+   await withFixture('node -e "process.exit(3)"', async (root) => {
+     await assert.rejects(
+@@ -691,10 +727,10 @@ test("real product assertions stay fresh while eligible baselines resume with du
+     const first = await produceVerifyEvidence({ rootDir: root });
+     const second = await produceVerifyEvidence({ rootDir: root });
+     assert.equal(second.evidence.command, command);
+-    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
++    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract", "baseline-architecture"]); // restated in place (QG-04, G20-36): the deterministic architecture measurement resumes like the other tree-bound baselines
+     const runs = join(root, ".git/agent-pipeline/verify/runs");
+     const run = join(runs, second.evidence.verifyRun.runId);
+-    assert.equal(readdirSync(join(run, "receipts")).length, 6); // restated in place (QG-04, G20-25): 5 -> 6 with the "baseline-security" suite
++    assert.equal(readdirSync(join(run, "receipts")).length, 7); // restated in place (QG-04, G20-25, G20-36): 5 -> 6 with the "baseline-security" suite, 6 -> 7 with "baseline-architecture"
+     assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
+     assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
+     writeFileSync(join(root, ".git/fail-product"), "fail");
