@@ -170,4 +170,35 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
 - **Interim for the PO (until candidate 20 is installed):** the Windows session asks for exactly one command, `! node scratch/move-adoption-state.mjs`
   (moves the file into `scratch/`, deletes nothing). The agent then materializes and switches to implementation on its own.
 
+## Greenfield analysis reports (PO 2026-11-07): further fixes in the same held patch
+
+Source: the three runner reports `docs/pipeline-analyse-greenfield_<project>.md` and their transcripts, read-only. The mapping of every
+finding is in the candidate-19 plan (G20-14 to G20-32).
+
+- **G20-14 (agy):** `model-role-dispatch-select.mjs --runner antigravity` exited 13 ("unsettled top-level await"). Cause, measured with an
+  import walk: `model-role-bootstrap.mjs` imports a graph that cycles back into the selector (via `session-critic-finalizer.mjs` and
+  `codex-critic-session-route.mjs`); the selector's top-level `await import(...)` left the entry module unevaluated and the cycle waited on it.
+  Fix: the CLI body is a function. Reproduced exit 13 before, JSON after. New MDS11 spawns the CLI. 11/11.
+- **G20-15 (agy):** invalid ADR sidecars were first found by `set-phase implementation`, after the PO signed; reopen-design and a second
+  signature followed. `submit-plan` now runs the structural ADR check (`inspectArchitectureDecisionAuthoringSources`, area `project`) for a
+  design-package profile and refuses before anything is recorded, naming each sidecar. Two pin cases. 23/23.
+- **G20-18 (Claude):** `architecture-adoption.mjs prepare --decided-at now` resolves to the canonical instant once (the agent has no admitted
+  clock). D10 restated in place (QG-04) for the new message; new case for `now`. 58/58.
+- **G20-19 (Claude):** the submit-plan warning named `configure-verify`, which the guard refuses while the plan awaits approval. It now names the
+  admitted `set-phase --phase implementation --verify-command "<cmd>"`. Two pins restated (QG-04).
+- **G20-21 (agy, Claude):** `<absolute node> scratch/<x>.mjs` and `node <root>/scratch/<x>.mjs` are the draft scratch shape (Node must resolve
+  outside the root; a planted `node` stays refused). The "use bare node" advice only appears where it applies. GIT-03 names
+  `git commit -F scratch/<message-file>`. `design-review-receipt.mjs create --help`: the script has no help, so the refusal is correct.
+- **G20-17 (Claude on Windows):** the human-override `plan` and `prepare-for-signature` are in the catalogue, yet were refused: the agent
+  typed the Windows Node path with forward slashes and the catalogue matched the interpreter only as `node` or the hook's exact
+  `process.execPath`. `resolveSanctionedScriptInvocation` now also admits an absolute Node that resolves to an executable file outside the
+  root (same rule as G20-1). This also covers the agy `architecture-baseline.mjs --validate` calls with the version-manager Node.
+- **G20-24 (Codex, PO decision):** the finalizer no longer refuses without a Source return record; it finalizes under the
+  `caller-authored-fallback` label with the lower-assurance receipt flags. A present record must still bind exactly. Cut A tests restated
+  (QG-04). 92/92.
+- **G20-32 (Claude):** `approve-plan` names `materialize-architecture` first when the approved design is `materialization-required`, and warns
+  off the adoption route. Two cases. 3/3.
+- **Separator sweep (PO 2026-11-07, "Check über den gesamten Code"):** a read-only search over hooks, lib and scripts for exact-spelling path
+  comparisons on agent input; results and fixes follow below once done.
+
 Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.
