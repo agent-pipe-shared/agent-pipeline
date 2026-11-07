@@ -134,7 +134,10 @@ export function architectureAdoptionAuthorityVerdict(root, command, dependencies
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: ${detail}\n`
-      + "Record one PO-owned approved-scoped or partial adoption decision for the active plan scope before requesting implementation authority.\n",
+      // C20 w252 (G20-5): an approved greenfield design is resolved by materialization, never by a PO adoption decision.
+      + (disposition?.disposition === "materialization-required"
+        ? "This is not an adoption decision: the approved design package already carries it. Materialize it, then retry the same set-phase.\n"
+        : "Record one PO-owned approved-scoped or partial adoption decision for the active plan scope before requesting implementation authority.\n"),
   );
 }
 

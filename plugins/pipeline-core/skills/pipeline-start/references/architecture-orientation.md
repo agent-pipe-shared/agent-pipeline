@@ -8,8 +8,13 @@ from an `AGENTS.md` pointer.
 When its status is `adoption-required`, execute its nested, read-only
 `nextAction` verbatim to obtain the staged proposal and surface it to the PO.
 For `design-pending`, state that the physical greenfield scaffold exists but
-is not an adopted baseline; finish initial design before asking the PO for a
-scoped disposition. For `decision-recorded`, read the declared architecture
+is not an adopted baseline. The scoped disposition is part of the PRD's
+architecture design block and is approved with the plan; there is no separate
+PO adoption step. After `approve-plan`, run
+`pipeline-state.mjs materialize-architecture` yourself, then
+`set-phase --phase implementation`. Never use `architecture-adoption.mjs
+prepare`/`apply` on a greenfield repository; that route is for existing ones
+and leaves an entry that blocks materialization. For `decision-recorded`, read the declared architecture
 map and compiled decision summary in the AGENTS re-entry order, then only
 concepts for touched modules. `unavailable` is an honest retry/diagnosis,
 never a claim that a map exists.

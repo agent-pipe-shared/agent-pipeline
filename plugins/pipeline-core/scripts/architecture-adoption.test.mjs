@@ -402,6 +402,31 @@ describe("Adoption authority anti-forgery and durable readback", () => {
     setupAdoptionFixture(root);
     assert.equal(resolveAdoptionState(root).state, "adoption-required");
   });
+  it("C20 w252 (G20-5): CLI apply with only --request/--proof reads the decision fields from the signed request; a changed field is still refused", () => {
+    const plugin = path.join(root, "plugin");
+    fs.cpSync(path.resolve("plugins/pipeline-core"), plugin, { recursive: true });
+    const script = path.join(plugin, "scripts/architecture-adoption.mjs");
+    const prepareArgv = ["--root", root, "--decision", input.decision, "--scope", input.scope, "--rationale", input.rationale, "--decision-ref", input.decisionRef, "--decided-at", input.decidedAt, "--json"];
+    const prepared = spawnSync(process.execPath, [script, "prepare", ...prepareArgv], { encoding: "utf8" });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const req = JSON.parse(prepared.stdout);
+    fs.writeFileSync(path.join(root, "request.json"), JSON.stringify(req));
+    fs.writeFileSync(path.join(root, "proof.json"), JSON.stringify(signAdoptionRequest(req, key)));
+    const signed = ["--request", path.join(root, "request.json"), "--proof", path.join(root, "proof.json")];
+    // A field given again with a different value than the signed one still breaks the subject binding.
+    const changed = spawnSync(process.execPath, [script, "apply", "--root", root, "--decision", input.decision, "--rationale", "a different rationale", ...signed], { encoding: "utf8" });
+    assert.notEqual(changed.status, 0, "a re-given field that differs from the signed subject is refused");
+    assert.match(changed.stderr, /ADOPTION-AUTHORITY-SUBJECT-MISMATCH/u, "refused by the subject binding, not by something else");
+    assert.equal(resolveAdoptionState(root).state, "adoption-required", "nothing was written by the refused apply");
+    // Only the signed files: every omitted field comes from the request, the digest comparison binds them.
+    const applied = spawnSync(process.execPath, [script, "apply", "--root", root, "--decision", input.decision, ...signed, "--json"], { encoding: "utf8" });
+    assert.equal(applied.status, 0, applied.stderr);
+    const state = JSON.parse(applied.stdout);
+    assert.equal(state.state, input.decision);
+    assert.equal(state.rationale, input.rationale.trim(), "the signed rationale, not the CLI default");
+    assert.equal(state.decisionRef, input.decisionRef);
+    assert.deepEqual(state.scope, req.subject.scope);
+  });
   it("actual CLI prepares, applies and reads back from a plugin-only installation", () => {
     const plugin = path.join(root, "plugin");
     fs.cpSync(path.resolve("plugins/pipeline-core"), plugin, { recursive: true });

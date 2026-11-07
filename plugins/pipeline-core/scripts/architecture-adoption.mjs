@@ -39,6 +39,19 @@ export const STATE_ADOPTION_REQUIRED = "adoption-required";
 export const STATE_APPROVED_SCOPED = "approved-scoped";
 export const STATE_DEFERRED = "deferred";
 export const STATE_PARTIAL = "partial";
+/** Not a stored state: an approved greenfield design package awaiting `pipeline-state.mjs materialize-architecture`. */
+export const STATE_MATERIALIZATION_REQUIRED = "materialization-required";
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+
+/** C20 w252 (G20-5): the adoption route is for existing repositories; refuse it while an approved design awaits materialization. */
+export function greenfieldMaterializationPending(rootDir, deps = {}) {
+  try {
+    const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(rootDir);
+    return design.ok === true && design.status === "materialization-required";
+  } catch {
+    return false;
+  }
+}
 
 function contractExists(rootDir, contractPath) {
   const directoryGlob = typeof contractPath === "string" && contractPath.endsWith("/**");
@@ -364,10 +377,19 @@ function scopeValueForState(scope) {
  * Asserts task scope has a resolved architecture disposition ('approved-scoped' or 'deferred')
  * before implementation authority per AC-17.
  */
-export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskScope = null, now = new Date()) {
-  const design = inspectArchitectureDesign(rootDir, taskScope);
+export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskScope = null, now = new Date(), deps = {}) {
+  const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(rootDir, taskScope);
   if (design.ok && design.status === "materialized") return {
     ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority,
+  };
+  // C20 w252 (G20-5): an approved greenfield design package carries its own scoped disposition. Until it is
+  // materialized the repository still reads as adoption-required, and naming the brownfield adoption route here
+  // sent a live greenfield session through a PO adoption signature and two override ceremonies. Name the one
+  // agent step that resolves it instead.
+  if (design.ok && design.status === "materialization-required") return {
+    ok: false,
+    disposition: STATE_MATERIALIZATION_REQUIRED,
+    error: `The approved design package carries the scoped architecture disposition but is not materialized yet. Run: node "${PIPELINE_STATE_SCRIPT}" materialize-architecture (an agent step; no separate PO adoption decision, no architecture-adoption.mjs prepare/apply), then request implementation authority again.`,
   };
   if (fs.existsSync(path.join(rootDir, "architecture/design-materialization.json")) && !design.ok) return {
     ok: false, disposition: "design-authority-stale", error: design.code,
@@ -506,6 +528,7 @@ function runCli() {
   let chatApproval = null;
   let by = "PO";
   let rationale = "Architecture adoption decision applied via CLI";
+  let rationaleGiven = false;
   let json = false;
   let taskScope = null;
   let out = null;
@@ -538,6 +561,7 @@ function runCli() {
       by = args[++i];
     } else if (arg === "--rationale" && args[i + 1]) {
       rationale = args[++i];
+      rationaleGiven = true;
     } else if (arg === "--out" && args[i + 1]) {
       out = args[++i];
     } else if (arg === "--json") {
@@ -553,6 +577,24 @@ function runCli() {
   if ((command === "prepare" || command === "apply") && decision === STATE_DEFERRED) {
     console.error("ADOPTION-DEFERRAL-RETIRED: a new deferred adoption can no longer be created (D162). Migrate to the measured baseline instead: run architecture-measure.mjs --apply, then prepare and apply --decision approved-scoped.");
     process.exit(1);
+  }
+
+  // C20 w252 (G20-5): an approved greenfield design package resolves its disposition through materialization.
+  if ((command === "prepare" || command === "apply") && greenfieldMaterializationPending(rootDir)) {
+    console.error(`ADOPTION-GREENFIELD-MATERIALIZE: this repository has an approved design package awaiting materialization; it carries the scoped architecture disposition. Run: node "${PIPELINE_STATE_SCRIPT}" materialize-architecture (an agent step, no PO signature). The adoption route (prepare/apply) is for existing repositories only. Nothing was written.`);
+    process.exit(1);
+  }
+
+  // C20 w252 (G20-5): apply reads the decision fields from the signed request when they are not given again.
+  // The subject digest comparison in applyAdoptionDecision still binds every value to the signature.
+  if (command === "apply" && approvalRequest?.subject && typeof approvalRequest.subject === "object") {
+    const subject = approvalRequest.subject;
+    if (decision === null || decision === undefined) decision = subject.decision;
+    if (scope === null) scope = subject.scope;
+    if (!rationaleGiven && typeof subject.rationale === "string") rationale = subject.rationale;
+    if (decisionRef === null) decisionRef = subject.decisionRef ?? null;
+    if (expires === null) expires = subject.expiresAt ?? null;
+    if (reviewDate === null) reviewDate = subject.reviewDate ?? null;
   }
 
   if (out !== null && command !== "prepare") {

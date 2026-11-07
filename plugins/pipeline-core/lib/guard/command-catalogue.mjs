@@ -286,10 +286,26 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
 // a real directory (or absent) and the target a regular file (or absent), so the fixed write cannot be redirected by a link.
 // --validate reads an arbitrary path and stays refused; --compile-summary combined with any other flag or argument stays refused.
 const COMPILED_SUMMARY_OUT = "project/architecture-decisions.compiled.json";
+// C20 w252 (G20-7, Antigravity greenfield): the architecture-decision skill tells the agent to validate each ADR sidecar and
+// to compile the summary while drafting the design. `--validate` was not admitted at all and `--compile-summary --format json`
+// was refused for its format flag, so every check ended in a human-override offer. `--validate` only reads one sidecar.
+const ADR_SIDECAR = /^docs\/adr\/[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.json$/u;
+function adrSidecarPath(root, value) {
+  if (typeof value !== "string" || value.includes("\0")) return false;
+  const rel = posix.isAbsolute(value) || win32.isAbsolute(value)
+    ? relative(root, value).split(sep).join("/")
+    : value;
+  return ADR_SIDECAR.test(rel) && !rel.split("/").some((part) => part === "." || part === "..")
+    && (rel === value || resolve(root, rel) === value);
+}
 function sanctionedArchitectureBaselineArgs(args, root) {
+  if (args.includes("--validate")) {
+    return args.length === 2 && args[0] === "--validate" && adrSidecarPath(root, args[1]);
+  }
   if (args.includes("--compile-summary")) {
-    return args.length === 3 && args[0] === "--root" && args[1] === root && args[2] === "--compile-summary"
-      && physicalDesignCoursePath(root, COMPILED_SUMMARY_OUT);
+    const base = args.length >= 3 && args[0] === "--root" && args[1] === root && args[2] === "--compile-summary";
+    const format = args.length === 3 || (args.length === 5 && args[3] === "--format" && (args[4] === "json" || args[4] === "text"));
+    return base && format && physicalDesignCoursePath(root, COMPILED_SUMMARY_OUT);
   }
   if (args.length === 1) return args[0] === "--help" || args[0] === "-h";
   const matched = matchFlagSpec(args, {
@@ -346,11 +362,12 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
 }
 
 // D165 (S1): the brownfield adoption route. Each script is admitted as exact argv shapes only; `architecture-adoption.mjs apply`
-// (PO proof) is deliberately NOT admitted. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
+// is admitted only in its signed shape (C20 w252, below), never with a chat approval. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
 // because matchFlagSpec refuses repeats). The fitness script ignores unknown flags itself, so this catalogue is the strict side.
 const ADOPTION_MAX_SCOPES = 8;
 const ADOPTION_TEXT = /^[A-Za-z0-9][A-Za-z0-9 ._:,+@/()-]{0,400}$/u;
 const ADOPTION_OUT = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/u;
+const ADOPTION_SIGNED_FILE = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
 function adoptionScope(value) {
   if (typeof value !== "string" || value.startsWith("/") || !/^[A-Za-z0-9._][A-Za-z0-9._/-]{0,200}$/u.test(value)) return false;
   const parts = value.split("/");
@@ -404,6 +421,24 @@ function sanctionedArchitectureAdoptionToolArgs(script, args, root) {
   }
   const rest = args.slice(1);
   if (["propose", "status", "check"].includes(args[0])) return matchFlagSpec(rest, { requiredValue: rootFlag, optional: { "--json": true } });
+  // C20 w252 (G20-5): the signed apply. D165 S1 kept `apply` out of the catalogue, so the agent needed a human-override
+  // ceremony (two more PO commands and a second signature) to record a decision the PO had just signed. The script
+  // verifies the Ed25519 proof against the request itself (verifyAdoptionAuthority, requireCurrent) and binds every
+  // field to the signed subject digest, so the agent cannot change what was signed. Only this exact shape is admitted:
+  // a scratch/ request and proof, no --chat-approval (an attribution record, not a proof), no --by (EL-36), no
+  // --scope/--rationale/--decision-ref (they are read from the signed request).
+  if (args[0] === "apply") {
+    const signedFile = (value) => ADOPTION_SIGNED_FILE.test(value) && adoptionPhysicalOut(root, value);
+    return matchFlagSpec(rest, {
+      requiredValue: {
+        ...rootFlag,
+        "--decision": (value) => value === "approved-scoped" || value === "partial",
+        "--request": signedFile,
+        "--proof": signedFile,
+      },
+      optional: { "--json": true },
+    });
+  }
   if (args[0] !== "prepare") return false;
   const others = [];
   let scopes = 0;

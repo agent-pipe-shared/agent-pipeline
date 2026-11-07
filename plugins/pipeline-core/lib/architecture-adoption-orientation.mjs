@@ -70,7 +70,7 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
     ? (greenfieldScaffold ? "design-pending" : "adoption-required")
     : migrationRequired ? "migration-required" : "decision-recorded";
   const guidance = status === "design-pending"
-    ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Complete initial design, then record a scoped architecture disposition before implementation."
+    ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Put the architecture design block in the PRD; it is approved with the plan. After approve-plan, run pipeline-state.mjs materialize-architecture (an agent step, no separate PO decision) before set-phase implementation. Do not use architecture-adoption.mjs prepare/apply: that route is for existing repositories."
     : status === "adoption-required"
       ? "No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation."
       : status === "migration-required"

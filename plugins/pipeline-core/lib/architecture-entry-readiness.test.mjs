@@ -106,6 +106,29 @@ test("incomplete greenfield design keeps the PRD authoring action instead of est
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("C20 w252 (G20-5): a greenfield estate blocked by foreign entries names them and the materialize repair, never the PRD authoring action", () => {
+  const root = fixture();
+  const prdPath = "specs/feature/prd.md";
+  try {
+    mkdirSync(join(root, "architecture/map"), { recursive: true });
+    writeFileSync(join(root, "architecture/map/index.md"), "# scaffold\n", "utf8");
+    writeFileSync(join(root, "architecture/map/inventory.json"), "{}\n", "utf8");
+    writeFileSync(join(root, "architecture/adoption-state.json"), "{}\n", "utf8");
+    writeFileSync(join(root, "architecture/map/extra.md"), "x\n", "utf8");
+    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
+      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
+        code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE", prdPath }),
+    } });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.nextAction.kind, "repair-required");
+    assert.equal(result.nextAction.code, "ARCHITECTURE-DESIGN-EXISTING-ESTATE");
+    assert.deepEqual(result.nextAction.entries, ["architecture/adoption-state.json", "architecture/map/extra.md"]);
+    assert.match(result.nextAction.guidance, /architecture\/adoption-state\.json/u);
+    assert.match(result.nextAction.guidance, /materialize-architecture/u);
+    assert.doesNotMatch(result.nextAction.guidance, /architecture\/map\/index\.md,|inventory\.json,/u, "the scaffold files are not listed as foreign");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
   const root = fixture();
   try {

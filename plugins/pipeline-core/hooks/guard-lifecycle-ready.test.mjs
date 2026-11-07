@@ -13004,6 +13004,9 @@ function d165s1Admitted(path) {
     `node ${D165S1_ADOPTION} check --root ${path} --json`,
     `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --rationale measured-baseline`,
     `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --scope lib/ --decision-ref D162-migration --out scratch/adoption-request.json`,
+    // C20 w252 (G20-5): the signed apply (the script verifies the proof and binds every field to the signed subject).
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision partial --request scratch/adoption-request.json --proof scratch/adoption-proof.json --json`,
     `node ${D165S1_MEASURE} --root ${path}`,
     `node ${D165S1_MEASURE} --root ${path} --apply`,
     `node ${D165S1_FITNESS} --root ${path}`,
@@ -13014,8 +13017,19 @@ function d165s1Admitted(path) {
 
 function d165s1Refused(path) {
   return [
-    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
+    // C20 w252: the signed apply moved to the admitted table; every widening of it stays refused.
     `node ${D165S1_ADOPTION} apply --root ${path}`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --chat-approval scratch/c.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --by PO`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --scope src/`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --rationale x`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision deferred --request scratch/r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request docs/r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/../r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.txt --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path}-other --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json extra`,
     `node ${D165S1_ADOPTION} propose --root ${path} --bogus`,
     `node ${D165S1_ADOPTION} propose --root ${path} extra`,
     `node ${D165S1_ADOPTION} propose --root ${path} --json --json`,
@@ -13054,7 +13068,7 @@ for (const status of ["draft", "approved"]) {
     } finally { rmSync(path, { recursive: true, force: true }); }
   });
 
-  test(`D165-S1 ${status}: apply, unknown flags, extra positionals, foreign roots and repeated flags stay refused`, () => {
+  test(`D165-S1 ${status}: unsigned or widened apply, unknown flags, extra positionals, foreign roots and repeated flags stay refused`, () => {
     const path = d165s1Fixture(status);
     try {
       mkdirSync(join(path, "scratch"), { recursive: true });

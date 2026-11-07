@@ -553,12 +553,19 @@ test("D115 architecture baseline --compile-summary: the exact documented form is
     // an already compiled summary (a regular file) is overwritten in place: still the same one output path
     writeFileSync(join(f.root, "project", "architecture-decisions.compiled.json"), "{}\n");
     bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary over an existing regular file");
+    // QG-04 (C20 w252, G20-7): "with a format" was pinned refused. An Antigravity greenfield session ran the documented step
+    // with `--format json` (stdout only; the output file is the same one fixed path) and was sent into an override ceremony.
+    // The trailing format is now admitted for json and text; every other placement or value stays refused below.
+    bothAdmit(base("--root", f.root, "--compile-summary", "--format", "json"), f, "compile-summary with a json format");
+    bothAdmit(base("--root", f.root, "--compile-summary", "--format", "text"), f, "compile-summary with a text format");
     for (const [label, action] of [
       ["flag before the root", base("--compile-summary", "--root", f.root)],
       ["no root", base("--compile-summary")],
       ["foreign root", base("--root", join(f.root, ".."), "--compile-summary")],
       ["relative root", base("--root", ".", "--compile-summary")],
-      ["with a format", base("--root", f.root, "--compile-summary", "--format", "json")],
+      ["with an unknown format", base("--root", f.root, "--compile-summary", "--format", "yaml")],
+      ["with a format and no value", base("--root", f.root, "--compile-summary", "--format")],
+      ["with a repeated format", base("--root", f.root, "--compile-summary", "--format", "json", "--format", "json")],
       ["format before the flag", base("--root", f.root, "--format", "json", "--compile-summary")],
       ["with a diff", base("--root", f.root, "--compile-summary", "--diff", "HEAD")],
       ["with a range", base("--root", f.root, "--compile-summary", "--from", "a".repeat(40), "--through", "b".repeat(40))],
@@ -586,6 +593,27 @@ test("D115 architecture baseline --compile-summary: the exact documented form is
     rmSync(join(f.root, "project"), { recursive: true, force: true });
     symlinkSync(join(f.root, "elsewhere"), join(f.root, "project"), "dir");
     bothRefuse(base(), f, "project is a linked directory");
+  });
+});
+
+// ---- C20 w252 (G20-7): `architecture-baseline --validate <ADR sidecar>` reads one docs/adr/*.json and nothing else ----
+test("C20 w252 architecture baseline --validate: one ADR sidecar under docs/adr is admitted, any other read target is not", () => {
+  withFixture("feature", f => {
+    const base = (...rest) => scriptAction(baselineScript, ...rest);
+    bothAdmit(base("--validate", "docs/adr/0001-offline-file-compatible-modular-architecture.json"), f, "relative sidecar");
+    bothAdmit(base("--validate", join(f.root, "docs", "adr", "0002-local-persistence.json")), f, "absolute sidecar inside the root");
+    for (const [label, action] of [
+      ["markdown ADR", base("--validate", "docs/adr/0001.md")],
+      ["outside docs/adr", base("--validate", "docs/other/0001.json")],
+      ["nested below docs/adr", base("--validate", "docs/adr/sub/0001.json")],
+      ["dot segment", base("--validate", "docs/adr/../../x.json")],
+      ["absolute outside the root", base("--validate", join(f.root, "..", "docs", "adr", "0001.json"))],
+      ["credential-like path", base("--validate", "/etc/passwd")],
+      ["no value", base("--validate")],
+      ["with a root", base("--root", f.root, "--validate", "docs/adr/0001.json")],
+      ["repeated", base("--validate", "docs/adr/0001.json", "--validate", "docs/adr/0002.json")],
+      ["extra argument", base("--validate", "docs/adr/0001.json", "extra")],
+    ]) bothRefuse(action, f, label);
   });
 });
 

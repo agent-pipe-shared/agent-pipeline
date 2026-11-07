@@ -43,7 +43,10 @@ command tables.
    The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
    This is enforced, not advice: while the push approval is active, `pipeline-state.mjs submit-plan`, `push-prepare.mjs` and the feature close
    (`feature-close-prepared`) refuse with `PUSH-THREAT-MODEL-MISSING`, `-EMPTY` or `-INVALID` (no markdown heading) and print the repair command and the commit rule.
-7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
+7. Greenfield only: `pipeline-state.mjs materialize-architecture` (agent, no flags, no PO step). The approved PRD's architecture design block carries the
+   scoped disposition; this writes the map, fitness model and baseline. Never take the `architecture-adoption.mjs prepare`/`apply` route in a greenfield
+   repository (owner: `references/architecture-orientation.md`).
+8. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
 
 ## 2. Implementation (one dispatch per task, from the template)
 

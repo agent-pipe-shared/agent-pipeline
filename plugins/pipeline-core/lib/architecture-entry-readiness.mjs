@@ -8,7 +8,7 @@
  * fitness evaluation answer whether the physical architecture evidence is
  * actually present and valid. One cannot substitute for the other.
  */
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -113,6 +113,23 @@ function proposalAction(root, inspectedDesign = null, deps = {}) {
     mutation: true, requiresConfirmation: false,
     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
   };
+  // C20 w252 (G20-5): a greenfield design cannot materialize while foreign entries sit beside the scaffold
+  // (for example an adoption-state.json left by the brownfield route). Name them and the repair, never a bare code.
+  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-EXISTING-ESTATE") {
+    const extra = [];
+    try {
+      for (const entry of readdirSync(resolve(root, "architecture")).sort()) if (entry !== "map") extra.push(`architecture/${entry}`);
+      for (const entry of readdirSync(resolve(root, "architecture/map")).sort()) {
+        if (entry !== "index.md" && entry !== "inventory.json") extra.push(`architecture/map/${entry}`);
+      }
+    } catch { /* the listing is guidance only */ }
+    return {
+      kind: "repair-required",
+      code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE",
+      entries: extra,
+      guidance: `The approved design can only materialize over the bare greenfield scaffold (architecture/map/index.md and inventory.json). Move these entries out of architecture/ (for example into scratch/, nothing is lost): ${extra.length ? extra.join(", ") : "(listing unavailable)"}. Then run: node "${fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url))}" materialize-architecture. If an entry is your own committed architecture, this is not a greenfield repository: use the adoption proposal instead.`,
+    };
+  }
   if (!design.ok && design.status === "design-required" && typeof design.prdPath === "string") return {
     kind: "architecture-design-required",
     prdPath: design.prdPath,
