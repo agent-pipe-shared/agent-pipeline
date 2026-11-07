@@ -812,12 +812,19 @@ const NATIVE_BOUNDARY_REBIND_LIMIT=8;
 export const NATIVE_TERMINAL_SIBLING_RACES=Object.freeze(['domain-membership-race','domain-native-membership-race','native-authority-member-drift','reference-preimage-changed','native-managed-unknown-native-entry']);
 /** C19L-W251: runs `round` (one whole write boundary) and repeats it on a fresh boundary, at most NATIVE_BOUNDARY_REBIND_LIMIT times with a growing
  * pause, while it fails with a sibling race; `refresh` re-reads this process's view between rounds. Any other refusal, or the last one, is raised. */
-export function nativeBoundaryRounds(round,refresh=()=>{},{limit=NATIVE_BOUNDARY_REBIND_LIMIT,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
+// C20 w252 (G20-4): under full load the eight rounds (about 2.8 s of pauses in total) ran out while a sibling stop was still writing its post-commit
+// files outside the lock, and the pair ended recovery-required (NGSP7 in the 19m Full Verify). With `budgetMs` a sibling race is retried past `limit`
+// for as long as that budget lasts (the stop passes what is left of its own lock-wait budget), with the pause capped at one second. Without a budget
+// the count bound is unchanged. Any other refusal is still raised at once.
+export function nativeBoundaryRounds(round,refresh=()=>{},{limit=NATIVE_BOUNDARY_REBIND_LIMIT,budgetMs=0,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
+  const start=now();
   for(let attempt=1;;attempt+=1){
     try{return round();}
     catch(error){
-      if(attempt>=limit||!NATIVE_TERMINAL_SIBLING_RACES.includes(error?.reason))throw error;
-      pause(100*attempt);
+      if(!NATIVE_TERMINAL_SIBLING_RACES.includes(error?.reason))throw error;
+      const wait=Math.min(100*attempt,1000);
+      if(attempt>=limit&&now()-start+wait>budgetMs)throw error;
+      pause(wait);
       try{refresh();}catch(refreshError){if(!NATIVE_TERMINAL_SIBLING_RACES.includes(refreshError?.reason))throw refreshError;}
     }
   }
@@ -1208,7 +1215,7 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
     if(inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value.delivery)
       return {status:'integration-pending',code:'NGHS-ITEM-RESERVATION-HELD',memberRef:operation.memberRef};
     return reread(()=>releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle}));
-  }),()=>nativeAuthorityScan(owner));
+  }),()=>nativeAuthorityScan(owner),{budgetMs:nativeStopWaitBudgetMs()});
   if(completed.status!=='integration-pending')return completed;
   const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
   if(!pending?.binding.itemDelivery)return completed;

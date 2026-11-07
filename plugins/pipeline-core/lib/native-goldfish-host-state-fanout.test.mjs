@@ -100,6 +100,26 @@ const cases = [
     let foreign = 0;
     assert.throws(() => nativeBoundaryRounds(() => { foreign += 1; race("native-authority-recovery-required")(); }, () => {}, { pause: () => {} }), error => error.reason === "native-authority-recovery-required");
     assert.equal(foreign, 1, "a refusal that is not a sibling race is raised at once");
+    // C20 w252 (G20-4): with a budget, a sibling race is retried past the count bound while the budget lasts, the pause is capped at one
+    // second, and the last race is raised once the next pause would overrun the budget. A foreign refusal is still raised at once.
+    clock = 0;
+    let budgeted = 0;
+    const pauses = [];
+    const fakePause = (ms) => { pauses.push(ms); clock += ms; };
+    assert.equal(nativeBoundaryRounds(() => { budgeted += 1; if (budgeted < 12) race("domain-membership-race")(); return "released"; }, () => {},
+      { limit: 4, budgetMs: 60_000, now: () => clock, pause: fakePause }), "released", "a long sibling race inside the budget is ridden out");
+    assert.equal(budgeted, 12);
+    assert.equal(Math.max(...pauses), 1000, "the pause is capped at one second");
+    clock = 0; pauses.length = 0;
+    let exhausted = 0;
+    assert.throws(() => nativeBoundaryRounds(() => { exhausted += 1; race("native-authority-member-drift")(); }, () => {},
+      { limit: 2, budgetMs: 3000, now: () => clock, pause: fakePause }), error => error.reason === "native-authority-member-drift");
+    assert.ok(clock <= 3000, `the pauses never overrun the budget (${clock} ms)`);
+    assert.ok(exhausted > 2, "the budget, not the count, ended the rounds");
+    let foreignBudgeted = 0;
+    assert.throws(() => nativeBoundaryRounds(() => { foreignBudgeted += 1; race("native-authority-recovery-required")(); }, () => {},
+      { budgetMs: 60_000, now: () => 0, pause: () => {} }), error => error.reason === "native-authority-recovery-required");
+    assert.equal(foreignBudgeted, 1, "a budget never retries a refusal that is not a sibling race");
   } },
   { id: "NGFO02", name: "overlapping admitted slice is ordered after the live overlap instead of refused", run: () => {
     const raw = queueOf(itemSlice("ITEM-A", "AC-1", ["src/change.mjs"]), itemSlice("ITEM-OLD", "AC-9", ["src/change.mjs"], { state: "cancelled", holdReason: "superseded" }));
