@@ -11585,9 +11585,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
         // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
+        // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
+        // follows (onboarding-init stopped with unsupported-next-action on a prose value).
         const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
         console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
-          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.nextAction ? commitStep : {}) }));
+          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.commitStep ? commitStep : {}) }));
         return result.ok && result.status === "materialized" ? 0 : 2;
       } finally { releaseContinuityLock(lock); }
     }

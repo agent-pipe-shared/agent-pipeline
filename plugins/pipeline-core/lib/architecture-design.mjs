@@ -547,11 +547,11 @@ export function architectureCommitStep(rootDir, extraPaths = []) {
   const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", "architecture", ...extraPaths],
     { cwd: resolve(rootDir), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (status.status !== 0 || status.error) {
-    return { uncommittedPaths: [], nextAction: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
+    return { uncommittedPaths: [], commitStep: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
   }
   const uncommittedPaths = status.stdout.split("\0").filter(Boolean).map(entry => entry.slice(3)).sort();
-  if (uncommittedPaths.length === 0) return { uncommittedPaths, nextAction: null };
-  return { uncommittedPaths, nextAction: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
+  if (uncommittedPaths.length === 0) return { uncommittedPaths, commitStep: null };
+  return { uncommittedPaths, commitStep: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
 }
 
 export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {

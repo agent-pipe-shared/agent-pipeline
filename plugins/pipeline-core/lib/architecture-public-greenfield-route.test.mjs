@@ -105,11 +105,13 @@ test('G20-36 materialize-architecture names the exact commit step while the mate
   assert.equal(output.status, 'materialized');
   assert(output.uncommittedPaths.includes('architecture/design-materialization.json'), JSON.stringify(output.uncommittedPaths));
   assert(output.uncommittedPaths.every(path => !path.includes('\\')), 'repository-relative paths');
-  assert.match(output.nextAction, /git add -- .*architecture\/design-materialization\.json/u);
-  assert.match(output.nextAction, /commit/u);
+  // The prose commit step is `commitStep`; `nextAction` stays reserved for the structured action guided drivers execute.
+  assert.match(output.commitStep, /git add -- .*architecture\/design-materialization\.json/u);
+  assert.match(output.commitStep, /commit/u);
+  assert.equal(output.nextAction, undefined, 'no prose nextAction for a guided driver to stop on');
   fixture.git(f, 'add', '--', ...output.uncommittedPaths);
   fixture.git(f, 'commit', '-q', '-m', 'docs(architecture): commit the materialized architecture\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
-  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], nextAction: null });
+  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], commitStep: null });
 });
 
 test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {
