@@ -675,7 +675,11 @@ record("a project bound to a known older shipped registry is refreshed to the cu
   const OLDER = "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac";
   const intent = v3Intent();
   intent.core_registry_sha256 = OLDER;
-  intent.routing.duties.mechanic.codex.effort = "high"; // a stale Core-owned cell as the older registry may have shipped it
+  // The cells the older registry shipped and G20-43 changed: Antigravity mechanic flash-medium, Critics a pinned model id.
+  intent.routing.duties.mechanic.antigravity.effort = "medium";
+  intent.routing.duties.mechanic.antigravity.selector = { kind: "model-id", value: "gemini-3.8-flash-medium" };
+  intent.routing.duties.critic_normal.antigravity.selector = { kind: "model-id", value: "gemini-3.8-flash-high" };
+  intent.routing.duties.critic_high_risk.antigravity.selector = { kind: "model-id", value: "gemini-3.1-pro-high" };
   const root = fixture(yaml(intent));
   try {
     const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
@@ -2008,7 +2012,8 @@ record("a later Codex activation adds only the Codex targets and shows no false 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 60, "the complete runner profile migration corpus must be registered before execution begins");
+// QG-04 restated (C20 G20-44): 60 -> 61, the known-older-registry refresh case was added; no case removed.
+assert.equal(cases.length, 61, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
