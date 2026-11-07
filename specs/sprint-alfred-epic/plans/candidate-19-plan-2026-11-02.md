@@ -690,6 +690,10 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
         measurements M10–M16 (modelName spelling, descriptor timing and state, host-commit trigger, Bash writes into the brain).
         The one red case of the agy adapter suite was caused by the G20-33 fix (once-per-session marker written into the real home
         under a fixed test session id); the test now uses its own home, assertions unchanged.
+    - PO tile decisions 2026-11-07: (1) the ADR binding of a `create-adr` proposal into the design package is automated IN
+      candidate 20 (remainder of G20-23); (2) G20-34 is fixed in candidate 20 (read-only git subcommands with `-C` follow the
+      read-scope rule, mutating ones stay refused); (3) an absent or unrecognised `stakes` counts as `standard`; (4) a critical
+      project with NO security gate configured blocks close/Verify (not `not applicable`).
   - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
     vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
     clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
