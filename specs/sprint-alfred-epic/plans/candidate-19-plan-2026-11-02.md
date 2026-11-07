@@ -645,6 +645,12 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     - G20-29 (Codex P1): dispatch records, briefings and work-verify evidence survive a fresh clone (tracked, data-sparse).
     - G20-30 (Codex P2): answered intake values are never re-asked after a restart; the signed proof is imported without a PO reply.
     - G20-31 (Codex P1): forensics reader paginates and separates "metadata complete" from "all events read".
+    - **Progress in clone w252 (2026-11-07):** built and suite-green: G20-14 (cause: an import cycle back into the selector, whose
+      top-level await deadlocked; now a CLI function), G20-15 (structural ADR sidecar check in `submit-plan`), G20-18 (`--decided-at now`),
+      G20-19 (the submit-plan warning named the refused `configure-verify`; it now names the admitted `set-phase --verify-command` route),
+      G20-21 (absolute-node scratch scripts admitted with a Node outside the root; GIT-03 names `git commit -F`), G20-24 (finalizer).
+      G20-21 `--help`: `design-review-receipt.mjs` has no help at all, so `create --help` would run `create`; the refusal is correct.
+      G20-8 B waits for the Antigravity measurement (`scratch/agy-subagent-measurement-task.md`, run in a repository without Pipeline).
     - G20-32 (Claude, architecture back-and-forth): from `approve-plan` to `set-phase implementation` the happy path needs zero PO
       terminal commands — `approve-plan` names (or runs) `materialize-architecture`, and no adoption or override ceremony can be
       reached on a greenfield design package. Measured by a fixture walking approve → materialize → set-phase with no human step.
