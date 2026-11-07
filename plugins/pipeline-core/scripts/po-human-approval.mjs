@@ -1062,7 +1062,7 @@ function suggestSubcommand(input, candidates) {
  * governance-fork-disposition-style verification bypass concern either.
  */
 const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND]);
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic"]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -2069,7 +2069,7 @@ export function authorizeCriticalPushCommand({
  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
  */
-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile"]);
+export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic"]);
 
 /**
  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`

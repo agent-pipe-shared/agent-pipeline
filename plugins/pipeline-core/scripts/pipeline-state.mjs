@@ -446,6 +446,7 @@ import {
   writeCriticalApproval,
 } from "../lib/critical-action-authorization.mjs";
 import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {parse} from 'node:path';
@@ -777,7 +778,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "inspect", "update-public-handover", "rebind-approval",
   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "seal-plan-approval",
   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance",
+  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
@@ -4820,7 +4821,7 @@ function localPushScratchArtifacts(dir, flags) {
  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
  * behaviour is byte-identical to before this addition.
  */
-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings"]);
+const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND]);
 
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
@@ -9813,6 +9814,70 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
   return 0;
 }
 
+// G20-39 (candidate 20): a PO acknowledgement of a caller-authored Critic for exactly one consumed packet and the candidate it reviewed. This is the
+// bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
+// human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
+function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
+  const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
+  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).`); return 2; };
+  const configured = criticalProofWaiverFor(dir, kind);
+  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+  const waived = configured.waived === true;
+  const parsed = parseExactFlags(rest, new Set(waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
+  const flags = parsed.value ?? {};
+  if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
+    console.error("Error: approve-critic-acknowledgement requires --by and --critic-packet and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
+    return 2;
+  }
+  const common = resolveCriticalApprovalCommonDir(dir);
+  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
+  const packetId = flags["critic-packet"];
+  let receipt;
+  try { receipt = (deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt; }
+  catch (error) { return refuse(typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"); }
+  if (typeof receipt?.candidate?.commit !== "string" || typeof receipt.candidate.tree !== "string") return refuse("CRITIC-PACKET-UNREADABLE");
+  // Nothing to acknowledge unless the consumed verdict really carries the caller-authored label; a Source-issued verdict needs no bridge.
+  if (receipt.independence !== "caller-authored-fallback") return refuse("CRITIC-ACK-NOT-CALLER-AUTHORED");
+  // The acknowledgement is bound to the candidate the Critic reviewed, never to the checkout's current HEAD.
+  const candidate = { commit: receipt.candidate.commit, tree: receipt.candidate.tree };
+  const subject = criticAcknowledgementSubject({ packetId, receipt });
+  console.error([`PO ACKNOWLEDGEMENT OF A CALLER-AUTHORED CRITIC -- the verdict of this packet was authored by the calling agent, not issued by a Critic subagent's stop:`,
+    `  packet: ${packetId}`, `  candidate: ${candidate.commit}`, `  critic receipt: ${subject.criticReceiptSha256}`,
+    "  this acknowledgement covers exactly this packet and candidate; the close record keeps the label caller-authored-fallback next to it."].join("\n"));
+  const approvedAt = now();
+  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
+    // Signature mode without a proof is not a dead end: the signing command for exactly this subject is rendered (never run), and the PO's own terminal signs it.
+    try {
+      const root = realpathSync(resolve(dir));
+      const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+      const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
+      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
+      console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
+        signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
+        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", "<po-name>", "--critic-packet", packetId, "--proof-request", "<proof-request>", "--proof-authority", "<proof-authority>", "--proof", "<proof>"],
+          note: "run after the PO signed: --by is the PO's own name; the three proof paths are printed by the signing step" } }));
+    } catch { /* the refusal below still names the missing flags */ }
+    return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
+  }
+  const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true });
+  if (!verified.ok) return refuse(verified.code);
+  const priorConsumption = base.criticalProofConsumption;
+  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
+  if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
+    || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
+  const approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, packetId, criticReceiptSha256: subject.criticReceiptSha256,
+    independence: subject.independence, criticalProof: verified.proof };
+  if (waived) {
+    // Chat mode is always an attributed, unattested approval carrying the live waiver source (mirrors the reconcile and residual records).
+    approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
+    approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
+  } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
+  const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
+  if (!stored.ok) return refuse(stored.code);
+  console.log(`Caller-authored Critic acknowledged by "${flags.by}" for packet ${packetId} and commit ${candidate.commit} (critic receipt ${subject.criticReceiptSha256}); run the identical close command again.`);
+  return 0;
+}
+
 function runFeaturePackageWriteCommand(sub, argv, deps) {
   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
   if (sub === "feature-package-reconcile") {
@@ -13872,6 +13937,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
 
     case "approve-residual-acceptance":
       return runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps });
+    case "approve-critic-acknowledgement":
+      return runApproveCriticAcknowledgement({ dir, rest, base, now, deps });
 
     case "approve-deploy": {
       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the

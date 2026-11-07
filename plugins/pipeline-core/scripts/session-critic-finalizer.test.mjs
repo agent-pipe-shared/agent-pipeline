@@ -1836,6 +1836,118 @@ test("Cut A (6) CLI finalize without an origin completes under the caller-author
   } finally { cleanup(fx); }
 });
 
+// G20-39 (candidate 20, AC-108): the Critic subagent's stop issues the Source return record into the private control area, and the
+// finalizer's CLI reads it there. Criterion-bound cases, written before the producer existed.
+const SOURCE_RETURN_FILE = "source-return.json";
+const verdictDigest = (value) => createHash("sha256").update(canonicalJson(value)).digest("hex");
+function admitViaCli(fx) {
+  const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+  assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
+  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+  const packetId = "6".repeat(32);
+  const { admission } = inspectClaimedSessionAdmission({ controlRoot, packetId });
+  return { requestPath, controlRoot, packetId, admission };
+}
+function writeSourceReturn(admitted, overrides = {}, verdictValue = verdict()) {
+  const record = { schema: ORIGIN_SCHEMA, issuer: "source", packetId: admitted.packetId, packetDigest: admitted.admission.packetDigest,
+    claimant: { runner: "codex", adapter: "session-functional-equivalent" }, sessionId: admitted.admission.sessionId, verdictSha256: verdictDigest(verdictValue),
+    issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000, ...overrides };
+  writeFileSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE), `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+  return record;
+}
+const stopInput = (text, overrides = {}) => ({ hook_event_name: "SubagentStop", session_id: "33333333-aaaa-bbbb-cccc-444444444444", agent_type: "critic",
+  last_assistant_message: text, stop_hook_active: false, cwd: "/work", ...overrides });
+const criticReturn = (value = verdict()) => `Report written to the notes file.\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n`;
+
+test("G20-39 (a) the CLI finalize reads the Source return record from the private control area and finalizes source-issued-origin", () => {
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    writeSourceReturn(admitted);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.independence, "source-issued-origin");
+    assert.equal(result.output.origin, "source");
+    assert.equal(result.output.receipt.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+});
+
+test("G20-39 (b) a record in the control area that does not bind the returned verdict, the packet or the session is refused, never relabelled", () => {
+  for (const overrides of [{ verdictSha256: "d".repeat(64) }, { packetDigest: "c".repeat(64) }, { sessionId: "another-session-1" }, { issuer: "caller" }, { expiresAtMs: Date.now() - 1 }]) {
+    const fx = fixture();
+    try {
+      const admitted = admitViaCli(fx);
+      writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+      writeSourceReturn(admitted, overrides);
+      const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+      assert.equal(result.exitCode, 2, JSON.stringify(overrides));
+      assert.equal(result.output.code, ORIGIN_BINDING, JSON.stringify(overrides));
+    } finally { cleanup(fx); }
+  }
+});
+
+test("G20-39 (c) the Critic stop hook issues the record bound to the claimed packet and to the returned verdict; finalize then reads it", async () => {
+  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    const issued = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn()) });
+    assert.equal(issued.status, "issued", JSON.stringify(issued));
+    assert.equal(issued.packetId, admitted.packetId);
+    const record = JSON.parse(readFileSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE), "utf8"));
+    assert.deepEqual(Object.keys(record).sort(), ["claimant", "expiresAtMs", "issuedAtMs", "issuer", "packetDigest", "packetId", "schema", "sessionId", "verdictSha256"]);
+    assert.equal(record.packetDigest, admitted.admission.packetDigest);
+    assert.equal(record.sessionId, admitted.admission.sessionId);
+    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
+    assert.equal(record.verdictSha256, verdictDigest(verdict()));
+    assert.ok(record.expiresAtMs > record.issuedAtMs);
+    // The coordinator copies the Critic's returned JSON verbatim: the identical close finalizes source-issued.
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    assert.equal(runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]).output.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+});
+
+test("G20-39 (d) a verdict that differs from the one the Critic returned finalizes to a refusal; a second stop never overwrites the record", async () => {
+  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn()) }).status, "issued");
+    const again = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(verdict({ pass: false, findings: [] }))) });
+    assert.notEqual(again.status, "issued");
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict({ deliberately_not_flagged: ["scope", "added by the caller"] }))}\n`);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.output.code, ORIGIN_BINDING);
+  } finally { cleanup(fx); }
+});
+
+test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped verdict, and a stop of another runner are a silent no-op that writes nothing", async () => {
+  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const attempts = [
+      { runner: "codex", input: stopInput(criticReturn(), { agent_type: "goldfish-implementor" }) },
+      { runner: "codex", input: stopInput(criticReturn(), { agent_type: undefined }) },
+      { runner: "codex", input: stopInput("The review is finished; no machine-readable verdict was returned.") },
+      { runner: "codex", input: stopInput(criticReturn({ pass: true })) },
+      { runner: "claude", input: stopInput(criticReturn()) },
+      { runner: "codex", input: stopInput(criticReturn(), { hook_event_name: "PostToolUse" }) },
+    ];
+    for (const attempt of attempts) {
+      const outcome = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), ...attempt });
+      assert.notEqual(outcome.status, "issued", JSON.stringify(outcome));
+      assert.equal(existsSync(target), false);
+    }
+    // The namespaced agent type of a plugin Critic is the Critic.
+    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "pipeline-core:critic" }) }).status, "issued");
+  } finally { cleanup(fx); }
+});
+
 const FALLBACK_FLAG = "--allow-caller-authored-fallback";
 
 test("Cut A follow-up (1) CLI finalize without the flag and without a Source record reports the same result as with the flag", () => {

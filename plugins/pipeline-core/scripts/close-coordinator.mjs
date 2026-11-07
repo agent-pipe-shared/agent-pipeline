@@ -27,6 +27,7 @@ import { writeCriticDispositionAddendumObject } from "./dispatch-record-write.mj
 import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
 import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
+import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
@@ -317,8 +318,8 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
   } catch (error) {
     fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", `feature close requires the exact private Critic/Verify lifecycle receipt (${error?.message ?? "unavailable"})`);
   }
-  assertCriticIndependenceForClose({ root, common, lifecycle });
-  return { evidence, lifecycle };
+  const criticIndependence = assertCriticIndependenceForClose({ root, common, lifecycle });
+  return { evidence, lifecycle, criticIndependence };
 }
 /**
  * C19-D2b (PO 2026-11-03): a Critic verdict the calling agent authored itself (finalizer fallback) satisfies the close gate only at
@@ -329,9 +330,10 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
 function assertCriticIndependenceForClose({ root, common, lifecycle }) {
   const packetId = lifecycle.receipt?.critic?.packetId;
   let independence;
-  try { independence = readConsumedCandidateReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt?.independence; }
+  let receipt;
+  try { receipt = readConsumedCandidateReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt; independence = receipt?.independence; }
   catch (error) { fail("CLOSE-CRITIC-CALLER-AUTHORED", `the consumed Critic receipt of packet ${packetId} could not be read to classify its independence (${error?.code ?? "unreadable"}); repair: restore the consumed receipt or run the Critic review as a fresh native session and finalize without the fallback`); }
-  if (independence !== "caller-authored-fallback") return;
+  if (independence !== "caller-authored-fallback") return Object.freeze({ independence: independence ?? null, acknowledgement: null });
   let rigor = null;
   try {
     const state = stateSnapshot(root).state;
@@ -343,8 +345,12 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
     }
   } catch { /* unreadable rigor refuses below */ }
   const highRisk = walkDispatchRecords(root).records.some(({ record }) => record?.criticRequired?.trigger?.riskClass === "high" || record?.criticRequired?.trigger?.riskFlag === true);
-  if (rigor === 0 && !highRisk) return;
-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: run the Critic review as a fresh native session and finalize WITHOUT the fallback`);
+  if (rigor === 0 && !highRisk) return Object.freeze({ independence, acknowledgement: null });
+  // G20-39: the one runnable bridge. A PO acknowledgement of exactly this packet, receipt and candidate (recorded through the human-approval
+  // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
+  const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
+  if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
+  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node <plugin-root>/scripts/pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet ${packetId} (in signature mode also --proof-request/--proof-authority/--proof from the signing step), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
 }
 function startPlan(values) {
   const root = physicalRoot(values.root);

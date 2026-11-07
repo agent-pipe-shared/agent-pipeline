@@ -288,25 +288,6 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const finalizer = (verb, request) => {
         mkdirSync(join(fx.root, "scratch"), { recursive: true });
         writeJson(join(fx.root, "scratch", `${verb}-request.json`), request);
-        if (verb === "finalize") {
-          // w266 finding 1: since G20-24 every finalize without a Source return record is labelled caller-authored-fallback, and the close
-          // gate (close-coordinator.mjs assertCriticIndependenceForClose) refuses that label at rigor >= 1 or high risk. No runner issues a
-          // Source return record (the CLI's reader is unavailableOriginalSourceReader), so on today's product no rigor >= 1 close is reachable.
-          // The walk stands in for the missing producer through the finalizer's own dependency, exactly as session-critic-finalizer.test.mjs
-          // does, run in-process under the runner identity's markers; the close gate itself is NOT weakened.
-          const savedEnv = { ...process.env };
-          for (const key of Object.keys(process.env)) delete process.env[key];
-          Object.assign(process.env, walkEnv);
-          let outcome;
-          try {
-            outcome = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", `scratch/${verb}-request.json`], {
-              readOriginalSourceReturnFn: (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId, packetDigest: query.packetDigest,
-                claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000 }),
-            });
-          } finally { for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, savedEnv); }
-          assert.equal(outcome.exitCode, 0, `${identity.runner}: in-process finalize: ${JSON.stringify(outcome.output).slice(0, 600)}`);
-          return { status: 0, stdout: JSON.stringify(outcome.output), stderr: "" };
-        }
         return step(log, `${identity.runner}: critic ${verb}`, process.execPath,
           [script("session-critic-finalizer.mjs"), verb, "--root", fx.root, "--request", `scratch/${verb}-request.json`], { cwd: fx.root });
       };
@@ -320,8 +301,23 @@ test("G20-35: the close path from implementation to release preflight is walked 
       };
       const admitted = json(finalizer("admit", finalizeRequest));
       assert.equal(admitted.packetId, packetId);
-      writeJson(join(fx.root, "evidence", "critic-verdict.json"), { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
-        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true });
+      const criticVerdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
+        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+      writeJson(join(fx.root, "evidence", "critic-verdict.json"), criticVerdict);
+      if (identity.runner !== "antigravity") {
+        // G20-39: the Critic subagent's stop is what issues the Source return record, never the calling agent. The stop hook runs as the runner runs
+        // it (a child process fed the stop payload on stdin) with the Critic's final message carrying the verdict; the CLI finalize below then reads
+        // the record from the private control area and the close gate admits it at rigor >= 1.
+        const stop = spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url)), "--runner", identity.runner],
+          { input: JSON.stringify({ hook_event_name: "SubagentStop", session_id: RUNNER_MARKERS[identity.runner].CLAUDE_CODE_SESSION_ID ?? RUNNER_MARKERS[identity.runner].CODEX_THREAD_ID,
+            agent_id: `critic-${identity.runner}-1`, agent_type: "pipeline-core:critic", cwd: fx.root, stop_hook_active: false,
+            last_assistant_message: `Review finished; notes are in the notes file.\n\n\`\`\`json\n${JSON.stringify(criticVerdict, null, 2)}\n\`\`\`\n` }),
+          cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 60_000 });
+        assert.equal(stop.status, 0, `${identity.runner}: the Critic stop hook never blocks: ${stop.stderr}`);
+        assert.equal(stop.stdout, "", `${identity.runner}: a stop hook's stdout is read as a decision and stays empty`);
+        assert.match(stop.stderr, /Critic Source return issued for packet/u, `${identity.runner}: ${stop.stderr}`);
+        assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json")), true);
+      }
       const finalized = json(finalizer("finalize", finalizeRequest));
       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
@@ -425,6 +421,24 @@ test("G20-35: the close path from implementation to release preflight is walked 
       assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
       writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
         packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
+      if (identity.runner === "antigravity") {
+        // G20-39 bridge: this identity has no Source return producer (its subagent stop event is still being measured), so its Critic finalized as
+        // caller-authored-fallback and the close gate refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
+        // packet and candidate, recorded through the human-approval route (the fixture selects chat); then the IDENTICAL close command is admitted.
+        const closeArgs = ["plan-transition", "--root", fx.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--audit-request", "evidence/audit-request.json",
+          "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"];
+        const refusedClose = step(log, `${identity.runner}: close without the acknowledgement`, process.execPath, [script("close-coordinator.mjs"), ...closeArgs], { cwd: fx.root, expectedStatus: 2 });
+        assert.equal(json(refusedClose).code, "CLOSE-CRITIC-CALLER-AUTHORED", refusedClose.stdout);
+        assert.match(refusedClose.stdout, new RegExp(`approve-critic-acknowledgement --by <name> --critic-packet ${packetId}`, "u"));
+        const wrongPacket = step(log, `${identity.runner}: acknowledgement of a packet that does not exist`, process.execPath,
+          [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", "2".repeat(32)], { cwd: fx.root, expectedStatus: 2 });
+        assert.match(wrongPacket.stderr, /refused/u);
+        const stillRefused = step(log, `${identity.runner}: close after an acknowledgement of another packet`, process.execPath, [script("close-coordinator.mjs"), ...closeArgs], { cwd: fx.root, expectedStatus: 2 });
+        assert.equal(json(stillRefused).code, "CLOSE-CRITIC-CALLER-AUTHORED");
+        const acknowledged = step(log, `${identity.runner}: approve-critic-acknowledgement (the command the refusal named)`, process.execPath,
+          [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", packetId], { cwd: fx.root });
+        assert.match(acknowledged.stdout, /acknowledged/u);
+      }
       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
       assert.equal(prepared.phase, "feature-close-prepared");
       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);

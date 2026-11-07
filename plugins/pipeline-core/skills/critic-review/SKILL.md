@@ -81,6 +81,7 @@ session; it need not exist for `admit`, but must exist for `finalize`.
 `source-complete/event-unavailable` and an identical-only retry. Any malformed
 argv, request, or verdict exits 2 with a closed
 `pipeline.session-critic-finalization-error.v1` object.
+The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a runner whose stop issues none, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
 A rejected prelaunch admission is a coordinator defect, not Critic work: do
 not spawn a child or substitute prose/evidence. A returned verdict without
 the exact prelaunch admission cannot mint a passing receipt.

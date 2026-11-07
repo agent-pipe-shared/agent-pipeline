@@ -823,6 +823,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // signed-proof wait every PO signing step (design approval, push approval, override, bootstrap acknowledgement) names.
   "plugins/pipeline-core/lib/answered-intake-values.mjs",
   "plugins/pipeline-core/lib/signed-proof-wait.mjs",
+  // C20 G20-39 (GMWKC01): the Critic Source-return producer the finalizer reads (session-critic-finalizer.mjs) and the PO
+  // acknowledgement of a caller-authored Critic the close gate and pipeline-state read. Their first-party imports
+  // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
+  "plugins/pipeline-core/lib/critic-source-return.mjs",
+  "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",

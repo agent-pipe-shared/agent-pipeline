@@ -22,7 +22,7 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
 export const CRITICAL_ACTION_KINDS = Object.freeze([
   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
-  "accept-residual-critic-findings",
+  "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

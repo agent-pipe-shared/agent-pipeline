@@ -2396,7 +2396,21 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     // clean-candidate check instead of the Usage refusal), so asserting Usage for it is a premise the source
     // no longer holds. This file holds NO positive-path test for interruption-promotion: that is a coverage
     // gap, reported and not built here. `accept-residual-critic-findings` (D190) is excluded for the same reason and has its own positive-path tests at the end of this file. Every other kind keeps the Usage assertion.
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings"].includes(entry))) {
+    // `acknowledge-caller-authored-critic` (G20-39, PO decision 2026-11-07 "Producer + Brücke") was added to CRITICAL_COMMAND_KINDS
+    // deliberately, so a signature-mode PO can sign the close-gate acknowledgement; excluded here (QG-04) and pinned positively below:
+    // prepare-critical composes it instead of refusing with Usage.
+    {
+      let usage = false;
+      try {
+        runHumanApproval([
+          "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+          "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+          "--kind", "acknowledge-caller-authored-critic", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+        ], {});
+      } catch (error) { usage = /Usage:/u.test(String(error?.message ?? error)); }
+      assert.equal(usage, false, "prepare-critical composes acknowledge-caller-authored-critic (G20-39)");
+    }
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",

@@ -195,7 +195,9 @@ export const CRITICAL_APPROVAL_STORE_SCHEMA = "pipeline.critical-approval-record
 export const AGENT_RESULT_ONLY_RECONCILE_BASIS = "agent-result-only-reconcile-no-po-proof";
 export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-consumption.v1";
 /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
-const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval" });
+const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval",
+  // G20-39: the PO acknowledgement of a caller-authored Critic (lib/critic-acknowledgement.mjs); read per packet, not through the slot overlay.
+  "acknowledge-caller-authored-critic": "criticAcknowledgement" });
 
 export function criticalApprovalStoreRoot(gitCommonDir) {
   return join(resolve(gitCommonDir), "agent-pipeline", "critical-approvals");
@@ -300,6 +302,22 @@ export function readLastPrivateApproval(gitCommonDir, kind) {
     // an absent or unreadable store is "nothing private"; the legacy fallback still applies
   }
   return null;
+}
+
+/** Every valid private approval record of `kind`, oldest first; an absent or unreadable store reads as none. */
+export function readPrivateApprovals(gitCommonDir, kind) {
+  const found = [];
+  try {
+    if (typeof gitCommonDir !== "string" || !Object.hasOwn(CRITICAL_APPROVAL_SLOTS, kind)) return found;
+    const dir = join(criticalApprovalStoreRoot(gitCommonDir), "approvals", kind);
+    for (const name of readdirSync(dir).filter((entry) => entry.endsWith(".json") && !entry.startsWith(".")).sort()) {
+      const envelope = readJsonFile(join(dir, name));
+      if (approvalEnvelopeValid(kind, envelope)) found.push(envelope);
+    }
+  } catch {
+    // an absent or unreadable store is "nothing private"
+  }
+  return found;
 }
 
 /** Every private consumption entry, in the legacy ledger's `{ proofSha256, kind, consumedAt }` shape. */

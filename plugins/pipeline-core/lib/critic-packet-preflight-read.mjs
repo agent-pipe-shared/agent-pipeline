@@ -20,6 +20,8 @@ export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
 export const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
 export const PACKET_ID = /^[a-f0-9]{32}$/;
 export const SHA256 = /^[a-f0-9]{64}$/;
+// The window in which a claimed session review may still complete; shared with the Critic Source return producer (lib/critic-source-return.mjs).
+export const SESSION_REVIEW_TTL_SECONDS = 24 * 60 * 60;
 export const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const SESSION_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const SIGNED_IMPORT_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";

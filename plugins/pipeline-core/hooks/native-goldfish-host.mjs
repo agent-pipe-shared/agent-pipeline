@@ -7,7 +7,8 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -179,6 +180,19 @@ function nativeGoldfishHookBaseMessage(result) {
   return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${describeFailureDetail(result.detail)}`;
 }
 
+/** G20-39: the self-describing line a Critic subagent stop prints (stderr; a stop hook's stdout is read as a decision). */
+export function criticSourceReturnMessage(outcome) {
+  const finalizeAs = "the verdict then finalizes as caller-authored-fallback, which the feature close admits only at rigor 0 and low risk (repair: a PO acknowledgement of the caller-authored Critic for this packet and candidate)";
+  switch (outcome?.status) {
+    case "issued": return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
+    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds one; it is never overwritten.`;
+    case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
+    case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
+    case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;
+    default: return `Critic Source return not issued (the private control area could not be read); ${finalizeAs}.`;
+  }
+}
+
 if (isDirectInvocation(import.meta.url)) {
   const runnerIndex = process.argv.indexOf("--runner");
   const runner = runnerIndex >= 0 ? process.argv[runnerIndex + 1] : null;
@@ -192,6 +206,18 @@ if (isDirectInvocation(import.meta.url)) {
   process.once("exit", () => admissionProgress("exit"));
   // T6-A: bind this Claude hook process to its own hook-observed session owner.
   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
+  // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
+  if (input.hook_event_name === "SubagentStop") {
+    try {
+      const criticStop = issueCriticSourceReturn({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), runner, input,
+        readHandbackFn: runner === "claude" ? readSubagentHandbackMessage : null });
+      if (criticStop.status !== "not-applicable") {
+        process.stderr.write(`${criticSourceReturnMessage(criticStop)}\n`);
+        process.exit(0);
+      }
+    } catch { /* fall through to the Goldfish route, which treats a non-Goldfish stop as not applicable */ }
+  }
   let result;
   try {
     result = finalizeNativeGoldfishHostReturn({ runner,

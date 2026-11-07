@@ -604,6 +604,8 @@ kernel authority, so a maintenance window cannot lift them:
 `plugins/pipeline-core/lib/spec-journey-coverage.mjs`,
 `plugins/pipeline-core/lib/answered-intake-values.mjs`,
 `plugins/pipeline-core/lib/signed-proof-wait.mjs`,
+`plugins/pipeline-core/lib/critic-source-return.mjs`,
+`plugins/pipeline-core/lib/critic-acknowledgement.mjs`,
 `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
 `plugins/pipeline-core/lib/critic-generic-batch.mjs`,
 `plugins/pipeline-core/lib/critic-verify-readiness.mjs`,

@@ -86,10 +86,16 @@ const INVENTORY = Object.freeze([
  * Critic round has failed, so it is a recovery act off the happy path, not a third per-feature decision. The happy path
  * (Critic passes) still needs exactly the plan approval and the push approval; the third-class and extra-ceremony mirrors
  * below stay red-checked.
+ *
+ * `approve-critic-acknowledgement` (G20-39, PO decision 2026-11-07 "Producer + Brücke") is the PO's acknowledgement of a
+ * caller-authored Critic verdict, the bridge for a runner that issues no Critic Source-return record. On Claude and Codex the
+ * Critic subagent's stop issues that record, so the happy path never meets it. HONEST LIMIT: on Antigravity no producer exists
+ * yet (its subagent stop event is being measured, M4c/M14), so there a rigor >= 1 feature close meets it as a third per-feature
+ * PO interaction until a producer lands; recorded on the PO list, not hidden by this classification.
  */
 const OFF_HAPPY_PATH_VERBS = Object.freeze([
   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
-  "approve-residual-acceptance",
+  "approve-residual-acceptance", "approve-critic-acknowledgement",
   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",

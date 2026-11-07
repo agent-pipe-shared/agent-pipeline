@@ -112,7 +112,7 @@ function readSubagentStopPending({ commonDir, input }) {
 const SUBAGENT_HANDBACK_TOOL = "SubagentHandback";
 const SUBAGENT_HANDBACK_MAX_BYTES = 8 * 1024 * 1024;
 const SUBAGENT_HANDBACK_UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
-function readSubagentHandbackMessage(input) {
+export function readSubagentHandbackMessage(input) {
   const unsafe = { ok: false, code: SUBAGENT_HANDBACK_UNSAFE };
   const none = { ok: false, code: "NGHR-CLAUDE-STOP-NO-HANDBACK" };
   const transcriptPath = input.transcript_path;

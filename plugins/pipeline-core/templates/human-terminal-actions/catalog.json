@@ -465,6 +465,26 @@
       "platforms": null
     },
     {
+      "id": "acknowledge-caller-authored-critic",
+      "inventoryId": "acknowledge-caller-authored-critic",
+      "revision": 1,
+      "purpose": "Record the caller-authored Critic acknowledgement terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-critic-acknowledgement"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
       "id": "critical-action-family",
       "inventoryId": "critical-action-family",
       "revision": 1,

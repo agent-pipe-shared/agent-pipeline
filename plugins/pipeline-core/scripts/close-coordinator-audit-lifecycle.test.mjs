@@ -13,6 +13,8 @@ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";imp
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { finishFeature } from "./finish-feature.mjs";
 import { readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
+import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+import { writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
 
 const ROOT = process.cwd();
 const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
@@ -149,7 +151,37 @@ test("D2b a caller-authored Critic verdict is refused CLOSE-CRITIC-CALLER-AUTHOR
   const f = fixture(t, { origin: "fallback" });
   const refused = planPrepared(f, 2);
   assert.equal(refused.code, "CLOSE-CRITIC-CALLER-AUTHORED");
-  assert.match(refused.message ?? JSON.stringify(refused), new RegExp(`${"1".repeat(32)}[\\s\\S]*rigor 1[\\s\\S]*without the fallback`, "iu"));
+  // Restated 2026-11-07 (G20-39, QG-04, same strictness): the old repair ("finalize WITHOUT the fallback") was not runnable, because finalizing
+  // without the flag is exactly what produces the fallback label. The refusal now names the one runnable repair, the PO acknowledgement command.
+  assert.match(refused.message ?? JSON.stringify(refused), new RegExp(`${"1".repeat(32)}[\\s\\S]*rigor 1[\\s\\S]*approve-critic-acknowledgement --by <name> --critic-packet ${"1".repeat(32)}`, "iu"));
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+});
+// G20-39 (AC-108): the acknowledgement is recorded the way the command records it (same private store, same record shape); the command itself is walked in close-path-e2e.
+function acknowledge(f, overrides = {}, packetId = "1".repeat(32)) {
+  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId });
+  const subject = criticAcknowledgementSubject({ packetId, receipt });
+  const approval = { approvedBy: "Fixture PO", approvedAt: "2026-11-07T10:00:00.000Z", forCommit: receipt.candidate.commit, forTree: receipt.candidate.tree, packetId,
+    criticReceiptSha256: subject.criticReceiptSha256, independence: subject.independence, criticalProof: null, ...overrides };
+  assert.equal(writeCriticalApproval({ gitCommonDir: join(f.root, ".git"), kind: CRITIC_ACKNOWLEDGEMENT_KIND, approval }).ok, true);
+}
+test("G20-39 an acknowledged caller-authored Critic admits the identical close at rigor 1, and the receipt keeps the caller-authored label", t => {
+  const f = fixture(t, { origin: "fallback" });
+  assert.equal(planPrepared(f, 2).code, "CLOSE-CRITIC-CALLER-AUTHORED");
+  acknowledge(f);
+  const plan = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id]);
+  invokeAction(f.root, plan.nextAction);
+  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
+  assert.equal(receipt.independence, "caller-authored-fallback");
+  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+});
+test("G20-39 an acknowledgement for another packet, another receipt or another candidate never admits the close; nothing is built", t => {
+  const f = fixture(t, { origin: "fallback" });
+  acknowledge(f, { packetId: "2".repeat(32) });
+  acknowledge(f, { criticReceiptSha256: "e".repeat(64) });
+  acknowledge(f, { forCommit: "d".repeat(40) });
+  acknowledge(f, { forTree: "c".repeat(40) });
+  const refused = planPrepared(f, 2);
+  assert.equal(refused.code, "CLOSE-CRITIC-CALLER-AUTHORED");
   assert.equal(existsSync(join(f.root, "audit-bundles")), false);
 });
 test("D2b a Source-issued Critic verdict closes at rigor 1 and its consumed receipt says so", t => {

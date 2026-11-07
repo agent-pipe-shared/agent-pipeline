@@ -13,6 +13,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
 import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
+import { readCriticSourceReturn } from "../lib/critic-source-return.mjs";
 import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
@@ -125,14 +126,15 @@ const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
 const SCF_REQUEST_SHAPE = "the request is a closed JSON file that does not match; session-critic-finalizer.mjs --help lists its exact keys";
 
 // Cut A: a record the Source issued when the fresh session returned upgrades the verdict to source-issued-origin.
-// No runner produces one yet; since G20-24 (PO 2026-11-07) a missing record finalizes under the weaker
+// The Critic subagent's stop hook issues it (G20-39); where none exists (Antigravity) a missing record, since G20-24 (PO 2026-11-07), finalizes under the weaker
 // caller-authored label instead of refusing, and a record that is present must still bind exactly.
 const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
 const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
-function unavailableOriginalSourceReader() { fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE"); }
-function originGate(query, options, deps) {
+// G20-39: the default reader is the private control area. The Critic subagent's stop hook (hooks/native-goldfish-host.mjs ->
+// lib/critic-source-return.mjs) issues the record there; a missing record reads as null, a present one is returned as stored.
+function originGate(query, options, deps, controlRoot) {
   let record = null;
-  try { record = (deps.readOriginalSourceReturnFn ?? unavailableOriginalSourceReader)(query); } catch { record = null; }
+  try { record = (deps.readOriginalSourceReturnFn ?? ((q) => readCriticSourceReturn({ controlRoot, packetId: q.packetId })))(query); } catch { record = null; }
   // G20-24 (PO decision 2026-11-07): no runner issues a Source return record, so requiring one made the normal finalize path
   // unreachable (SCF-ORIGINAL-SOURCE-UNAVAILABLE on every runner). Without a record the verdict is finalized with the honest
   // caller-authored label; a record that IS present must still bind exactly (below). The option is kept for compatibility only.
@@ -674,7 +676,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   let event = null;
   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
-    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps);
+    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot);
   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence });
   validateResult(result, prepared.packet, prepared.packetDigest);
   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
