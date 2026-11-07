@@ -251,11 +251,17 @@ function ensureStore(c) {
 }
 function reference(root, commit, p, role = "spec") {
   p = normalizePacketPath(p);
+  // C20 w252 (G20-10, Codex greenfield): the bare "Generic Critic batch is unavailable or refused" sent the session into the source to
+  // find that one `--guardrail .claude/settings.json` was the cause. Name the path, its role and the rule. Repository-relative only.
   if ((p.startsWith(".") && !(role === "guardrail" && [".claude/pipeline.yaml", ".claude/pipeline.json"].includes(p)))
-    || p.startsWith("scratch/") || p.startsWith("evidence/")) fail("CGB-REFERENCE");
+    || p.startsWith("scratch/") || p.startsWith("evidence/")) {
+    fail("CGB-REFERENCE", `CGB-REFERENCE: the ${role} path ${JSON.stringify(p)} cannot be a Critic reference. A reference must be a committed file outside scratch/ and evidence/ with no hidden (dot) segment; the only hidden guardrails admitted are .claude/pipeline.yaml and .claude/pipeline.json. Remove it from the request (or name the committed file it stands for) and retry.`);
+  }
   const row = git(root, ["ls-tree", "-z", commit, "--", p]);
   const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/u.exec(row);
-  if (!match || match[3] !== p) fail("CGB-REFERENCE");
+  if (!match || match[3] !== p) {
+    fail("CGB-REFERENCE", `CGB-REFERENCE: the ${role} path ${JSON.stringify(p)} is not a regular committed file at ${commit}. Commit it first, or remove it from the request, then retry.`);
+  }
   const bytes = git(root, ["show", `${commit}:${p}`]);
   return { path: p, commit, blobOid: match[2], sha256: sha256(bytes) };
 }

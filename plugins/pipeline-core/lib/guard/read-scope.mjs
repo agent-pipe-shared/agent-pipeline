@@ -630,9 +630,9 @@ function qp4MissingInRootTarget(raw, root) {
 // A missing target is diagnosable only for these exact, option-bounded single
 // reads. Keep pattern operands separate from paths and leave unfamiliar flags
 // to the closed grammar's unsupported-command diagnosis.
-export function isMissingSingleReadTarget(parsed, root) {
+function singleReadTargetOperand(parsed) {
   if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
-    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
   const { executable, argv } = parsed.segments[0];
   const name = basename(executable).toLowerCase();
   let target = null;
@@ -641,8 +641,49 @@ export function isMissingSingleReadTarget(parsed, root) {
     const args = argv[0] === "-n" ? argv.slice(1) : argv;
     if (args.length === 2 && args[0] !== "" && !args[0].startsWith("-")) target = args[1];
   }
-  if (target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root)) return true;
+  return target !== null && !target.startsWith("-") ? target : null;
+}
+export function isMissingSingleReadTarget(parsed, root) {
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(executable).toLowerCase();
+  const target = singleReadTargetOperand(parsed);
+  if (target !== null && qp4MissingInRootTarget(target, root)) return true;
   return missingOperandIsTheOnlyFault(name, executable, argv, root);
+}
+
+/**
+ * C20 w252 (G20-9, Codex greenfield Goldfish children): canon pointers such as `templates/prompts/agent-obligations.md` mean the
+ * repository file when it exists, else the plugin's own copy. In a consumer project every Goldfish first read the project path, was
+ * refused as missing, and then went looking. When the missing project-relative path exists as a regular file under the running
+ * plugin root, name that file. Label text only: the read stays refused, nothing is admitted here.
+ */
+export function pluginCopyOfMissingProjectPath(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+  if (typeof raw !== "string" || raw === "" || raw.includes("\0")) return null;
+  if (raw.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return null;
+  let rel;
+  try { rel = relative(resolve(root), resolve(passiveCandidate(raw, root))); } catch { return null; }
+  if (rel === "" || isAbsolute(rel) || rel.split(sep).some((segment) => segment === "" || segment === "." || segment === ".." || segment.startsWith("."))) return null;
+  for (const pluginRoot of pluginRoots) {
+    const candidate = join(pluginRoot, rel);
+    try { if (lstatSync(candidate).isFile()) return candidate; } catch { /* not shipped there */ }
+  }
+  return null;
+}
+
+/** The missing-project-target refusal, naming the plugin copy when there is one. */
+export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+  const copy = pluginCopyOfMissingProjectPath(raw, root, pluginRoots);
+  return "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); "
+    + (copy
+      ? `this project has no copy, but the Pipeline plugin ships this file: read ${copy} (a canon pointer such as templates/prompts/... means the plugin copy when the project has none).\n`
+      : "check the spelling or create it first.\n");
+}
+
+/** The single read target of a simple command, for the missing-target text (null when the command names none). */
+export function missingSingleReadTargetOperand(parsed) {
+  return singleReadTargetOperand(parsed);
 }
 
 // 2026-10-30 (consumer finding): any other admitted shape (rg -l, rg -i, several paths, head -n 5 ...) with a missing
@@ -753,7 +794,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
   // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n");
+    return verdict(2, missingProjectTargetDenialText(path, root, pluginRoots));
   }
   // K105 (PO decision 2026-10-23, asked after K96): a credential TARGET is refused with the typed code and repair the shell lane and the
   // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the

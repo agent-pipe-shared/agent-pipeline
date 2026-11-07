@@ -251,12 +251,20 @@ test("generated pipeline JSON is an exact committed guardrail reference",()=>{
     const saved=JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));
     assert.deepEqual(saved.declaredScope.guardrails.map(row=>[row.path,row.sha256]),[[".claude/pipeline.json",sha256(calibration)]]);
     rejected(()=>register(fx,{...d,guardrailPaths:[".claude/credentials.json"]}),"CGB-REFERENCE");
+    // C20 w252 (G20-10): the refusal names the path, its role and the rule instead of the bare batch text.
+    assert.throws(()=>register(fx,{...d,guardrailPaths:[".claude/settings.json"]}),e=>e.code==="CGB-REFERENCE"
+      &&e.message.includes("guardrail path \".claude/settings.json\"")&&e.message.includes(".claude/pipeline.yaml and .claude/pipeline.json")
+      &&!e.message.includes("Generic Critic batch is unavailable"));
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 test("rejected guardrail leaves no held transaction and retry can register",()=>{
   const fx=fixture();try{
     const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
     rejected(()=>register(fx,declaration(fx,{guardrailPaths:[".claude/missing.json"]})),"CGB-REFERENCE");
+    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
+    // C20 w252 (G20-10): an uncommitted reference names itself and the repair.
+    assert.throws(()=>register(fx,declaration(fx,{guardrailPaths:["docs/not-committed.md"]})),e=>e.code==="CGB-REFERENCE"
+      &&e.message.includes("\"docs/not-committed.md\" is not a regular committed file")&&e.message.includes("Commit it first"));
     assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
     assert.ok(register(fx).batchRef);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
