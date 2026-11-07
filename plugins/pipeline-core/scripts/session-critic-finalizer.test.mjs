@@ -1484,18 +1484,26 @@ test("PF-93 (9) the explicit legacy option accepts exactly the old key set and d
   } finally { cleanup(fx); }
 });
 
-test("Cut A (1) a caller-authored verdict with no Source origin is refused typed, and the packet stays unconsumed", () => {
-  const fx = fixture();
-  try {
-    const request = preadmitted(fx, { packetId: "7".repeat(32) });
-    assert.throws(() => finalizeRaw(request), codeIs(ORIGIN_UNAVAILABLE));
-    assert.throws(() => finalizeRaw(request), (error) => /--allow-caller-authored-fallback/u.test(error.message) && /caller-authored/u.test(error.message),
-      "the refusal names the opt-in that is admitted");
-    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => { throw new Error("no producer"); } }), codeIs(ORIGIN_UNAVAILABLE));
-    // Nothing was recorded or consumed, so the same admitted packet still finalizes once an origin exists.
-    const done = finalizeRaw(request, { readOriginalSourceReturnFn: originStub() });
-    assert.equal(done.status, "completed");
-  } finally { cleanup(fx); }
+// Restated 2026-11-07 (candidate 20, G20-24, QG-04): the PO dropped the Source-return requirement because no runner produces it and
+// the normal finalize path was unreachable. Same strictness, new contract: with no record the verdict completes, but only ever under
+// the weaker caller-authored label with the lower-assurance receipt flags, and the packet is consumed exactly once.
+test("Cut A (1) a caller-authored verdict with no Source origin completes only under the weaker caller-authored label", () => {
+  for (const [packetId, deps] of [["7".repeat(32), undefined], ["7a".repeat(16), { readOriginalSourceReturnFn: () => { throw new Error("no producer"); } }]]) {
+    const fx = fixture();
+    try {
+      const request = preadmitted(fx, { packetId });
+      const done = deps === undefined ? finalizeRaw(request) : finalizeRaw(request, deps);
+      assert.equal(done.status, "completed");
+      assert.equal(done.independence, "caller-authored-fallback");
+      assert.equal(done.origin, "caller-authored");
+      assert.equal(done.nativeAttestation, false);
+      assert.equal(done.receipt.independence, "caller-authored-fallback");
+      assert.equal(done.receipt.session.freshContext, false);
+      assert.equal(done.receipt.session.historyInherited, true);
+      // Consumed exactly once: a replay is refused, never relabelled.
+      assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub() }), (error) => error instanceof SessionCriticFinalizerError);
+    } finally { cleanup(fx); }
+  }
 });
 
 test("Cut A (2) an origin record offered by the caller is never accepted", () => {
@@ -1504,11 +1512,15 @@ test("Cut A (2) an origin record offered by the caller is never accepted", () =>
     const request = preadmitted(fx, { packetId: "8".repeat(32) });
     const query = { packetId: request.packetId };
     // A record smuggled through the finalize options is ignored; only the injected reader counts.
-    const forged = { ...request, originalSourceReturn: originStub()({ ...query, packetDigest: "a".repeat(64), claimant: {}, sessionId: request.sessionId, verdictSha256: "b".repeat(64) }) };
-    assert.throws(() => finalizeRaw(forged), codeIs(ORIGIN_UNAVAILABLE));
     // A record smuggled into the verdict is not a verdict key.
     assert.throws(() => finalizeRaw({ ...request, verdict: verdict({ sourceReturn: { issuer: "source" } }) }),
-      (error) => error instanceof SessionCriticFinalizerError && (error.code === "SCF-VERDICT-SCHEMA" || error.code === ORIGIN_UNAVAILABLE));
+      (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-VERDICT-SCHEMA");
+    // G20-24 restatement: the smuggled options record never upgrades the label; the verdict completes as caller-authored only.
+    const forged = { ...request, originalSourceReturn: originStub()({ ...query, packetDigest: "a".repeat(64), claimant: {}, sessionId: request.sessionId, verdictSha256: "b".repeat(64) }) };
+    const done = finalizeRaw(forged);
+    assert.equal(done.independence, "caller-authored-fallback");
+    assert.equal(done.origin, "caller-authored");
+    assert.notEqual(done.receipt.independence, "source-issued-origin");
     // A record smuggled into the closed CLI request file is a request violation.
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
     const path = writeScratchRequest(fx, "origin-request.json", { ...cliBatchRequest(fx), origin: { issuer: "source" } });
@@ -1535,10 +1547,15 @@ test("Cut A (3) a record bound to anything else, an expired record, and a replay
     ]) {
       assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub(overrides) }), codeIs(ORIGIN_BINDING), JSON.stringify(overrides));
     }
-    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => null }), codeIs(ORIGIN_UNAVAILABLE));
     assert.equal(finalizeRaw(request, { readOriginalSourceReturnFn: originStub() }).status, "completed");
     // Replay: the packet is consumed, so the same record cannot finalize a second time.
     assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub() }), (error) => error instanceof SessionCriticFinalizerError);
+    // G20-24 restatement: an absent record (null) completes a fresh packet under the caller-authored label, never as source.
+    const fresh = fixture();
+    try {
+      const absent = finalizeRaw(preadmitted(fresh, { packetId: "9a".repeat(16) }), { readOriginalSourceReturnFn: () => null });
+      assert.equal(absent.independence, "caller-authored-fallback");
+    } finally { cleanup(fresh); }
   } finally { cleanup(fx); }
 });
 
@@ -1778,7 +1795,13 @@ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps re
   try {
     const request = preadmitted(fx, { packetId: "b2".repeat(16), allowCallerAuthoredFallback: true });
     assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub({ verdictSha256: "d".repeat(64) }) }), codeIs(ORIGIN_BINDING));
-    assert.throws(() => finalizeRaw({ ...request, allowCallerAuthoredFallback: "yes" }), codeIs(ORIGIN_UNAVAILABLE));
+    // G20-24 restatement: the option no longer decides anything; a request without it completes under the same weaker marker.
+    const fresh = fixture();
+    try {
+      const withoutOption = finalizeRaw(preadmitted(fresh, { packetId: "b3".repeat(16) }));
+      assert.equal(withoutOption.independence, "caller-authored-fallback");
+      assert.equal(withoutOption.receipt.session.freshContext, false);
+    } finally { cleanup(fresh); }
     const result = finalizeRaw(request);
     assert.equal(result.status, "completed");
     assert.equal(result.independence, "caller-authored-fallback");
@@ -1797,30 +1820,35 @@ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps re
   } finally { cleanup(fx); }
 });
 
-test("Cut A (6) CLI finalize without an origin exits 2 with the typed code, not SCF-INTERNAL", () => {
+test("Cut A (6) CLI finalize without an origin completes under the caller-authored label, never SCF-INTERNAL or a stop", () => {
   const fx = fixture();
   try {
     const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
     assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
     const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
-    assert.equal(result.exitCode, 2);
-    assert.equal(result.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
-    assert.equal(result.output.code, ORIGIN_UNAVAILABLE);
+    assert.equal(result.exitCode, 0);
+    assert.notEqual(result.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
+    assert.notEqual(result.output.code, ORIGIN_UNAVAILABLE);
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.independence, "caller-authored-fallback");
+    assert.equal(result.output.nativeAttestation, false);
   } finally { cleanup(fx); }
 });
 
 const FALLBACK_FLAG = "--allow-caller-authored-fallback";
 
-test("Cut A follow-up (1) CLI finalize without the flag and without a Source record is refused typed at exit 2", () => {
+test("Cut A follow-up (1) CLI finalize without the flag and without a Source record reports the same result as with the flag", () => {
   const fx = fixture();
   try {
     const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
     assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
     const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
-    assert.equal(result.exitCode, 2);
-    assert.equal(result.output.code, ORIGIN_UNAVAILABLE);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.independence, "caller-authored-fallback");
+    assert.equal(result.output.origin, "caller-authored");
   } finally { cleanup(fx); }
 });
 

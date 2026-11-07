@@ -124,20 +124,20 @@ const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
 // The CLI error detail is cut to one line of 200 characters, so the full key list lives in --help and the detail points there.
 const SCF_REQUEST_SHAPE = "the request is a closed JSON file that does not match; session-critic-finalizer.mjs --help lists its exact keys";
 
-// Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
-// No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
-// the caller's options (never a request file) lets finalization complete, with a weaker marker.
+// Cut A: a record the Source issued when the fresh session returned upgrades the verdict to source-issued-origin.
+// No runner produces one yet; since G20-24 (PO 2026-11-07) a missing record finalizes under the weaker
+// caller-authored label instead of refusing, and a record that is present must still bind exactly.
 const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
 const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
 function unavailableOriginalSourceReader() { fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE"); }
 function originGate(query, options, deps) {
   let record = null;
   try { record = (deps.readOriginalSourceReturnFn ?? unavailableOriginalSourceReader)(query); } catch { record = null; }
+  // G20-24 (PO decision 2026-11-07): no runner issues a Source return record, so requiring one made the normal finalize path
+  // unreachable (SCF-ORIGINAL-SOURCE-UNAVAILABLE on every runner). Without a record the verdict is finalized with the honest
+  // caller-authored label; a record that IS present must still bind exactly (below). The option is kept for compatibility only.
   if (record === null || record === undefined) {
-    if (options.allowCallerAuthoredFallback === true) {
-      return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
-    }
-    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE", "no runner issues a Source return record for the fresh session yet; to finalize this verdict as caller-authored (a weaker, labelled independence marker) repeat the finalize call with the sixth argument --allow-caller-authored-fallback");
+    return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
   }
   const now = (deps.originNowMsFn ?? Date.now)();
   if (!exact(record, ORIGINAL_SOURCE_RETURN_KEYS) || record.schema !== ORIGINAL_SOURCE_RETURN_SCHEMA || record.issuer !== "source"
