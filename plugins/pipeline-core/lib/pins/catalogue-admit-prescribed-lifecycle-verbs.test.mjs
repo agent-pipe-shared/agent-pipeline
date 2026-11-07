@@ -379,6 +379,33 @@ function bothRefuse(action, f, label) {
   assert.equal(guardCode(action, f), 2, `${label}: real guard`);
 }
 
+// ---- C20 G20-31: the transcript reader's page and window flags, in their closed shapes ----
+test("C20 G20-31 transcript recovery: list --page-size [--cursor] and read --window-bytes [--cursor] are admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "runner-transcript-recovery.mjs");
+    const base = ["--root", f.root, "--runner", "codex", "--exclude-session", "current-session"];
+    bothAdmit(scriptAction(script, "list", ...base), f, "plain list");
+    bothAdmit(scriptAction(script, "list", ...base, "--page-size", "50"), f, "paged list");
+    bothAdmit(scriptAction(script, "list", ...base, "--page-size", "50", "--cursor", "WzE3MDAsInMxIiwwXQ"), f, "paged list with cursor");
+    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1"), f, "plain read");
+    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1", "--window-bytes", "65536"), f, "windowed read");
+    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1", "--window-bytes", "65536", "--cursor", "1200.0123456789abcdef"), f, "windowed read with cursor");
+    for (const [label, argv] of [
+      ["list cursor without a page size", ["list", ...base, "--cursor", "abc"]],
+      ["list with a window size", ["list", ...base, "--window-bytes", "10"]],
+      ["list with a non-numeric page size", ["list", ...base, "--page-size", "ten"]],
+      ["list with a negative page size", ["list", ...base, "--page-size", "-1"]],
+      ["list with a cursor holding a separator", ["list", ...base, "--page-size", "2", "--cursor", "a/b"]],
+      ["list with a repeated page size", ["list", ...base, "--page-size", "2", "--page-size", "3"]],
+      ["read cursor without a window size", ["read", ...base, "--session-id", "s1", "--cursor", "abc"]],
+      ["read with a page size", ["read", ...base, "--session-id", "s1", "--page-size", "2"]],
+      ["read with a non-numeric window size", ["read", ...base, "--session-id", "s1", "--window-bytes", "big"]],
+      ["export with a page size", ["export", ...base, "--session-id", "s1", "--page-size", "2"]],
+      ["export with a cursor", ["export", ...base, "--session-id", "s1", "--cursor", "abc"]],
+    ]) bothRefuse(scriptAction(script, ...argv), f, label);
+  });
+});
+
 test("D64 pipeline-state documented help and readback forms are admitted", () => {
   withFixture("feature", f => {
     for (const word of ["--help", "-h", "help"]) bothAdmit(stateAction(word), f, word);

@@ -244,6 +244,9 @@ const claudeAssistant = (sessionId, cwd, timestamp, id, usage, model = "claude-s
   type: "assistant", sessionId, cwd, timestamp, message: { id, role: "assistant", model, usage },
 });
 
+// The turn description as it was before C20 G20-31 added endTimestamp, recordCount and toolCallCount to each marker.
+const legacyTurns = (turns) => ({ ...turns, markers: turns.markers.map(({ index, record, timestamp }) => ({ index, record, timestamp })) });
+
 function runMain(argv, env) {
   const chunks = [];
   const originalWrite = process.stdout.write;
@@ -305,9 +308,11 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
 
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
-      "childSessions", "completeness", "firstTimestamp", "incompleteReasons", "lastTimestamp", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+      "childSessions", "completeness", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
       "segments", "sessionId", "status", "turns", "unparsedLineCount", "usage",
     ]);
+    // Justification (C20 G20-31, restated in place, nothing weakened): the key set is still pinned; the two new keys are the
+    // split of `completeness` into metadataComplete and eventsComplete.
     // Justification (AC-175 part B): the key set stays pinned on purpose; `turns` is the new turn-boundary marker block.
     // Justification (G23.forensics Slice A): the key set is pinned on purpose; the three new keys are the completeness marker.
     assert.equal(result.completeness, "partial", "this session holds a damaged line");
@@ -719,7 +724,9 @@ test("AC-175B: the Claude export lists child sessions with agent type, turn span
       firstTimestamp: stamp("09:00:05"), lastTimestamp: stamp("09:00:20"),
     });
     assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "claude-assistant-message-usage", observations: 1, counters: { input_tokens: 10, output_tokens: 2 } });
-    assert.deepEqual(result.turns, {
+    // Justification (C20 G20-31, restated in place): turn markers gained endTimestamp/recordCount/toolCallCount; the original
+    // fields are still compared exactly through legacyTurns, the new ones are pinned by the G20-31 cases.
+    assert.deepEqual(legacyTurns(result.turns), {
       model: "claude-assistant-message-id", count: 4, markersTruncated: false,
       markers: [
         { index: 0, record: 1, timestamp: stamp("09:00:01") }, { index: 1, record: 2, timestamp: stamp("09:00:02") },
@@ -742,7 +749,7 @@ test("AC-175B: a Claude session without a subagent directory lists no children, 
     const plain = recovery.exportRunnerTranscript({ ...args, sessionId: "plain" });
     assert.deepEqual(plain.childSessions, []);
     assert.equal(plain.completeness, "complete");
-    assert.deepEqual(plain.turns, { model: "claude-assistant-message-id", count: 1, markersTruncated: false, markers: [{ index: 0, record: 1, timestamp: stamp("08:00:01") }] });
+    assert.deepEqual(legacyTurns(plain.turns), { model: "claude-assistant-message-id", count: 1, markersTruncated: false, markers: [{ index: 0, record: 1, timestamp: stamp("08:00:01") }] });
 
     claudeSegment(claudeHome, project, "linked.jsonl", [claudeUser("linked", project, stamp("08:10:00"))]);
     const projectDirectory = join(claudeHome, "projects", realpathSync(project).replace(/[^A-Za-z0-9]/gu, "-"));
@@ -810,7 +817,7 @@ test("AC-175B: the Codex export lists spawned child sessions with turn span, rol
     assert.equal(result.childSessions[0].transcript.sha256, sha256Of(readFileSync(child1)));
     assert.equal(result.childSessions[0].transcript.recordCount, 3);
     assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "codex-token-count-total", observations: 1, counters: codexCounters(40) });
-    assert.deepEqual(result.turns, {
+    assert.deepEqual(legacyTurns(result.turns), {
       model: "codex-task-started", count: 3, markersTruncated: false,
       markers: [{ index: 0, record: 1, timestamp: stamp("10:00:01") }, { index: 1, record: 5, timestamp: stamp("10:05:00") }, { index: 2, record: 10, timestamp: stamp("10:10:00") }],
     });
@@ -867,7 +874,7 @@ test("AC-175B: the Antigravity export reads the current conversation through the
     assert.equal(result.lastTimestamp, stamp("11:05:09"));
     assert.equal(result.completeness, "complete");
     assert.deepEqual(result.usage, { status: "available", source: "antigravity-turn-completed", observations: 2, counters: { input_tokens: 15, cached_input_tokens: 2, output_tokens: 4 } });
-    assert.deepEqual(result.turns, {
+    assert.deepEqual(legacyTurns(result.turns), {
       model: "antigravity-turn-started", count: 2, markersTruncated: false,
       markers: [{ index: 0, record: 0, timestamp: stamp("11:00:00") }, { index: 1, record: 3, timestamp: stamp("11:05:00") }],
     });
@@ -1097,5 +1104,143 @@ test("AC-175C: the stale-handoff sweep removes expired and foreign leftovers and
     assert.equal(swept.removed, 2);
     assert.deepEqual(readdirSync(directory), [`${AGY_CONVERSATION}.json`]);
     assert.equal(handoff.sweepAntigravityHostHandoffs({ root: join(root, "no-such-root") }).removed, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// C20 G20-31: the forensics reader paginates and separates 'metadata complete' from 'all events read'.
+// ---------------------------------------------------------------------------------------------
+
+function withFiveSessions(run) {
+  withExportFixture(({ project, codexHome, ...rest }) => {
+    ["s1", "s2", "s3", "s4", "s5"].forEach((id, index) => {
+      const target = codexSegment(codexHome, `${id}.jsonl`, { cwd: project, sessionId: id, metaTimestamp: stamp(`0${index}:00:00`), records: [tokenCount(stamp(`0${index}:01:00`), index)] });
+      const when = new Date(Date.UTC(2026, 8, 1, index, 0, 0));
+      utimesSync(target, when, when);
+    });
+    run({ project, codexHome, ...rest, args: { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome } } });
+  });
+}
+
+test("G20-31 list paginates with a stable cursor, says when more exists and names the next call, and never silently caps", () => {
+  withFiveSessions(({ args }) => {
+    const whole = recovery.listRunnerTranscripts(args);
+    assert.deepEqual(whole.sessions.map((s) => s.sessionId), ["s5", "s4", "s3", "s2", "s1"]);
+    assert.equal(whole.page.more, false, "an unpaged list returns everything and says nothing is left");
+    assert.equal(whole.metadataComplete, true);
+    const seen = [];
+    let cursor;
+    let calls = 0;
+    for (;;) {
+      const page = recovery.listRunnerTranscripts({ ...args, pageSize: 2, ...(cursor === undefined ? {} : { cursor }) });
+      assert.equal(page.status, "available");
+      assert.ok(page.sessions.length <= 2);
+      seen.push(...page.sessions.map((s) => s.sessionId));
+      calls += 1;
+      if (!page.page.more) { assert.equal(page.page.nextCursor, null); assert.equal(page.page.nextCall, null); break; }
+      assert.equal(typeof page.page.nextCursor, "string");
+      assert.deepEqual(page.page.nextCall, { operation: "list", pageSize: 2, cursor: page.page.nextCursor });
+      cursor = page.page.nextCursor;
+    }
+    assert.equal(calls, 3);
+    assert.deepEqual(seen, ["s5", "s4", "s3", "s2", "s1"]);
+    for (const bad of [{ pageSize: 0 }, { pageSize: 1.5 }, { pageSize: 501 }, { pageSize: 2, cursor: "not-a-cursor" }]) {
+      assert.equal(recovery.listRunnerTranscripts({ ...args, ...bad }).reason, bad.cursor ? "invalid-cursor" : "invalid-page-size");
+    }
+  });
+});
+
+test("G20-31 list is metadata-incomplete when the enumeration cap truncates, and says so", () => {
+  withFiveSessions(({ args }) => {
+    const capped = recovery.listRunnerTranscripts({ ...args, limits: { maxCandidates: 3 } });
+    assert.equal(capped.status, "available");
+    assert.equal(capped.metadataComplete, false);
+    assert.equal(capped.page.candidateBoundReached, true);
+  });
+});
+
+test("G20-31 a session is read window by window to the end and the windows concatenate to the whole read", () => {
+  withExportFixture(({ project, codexHome }) => {
+    const records = Array.from({ length: 6 }, (_, index) => ({ timestamp: stamp(`05:0${index}:00`), type: "event_msg", payload: { type: "agent_message", message: `event-${index}-${"x".repeat(40)}` } }));
+    codexSegment(codexHome, "long.jsonl", { cwd: project, sessionId: "long", metaTimestamp: stamp("05:00:00"), records });
+    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "long" };
+    const whole = recovery.readRunnerTranscript(args);
+    const parts = [];
+    let cursor;
+    let windows = 0;
+    for (;;) {
+      const window = recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 150, ...(cursor === undefined ? {} : { cursor }) });
+      assert.equal(window.status, "available");
+      assert.equal(window.totalBytes, whole.bytes.length);
+      assert.ok(window.bytes.length > 0 && window.bytes.at(-1) === 10, "a window holds whole lines only");
+      parts.push(window.bytes);
+      windows += 1;
+      assert.equal(window.metadataComplete, true);
+      assert.equal(window.eventsComplete, window.nextCursor === null, "complete only when no window is left unread");
+      if (window.nextCursor === null) break;
+      assert.equal(window.endOffset < window.totalBytes, true);
+      assert.deepEqual(window.nextCall, { operation: "read", windowBytes: 150, cursor: window.nextCursor });
+      cursor = window.nextCursor;
+    }
+    assert.ok(windows > 1);
+    assert.deepEqual(Buffer.concat(parts), whole.bytes);
+    assert.equal(recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 150, cursor: "bogus" }).reason, "invalid-cursor");
+    assert.equal(recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 0 }).reason, "invalid-window-size");
+  });
+});
+
+test("G20-31 export separates metadataComplete from eventsComplete and never says complete while a window is unread", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "clean.jsonl", { cwd: project, sessionId: "clean", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
+    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "clean" };
+    const clean = recovery.exportRunnerTranscript(args);
+    assert.deepEqual([clean.metadataComplete, clean.eventsComplete, clean.completeness], [true, true, "complete"]);
+    const unread = recovery.exportRunnerTranscript({ ...args, limits: { maxSegmentBytes: 10 } });
+    assert.equal(unread.metadataComplete, true, "the digest and counts identify the whole file");
+    assert.equal(unread.eventsComplete, false, "the events past the ceiling were not read");
+    assert.equal(unread.completeness, "partial");
+  });
+});
+
+test("G20-31 turn markers carry an end time and per-turn counters where the transcript records them", () => {
+  withExportFixture(({ project, codexHome }) => {
+    const call = (timestamp) => ({ timestamp, type: "response_item", payload: { type: "function_call", name: "shell", call_id: `c${timestamp}` } });
+    codexSegment(codexHome, "turns.jsonl", { cwd: project, sessionId: "turns", metaTimestamp: stamp("05:00:00"), records: [
+      { timestamp: stamp("05:00:01"), type: "event_msg", payload: { type: "task_started" } },
+      call(stamp("05:00:05")), call(stamp("05:00:09")),
+      { timestamp: stamp("05:00:20"), type: "event_msg", payload: { type: "task_started" } },
+      call(stamp("05:00:30")),
+    ] });
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "turns" });
+    const [first, second] = result.turns.markers;
+    assert.equal(first.endTimestamp, stamp("05:00:09"));
+    assert.equal(first.recordCount, 3);
+    assert.equal(first.toolCallCount, 2);
+    assert.equal(second.endTimestamp, stamp("05:00:30"));
+    assert.equal(second.toolCallCount, 1);
+  });
+});
+
+test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
+  withFiveSessions(({ project, args }) => {
+    const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };
+    const base = ["--root", project, "--runner", "codex", "--exclude-session", "current-session"];
+    const page = JSON.parse(runMain(["list", ...base, "--page-size", "2"], env));
+    assert.equal(page.sessions.length, 2);
+    assert.equal(page.page.more, true);
+    const next = JSON.parse(runMain(["list", ...base, "--page-size", "2", "--cursor", page.page.nextCursor], env));
+    assert.deepEqual(next.sessions.map((s) => s.sessionId), ["s3", "s2"]);
+    const window = JSON.parse(runMain(["read", ...base, "--session-id", "s5", "--window-bytes", "60"], env));
+    assert.equal(window.status, "available");
+    assert.equal(window.eventsComplete, false);
+    assert.equal(typeof window.text, "string");
+    const invalid = { schema: SCHEMA, status: "unavailable", runner: "unknown", reason: "invalid-invocation" };
+    for (const argv of [
+      ["list", ...base, "--cursor", "x"],
+      ["list", ...base, "--window-bytes", "60"],
+      ["read", ...base, "--session-id", "s5", "--page-size", "2"],
+      ["read", ...base, "--session-id", "s5", "--cursor", "x"],
+      ["export", ...base, "--session-id", "s5", "--page-size", "2"],
+    ]) assert.deepEqual(JSON.parse(runMain(argv, env)), invalid, argv.join(" "));
   });
 });

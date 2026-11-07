@@ -236,7 +236,10 @@ function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env =
   const candidates = regularJsonlFiles(sessionsDirectory, limits?.maxCandidates ?? MAX_CANDIDATES, enumeration)
     .map((filePath) => candidateMetadata(filePath, projectIdentity))
     .filter((candidate) => candidate !== null && candidate.sessionId !== excludeSession)
-    .sort((left, right) => right.mtimeMs - left.mtimeMs);
+    // Recency, then session id and path: a total order, so a pagination cursor stays stable across equal mtimes.
+    .sort((left, right) => right.mtimeMs - left.mtimeMs
+      || (left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0)
+      || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
   if (candidates.length === 0) {
     return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
   }
@@ -319,16 +322,112 @@ export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env =
 export function listRunnerTranscripts(options = {}) {
   const conflict = claimedSessionConflict(options);
   if (conflict !== null) return conflict;
+  const { pageSize, cursor } = options;
+  const paged = pageSize !== undefined;
+  if (paged && !(Number.isSafeInteger(pageSize) && pageSize >= 1 && pageSize <= MAX_PAGE_SIZE)) {
+    return unavailable(CODEX_RUNNER, "invalid-page-size");
+  }
+  const after = cursor === undefined ? null : decodeListCursor(cursor);
+  if (cursor !== undefined && (after === null || !paged)) return unavailable(CODEX_RUNNER, "invalid-cursor");
   const found = priorProjectMatchingCandidates(options);
   if (found.unavailable) return found.unavailable;
+  // The position of each candidate in the total order: (mtime desc, session id, duplicate ordinal of equal segments).
+  const seen = new Map();
+  const keyed = found.candidates.map((candidate) => {
+    const base = `${candidate.mtimeMs}|${candidate.sessionId}`;
+    const ordinal = seen.get(base) ?? 0;
+    seen.set(base, ordinal + 1);
+    return { candidate, key: [candidate.mtimeMs, candidate.sessionId, ordinal] };
+  });
+  const remaining = after === null ? keyed : keyed.filter((entry) => listKeyOrder(entry.key, after) > 0);
+  const slice = paged ? remaining.slice(0, pageSize) : remaining;
+  const more = slice.length < remaining.length;
+  const nextCursor = more ? encodeListCursor(slice[slice.length - 1].key) : null;
   return {
     schema: SCHEMA,
     status: "available",
     runner: CODEX_RUNNER,
-    sessions: found.candidates.map((candidate) => ({
+    // The candidate enumeration is capped; metadata is complete only when that cap did not truncate it.
+    metadataComplete: found.boundReached !== true,
+    page: {
+      pageSize: paged ? pageSize : null,
+      returned: slice.length,
+      total: keyed.length,
+      more,
+      nextCursor,
+      nextCall: more ? { operation: "list", pageSize, cursor: nextCursor } : null,
+      candidateBoundReached: found.boundReached === true,
+    },
+    sessions: slice.map(({ candidate }) => ({
       sessionId: candidate.sessionId,
       excerpt: operationalExcerpt(readTranscriptPrefix(candidate.filePath, MAX_EXCERPT_BYTES) ?? Buffer.alloc(0)),
     })),
+  };
+}
+
+const MAX_PAGE_SIZE = 500;
+const MAX_WINDOW_BYTES = 8 * 1024 * 1024;
+
+function encodeListCursor(key) { return Buffer.from(JSON.stringify(key)).toString("base64url"); }
+
+function decodeListCursor(value) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,1024}$/u.test(value)) return null;
+  try {
+    const key = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    return Array.isArray(key) && key.length === 3 && typeof key[0] === "number" && Number.isFinite(key[0])
+      && typeof key[1] === "string" && Number.isSafeInteger(key[2]) && key[2] >= 0 ? key : null;
+  } catch { return null; }
+}
+
+/** Order of two list keys in the list's own order: mtime descending, then session id, then duplicate ordinal. */
+function listKeyOrder(left, right) {
+  if (left[0] !== right[0]) return right[0] - left[0];
+  if (left[1] !== right[1]) return left[1] < right[1] ? -1 : 1;
+  return left[2] - right[2];
+}
+
+/**
+ * Read one bounded window of one session's merged raw events, resumable by cursor. The window holds whole lines only (a
+ * single line longer than the window is returned whole). `eventsComplete` is true only for the window that reaches the end;
+ * `metadataComplete` says the session's segments were authenticated and read as a snapshot. The cursor binds the byte offset
+ * to the session digest, so a session that changed between windows is `cursor-stale`, never a silently shifted read.
+ */
+export function readRunnerTranscriptWindow({ windowBytes, cursor, ...options } = {}) {
+  if (!(Number.isSafeInteger(windowBytes) && windowBytes >= 1 && windowBytes <= MAX_WINDOW_BYTES)) {
+    return unavailable(CODEX_RUNNER, "invalid-window-size");
+  }
+  let offset = 0;
+  let digest = null;
+  if (cursor !== undefined) {
+    const match = typeof cursor === "string" ? /^(\d{1,15})\.([0-9a-f]{16})$/u.exec(cursor) : null;
+    if (match === null) return unavailable(CODEX_RUNNER, "invalid-cursor");
+    offset = Number(match[1]);
+    digest = match[2];
+  }
+  const whole = readRunnerTranscript(options);
+  if (whole.status !== "available") return whole;
+  const all = whole.bytes;
+  const wholeDigest = createHash("sha256").update(all).digest("hex").slice(0, 16);
+  if (digest !== null && (digest !== wholeDigest || offset >= all.length)) return unavailable(CODEX_RUNNER, "cursor-stale");
+  let end = Math.min(all.length, offset + windowBytes);
+  if (end < all.length && all[end - 1] !== 10) {
+    const lastNewline = all.subarray(offset, end).lastIndexOf(10);
+    if (lastNewline >= 0) end = offset + lastNewline + 1;
+    else { const next = all.indexOf(10, end); end = next < 0 ? all.length : next + 1; }
+  }
+  const bytes = all.subarray(offset, end);
+  const done = end >= all.length;
+  const nextCursor = done ? null : `${end}.${wholeDigest}`;
+  return {
+    schema: SCHEMA, status: "available", runner: CODEX_RUNNER,
+    segmentCount: whole.segmentCount, segmentOrder: whole.segmentOrder,
+    metadataComplete: true,
+    eventsComplete: done,
+    startOffset: offset, endOffset: end, totalBytes: all.length,
+    lineCount: bytes.toString("utf8").split("\n").filter((line) => line !== "").length,
+    nextCursor,
+    nextCall: done ? null : { operation: "read", windowBytes, cursor: nextCursor },
+    bytes,
   };
 }
 
@@ -639,6 +738,26 @@ function describeTurns(runner, records) {
       turnAt[index] = latest;
     });
   }
+  // Per-turn counters from the records the transcript carries: the turn's end time is its last timestamped record, its
+  // tool calls are the call records of the runner's own spelling. Absent timestamps stay null, never a guess.
+  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, endMs: null }));
+  records.forEach((row, index) => {
+    const turn = turnAt[index];
+    if (turn === null || counters[turn] === undefined) return;
+    counters[turn].recordCount += 1;
+    const ms = recordTimestampMs(row);
+    if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
+    const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
+    if ((row?.type === "response_item" && row.payload?.type === "function_call")
+      || (runner === CLAUDE_RUNNER && row?.type === "assistant")) {
+      counters[turn].toolCallCount += runner === CLAUDE_RUNNER ? blocks.filter((block) => block?.type === "tool_use").length : 1;
+    }
+  });
+  markers.forEach((marker, ordinal) => {
+    marker.endTimestamp = isoOrNull(counters[ordinal].endMs);
+    marker.recordCount = counters[ordinal].recordCount;
+    marker.toolCallCount = counters[ordinal].toolCallCount;
+  });
   return {
     turns: { model: TURN_MODELS[runner] ?? "unknown", count: markers.length, markersTruncated: markers.length > MAX_TURN_MARKERS, markers: markers.slice(0, MAX_TURN_MARKERS) },
     turnAt,
@@ -998,6 +1117,10 @@ function describeExport({ runner, sessionId, snapshots, options, found }) {
     // Totals below are only totals of what was read: a consumer must read this field with them.
     completeness: incompleteReasons.length === 0 ? "complete" : "partial",
     incompleteReasons,
+    // Two different claims: the metadata (candidate set, children) is whole, and every event was actually read. A byte ceiling
+    // or a skipped line leaves digests and counts valid for the whole file but events unread, so only the second flag drops.
+    metadataComplete: !incompleteReasons.some((reason) => reason === "candidate-bound-reached" || children.incompleteReasons.includes(reason)),
+    eventsComplete: !incompleteReasons.some((reason) => reason === "records-skipped" || reason === "byte-ceiling"),
     // A list when the runner records its children (empty when none), otherwise a typed reason; never a guess.
     childSessions: children.value,
     turns: turnView.turns,
@@ -1035,24 +1158,35 @@ function parseArgs(argv) {
   const operation = argv[0] === "list" || argv[0] === "read" || argv[0] === "export" ? argv[0] : "legacy";
   const values = operation === "legacy" ? argv : argv.slice(1);
   const takesSessionId = operation === "read" || operation === "export";
-  const expectedLength = takesSessionId ? 8 : 6;
-  if (values.length !== expectedLength) return null;
+  // G20-31: `list` may add --page-size [--cursor]; `read` may add --window-bytes [--cursor]. A cursor without its size flag is
+  // refused (the size is part of the next call it names). Every other shape keeps its original exact length.
+  const requiredLength = takesSessionId ? 8 : 6;
+  const extra = operation === "list" ? ["--page-size", "--cursor"] : operation === "read" ? ["--window-bytes", "--cursor"] : [];
+  if (values.length < requiredLength || values.length > requiredLength + 2 * extra.length || values.length % 2 !== 0) return null;
   const fields = new Map();
-  const permitted = takesSessionId
-    ? ["--root", "--runner", "--exclude-session", "--session-id"]
-    : ["--root", "--runner", "--exclude-session"];
+  const permitted = [...(takesSessionId ? ["--root", "--runner", "--exclude-session", "--session-id"] : ["--root", "--runner", "--exclude-session"]), ...extra];
   for (let index = 0; index < values.length; index += 2) {
     const flag = values[index];
     const value = values[index + 1];
     if (!permitted.includes(flag) || typeof value !== "string" || value === "" || value.startsWith("-") || fields.has(flag)) return null;
     fields.set(flag, value);
   }
+  // The four mandatory flags must all be present (a length check alone would let an optional flag stand in for one).
+  const mandatory = takesSessionId ? ["--root", "--runner", "--exclude-session", "--session-id"] : ["--root", "--runner", "--exclude-session"];
+  if (!mandatory.every((flag) => fields.has(flag))) return null;
+  const sizeFlag = operation === "list" ? "--page-size" : "--window-bytes";
+  if (fields.has("--cursor") && !fields.has(sizeFlag)) return null;
+  const size = fields.has(sizeFlag) ? Number(fields.get(sizeFlag)) : undefined;
+  if (size !== undefined && !(/^\d{1,9}$/u.test(fields.get(sizeFlag)))) return null;
   return {
     operation,
     rootDir: fields.get("--root"),
     runner: fields.get("--runner"),
     excludeSession: fields.get("--exclude-session"),
     sessionId: fields.get("--session-id"),
+    ...(operation === "list" && size !== undefined ? { pageSize: size } : {}),
+    ...(operation === "read" && size !== undefined ? { windowBytes: size } : {}),
+    ...(fields.has("--cursor") ? { cursor: fields.get("--cursor") } : {}),
   };
 }
 
@@ -1081,11 +1215,14 @@ export function main(argv = process.argv.slice(2), seams = {}) {
   const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
     if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
     if (args.operation === "list") return listRunnerTranscripts(args);
-    if (args.operation === "read") return readRunnerTranscript(args);
+    if (args.operation === "read") return args.windowBytes === undefined ? readRunnerTranscript(args) : readRunnerTranscriptWindow(args);
     if (args.operation === "export") return exportFromCommandLine(args, argv, seams);
     return recoverRunnerTranscript(args);
   })();
-  if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
+  if (args?.operation === "read" && args.windowBytes !== undefined && result.status === "available") {
+    const { bytes, ...window } = result;
+    process.stdout.write(`${JSON.stringify({ ...window, text: bytes.toString("utf8") })}\n`);
+  } else if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
   else process.stdout.write(`${JSON.stringify(result)}\n`);
   return result;
 }

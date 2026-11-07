@@ -195,11 +195,18 @@ export function sanctionedTranscriptRecoveryArgs(args, root) {
   // Preserve the original flag-only reader for compatibility.  `list` and
   // `read` are the only operation prefixes: their exact flag sets keep this
   // hook from becoming a general runner-session directory read capability.
-  if (args[0] === "list") return matchFlagSpec(args.slice(1), base);
+  // C20 G20-31: `list` may add --page-size [--cursor] and `read` --window-bytes [--cursor] (bounded digits; an opaque cursor of
+  // URL-safe characters). The cursor never stands without its size flag, mirroring the script's own parseArgs.
+  const sizeValue = (value) => typeof value === "string" && /^\d{1,9}$/u.test(value);
+  const cursorValue = (value) => typeof value === "string" && /^[A-Za-z0-9_.-]{1,1024}$/u.test(value);
+  const pagedFlags = (sizeFlag) => ({ optionalValue: { [sizeFlag]: sizeValue, "--cursor": cursorValue } });
+  const cursorNeeds = (sizeFlag) => !args.includes("--cursor") || args.includes(sizeFlag);
+  if (args[0] === "list") return cursorNeeds("--page-size") && matchFlagSpec(args.slice(1), { ...base, ...pagedFlags("--page-size") });
   if (args[0] === "read") {
-    return matchFlagSpec(args.slice(1), {
+    return cursorNeeds("--window-bytes") && matchFlagSpec(args.slice(1), {
       ...base,
       requiredValue: { ...base.requiredValue, "--session-id": sessionId },
+      ...pagedFlags("--window-bytes"),
     });
   }
   // ALF-C-N1-02C: `export` takes the read flag set but admits all three runners, because the Claude and
