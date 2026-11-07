@@ -45,4 +45,55 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
 - **Tests:** the registered-plugin read test in `guard-lifecycle-ready.test.mjs` is extended. The full suite is green (427 pass, 0 fail,
   3 skipped).
 
-Not yet: live greenfield retest of all three, Full Verify, Critic, PO acceptance.
+## G20-5 (P0, Claude on Windows): greenfield architecture entry steered into the brownfield adoption route
+
+- **Seen:** after a signed `approve-plan`, `set-phase --phase implementation` was refused with `GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED`
+  and "Record one PO-owned approved-scoped or partial adoption decision". The preflight readback said `design-pending` and "record a
+  scoped architecture disposition". The PRD carried a valid `pipeline-architecture-design` block, so the sanctioned next step was the
+  agent-run `pipeline-state.mjs materialize-architecture`. The session took the adoption route instead: a PO adoption signature, a
+  refused `apply`, two human-override ceremonies, about eight PO terminal commands. It then ended in `ARCHITECTURE-DESIGN-EXISTING-ESTATE`
+  because `architecture/adoption-state.json` now sat beside the scaffold.
+- **Confirmed:** a copy of that project (read-only source, modes normalised) reports `ARCHITECTURE-DESIGN-EXISTING-ESTATE` with the
+  adoption record and `materialization-required` with 14 targets without it.
+- **Cause:** `checkPlanningAdoptionDisposition` fell through to `adoption-required` while the approved design was still
+  `materialization-required`. The readiness library already returned `materialize-architecture` as its nextAction, but the guard sits in
+  front of `set-phase` and only echoed the adoption text.
+- **Fix:**
+  - `checkPlanningAdoptionDisposition` returns the disposition `materialization-required` with an error naming the exact
+    `pipeline-state.mjs materialize-architecture` path. It is still `ok: false`; implementation authority still needs the materialized design.
+  - The guard's trailing line depends on the disposition: "This is not an adoption decision … Materialize it, then retry the same
+    set-phase" for that disposition, the unchanged PO-adoption line for every other one.
+  - `architecture-adoption.mjs prepare|apply` refuse with `ADOPTION-GREENFIELD-MATERIALIZE` while an approved design awaits
+    materialization, before anything is written.
+  - `ARCHITECTURE-DESIGN-EXISTING-ESTATE` is no longer a bare code: the readiness nextAction is `repair-required` and lists the foreign
+    entries under `architecture/` plus the move-aside and materialize repair.
+  - The `design-pending` orientation text, `references/architecture-orientation.md` and the `references/happy-path.md` index name the
+    materialization step and warn off the adoption route for a greenfield repository.
+- **Brownfield time sink (same transcript):**
+  - `apply` asked again for `--scope/--rationale/--decision-ref` although the signed request carries them. It now reads every omitted
+    field from the request's subject. The existing subject digest comparison still binds each value to the signature.
+  - **Policy reversal, stated plainly:** D165 S1 kept `architecture-adoption.mjs apply` out of the guard catalogue on purpose, so the
+    agent needed a human-override ceremony to record a decision the PO had just signed. It is now admitted in exactly one shape:
+    `apply --root <root> --decision approved-scoped|partial --request scratch/<x>.json --proof scratch/<y>.json [--json]`. The script
+    verifies the Ed25519 proof against the request (`verifyAdoptionAuthority`, `requireCurrent`) and the subject digest. It stays refused
+    with `--chat-approval` (an attribution record, not a proof), with `--by` (EL-36), with `--scope/--rationale/--decision-ref`, with
+    `deferred`, a non-scratch, dot-segment or non-JSON path, a foreign root or an extra word.
+- **Tests:** new pin `lib/pins/greenfield-architecture-entry-names-materialization.test.mjs` (disposition, guard text for both cases,
+  CLI refusal predicate, orientation text). `architecture-entry-readiness.test.mjs` gains the EXISTING-ESTATE repair case. The D165-S1
+  tables in `guard-lifecycle-ready.test.mjs` are restated in place (QG-04): the signed shape moves to the admitted list, and the refused
+  list gains every widening above.
+
+## G20-7 (P2, Antigravity): the documented ADR checks were refused in the draft phase
+
+- **Seen:** the architecture-decision skill tells the agent to validate each ADR sidecar and to compile the decision summary. In the draft
+  phase `architecture-baseline.mjs --validate docs/adr/<x>.json` (never admitted) and `--compile-summary --format json` (refused for the
+  format flag) each ended in a human-override offer, five times in one run.
+- **Fix:** `--validate <one docs/adr/*.json>` (relative, or absolute inside the root) is admitted; it only reads that file.
+  `--compile-summary` admits a trailing `--format json|text`; the output file is the same fixed path as before.
+- **Tests:** `catalogue-admit-prescribed-lifecycle-verbs.test.mjs`: the D115 "with a format" case is restated as admitted (QG-04),
+  with unknown, empty and repeated formats added as refused; a new `--validate` test pins every other read target as refused.
+- **Not changed, for the PO:** the sidecar schema `pipeline.architecture-decision.v1` is not shipped in the plugin (it exists only under the
+  repository's `schemas/`), so consumer agents keep guessing its path, and `--validate` in a consumer checks only the built-in fields.
+  Shipping the schema would make consumer validation stricter; held back as a decision.
+
+Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.
