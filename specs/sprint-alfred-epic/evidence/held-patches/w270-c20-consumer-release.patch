@@ -1,0 +1,816 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index ec6510600..0aae8f2cc 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -606,6 +606,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/signed-proof-wait.mjs`,
+ `plugins/pipeline-core/lib/critic-source-return.mjs`,
+ `plugins/pipeline-core/lib/critic-acknowledgement.mjs`,
++`plugins/pipeline-core/lib/consumer-release.mjs`,
+ `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+ `plugins/pipeline-core/lib/critic-generic-batch.mjs`,
+ `plugins/pipeline-core/lib/critic-verify-readiness.mjs`,
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index e245fd0c8..dab89d5ed 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -390,6 +390,26 @@ it belongs under `/evidence/` (`.gitignore:39`), the same ignored-but-present
+ location every other pre-signature scratch artifact in this flow already
+ uses.
+ 
++### Releasing a consumer project: a version tag (G20-42)
++
++For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
++`release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
++the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
++
++1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
++   and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
++   criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
++2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
++   writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
++   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
++   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
++3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
++   records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
++   this subject, then runs again with `--proof-request`/`--proof`.
++4. The agent runs the two `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
++   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
++   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
++
+ ### Source reader binding (Agent Pipeline source checkout only)
+ 
+ Release, tag, marketplace and publication preparation require fresh
+diff --git a/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs b/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
+index 378b894c7..6a1fe9ff7 100644
+--- a/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
+@@ -213,6 +213,41 @@ const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + wa
+   );
+ }
+ 
++// ---- G20-42 -- the same shape as TAGPROV3d with an ANNOTATED release tag in a consumer-shaped project: the consumer release check judges it and
++// refuses it by name (no release approval recorded), naming the release command. A lightweight tag (TAGPROV3d) keeps the general gate. -----------
++{
++  const { dir, head } = freshRepo("annotated-consumer-release-tag");
++  writeManifest(dir, manifestPush({ approval: "required" }));
++  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
++  gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", head);
++  check(
++    "G20-42b block  an annotated release tag in a consumer project needs the release approval (named refusal with the release command)",
++    "git push origin v1.0.0",
++    dir,
++    BLOCK,
++    { stderrIncludes: ["RELEASE-APPROVAL-MISSING", "release-preflight-cli.mjs"] },
++  );
++}
++
++// ---- G20-42 -- the same shape, but a Pipeline SOURCE checkout (the plugin manifests are present): the consumer release check does not apply,
++// and the original downstream approval gate still blocks an annotated tag with its original message, unchanged. -------------------------------
++{
++  const { dir, head } = freshRepo("no-origin-main-approval-required-source");
++  for (const manifest of ["plugins/pipeline-core/.codex-plugin/plugin.json", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugins/pipeline-core/plugin.json"]) {
++    writeEvidence(dir, manifest, { name: "pipeline-core", version: "1.0.0" });
++  }
++  writeManifest(dir, manifestPush({ approval: "required" }));
++  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
++  gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", head);
++  check(
++    "G20-42a block  a Pipeline source checkout keeps the general approval gate for a release tag (the consumer release check does not apply)",
++    "git push origin v1.0.0",
++    dir,
++    BLOCK,
++    { stderrIncludes: ["release-tag ancestry check was skipped", "Push approval missing"] },
++  );
++}
++
+ // ---- AC-3 -- with refs/remotes/origin/main PRESENT, an unreachable release tag is still --
+ // refused exactly as before -- the new early-return above must not affect this path. --------
+ {
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 418092238..b17a64160 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -136,7 +136,7 @@ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ 
+ import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
+-import { authorizeRecordedDeploy, authorizeRecordedPush, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
++import { authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
+ import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+@@ -1953,6 +1953,29 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
+   ]);
+ }
+ 
++// G20-42: for a CONSUMER project (decided from its shape: no Pipeline plugin manifests) a release tag v<n>.<n>.<n> is its release. The tag
++// publishes nothing new (its commit was pushed under the push approval and the ancestry rule above holds), so what it needs is the one release
++// approval bound to exactly this annotated tag and commit; any other release tag, or one with no approval, is refused with the command that
++// records it. The Pipeline's own source checkout is not a consumer project and keeps its full gate below, unchanged.
++{
++  const releaseTagRef = resolvePushedTagRef(pushBinding);
++  if (releaseTagRef !== null && RELEASE_TAG_REF.test(releaseTagRef) && isConsumerReleaseProject(pushBinding.projectDir)) {
++    const release = authorizeRecordedReleaseTag({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), tagRef: releaseTagRef, commit: sourceCommit });
++    if (release.ok) {
++      if (invalidityNote) emit(1, [invalidityNote]);
++      allowExit();
++    }
++    // A LIGHTWEIGHT release tag is not a consumer release: it falls through to the full gate below, unchanged (Verify evidence and a push approval
++    // bound to the tag destination), which still refuses it. Only an annotated release tag is judged here.
++    if (release.code !== "RELEASE-TAG-NOT-ANNOTATED") {
++      emit(2, [
++        `BLOCKED (guard-push consumer release tag, plugin pipeline-core): ${release.code}: ${release.message}.`,
++        `Fix: ${release.repair}`,
++      ]);
++    }
++  }
++}
++
+ // N27a / D206: a tag whose target is already published on THIS remote (a rollback tag on the pre-merge main commit) publishes
+ // nothing new, so Verify evidence and an approval for that old commit can neither be met nor mean anything. The ONE predicate
+ // is shared with the generated pre-push hook (lib/published-tag-push.mjs, which also states the trust assumption: a local
+diff --git a/plugins/pipeline-core/lib/consumer-release.mjs b/plugins/pipeline-core/lib/consumer-release.mjs
+new file mode 100644
+index 000000000..59bf91688
+--- /dev/null
++++ b/plugins/pipeline-core/lib/consumer-release.mjs
+@@ -0,0 +1,135 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-42 (candidate 20): the consumer release. For a consumer project a release is a version tag (PO decision 2026-11-07). This module holds the
++ * observations behind the consumer mode of scripts/release-preflight-cli.mjs; the project-shape test and the tag authorization the push guard
++ * reads live in lib/critical-action-authorization.mjs (a kernel file the guard already imports).
++ *
++ * `firstConsumerReleaseBlocker` answers one question: is the closed, pushed feature ready for the one PO release approval? It returns the FIRST
++ * missing step as { code, message, repair } -- the repair is a command the agent can run -- or null. Nothing is written here.
++ */
++import { createHash } from "node:crypto";
++import { existsSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++import { authorizeRecordedChatPush, authorizeRecordedPush, withPrivateCriticalApprovals } from "./critical-action-authorization.mjs";
++import { criticalProofWaiverFor } from "./critical-human-proof-policy.mjs";
++import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
++import { securityGateNotConfiguredRefusal } from "./security-close-status.mjs";
++
++export const CONSUMER_VERSION_INITIAL = "0.1.0";
++export const CONSUMER_RELEASE_RECORD_PATH = "evidence/release-preflight.json";
++export const CONSUMER_RELEASE_NOTES_PATH = "RELEASE-NOTES.md";
++export const CONSUMER_RELEASE_PREFLIGHT_ID = "consumer-release";
++/** A consumer project has no retention policy file; the digest of this label stands in so the record shape stays the Pipeline's. */
++export const CONSUMER_RETENTION_POLICY_SHA256 = createHash("sha256").update("pipeline.consumer-release-retention.v1").digest("hex");
++export const CONSUMER_RELEASE_REMOTE = "origin";
++export const CONSUMER_RELEASE_DESTINATION = "refs/heads/main";
++const SEMVER = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
++/** Checks push-prepare appends AFTER readiness for the signature route; they concern the push ceremony, not this release. */
++const PUSH_CEREMONY_CHECKS = new Set(["subject-hash", "active-feature", "approval-directory"]);
++
++const script = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
++const word = (value) => (/^[\w@%+=:,./\\-]+$/u.test(value) ? value : JSON.stringify(value));
++
++function gitOut(root, args) {
++  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10_000 });
++  return result.status === 0 ? String(result.stdout).trim() : null;
++}
++
++/** The repair for a missing VERSION: the release preparation creates it, create-only, and the agent commits it. */
++export function consumerVersionRepair(root) {
++  return `node ${word(script("release-preflight-cli.mjs"))} --init-version --root ${word(root)} (creates VERSION ${CONSUMER_VERSION_INITIAL}, never overwrites), then commit it`;
++}
++
++export function readConsumerVersion(root) {
++  const path = join(root, "VERSION");
++  if (!existsSync(path)) return { ok: false, code: "RPC-VERSION-MISSING", message: "this project has no tracked VERSION file", repair: consumerVersionRepair(root) };
++  const version = readFileSync(path, "utf8").trim();
++  if (!SEMVER.test(version)) return { ok: false, code: "RPC-VERSION", message: `VERSION must hold one stable version such as ${CONSUMER_VERSION_INITIAL} (found ${JSON.stringify(version.slice(0, 40))})`, repair: "correct VERSION and commit it" };
++  return { ok: true, version };
++}
++
++/** prd/spec/acceptance/result of the feature package, read from its registered manifest (the consumer has no separate lifecycle.documents). */
++export function consumerManifestDocuments(manifest) {
++  const artifacts = Array.isArray(manifest?.artifacts) ? manifest.artifacts : [];
++  const documents = {};
++  for (const kind of ["prd", "spec", "acceptance", "result"]) {
++    const entry = artifacts.find((artifact) => artifact?.class === kind && typeof artifact.path === "string");
++    if (entry === undefined) return { ok: false, kind };
++    documents[kind] = entry.path;
++  }
++  return { ok: true, documents };
++}
++
++function readClosedFeatureIds(root) {
++  const authority = resolveProjectAuthorityPaths({ rootDir: root });
++  if (authority.status !== "ready") return null;
++  try {
++    const state = JSON.parse(readFileSync(join(root, authority.state), "utf8"));
++    return { state, ids: Array.isArray(state.closedFeatures) ? state.closedFeatures.map((entry) => entry?.id) : [] };
++  } catch {
++    return null;
++  }
++}
++
++/**
++ * @param {{root: string, featureId: string, version: string, candidate: {commit: string, tree: string}, pushReport: object, now?: string}} input
++ *   `pushReport` is push-prepare's own report for origin/refs/heads/main (the SAME Verify, Critic-bound Verify and security checks the push used).
++ */
++export function firstConsumerReleaseBlocker({ root, featureId, version, candidate, pushReport, now = new Date().toISOString() }) {
++  const push = script("push-prepare.mjs");
++  // 1 the feature is closed
++  const closed = readClosedFeatureIds(root);
++  if (closed === null || !closed.ids.includes(featureId)) {
++    return { code: "RPC-CONSUMER-NOT-CLOSED", message: `feature ${featureId} is not in the State's closedFeatures`,
++      repair: `close it with the close-feature skill (node ${word(script("close-coordinator.mjs"))} plan-start --root ${word(root)} --lifecycle <id> --actor PO --close-intent durable-stop, then each action it returns)` };
++  }
++  // 2 the release-notes entry is committed (written with the feature, so the Critic reviewed it and the Critic-bound Verify carries it)
++  const notes = gitOut(root, ["show", `${candidate.commit}:${CONSUMER_RELEASE_NOTES_PATH}`]);
++  const heading = new RegExp(`^##\\s+v${version.replaceAll(".", "\\.")}\\s*$`, "mu");
++  if (notes === null || !heading.test(notes) || !notes.includes(featureId)) {
++    return { code: "RPC-CONSUMER-RELEASE-NOTES", message: `${CONSUMER_RELEASE_NOTES_PATH} has no committed "## v${version}" entry naming feature ${featureId}`,
++      repair: `write that entry (feature id, title, the acceptance criteria met, the version) in ${CONSUMER_RELEASE_NOTES_PATH}, commit it, run the Critic-bound push Verify again (verify-evidence-producer.mjs --mode release with the Critic inputs, push-prepare names the command) and push` };
++  }
++  // 3 Verify green, the Critic carried to this candidate, security evidence per calibration: push-prepare's own checks, not a second reader
++  const failed = (pushReport?.checks ?? []).find((check) => check.ok !== true && !PUSH_CEREMONY_CHECKS.has(check.id));
++  if (failed !== undefined) {
++    return { code: "RPC-CONSUMER-EVIDENCE", message: `${failed.id}: ${String(failed.message).split("\n")[0]}`,
++      repair: String(failed.remedy ?? `node ${word(push)} --root ${word(root)} --by <name> --remote ${CONSUMER_RELEASE_REMOTE} --destination ${CONSUMER_RELEASE_DESTINATION}`).split("\n")[0] };
++  }
++  // 3b the security close status is reported per calibration (G20-25): a critical calibration without a configured gate has no security status
++  const securityRefusal = (pushReport?.checks ?? []).some((check) => check.id === "security-evidence") ? null : securityGateNotConfiguredRefusal(root, "the consumer release");
++  if (securityRefusal !== null) {
++    return { code: "RPC-CONSUMER-SECURITY", message: securityRefusal.split(": ")[0], repair: securityRefusal.slice(securityRefusal.indexOf("Run this command")) };
++  }
++  // 4 the push approval for exactly this candidate exists
++  let approvalOk = false;
++  let approvalCode = "unavailable";
++  try {
++    const authority = resolveProjectAuthorityPaths({ rootDir: root });
++    const stateRaw = authority.status === "ready" ? JSON.parse(readFileSync(join(root, authority.state), "utf8")) : {};
++    const state = withPrivateCriticalApprovals(stateRaw, root);
++    const waived = criticalProofWaiverFor(root, "push").waived === true;
++    const input = { projectDir: root, anchorDir: root, state, candidate, remote: CONSUMER_RELEASE_REMOTE, destination: CONSUMER_RELEASE_DESTINATION };
++    const decision = waived ? authorizeRecordedChatPush(input) : authorizeRecordedPush({ ...input, now });
++    approvalOk = decision.authorized === true;
++    approvalCode = decision.code;
++  } catch { /* unreadable approval state reads as no approval */ }
++  if (!approvalOk) {
++    return { code: "RPC-CONSUMER-PUSH-APPROVAL", message: `no push approval is recorded for candidate ${candidate.commit.slice(0, 12)} (${approvalCode})`,
++      repair: `node ${word(push)} --root ${word(root)} --by <name> --remote ${CONSUMER_RELEASE_REMOTE} --destination ${CONSUMER_RELEASE_DESTINATION}, then the approve-push line it prints` };
++  }
++  // 5 the candidate is on the published channel (ADR-0078 D5: origin/main)
++  const published = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", candidate.commit, `refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`], { encoding: "utf8", timeout: 10_000 });
++  if (published.status !== 0) {
++    return { code: "RPC-CONSUMER-NOT-PUSHED", message: `candidate ${candidate.commit.slice(0, 12)} is not on refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`,
++      repair: `git push ${CONSUMER_RELEASE_REMOTE} HEAD:${CONSUMER_RELEASE_DESTINATION} (the approved push; the release tags what is already published)` };
++  }
++  // 6 the version tag is free or already names this commit
++  const tagged = gitOut(root, ["rev-parse", "--verify", "--quiet", `refs/tags/v${version}^{commit}`]);
++  if (tagged !== null && tagged !== "" && tagged !== candidate.commit) {
++    return { code: "RPC-CONSUMER-TAG-EXISTS", message: `tag v${version} already names ${tagged.slice(0, 12)}, not this candidate`, repair: "raise VERSION to the next version, commit it and release that" };
++  }
++  return null;
++}
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index 9c27d107e..f4a0ecd38 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -55,7 +55,8 @@
+  */
+ import { spawnSync } from "node:child_process";
+ import { createHash, randomBytes } from "node:crypto";
+-import { closeSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++import { closeSync, existsSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V3, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+ import { fsyncDirectoryDurable } from "./fs-durability.mjs";
+@@ -197,7 +198,9 @@ export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-
+ /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
+ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval",
+   // G20-39: the PO acknowledgement of a caller-authored Critic (lib/critic-acknowledgement.mjs); read per packet, not through the slot overlay.
+-  "acknowledge-caller-authored-critic": "criticAcknowledgement" });
++  "acknowledge-caller-authored-critic": "criticAcknowledgement",
++  // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
++  "release-preflight": "releasePreflightApproval" });
+ 
+ export function criticalApprovalStoreRoot(gitCommonDir) {
+   return join(resolve(gitCommonDir), "agent-pipeline", "critical-approvals");
+@@ -514,6 +517,52 @@ export function authorizeRecordedChatPush({
+   return { authorized: true, code: "PUSH-PROOF-WAIVED", mode: waiver.waiver.mode };
+ }
+ 
++/**
++ * G20-42: the consumer release tag. A consumer project's release is a version tag (PO decision 2026-11-07); it is decided from the project's
++ * shape, never from a caller claim: a Pipeline source checkout carries the plugin manifests below, a consumer project never does.
++ */
++const PIPELINE_SOURCE_MANIFESTS = Object.freeze([
++  "plugins/pipeline-core/.codex-plugin/plugin.json", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugins/pipeline-core/plugin.json",
++]);
++export function isConsumerReleaseProject(projectDir) {
++  return typeof projectDir === "string" && projectDir !== "" && existsSync(projectDir) && PIPELINE_SOURCE_MANIFESTS.every((path) => !existsSync(join(projectDir, path)));
++}
++
++/**
++ * Admits the push of exactly one release tag for a consumer project: the tag is annotated, names a version the release preflight approved,
++ * and peels to the commit that approval is bound to. The approval is the private `release-preflight` record the consumer release preflight
++ * writes only for a `ready` record (release-preflight-cli.mjs); a signature-mode project additionally demands the consumed proof it carries.
++ * @returns {{ok: true} | {ok: false, code: string, message: string, repair: string}}
++ */
++export function authorizeRecordedReleaseTag({ projectDir, anchorDir = projectDir, tagRef, commit } = {}) {
++  const script = fileURLToPath(new URL("../scripts/release-preflight-cli.mjs", import.meta.url));
++  const refuse = (code, message, repair) => ({ ok: false, code, message, repair });
++  const name = typeof tagRef === "string" && tagRef.startsWith("refs/tags/") ? tagRef.slice("refs/tags/".length) : "";
++  const command = `node ${JSON.stringify(script)} --root ${JSON.stringify(projectDir)} --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`;
++  if (name === "" || typeof commit !== "string" || commit === "") return refuse("RELEASE-TAG-INPUT-INVALID", "the release tag push is not one tag at one commit", "push exactly one release tag: git push origin refs/tags/v<VERSION>");
++  const kind = spawnSync("git", ["-C", projectDir, "cat-file", "-t", tagRef], { encoding: "utf8", timeout: 5000 });
++  if (kind.status !== 0 || String(kind.stdout).trim() !== "tag") {
++    return refuse("RELEASE-TAG-NOT-ANNOTATED", `${name} is not an annotated tag`, `git tag -a ${name} -m "version tag" ${commit}`);
++  }
++  const common = resolveCriticalApprovalCommonDir(projectDir);
++  const approval = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
++  if (!object(approval)) {
++    return refuse("RELEASE-APPROVAL-MISSING", `no release approval is recorded for ${name}; a consumer release needs the one PO release approval`, command);
++  }
++  if (approval.forCommit !== commit || approval.tag !== name || name !== `v${approval.version}`) {
++    return refuse("RELEASE-APPROVAL-MISMATCH", `the recorded release approval binds ${approval.tag ?? "another tag"} at ${String(approval.forCommit).slice(0, 12)}, not ${name} at ${commit.slice(0, 12)}`, command);
++  }
++  let waiver;
++  try { waiver = criticalProofWaiverFor(anchorDir, "release-preflight"); } catch { waiver = { waived: false }; }
++  if (waiver?.waived !== true) {
++    const proof = object(approval.criticalProof) ? approval.criticalProof.proofSha256 : null;
++    if (approval.mode !== "signature" || !SHA256.test(proof ?? "") || !isCriticalProofConsumedPrivately(common, proof)) {
++      return refuse("RELEASE-APPROVAL-PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof", command);
++    }
++  }
++  return { ok: true };
++}
++
+ /**
+  * The release route's equivalent: is there a recorded, unused deploy approval for this
+  * artifact and environment whose detached proof verifies against the committed anchor?
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index f9240c834..2e73d9307 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -828,6 +828,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
+   "plugins/pipeline-core/lib/critic-source-return.mjs",
+   "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
++  // C20 G20-42 (GMWKC01): the consumer release route project-onboarding-v3.mjs imports (VERSION target, release preflight,
++  // annotated version tag). Its first-party imports are already listed.
++  "plugins/pipeline-core/lib/consumer-release.mjs",
+   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
+   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 427895717..87db141a0 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -93,6 +93,10 @@ const INVENTORY = Object.freeze([
+  * yet (its subagent stop event is being measured, M4c/M14), so there a rigor >= 1 feature close meets it as a third per-feature
+  * PO interaction until a producer lands; recorded on the PO list, not hidden by this classification.
+  */
++// G20-42 (honest accounting, no case changed): a consumer project's release (the version tag after close and push) takes ONE PO release approval
++// per RELEASE, not per feature: it is the existing `release-preflight` critical kind recorded by `release-preflight-cli.mjs` (chat run, or the PO's
++// signature of the printed `authorize-critical --kind release-preflight` line). It adds no pipeline-state verb, so nothing here classifies it, and
++// the per-feature count of the feature course stays two (plan approval, push approval); the release is a separate, last, per-release interaction.
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+   "approve-residual-acceptance", "approve-critic-acknowledgement",
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 760bf5fce..2452413c7 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -9,6 +9,7 @@
+  */
+ import { createHash, randomBytes } from "node:crypto";
+ import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
++import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
+ import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+ import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
+@@ -6120,6 +6121,9 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
+   // already owns a `.gitignore` is never touched -- it simply gets no such target.
+   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
+   const seedsProjectAttributes = !(inspected.entries ?? []).includes(".gitattributes");
++  // G20-42: the consumer release is a version tag, so the project carries a tracked VERSION from its first commit. Create-only like the ignore
++  // seed: a project that already owns a VERSION keeps it, and an already-onboarded one gets it from `release-preflight-cli.mjs --init-version`.
++  const seedsProjectVersion = !(inspected.entries ?? []).includes("VERSION");
+   // Both scaffold producers answer only to a fresh classification. An `existing-unmanaged`
+   // root that the bounded walk proves code-free is presented to them as `fresh`, so the
+   // bytes stay identical to what the PRD gate and the design inspection compare against.
+@@ -6139,6 +6143,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
+     { path: CONSUMER_VERIFY_ADAPTER_PATH, bytes: CONSUMER_VERIFY_ADAPTER },
+     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
+     ...(seedsProjectAttributes ? [{ path: ".gitattributes", bytes: PROJECT_ATTRIBUTES_SEED }] : []),
++    ...(seedsProjectVersion ? [{ path: "VERSION", bytes: `${CONSUMER_VERSION_INITIAL}\n` }] : []),
+   ].sort((left, right) => {
+     // Publish the physical map before its root entry pointer. The remaining
+     // scaffold retains deterministic path order; apply uses this same array.
+@@ -6150,8 +6155,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
+     // The project entry and ignore file are not compiled V3 runtime targets.
+     kind: target.path === SOURCE
+       ? "source"
+-      : (target.path === ".gitignore" || target.path === ".gitattributes"
+-        ? (target.path === ".gitignore" ? "project-ignore" : "project-attributes")
++      : (target.path === ".gitignore" || target.path === ".gitattributes" || target.path === "VERSION"
++        ? (target.path === ".gitignore" ? "project-ignore" : (target.path === "VERSION" ? "project-version" : "project-attributes"))
+         : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
+           : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
+     before: describe(null),
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index ddf96986f..dd319ff5a 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -2968,7 +2968,7 @@ test("blank real root inspect and plan are read-only", () => {
+     assert.deepEqual(names(path), []);
+     assert.deepEqual(plan.targets.map((target) => target.path), [
+       "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-      "project/pipeline.json", "project/pipeline.yaml",
++      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+     ]);
+   } finally { dispose(path); }
+ });
+@@ -7808,7 +7808,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
+       plan.targets.map((target) => target.path),
+       [
+         "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-        "project/pipeline.json", "project/pipeline.yaml",
++        "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+       ],
+       "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
+     );
+@@ -7974,7 +7974,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
+     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
+     assert.deepEqual(planned.targets.map((target) => target.path), [
+       "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-      "project/pipeline.json", "project/pipeline.yaml",
++      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+     ]);
+     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
+     assert.equal(applied.status, "applied");
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 367336fa6..5c97e0e0d 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -130,6 +130,8 @@ function consumerFixture(log, identity) {
+   assert.equal(realpathSync(root), root);
+   write("README.md", "# Consumer fixture\n");
+   write(".gitignore", "scratch/\n/evidence/\nproject/pipeline-state.json\n.claude/pipeline-state.json\n");
++  // G20-42: onboarding creates the tracked VERSION file (0.1.0) in its sanctioned commit route; the fixture stands in for that route.
++  write("VERSION", "0.1.0\n");
+   const calibration = buildRootProjectCalibrationIdentity({ rootDir: root });
+   const baseline = { schema: "pipeline.project.v1", project: basename(root), verify: 'node -e "process.exit(0)"', autonomy: "gated", handover: "docs/state.md",
+     projectIdentity: { schema: calibration.schema, kind: calibration.kind, rootSha256: calibration.rootSha256 } };
+@@ -252,6 +254,9 @@ test("G20-35: the close path from implementation to release preflight is walked
+       // 1 implementation commit, then the authored dispatch record of the slice that produced it
+       mkdirSync(join(fx.root, "src"), { recursive: true });
+       writeFileSync(join(fx.root, "src", "index.mjs"), "export const value = 'expected';\n");
++      // G20-42 (3): the release-notes entry is written with the feature, so it is part of the Critic-reviewed candidate (a later non-evidence commit
++      // would not be carried by the Critic-bound push Verify). The entry names the closed feature id, its title, the criteria met and the version.
++      writeFileSync(join(fx.root, "RELEASE-NOTES.md"), `# Release notes\n\n## v0.1.0\n\n- Feature ${FEATURE_ID}: Synthetic Test PRD\n  - AC-1: The package must receive a PASS verdict from an independent Critic before acceptance.\n`);
+       const implementation = commit(log, fx.root, "feat: implementation");
+       const taskId = `g2035-${identity.runner}`;
+       mkdirSync(join(fx.root, "evidence"), { recursive: true });
+@@ -481,7 +486,10 @@ test("G20-35: the close path from implementation to release preflight is walked
+       // 5 push boundary. push-prepare's own remedy (N24): a Critic-bound push Verify is produced with --mode release plus the Critic inputs, as
+       // evidence/verify-latest.json. It carries the Critic bound at the reviewed candidate across the close's own commits to the pushed commit
+       // (criticCloseCommit admits the close commit; w266 finding 2 is the Verify evidence path that used to break exactly this).
+-      git(log, fx.root, ["remote", "add", "origin", "https://example.invalid/g2035-consumer.git"]);
++      // G20-42: a local bare repository stands in for origin (no network), so the push really happens and refs/remotes/origin/main exists.
++      const bareRemote = join(fx.parent, "origin.git");
++      step(log, `${identity.runner}: bare remote`, "git", ["init", "-q", "--bare", "-b", "main", bareRemote]);
++      git(log, fx.root, ["remote", "add", "origin", bareRemote]);
+       const pushVerify = step(log, `${identity.runner}: push-boundary verify (release mode, Critic-bound)`, process.execPath,
+         [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "release", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", "evidence/verify-latest.json"], { cwd: fx.root });
+       assert.equal(pushVerify.status, 0);
+@@ -497,6 +505,13 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const pushCommand = "git push origin HEAD:refs/heads/main";
+       const before = guardPush(pushCommand);
+       assert.equal(before.status, 2, `${identity.runner}: the guard blocks the push before any approval is recorded\n${before.stderr}`);
++      // G20-42: the consumer release preflight refuses until its prerequisites exist, each refusal naming the one missing step and leaving no record.
++      const releaseArgs = [script("release-preflight-cli.mjs"), "--root", fx.root, "--base", base, "--lifecycle", MANIFEST];
++      const releasePreflight = () => spawnSync(process.execPath, releaseArgs, { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
++      const noApproval = releasePreflight();
++      assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
++      assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
++      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
+       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
+         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
+       const admitted5 = guardPush(pushCommand);
+@@ -504,16 +519,34 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const elsewhere = guardPush("git push origin HEAD:refs/heads/other");
+       assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
+ 
+-      // 6 release preflight (shape of scripts/release-preflight-cli.test.mjs). MEASURED (w266 finding 3): the release preflight is the Pipeline's
+-      // own publication gate, not a consumer step. It observes the Pipeline's version surfaces (VERSION and the plugin manifests under
+-      // plugins/pipeline-core/) and, in the source checkout, the source reader binding; a consumer project has none of them, so the first
+-      // observation refuses with RPC-INPUT and writes nothing. The walk pins that precise refusal; a consumer release route, when one exists,
+-      // replaces this assertion with a `ready` record.
+-      const releasePreflight = spawnSync(process.execPath, [script("release-preflight-cli.mjs"), "--root", fx.root, "--preflight-id", "g2035-preflight", "--base", base,
+-        "--lifecycle", MANIFEST, "--retention-policy", "a".repeat(64), "--out", "evidence/release-preflight.json"], { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+-      assert.equal(releasePreflight.status, 2, `${identity.runner}: ${releasePreflight.stdout}${releasePreflight.stderr}`);
+-      assert.match(releasePreflight.stderr, /RPC-INPUT: VERSION is unavailable/u, `${identity.runner}: ${releasePreflight.stderr}`);
+-      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
++      // 5b the approved push really happens (the local bare repository is origin), which creates refs/remotes/origin/main: the published channel.
++      const unpushed = releasePreflight();
++      assert.equal(unpushed.status, 2, `${identity.runner}: ${unpushed.stdout}${unpushed.stderr}`);
++      assert.match(unpushed.stderr, /RPC-CONSUMER-NOT-PUSHED.*git push origin HEAD:refs\/heads\/main/u, `${identity.runner}: ${unpushed.stderr}`);
++      step(log, `${identity.runner}: the approved push`, "git", ["-C", fx.root, "push", "-q", "origin", "HEAD:refs/heads/main"]);
++
++      // 6 consumer release (G20-42, PO decision 2026-11-07: a release is a version tag). w266 finding 3 measured that the release preflight was the
++      // Pipeline's own publication gate and refused a consumer with RPC-INPUT; the consumer mode of the same route is decided from the project's
++      // shape (no Pipeline plugin manifests) and is `ready` only for a closed, pushed, approved, Critic-carried, Verify-green candidate.
++      const tag = "v0.1.0";
++      step(log, `${identity.runner}: annotated version tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", tag, "-m", "version tag"]);
++      const tagPush = `git push origin refs/tags/${tag}`;
++      const tagBefore = guardPush(tagPush);
++      assert.equal(tagBefore.status, 2, `${identity.runner}: the guard refuses the release tag before the release approval\n${tagBefore.stderr}`);
++      assert.match(tagBefore.stderr, /release-preflight-cli\.mjs/u, `${identity.runner}: the refusal names the release command\n${tagBefore.stderr}`);
++      const released = releasePreflight();
++      assert.equal(released.status, 0, `${identity.runner}: ${released.stdout}${released.stderr}`);
++      const releaseResult = JSON.parse(released.stdout);
++      assert.equal(releaseResult.status, "ready", released.stdout);
++      assert.equal(releaseResult.tag, tag);
++      assert.equal(JSON.parse(readFileSync(join(fx.root, "evidence", "release-preflight.json"), "utf8")).candidate.commit, git(log, fx.root, ["rev-parse", "HEAD"]));
++      const tagAdmitted = guardPush(tagPush);
++      assert.equal(tagAdmitted.status, 0, `${identity.runner}: the guard admits exactly the approved version tag\n${tagAdmitted.stderr}`);
++      step(log, `${identity.runner}: another annotated tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", "v9.9.9", "-m", "version tag"]);
++      const otherTag = guardPush("git push origin refs/tags/v9.9.9");
++      assert.equal(otherTag.status, 2, `${identity.runner}: any other release tag stays refused\n${otherTag.stderr}`);
++      step(log, `${identity.runner}: the version tag push`, "git", ["-C", fx.root, "push", "-q", "origin", `refs/tags/${tag}`]);
++      assert.match(git(log, fx.root, ["ls-remote", "--tags", "origin"]), /refs\/tags\/v0\.1\.0\^\{\}/u, `${identity.runner}: the tag reached the remote`);
+     } finally {
+       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
+     }
+diff --git a/plugins/pipeline-core/scripts/release-preflight-cli.mjs b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+index ca97cd813..08abb8ab8 100644
+--- a/plugins/pipeline-core/scripts/release-preflight-cli.mjs
++++ b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+@@ -61,6 +61,12 @@ import { prepareAuthorizeCriticalLine } from "./po-human-approval.mjs";
+ import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+ import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+ import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
++import { isConsumerReleaseProject, resolveCriticalApprovalCommonDir, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
++import {
++  CONSUMER_RELEASE_PREFLIGHT_ID, CONSUMER_RELEASE_RECORD_PATH, CONSUMER_RETENTION_POLICY_SHA256, CONSUMER_VERSION_INITIAL,
++  consumerManifestDocuments, consumerVersionRepair, firstConsumerReleaseBlocker, readConsumerVersion,
++} from "../lib/consumer-release.mjs";
++import { pushPrepareReport } from "./push-prepare.mjs";
+ 
+ const DOCUMENTS = Object.freeze(["prd", "spec", "acceptance", "result"]);
+ const FINAL_GATES = Object.freeze(["verify", "security", "critic", "remote", "human"]);
+@@ -265,7 +271,12 @@ function observeRepository(root) {
+  * reading the file twice would risk the two reads disagreeing on a dirty tree, and
+  * would just be a second definition of the same observation.
+  */
+-function observeVersion(root, consent, candidateVersion) {
++function observeVersion(root, consent, candidateVersion, consumer = false) {
++  // G20-42: a consumer project has one version surface, VERSION; the Pipeline's plugin manifests belong to the Pipeline's own release.
++  if (consumer) {
++    return { candidateVersion, targetVersion: candidateVersion, decisionId: consent.decisionId, decisionSha256: consent.authoritySha256,
++      surfaces: [{ path: "VERSION", version: candidateVersion }], agreed: true };
++  }
+   const manifests = VERSION_SURFACES.slice(1).map((path) => {
+     const value = readJson(root, path, path)?.version;
+     if (typeof value !== "string") fail("RPC-VERSION", `${path} carries no string version`);
+@@ -284,10 +295,13 @@ function observeVersion(root, consent, candidateVersion) {
+   };
+ }
+ 
+-function observeDocumentation(root, lifecycle) {
++function observeDocumentation(root, lifecycle, consumer = false) {
+   const documentation = {};
++  // G20-42: a consumer's documents are the artifacts of its registered feature package (the lifecycle manifest), by class.
++  const consumerDocuments = consumer ? consumerManifestDocuments(lifecycle) : null;
++  if (consumerDocuments !== null && !consumerDocuments.ok) fail("RPC-INPUT", `the feature package manifest has no ${consumerDocuments.kind} artifact`);
+   for (const kind of DOCUMENTS) {
+-    const path = lifecycle.documents?.[kind];
++    const path = consumer ? consumerDocuments.documents[kind] : lifecycle.documents?.[kind];
+     if (typeof path !== "string") fail("RPC-INPUT", `lifecycle.documents.${kind} is missing`);
+     documentation[kind] = { path, sha256: sha256(readFileSync(repoFile(root, path, `documentation.${kind}`))) };
+   }
+@@ -543,10 +557,24 @@ function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, reten
+   const candidate = { commit: repository.headCommit, tree: repository.headTree };
+   const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
+   const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
+-  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
++  const consumer = isConsumerReleaseProject(root);
++  let consumerVersion = null;
++  // The registered feature package names its feature as manifest.feature.id (the Pipeline's own lifecycle input carries featureId directly).
++  if (consumer && lifecycleInput.featureId === undefined) lifecycleInput.featureId = lifecycleInput.feature?.id;
++  if (consumer) {
++    // G20-42: the consumer route refuses at the FIRST missing step, naming the command that supplies it; nothing is written by a refusal.
++    const read = readConsumerVersion(root);
++    if (!read.ok) fail(read.code, `${read.message}; repair: ${read.repair}`);
++    consumerVersion = read.version;
++    const pushReport = pushPrepareReport(["--by", "release", "--remote", "origin", "--destination", "refs/heads/main"], { dir: root }, { foldPendingApprovalWrite: false });
++    const blocker = firstConsumerReleaseBlocker({ root, featureId: lifecycleInput.featureId, version: read.version, candidate, pushReport: pushReport.report });
++    if (blocker !== null) fail(blocker.code, `${blocker.message}; repair: ${blocker.repair}`);
++  } else {
++    requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
++  }
+   const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
+   const manifestSha256 = sha256(readFileSync(manifestAbsolute));
+-  const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
++  const candidateVersion = consumer ? consumerVersion : readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
+   const subject = {
+     schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
+     version: candidateVersion,
+@@ -554,7 +582,7 @@ function observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, reten
+     lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
+     retentionPolicySha256,
+   };
+-  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject };
++  return { lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject, consumer };
+ }
+ 
+ /**
+@@ -589,13 +617,25 @@ export function buildReleasePreflight({
+   // compares the source to HEAD and therefore cannot be activated by a working
+   // tree edit.
+   const humanApproval = globalChatAttribution(root);
+-  if (consentPath === null && proofRequestPath === null && humanApproval === null) {
++  const consumerProject = isConsumerReleaseProject(root);
++  // A consumer project learns what is missing in step order first; the PO's approval step is printed once everything before it holds.
++  if (consentPath === null && proofRequestPath === null && humanApproval === null && !consumerProject) {
+     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
+   }
++  if (consumerProject) retentionPolicySha256 ??= CONSUMER_RETENTION_POLICY_SHA256;
++  preflightId ??= CONSUMER_RELEASE_PREFLIGHT_ID;
+ 
+   const {
+-    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject,
++    lifecycleInput, repository, candidate, base, manifestSha256, candidateVersion, subject, consumer,
+   } = observeReleasePreflightSubject(root, { baseCommit, lifecyclePath, retentionPolicySha256 });
++  if (consumer && consentPath === null && proofRequestPath === null && humanApproval === null) {
++    // G20-42 (4): signature mode. Every prerequisite holds; the PO approves this one subject, and the exact signing command is printed.
++    const documents = consumerManifestDocuments(lifecycleInput);
++    if (!documents.ok) fail("RPC-INPUT", `the feature package manifest has no ${documents.kind} artifact`);
++    const prepared = prepareReleasePreflightAuthorizeLine({ rootDir: root, baseCommit, lifecyclePath, retentionPolicySha256, plan: documents.documents.prd, spec: documents.documents.spec, now });
++    fail("RPC-CONSUMER-PO-APPROVAL", `all release prerequisites hold; the release needs the PO's one approval of exactly subject ${prepared.subjectSha256} (version ${candidateVersion}, candidate ${candidate.commit.slice(0, 12)}). `
++      + `PO step, in the PO's own terminal: ${prepared.command} -- then run this command again with --proof-request <request file> --proof <proof file> (both outside the repository).`);
++  }
+   const consent = consentPath !== null
+     ? resolveHandSuppliedConsent(root, consentPath)
+     : proofRequestPath !== null
+@@ -605,8 +645,8 @@ export function buildReleasePreflight({
+     })
+       : resolveConsentFromGlobalChat({ candidate, subject, now });
+ 
+-  const version = observeVersion(root, consent, candidateVersion);
+-  const documentation = observeDocumentation(root, lifecycleInput);
++  const version = observeVersion(root, consent, candidateVersion, consumer);
++  const documentation = observeDocumentation(root, lifecycleInput, consumer);
+ 
+   const input = {
+     preflightId,
+@@ -642,7 +682,28 @@ export function buildReleasePreflight({
+ 
+   const record = createReleasePreflight(input);
+   validateReleasePreflight(record);
+-  return { record, versionSurfaces: version.surfaces, versionAgreed: version.agreed };
++  return { record, versionSurfaces: version.surfaces, versionAgreed: version.agreed, consumer, consent, proofBacked: proofRequestPath !== null, humanApproval, now };
++}
++
++/**
++ * G20-42 (4): the consumer release approval. A `ready` record whose consent is approved is the one PO release approval; it is stored privately
++ * (the same store as the push approval) bound to the tag, the version and exactly this commit, which is what the push guard admits the tag by.
++ * A signature-backed record carries the consumed proof's digest; replay of the same proof is refused by the store.
++ */
++function recordConsumerReleaseApproval(root, built) {
++  const { record } = built;
++  if (!built.consumer || record.status !== "ready" || record.consent.status !== "approved") return null;
++  const common = resolveCriticalApprovalCommonDir(root);
++  if (common === null) fail("RPC-APPROVAL-STORE", "the git common directory could not be resolved, so no release approval can be recorded");
++  const mode = built.proofBacked ? "signature" : (built.humanApproval !== null ? built.humanApproval.mode : "waiver");
++  const approval = {
++    schema: "pipeline.consumer-release-approval.v1", forCommit: record.candidate.commit, tree: record.candidate.tree, version: record.version.targetVersion,
++    tag: `v${record.version.targetVersion}`, preflightId: record.preflightId, recordSha256: record.recordSha256, mode,
++    criticalProof: built.proofBacked ? { proofSha256: record.consent.authoritySha256 } : null, approvedAt: built.now,
++  };
++  const stored = writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval, consumedAt: built.now });
++  if (!stored.ok) fail("RPC-APPROVAL-STORE", `the release approval was not recorded (${stored.code}); no release record was written`);
++  return approval;
+ }
+ 
+ const USAGE = "Usage: release-preflight-cli.mjs --preflight-id <id> --base <commit> (--consent <repo-path> | --proof-request <external-path> --proof <external-path>) --lifecycle <path> --retention-policy <sha256> --out <path> [--gg03 <path>] [--root <repo>]";
+@@ -657,7 +718,10 @@ function parseArgs(argv) {
+     }
+     value[flag] = next;
+   }
+-  for (const required of ["--preflight-id", "--base", "--lifecycle", "--retention-policy", "--out"]) {
++  // G20-42: a consumer project (decided from its shape) needs only the base and the feature package; the id, the retention digest and the
++  // record path have fixed consumer values, which the push guard's release approval and the docs name.
++  const consumerRoot = isConsumerReleaseProject(resolve(value["--root"] ?? process.cwd()));
++  for (const required of consumerRoot ? ["--base", "--lifecycle"] : ["--preflight-id", "--base", "--lifecycle", "--retention-policy", "--out"]) {
+     if (!value[required]) fail("RPC-USAGE", `${required} is required`);
+   }
+   // ADR-0064 Decision 5: --consent (hand-supplied) and --proof-request/--proof
+@@ -668,7 +732,7 @@ function parseArgs(argv) {
+   if (Boolean(value["--proof-request"]) !== Boolean(value["--proof"])) fail("RPC-USAGE", "--proof-request and --proof must be supplied together");
+   if (value["--consent"] && value["--proof-request"]) fail("RPC-USAGE", "--consent and --proof-request/--proof are mutually exclusive");
+   const rootDir = value["--root"] ?? process.cwd();
+-  if (!value["--consent"] && !value["--proof-request"] && globalChatAttribution(resolve(rootDir)) === null) {
++  if (!consumerRoot && !value["--consent"] && !value["--proof-request"] && globalChatAttribution(resolve(rootDir)) === null) {
+     fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
+   }
+   return {
+@@ -681,7 +745,7 @@ function parseArgs(argv) {
+     lifecyclePath: value["--lifecycle"],
+     retentionPolicySha256: value["--retention-policy"],
+     gg03Path: value["--gg03"] ?? null,
+-    outPath: value["--out"],
++    outPath: value["--out"] ?? CONSUMER_RELEASE_RECORD_PATH,
+   };
+ }
+ 
+@@ -716,14 +780,35 @@ function runPrintAuthorizeCritical(argv) {
+   process.stdout.write(`${JSON.stringify({ command: prepared.command, argv: prepared.argv, subjectSha256: prepared.subjectSha256, expiresAt: prepared.expiresAt }, null, 2)}\n`);
+ }
+ 
++/**
++ * G20-42 (1): the named repair for an already-onboarded project without a VERSION file. Create-only: an existing file is never touched, and
++ * the Pipeline's own source checkout is refused (its VERSION is its release decision). The agent commits the new file.
++ */
++function runInitVersion(argv) {
++  const index = argv.indexOf("--root");
++  const root = resolve(index >= 0 && argv[index + 1] ? argv[index + 1] : process.cwd());
++  if (!isConsumerReleaseProject(root)) fail("RPC-USAGE", "--init-version applies to a consumer project; the Pipeline's own VERSION is its release decision");
++  const path = join(root, "VERSION");
++  let created = true;
++  try { writeFileSync(path, `${CONSUMER_VERSION_INITIAL}\n`, { flag: "wx" }); } catch (error) { if (error.code !== "EEXIST") throw error; created = false; }
++  process.stdout.write(`${JSON.stringify({ status: created ? "version-created" : "version-exists", path: "VERSION", version: readFileSync(path, "utf8").trim(),
++    next: created ? "commit VERSION, then continue with the release preflight" : null }, null, 2)}\n`);
++}
++
+ if (isDirectInvocation(import.meta.url)) {
+   try {
+     if (process.argv.slice(2).includes(PRINT_FLAG)) {
+       runPrintAuthorizeCritical(process.argv.slice(2));
+       process.exit(0);
+     }
+-    const options = parseArgs(process.argv.slice(2));
++    const rawArgs = process.argv.slice(2);
++    if (rawArgs.includes("--init-version")) {
++      runInitVersion(rawArgs);
++      process.exit(0);
++    }
++    const options = parseArgs(rawArgs);
+     const built = buildReleasePreflight(options);
++    const approval = recordConsumerReleaseApproval(resolve(options.rootDir), built);
+     writeOutput(options.rootDir, options.outPath, built.record);
+     process.stdout.write(`${JSON.stringify({
+       status: built.record.status,
+@@ -731,6 +816,11 @@ if (isDirectInvocation(import.meta.url)) {
+       recordSha256: built.record.recordSha256,
+       versionSurfacesAgree: built.versionAgreed,
+       writtenTo: options.outPath,
++      ...(approval === null ? {} : {
++        tag: approval.tag,
++        // The agent's last two steps; the push guard admits exactly this annotated tag at exactly this commit.
++        nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`, `git push origin refs/tags/${approval.tag}`],
++      }),
+     }, null, 2)}\n`);
+   } catch (error) {
+     const code = error instanceof ReleasePreflightCliError ? error.code : (error?.code ?? "RPC-ERROR");
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 262caa008..010a4b495 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -232,6 +232,15 @@ The close request is one JSON file in the repository, schema `pipeline.continuit
+ The usual choice is the combined Verify/Critic receipt of the feature. The State must also be close-ready: queue head `nextAction`
+ `close`, no dispatch, no blocker, no decision transaction.
+ 
++## After the close and the push: the release (a consumer project's last step)
++
++A consumer project's release is the annotated version tag `v<VERSION>` on the closed, pushed feature. Write the `RELEASE-NOTES.md` entry
++(`## v<VERSION>`: closed feature id, title, acceptance criteria met) WITH the feature, before the Critic round, so the Critic reviews it and the
++Critic-bound push Verify carries it; a notes commit after the review is a content change the carry refuses. After the push run
++`release-preflight-cli.mjs --root <repo> --base <base> --lifecycle specs/<feature>/lifecycle.json`: it stops at the first missing step with its
++repair command, records the PO's one release approval (chat) or prints the PO's signing command (signature), and prints the tag and tag-push
++commands. Owner: `docs/push-release-flow.md`, "Releasing a consumer project".
++
+ ## Command signatures
+ 
+ Spellings are taken from each script's own parser or help; `<...>` is a value.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index e936828f0..67fb3c74e 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -107,6 +107,14 @@ Owner: `docs/push-release-flow.md`.
+ 3. `pipeline-state.mjs approve-push --by <name> --remote <remote> --destination refs/heads/<branch>` with the proof flags in signature mode.
+ 4. `git push <remote> <branch>:refs/heads/<branch>` (full refspec; never force). A stop at the runner's own prompt is the runner's gate, not a Pipeline refusal.
+ 
++## 6. Release (a consumer project: one version tag, the last step)
++
++Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A consumer's release is the annotated tag `v<VERSION>` on the closed, pushed feature.
++
++1. Before the Critic round, with the feature: `RELEASE-NOTES.md` gets a `## v<VERSION>` entry (closed feature id, title, acceptance criteria met). `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project: `release-preflight-cli.mjs --init-version --root <repo>`, then commit).
++2. `node "${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs" --root <repo> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`. It stops at the first missing step (feature not closed, notes, Verify/Critic/security evidence, push approval, push) and prints the repair command. In `signature` mode it prints the PO's exact signing command for this subject (`RPC-CONSUMER-PO-APPROVAL`); in `chat` mode the run records the release approval. This is the one release approval of the whole path.
++3. The `nextActions` it prints: `git tag -a v<VERSION> -m "version tag" <commit>`, then `git push <remote> refs/tags/v<VERSION>` (the push guard admits exactly that tag).
++
+ ## What differs per runner (only rows with a source)
+ 
+ | Topic | Claude | Codex | Antigravity |
