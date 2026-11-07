@@ -630,6 +630,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
   // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
   const nativeChild = evaluateNativeChildCall(input);
   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
+  // G20-43: a resolved model that differs from the registry cell is recorded in the verdict and noticed here (one stderr line), never denied.
+  if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty });
   // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
   // only effect and one diagnostic line says what became of it when it was applicable.
   if (input?.toolCall?.name === "send_message") {

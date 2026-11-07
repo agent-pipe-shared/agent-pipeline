@@ -164,25 +164,62 @@ test("a child hook call is bound to its parent through the host-written descript
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
-test("a child whose resolved modelName differs from the selected model is refused with a typed code that names the repair", async () => {
+// G20-43 restatement (QG-04, restated in place; every other assertion of this file is kept). MEASURED on Antigravity (M4c/M10): the
+// subagent Model alias does not select a model -- `flash` and `pro` both resolved to gemini-3.8-flash-tiered, and a child launched without a
+// Model inherits the session's model. A native child whose resolved modelName differs from the registry cell was therefore refused on the
+// happy path with a repair only the PO could run. PO decision 2026-11-07: record instead of refuse. The former case pinned the denial
+// (AGY-NATIVE-CHILD-MODEL-MISMATCH, exit 2); it now pins that the mismatch is ADMITTED, RECORDED next to the expected cell, and NOTICED once.
+test("G20-43: a child whose resolved modelName differs from the selected model is admitted, recorded next to the expected cell and noticed, never refused", async () => {
   const fx = brainFixture();
   try {
     descriptor(fx, CHILD, "goldfish-implementor");
+    writeFileSync(join(fx.workspace, "x.txt"), "x\n");
     const { evaluateNativeChildCall } = await loadModule();
-    const childCall = { name: "view_file", args: { Path: join(fx.workspace, "x.txt") } };
+    const childCall = { name: "view_file", args: { AbsolutePath: join(fx.workspace, "x.txt") } };
     const wrong = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: "some-other-model", toolCall: childCall });
     const verdict = evaluateNativeChildCall(wrong);
-    assert.equal(verdict.ok, false);
-    assert.equal(verdict.code, "AGY-NATIVE-CHILD-MODEL-MISMATCH");
-    assert.ok(verdict.reason.includes("some-other-model") && verdict.reason.includes(selectedModel("implement")), verdict.reason);
-    assert.match(verdict.reason, /repair/iu);
-    // The adapter denies the child's call, verbatim and typed.
+    assert.equal(verdict.ok, true, JSON.stringify(verdict));
+    assert.equal(verdict.attributed.parentConversationId, PARENT, "binding is unchanged");
+    assert.equal(verdict.modelCheck.status, "mismatch");
+    assert.equal(verdict.modelCheck.resolved, "some-other-model");
+    assert.deepEqual(verdict.modelCheck.expected, { duty: "implement", value: selectedModel("implement") });
+    assert.ok(verdict.notice.includes("some-other-model") && verdict.notice.includes(selectedModel("implement")), verdict.notice);
+    assert.equal(verdict.notice.includes("\n"), false, "one notice line");
+    // The adapter admits the child's call and prints the one notice line; no MODEL-MISMATCH denial any more.
     const res = runAdapter(fx, wrong);
-    assert.equal(res.status, 2, `${res.stdout}${res.stderr}`);
-    assert.match(res.stdout, /AGY-NATIVE-CHILD-MODEL-MISMATCH/u);
+    assert.equal(res.status, 0, `${res.stdout}${res.stderr}`);
+    assert.doesNotMatch(res.stdout, /AGY-NATIVE-CHILD-MODEL-MISMATCH/u);
+    const notices = res.stderr.split("\n").filter((line) => line.includes("agy-native-child-model-mismatch"));
+    assert.equal(notices.length, 1, res.stderr);
+    assert.ok(notices[0].includes("some-other-model") && notices[0].includes(selectedModel("implement")), notices[0]);
+    // The expected model resolves: recorded as a match, no notice.
     const right = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement"), toolCall: childCall });
-    assert.equal(evaluateNativeChildCall(right).ok, true);
+    const matched = evaluateNativeChildCall(right);
+    assert.equal(matched.ok, true);
+    assert.equal(matched.modelCheck.status, "match");
+    assert.equal(matched.notice, undefined);
+    assert.doesNotMatch(runAdapter(fx, right).stderr, /agy-native-child-model-mismatch/u);
+    // Every other check still governs: an ambiguous binding is still refused whatever the model.
+    mkdirSync(join(fx.brain, "44444444-dddd-4ddd-8ddd-000000000004"), { recursive: true });
+    descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_ALIVE", "44444444-dddd-4ddd-8ddd-000000000004");
+    assert.equal(evaluateNativeChildCall(wrong).ok, false);
+    assert.equal(evaluateNativeChildCall(wrong).code, "AGY-NATIVE-CHILD-BINDING-AMBIGUOUS");
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// G20-43 routing (PO 2026-11-07): the Critic inherits the session model (no Model parameter); implementor = flash medium, deep = flash high,
+// mechanic = flash low. The Model alias exists only for the three Goldfish roles and is always `flash`.
+test("G20-43: the registry routes implementor flash-medium, deep flash-high, mechanic flash-low and the Critic to the session model", async () => {
+  const route = (duty) => registeredFunctionalTaskRoutes().taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === `duty.${duty}`);
+  const cell = (duty) => ({ selector: route(duty).selector ?? route(duty).cell.selector, effort: route(duty).effort ?? route(duty).cell.effort });
+  assert.deepEqual([cell("implement").selector.value, cell("implement").effort], ["gemini-3.8-flash-medium", "medium"]);
+  assert.deepEqual([cell("deep").selector.value, cell("deep").effort], ["gemini-3.8-flash-high", "high"]);
+  assert.deepEqual([cell("mechanic").selector.value, cell("mechanic").effort], ["gemini-3.8-flash-low", "low"]);
+  for (const duty of ["implement", "deep", "mechanic"]) assert.equal(route(duty).nativeTier, "flash", duty);
+  for (const duty of ["critic_normal", "critic_high_risk"]) {
+    assert.equal(cell(duty).selector.value, "inherit", duty);
+    assert.equal(route(duty).nativeTier, "inherit", duty);
+  }
 });
 
 // M4b restatement of the former serialization case ("a second code-writing child while one is alive is refused ..."). Measured instead

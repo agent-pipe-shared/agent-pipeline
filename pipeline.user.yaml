@@ -5,7 +5,7 @@ autonomy:
   branch_model: "feature-branch"
   push_policy: "gated"
   wip_limit: 3
-core_registry_sha256: "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac"
+core_registry_sha256: "20ee1ddb3fc4d717cc3fd93e6f22898611cb1737c41601fda1ed0d48cb4a9d4a"
 critic_export:
   mode: "allowlisted"
   rules:
@@ -99,8 +99,8 @@ routing:
         effort: "high"
         evidence: "dispatch-receipt"
         selector:
-          kind: "model-id"
-          value: "gemini-3.1-pro-high"
+          kind: "alias"
+          value: "inherit"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -124,8 +124,8 @@ routing:
         effort: "high"
         evidence: "dispatch-receipt"
         selector:
-          kind: "model-id"
-          value: "gemini-3.8-flash-high"
+          kind: "alias"
+          value: "inherit"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -196,11 +196,11 @@ routing:
         unavailable: "defer"
     mechanic:
       antigravity:
-        effort: "medium"
+        effort: "low"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.8-flash-medium"
+          value: "gemini-3.8-flash-low"
         state: "unavailable"
         unavailable: "defer"
       claude:

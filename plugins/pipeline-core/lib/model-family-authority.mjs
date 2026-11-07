@@ -47,7 +47,7 @@ function sourceProjection(routeSource) {
   for (const t of routeSource.taskRoutes) {
     // Antigravity rows carry its native tier (dc8204a28); the key is admitted only there and only with a closed value.
     const hasTier = t !== null && typeof t === "object" && Object.hasOwn(t, "nativeTier");
-    if (hasTier && (t.runner !== "antigravity" || ![undefined, "pro", "flash"].includes(t.nativeTier))) return null;
+    if (hasTier && (t.runner !== "antigravity" || ![undefined, "pro", "flash", "inherit"].includes(t.nativeTier))) return null;
     if (!own(t, hasTier
       ? ["taskRoute", "runner", "role", "effort", "state", "selector", "nativeTier"]
       : ["taskRoute", "runner", "role", "effort", "state", "selector"])

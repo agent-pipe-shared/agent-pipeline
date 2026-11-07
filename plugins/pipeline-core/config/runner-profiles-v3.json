@@ -267,9 +267,9 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.8-flash-medium"
+          "value": "gemini-3.8-flash-low"
         },
-        "effort": "medium",
+        "effort": "low",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       }
@@ -362,8 +362,8 @@
       "antigravity": {
         "state": "unavailable",
         "selector": {
-          "kind": "model-id",
-          "value": "gemini-3.8-flash-high"
+          "kind": "alias",
+          "value": "inherit"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -394,8 +394,8 @@
       "antigravity": {
         "state": "unavailable",
         "selector": {
-          "kind": "model-id",
-          "value": "gemini-3.1-pro-high"
+          "kind": "alias",
+          "value": "inherit"
         },
         "effort": "high",
         "unavailable": "defer",

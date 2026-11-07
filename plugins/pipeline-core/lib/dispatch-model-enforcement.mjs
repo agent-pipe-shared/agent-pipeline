@@ -16,6 +16,8 @@ const ENFORCED_RUNNERS = Object.freeze(["claude"]);
 /** The Antigravity native Model aliases (the one list: the briefing generator imports it instead of copying it). */
 export const ANTIGRAVITY_NATIVE_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
 const ANTIGRAVITY_MODELS = ANTIGRAVITY_NATIVE_MODELS;
+/** The route tier of a duty that passes no Model and runs on the session's model (G20-43: the Critic). Not an alias, so not in the list above. */
+const INHERIT_TIER = "inherit";
 
 /** The approved Antigravity native alias the registry projects for a duty task route (e.g. `duty.implement`), or null when none is registered. */
 export function antigravityNativeTierForTaskRoute(taskRoute, routeSource = registeredFunctionalTaskRoutes()) {
@@ -59,6 +61,19 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
       }] };
       return { ok: true, findings: [], skipped: "agent-type-not-governed" };
     }
+    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
+      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity"
+        && duties.includes(route.taskRoute.startsWith("duty.") ? route.taskRoute.slice("duty.".length) : "")
+        && (ANTIGRAVITY_MODELS.includes(route.nativeTier) || route.nativeTier === INHERIT_TIER)) : [];
+    const expected = [...new Set(routes.map((route) => route.nativeTier))];
+    // G20-43 (PO 2026-11-07): a duty whose route is `inherit` (the Critic) passes NO Model and runs on the session's model; an explicit alias
+    // would only select a model of the host's own choosing (measured), so it is refused with the repair "omit Model".
+    if (expected.length > 0 && expected.every((tier) => tier === INHERIT_TIER)) {
+      const omitted = model === undefined || model === null || model === "" || model === "inherit";
+      return omitted ? { ok: true, findings: [], skipped: null } : { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-DUTY-MISMATCH",
+        message: `Antigravity Subagents[].Model for ${subagentType} must be omitted: its configured duty route inherits the session model. Re-issue that entry with no Model (omit Model).`,
+      }] };
+    }
     if (!ANTIGRAVITY_MODELS.includes(model)) {
       return { ok: false, skipped: null, findings: [{
         code: model === undefined || model === null || model === "" || model === "inherit"
@@ -66,11 +81,6 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
         message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
       }] };
     }
-    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
-      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity"
-        && duties.includes(route.taskRoute.startsWith("duty.") ? route.taskRoute.slice("duty.".length) : "")
-        && ANTIGRAVITY_MODELS.includes(route.nativeTier)) : [];
-    const expected = [...new Set(routes.map((route) => route.nativeTier))];
     if (expected.length === 0) {
       return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-ROUTE-UNAVAILABLE",
         message: `No approved Antigravity native tier is registered for ${subagentType}; do not infer one from a concrete V3 model ID.`,

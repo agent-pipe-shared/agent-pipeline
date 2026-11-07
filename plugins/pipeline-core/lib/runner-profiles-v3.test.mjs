@@ -96,15 +96,16 @@ const cases = [
       "advisory.antigravity": "gemini-3.1-pro-high / high",
       "advisory.claude.consult": "opus / max",
       "critic-high-risk.codex": "gpt-6-sol / max", "critic-high-risk.claude": "opus / max",
-      "critic-high-risk.antigravity": "gemini-3.1-pro-high / high",
+      // G20-43 (PO 2026-11-07): the Antigravity Critic inherits the session model (no Model alias selects a model on the host).
+      "critic-high-risk.antigravity": "inherit / high",
       "critic-normal.codex": "gpt-6-sol / medium", "critic-normal.claude": "opus / medium",
-      "critic-normal.antigravity": "gemini-3.8-flash-high / high",
+      "critic-normal.antigravity": "inherit / high",
       "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / medium",
       "deep.antigravity": "gemini-3.8-flash-high / high",
       "implement.codex": "gpt-6-luna / high", "implement.claude": "sonnet / medium",
       "implement.antigravity": "gemini-3.8-flash-medium / medium",
       "mechanic.codex": "gpt-6-luna / high", "mechanic.claude": "haiku / high",
-      "mechanic.antigravity": "gemini-3.8-flash-medium / medium",
+      "mechanic.antigravity": "gemini-3.8-flash-low / low", // G20-43: mechanic = flash low (was flash medium)
       "readiness.codex": "gpt-6-luna / high", "readiness.claude": "sonnet / high",
       "readiness.antigravity": "gemini-3.8-flash-high / high",
       "read.codex": "gpt-6-luna / medium", "read.claude": "haiku / medium",
@@ -172,11 +173,12 @@ const cases = [
     assert.equal(codexRoute.effort, "medium");
 
     const agyRoute = registry.duties.critic_normal.antigravity;
-    assert.equal(agyRoute.selector.value, "gemini-3.8-flash-high");
+    // G20-43: the Antigravity Critic cells say inherit (the session's model); the effort is the session's too and is kept as it was.
+    assert.equal(agyRoute.selector.value, "inherit");
     assert.equal(agyRoute.effort, "high");
 
     const agyHighRisk = registry.duties.critic_high_risk.antigravity;
-    assert.equal(agyHighRisk.selector.value, "gemini-3.1-pro-high");
+    assert.equal(agyHighRisk.selector.value, "inherit");
     assert.equal(agyHighRisk.effort, "high");
   }],
   ["keep-awake accepts only its explicit boolean and legacy V3 absence remains compatible", () => {

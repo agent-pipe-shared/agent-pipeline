@@ -127,8 +127,9 @@ function prepareNative(root, nativeSubagents) {
   for (const entry of nativeSubagents) {
     if (entry.Model !== undefined) continue;
     const type = String(entry.TypeName ?? "").replace(/^pipeline-core:/u, "");
-    if (["goldfish-deep", "critic", "consult-advisor"].includes(type)) entry.Model = "pro";
-    else if (["goldfish-implementor", "goldfish-mechanic", "readiness-reviewer"].includes(type)) entry.Model = "flash";
+    // G20-43 (PO 2026-11-07): the Critic inherits the session model and passes NO Model; the three Goldfish roles pass `flash`.
+    if (["consult-advisor"].includes(type)) entry.Model = "pro";
+    else if (["goldfish-deep", "goldfish-implementor", "goldfish-mechanic", "readiness-reviewer"].includes(type)) entry.Model = "flash";
   }
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
@@ -1578,8 +1579,9 @@ check("Antigravity pretool guard blocks a critic dispatch carrying prose at inde
 check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
   const root = nativeFixture();
   const nativeSubagents = [
-    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
-    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
+    // G20-43: the Critic inherits the session model, so it passes no Model (was Model "pro").
+    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
   ];
   prepareNative(root, nativeSubagents);
   const res = decision(run({

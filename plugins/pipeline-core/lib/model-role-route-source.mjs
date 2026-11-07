@@ -32,16 +32,17 @@ const DUTY_ROLES = Object.freeze({
   read: ["efficient", "efficient", "efficient"],
 });
 // Antigravity's native Model enum is independent of the concrete V3 model IDs.
-// This PO-approved projection is explicit and never treats inherit as a route.
+// This PO-approved projection is explicit. G20-43 (PO 2026-11-07; measured: the alias does not select a model on the host): the three Goldfish
+// duties pass Model `flash`; the Critic duties are the one place `inherit` IS the route -- they pass NO Model and run on the session's model.
 const AGY_NATIVE_TIERS = Object.freeze({
   "profile.frontier": "pro",
   "profile.worker": "flash",
   "duty.implement": "flash",
   "duty.mechanic": "flash",
-  "duty.deep": "pro",
+  "duty.deep": "flash",
   "duty.test_author": "flash",
-  "duty.critic_normal": "pro",
-  "duty.critic_high_risk": "pro",
+  "duty.critic_normal": "inherit",
+  "duty.critic_high_risk": "inherit",
   "duty.readiness": "flash",
   "duty.advisory": "pro",
   "duty.read": "flash",

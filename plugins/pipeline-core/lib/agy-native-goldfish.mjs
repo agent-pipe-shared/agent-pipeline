@@ -9,9 +9,12 @@
 //   * the host writes <brain root>/<parentId>/.system_generated/subagents/<childId>.json = { conversationId, subagentDescriptor {typeName,
 //     role}, state, spawnStepIndex, workspaceUris }; the brain root is the parent directory of the payload's artifactDirectoryPath. A child
 //     is BOUND when exactly one parent directory holds a descriptor named after its id;
-//   * the alias (Model) is only in the parent's call; every child call carries the RESOLVED modelName, and flash and pro resolved to the
-//     SAME model on the measured host, so the child's modelName is compared with the model the dispatch selection resolved for its role
-//     (the registry's Antigravity cell for that duty), never with the alias;
+//   * the alias (Model) is only in the parent's call; every child call carries the RESOLVED modelName. MEASURED (M4c/M10, 2026-11-07): the
+//     alias does NOT select a model -- `flash` AND `pro` both resolved to `gemini-3.8-flash-tiered`, and a child launched WITHOUT a Model
+//     inherits the main session's model (`gemini-4-argon-medium`). The child's modelName is therefore only COMPARED with the registry's
+//     Antigravity cell for its duty and RECORDED (G20-43, PO 2026-11-07: record instead of refuse); a mismatch is never a denial. The routing
+//     is: goldfish-implementor flash medium, goldfish-deep flash high, goldfish-mechanic flash low (all Model `flash`), the Critic inherits
+//     (no Model);
 //   * invoke_subagent args are FLAT (TypeName, Role, Prompt, Model, Workspace) and may be JSON-string-encoded ("\"flash\"").
 //
 // Measured by the M4b run (scratch/agy-m4b-findings.md, specs/sprint-alfred-epic/evidence/held-patches/w258-c20-agy-native-isolation.notes.md):
@@ -24,7 +27,7 @@
 //     and carries no governance marker, so it is resolved to its repository here (resolveNativeChildGovernance) and governed like the parent;
 //   * a finished child's descriptor STAYS SUBAGENT_STATE_ALIVE, so no rule may count ALIVE children.
 //
-// NOT measured, so not assumed: the exact spelling of modelName (the w255 model check is kept as is), the descriptor state of a killed or
+// NOT measured, so not assumed: the exact spelling of modelName beyond the two values above, the descriptor state of a killed or
 // failed child, descriptor timing, a hook at a child's end.
 
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
@@ -102,7 +105,10 @@ export function expectedNativeModel(type, routeSource = registeredFunctionalTask
 
 const deny = (code, reason) => ({ ok: false, code, reason: `${code}: ${reason}` });
 
-/** A hook call from a native child: attribute it to its parent and check the model it actually resolved to (goldfish roles only). */
+/**
+ * A hook call from a native child: attribute it to its parent and RECORD the model it actually resolved to next to the registry cell
+ * (goldfish roles only; G20-43: a model mismatch is reported in `modelCheck` and one `notice` line, never a denial).
+ */
 export function evaluateNativeChildCall(input, { routeSource } = {}) {
   const bound = bindNativeChild(input);
   if (bound.status === "not-a-child") return { ok: true, attributed: null };
@@ -119,10 +125,15 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
   if (!isNativeCodeWriterType(bound.typeName)) return { ok: true, attributed };
   const expected = expectedNativeModel(bound.typeName, routeSource);
   if (expected === null) return { ok: true, attributed, modelCheck: "no-opinion" };
-  if (normalizeModel(input?.modelName) !== normalizeModel(expected.value)) {
-    return deny("AGY-NATIVE-CHILD-MODEL-MISMATCH", `child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(input?.modelName ?? null)}, but the dispatch selection for it (duty.${expected.duty}, Antigravity cell) is ${JSON.stringify(expected.value)}. The host maps the aliases flash and pro to models of its own and they may be the same model, so the alias in the parent call does not select the model. Repair: stop this child with manage_subagents (kill) and dispatch it again with a Model alias that resolves to ${JSON.stringify(expected.value)}; if no alias does on this host, stop and report that to the PO (the PO can set the registry's Antigravity cell for duty.${expected.duty} in config/runner-profiles-v3.json to the model the host really resolves). Do not implement in the parent session instead.`);
-  }
-  return { ok: true, attributed };
+  // G20-43: the resolved model is RECORDED next to the expected registry cell and never refused. The host's Model alias does not select a
+  // model (measured), so a refusal here only blocked every happy-path child with a repair nobody could run.
+  const resolved = input?.modelName ?? null;
+  const modelCheck = { status: normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : "mismatch", resolved, expected };
+  if (modelCheck.status === "match") return { ok: true, attributed, modelCheck };
+  return {
+    ok: true, attributed, modelCheck,
+    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,
+  };
 }
 
 /** Tracked files with uncommitted changes (staged or not) in a git working tree; [] when git cannot say, since this is a hygiene check. */

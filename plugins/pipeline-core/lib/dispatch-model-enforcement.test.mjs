@@ -118,10 +118,31 @@ test("DME12 approved Antigravity tiers are projected beside, not substituted for
   assert.equal(source.ok, true);
   const routes = source.taskRoutes.filter((route) => route.runner === "antigravity" && route.taskRoute.startsWith("duty."));
   assert.equal(routes.find((route) => route.taskRoute === "duty.implement").nativeTier, "flash");
-  assert.equal(routes.find((route) => route.taskRoute === "duty.deep").nativeTier, "pro");
-  assert.equal(routes.find((route) => route.taskRoute === "duty.critic_normal").nativeTier, "pro");
+  // G20-43 (PO 2026-11-07, measured: the alias does not select a model on the host): the three Goldfish roles pass `flash`, the Critic
+  // passes no Model and inherits the session's model (was: deep "pro", critic_normal "pro").
+  assert.equal(routes.find((route) => route.taskRoute === "duty.deep").nativeTier, "flash");
+  assert.equal(routes.find((route) => route.taskRoute === "duty.critic_normal").nativeTier, "inherit");
   assert.equal(routes.find((route) => route.taskRoute === "duty.advisory").nativeTier, "pro");
   assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "consult-advisor", model: "pro", routeSource: source }).ok, true);
   assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "plan-verifier", model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-ROUTE-UNAVAILABLE");
   assert.notEqual(routes.find((route) => route.taskRoute === "duty.implement").selector.value, "flash");
+});
+
+test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no Model (it inherits the session model)", () => {
+  const source = registeredFunctionalTaskRoutes();
+  for (const subagentType of ["goldfish-implementor", "goldfish-mechanic", "goldfish-deep"]) {
+    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "flash", routeSource: source }).ok, true, subagentType);
+    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH", subagentType);
+    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].code, "DISPATCH-MODEL-MISSING", subagentType);
+  }
+  for (const subagentType of ["critic", "pipeline-core:critic"]) {
+    for (const model of [undefined, "", "inherit"]) {
+      assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model, routeSource: source }).ok, true, `${subagentType}/${String(model)}`);
+    }
+    // An explicit alias would only pick a model of the host's own choosing; the repair is to omit it.
+    const refused = evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH");
+    assert.match(dispatchModelRefusalText(refused), /omit Model/u);
+  }
 });

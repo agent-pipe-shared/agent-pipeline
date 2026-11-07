@@ -212,9 +212,10 @@ check("RP38 current V3 Antigravity duties keep Pro design and distinct Flash-hig
   v3Registry.profiles.epic.design_phase.antigravity.selector.value === "gemini-3.1-pro-high"
   && v3Registry.duties.implement.antigravity.selector.value === "gemini-3.8-flash-medium"
   && v3Registry.duties.implement.antigravity.effort === "medium"
-  && v3Registry.duties.mechanic.antigravity.selector.value === "gemini-3.8-flash-medium"
-  && v3Registry.duties.mechanic.antigravity.effort === "medium"
-  && v3Registry.duties.critic_normal.antigravity.selector.value === "gemini-3.8-flash-high"
+  // G20-43 (PO 2026-11-07): mechanic = flash low (was flash medium); the Antigravity Critic inherits the session model (was gemini-3.8-flash-high).
+  && v3Registry.duties.mechanic.antigravity.selector.value === "gemini-3.8-flash-low"
+  && v3Registry.duties.mechanic.antigravity.effort === "low"
+  && v3Registry.duties.critic_normal.antigravity.selector.value === "inherit"
 );
 check("RP39 Antigravity aliases resolve accurately",
   projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model

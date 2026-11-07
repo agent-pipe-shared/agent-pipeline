@@ -24,7 +24,7 @@ Measured shape of the host tool (`w252-agy-native-subagent-measurement.md`): `in
 and `Prompt` required, `Model` one of `inherit|flash_lite|flash|pro`, `Workspace` one of `inherit|branch|share`; there is no `Subagents`
 array. In a hook payload the arguments may be JSON-string-encoded (`Model` arrives as the string `"flash"` with its quotes); the guard
 decodes one level. Build the call from the briefing the generator produced (`dispatch-briefing.mjs build --runner antigravity`, a native
-alias as the model id) and set `Model` to the alias the dispatch selection names for the role.
+alias as the model id) and set `Model` to `flash` for the three Goldfish roles (a Critic dispatch passes no `Model`).
 
 - **Admission** is the one Claude uses: the generated briefing route, the selected model and the write-capable carrier are judged by
   `guard-dispatch`. There is no per-dispatch PO consent and no signature, and no prepare step for these three roles (the prepared
@@ -35,10 +35,13 @@ alias as the model id) and set `Model` to the alias the dispatch selection names
   of the payload's `artifactDirectoryPath`. A child is bound when exactly one parent directory holds a descriptor named after it
   (`lib/agy-native-goldfish.mjs`). The guard refuses agent writes under the Antigravity brain and config directories
   (`AGY-NATIVE-BRAIN-WRITE`).
-- **Model.** The alias exists only in the parent call; every child call carries the RESOLVED `modelName`, and `flash` and `pro` resolved to the
-  same model on the measured host. The guard compares the child's `modelName` with the model the dispatch selection resolved for its role
-  (the registry's Antigravity cell for that duty), never with the alias, and refuses a mismatch with `AGY-NATIVE-CHILD-MODEL-MISMATCH`
-  naming both values and the repair.
+- **Model (measured M4c/M10, G20-43).** The alias exists only in the parent call and does NOT select a model on the host: `flash` AND `pro`
+  both resolved to `gemini-3.8-flash-tiered` (the child's hook payload `modelName`), and a child launched WITHOUT a Model inherits the main
+  session's model (`gemini-4-argon-medium` measured). Routing (PO 2026-11-07): `goldfish-implementor` = flash medium, `goldfish-deep` =
+  flash high, `goldfish-mechanic` = flash low, all dispatched with `Model: "flash"`; the Critic inherits (pass NO `Model`; an explicit
+  alias on a Critic is refused by guard-dispatch with the repair "omit Model"). The guard compares the child's `modelName` with the
+  registry's Antigravity cell for its duty and RECORDS the result (`modelCheck` in the verdict) with one stderr notice line
+  (`agy-native-child-model-mismatch`) on a mismatch; it never denies for a model mismatch.
 - **Isolation (measured, M4b).** A code-writing child is dispatched with `Workspace: "branch"` (every other value, absent included, is
   refused: `AGY-NATIVE-WORKSPACE-NOT-ISOLATED`). The host then creates a real git worktree of the project below
   `<home>/.gemini/antigravity-cli/worktrees/<parentConversationId>/subagent-<...>` on a new branch of the same name, cut from the parent's
@@ -65,7 +68,7 @@ alias as the model id) and set `Model` to the alias the dispatch selection names
   reaches it verbatim. The child commits on its own branch; the Elephant's commit is the take-over above followed by the existing
   `scripts/goldfish-host-commit-recover.mjs` plan/apply route. There is no Antigravity-only commit mechanism and no in-session
   implementation by the Elephant as a sanctioned route.
-- **Not measured, so not assumed.** The spelling of `modelName` (the model check above is kept as it was), the descriptor state of a killed or
+- **Not measured, so not assumed.** The spelling of `modelName` beyond the two values above, the descriptor state of a killed or
   failed child, descriptor timing, a hook at a child's end, and whether a global (Pipeline) hook install fires once or twice per child tool call.
 
 ### Legacy route (Codex-to-Antigravity)
