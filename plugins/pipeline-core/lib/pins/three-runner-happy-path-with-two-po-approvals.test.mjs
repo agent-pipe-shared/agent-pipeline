@@ -312,14 +312,37 @@ const designPresentation = () => (designPresentationRun ??= buildDefaultModeDesi
 
 test("AC-264: the default-mode present-plan hands the PO exactly one sign-intent command, in the absolute --request form, with no guard-override wording", () => {
   const f = designPresentation();
-  const lines = f.presentOut.split(/\r?\n/u).filter((line) => /sign-intent/u.test(line));
-  assert.equal(lines.length, 1, `exactly one line names sign-intent; output: ${f.presentOut}`);
-  const requestFlag = /--request\s+"([^"]+)"/u.exec(lines[0]);
-  assert.ok(requestFlag, `the sign command carries --request "<path>": ${lines[0]}`);
-  assert.ok(isAbsolute(requestFlag[1]), "the --request path is absolute");
-  assert.equal(requestFlag[1], resolve(f.root, f.requestRel), "it names the request file present-plan recorded");
-  assert.ok(existsSync(requestFlag[1]), "the named request file exists");
-  assert.match(lines[0], /--repo-root\s+"[^"]+"/u, "the repository is named absolutely too, so a paste works from any directory");
+  // QG-04 restatement (C20, G20-16 renderPoTerminalCommand): the step is no longer one raw line. It is a bounded copy block
+  // (POSIX `CMD='...'` / `CMD=${CMD}'...'` fragments, or PowerShell `$CMD = '...'` / `$CMD += '...'` fragments), and inside WSL it is
+  // rendered once per terminal the PO may use (option A: WSL terminal, option B: Windows PowerShell through wsl.exe, the SAME argv)
+  // under a "copy exactly ONE" line; on every other host it is one block. Each block is reassembled to its full command and the
+  // original duties are asserted on every one: one sign-intent command per terminal block, absolute --request naming the recorded
+  // request, absolute --repo-root.
+  const blocks = [];
+  let current = null;
+  for (const line of f.presentOut.split(/\r?\n/u)) {
+    const start = /^CMD='(.*)'$/u.exec(line) ?? /^\$CMD = '(.*)'$/u.exec(line);
+    if (start) { current = { powershell: line.startsWith("$"), parts: [start[1]] }; blocks.push(current); continue; }
+    const more = current && (/^CMD=\$\{CMD\}'(.*)'$/u.exec(line) ?? /^\$CMD \+= '(.*)'$/u.exec(line));
+    if (more) { current.parts.push(more[1]); continue; }
+    current = null;
+  }
+  const assembled = blocks.map((block) => (block.powershell ? block.parts.join("").replace(/''/gu, "'") : block.parts.join("")));
+  const rawLines = f.presentOut.split(/\r?\n/u).filter((line) => /sign-intent/u.test(line) && !/^(?:CMD=|\$CMD )/u.test(line));
+  const commands = [...assembled.filter((command) => /sign-intent/u.test(command)), ...rawLines];
+  const wslDistro = typeof process.env.WSL_DISTRO_NAME === "string" && /^[A-Za-z0-9._-]{1,64}$/u.test(process.env.WSL_DISTRO_NAME);
+  const expectedBlocks = wslDistro ? 2 : 1;
+  assert.equal(commands.length, expectedBlocks, `exactly one sign-intent command per terminal block (${expectedBlocks}); output: ${f.presentOut}`);
+  if (wslDistro) assert.match(f.presentOut, /Copy exactly ONE of the two blocks/u, "the two terminal blocks are introduced as alternatives");
+  for (const command of commands) {
+    const requestFlag = /--request'?\s+['"]?([^'"\s]+)/u.exec(command);
+    assert.ok(requestFlag, `the sign command carries --request <path>: ${command}`);
+    assert.ok(isAbsolute(requestFlag[1]), "the --request path is absolute");
+    assert.equal(requestFlag[1], resolve(f.root, f.requestRel), "it names the request file present-plan recorded");
+    assert.ok(existsSync(requestFlag[1]), "the named request file exists");
+    const repoFlag = /--repo-root'?\s+['"]?([^'"\s]+)/u.exec(command);
+    assert.ok(repoFlag && isAbsolute(repoFlag[1]), `the repository is named absolutely too, so a paste works from any directory: ${command}`);
+  }
   assert.equal(f.request.schema, "pipeline.design-approval-request.v1");
   assert.doesNotMatch(f.presentOut, /--intent-sha256/u, "the bare digest form is never handed to the PO for a design approval");
   assert.doesNotMatch(f.presentOut, /HGO-|no recorded request resolves|guard[- ]override/iu, "the present-plan output carries no guard-override code or warning");
