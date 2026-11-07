@@ -617,6 +617,44 @@ test("C20 w252 architecture baseline --validate: one ADR sidecar under docs/adr 
   });
 });
 
+// ---- C20 w253 (G20-26): `create-adr.mjs`, the sanctioned ADR proposal generator, in its two closed shapes ----
+test("C20 w253 create-adr: the create and refresh shapes are admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "create-adr.mjs");
+    const make = (...rest) => scriptAction(script, "--root", f.root, ...rest);
+    bothAdmit(make("--slug", "storage-adapter", "--title", "Use a storage adapter"), f, "minimal create");
+    bothAdmit(make("--slug", "s", "--title", "A title, with: punctuation", "--scope", "global", "--supersedes", "0003-old", "--date", "2026-11-07"), f, "create with scope, supersedes and date");
+    bothAdmit(make("--slug", "s", "--title", "T", "--modules", "alpha,beta-2"), f, "create with modules");
+    bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
+    bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
+    for (const [label, action] of [
+      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
+      ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],
+      ["no root", scriptAction(script, "--slug", "s", "--title", "T")],
+      ["no title", make("--slug", "s")],
+      ["no slug", make("--title", "T")],
+      ["slug with a separator", make("--slug", "a/b", "--title", "T")],
+      ["slug with a dot segment", make("--slug", "..", "--title", "T")],
+      ["upper-case slug", make("--slug", "Abc", "--title", "T")],
+      ["overlong slug", make("--slug", "a".repeat(65), "--title", "T")],
+      ["empty title", make("--slug", "s", "--title", "")],
+      ["title with a control character", make("--slug", "s", "--title", "a\u0007b")],
+      ["title with leading space", make("--slug", "s", "--title", " T")],
+      ["scope module", make("--slug", "s", "--title", "T", "--scope", "module")],
+      ["modules with an upper-case id", make("--slug", "s", "--title", "T", "--modules", "Alpha")],
+      ["modules with an empty id", make("--slug", "s", "--title", "T", "--modules", "alpha,")],
+      ["supersedes with a separator", make("--slug", "s", "--title", "T", "--supersedes", "../x")],
+      ["date that is not a date", make("--slug", "s", "--title", "T", "--date", "tomorrow")],
+      ["unknown flag", make("--slug", "s", "--title", "T", "--out", "x")],
+      ["repeated flag", make("--slug", "s", "--title", "T", "--slug", "t")],
+      ["refresh with a title", make("--slug", "s", "--title", "T", "--refresh")],
+      ["refresh without a slug", make("--refresh")],
+      ["refresh with a value", make("--slug", "s", "--refresh", "x")],
+      ["extra positional", make("--slug", "s", "--title", "T", "extra")],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
 test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
   withFixture("feature", f => {
     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made

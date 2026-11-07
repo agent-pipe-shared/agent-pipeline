@@ -71,16 +71,23 @@ node plugins/pipeline-core/scripts/architecture-baseline.mjs --root "$PWD" [--di
 - `no-material-architecture-decision`: Changes are purely routine or localized implementation details.
 
 ### 2. Draft Concise ADR from Governed Evidence
-When an architectural decision is required, draft a concise ADR in `docs/adr/`:
-- Filename convention: `docs/adr/XXXX-<slug>.md` (e.g. `docs/adr/0064-storage-adapter-migration.md`).
-- Companion sidecar JSON: `docs/adr/XXXX-<slug>.json` adhering to
-  `pipeline.architecture-decision.v1` for project/global scope, or `.v2` for
-  an explicit module scope. A v2 record must name sorted, unique module IDs
-  present in the physical OKF map. Bind its selected scope and digests to the
-  common design approval where required; do not treat `status: "accepted"`
-  as that proof or request a separate normal activation signature.
-- Compute the SHA-256 digest of the markdown content and record it in `digest`.
-- Include standard ADR sections: Title, Status, Date, Context, Decision, Consequences, and Affected Contracts.
+When an architectural decision is required, create the proposal with the one sanctioned script, never by hand:
+```bash
+node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<title>" [--scope global | --modules <id[,id...]>] [--supersedes <adr-id>] [--date YYYY-MM-DD]
+```
+- It writes `docs/adr/draft-<slug>.md` and the sidecar `docs/adr/draft-<slug>.json` (`pipeline.architecture-decision.v1` for
+  project/global scope, `.v2` with `--modules`; module IDs must exist in the physical OKF map), status `proposed`, the digest already
+  computed. It prints the next free ADR number: the accepted record will be `docs/adr/NNNN-<slug>`.
+- The file is `draft-<slug>`, not `NNNN-<slug>`, on purpose: the sanctioned materializer writes the ACCEPTED record to a different
+  file whose bytes the signed design package pre-binds, so approval never changes a digest it covers. Never rename a draft, never
+  write `accepted`, `superseded` or `waived` yourself, and do not request a separate activation signature.
+- Fill each `REPLACE:` section of the Markdown (Context, Decision, Consequences, Affected Contracts), then run the same script with
+  `--root "$PWD" --slug <slug> --refresh` to recompute the digest; never hash by hand. The status and date live in the sidecar only,
+  the Markdown carries no status line.
+- Check one sidecar with `node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/draft-<slug>.json` (both sidecar
+  schemas ship in the plugin; the digest is compared with the sibling Markdown). `submit-plan` runs the same structural check.
+- Bind the proposal to the common design approval where required (v2 `pipeline-design-decision-bindings` block with the
+  prospective-architecture manifest and the chat selection, see section 5); do not treat `status: "accepted"` as that proof.
 
 ### 3. Identify Applicable Inherited Decisions
 Resolve effective architecture decisions through authority layering:
@@ -120,11 +127,16 @@ When a project requires a deliberate deviation from an inherited decision or rul
 ### 5. Supersede Rather than Rewrite
 Architecture decisions are immutable history. When reversing or replacing a decision:
 - Never overwrite or rewrite the previous ADR file.
-- Draft the replacement with `status: "proposed"` and `supersedes: "<previous-id>"`.
+- Draft the replacement with `create-adr.mjs ... --supersedes <previous-id>` (status `proposed`, `supersedes` recorded).
 - Include the replacement and its historical lineage in the common design
   package. Only after its required aggregate approval may the sanctioned
   consumer materialize the replacement as `accepted` and the former record as
   `superseded`; the agent must not grant those statuses by itself.
+- How the statuses change, and why no digest breaks: `pipeline-state.mjs materialize-architecture` (an agent step, after
+  `approve-plan`) publishes the targets the SIGNED prospective-architecture manifest lists: the accepted record
+  `docs/adr/NNNN-<slug>.md/.json` (a new file; its Markdown wraps the approved draft verbatim) and, for `supersedes`, the superseded
+  predecessor sidecar. The draft files stay `proposed` and untouched. A draft that is not bound in the approved package is never
+  accepted.
 - Preserve the complete lineage and historical context.
 
 ### 6. Update Living Summary and References

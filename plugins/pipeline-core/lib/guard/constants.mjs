@@ -198,6 +198,8 @@ export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/
 export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
 export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
 export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+// C20 w253 (G20-26): the one way an ADR proposal is created (docs/adr/draft-<slug>.md + .json); closed argv grammar in command-catalogue.mjs.
+export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr.mjs", import.meta.url));
 // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
 export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
 // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).

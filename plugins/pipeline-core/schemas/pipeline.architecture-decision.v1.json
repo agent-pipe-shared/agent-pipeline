@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.architecture-decision.v1",
+  "title": "Architecture Decision Record (pipeline.architecture-decision.v1)",
+  "description": "Schema for architecture decision records and sidecars (Issue #99, WP-D1).",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "title",
+    "status",
+    "digest",
+    "scope",
+    "date"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.architecture-decision.v1"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "accepted",
+        "superseded",
+        "waived"
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "project",
+        "module",
+        "global"
+      ]
+    },
+    "supersedes": {
+      "type": "string"
+    },
+    "exception": {
+      "type": "object",
+      "required": [
+        "authority",
+        "rationale",
+        "scope",
+        "expiry"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expiry": {
+          "type": "string"
+        }
+      }
+    },
+    "date": {
+      "type": "string"
+    }
+  }
+}

@@ -12,10 +12,12 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
+import { fileURLToPath } from "node:url";
+import { inspectEffectiveArchitectureDecisions, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
 
 export const SCHEMA_BASELINE_RESULT = "pipeline.architecture-baseline-result.v1";
 export const SCHEMA_DECISION = "pipeline.architecture-decision.v1";
+export const SCHEMA_DECISION_V2 = "pipeline.architecture-decision.v2";
 export const SCHEMA_DECISION_SUMMARY = "pipeline.architecture-decisions-summary.v1";
 
 export const STATUS_INITIAL_ADR_REQUIRED = "initial-adr-required";
@@ -477,18 +479,15 @@ export function compileDecisionSummary(root, options = {}) {
 export function validateArchitectureDecision(record, schema) {
   let activeSchema = schema;
   if (!activeSchema) {
-    const defaultSchemaPath = path.join(
-      path.dirname(import.meta.url.replace(/^file:\/\//, "")),
-      "../../..",
-      "schemas",
-      "pipeline.architecture-decision.v1.json"
-    );
-    if (fs.existsSync(defaultSchemaPath)) {
-      try {
-        activeSchema = JSON.parse(fs.readFileSync(defaultSchemaPath, "utf8"));
-      } catch {
-        // fallback
-      }
+    // C20 G20-26: both sidecar schemas ship in the plugin (schemas/, byte-pinned to the repository copies), so a consumer
+    // validates against the same closed shape as this repository. The path comes from fileURLToPath: the earlier
+    // string surgery on the file URL was wrong on Windows and only reached the repository root's schemas/.
+    const version = record?.schema === SCHEMA_DECISION_V2 ? "v2" : "v1";
+    try {
+      activeSchema = JSON.parse(fs.readFileSync(
+        fileURLToPath(new URL(`../schemas/pipeline.architecture-decision.${version}.json`, import.meta.url)), "utf8"));
+    } catch {
+      // fallback: the structural checks below still apply
     }
   }
 
@@ -502,14 +501,19 @@ export function validateArchitectureDecision(record, schema) {
     return { valid: false, errors };
   }
 
-  if (record.schema && record.schema !== SCHEMA_DECISION) {
-    errors.push("schema must be " + SCHEMA_DECISION);
+  if (record.schema && record.schema !== SCHEMA_DECISION && record.schema !== SCHEMA_DECISION_V2) {
+    errors.push("schema must be " + SCHEMA_DECISION + " or " + SCHEMA_DECISION_V2);
   }
   if (record.digest !== undefined && (typeof record.digest !== "string" || !/^[a-f0-9]{64}$/u.test(record.digest))) {
     errors.push("$.digest: digest must be a 64-character lowercase SHA-256 hex string");
   }
   if (record.id !== undefined && (typeof record.id !== "string" || !/^[A-Za-z0-9._-]+$/u.test(record.id))) {
     errors.push("$.id: id must match pattern ^[A-Za-z0-9._-]+$");
+  }
+  // schema-lite does not evaluate const / pattern / minItems / uniqueItems / format, so the closed shape that submit-plan and the
+  // effective-decision reader enforce is applied here too: a record that passes `--validate` also passes the structural ADR check.
+  if (errors.length === 0 && !validateArchitectureDecisionSidecar(record)) {
+    errors.push("$: record fails the structural sidecar check (date YYYY-MM-DD, scope/schema agreement, sorted unique moduleIds for v2, closed keys)");
   }
 
   return { valid: errors.length === 0, errors };
@@ -586,6 +590,13 @@ export function main(argv = process.argv.slice(2)) {
     try {
       const record = JSON.parse(fs.readFileSync(options.validatePath, "utf8"));
       const result = validateArchitectureDecision(record);
+      // The digest binds the sibling Markdown (skill capability 7); a sidecar whose digest drifted fails here, not at submit-plan.
+      const sibling = options.validatePath.replace(/\.json$/u, ".md");
+      if (result.valid && sibling !== options.validatePath && fs.existsSync(sibling)
+        && createHash("sha256").update(fs.readFileSync(sibling)).digest("hex") !== record.digest) {
+        result.valid = false;
+        result.errors.push("$.digest: digest does not match the SHA-256 of " + path.basename(sibling));
+      }
       if (result.valid) {
         console.log("Validation PASSED: " + options.validatePath);
         process.exit(0);

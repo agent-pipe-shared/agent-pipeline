@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
@@ -323,6 +323,29 @@ function sanctionedArchitectureBaselineArgs(args, root) {
   return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
 }
 
+// C20 w253 (G20-26): scripts/create-adr.mjs writes exactly docs/adr/draft-<slug>.md and .json (status `proposed`; it has no output flag,
+// no status flag and no path flag) or, with --refresh, recomputes that sidecar's digest. Two closed argv shapes bound to this root; the
+// script validates its own inputs again and refuses with a repair. Slug/modules/supersedes are path-safe tokens, the title is free text
+// without control characters, so none of them can name a file outside docs/adr.
+const CREATE_ADR_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+const CREATE_ADR_MODULES = /^[a-z][a-z0-9-]{0,79}(?:,[a-z][a-z0-9-]{0,79}){0,31}$/u;
+const CREATE_ADR_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length > 0 && value.length <= 160
+  && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+function sanctionedCreateAdrArgs(args, root) {
+  const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
+  if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
+  return matchFlagSpec(args, {
+    requiredValue: { ...rooted, "--title": CREATE_ADR_TITLE },
+    optionalValue: {
+      "--scope": (value) => value === "project" || value === "global",
+      "--modules": (value) => CREATE_ADR_MODULES.test(value),
+      "--supersedes": (value) => CREATE_ADR_ID.test(value),
+      "--date": (value) => /^\d{4}-\d{2}-\d{2}$/u.test(value),
+    },
+  });
+}
+
 // AC-245 (D139): scripts/dispatch-recovery.mjs keeps ONE bounded recovery state file per dispatch under
 // <root>/evidence (it validates its own inputs and refuses with a repair). Admitted as exactly three argv shapes,
 // all bound to this root; the packet and result are repository-relative regular .json paths without a dot segment.
@@ -571,6 +594,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
+  if (script === CREATE_ADR_SCRIPT) return sanctionedCreateAdrArgs(args, root);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
