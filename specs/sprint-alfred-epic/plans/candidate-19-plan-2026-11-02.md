@@ -695,6 +695,22 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
       read-scope rule, mutating ones stay refused); (3) an absent or unrecognised `stakes` counts as `standard`; (4) a critical
       project with NO security gate configured blocks close/Verify (not `not applicable`); the refusal names the exact repair command,
       and that repair configures the security gate directly (a sanctioned gate writer; none existed in w252).
+    - Built in clone w252 after the tile decisions (focused suites green there; PO apply, Full Verify, Critic, PO acceptance pending):
+      - w256 ADR binding: `bind-adr-proposals.mjs` writes the manifest, selection and v2 bindings block from the drafts and a
+        PO-supplied selection file; end-to-end test create-adr → bind → submit/approve → materialize gives the accepted record;
+        superseding an accepted predecessor through a signed-preimage lane; `REPLACE:` placeholders refused before signing.
+      - w257 security gate: critical + no gate is refused at Verify, close and push (`SEC-CLOSE-GATE-NOT-CONFIGURED`), naming
+        `security-gate-configure.mjs --root <root>` (idempotent, writes only the onboarding gate block); the push part and the doc
+        sentences were added by the Elephant.
+      - G20-34: a read-only `-C` query on another Git repository follows the passive read policy (Elephant, new pin 5/5).
+      - w258 Antigravity isolation after the PO-run M4b measurement
+        (`specs/sprint-alfred-epic/evidence/held-patches/w258-agy-m4b-measurement.md`): code writers run in `Workspace: "branch"`
+        worktrees in parallel, governed as the registered repository and confined to their worktree (the old adapter let a
+        worktree child push main); two w255 defects fixed (ALIVE never clears; the brain-write rule covered the worktrees);
+        `agy-native-integrate.mjs` takes a child branch over for the host-commit recovery. Open PO measurements:
+        `scratch/agy-subagent-measurement-m4c.md` (M10–M14), single vs double hook firing with the installed hooks, and one real
+        branch child taken over end to end.
+      - The four new suites are registered in `harness/verify-suites.json`.
   - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
     vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
     clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
