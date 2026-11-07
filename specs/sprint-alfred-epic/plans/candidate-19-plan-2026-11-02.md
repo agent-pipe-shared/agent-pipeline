@@ -711,9 +711,46 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
         `scratch/agy-subagent-measurement-m4c.md` (M10–M14), single vs double hook firing with the installed hooks, and one real
         branch child taken over end to end.
       - The four new suites are registered in `harness/verify-suites.json`.
-  - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
-    vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
-    clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
+    - G20-35 (PO 2026-11-07, "auch für den weiteren pfad"): the path after implementation was never reached by a greenfield run.
+      G20-36 (Codex P1 and Claude): architecture fitness measured on the real code with module budgets; the materialized
+      architecture is committed or named as the next step.
+    - Wave built in clone w252 on 2026-11-07 (each slice applied on top, focused suites green there; PO apply, Full Verify, Critic
+      and PO acceptance pending for all):
+      - w259 G20-27: user-facing acceptance criteria carry `Journeys:`/`Asserts:` clauses; the plan hand-off refuses a Spec without
+        them (`PLR-HANDOFF-NO-JOURNEY` with its repair); the close readback lists AC-n covered / not covered; Spec, Goldfish and
+        Critic templates carry the duty. Heuristic: a closed English vocabulary unless tagged `[user-facing]`.
+      - w260 G20-29: `durable-evidence.mjs sync|check` mirrors dispatch records (host-observed / orchestrator-attested label),
+        work-verify results and the public approval proof into tracked `audit/` with an index; a fresh clone reaches every record.
+        Open: where `sync` is triggered automatically (close chain or post-approval).
+      - w261 G20-30: answered intake values read back, re-asking refused at runtime (`INTAKE-REASK-REFUSED`); every PO signing step
+        (design approval, push approval, override, bootstrap acknowledgement) names its proof path and a bounded `proof-wait.mjs`.
+        Open: the override wait takes POSIX proof paths only; a case for the bootstrap-acknowledgement wiring.
+      - w262 G20-31: the transcript index pages with a stable cursor; a session reads window by window; `metadataComplete` and
+        `eventsComplete` are separate. Windowed read is Codex only (no Claude/Antigravity list adapter); per-phase counters are not
+        exported because transcripts carry no phase label.
+      - w263 G20-36: `baseline-architecture` Verify suite measures real cross-module imports (finding with module and file) and
+        reports per-module budgets (advisory); `materialize-architecture` names the uncommitted paths and the commit step.
+      - G20-28 (Elephant): the Spec template's plan is sliced vertical first; kickoff and intake references point to it.
+      - Kernel closure (Elephant): GMWKC01 was red in the chain (nine violations from the separator sweep, G20-25 and G20-27, then
+        two from G20-30). The baseline-security suite got its own dispatcher (`security-close-check.mjs`, no scanner tree in the
+        kernel) and five leaf modules joined the never-liftable list and the threat model.
+      - QG-04 restatements (Elephant): AC-264 sign-intent (one command per terminal block since G20-16); SECGATE-1 (Verify now writes
+        the security evidence itself, asserted, then removed to keep the original duty isolated); SECGATE-2 fixture copy list.
+      - w264 G20-35: one walk per runner identity (claude, codex, antigravity) from implementation through work Verify with
+        baseline-security, Critic consume and identical readback, continuity close and the close-feature chain to closed-local:
+        green in w252. Step 5 (push gate and release preflight) is NOT proven. Measured cause of the stop: the walk's start state
+        lacked the plan-submission rigor row, so the coordinator's pre-close check said low rigor while the close's own rigor row
+        derived `feature` and the push then required a Critic that can no longer run. A real course records that row at
+        submit-plan, so the coordinator demands the audit route before the close; whether that Critic is carried across the
+        close commits to the push is the open question (follow-up slice).
+      - Q9 (D55) in `human-guard-override.test.mjs` is environmental: it passes with an owner-only TMPDIR, the scratch runner used /tmp.
+  - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; an OS-level sandbox for
+    the AI observation boundary (node scripts read outside the repository). (AC journeys, vertical-first slicing, durable evidence
+    and forensics pagination moved into candidate 20 above.)
+  - **PO list (2026-11-07):** G20-37 time sink: the G20-33 Antigravity start hint ("ask whether to install, end the turn and
+    wait") stopped the M4c measurement in the non-pipeline probe repository at its first turn (15:28), so nothing ran for hours.
+    Proposal for a PO decision: when the first message is an explicit task unrelated to installing the Pipeline, do the task and
+    ask the install question once alongside. Not built.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## Moved from docs/state.md (2026-11-07, size cap): candidate 18/19 verification line, verbatim
