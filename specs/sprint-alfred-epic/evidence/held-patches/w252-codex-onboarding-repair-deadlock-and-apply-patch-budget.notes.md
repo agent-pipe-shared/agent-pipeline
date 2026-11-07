@@ -118,4 +118,20 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
   for naming the file. The script writes its `--out`/`--log`, so it cannot join the write-free exemption list. It cost one retry; the
   session dropped that guardrail input. Whether the Critic packet still carries the calibration was not checked: open for the PO.
 
+## G20-4 (P2, Full Verify under load): the stop-pair terminal release ran out of rounds
+
+- **Seen:** in the 19m Full Verify, NGSP7 landed its host commit and then ended `recovery-required` at the terminal release
+  (`domain-membership-race`). Green when run alone.
+- **Cause:** `nativeBoundaryRounds` repeats the terminal write boundary at most 8 times with 100 to 700 ms pauses, about 2.8 s in total. Under
+  full load a sibling stop's post-commit writes outside the lock take longer than that, although the stop itself still has up to 90 s of
+  lock-wait budget.
+- **Fix:** `nativeBoundaryRounds` takes an optional `budgetMs`. A sibling race is retried past the count bound while that budget lasts, with the
+  pause capped at one second, and the last race is raised once the next pause would overrun it. The terminal release passes what is left of
+  the stop's own wait budget (`nativeStopWaitBudgetMs()`, itself bounded by the 240 s stop ceiling). Without a budget the old count bound
+  holds. A refusal that is not a sibling race is still raised at once. **Cost:** a genuine, lasting conflict now surfaces after the stop's
+  remaining budget instead of after about 2.8 s; the refusal is the same.
+- **Tests:** `native-goldfish-host-state-fanout.test.mjs` NGFO01 is extended in place: a race ridden out inside the budget, the one-second pause
+  cap, the budget ending the rounds without overrun, and no retry of a foreign refusal. 8/8; `native-goldfish-host-stop-pair.test.mjs` 13/13
+  alone. The load case itself is shown only by the next Full Verify.
+
 Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.

@@ -585,7 +585,8 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     - Under load (a concurrent Full Verify) every design write timed out.
     - Direction: a faster lifecycle guard, or a budget that matches it.
   - **G20-3 (agy):** refusals so far look like ordinary gates: `GUARD-READ-TARGET` (inexact read path), `GUARD-READ-TARGET-MISSING`, and `GUARD-DEVPLAN-SHELL` for an opaque script write while the feature is in draft. Still to be classified once the run ends.
-  - **G20-4:** the stop-pair release race under full load (NGSP7, above).
+  - **G20-4:** the stop-pair release race under full load (NGSP7, above). Fixed in w252: the terminal release retries a sibling race for the stop's own remaining wait budget instead of about 2.8 s (notes). The load case is shown only by the next Full Verify.
+  - G20-9 (canon pointer names the plugin copy) and G20-10 (`CGB-REFERENCE` names its path), both from the Codex run, are fixed in w252 too.
   - **G20-5 (P0, Claude on Windows, greenfield `TabletApp_claude_070_2`): greenfield architecture entry steered into the brownfield adoption route.** Read-only from the Windows transcript (session "Claude Fam App 2").
     - After a signed `approve-plan`, `set-phase --phase implementation` was refused by `GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED` ("Record one PO-owned approved-scoped or partial adoption decision"). The preflight readback said `design-pending` with "record a scoped architecture disposition".
     - The PRD carried a validated `pipeline-architecture-design` block (submit-plan had checked its `implementationSurface`). The sanctioned next step was therefore the agent-run `pipeline-state.mjs materialize-architecture`. Neither the guard nor the readback named it.

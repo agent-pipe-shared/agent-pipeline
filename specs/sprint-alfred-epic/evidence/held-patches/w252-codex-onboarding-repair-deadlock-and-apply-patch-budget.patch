@@ -605,6 +605,73 @@ index b816ce6ce..dd7bfcb9d 100644
    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
      + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
      + (toolName === "Glob"
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
+index 6c581845a..edb698fb3 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
+@@ -100,6 +100,26 @@ const cases = [
+     let foreign = 0;
+     assert.throws(() => nativeBoundaryRounds(() => { foreign += 1; race("native-authority-recovery-required")(); }, () => {}, { pause: () => {} }), error => error.reason === "native-authority-recovery-required");
+     assert.equal(foreign, 1, "a refusal that is not a sibling race is raised at once");
++    // C20 w252 (G20-4): with a budget, a sibling race is retried past the count bound while the budget lasts, the pause is capped at one
++    // second, and the last race is raised once the next pause would overrun the budget. A foreign refusal is still raised at once.
++    clock = 0;
++    let budgeted = 0;
++    const pauses = [];
++    const fakePause = (ms) => { pauses.push(ms); clock += ms; };
++    assert.equal(nativeBoundaryRounds(() => { budgeted += 1; if (budgeted < 12) race("domain-membership-race")(); return "released"; }, () => {},
++      { limit: 4, budgetMs: 60_000, now: () => clock, pause: fakePause }), "released", "a long sibling race inside the budget is ridden out");
++    assert.equal(budgeted, 12);
++    assert.equal(Math.max(...pauses), 1000, "the pause is capped at one second");
++    clock = 0; pauses.length = 0;
++    let exhausted = 0;
++    assert.throws(() => nativeBoundaryRounds(() => { exhausted += 1; race("native-authority-member-drift")(); }, () => {},
++      { limit: 2, budgetMs: 3000, now: () => clock, pause: fakePause }), error => error.reason === "native-authority-member-drift");
++    assert.ok(clock <= 3000, `the pauses never overrun the budget (${clock} ms)`);
++    assert.ok(exhausted > 2, "the budget, not the count, ended the rounds");
++    let foreignBudgeted = 0;
++    assert.throws(() => nativeBoundaryRounds(() => { foreignBudgeted += 1; race("native-authority-recovery-required")(); }, () => {},
++      { budgetMs: 60_000, now: () => 0, pause: () => {} }), error => error.reason === "native-authority-recovery-required");
++    assert.equal(foreignBudgeted, 1, "a budget never retries a refusal that is not a sibling race");
+   } },
+   { id: "NGFO02", name: "overlapping admitted slice is ordered after the live overlap instead of refused", run: () => {
+     const raw = queueOf(itemSlice("ITEM-A", "AC-1", ["src/change.mjs"]), itemSlice("ITEM-OLD", "AC-9", ["src/change.mjs"], { state: "cancelled", holdReason: "superseded" }));
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index d4b63ccb9..6f9a1dfdb 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -812,12 +812,19 @@ const NATIVE_BOUNDARY_REBIND_LIMIT=8;
+ export const NATIVE_TERMINAL_SIBLING_RACES=Object.freeze(['domain-membership-race','domain-native-membership-race','native-authority-member-drift','reference-preimage-changed','native-managed-unknown-native-entry']);
+ /** C19L-W251: runs `round` (one whole write boundary) and repeats it on a fresh boundary, at most NATIVE_BOUNDARY_REBIND_LIMIT times with a growing
+  * pause, while it fails with a sibling race; `refresh` re-reads this process's view between rounds. Any other refusal, or the last one, is raised. */
+-export function nativeBoundaryRounds(round,refresh=()=>{},{limit=NATIVE_BOUNDARY_REBIND_LIMIT,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
++// C20 w252 (G20-4): under full load the eight rounds (about 2.8 s of pauses in total) ran out while a sibling stop was still writing its post-commit
++// files outside the lock, and the pair ended recovery-required (NGSP7 in the 19m Full Verify). With `budgetMs` a sibling race is retried past `limit`
++// for as long as that budget lasts (the stop passes what is left of its own lock-wait budget), with the pause capped at one second. Without a budget
++// the count bound is unchanged. Any other refusal is still raised at once.
++export function nativeBoundaryRounds(round,refresh=()=>{},{limit=NATIVE_BOUNDARY_REBIND_LIMIT,budgetMs=0,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
++  const start=now();
+   for(let attempt=1;;attempt+=1){
+     try{return round();}
+     catch(error){
+-      if(attempt>=limit||!NATIVE_TERMINAL_SIBLING_RACES.includes(error?.reason))throw error;
+-      pause(100*attempt);
++      if(!NATIVE_TERMINAL_SIBLING_RACES.includes(error?.reason))throw error;
++      const wait=Math.min(100*attempt,1000);
++      if(attempt>=limit&&now()-start+wait>budgetMs)throw error;
++      pause(wait);
+       try{refresh();}catch(refreshError){if(!NATIVE_TERMINAL_SIBLING_RACES.includes(refreshError?.reason))throw refreshError;}
+     }
+   }
+@@ -1208,7 +1215,7 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
+     if(inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value.delivery)
+       return {status:'integration-pending',code:'NGHS-ITEM-RESERVATION-HELD',memberRef:operation.memberRef};
+     return reread(()=>releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle}));
+-  }),()=>nativeAuthorityScan(owner));
++  }),()=>nativeAuthorityScan(owner),{budgetMs:nativeStopWaitBudgetMs()});
+   if(completed.status!=='integration-pending')return completed;
+   const inventory=nativeAuthorityScanCurrent(repository.primaryRoot).read,pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
+   if(!pending?.binding.itemDelivery)return completed;
 diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
 index f3cf51d1a..99c212a72 100644
 --- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
