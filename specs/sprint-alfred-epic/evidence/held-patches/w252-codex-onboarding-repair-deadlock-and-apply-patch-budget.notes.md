@@ -96,4 +96,26 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
   repository's `schemas/`), so consumer agents keep guessing its path, and `--validate` in a consumer checks only the built-in fields.
   Shipping the schema would make consumer validation stricter; held back as a decision.
 
+## G20-9 (P3, Codex Goldfish children): a missing canon pointer did not name the plugin copy
+
+- **Seen:** each Codex Goldfish child first read `templates/prompts/agent-obligations.md` or `templates/prompts/goldfish-task.md` at the
+  project path, was refused with `GUARD-READ-TARGET-MISSING` ("check the spelling or create it first") and then searched for the file.
+  Canon pointers mean the repository file when it exists, else the plugin's own copy.
+- **Fix:** both missing-target refusals (native Read in `read-scope.mjs`, the shell lane in `evaluate.mjs`) name the running plugin's
+  copy when the missing project-relative path exists there as a regular file. Same code and prefix; the read stays refused. No copy is
+  offered for a dot or hidden segment, a path outside the project, a directory or a link.
+- **Tests:** new pin `lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs`; `guard-lifecycle-ready.test.mjs` 427/0/3 and the
+  eight suites that pin the old text are rerun.
+
+## G20-10 (P3, Codex Critic path): `CGB-REFERENCE` named no path
+
+- **Seen:** the session-critic finalizer refused with only "Generic Critic batch is unavailable or refused". The cause was one
+  `--guardrail .claude/settings.json`; the session read `lib/critic-generic-batch.mjs` to find that out.
+- **Fix:** both `CGB-REFERENCE` refusals in `reference()` name the path, its role and the rule (hidden or scratch/evidence path; not a
+  regular committed file at the commit) and the repair. Code unchanged.
+- **Tests:** `critic-generic-batch.test.mjs` asserts both texts next to the existing refusals.
+- **Noted, not changed:** `critic-diagnostic-evidence.mjs --guardrail project/pipeline.json` is refused by the gate-strength shell lane
+  for naming the file. The script writes its `--out`/`--log`, so it cannot join the write-free exemption list. It cost one retry; the
+  session dropped that guardrail input. Whether the Critic packet still carries the calibration was not checked: open for the PO.
+
 Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.

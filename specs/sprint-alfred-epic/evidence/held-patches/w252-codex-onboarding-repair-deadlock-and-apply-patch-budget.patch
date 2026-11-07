@@ -218,6 +218,56 @@ index 9bfde3229..e6422603a 100644
  test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
    const root = fixture();
    try {
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index ac0f011ab..bfb68d223 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -251,11 +251,17 @@ function ensureStore(c) {
+ }
+ function reference(root, commit, p, role = "spec") {
+   p = normalizePacketPath(p);
++  // C20 w252 (G20-10, Codex greenfield): the bare "Generic Critic batch is unavailable or refused" sent the session into the source to
++  // find that one `--guardrail .claude/settings.json` was the cause. Name the path, its role and the rule. Repository-relative only.
+   if ((p.startsWith(".") && !(role === "guardrail" && [".claude/pipeline.yaml", ".claude/pipeline.json"].includes(p)))
+-    || p.startsWith("scratch/") || p.startsWith("evidence/")) fail("CGB-REFERENCE");
++    || p.startsWith("scratch/") || p.startsWith("evidence/")) {
++    fail("CGB-REFERENCE", `CGB-REFERENCE: the ${role} path ${JSON.stringify(p)} cannot be a Critic reference. A reference must be a committed file outside scratch/ and evidence/ with no hidden (dot) segment; the only hidden guardrails admitted are .claude/pipeline.yaml and .claude/pipeline.json. Remove it from the request (or name the committed file it stands for) and retry.`);
++  }
+   const row = git(root, ["ls-tree", "-z", commit, "--", p]);
+   const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/u.exec(row);
+-  if (!match || match[3] !== p) fail("CGB-REFERENCE");
++  if (!match || match[3] !== p) {
++    fail("CGB-REFERENCE", `CGB-REFERENCE: the ${role} path ${JSON.stringify(p)} is not a regular committed file at ${commit}. Commit it first, or remove it from the request, then retry.`);
++  }
+   const bytes = git(root, ["show", `${commit}:${p}`]);
+   return { path: p, commit, blobOid: match[2], sha256: sha256(bytes) };
+ }
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 87a5f7eab..964dc949e 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -251,6 +251,10 @@ test("generated pipeline JSON is an exact committed guardrail reference",()=>{
+     const saved=JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));
+     assert.deepEqual(saved.declaredScope.guardrails.map(row=>[row.path,row.sha256]),[[".claude/pipeline.json",sha256(calibration)]]);
+     rejected(()=>register(fx,{...d,guardrailPaths:[".claude/credentials.json"]}),"CGB-REFERENCE");
++    // C20 w252 (G20-10): the refusal names the path, its role and the rule instead of the bare batch text.
++    assert.throws(()=>register(fx,{...d,guardrailPaths:[".claude/settings.json"]}),e=>e.code==="CGB-REFERENCE"
++      &&e.message.includes("guardrail path \".claude/settings.json\"")&&e.message.includes(".claude/pipeline.yaml and .claude/pipeline.json")
++      &&!e.message.includes("Generic Critic batch is unavailable"));
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
+ test("rejected guardrail leaves no held transaction and retry can register",()=>{
+@@ -258,6 +262,10 @@ test("rejected guardrail leaves no held transaction and retry can register",()=>
+     const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
+     rejected(()=>register(fx,declaration(fx,{guardrailPaths:[".claude/missing.json"]})),"CGB-REFERENCE");
+     assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
++    // C20 w252 (G20-10): an uncommitted reference names itself and the repair.
++    assert.throws(()=>register(fx,declaration(fx,{guardrailPaths:["docs/not-committed.md"]})),e=>e.code==="CGB-REFERENCE"
++      &&e.message.includes("\"docs/not-committed.md\" is not a regular committed file")&&e.message.includes("Commit it first"));
++    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
+     assert.ok(register(fx).batchRef);
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
 diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
 index f446e7545..3584c70e7 100644
 --- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
@@ -350,6 +400,29 @@ index 17846ce25..a5a8d66bd 100644
    );
  }
  
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 2cca3f4ce..4ac7d1742 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -26,7 +26,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
+ import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
+ import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
+ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
+-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
++import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingSingleReadTargetOperand, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
+ import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+@@ -509,7 +509,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
+       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
+       if (!outsideRoot && !credentialTarget && isMissingSingleReadTarget(rejected, root)) {
+-        return withLifts(lifts, verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n"));
++        // C20 w252 (G20-9): name the plugin's own copy of a canon pointer the project does not carry.
++        return withLifts(lifts, verdict(2, missingProjectTargetDenialText(missingSingleReadTargetOperand(rejected) ?? "", root)));
+       }
+     } catch { outsideRoot = false; credentialTarget = false; }
+     if (credentialTarget) {
 diff --git a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
 index 133338685..78ceaa767 100644
 --- a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
@@ -413,7 +486,7 @@ index 133338685..78ceaa767 100644
 +  assert.equal(sameNodeInterpreter(join(repository, "scratch", "node"), GUARD_NODE, repository, { realpathFn: (p) => p, lstatFn: () => ({ isFile: () => true, mode: 0o755 }) }), false, "a node inside the root is refused even when it is an executable file");
  });
 diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
-index b816ce6ce..6fcc987da 100644
+index b816ce6ce..dd7bfcb9d 100644
 --- a/plugins/pipeline-core/lib/guard/read-scope.mjs
 +++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
 @@ -496,6 +496,27 @@ function registeredPluginReadPathStatus(raw, projectRoot, pluginRoots) {
@@ -444,7 +517,79 @@ index b816ce6ce..6fcc987da 100644
  function isSafeRegisteredPluginDirectory(raw, root, extraRoots, pluginPathStatus) {
    if (pluginPathStatus !== true || !isAllowedPassiveReadTarget(raw, {
      rootDir: root, recursive: true, directoryListing: true, additionalRecursiveRoots: extraRoots,
-@@ -738,6 +759,15 @@ export function readToolScopeVerdict(input, root, dependencies) {
+@@ -609,9 +630,9 @@ function qp4MissingInRootTarget(raw, root) {
+ // A missing target is diagnosable only for these exact, option-bounded single
+ // reads. Keep pattern operands separate from paths and leave unfamiliar flags
+ // to the closed grammar's unsupported-command diagnosis.
+-export function isMissingSingleReadTarget(parsed, root) {
++function singleReadTargetOperand(parsed) {
+   if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+-    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+   const { executable, argv } = parsed.segments[0];
+   const name = basename(executable).toLowerCase();
+   let target = null;
+@@ -620,10 +641,51 @@ export function isMissingSingleReadTarget(parsed, root) {
+     const args = argv[0] === "-n" ? argv.slice(1) : argv;
+     if (args.length === 2 && args[0] !== "" && !args[0].startsWith("-")) target = args[1];
+   }
+-  if (target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root)) return true;
++  return target !== null && !target.startsWith("-") ? target : null;
++}
++export function isMissingSingleReadTarget(parsed, root) {
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
++  const { executable, argv } = parsed.segments[0];
++  const name = basename(executable).toLowerCase();
++  const target = singleReadTargetOperand(parsed);
++  if (target !== null && qp4MissingInRootTarget(target, root)) return true;
+   return missingOperandIsTheOnlyFault(name, executable, argv, root);
+ }
+ 
++/**
++ * C20 w252 (G20-9, Codex greenfield Goldfish children): canon pointers such as `templates/prompts/agent-obligations.md` mean the
++ * repository file when it exists, else the plugin's own copy. In a consumer project every Goldfish first read the project path, was
++ * refused as missing, and then went looking. When the missing project-relative path exists as a regular file under the running
++ * plugin root, name that file. Label text only: the read stays refused, nothing is admitted here.
++ */
++export function pluginCopyOfMissingProjectPath(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
++  if (typeof raw !== "string" || raw === "" || raw.includes("\0")) return null;
++  if (raw.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return null;
++  let rel;
++  try { rel = relative(resolve(root), resolve(passiveCandidate(raw, root))); } catch { return null; }
++  if (rel === "" || isAbsolute(rel) || rel.split(sep).some((segment) => segment === "" || segment === "." || segment === ".." || segment.startsWith("."))) return null;
++  for (const pluginRoot of pluginRoots) {
++    const candidate = join(pluginRoot, rel);
++    try { if (lstatSync(candidate).isFile()) return candidate; } catch { /* not shipped there */ }
++  }
++  return null;
++}
++
++/** The missing-project-target refusal, naming the plugin copy when there is one. */
++export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
++  const copy = pluginCopyOfMissingProjectPath(raw, root, pluginRoots);
++  return "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); "
++    + (copy
++      ? `this project has no copy, but the Pipeline plugin ships this file: read ${copy} (a canon pointer such as templates/prompts/... means the plugin copy when the project has none).\n`
++      : "check the spelling or create it first.\n");
++}
++
++/** The single read target of a simple command, for the missing-target text (null when the command names none). */
++export function missingSingleReadTargetOperand(parsed) {
++  return singleReadTargetOperand(parsed);
++}
++
+ // 2026-10-30 (consumer finding): any other admitted shape (rg -l, rg -i, several paths, head -n 5 ...) with a missing
+ // in-root path fell through to GUARD-READ-COMMAND-UNSUPPORTED, which tells the agent to re-spell flags that were fine.
+ // Label selection only, by asking the grammar itself: the missing path is the fault when putting an existing in-root
+@@ -732,12 +794,21 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
+   // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
+   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n");
++    return verdict(2, missingProjectTargetDenialText(path, root, pluginRoots));
+   }
+   // K105 (PO decision 2026-10-23, asked after K96): a credential TARGET is refused with the typed code and repair the shell lane and the
    // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the
    // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
    if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
@@ -611,6 +756,77 @@ index 000000000..01b6cac6b
 +  assert.match(readback.guidance, /no separate PO decision/u);
 +  assert.match(readback.guidance, /Do not use architecture-adoption\.mjs prepare\/apply/u);
 +  assert.doesNotMatch(readback.guidance, /then record a scoped architecture disposition/u, "the sentence that sent the session down the brownfield route is gone");
++}));
+diff --git a/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+new file mode 100644
+index 000000000..22a7c9c3c
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+@@ -0,0 +1,65 @@
++// SPDX-License-Identifier: SUL-1.0
++// C20 w252 (G20-9, Codex greenfield 2026-11-07): Goldfish children in a consumer project read `templates/prompts/agent-obligations.md`
++// and `templates/prompts/goldfish-task.md` at the project path, were refused with GUARD-READ-TARGET-MISSING ("check the spelling or
++// create it first") and then went looking for the plugin copy. Canon pointers mean the repository file when it exists, else the plugin's
++// own copy. The refusal now names that copy. The read itself stays refused; only the text changes.
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { missingProjectTargetDenialText, pluginCopyOfMissingProjectPath } from "../guard/read-scope.mjs";
++import { readToolScopeVerdict } from "../guard/read-scope.mjs";
++
++function fixture(fn) {
++  const base = mkdtempSync(join(tmpdir(), "c20-w252-g20-9-"));
++  const project = join(base, "project");
++  const plugin = join(base, "plugin");
++  mkdirSync(join(project, "templates"), { recursive: true });
++  mkdirSync(join(plugin, "templates", "prompts"), { recursive: true });
++  writeFileSync(join(plugin, "templates", "prompts", "agent-obligations.md"), "# obligations\n");
++  try { return fn({ project, plugin }); } finally { rmSync(base, { recursive: true, force: true }); }
++}
++
++test("a missing project path the plugin ships is named with the plugin copy", () => fixture(({ project, plugin }) => {
++  const expected = join(plugin, "templates", "prompts", "agent-obligations.md");
++  assert.equal(pluginCopyOfMissingProjectPath("templates/prompts/agent-obligations.md", project, [plugin]), expected);
++  assert.equal(pluginCopyOfMissingProjectPath(join(project, "templates", "prompts", "agent-obligations.md"), project, [plugin]), expected, "absolute spelling inside the project");
++  const text = missingProjectTargetDenialText("templates/prompts/agent-obligations.md", project, [plugin]);
++  assert.match(text, /^BLOCKED \(guard-lifecycle-ready, plugin pipeline-core\): GUARD-READ-TARGET-MISSING: /u, "same code and prefix as before");
++  assert.ok(text.includes(expected), text);
++  assert.doesNotMatch(text, /check the spelling/u);
++}));
++
++test("anything the plugin does not ship keeps the previous text", () => fixture(({ project, plugin }) => {
++  mkdirSync(join(plugin, "templates", "prompts", "dir.md"));
++  for (const raw of [
++    "templates/prompts/goldfish-task.md", // not shipped in this fixture plugin
++    "templates/prompts/dir.md", // a directory, not a file
++    "templates/../templates/prompts/agent-obligations.md", // dot segment
++    ".claude/agent-obligations.md", // hidden segment
++    "", // empty
++    join(project, "..", "plugin", "templates", "prompts", "agent-obligations.md"), // outside the project
++  ]) {
++    assert.equal(pluginCopyOfMissingProjectPath(raw, project, [plugin]), null, raw);
++    assert.equal(missingProjectTargetDenialText(raw, project, [plugin]),
++      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n", raw);
++  }
++}));
++
++test("a linked plugin entry is not offered as the copy", (t) => fixture(({ project, plugin }) => {
++  const target = join(plugin, "templates", "prompts", "agent-obligations.md");
++  const linked = join(plugin, "templates", "prompts", "linked.md");
++  try { symlinkSync(target, linked, "file"); } catch (error) { t.skip(`host cannot create a file link (${error?.code ?? "unknown"})`); return; }
++  assert.equal(pluginCopyOfMissingProjectPath("templates/prompts/linked.md", project, [plugin]), null);
++}));
++
++test("the native Read refusal of a missing canon pointer names the running plugin's copy", () => fixture(({ project }) => {
++  const pluginRoot = fileURLToPath(new URL("../..", import.meta.url));
++  const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(project, "templates", "prompts", "goldfish-task.md") } }, project, {});
++  assert.equal(verdict.exitCode, 2, "the read stays refused");
++  assert.match(verdict.stderr, /GUARD-READ-TARGET-MISSING/u);
++  assert.ok(verdict.stderr.includes(join(pluginRoot, "templates", "prompts", "goldfish-task.md")), verdict.stderr);
 +}));
 diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
 index c8e713244..5f67dc28c 100644
