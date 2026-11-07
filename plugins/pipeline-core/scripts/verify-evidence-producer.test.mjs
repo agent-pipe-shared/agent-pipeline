@@ -195,15 +195,51 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
       // Restated in place (QG-04, G20-25): the standard baseline gained the "baseline-security" suite, so one more suite is registered and
       // receipted (5 -> 6); nothing is weakened, the exact suite list below pins the new member.
-      registeredSuiteCount: 6, terminalReceiptCount: 6, terminalStatus: "passed",
+      // Restated again in place (QG-04, G20-36): the standard baseline gained "baseline-architecture" (6 -> 7).
+      registeredSuiteCount: 7, terminalReceiptCount: 7, terminalStatus: "passed",
       receiptReuse: "allowed",
     }));
-    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-architecture", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
     assert.equal(result.evidence.coverage, "project-calibrated");
     assert.equal(result.evidence.selection.mode, "candidate");
     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
     assert.deepEqual(onDisk, result.evidence);
     assert.deepEqual(activeSessionDescriptors(root), [], "a completed Verify must retire its private session descriptor");
+  });
+});
+
+// G20-36 (AC-108): the normal Verify measures the implemented modules against the architecture map, not only at set-phase.
+const architectureConcept = (id, owned, allowed) => `---\ntype: Governed Module\nid: ${id}\nresponsibility: ${id} module\nnonResponsibilities: []\nownedPaths:\n  - ${owned}\nallowedDependencies:${allowed.length ? `\n${allowed.map((value) => `  - ${value}`).join("\n")}` : " []"}\npublicContracts: []\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n\n# ${id}\n`;
+function commitArchitecture(root, allowed) {
+  const files = { "architecture/map/index.md": "# Map\n", "architecture/map/app.md": architectureConcept("app", "src/app/**", allowed),
+    "architecture/map/lib.md": architectureConcept("lib", "src/lib/**", []),
+    "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\nexport const y = x;\n', "src/lib/x.mjs": "export const x = 1;\n" };
+  for (const [name, text] of Object.entries(files)) { mkdirSync(join(root, name, ".."), { recursive: true }); writeFileSync(join(root, name), text); }
+  git(root, ["add", "."]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "implement against the map"]);
+}
+const suiteLog = (root, runId, suite) => readFileSync(join(root, ".git/agent-pipeline/verify/runs", runId, "logs", `${verifySuiteArtifactName(suite)}.log`), "utf8");
+
+test("G20-36 the normal Verify reports a module that imports across a forbidden boundary with module and file, and the observation budgets", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    commitArchitecture(root, []);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }),
+      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"baseline-architecture","exitCode":1/u.test(error.message));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false, "a boundary finding leaves no Verify evidence");
+    const runs = join(root, ".git/agent-pipeline/verify/runs");
+    const failedLog = suiteLog(root, readdirSync(runs)[0], "baseline-architecture");
+    assert.match(failedLog, /\[forbidden-dependency\] module app imports src\/lib\/x\.mjs of module lib/u);
+    assert.match(failedLog, /architecture-boundary-check\.mjs --root \. --write-policy/u, "the refusal names the runnable repair");
+    // The repair: declare the dependency in the map; the same Verify then passes and carries the measurement.
+    writeFileSync(join(root, "architecture/map/app.md"), architectureConcept("app", "src/app/**", ["lib"]));
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "declare the dependency"]);
+    const passed = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(passed.status, "passed");
+    const log = suiteLog(root, passed.evidence.verifyRun.runId, "baseline-architecture");
+    const measurement = JSON.parse(log.split("\n").find((line) => line.startsWith("{")));
+    assert.equal(measurement.measurement.budgets.source, "default");
+    assert.deepEqual(measurement.measurement.modules.find((entry) => entry.id === "app").measuredDependencies, ["lib"]);
   });
 });
 
@@ -691,10 +727,10 @@ test("real product assertions stay fresh while eligible baselines resume with du
     const first = await produceVerifyEvidence({ rootDir: root });
     const second = await produceVerifyEvidence({ rootDir: root });
     assert.equal(second.evidence.command, command);
-    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
+    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract", "baseline-architecture"]); // restated in place (QG-04, G20-36): the deterministic architecture measurement resumes like the other tree-bound baselines
     const runs = join(root, ".git/agent-pipeline/verify/runs");
     const run = join(runs, second.evidence.verifyRun.runId);
-    assert.equal(readdirSync(join(run, "receipts")).length, 6); // restated in place (QG-04, G20-25): 5 -> 6 with the "baseline-security" suite
+    assert.equal(readdirSync(join(run, "receipts")).length, 7); // restated in place (QG-04, G20-25, G20-36): 5 -> 6 with the "baseline-security" suite, 6 -> 7 with "baseline-architecture"
     assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
     assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
     writeFileSync(join(root, ".git/fail-product"), "fail");

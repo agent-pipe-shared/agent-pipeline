@@ -32,7 +32,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadMapBundle, pathMatchesPattern } from "./module-inventory.mjs";
-import { extractJsImports } from "./architecture-fitness.mjs";
+import { evaluateSizeBudgets, extractJsImports, loadFitnessModel } from "./architecture-fitness.mjs";
+import { CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
 
 export const BOUNDARY_CHECK_SCHEMA = "pipeline.architecture-boundary-check.v1";
 export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1";
@@ -126,6 +127,8 @@ function observe(root, modules, policy, listed, readFile, extensions) {
   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
   const violations = [];
+  const usage = new Map(); // module id -> { files, lines } of its source files
+  const edges = new Map(); // module id -> Set of module ids its source files really import (allowed or not)
   for (const file of sources) {
     const owners = owningModules(file, modules);
     if (owners.length === 0) {
@@ -137,6 +140,10 @@ function observe(root, modules, policy, listed, readFile, extensions) {
     let text;
     try { text = readFile(path.join(root, file)); } catch { continue; }
     const lines = lineCount(text);
+    if (owners.length === 1) {
+      const row = usage.get(owners[0].id) ?? { files: 0, lines: 0 };
+      usage.set(owners[0].id, { files: row.files + 1, lines: row.lines + lines });
+    }
     if (lines > policy.lineBound) {
       violations.push({ file, module: owners.length === 1 ? owners[0].id : null, rule: "over-line-bound", lines,
         detail: `${file} has ${lines} lines, over the bound of ${policy.lineBound}` });
@@ -152,12 +159,15 @@ function observe(root, modules, policy, listed, readFile, extensions) {
         continue;
       }
       const targetOwners = owningModules(target, modules);
-      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id || allowed.includes(targetOwners[0].id)) continue;
+      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id) continue;
+      if (!edges.has(caller.id)) edges.set(caller.id, new Set());
+      edges.get(caller.id).add(targetOwners[0].id);
+      if (allowed.includes(targetOwners[0].id)) continue;
       violations.push({ file, module: caller.id, rule: "forbidden-dependency", target,
         detail: `module ${caller.id} imports ${target} of module ${targetOwners[0].id}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
     }
   }
-  return { sources, violations: violations.sort(order) };
+  return { sources, violations: violations.sort(order), usage, edges };
 }
 
 /**
@@ -178,7 +188,7 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
   const listed = (deps.listFiles ?? trackedFiles)(root);
   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
-  const { sources, violations: observed } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
+  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
 
   const accepted = new Map(policy.exceptions.map((entry) => [exceptionKey(entry.rule, entry.path, entry.target ?? null), entry]));
   const used = new Set();
@@ -211,6 +221,49 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
     violations,
     staleExceptions,
     _observed: observed,
+    _measured: { modules: bundle.modules, usage, edges },
+  };
+}
+
+// G20-36 (AC-108): what the Verify path measures on top of the check -- the real cross-module imports and the size of every
+// module, next to the observation budgets. Files the Pipeline itself keeps in a consumer project belong to no module.
+export const ARCHITECTURE_MEASUREMENT_SCHEMA = "pipeline.architecture-measurement.v1";
+const MANAGED_EXCLUSIONS = Object.freeze([
+  { pattern: CONSUMER_VERIFY_ADAPTER_PATH, reason: "the Pipeline's consumer Verify adapter, not project source" },
+  { pattern: ".claude/**", reason: "Pipeline runtime files, not project source" },
+]);
+
+export function measureArchitecture({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
+  const readPolicy = deps.readPolicy ?? readBoundaryPolicy;
+  const withManaged = (root) => {
+    const read = readPolicy(root);
+    return read.ok ? { ok: true, policy: { ...read.policy, excludedPaths: [...read.policy.excludedPaths, ...MANAGED_EXCLUSIONS] } } : read;
+  };
+  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, { ...deps, readPolicy: withManaged });
+  const measured = result._measured;
+  const publicOut = publicResult(result);
+  if (!measured) return publicOut;
+  const root = path.resolve(rootDir);
+  const fitnessModel = loadFitnessModel(root);
+  const advisory = evaluateSizeBudgets({ rootDir: root, inventory: measured.modules, fitnessModel });
+  const bySize = (a, b) => (a.scope === b.scope ? 0 : a.scope === "file" ? -1 : 1) || String(a.path).localeCompare(String(b.path));
+  const budget = { maxFileLines: advisory.budgets.maxFileLines, maxModuleLines: advisory.budgets.maxModuleLines };
+  return {
+    ...publicOut,
+    measurement: {
+      schema: ARCHITECTURE_MEASUREMENT_SCHEMA,
+      budgets: { ...budget, source: fitnessModel?.sizeBudgets && typeof fitnessModel.sizeBudgets === "object" ? "fitness-model" : "default" },
+      modules: measured.modules.map((mod) => ({
+        id: mod.id,
+        ownedPaths: mod.ownedPaths ?? [],
+        sourceFiles: measured.usage.get(mod.id)?.files ?? 0,
+        sourceLines: measured.usage.get(mod.id)?.lines ?? 0,
+        measuredDependencies: [...(measured.edges.get(mod.id) ?? [])].sort(),
+        allowedDependencies: [...(mod.allowedDependencies ?? [])].sort(),
+        budget,
+        overBudget: advisory.overBudget.filter((entry) => entry.module === mod.id).map(({ scope, path: file, lines, budget: limit }) => ({ scope, path: file, lines, budget: limit })).sort(bySize),
+      })),
+    },
   };
 }
 
@@ -238,8 +291,25 @@ export function exitCodeForBoundaryCheck(result) {
 }
 
 function publicResult(result) {
-  const { _observed, ...rest } = result;
+  const { _observed, _measured, ...rest } = result;
   return rest;
+}
+
+// G20-36 (AC-108): the dispatcher the generated Verify adapter imports for the `baseline-architecture` suite (the producer passes this
+// module's URL; no kernel file imports it). Every real cross-module import and every file outside the module that owns it is a finding with
+// its module and file; the observation budgets are reported per module (advisory). A project without an architecture map is not applicable.
+export function runConsumerVerifyCheck(check) {
+  if (check !== "architecture") { console.error(`unknown architecture Verify check: ${check}`); return 1; }
+  const result = measureArchitecture({ rootDir: process.cwd() });
+  console.log(JSON.stringify(result));
+  for (const violation of result.violations ?? []) console.error(`[${violation.rule}] ${violation.detail}`);
+  for (const line of result.errors ?? []) console.error(line);
+  if (result.reason && result.status !== "not-applicable") console.error(result.reason);
+  const code = exitCodeForBoundaryCheck(result);
+  if (code !== 0) {
+    console.error(`architecture check ${result.status}: fix the code or declare the module, path or dependency in architecture/map; an existing, accepted state is recorded once with: node ${fileURLToPath(import.meta.url)} --root . --write-policy`);
+  }
+  return code === 0 ? 0 : 1;
 }
 
 function runCli(argv) {

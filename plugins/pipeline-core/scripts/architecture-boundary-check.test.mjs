@@ -15,6 +15,7 @@ import {
   DEFAULT_LINE_BOUND,
   checkArchitectureBoundaries,
   exitCodeForBoundaryCheck,
+  measureArchitecture,
   owningModules,
 } from "./architecture-boundary-check.mjs";
 
@@ -178,4 +179,33 @@ test("ABC09 the CLI writes a first policy once, accepting the current violations
   assert.equal(Object.hasOwn(JSON.parse(json.stdout), "_observed"), false);
   assert.equal(cli("--bogus").status, 2);
   assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), true);
+});
+
+// G20-36 (AC-108): the map is measured against the implemented code, with the observation budgets reported per module.
+test("ABC10 the measurement names the module and file of a forbidden import and reports each module's real dependencies and size", () => {
+  const root = fixture({ deps: { app: [] }, files: { "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(3) } });
+  const result = measureArchitecture({ rootDir: root });
+  assert.equal(result.status, "findings");
+  assert.equal(exitCodeForBoundaryCheck(result), 1);
+  assert.deepEqual(result.violations.map((violation) => [violation.rule, violation.module, violation.file, violation.target]), [["forbidden-dependency", "app", "src/app/main.mjs", "src/lib/x.mjs"]]);
+  assert.equal(result.measurement.schema, "pipeline.architecture-measurement.v1");
+  assert.deepEqual(result.measurement.budgets, { maxFileLines: 500, maxModuleLines: 2500, source: "default" });
+  const app = result.measurement.modules.find((entry) => entry.id === "app");
+  assert.deepEqual([app.measuredDependencies, app.allowedDependencies, app.sourceFiles, app.sourceLines], [["lib"], [], 1, 1]);
+  assert.deepEqual(app.budget, { maxFileLines: 500, maxModuleLines: 2500 });
+  assert.equal(result.measurement.modules.find((entry) => entry.id === "lib").sourceLines, 3);
+  assert.equal(Object.hasOwn(result, "_observed"), false);
+  assert.equal(measureArchitecture({ rootDir: fixture({ map: false, files: { "src/x.mjs": "export {};\n" } }) }).status, "not-applicable");
+});
+
+test("ABC11 budgets carried by the fitness model are reported per module and stay advisory", () => {
+  const model = JSON.stringify({ schema: "pipeline.fitness-model.v1", profileId: "p", revision: 1, modules: ["app", "lib"], allowedBoundaryCrossings: [], sizeBudgets: { maxFileLines: 3, maxModuleLines: 4 } });
+  const root = fixture({ files: { "architecture/fitness-model.json": model, "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(5) } });
+  const result = measureArchitecture({ rootDir: root });
+  assert.equal(result.status, "pass", "an over-budget file is reported, never a boundary finding");
+  assert.deepEqual(result.measurement.budgets, { maxFileLines: 3, maxModuleLines: 4, source: "fitness-model" });
+  const lib = result.measurement.modules.find((entry) => entry.id === "lib");
+  assert.deepEqual(lib.budget, { maxFileLines: 3, maxModuleLines: 4 });
+  assert.deepEqual(lib.overBudget, [{ scope: "file", path: "src/lib/x.mjs", lines: 5, budget: 3 }, { scope: "module", path: null, lines: 5, budget: 4 }]);
+  assert.deepEqual(result.measurement.modules.find((entry) => entry.id === "app").overBudget, []);
 });

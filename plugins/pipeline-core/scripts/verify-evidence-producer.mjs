@@ -492,6 +492,9 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
     { name: "baseline-repository", file, args: [CONSUMER_VERIFY_DISPATCHER, "repository-baseline"] },
     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
+    // G20-36: the implemented modules are measured against the architecture map in the normal delivery path (not applicable without a map).
+    // The dispatcher is the measurement module itself (a URL, not an import edge), so the kernel closure of consumer-verify-check.mjs is unchanged.
+    { name: "baseline-architecture", file, args: [new URL("./architecture-boundary-check.mjs", import.meta.url).href, "architecture"] },
     // G20-25: the configured security scanners run in the normal delivery path (not applicable when the project configures no gate).
     // The attempt token makes the scan always re-run: a cached result for an unchanged tree would hide a scanner that is now missing.
     // Its own dispatcher (scripts/security-close-check.mjs), never a branch of the kernel file consumer-verify-check.mjs (GMWKC01).

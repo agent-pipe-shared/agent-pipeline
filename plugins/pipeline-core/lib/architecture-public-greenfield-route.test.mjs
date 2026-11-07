@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import * as fixture from './architecture-prospective-materialization.fixture.mjs';
 import { inspectArchitectureEntryReadiness } from './architecture-entry-readiness.mjs';
-import { inspectArchitectureDesign } from './architecture-design.mjs';
+import { architectureCommitStep, inspectArchitectureDesign } from './architecture-design.mjs';
 
 const readiness = f => inspectArchitectureEntryReadiness({ rootDir: f.dir, taskScope: fixture.PLAN,
   deps: { readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }) } });
@@ -95,6 +95,21 @@ test('G27-PUBLIC-006 rebinding approved State to a different physical root is re
   assert.equal(actionIsMaterializer(before.nextAction), false);
   assert.notEqual(fixture.invoke(target, ['materialize-architecture']).status, 0);
   assert.equal(existsSync(join(target.dir, 'architecture/design-materialization.json')), false);
+});
+
+test('G20-36 materialize-architecture names the exact commit step while the materialized architecture is uncommitted', () => {
+  const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+  const executed = fixture.invoke(f, ['materialize-architecture']);
+  assert.equal(executed.status, 0, executed.text);
+  const output = JSON.parse(executed.text);
+  assert.equal(output.status, 'materialized');
+  assert(output.uncommittedPaths.includes('architecture/design-materialization.json'), JSON.stringify(output.uncommittedPaths));
+  assert(output.uncommittedPaths.every(path => !path.includes('\\')), 'repository-relative paths');
+  assert.match(output.nextAction, /git add -- .*architecture\/design-materialization\.json/u);
+  assert.match(output.nextAction, /commit/u);
+  fixture.git(f, 'add', '--', ...output.uncommittedPaths);
+  fixture.git(f, 'commit', '-q', '-m', 'docs(architecture): commit the materialized architecture\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
+  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], nextAction: null });
 });
 
 test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {

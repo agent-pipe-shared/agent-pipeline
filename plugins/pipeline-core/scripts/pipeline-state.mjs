@@ -471,7 +471,7 @@ import {
   validateDesignWorkflowPackageApprovalRequest,
   verifyDesignWorkflowPackageApproval,
 } from "../lib/design-workflow-approval.mjs";
-import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
+import { architectureCommitStep, materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
 import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
 import {
@@ -11581,8 +11581,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
+        // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
+        const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
         console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
-          code: result.code ?? null, receipt: result.receipt ?? null }));
+          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.nextAction ? commitStep : {}) }));
         return result.ok && result.status === "materialized" ? 0 : 2;
       } finally { releaseContinuityLock(lock); }
     }

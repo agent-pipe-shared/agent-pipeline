@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Explicit architecture content in the PO-approved design, never inferred from a repository. */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { readAuthoritySeal } from "./authority-seal-reader.mjs";
@@ -536,6 +537,21 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
   const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
     ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];
   return { ok: true, inspected, prospective, approvalBasis: subset.approvalBasis ?? null, targets, sealedTargets };
+}
+
+/**
+ * G20-36 (AC-108): the materialized architecture must reach the audit trail. The writer publishes files, it does not commit; this reads the
+ * working tree back (`git status`, repository-relative paths) and names the exact stage-and-commit step while any of it is uncommitted.
+ */
+export function architectureCommitStep(rootDir, extraPaths = []) {
+  const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", "architecture", ...extraPaths],
+    { cwd: resolve(rootDir), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (status.status !== 0 || status.error) {
+    return { uncommittedPaths: [], nextAction: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
+  }
+  const uncommittedPaths = status.stdout.split("\0").filter(Boolean).map(entry => entry.slice(3)).sort();
+  if (uncommittedPaths.length === 0) return { uncommittedPaths, nextAction: null };
+  return { uncommittedPaths, nextAction: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
 }
 
 export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {
