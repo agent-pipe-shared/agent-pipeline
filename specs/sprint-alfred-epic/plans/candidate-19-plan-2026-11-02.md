@@ -675,6 +675,21 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
       refused BY DESIGN (`AGY-NATIVE-IMPLEMENTATION-…`: no authenticated parent identity) — not an install question; the descriptor
       is that missing identity. Isolation (`Workspace: branch/share` in a git workspace) is re-measured as M4b
       (`scratch/agy-subagent-measurement-m4b.md`). Assumption until then: code writers serialized through the shared tree.
+    - Built in clone w252 (2026-11-07), each slice applied on top of the previous one and its focused suites green there; PO apply,
+      Full Verify, Critic and PO acceptance pending for all:
+      - G20-26 + G20-23 (w253, `7c19bad`): `create-adr.mjs` writes `docs/adr/draft-<slug>` proposals with the digest bound; both
+        sidecar schemas ship; guard admission. Placement decision: an in-place `proposed`→`accepted` flip would break the digests the
+        PO's design signature covers, so `materialize-architecture` publishes the accepted `NNNN-<slug>` record. Residual G20-23 risk:
+        binding a proposal into the design package (manifest, bindings block) is still manual.
+      - G20-25 (w254, `1b00615` + docs `7130ef7`): four states; `stakes` critical/high/kritisch/hoch blocks a scanner that did not
+        execute (this repository's own `hoch` becomes critical); Verify runs the scanners (`baseline-security`). SEC-06 and the
+        operating-model paragraph updated in the originals, vendored copies regenerated. Open: the German reference paragraph of the
+        operating model; registering the new pin in the Verify suite list.
+      - G20-8 B + G20-22 (w255): native code-writing Goldfish admitted through the generated-briefing route, no per-dispatch consent;
+        child bound to the parent descriptor and its resolved model checked; second live code writer refused until M4b. Open PO
+        measurements M10–M16 (modelName spelling, descriptor timing and state, host-commit trigger, Bash writes into the brain).
+        The one red case of the agy adapter suite was caused by the G20-33 fix (once-per-session marker written into the real home
+        under a fixed test session id); the test now uses its own home, assertions unchanged.
   - **Deferred, not pipeline defects or not candidate-20 sized:** Codex product bugs in the TabletApp itself; AC journey-coverage and
     vertical-first slicing guidance (Ponytail, candidate 19 topic); host-observed dispatch records and exported evidence for a fresh
     clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
