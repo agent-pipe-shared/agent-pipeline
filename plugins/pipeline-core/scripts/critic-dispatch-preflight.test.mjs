@@ -1248,6 +1248,22 @@ test("CCI (2b) the lineage and delta-request files the course registration write
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+test("CCI (2d) C20 w252 (G20-11): the reader-review skill's retained reports are retained prior results; look-alikes stay source", () => {
+  const fx = cciFixture();
+  const retained = ["specs/feat-x/evidence/reader-review/phase-one/2.md", "specs/feat-x/evidence/reader-review/phase-two/2.md"];
+  const lookalikes = ["specs/feat-x/evidence/reader-review.md", "specs/feat-x/notes/reader-review/phase-one/1.md", "specs/feat-x/evidence/reader-reviews/phase-one/1.md", "docs/reader-review/phase-one/1.md"];
+  try {
+    for (const path of retained) cciWrite(fx.root, path, "reader report\n");
+    for (const path of lookalikes) cciWrite(fx.root, path, "not a retained reader report\n");
+    cciWrite(fx.root, "src/a.txt", "changed\n");
+    const head = commit(fx.root, "reader review evidence");
+    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
+    assert.deepEqual(doc.exclusions.map((e) => e.path), retained);
+    for (const entry of doc.exclusions) assert.equal(entry.role, "retained prior result");
+    assert.deepEqual(doc.sourcePaths, [...lookalikes, "src/a.txt"].sort());
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 // D213: the calibration names, positively, the files that quote earlier Critic findings (the finding-disposition record role).
 const cciCalibration = (root, extra) => cciWrite(root, "project/pipeline.json", `${JSON.stringify({ project: "fixture", handover: "docs/state.md", ...extra })}\n`);
 test("CCI (2c) files named by the calibration finding-record list are finding-disposition records; a file never declares itself and look-alikes stay source (D213)", () => {

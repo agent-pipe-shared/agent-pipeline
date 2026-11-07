@@ -19,7 +19,10 @@ const CHANGE_NAMES = { A: "added", M: "modified", D: "deleted", T: "type-changed
 // The layout session-critic-finalizer.mjs writes: specs/<segment>/evidence/critic/<packetId>/..., and the root form evidence/critic/....
 // Also the two immutable files the course registration (register-feature-package.mjs) writes beside that directory,
 // `critic-lineage-<sha256>.json` and `critic-delta-request-<sha256>.json`: they carry the prior round's verdict metadata (PF-98).
-const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/(?:critic\/[^/]+(?:\/[^/]+)*|critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json)$/u;
+// C20 w252 (G20-11, Codex greenfield): the reader-review skill retains its reports under specs/<feature-id>/evidence/reader-review/<phase>/<round>.md
+// (skills/reader-review/SKILL.md, lib/doc-reader-plan-scope.mjs). They are another review's retained results, not source; listed as source they made
+// the first independent Critic stop on a briefing violation before any substantive review.
+const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/(?:critic\/[^/]+(?:\/[^/]+)*|critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json|reader-review\/[^/]+(?:\/[^/]+)*)$/u;
 
 export class CriticCorrectionInputBindingsError extends Error {
   constructor(code, detail) {
