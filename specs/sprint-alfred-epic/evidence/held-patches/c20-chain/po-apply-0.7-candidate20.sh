@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 20: 53 held patches exported from the build clone chain 72ef2e315..e28f639ba
+# PO apply script for candidate 20: 54 held patches exported from the build clone chain 72ef2e315..d83ce4e29
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -67,6 +67,7 @@ step 50-b1ca8abad 'feat(release): consumer release as an annotated version tag a
 step 51-36791a766 'fix(migration): refresh a project bound to a known older shipped registry instead of stranding it (G20-44)'
 step 52-30e7a0011 'feat(agy): record the resolved native child model instead of refusing it, route Critic inherit and Goldfish flash medium/high/low (G20-43)'
 step 53-e28f639ba 'test(migration): pin the known-older-registry refresh with the cells G20-43 changed, restate the corpus count (G20-44)'
+step 54-d83ce4e29 'chore(verify): categorize the seven new Verify suites in the capability inventory and register the close-path walk for case completion'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
