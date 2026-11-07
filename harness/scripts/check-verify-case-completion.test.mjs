@@ -190,8 +190,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",406],
-    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",116],
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",409], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
+    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",119], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
     ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",20],
@@ -235,7 +235,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["mid-session-hook-refresh-tests","plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs","top-level-assertions",21],
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
     ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
-    ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",67], // cand. 19l w250 (QG-04: extension only): NGFO01 gained the binding-change retry and terminal-round cases, measured with the unchanged classifier
+    ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",75], // cand. 20 w252 G20-4 release retry cases (QG-04: extension only), measured; cand. 19l w250 (QG-04: extension only): NGFO01 gained the binding-change retry and terminal-round cases, measured with the unchanged classifier
     ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",66], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
     ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
@@ -243,7 +243,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
     ["passive-read-credential-follow-tests","plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs","top-level-assertions",23],
     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",21],
-    ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",43],
+    ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",46], // cand. 20 G20-20 DND014 (QG-04: extension only), measured
     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",16],
     ["pin-installed-design-trailer-example-is-rejected-by-git-guard-tests","plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs","node-test-single",60],
     ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
@@ -282,7 +282,10 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   }).sort((left, right) => left[0].localeCompare(right[0]));
   const addedNames = new Set(newlyCounted.map((entry) => entry[0]));
   assert.deepEqual(classified.filter((entry) => addedNames.has(entry[0])), newlyCounted);
-  const convertedSinceR8 = ["antigravity-topology-refresh-host-tests"];
+  // cand. 20 w252 (QG-04, extension only): pipeline-state-approve-announce-tests gained the G20-32 cases (three node:test cases), so the
+  // classifier no longer reports it `node-test-single`; it is re-added to the retained R8 identity set from its registry row exactly like
+  // antigravity-topology-refresh-host-tests, leaving the pinned 266 and its digest unchanged.
+  const convertedSinceR8 = ["antigravity-topology-refresh-host-tests", "pipeline-state-approve-announce-tests"];
   const retainedIdentities = [
     ...classified.filter((entry) => !addedNames.has(entry[0])).map(([name, path]) => [name, path]),
     ...convertedSinceR8.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),
@@ -393,7 +396,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   ]);
   // Restated 2026-10-28 (QG-04): antigravity-topology-refresh-host-tests adopted the completion protocol and no longer classifies vulnerable;
   // re-added from its registry row like the two before it, so the R5 set (284) and its digest stay unchanged.
-  const convertedSinceR5 = ["antigravity-topology-refresh-host-tests","clone-hook-readiness-tests","commit-msg-hook-install-tests"];
+  // cand. 20 w252 (QG-04, extension only): pipeline-state-approve-announce-tests converted by the G20-32 cases, re-added like the others.
+  const convertedSinceR5 = ["antigravity-topology-refresh-host-tests","clone-hook-readiness-tests","commit-msg-hook-install-tests","pipeline-state-approve-announce-tests"];
   const retainedR5Identities = [
     ...classified.filter((entry) => entry[0] !== "design-course-command-admission-tests" && !addedAfterR5.has(entry[0])).map(([suite, path]) => [suite, path]),
     ...convertedSinceR5.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),

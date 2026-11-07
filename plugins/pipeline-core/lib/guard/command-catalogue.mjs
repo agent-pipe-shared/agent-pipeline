@@ -342,7 +342,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT } from "./constants.mjs";
+import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -537,7 +537,19 @@ function sanctionedHostCommitRecoverArgs(args, root) {
   return args[0] === "plan" ? !expect : expect;
 }
 
+// G20-20: only the read-only verbs, each with exactly its own flags: `inspect --root <root>`, `inspect-aside --root <root>
+// --aside <name>`, `wait --root <root> [--timeout <1-600>]`. Every mutating verb (heal, move-aside, release-lock, take-over) stays
+// outside this lane.
+function sanctionedSessionAuthorityRepairReadArgs(args, root) {
+  if (args[1] !== "--root" || args[2] !== root) return false;
+  if (args[0] === "inspect") return args.length === 3;
+  if (args[0] === "inspect-aside") return args.length === 5 && args[3] === "--aside" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(args[4] ?? "") && !args[4].includes("..");
+  if (args[0] === "wait") return args.length === 3 || (args.length === 5 && args[3] === "--timeout" && /^(?:[1-9][0-9]{0,2})$/u.test(args[4] ?? "") && Number(args[4]) <= 600);
+  return false;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
   if (script === ROUTINE_REPAIR_SCRIPT) return sanctionedRoutineRepairArgs(args, root);
   if (script === PHOENIX_AUTHORITY_REVISION_SCRIPT) return sanctionedPhoenixRevisionArgs(args, root);

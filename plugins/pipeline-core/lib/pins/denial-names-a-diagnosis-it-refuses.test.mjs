@@ -244,4 +244,19 @@ check('DND013', 'D117 advisory: the other codes of the former denial still block
   }
 });
 
+check('DND014', 'G20-20: the session-authority diagnosis every SDC refusal names is admitted in a draft feature; its mutating verbs are not', () => {
+  const script = fileURLToPath(new URL('../../scripts/session-authority-repair.mjs', import.meta.url));
+  for (const tail of ['inspect', 'wait', 'wait --timeout 120', 'inspect-aside --aside 20261106101024902-47512958']) {
+    const [verb, ...rest] = tail.split(' ');
+    const command = `node "${script}" ${verb} --root ${root}${rest.length ? ` ${rest.join(' ')}` : ''}`;
+    assert.equal(isSanctionedLifecycleCommand(command, root, {}), true, `named diagnosis refused: ${tail}`);
+    assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null, `draft lane refuses the named diagnosis: ${tail}`);
+  }
+  for (const tail of ['heal', 'move-aside --reason x', 'release-lock --reason x', 'take-over --from s --reason x --class budget', 'inspect --extra', 'wait --timeout 601', 'wait --timeout 0']) {
+    const [verb, ...rest] = tail.split(' ');
+    const command = `node "${script}" ${verb} --root ${root}${rest.length ? ` ${rest.join(' ')}` : ''}`;
+    assert.equal(isSanctionedLifecycleCommand(command, root, {}), false, `mutating or malformed verb admitted: ${tail}`);
+  }
+});
+
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
