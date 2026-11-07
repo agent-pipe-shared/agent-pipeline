@@ -1,0 +1,293 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 3c8d7c9a0..fc5d3c9c7 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -494,7 +494,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+  * Registers a passing candidate-bound Verify evidence file (`--add-verify-evidence <path>`) as an immutable, non-authority
+  * `candidate-evidence` entry of the feature manifest. The feature-close audit route needs such an entry (and a package candidate
+  * the next `feature-package-plan --next-state verifying` derives from it); no other verb writes it. The file, produced by
+- * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/...`, must already exist under `specs/<feature>/`; it must be a
++ * `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/...`, must already exist under `specs/<feature>/evidence/`; it must be a
+  * `pipeline.verify-evidence.v0` with `exitCode` 0 whose candidate commit and tree resolve in this repository. Nothing else of the
+  * manifest changes, and a path registered with other bytes is refused, never replaced.
+  */
+@@ -516,7 +516,10 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
+     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
+     return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+   }
+-  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(packageDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${packageDir}; produce the evidence with verify-evidence-producer.mjs --out under ${packageDir}`, { manifestPath, path: evidenceRel });
++  // Registered candidate evidence is read back by the course history (CCA-REGISTRATION-SHAPE requires specs/<feature>/evidence/), so a path
++  // directly under the package directory would register here and then end the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE).
++  const evidenceDir = `${packageDir}evidence/`;
++  if (!repositoryRelative(evidenceRel) || !evidenceRel.startsWith(evidenceDir)) return refused("FPR-VERIFY-PATH", `${evidenceRel} is not a repository-relative path under ${evidenceDir}; produce the evidence with verify-evidence-producer.mjs --out ${evidenceDir}<name>.json (the registered course reads candidate evidence only from there), then register it`, { manifestPath, path: evidenceRel });
+   const seen = inspect(root, evidenceRel);
+   if (seen.kind !== "file") return refused("FPR-VERIFY-PATH", `${evidenceRel} is missing or is not a regular file`, { manifestPath, path: evidenceRel });
+   try { if (realpathSync(join(root, evidenceRel)) !== join(root, evidenceRel)) return refused("FPR-VERIFY-PATH", `${evidenceRel} resolves through a link`, { manifestPath, path: evidenceRel }); } catch { return refused("FPR-VERIFY-PATH", `${evidenceRel} does not resolve`, { manifestPath, path: evidenceRel }); }
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 69c2c2a3f..22fa39842 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -15,24 +15,27 @@
+  *   4 close: close-coordinator chain to final-verify-green, then the State writer's close-feature
+  *   5 push gate decision for the candidate commit (guard-push), then release-preflight (createReleasePreflight over the facts of the walk)
+  *
+- * STATUS (budget checkpoint 2): steps 1-4 are GREEN on all three runner identities, through closed-local and the drive quality readback (security-scan
+- * and critic-report-file rows present). Step 5 (push gate decision with a fixture approval, release preflight) is NOT written yet; the walk contains
+- * no assertion for it. The close walked is a mini-profile (rigor 0) course: the rigor >= 1 candidate-bound Critic/Verify audit route is not walked.
++ * STATUS (w266): the whole walk is GREEN on all three runner identities. The course is the sanctioned feature course (rigor >= 1): Critic on the
++ * feature course, the audit route (Verify evidence registered under specs/<feature>/evidence/, package to verifying and completed, audit request,
++ * feature-close-prepared with --audit-request and --critic-verify-lifecycle), the close to closed-local, the Critic-bound push Verify, push-prepare
++ * `ready`, the push guard (blocked before approve-push, admitted after, bound to its destination), and the release preflight, which is the
++ * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). One fixture stand-in is declared at
++ * the finalize call: the Source return record that no runner issues yet (w266 finding 1).
+  */
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test, { after } from "node:test";
+ import { runSecurityScan } from "./security-scan.mjs";
++import { runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
+ import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+ 
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { dirname, resolve } from "node:path";
+ import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+-import { classifyRegisteredEvidenceOnlyCommits } from "../lib/critic-course-admission.mjs";
+ import { prepareConsumerVerify } from "../lib/consumer-verify.mjs";
+ import { buildRootProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+ import { readState, run } from "./pipeline-state.mjs";
+@@ -53,6 +56,7 @@ export const RUNNER_IDENTITIES = Object.freeze([
+ ]);
+ 
+ const FEATURE_ID = "e2e";
++const GUARD_PUSH = fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url));
+ const RUNNER_MARKERS = Object.freeze({
+   claude: { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "11111111-aaaa-bbbb-cccc-222222222222" },
+   codex: { CODEX_THREAD_ID: "33333333-aaaa-bbbb-cccc-444444444444" },
+@@ -139,7 +143,8 @@ function consumerFixture(log, identity) {
+   write("pipeline.user.yaml", "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\ngates:\n  human_approval: chat\n");
+   gitOk("add", "--", "pipeline.user.yaml");
+   gitOk("commit", "-q", "-m", "selected approval mode");
+-  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
++  // The push gate is configured from the start (the PO-gate profile receipt below binds these exact bytes): blocking, human, approval required.
++  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
+   write(NEUTRAL_MANIFEST, read(".claude/pipeline.yaml"));
+   for (const target of initialGreenfieldMapTargets("fresh")) write(target.path, target.bytes);
+   const pointer = initialGreenfieldAgentEntryTarget("fresh");
+@@ -164,6 +169,9 @@ function consumerFixture(log, identity) {
+   const keyPair = generateKeyPairSync("ed25519");
+   const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+   write("project/critical-human-proof.json", `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-key", publicKeySha256: sha256(publicKeyPem) }] }, null, 2)}\n`);
++  // The push approval is active (the manifest above), so submit-plan refuses PUSH-THREAT-MODEL-MISSING until the sanctioned verb
++  // materializes the threat model; its repair names it, and it must be in the same draft commit (before the item binding).
++  lifecycle(["materialize-push-threat-model"]);
+   gitOk("add", ".");
+   gitOk("commit", "-q", "-m", "finished design");
+   // The public lifecycle route, in order; each step is the real verb. No lifecycle.json and no State is written by hand.
+@@ -280,6 +288,25 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const finalizer = (verb, request) => {
+         mkdirSync(join(fx.root, "scratch"), { recursive: true });
+         writeJson(join(fx.root, "scratch", `${verb}-request.json`), request);
++        if (verb === "finalize") {
++          // w266 finding 1: since G20-24 every finalize without a Source return record is labelled caller-authored-fallback, and the close
++          // gate (close-coordinator.mjs assertCriticIndependenceForClose) refuses that label at rigor >= 1 or high risk. No runner issues a
++          // Source return record (the CLI's reader is unavailableOriginalSourceReader), so on today's product no rigor >= 1 close is reachable.
++          // The walk stands in for the missing producer through the finalizer's own dependency, exactly as session-critic-finalizer.test.mjs
++          // does, run in-process under the runner identity's markers; the close gate itself is NOT weakened.
++          const savedEnv = { ...process.env };
++          for (const key of Object.keys(process.env)) delete process.env[key];
++          Object.assign(process.env, walkEnv);
++          let outcome;
++          try {
++            outcome = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", `scratch/${verb}-request.json`], {
++              readOriginalSourceReturnFn: (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId, packetDigest: query.packetDigest,
++                claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000 }),
++            });
++          } finally { for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, savedEnv); }
++          assert.equal(outcome.exitCode, 0, `${identity.runner}: in-process finalize: ${JSON.stringify(outcome.output).slice(0, 600)}`);
++          return { status: 0, stdout: JSON.stringify(outcome.output), stderr: "" };
++        }
+         return step(log, `${identity.runner}: critic ${verb}`, process.execPath,
+           [script("session-critic-finalizer.mjs"), verb, "--root", fx.root, "--request", `scratch/${verb}-request.json`], { cwd: fx.root });
+       };
+@@ -363,23 +390,31 @@ test("G20-35: the close path from implementation to release preflight is walked
+       assert.equal(json(bare).code, "CLOSE-QUALIFICATION-REQUIRED", bare.stdout);
+       // The audit route (close-feature skill, Step 2): candidate Verify bound to the Critic packet (records the Critic/Verify lifecycle), registered into
+       // the package, the package driven to verifying and completed for exactly HEAD, then the audit request.
+-      const verifyPath = `specs/${FEATURE_ID}/verify-candidate.json`;
+-      let lifecycleVerify;
+-      try {
+-        lifecycleVerify = step(log, `${identity.runner}: candidate verify bound to the Critic packet`, process.execPath,
+-          [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "candidate", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", verifyPath], { cwd: fx.root });
+-      } catch (error) {
+-        let classified;
+-        try { const range = classifyRegisteredEvidenceOnlyCommits({ repoRoot: fx.root, featureId: FEATURE_ID, baseCommit: candidate, candidateCommit: git(log, fx.root, ["rev-parse", "HEAD"]), admitCriticExports: true });
+-          classified = JSON.stringify({ correction: range.correctionCommits, evidenceOnly: range.evidenceOnlyCommits, administration: range.administrationDocumentationCommits, range: range.rangeCommits }); }
+-        catch (inner) { classified = `classifier threw ${inner.code} ${inner.message}`; }
+-        throw new Error(`${error.message}\nCLASSIFIED ${classified}\nRANGE ${git(log, fx.root, ["log", "--format=%H %s", `${candidate}..HEAD`])}`);
+-      }
++      const verifyPath = `specs/${FEATURE_ID}/evidence/verify-candidate.json`;
++      // The Verify evidence goes under specs/<feature>/evidence/ (w266 finding 2): the registered course reads candidate evidence only from there.
++      const lifecycleVerify = step(log, `${identity.runner}: candidate verify bound to the Critic packet`, process.execPath,
++        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "candidate", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", verifyPath], { cwd: fx.root });
+       // The carry-forward from the Critic-reviewed candidate to HEAD held across the evidence, lineage and reconcile commits (w265 finding 4).
+       assert.equal(lifecycleVerify.status, 0);
+       assert.ok(existsSync(join(fx.root, verifyPath)), `${identity.runner}: the Critic-bound candidate Verify evidence was written`);
+-      if (process.env.G2035_STOP_AT_AUDIT !== "0") continue; // CHECKPOINT: the audit route below is the next step (w265 notes)
+-      const prepared = transition("feature-close-prepared", ["--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
++      // Package side, nothing committed in between (close-feature skill, Step 2): register the Verify evidence, then drive the package to
++      // verifying and completed for exactly HEAD with the sanctioned plan/apply pair.
++      step(log, `${identity.runner}: register the candidate Verify evidence`, process.execPath,
++        [script("register-feature-package.mjs"), "--root", fx.root, "--add-verify-evidence", verifyPath], { cwd: fx.root });
++      for (const nextState of ["verifying", "completed"]) {
++        const planned = json(step(log, `${identity.runner}: feature-package-plan ${nextState}`, process.execPath,
++          [script("pipeline-state.mjs"), "feature-package-plan", "--root", fx.root, "--manifest", MANIFEST, "--next-state", nextState], { cwd: fx.root }));
++        assert.match(String(planned.planSha256), /^[a-f0-9]{64}$/u, JSON.stringify(planned).slice(0, 500));
++        step(log, `${identity.runner}: feature-package-apply ${nextState}`, process.execPath,
++          [script("pipeline-state.mjs"), "feature-package-apply", "--root", fx.root, "--manifest", MANIFEST, "--next-state", nextState, "--plan-sha256", planned.planSha256], { cwd: fx.root });
++      }
++      // The Critic/Verify lifecycle receipt the candidate Verify recorded privately (its file name is the lifecycle id), then the audit request.
++      const lifecycleDir = join(fx.root, ".git", "agent-pipeline", "critic-verify-lifecycle");
++      const lifecycleIds = readdirSync(lifecycleDir).filter((name) => /^[a-f0-9]{64}\.json$/u.test(name)).map((name) => name.slice(0, -5));
++      assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
++      writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
++        packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
++      const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+       assert.equal(prepared.phase, "feature-close-prepared");
+       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
+       // The State writer prints a plain sentence, not JSON.
+@@ -417,6 +452,43 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const rowStatus = Object.fromEntries(readback.qualityReadback.map((row) => [row.id, row.status]));
+       assert.equal(rowStatus["security-scan"], "present", JSON.stringify(readback.qualityReadback));
+       assert.equal(rowStatus["critic-report-file"], "present", JSON.stringify(readback.qualityReadback));
++
++      // 5 push boundary. push-prepare's own remedy (N24): a Critic-bound push Verify is produced with --mode release plus the Critic inputs, as
++      // evidence/verify-latest.json. It carries the Critic bound at the reviewed candidate across the close's own commits to the pushed commit
++      // (criticCloseCommit admits the close commit; w266 finding 2 is the Verify evidence path that used to break exactly this).
++      git(log, fx.root, ["remote", "add", "origin", "https://example.invalid/g2035-consumer.git"]);
++      const pushVerify = step(log, `${identity.runner}: push-boundary verify (release mode, Critic-bound)`, process.execPath,
++        [script("verify-evidence-producer.mjs"), "--root", fx.root, "--mode", "release", "--critic-packet-id", packetId, "--critic-evidence-feature-id", FEATURE_ID, "--out", "evidence/verify-latest.json"], { cwd: fx.root });
++      assert.equal(pushVerify.status, 0);
++      const spawned = spawnSync(process.execPath, [script("push-prepare.mjs"), "--root", fx.root, "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
++        { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
++      const pushPrepared = JSON.parse(spawned.stdout);
++      assert.equal(pushPrepared.ready, true, JSON.stringify(pushPrepared.checks.filter((c) => c.ok !== true)).slice(0, 3000));
++      // The push guard as the runner's hook runs it (a child process fed the tool call on stdin). The push gate is configured `approval: required`
++      // in the fixture manifest, so a push with no recorded approval is blocked; then the approval route push-prepare printed (chat mode: the
++      // fixture's pipeline.user.yaml selects chat) records the approval for exactly this commit, and the same push is admitted.
++      const guardPush = (command) => spawnSync(process.execPath, [GUARD_PUSH], { input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
++        encoding: "utf8", cwd: fx.root, env: walkEnv, timeout: 60_000 });
++      const pushCommand = "git push origin HEAD:refs/heads/main";
++      const before = guardPush(pushCommand);
++      assert.equal(before.status, 2, `${identity.runner}: the guard blocks the push before any approval is recorded\n${before.stderr}`);
++      step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
++        [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
++      const admitted5 = guardPush(pushCommand);
++      assert.equal(admitted5.status, 0, `${identity.runner}: the guard admits the push of the final candidate\n${admitted5.stderr}`);
++      const elsewhere = guardPush("git push origin HEAD:refs/heads/other");
++      assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
++
++      // 6 release preflight (shape of scripts/release-preflight-cli.test.mjs). MEASURED (w266 finding 3): the release preflight is the Pipeline's
++      // own publication gate, not a consumer step. It observes the Pipeline's version surfaces (VERSION and the plugin manifests under
++      // plugins/pipeline-core/) and, in the source checkout, the source reader binding; a consumer project has none of them, so the first
++      // observation refuses with RPC-INPUT and writes nothing. The walk pins that precise refusal; a consumer release route, when one exists,
++      // replaces this assertion with a `ready` record.
++      const releasePreflight = spawnSync(process.execPath, [script("release-preflight-cli.mjs"), "--root", fx.root, "--preflight-id", "g2035-preflight", "--base", base,
++        "--lifecycle", MANIFEST, "--retention-policy", "a".repeat(64), "--out", "evidence/release-preflight.json"], { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
++      assert.equal(releasePreflight.status, 2, `${identity.runner}: ${releasePreflight.stdout}${releasePreflight.stderr}`);
++      assert.match(releasePreflight.stderr, /RPC-INPUT: VERSION is unavailable/u, `${identity.runner}: ${releasePreflight.stderr}`);
++      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
+     } finally {
+       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
+     }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+index 6e2471306..cca6c92f0 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs
+@@ -175,7 +175,7 @@ function auditFixture() {
+   const root = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+   gitIn(root, ["init", "-q"]);
+   const base = `specs/${AUDIT_ID}`;
+-  mkdirSync(join(root, base), { recursive: true });
++  mkdirSync(join(root, base, "evidence"), { recursive: true });
+   const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "mutable"], ["acceptance", "acceptance.md", false, "mutable"], ["result", "result.md", false, "mutable"], ["candidate-evidence", "envelope.json", false, "immutable"]].map(([klass, name, authority, mutability]) => {
+     const bytes = `${klass} of ${AUDIT_ID}\n`;
+     writeFileSync(join(root, base, name), bytes);
+@@ -188,11 +188,13 @@ function auditFixture() {
+   gitIn(root, ["add", "-A"]);
+   gitIn(root, ["commit", "-qm", "work"]);
+   const head = () => ({ commit: gitIn(root, ["rev-parse", "HEAD"]), tree: gitIn(root, ["rev-parse", "HEAD^{tree}"]) });
+-  const evidence = (name, overrides = {}) => {
++  // w266 (G20-35): registered candidate evidence lives under specs/<feature>/evidence/ (every reader of the registered course requires it,
++  // CCA-REGISTRATION-SHAPE), so valid Verify evidence is written there by default; `dir` names another directory for the refusal case.
++  const evidence = (name, overrides = {}, dir = `${base}/evidence`) => {
+     const candidate = head();
+     const value = { schema: "pipeline.verify-evidence.v0", ...candidate, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }), ...overrides };
+-    writeFileSync(join(root, base, name), JSON.stringify(value));
+-    return `${base}/${name}`;
++    writeFileSync(join(root, dir, name), JSON.stringify(value));
++    return `${dir}/${name}`;
+   };
+   const readManifest = () => readFileSync(join(root, manifestRel), "utf8");
+   return { root, base, manifestRel, manifest, head, evidence, readManifest, state: { activeFeature: { id: AUDIT_ID } } };
+@@ -221,8 +223,11 @@ test("Verify evidence registration refuses what cannot qualify a candidate and n
+     const bad = { commit: "f".repeat(40), tree: "e".repeat(40) };
+     const cases = [
+       ["outside the package directory", () => { writeFileSync(join(f.root, "loose.json"), "{}"); return "loose.json"; }, "FPR-VERIFY-PATH"],
+-      ["missing file", () => `${f.base}/absent.json`, "FPR-VERIFY-PATH"],
+-      ["not JSON", () => { writeFileSync(join(f.root, f.base, "text.json"), "no"); return `${f.base}/text.json`; }, "FPR-VERIFY-SCHEMA"],
++      // w266 (G20-35): a VALID passing evidence directly under the package directory (the path the skill and the usage text used to prescribe)
++      // registered fine and then broke the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE); it is refused at registration now.
++      ["directly under the package directory, outside evidence/", () => f.evidence("direct.json", {}, f.base), "FPR-VERIFY-PATH"],
++      ["missing file", () => `${f.base}/evidence/absent.json`, "FPR-VERIFY-PATH"],
++      ["not JSON", () => { writeFileSync(join(f.root, f.base, "evidence", "text.json"), "no"); return `${f.base}/evidence/text.json`; }, "FPR-VERIFY-SCHEMA"],
+       ["another schema", () => f.evidence("schema.json", { schema: "pipeline.verify-evidence.v9" }), "FPR-VERIFY-SCHEMA"],
+       ["a failed run", () => f.evidence("failed.json", { exitCode: 1 }), "FPR-VERIFY-NOT-PASSING"],
+       ["a candidate no commit of this repository has", () => f.evidence("ghost.json", { ...bad, candidate: bad }), "FPR-VERIFY-CANDIDATE"],
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 9d0e54085..5b5d3284b 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -73,8 +73,8 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
+   "",
+   "Feature-close audit route, package side (run in this order, nothing committed in between: the package candidate must equal HEAD):",
+-  "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/<name>.json",
+-  "  2. Register it: register-feature-package.mjs --root <root> --add-verify-evidence specs/<feature>/<name>.json",
++  "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/evidence/<name>.json",
++  "  2. Register it: register-feature-package.mjs --root <root> --add-verify-evidence specs/<feature>/evidence/<name>.json",
+   "  3. pipeline-state.mjs feature-package-plan, then feature-package-apply, with --next-state verifying (this binds the candidate to HEAD), then the same with --next-state completed.",
+   "  4. Plan the close with close-coordinator.mjs plan-transition --phase feature-close-prepared --audit-request <path> --critic-verify-lifecycle <id>.",
+   "",
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index ef5b949c3..ca5e1502a 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -59,7 +59,9 @@ consumer without an organization policy, the shipped name `pipeline-core-baselin
+ (floors only, never applied unless named), and its `coreVersion` is plain `x.y.z`.
+ The package must be `completed` with a candidate equal to HEAD and a registered
+ passing Verify evidence. Package side, nothing committed in between: produce the
+-evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`,
++evidence with `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`
++(under `evidence/`: the registered course reads candidate evidence only from there, and an evidence file
++elsewhere under `specs/<feature>/` is refused `FPR-VERIFY-PATH` at registration),
+ register it with `register-feature-package.mjs --root <root> --add-verify-evidence
+ <path>`, then run `pipeline-state.mjs feature-package-plan` and `feature-package-apply`
+ with `--next-state verifying` (this binds the candidate to HEAD, refused without a
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 2c2f58131..e936828f0 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -87,7 +87,7 @@ command tables.
+ 
+ Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
+ 
+-1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
++1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
+    then `pipeline-state.mjs feature-package-plan` / `feature-package-apply` with `--next-state verifying`, and again with `--next-state completed` (one step at a time).
+ 2. `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, apply the returned action, then
+    `plan-transition` / `apply-transition` through `checkpointed`, `feature-close-prepared`, `tracked-close-finalized`, `candidate-frozen`, `final-verify-green`,
