@@ -111,6 +111,11 @@ test('G20-21 control: absolute spellings outside <root>/scratch/, nested, with a
     `${q(node)} scratch/forensics.mjs arg`,
     `"/usr/bin/python3" scratch/forensics.mjs`,
   ]) assert.equal(refused(command), true, command);
+  // A "node" planted inside the project root is never an interpreter for this admission.
+  mkdirSync(join(root, 'scratch', 'bin'), { recursive: true });
+  const planted = join(root, 'scratch', 'bin', 'node');
+  writeFileSync(planted, '#!/bin/sh\n', { mode: 0o755 });
+  assert.equal(refused(`${q(planted)} scratch/forensics.mjs`), true, 'planted node');
 });
 
 test('AC-207 point 2 control: scratch-script near-misses stay refused', () => {

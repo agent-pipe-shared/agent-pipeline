@@ -12,7 +12,7 @@ import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./consta
 import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation } from "./command-catalogue.mjs";
+import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter } from "./command-catalogue.mjs";
 
 /**
  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
@@ -117,7 +117,7 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
     // argument is a draft-phase scratch script, not an opaque implementation write.
     // G20-21: the Pipeline itself prints absolute interpreter and script paths, so the same scratch script spelled with an absolute
     // `node` and/or an absolute path inside <root>/scratch/ is the same draft-phase shape, not an opaque implementation write.
-    const draftScratchScript = words !== null && words.length === 2 && isNodeInterpreterWord(words[0])
+    const draftScratchScript = words !== null && words.length === 2 && sameNodeInterpreter(words[0], "node", root, dependencies)
       && scratchScriptRelative(words[1], root) !== null;
     const opaqueScript = words === null || draftScratchScript ? null : opaqueScriptExecutionCandidate(words, root);
     if (opaqueScript !== null
@@ -195,6 +195,7 @@ function isNodeInterpreterWord(word) {
   if (word === "node") return true;
   return typeof word === "string" && isAbsolute(word) && ["node", "node.exe"].includes(basename(word).toLowerCase());
 }
+// isNodeInterpreterWord only shapes the advice text; admission uses sameNodeInterpreter (an executable outside the project root).
 
 function scratchScriptRelative(word, root) {
   if (typeof word !== "string" || word === "") return null;
