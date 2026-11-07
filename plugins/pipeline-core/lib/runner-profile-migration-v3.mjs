@@ -72,6 +72,15 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 // "older version" bypass: only its complete Core-owned route and export
 // preimage may advance through the explicit migration transaction.
 const READ_DUTY_PREDECESSOR_REGISTRY_SHA256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
+// C20 G20-44: registry digests this Core shipped AFTER the read-duty predecessor, each an exact, known OLDER registry. Routing and
+// critic_export are Core-owned (the validator compares them byte-exact with the registry), so a project bound to one of these
+// digests is refreshed wholesale to the current registry: nothing a project owns is discarded. `c1641d49...` is the registry every
+// 0.7 candidate shipped from 2026-09-27 until G20-43 changed the Antigravity cells; without this entry every project onboarded on
+// it was refused (`frozen_mapping`) with no runnable repair. An UNKNOWN digest (possibly a newer Core) keeps the refusal, so an
+// older installed plugin still never rewrites a newer project's routes. Add the outgoing digest here whenever the registry changes.
+const KNOWN_OLDER_REGISTRY_SHA256 = Object.freeze(new Set([
+  "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac",
+]));
 const OID = /^[0-9a-f]{40}$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
@@ -474,10 +483,14 @@ function refreshKnownV3RegistryDelta(parsed) {
   // default we may overwrite. In particular, an older installed plugin must
   // never rewrite a newer project's model routes during bootstrap.
   const previousBinding = parsed.core_registry_sha256;
-  const boundToKnownPredecessor = previousBinding === READ_DUTY_PREDECESSOR_REGISTRY_SHA256;
+  const boundToReadDutyPredecessor = previousBinding === READ_DUTY_PREDECESSOR_REGISTRY_SHA256;
+  const boundToKnownOlderRegistry = KNOWN_OLDER_REGISTRY_SHA256.has(previousBinding)
+    && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256;
+  const boundToKnownPredecessor = boundToReadDutyPredecessor || boundToKnownOlderRegistry;
   if (Object.hasOwn(parsed, "core_registry_sha256")
-    && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256) {
-    if (!boundToKnownPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
+    && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256
+    && !boundToKnownOlderRegistry) {
+    if (!boundToReadDutyPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
     const oldDuties = clone(registry.duties);
     delete oldDuties.read;
     if (!same(parsed.routing, { profiles: registry.profiles, duties: oldDuties })
@@ -487,7 +500,7 @@ function refreshKnownV3RegistryDelta(parsed) {
   const compatibilityDeltas = [];
   if (boundToKnownPredecessor) {
     candidate.core_registry_sha256 = RUNNER_PROFILES_V3_REGISTRY_SHA256;
-    compatibilityDeltas.push({ name: "known-v3-read-duty-registry-upgrade",
+    compatibilityDeltas.push({ name: boundToReadDutyPredecessor ? "known-v3-read-duty-registry-upgrade" : "known-v3-older-registry-upgrade",
       path: "core_registry_sha256", from: previousBinding,
       to: RUNNER_PROFILES_V3_REGISTRY_SHA256 });
   }

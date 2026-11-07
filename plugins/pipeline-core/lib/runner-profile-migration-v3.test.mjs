@@ -668,6 +668,39 @@ record("the exact prior V3 registry upgrades its pure-read duty without weakenin
   } finally { rmSync(alteredRoot, { recursive: true, force: true }); }
 });
 
+// C20 G20-44: every 0.7 candidate shipped registry c1641d49... until G20-43 changed the Antigravity cells. A project bound to that
+// known OLDER digest must get the runnable refresh (plan, explicit activation), not a frozen_mapping refusal with no repair; an
+// unknown digest keeps the refusal (the downgrade case above).
+record("a project bound to a known older shipped registry is refreshed to the current registry, never stranded", () => {
+  const OLDER = "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac";
+  const intent = v3Intent();
+  intent.core_registry_sha256 = OLDER;
+  intent.routing.duties.mechanic.codex.effort = "high"; // a stale Core-owned cell as the older registry may have shipped it
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    if (RUNNER_PROFILES_V3_REGISTRY_SHA256 === OLDER) {
+      // Before the registry moves on, that digest IS the current one: nothing to upgrade.
+      assert.notEqual(inspection.sourceKind, "invalid-source");
+      return;
+    }
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas.map((delta) => [delta.name, delta.path]),
+      [["known-v3-older-registry-upgrade", "core_registry_sha256"], ["closed-v3-routing-registry-refresh", "routing"]]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root }).status, "activation-required");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const upgraded = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    assert.equal(upgraded.core_registry_sha256, RUNNER_PROFILES_V3_REGISTRY_SHA256);
+    const registry = loadRunnerProfilesV3Registry();
+    assert.deepEqual(upgraded.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.equal(validatePipelineUserV3(upgraded).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("historical Public aliases migrate atomically without pre-seeded Codex files or private policy", () => {
   const root = fixture(yaml(publicLegacyIntent()), { omitCodex: true });
   try {
