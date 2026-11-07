@@ -23,15 +23,20 @@ const full = (over = {}) => ({
 });
 const rows = (readers) => Object.fromEntries(closeQualityReadback({ root: "<root>", featureId: FEATURE, readers }).map((r) => [r.id, r]));
 
+// QG-04 restatement (C20 G20-27, AC-108): the original five ids are unchanged and keep their order and shape; the readback gained a sixth,
+// appended row, "journey-coverage", whose cases live in lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs. `full()`
+// carries no Spec reader, so that row is "unknown" here (never "present" without a signal), and the original "every row is present"
+// assertion now covers the five original rows.
 test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
+  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
   for (const row of list) {
     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
   }
-  assert.ok(list.every((r) => r.status === "present"), JSON.stringify(list));
+  assert.ok(list.filter((r) => r.id !== "journey-coverage").every((r) => r.status === "present"), JSON.stringify(list));
+  assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
 });
 
 test("AC-239 security-scan: present with the envelope path, missing with the scan command, unknown when unreadable", () => {

@@ -429,7 +429,14 @@ Hunt systematically, in this order:
 
 1. **Spec fidelity:** For each acceptance criterion ({{AC_IDS or "all in the
    spec"}}): does the diff actually satisfy it? Any criterion without a
-   covering change or test is a candidate finding.
+   covering change or test is a candidate finding. **Journey coverage
+   (user-facing criteria):** for each user-facing criterion, check the tests
+   against the journeys and state transitions the Spec names for it (every entry
+   path, a reload in the middle of a transition, a second action after an error,
+   a concurrent import, every dynamic text context) and against the actual effect
+   asserted, not only that text changed. Report journey coverage per criterion
+   as covered / not covered; a missing journey is a finding (a criterion that
+   names none is itself a Spec-readiness finding, `PLR-HANDOFF-NO-JOURNEY`).
 2. **Scope:** Compare the diff's file list against the spec's Detailed
    Implementation enumeration. Unlisted files touched, listed files untouched,
    silent deviations — candidates.

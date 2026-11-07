@@ -32,9 +32,10 @@ import { observeGovernanceScope } from './governance-scope.mjs';
 import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from './critic-accepted-contract.mjs';
 import { validateItemDeliveryBriefing } from './native-goldfish-host-return.mjs';
 import { readConsumerVerifyConfiguration } from './consumer-verify.mjs';
+import { inspectSpecJourneys, JOURNEY_REPAIR } from './spec-journey-coverage.mjs';
 
 export const PLAN_HANDOFF_CODES = Object.freeze([
-  'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-SPEC-UNREADABLE',
+  'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-NO-JOURNEY', 'PLR-HANDOFF-SPEC-UNREADABLE',
   'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-CHECK-UNREGISTERED', 'PLR-HANDOFF-UNAVAILABLE',
 ]);
 
@@ -94,6 +95,8 @@ function checkState(root, path) {
 // One runnable repair per not-ready code. Every repair is an edit the author can make plus the command to re-run.
 const HANDOFF_REPAIRS = Object.freeze({
   'PLR-HANDOFF-NO-CRITERION': 'add a normative acceptance-criterion table to the Spec (header row, then rows such as `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |`, or numbered `1` / `R-2` rows under an acceptance-criteria heading), commit it',
+  // A getter: spec-journey-coverage.mjs and this module sit in one import cycle through the host parser, so the constant is read at call time.
+  get 'PLR-HANDOFF-NO-JOURNEY'() { return JOURNEY_REPAIR; },
   'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
   'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
   'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
@@ -155,6 +158,14 @@ export function inspectPlanDeliveryHandoff(input, deps = {}) {
       if (ADMITTED_CRITERION_STATUSES.includes(parsed.status)) admitted.push({ id: row.id, locator });
     }
     if (admitted.length === 0) return refuse('PLR-HANDOFF-NO-CRITERION', 'the Spec has no normative acceptance criterion row the host parser admits for a delivery briefing');
+
+    // G20-27: a user-facing criterion is examined as whole journeys and state transitions. One that names no journey, or no asserted
+    // effect, is not ready (the Spec text decides; same reading as the close readback).
+    const unjourneyed = inspectSpecJourneys(source).criteria.filter((entry) => entry.status === 'not-covered');
+    if (unjourneyed.length > 0) {
+      const named = unjourneyed.slice(0, 20).map((entry) => `${entry.id} (no ${entry.missing.map((part) => (part === 'journeys' ? 'journey named' : 'asserted effect')).join(', no ')})`).join('; ');
+      return refuse('PLR-HANDOFF-NO-JOURNEY', `${unjourneyed.length} user-facing acceptance criteri${unjourneyed.length === 1 ? 'on' : 'a'} of the Spec ${unjourneyed.length === 1 ? 'is' : 'are'} not examined as a whole journey: ${named}${unjourneyed.length > 20 ? '; ...' : ''}`);
+    }
 
     // Check paths: shape (the briefing validator's own rule) first for every path, then trackability and presence.
     const paths = [...new Set([...source.matchAll(CHECK_TOKEN)].map((match) => match[0]))].sort();

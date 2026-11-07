@@ -434,6 +434,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - Regression RED-to-GREEN: name the intended behavior and meaningful original
   failure. Update only the test cases required by the owned outcome; preserve
   existing acceptance examiners and their original evidence.
+- Journey coverage (test authorship; user-facing criteria): examine the criterion
+  as a whole user journey and state transition, not only as a unit. For every
+  user-facing acceptance criterion, write cases for each journey the Spec names
+  (every entry path, a reload in the middle of a transition, a second action
+  after an error, a concurrent import, every dynamic text context) and assert the
+  actual effect (the stored state or produced output), not only "text changed".
+  Report journey coverage per criterion as covered / not covered; a Spec criterion
+  that names no journey is a stop condition (briefing defect), not a gap to guess.
 - {{ADDITIONAL_CHECKS or delete this line}}
 
 ### 4. Forbidden

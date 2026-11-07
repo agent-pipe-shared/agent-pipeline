@@ -32,6 +32,11 @@ HARD RULES (checkable)
 - Every acceptance criterion MUST be EARS-formed and binary-checkable.
   Why: EARS makes each criterion 1:1 a test case — the bridge spec → tests →
   Critic (ADR-0004). Check: each criterion maps to at least one verify/test.
+- Every user-facing acceptance criterion MUST name the journeys and state
+  transitions that prove it and the actual effect asserted (§5, "Journeys and
+  state transitions"). Why: a criterion examined only as a unit lets a whole
+  journey break unseen (G20-27). Check: readiness check refuses a Spec without
+  them (PLR-HANDOFF-NO-JOURNEY); the Critic reports a missing journey.
 - Detailed Implementation MUST enumerate EVERY file to be changed/created, each
   with a rationale. Why: the critical anti-derailing instrument (Rensin K4/§5);
   it is simultaneously the Goldfish task interface. Check: Critic compares the
@@ -126,9 +131,32 @@ THE SYSTEM SHALL …" · State-driven "WHILE … THE SYSTEM SHALL …" · Option
 feature "WHERE … THE SYSTEM SHALL …" · Unwanted behaviour "IF … THEN THE
 SYSTEM SHALL …".}}
 
-- AC-1: WHEN {{trigger/event}}, THE SYSTEM SHALL {{observable behaviour}}.
-- AC-2: IF {{failure condition}}, THEN THE SYSTEM SHALL {{safe behaviour}}.
+- AC-1: WHEN {{trigger/event}}, THE SYSTEM SHALL {{observable behaviour}}. Journeys: {{every entry path; reload in the middle of the transition; a second action after an error; concurrent import; every dynamic text context}}. Asserts: {{the actual effect, e.g. the stored state}}.
+- AC-2: IF {{failure condition}}, THEN THE SYSTEM SHALL {{safe behaviour}}. [not user-facing: {{reason no user sees it}}]
 - AC-3: {{...}}
+
+#### Journeys and state transitions (user-facing criteria)
+
+A criterion a user can reach is examined as a whole journey, not only as a unit
+(Codex greenfield P0: green tests missed stored-HTML execution, play without a
+timer, an overwrite after an import with the same revision and the loss of the
+rescue candidate). Every user-facing criterion therefore carries two clauses in
+its own text (a table cell, or an indented continuation line of a bullet):
+
+- `Journeys:` the journeys and state transitions that prove it: every entry
+  path to the transition; a reload in the middle of a transition; a second
+  action after an error; a concurrent import; every dynamic text context (each
+  place stored text is rendered or executed). List the ones that apply.
+- `Asserts:` the actual effect checked (the stored state, the produced output,
+  the refused write), never only that "text changed".
+
+`[user-facing]` forces the duty on a criterion the vocabulary check would miss
+(it recognises English wording only); `[not user-facing: <reason>]` exempts a
+criterion no user sees, and a tag without a reason exempts nothing. A Spec whose
+user-facing criterion names no journey is not ready: the plan hand-off refuses it
+with `PLR-HANDOFF-NO-JOURNEY` and this repair, the Critic reports the missing
+journey as a finding, and the close readback lists each criterion as covered or
+not covered.
 
 #### Optional mechanical requirement map
 

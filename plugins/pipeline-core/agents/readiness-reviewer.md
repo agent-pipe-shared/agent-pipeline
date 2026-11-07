@@ -34,6 +34,14 @@ that a single module leaves no slice that can run in parallel. This is a
 question in the review, never a block, and a justified single module (one
 responsibility, small scope) is not a finding.
 
+Journeys: read each user-facing acceptance criterion of the Spec for the journeys
+and state transitions that prove it (every entry path, a reload in the middle of a
+transition, a second action after an error, a concurrent import, every dynamic text
+context) and for the actual effect asserted, not only that text changed. A
+criterion that names none is not ready: raise it as a finding naming the criterion
+and the typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and
+an `Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
+
 Decisions to record: read the design for choices that need an ADR (module
 boundaries, data keeping, offline and error strategy, a security trade-off). When
 the design makes such a choice and no module names an ADR path for it in

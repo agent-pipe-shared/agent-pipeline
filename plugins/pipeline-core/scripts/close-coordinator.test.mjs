@@ -1005,7 +1005,8 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
     },
   });
   for (const out of [seen.drive, seen.dry]) {
-    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
+    // QG-04 restatement (C20 G20-27, AC-108): the five original ids keep their order; the readback gained an appended sixth row, "journey-coverage".
+    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
     const scan = out.qualityReadback.find((r) => r.id === "security-scan");
     assert.equal(scan.status, "missing");
     const ids = out.actions.actions.map((a) => a.id);
@@ -1019,7 +1020,7 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
   assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
   const prd = seen.index.entries.find((e) => e.id === "prd");
   assert.equal(prd.sha256, digest("# PRD\n"));
-  assert.equal(seen.index.qualityRows.length, 5);
+  assert.equal(seen.index.qualityRows.length, 6); // QG-04 restatement (C20 G20-27): five original rows plus the appended journey-coverage row
   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
 });
 

@@ -1234,7 +1234,10 @@ function readQualityRows(root, coordinator) {
     if (!bundle.ok) return null;
     return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
   };
-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
+  // G20-27: the journey row reads the Spec the plan was bound to (the same path the audit index records), else the conventional one.
+  let specPath;
+  try { const bound = stateSnapshot(root).state?.planSubmission?.specPath; if (typeof bound === "string" && SAFE_RELATIVE.test(bound)) specPath = bound; } catch { /* the conventional spec path applies */ }
+  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
 }
 function auditPackageIndex(root, coordinator) {
   const { readers } = qualityReaders(root);

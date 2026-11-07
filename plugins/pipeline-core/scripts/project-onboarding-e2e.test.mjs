@@ -1310,7 +1310,9 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       assert.ok(generatedSpecBeforeRefusal.includes(skeletonCriterion), `${runner}: the generated Spec carries the skeleton criterion placeholder`);
       assert.ok(generatedSpecBeforeRefusal.includes(skeletonTraceability), `${runner}: the generated Spec carries the skeleton traceability placeholder`);
       const partialSpec = generatedSpecBeforeRefusal
-        .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
+        // QG-04 restatement (C20 G20-27, AC-108): the criterion text and its test path are unchanged; a user-facing criterion now also names its
+        // journeys and the asserted effect, otherwise the plan hand-off refuses the Spec (PLR-HANDOFF-NO-JOURNEY) before submit-plan.
+        .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. Journeys: key press at game start and after a restart; reload in the middle of a game; a second key press after an error. Asserts: the exported playable flag is true after each journey. | tests/game.test.mjs |")
         .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
       const partialPrd = generatedPrdBeforeRefusal
         .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")

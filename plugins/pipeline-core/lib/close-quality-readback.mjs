@@ -10,14 +10,18 @@
 //   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
 //                         When the receipts are readable the row names a PASSING review's report (the last in listing order) and is missing when every report records a fail.
 //   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
+//   journey-coverage      (G20-27) per user-facing criterion of specs/<feature>/spec.md: covered when it names journeys and an asserted effect, else not covered.
+//                         The evidence lists every such criterion as `AC-n: covered` / `AC-n: not covered`; present when none is not covered, not-applicable
+//                         when the Spec has no user-facing criterion, unknown when the Spec cannot be read.
 // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
 import { createHash } from "node:crypto";
 import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
+import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
+export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
 export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
 export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
 
@@ -116,6 +120,19 @@ function criticRow(readers, featureId) {
   return row(id, "present", reports[0].path);
 }
 
+// G20-27: per user-facing criterion of the Spec, covered / not covered by a named journey and an asserted effect (never a bare count).
+function journeyRow(readers, specPath) {
+  const id = "journey-coverage";
+  const bytes = call(readers.readBytes, specPath);
+  if (!bytes.ok) return unknown(id, JOURNEY_REPAIR);
+  let coverage;
+  try { coverage = inspectSpecJourneys(Buffer.from(bytes.value).toString("utf8")); } catch { return unknown(id, JOURNEY_REPAIR); }
+  const userFacing = coverage.criteria.filter((entry) => entry.status !== "not-user-facing");
+  if (userFacing.length === 0) return row(id, "not-applicable");
+  const listing = userFacing.map((entry) => `${entry.id}: ${entry.status === "covered" ? "covered" : `not covered (no ${entry.missing.join(", no ")})`}`).join("; ");
+  return coverage.notCovered.length === 0 ? row(id, "present", `${specPath} (${listing})`) : row(id, "missing", `${specPath} (${listing})`, JOURNEY_REPAIR);
+}
+
 function handoverRow(readers, handoverPath) {
   const id = "handover-freshness";
   const updated = call(readers.handoverUpdatedMs);
@@ -124,13 +141,14 @@ function handoverRow(readers, handoverPath) {
   return head.value - updated.value <= HANDOVER_FRESHNESS_BOUND_MS ? row(id, "present", handoverPath) : row(id, "missing", handoverPath);
 }
 
-export function closeQualityReadback({ featureId, handoverPath = "docs/state.md", readers = {} } = {}) {
+export function closeQualityReadback({ featureId, handoverPath = "docs/state.md", specPath = `specs/${featureId}/spec.md`, readers = {} } = {}) {
   return [
     securityRow(readers),
     adrRow(readers),
     fitnessRow(readers, featureId),
     criticRow(readers, featureId),
     handoverRow(readers, handoverPath),
+    journeyRow(readers, specPath),
   ];
 }
 

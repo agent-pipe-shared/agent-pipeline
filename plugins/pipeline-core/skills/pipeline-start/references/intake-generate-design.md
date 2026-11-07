@@ -128,7 +128,8 @@ afterwards.
   product framing (What/Why/Scope/Non-goals/Risks/Alternatives/DoD) authored
   before binding.
 - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
-  acceptance criteria and implementation detail authored before binding.
+  acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
+  clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
 
 Use the accepted criterion table header `| # | Criterion | Evidence |` and a
 row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
