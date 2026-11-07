@@ -162,7 +162,13 @@ function parseArgs(args) {
     hostHookSessionId: agy ? args[7] : null };
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// G20-14: the CLI body runs in a function, never as a top-level await. The
+// Antigravity branch imports model-role-bootstrap.mjs, whose import graph cycles
+// back into this module (via session-critic-finalizer.mjs and
+// codex-critic-session-route.mjs). A top-level await here left this module
+// unevaluated, the cycle waited on it, and Node exited 13 (unsettled top-level
+// await) before any output.
+async function runCli() {
   try {
     const input = parseArgs(process.argv.slice(2));
     if (input.runner === "antigravity") {
@@ -189,4 +195,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       if (!selected.ok) process.exitCode = 2;
     }
   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 64; }
+}
+
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void runCli();
 }

@@ -7,6 +7,8 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import { devNull } from "node:os";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MDS${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -253,7 +255,22 @@ test("family selection script-level identity transport failure stays unavailable
   assert.equal(Object.hasOwn(result, "v3Route"), false);
 });
 
-assert.equal(cases.length, 10);
+test("G20-14: the Antigravity CLI branch settles and prints one JSON result instead of exiting 13", () => {
+  const script = fileURLToPath(new URL("./model-role-dispatch-select.mjs", import.meta.url));
+  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  const run = spawnSync(process.execPath, [script, "--repo-root", repoRoot, "--runner", "antigravity",
+    "--task-route", "duty.implement", "--host-session-id", "g20-14-probe"],
+  { encoding: "utf8", timeout: 60_000 });
+  assert.notEqual(run.status, 13, run.stderr);
+  assert.doesNotMatch(run.stderr, /unsettled top-level await/u);
+  const lines = run.stdout.trim().split("\n");
+  assert.equal(lines.length, 1, run.stdout);
+  const parsed = JSON.parse(lines[0]);
+  assert.equal(parsed.runner, "antigravity");
+  assert.equal(parsed.taskRoute, "duty.implement");
+});
+
+assert.equal(cases.length, 11);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
