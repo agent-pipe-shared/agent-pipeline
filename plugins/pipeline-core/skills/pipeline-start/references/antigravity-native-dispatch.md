@@ -39,17 +39,34 @@ alias as the model id) and set `Model` to the alias the dispatch selection names
   same model on the measured host. The guard compares the child's `modelName` with the model the dispatch selection resolved for its role
   (the registry's Antigravity cell for that duty), never with the alias, and refuses a mismatch with `AGY-NATIVE-CHILD-MODEL-MISMATCH`
   naming both values and the repair.
-- **Serialization.** `Workspace` `branch`/`share` in a git workspace is NOT measured (M4b). A code-writing child is therefore dispatched
-  alone in its own call (`AGY-NATIVE-CODE-WRITER-ONE-PER-CALL`), with `Workspace` absent or `inherit` (`AGY-NATIVE-WORKSPACE-UNMEASURED`),
-  and only while no other code-writing child of the session is alive (`AGY-NATIVE-CODE-WRITER-ALIVE`: wait for the first child's
-  message, then dispatch the next). Read-only roles may run in parallel. The rule is the single switch
-  `AGY_NATIVE_SERIALIZE_CODE_WRITERS` in `lib/agy-native-goldfish.mjs`.
+- **Isolation (measured, M4b).** A code-writing child is dispatched with `Workspace: "branch"` (every other value, absent included, is
+  refused: `AGY-NATIVE-WORKSPACE-NOT-ISOLATED`). The host then creates a real git worktree of the project below
+  `<home>/.gemini/antigravity-cli/worktrees/<parentConversationId>/subagent-<...>` on a new branch of the same name, cut from the parent's
+  COMMITTED HEAD: uncommitted parent changes are not in it, so a parent tree with uncommitted tracked changes is refused before dispatch
+  (`AGY-NATIVE-WORKTREE-UNCOMMITTED`, repair: commit first; untracked files are not checked, but the child sees none of them). Several code
+  writers may run in parallel, in one call or several; there is no one-per-call and no alive-count rule, because a finished child's descriptor
+  stays `SUBAGENT_STATE_ALIVE`. Read-only roles are unaffected.
+- **Governance of a branch child.** Its hook payload names the worktree first in `workspacePaths` and the project second. The guard resolves a
+  worktree that the project repository lists (`git worktree list`) to that repository and governs the call with the project's governance, with
+  every worktree path judged at the same relative path in the project; a worktree-shaped directory the repository does not list is refused
+  (`AGY-NATIVE-WORKTREE-UNREGISTERED`). A child's file writes and shell working directory are confined to its own worktree
+  (`AGY-NATIVE-CHILD-WRITE-OUTSIDE-WORKTREE`); only `brain/`, `config/`, `.system_generated/` and credentials of the host stay unwritable
+  (`AGY-NATIVE-BRAIN-WRITE`), not the `worktrees/` directory.
+- **Integration (the Elephant's take-over).** The child's commit lands at once in the shared object database on its branch; nothing is merged,
+  copied or patched back, and the parent only receives the child's text message. After the child reported, run `scripts/agy-native-integrate.mjs
+  plan --root <root> --branch <the child's branch> --allowed-path <briefed path>...` (read-only; `git worktree list` names the branch), then the
+  same command as `apply` with the `--expect-sha256` digest it printed. `apply` writes the branch's net change into the working tree,
+  uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
+  commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
+  branch; do not remove them.
 - **Delivery.** The child runs in the background and its completion message arrives in the SAME parent turn, at the next model
   invocation, as a `<SYSTEM_MESSAGE>`; the parent does not need to end its turn.
-- **Hand-back and commit.** Hooks govern the child unchanged: its writes, shell and commits pass the same PreToolUse guard and a denial
-  reaches it verbatim. Commits use the existing Goldfish host-commit route; if the Antigravity completion does not trigger it, run
-  the agent-run `scripts/goldfish-host-commit-recover.mjs` plan/apply route after the child reported. There is no Antigravity-only commit
-  mechanism and no in-session implementation by the Elephant as a sanctioned route.
+- **Hand-back and commit.** Hooks govern the child (see above): its writes, shell and commits pass the same PreToolUse guard and a denial
+  reaches it verbatim. The child commits on its own branch; the Elephant's commit is the take-over above followed by the existing
+  `scripts/goldfish-host-commit-recover.mjs` plan/apply route. There is no Antigravity-only commit mechanism and no in-session
+  implementation by the Elephant as a sanctioned route.
+- **Not measured, so not assumed.** The spelling of `modelName` (the model check above is kept as it was), the descriptor state of a killed or
+  failed child, descriptor timing, a hook at a child's end, and whether a global (Pipeline) hook install fires once or twice per child tool call.
 
 ### Legacy route (Codex-to-Antigravity)
 

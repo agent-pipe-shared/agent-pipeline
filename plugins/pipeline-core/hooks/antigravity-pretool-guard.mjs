@@ -43,6 +43,7 @@ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import {
   decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
+  nativeChildWriteRefusal, projectNativeChildInput, resolveNativeChildGovernance,
 } from "../lib/agy-native-goldfish.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -567,6 +568,23 @@ export function inspectScratchShellScript(command, projectRoot, {
 }
 
 export async function runAntigravityPreToolGuard(rawInput) {
+  // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
+  // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
+  // A registered worktree is governed as its parent repository: confined to its own worktree first, then judged with every worktree path
+  // mapped to the same relative path in the repository. A worktree-shaped directory that is NOT registered there is refused, never trusted.
+  let parsedEarly = null;
+  try { parsedEarly = JSON.parse(rawInput); } catch { parsedEarly = null; }
+  const childWorktree = parsedEarly !== null && typeof parsedEarly === "object" ? resolveNativeChildGovernance(parsedEarly) : { status: "not-worktree" };
+  if (childWorktree.status === "unregistered") {
+    deny(`BLOCKED (Antigravity native child): AGY-NATIVE-WORKTREE-UNREGISTERED: the workspace ${childWorktree.worktreeRoot} looks like a git worktree but ${childWorktree.reason}, so it cannot be governed as part of the project and borrows no authority from it. Repair: stop this child with manage_subagents (kill) and dispatch it again from the parent with Workspace: "branch"; the host then creates a worktree the project repository lists (git worktree list).`);
+  }
+  if (childWorktree.status === "governed") {
+    const original = normalizeAntigravityToolInput(parsedEarly);
+    const confinement = ["Edit", "Write", "Bash"].includes(original.toolName)
+      ? nativeChildWriteRefusal(childWorktree, { filePath: original.filePath, cwd: original.toolName === "Bash" ? original.toolInput?.cwd : null }) : null;
+    if (confinement !== null) deny(`BLOCKED (Antigravity native child): ${confinement}`);
+    rawInput = JSON.stringify(projectNativeChildInput(parsedEarly, childWorktree));
+  }
   const scopeAdmission = nativeHookGovernanceAdmission({ runner: "antigravity", rawInput });
   if (!scopeAdmission.requiresEnforcement) {
     if (scopeAdmission.destructiveDenial) deny(scopeAdmission.destructiveDenial);
@@ -591,7 +609,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
   if (input?.toolCall?.name === "invoke_subagent"
     && normalized.nativeSubagents?.some((entry) => isNativeCodeWriterType(entry?.TypeName))) {
     // A native Goldfish is admitted like a Claude Agent call: guard-dispatch judges the generated briefing, the selected model and the
-    // write-capable carrier below, with NO per-dispatch PO consent. What is left here is the shared-tree rule while M4b is unmeasured.
+    // write-capable carrier below, with NO per-dispatch PO consent. What is left here is the isolation rule (M4b): Workspace "branch", from a
+    // committed HEAD.
     const parentCall = evaluateNativeGoldfishParentCall(input, normalized.nativeSubagents);
     if (!parentCall.ok) deny(`BLOCKED (Antigravity dispatch preflight): ${parentCall.reason}`);
   }

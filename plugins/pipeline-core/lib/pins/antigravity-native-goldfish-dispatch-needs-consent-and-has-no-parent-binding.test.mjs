@@ -12,9 +12,9 @@
 // Before the change: the guard refused every native goldfish call without a signed consent (AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE),
 // had no module reading the descriptor, no resolved-model check and no code-writer serialization, and did not decode a quoted Model.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -30,8 +30,16 @@ const PARENT = "11111111-aaaa-4aaa-8aaa-000000000001";
 const CHILD = "22222222-bbbb-4bbb-8bbb-000000000002";
 const OTHER_CHILD = "33333333-cccc-4ccc-8ccc-000000000003";
 
+// A real git invocation: the worktree facts (M4b) are read from git state, so the fixtures use real repositories and real worktrees.
+const git = (cwd, ...args) => {
+  const res = spawnSync("git", ["-c", "user.email=t@example.invalid", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args],
+    { cwd, encoding: "utf8", timeout: 30_000 });
+  assert.equal(res.status, 0, `git ${args.join(" ")}: ${res.stderr}`);
+  return res.stdout.trim();
+};
+
 function brainFixture() {
-  const base = mkdtempSync(join(tmpdir(), "agy-native-goldfish-"));
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "agy-native-goldfish-")));
   const brain = join(base, "brain");
   const workspace = join(base, "workspace");
   mkdirSync(join(brain, PARENT, ".system_generated", "subagents"), { recursive: true });
@@ -42,8 +50,27 @@ function brainFixture() {
   writeFileSync(join(workspace, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
     schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z",
   }));
+  // The workspace is a git repository with one commit (M4b: a branch worktree starts at the committed HEAD).
+  git(workspace, "init", "-q");
+  git(workspace, "add", ".claude/pipeline.json");
+  git(workspace, "commit", "-q", "-m", "init");
   return { base, brain, workspace };
 }
+
+// M4b item 1: the host makes a REAL git worktree below <home>/.gemini/antigravity-cli/worktrees/<parentId>/ on a new branch of the same name.
+function worktreeFixture(fx, name = "subagent-Goldfish-goldfish-implementor-1a2b3c") {
+  const home = join(fx.base, "home");
+  mkdirSync(join(home, ".gemini", "antigravity-cli", "worktrees", PARENT), { recursive: true });
+  const path = join(home, ".gemini", "antigravity-cli", "worktrees", PARENT, name);
+  git(fx.workspace, "worktree", "add", "-q", "-b", name, path);
+  return { path: realpathSync(path), branch: name, home };
+}
+
+// M4b item 5: a child's hook payload names its worktree FIRST and the parent repository second.
+const childPayload = (fx, wt, toolCall, conversationId = CHILD) => ({
+  ...payload(fx, { conversationId, lastUserInput: "", modelName: selectedModel("implement"), toolCall }),
+  workspacePaths: [wt.path, fx.workspace],
+});
 
 function descriptor(fx, childId, typeName, state = "SUBAGENT_STATE_ALIVE", parent = PARENT) {
   mkdirSync(join(fx.brain, parent, ".system_generated", "subagents"), { recursive: true });
@@ -95,15 +122,17 @@ function runAdapter(fx, input) {
 test("a flat invoke_subagent call with a quoted Model is read as the alias and the goldfish call needs no consent", async () => {
   const fx = brainFixture();
   try {
-    const normalized = normalizeAntigravityToolInput({ toolCall: flatCall("pipeline-core:goldfish-implementor") });
+    // M4b restatement: a code-writing child is dispatched with Workspace "branch" (the measured isolation); the case is otherwise unchanged.
+    const call = flatCall("pipeline-core:goldfish-implementor", { Workspace: JSON.stringify("branch") });
+    const normalized = normalizeAntigravityToolInput({ toolCall: call });
     assert.equal(normalized.nativeCallShape, "flat");
     assert.equal(normalized.nativeSubagents[0].Model, "flash", "one level of JSON string encoding is decoded");
+    assert.equal(normalized.nativeSubagents[0].Workspace, "branch", "a quoted Workspace is decoded the same way");
     const { evaluateNativeGoldfishParentCall } = await loadModule();
-    const verdict = evaluateNativeGoldfishParentCall(
-      payload(fx, { conversationId: PARENT, toolCall: flatCall("pipeline-core:goldfish-implementor") }), normalized.nativeSubagents);
+    const verdict = evaluateNativeGoldfishParentCall(payload(fx, { conversationId: PARENT, toolCall: call }), normalized.nativeSubagents);
     assert.equal(verdict.ok, true, JSON.stringify(verdict));
     // The adapter must no longer name a missing signed consent as the cause of a refusal.
-    const res = runAdapter(fx, payload(fx, { conversationId: PARENT, toolCall: flatCall("pipeline-core:goldfish-implementor") }));
+    const res = runAdapter(fx, payload(fx, { conversationId: PARENT, toolCall: call }));
     assert.doesNotMatch(`${res.stdout}${res.stderr}`, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|AGY-NATIVE-SCOPE-NOT-GRANTED/u);
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
@@ -156,29 +185,167 @@ test("a child whose resolved modelName differs from the selected model is refuse
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
-test("a second code-writing child while one is alive is refused with the serialize repair; read-only roles and finished children do not block", async () => {
+// M4b restatement of the former serialization case ("a second code-writing child while one is alive is refused ..."). Measured instead
+// (scratch/agy-m4b-findings.md): Workspace "branch" in a git workspace gives every code writer its own worktree and branch, two writers run in
+// parallel without conflict, and a finished child's descriptor STAYS SUBAGENT_STATE_ALIVE -- so counting ALIVE writers would refuse every
+// later writer for good. The one-per-call and the ALIVE refusals are therefore gone; what is left is the isolation requirement.
+test("M4b: code-writing children run isolated with Workspace branch, in parallel, and a finished (still ALIVE) child never blocks the next one", async () => {
   const fx = brainFixture();
   try {
     const { evaluateNativeGoldfishParentCall } = await loadModule();
     const parentCall = (TypeName, extra) => ({ conversationId: PARENT, toolCall: flatCall(TypeName, extra) });
     const entry = (TypeName, extra = {}) => ({ TypeName, Role: "Goldfish", Prompt: "p", Model: "flash", ...extra });
-    descriptor(fx, CHILD, "goldfish-implementor");
-    const second = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic")]);
-    assert.equal(second.ok, false);
-    assert.equal(second.code, "AGY-NATIVE-CODE-WRITER-ALIVE");
-    assert.match(second.reason, /wait for the first child's (completion )?message/u);
-    // A read-only role may run beside it.
+    descriptor(fx, CHILD, "goldfish-implementor"); // ALIVE although it finished (M4b item 6)
+    const branch = (TypeName) => entry(TypeName, { Workspace: "branch" });
+    const next = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [branch("goldfish-mechanic")]);
+    assert.equal(next.ok, true, JSON.stringify(next));
+    // A read-only role may run beside them.
     assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("critic")), [entry("critic", { Model: "pro" })]).ok, true);
-    // A finished child no longer counts.
-    descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_COMPLETED");
-    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic")]).ok, true);
-    // Two code writers in one call, and an isolation request that is not measured, are refused too.
-    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")),
-      [entry("goldfish-mechanic"), entry("goldfish-implementor")]).ok, false);
-    const branch = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic", { Workspace: "branch" })]);
-    assert.equal(branch.ok, false);
-    assert.equal(branch.code, "AGY-NATIVE-WORKSPACE-UNMEASURED");
-    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic", { Workspace: "inherit" })]).ok, true);
+    // Two code writers in one call are admitted (parallel, separate worktrees).
+    const both = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [branch("goldfish-mechanic"), branch("goldfish-implementor")]);
+    assert.equal(both.ok, true, JSON.stringify(both));
+    // A code writer without the isolation, or with the shared tree, is refused with the exact repair.
+    for (const extra of [{}, { Workspace: "inherit" }, { Workspace: "share" }]) {
+      const refused = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic", extra)]);
+      assert.equal(refused.ok, false, JSON.stringify(extra));
+      assert.equal(refused.code, "AGY-NATIVE-WORKSPACE-NOT-ISOLATED");
+      assert.match(refused.reason, /Workspace: "branch"/u);
+    }
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// M4b item 2: the worktree starts at the committed HEAD, so changes of the parent that are not committed are invisible to the child.
+test("M4b: a parent tree with uncommitted tracked changes is refused before dispatch with the commit-first repair; untracked files do not block", async () => {
+  const fx = brainFixture();
+  try {
+    const { evaluateNativeGoldfishParentCall } = await loadModule();
+    const call = (extra) => payload(fx, { conversationId: PARENT, toolCall: flatCall("goldfish-mechanic", extra) });
+    const writer = [{ TypeName: "goldfish-mechanic", Role: "Goldfish", Prompt: "p", Model: "flash", Workspace: "branch" }];
+    writeFileSync(join(fx.workspace, "untracked.txt"), "new\n");
+    assert.equal(evaluateNativeGoldfishParentCall(call({ Workspace: "branch" }), writer).ok, true, "an untracked file is not a tracked change");
+    writeFileSync(join(fx.workspace, ".claude", "pipeline.json"), JSON.stringify({ project: "changed" }));
+    const dirty = evaluateNativeGoldfishParentCall(call({ Workspace: "branch" }), writer);
+    assert.equal(dirty.ok, false);
+    assert.equal(dirty.code, "AGY-NATIVE-WORKTREE-UNCOMMITTED");
+    assert.match(dirty.reason, /commit first/iu);
+    assert.ok(dirty.reason.includes(".claude/pipeline.json"), dirty.reason);
+    // Committing the change is the repair, and it works.
+    git(fx.workspace, "add", ".claude/pipeline.json");
+    git(fx.workspace, "commit", "-q", "-m", "change");
+    assert.equal(evaluateNativeGoldfishParentCall(call({ Workspace: "branch" }), writer).ok, true);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// M4b item 5: the worktree of a child is FIRST in workspacePaths; the registered-worktree check decides whose governance applies.
+test("M4b: a child's worktree is resolved to its parent repository only when it is a registered worktree of exactly that repository", async () => {
+  const fx = brainFixture();
+  try {
+    const { resolveNativeChildGovernance } = await loadModule();
+    const wt = worktreeFixture(fx);
+    const governed = resolveNativeChildGovernance(childPayload(fx, wt, { name: "view_file", args: {} }));
+    assert.equal(governed.status, "governed", JSON.stringify(governed));
+    assert.equal(governed.repoRoot, fx.workspace);
+    assert.equal(governed.worktreeRoot, wt.path);
+    // The second entry is optional: the git common dir alone names the repository.
+    assert.equal(resolveNativeChildGovernance({ workspacePaths: [wt.path] }).repoRoot, fx.workspace);
+    // The parent session and a plain directory are not worktrees.
+    assert.equal(resolveNativeChildGovernance({ workspacePaths: [fx.workspace] }).status, "not-worktree");
+    assert.equal(resolveNativeChildGovernance({ workspacePaths: [join(fx.base, "brain")] }).status, "not-worktree");
+    assert.equal(resolveNativeChildGovernance({}).status, "not-worktree");
+    // A worktree of ANOTHER repository must not borrow this repository's governance, nor may a payload pair it with this repository.
+    const other = join(fx.base, "other");
+    mkdirSync(other, { recursive: true });
+    git(other, "init", "-q");
+    writeFileSync(join(other, "a.txt"), "a\n");
+    git(other, "add", "a.txt");
+    git(other, "commit", "-q", "-m", "init");
+    const foreignPath = join(fx.base, "foreign-wt");
+    git(other, "worktree", "add", "-q", "-b", "subagent-foreign", foreignPath);
+    const foreign = resolveNativeChildGovernance({ workspacePaths: [realpathSync(foreignPath), fx.workspace] });
+    assert.equal(foreign.status, "unregistered", JSON.stringify(foreign));
+    // A registered worktree paired with a repository it does not belong to is refused too.
+    const mismatch = resolveNativeChildGovernance({ workspacePaths: [wt.path, other] });
+    assert.equal(mismatch.status, "unregistered", JSON.stringify(mismatch));
+    // A directory whose .git file merely POINTS at this repository's worktree area, without being registered there, is refused.
+    const forged = join(fx.base, "forged");
+    mkdirSync(forged, { recursive: true });
+    mkdirSync(join(fx.workspace, ".git", "worktrees", "forged"), { recursive: true });
+    writeFileSync(join(forged, ".git"), `gitdir: ${join(fx.workspace, ".git", "worktrees", "forged")}\n`);
+    const forgedVerdict = resolveNativeChildGovernance({ workspacePaths: [forged, fx.workspace] });
+    assert.equal(forgedVerdict.status, "unregistered", JSON.stringify(forgedVerdict));
+    // ... even when it also forges the back-link to a registered worktree's admin directory it does not own.
+    writeFileSync(join(fx.workspace, ".git", "worktrees", "forged", "gitdir"), join(wt.path, ".git"));
+    assert.equal(resolveNativeChildGovernance({ workspacePaths: [forged, fx.workspace] }).status, "unregistered");
+    // A .git file that is not a worktree pointer (a submodule) is simply not a worktree.
+    const submodule = join(fx.base, "submodule");
+    mkdirSync(submodule, { recursive: true });
+    writeFileSync(join(submodule, ".git"), "gitdir: ../.git/modules/sub\n");
+    assert.equal(resolveNativeChildGovernance({ workspacePaths: [submodule] }).status, "not-worktree");
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+test("M4b: a governed child's writes and shell are confined to its own worktree and are judged at the same relative path in the parent repository", async () => {
+  const fx = brainFixture();
+  try {
+    const { resolveNativeChildGovernance, nativeChildWriteRefusal, projectNativeChildInput } = await loadModule();
+    const wt = worktreeFixture(fx);
+    const governed = resolveNativeChildGovernance(childPayload(fx, wt, { name: "view_file", args: {} }));
+    assert.equal(governed.status, "governed");
+    const refusal = (args) => nativeChildWriteRefusal(governed, args);
+    assert.equal(refusal({ filePath: join(wt.path, "src", "a.mjs") }), null);
+    assert.equal(refusal({ filePath: "src/a.mjs" }), null, "a relative path resolves inside the worktree");
+    assert.equal(refusal({ filePath: join(wt.path, "src", "a.mjs"), cwd: wt.path }), null);
+    for (const outside of [join(fx.workspace, "src", "a.mjs"), join(wt.path, "..", "x.mjs"), "../x.mjs", join(fx.base, "elsewhere.txt")]) {
+      assert.match(refusal({ filePath: outside }) ?? "", /AGY-NATIVE-CHILD-WRITE-OUTSIDE-WORKTREE/u, outside);
+    }
+    assert.match(refusal({ cwd: fx.workspace }) ?? "", /AGY-NATIVE-CHILD-WRITE-OUTSIDE-WORKTREE/u);
+    // The refusal names the repair.
+    assert.match(refusal({ filePath: join(fx.workspace, "a.mjs") }), /Repair:/u);
+    // The projection puts every worktree path onto the parent repository, so one governance judges both with the same relative path.
+    const input = childPayload(fx, wt, { name: "write_to_file", args: { TargetFile: join(wt.path, "src", "a.mjs"), CodeContent: "x" } });
+    const projected = projectNativeChildInput(input, governed);
+    assert.deepEqual(projected.workspacePaths, [fx.workspace, wt.path]);
+    assert.equal(projected.toolCall.args.TargetFile, join(fx.workspace, "src", "a.mjs"));
+    const shell = projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status", Cwd: wt.path } }), governed);
+    assert.equal(shell.toolCall.args.Cwd, fx.workspace);
+    assert.equal(input.toolCall.args.TargetFile, join(wt.path, "src", "a.mjs"), "the original payload is not mutated");
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// Before this change a child in a branch worktree was ALLOWED EVERYTHING (measured with the old adapter: even `git push origin main`),
+// because the worktree is outside the project and carries no governance marker of its own.
+test("M4b: the adapter governs a child's call in its worktree with the parent repository's governance, and refuses a write into the parent tree", () => {
+  const fx = brainFixture();
+  try {
+    const wt = worktreeFixture(fx);
+    descriptor(fx, CHILD, "goldfish-implementor");
+    const shell = (CommandLine, Cwd) => ({ name: "run_command", args: { CommandLine, Cwd } });
+    // Governed like the parent: the push guard answers for the child exactly as it answers for the parent session.
+    const parentPush = runAdapter(fx, payload(fx, { conversationId: PARENT, toolCall: shell("git push origin main", fx.workspace) }));
+    assert.equal(parentPush.status, 2, `${parentPush.stdout}${parentPush.stderr}`);
+    const childPush = runAdapter(fx, childPayload(fx, wt, shell("git push origin main", wt.path)));
+    assert.equal(childPush.status, 2, `the child's push must be governed: ${childPush.stdout}${childPush.stderr}`);
+    // A write into the parent tree from the child is refused by name, never judged as an ordinary project write.
+    const intoParent = runAdapter(fx, childPayload(fx, wt, { name: "write_to_file", args: { TargetFile: join(fx.workspace, "a.txt"), CodeContent: "x" } }));
+    assert.equal(intoParent.status, 2, `${intoParent.stdout}${intoParent.stderr}`);
+    assert.match(intoParent.stdout, /AGY-NATIVE-CHILD-WRITE-OUTSIDE-WORKTREE/u);
+    // A write inside its own worktree is no longer a brain write (M4b item 2).
+    const inside = runAdapter(fx, childPayload(fx, wt, { name: "write_to_file", args: { TargetFile: join(wt.path, "a.txt"), CodeContent: "x" } }));
+    assert.doesNotMatch(inside.stdout, /AGY-NATIVE-BRAIN-WRITE|AGY-NATIVE-CHILD-WRITE-OUTSIDE-WORKTREE/u, inside.stdout);
+    // A governed child reads what it writes: a file that exists only in its worktree is readable and listable (not judged as a missing project file).
+    writeFileSync(join(wt.path, "own.txt"), "mine\n");
+    for (const toolCall of [{ name: "view_file", args: { AbsolutePath: join(wt.path, "own.txt") } }, { name: "list_dir", args: { DirectoryPath: wt.path } }]) {
+      const read = runAdapter(fx, childPayload(fx, wt, toolCall));
+      assert.equal(read.status, 0, `${toolCall.name}: ${read.stdout}${read.stderr}`);
+    }
+    // A worktree-shaped directory that is not registered with the parent repository is refused, not waved through ungoverned.
+    const forged = join(fx.base, "forged");
+    mkdirSync(forged, { recursive: true });
+    mkdirSync(join(fx.workspace, ".git", "worktrees", "forged"), { recursive: true });
+    writeFileSync(join(forged, ".git"), `gitdir: ${join(fx.workspace, ".git", "worktrees", "forged")}\n`);
+    const unregistered = runAdapter(fx, { ...childPayload(fx, wt, shell("git push origin main", forged)), workspacePaths: [forged, fx.workspace] });
+    assert.equal(unregistered.status, 2, `${unregistered.stdout}${unregistered.stderr}`);
+    assert.match(unregistered.stdout, /AGY-NATIVE-WORKTREE-UNREGISTERED/u);
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
@@ -190,6 +357,17 @@ test("an agent write under the Antigravity brain or config directory is refused"
     assert.match(nativeBrainWriteRefusal({ filePath: descriptorPath, command: "" }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.match(nativeBrainWriteRefusal({ filePath: "/home/u/.gemini/antigravity-cli/brain/x/y.json", command: "" }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.equal(nativeBrainWriteRefusal({ filePath: join(fx.workspace, "src", "a.mjs"), command: "" }), null);
+    // M4b item 2: only the host-owned parts are protected. A child's own worktree lives below <home>/.gemini/antigravity-cli/worktrees/ and is
+    // writable; brain/, config/ and .system_generated/ stay refused, also when a path climbs out of worktrees/ or a Windows spelling is used.
+    const cli = "/home/u/.gemini/antigravity-cli";
+    assert.equal(nativeBrainWriteRefusal({ filePath: `${cli}/worktrees/${PARENT}/subagent-x/src/a.mjs`, command: "" }), null);
+    assert.equal(nativeBrainWriteRefusal({ filePath: "C:\\Users\\u\\.gemini\\antigravity-cli\\worktrees\\p\\subagent-x\\a.mjs", command: "" }), null);
+    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `git -C ${cli}/worktrees/${PARENT}/subagent-x commit -q` }), null);
+    for (const filePath of [`${cli}/brain/${PARENT}/x.json`, `${cli}/worktrees/../brain/${PARENT}/x.json`, "/home/u/.gemini/config/c.json",
+      `${cli}/worktrees/${PARENT}/subagent-x/.system_generated/subagents/y.json`, "C:\\Users\\u\\.gemini\\antigravity-cli\\brain\\p\\x.json"]) {
+      assert.match(nativeBrainWriteRefusal({ filePath, command: "" }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, filePath);
+    }
+    assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${cli}/worktrees/../brain/x.json` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${descriptorPath}` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `cat ${descriptorPath}` }), null);
     const res = runAdapter(fx, payload(fx, {
@@ -198,4 +376,99 @@ test("an agent write under the Antigravity brain or config directory is refused"
     assert.equal(res.status, 2, `${res.stdout}${res.stderr}`);
     assert.match(res.stdout, /AGY-NATIVE-BRAIN-WRITE/u);
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// M4b item 3: nothing is merged, copied or patched back automatically; the child's commit sits on its branch in the shared object database.
+// The Elephant's sanctioned take-over is scripts/agy-native-integrate.mjs: plan (read-only), then apply with the plan's digest, which lands the
+// branch's NET change uncommitted in the working tree. The existing host-commit recovery (goldfish-host-commit-recover.mjs) then makes the
+// ordinary dispatch-trailer commit, so the commit route is unchanged and nothing mutating needs a command the guard cannot admit.
+function childWork(fx, wt, files) {
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(wt.path, name)), { recursive: true });
+    writeFileSync(join(wt.path, name), text);
+    git(wt.path, "add", name);
+  }
+  git(wt.path, "commit", "-q", "-m", "child work");
+}
+
+test("M4b: the Elephant takes over a finished child's branch with plan then apply; the net change lands uncommitted and the host-commit recovery commits it", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const recover = await import("../../scripts/goldfish-host-commit-recover.mjs");
+    const wt = worktreeFixture(fx);
+    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n" });
+    const head = git(fx.workspace, "rev-parse", "HEAD");
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const planned = integrate.plan(options);
+    assert.equal(planned.status, "ready", JSON.stringify(planned));
+    assert.deepEqual(planned.paths, ["src/a.mjs"]);
+    assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(existsSync(join(fx.workspace, "src", "a.mjs")), false, "plan is read-only");
+    // A wrong digest, or a refused plan, applies nothing and leaves no state.
+    const wrong = integrate.apply({ ...options, expect: "0".repeat(64) });
+    assert.equal(wrong.status, "refused");
+    assert.equal(wrong.code, "AGYI-PLAN-DIGEST-MISMATCH");
+    assert.equal(existsSync(join(fx.workspace, "src", "a.mjs")), false);
+    const applied = integrate.apply({ ...options, expect: planned.planSha256 });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 1;\n");
+    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "apply commits nothing");
+    assert.equal(git(fx.workspace, "diff", "--cached", "--name-only"), "", "apply stages nothing");
+    assert.match(applied.next, /goldfish-host-commit-recover\.mjs plan/u);
+    // The recovery route sees exactly that result.
+    const recovered = recover.plan({ verb: "plan", root: fx.workspace, dispatchId: "C20-G208B-AGY-ISOLATION", allowed: ["src/a.mjs"], paths: [], expect: null, briefing: null, handback: null });
+    assert.equal(recovered.status, "ready", JSON.stringify(recovered));
+    assert.deepEqual(recovered.paths, ["src/a.mjs"]);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+test("M4b: the take-over refuses with a typed repair and leaves no state: unknown branch, no scope, paths outside the scope, dirty target, moved HEAD", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n", "docs/b.md": "b\n" });
+    const base = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs", "docs/b.md"], expect: null };
+    const code = (options) => integrate.plan({ ...base, ...options }).refusals?.[0]?.code;
+    assert.equal(code({ branch: "main" }), "AGYI-BRANCH");
+    assert.equal(code({ branch: "subagent-does-not-exist" }), "AGYI-BRANCH-UNKNOWN");
+    assert.equal(code({ allowed: [] }), "AGYI-ALLOWED-REQUIRED");
+    assert.equal(code({ allowed: ["src/a.mjs"] }), "AGYI-PATH-OUTSIDE-ALLOWED");
+    const refused = integrate.plan({ ...base, allowed: ["src/a.mjs"] });
+    assert.ok(refused.refusals[0].next.length > 0, "every refusal names the repair");
+    // A target path the Elephant changed itself would be mixed with the child's result: refused.
+    mkdirSync(join(fx.workspace, "docs"), { recursive: true });
+    writeFileSync(join(fx.workspace, "docs", "b.md"), "mine\n");
+    assert.equal(code({}), "AGYI-PATH-DIRTY");
+    rmSync(join(fx.workspace, "docs"), { recursive: true, force: true });
+    assert.equal(code({}), undefined, "the plan is ready once the target is clean again");
+    // The parent moved on and changed a path the child also changed: the change no longer applies; nothing is written.
+    mkdirSync(join(fx.workspace, "src"), { recursive: true });
+    writeFileSync(join(fx.workspace, "src", "a.mjs"), "export const a = 0;\n");
+    git(fx.workspace, "add", "src/a.mjs");
+    git(fx.workspace, "commit", "-q", "-m", "parent edits the same file");
+    const conflict = integrate.plan(base);
+    assert.equal(conflict.status, "refused");
+    assert.equal(conflict.refusals[0].code, "AGYI-APPLY-CONFLICT");
+    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 0;\n");
+    assert.equal(git(fx.workspace, "status", "--porcelain"), "?? .agent-pipeline/", "refused plan left nothing behind");
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
+  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+  const root = realpathSync(resolve(libDir, "..", "..", ".."));
+  const entry = resolve(root, "plugins/pipeline-core/scripts/agy-native-integrate.mjs");
+  const admitted = (args) => isSanctionedLifecycleCommand(`node '${entry}' ${args}`, root);
+  const branch = "subagent-Goldfish-goldfish-implementor-1a2b3c";
+  assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt`), true);
+  assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt --allowed-path c.md`), true);
+  assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)}`), true);
+  for (const args of [
+    "", "plan", `plan --root '${root}'`, `plan --root '${root}/x' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch main --allowed-path a`,
+    `plan --root '${root}' --branch ${branch}`, `plan --root '${root}' --branch ${branch} --allowed-path ../x`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)}`,
+    `plan --root '${root}' --branch ${branch} --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --force`,
+  ]) assert.equal(admitted(args), false, args);
 });

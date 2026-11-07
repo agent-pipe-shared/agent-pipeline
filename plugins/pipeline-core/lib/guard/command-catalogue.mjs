@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
+import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -586,6 +586,24 @@ function sanctionedHostCommitRecoverArgs(args, root) {
   return args[0] === "plan" ? !expect : expect;
 }
 
+// C20 G20-8 B (M4b): scripts/agy-native-integrate.mjs takes over a native Goldfish's branch worktree result. Exact argv only:
+// `plan --root <root> --branch <subagent-...> --allowed-path <p>...` or the same with `apply` and one `--expect-sha256 <64 hex>`.
+// plan writes nothing; apply changes the working tree only (never the index, HEAD or a ref), all-or-nothing.
+function sanctionedAgyNativeIntegrateArgs(args, root) {
+  if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+  const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
+    && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+  let branch = false, expect = false, allowedCount = 0;
+  for (let index = 3; index < args.length; index += 2) {
+    const flag = args[index], value = args[index + 1];
+    if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
+    else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
+    else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
+    else return false;
+  }
+  return branch && allowedCount > 0 && (args[0] === "apply" ? expect : !expect);
+}
+
 // G20-20: only the read-only verbs, each with exactly its own flags: `inspect --root <root>`, `inspect-aside --root <root>
 // --aside <name>`, `wait --root <root> [--timeout <1-600>]`. Every mutating verb (heal, move-aside, release-lock, take-over) stays
 // outside this lane.
@@ -600,6 +618,7 @@ function sanctionedSessionAuthorityRepairReadArgs(args, root) {
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
+  if (script === AGY_NATIVE_INTEGRATE_SCRIPT) return sanctionedAgyNativeIntegrateArgs(args, root);
   if (script === ROUTINE_REPAIR_SCRIPT) return sanctionedRoutineRepairArgs(args, root);
   if (script === PHOENIX_AUTHORITY_REVISION_SCRIPT) return sanctionedPhoenixRevisionArgs(args, root);
   if (script === ARCHITECTURE_ADOPTION_SCRIPT || script === ARCHITECTURE_MEASURE_SCRIPT || script === ARCHITECTURE_FITNESS_SCRIPT) {

@@ -214,6 +214,8 @@ export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/
 // exports of this module) resolves every separator / drive-letter-case / MSYS spelling of them, like every other sanctioned script.
 export const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
 export const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+// C20 G20-8 B (M4b): the Elephant's take-over of a native Goldfish's branch worktree result; its commit is the recovery script above.
+export const AGY_NATIVE_INTEGRATE_SCRIPT = fileURLToPath(new URL("../../scripts/agy-native-integrate.mjs", import.meta.url));
 // C20 G20-20 (Claude on Windows, greenfield): every SDC-AUTHORITY-UNAVAILABLE / SDC-LOCK-HELD refusal names
 // `session-authority-repair.mjs inspect` (or `wait`) as the diagnosis, and in a draft feature the devplan lane refused exactly
 // that command as an opaque script. Its read-only verbs are admitted by an exact grammar in command-catalogue.mjs.
