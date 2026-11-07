@@ -3,7 +3,7 @@
 
 import { readOnlyGitApplyCheckArguments } from "../protected-test-paths.mjs";
 import { homedir } from "node:os";
-import { lstatSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
@@ -1321,15 +1321,24 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
     });
   }
   let index = 0;
+  let operandRoot = root;
   while (index < args.length && args[index].startsWith("-")) {
     if (args[index] === "-C") {
-      // The directory must be a real (non-symlink) directory inside the project/approved roots.
+      // The directory must be a real (non-symlink) directory inside the project/approved roots -- or (C20 G20-34, PO decision
+      // 2026-11-07) another Git repository outside them that the passive read policy admits (the same credential-root rule the
+      // native Read lane applies: reading outside the project is allowed, credential roots are not). Only the read-only
+      // subcommands below are admitted for it, and their path operands must stay inside THAT repository.
       const target = args[index + 1];
       if (typeof target !== "string" || target === "" || target.startsWith("-")) return false;
       const directory = resolve(root, target);
       try {
         if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) return false;
-        if (!isApprovedSingleCommandReadArg(realpathSync(directory), root, extraRoots, true)) return false;
+        const real = realpathSync(directory);
+        if (!isApprovedSingleCommandReadArg(real, root, extraRoots, true)) {
+          if (!existsSync(join(real, ".git"))
+            || !isAllowedPassiveReadTarget(real, { rootDir: root, recursive: true })) return false;
+          operandRoot = real;
+        }
       } catch { return false; }
       index += 2;
     } else if (["--no-pager", "-p", "--literal-pathspecs"].includes(args[index])) {
@@ -1341,7 +1350,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
   const subcommand = args[index];
   const subargs = args.slice(index + 1);
   return isReadOnlyGitSubcommand(subcommand, subargs)
-    && areGitReadOperandsInsideRoot(subcommand, subargs, root);
+    && areGitReadOperandsInsideRoot(subcommand, subargs, operandRoot);
 }
 
 // C6g1 F3 (ALF-C-C6G1-CORR-A, refined by ALF-C-C6G1-CORR-A2 under the PO decision of 2026-10-17): the output/execution denylist
