@@ -769,6 +769,27 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     readback. Not changed.
     Info: submit-plan records a plan-submission rigor row deriving `feature` even for `--profile mini` (unavailable inputs), so
     the close demands the Critic audit route for practically every consumer close; consistent with the floor design.
+  - **PO tiles (2026-11-07 evening):** G20-37 "So lassen" (the Antigravity start hint keeps asking and waiting; no change).
+    G20-38 "Agent bei unverändertem Paket": built as w267. G20-35 finding 1 → G20-39 "Producer + Brücke": built as w268.
+  - **w266 (G20-35 last part, held `b48c4cff5`, in w252 `f4e9c1d3d`):** the walk runs the audit route to closed-local, the
+    Critic-bound push Verify, push-prepare `ready`, the push guard (blocked before, admitted after approve-push) and pins the
+    consumer release-preflight refusal (`RPC-INPUT: VERSION`; no consumer release route exists yet). The Critic bound before the
+    close IS carried to the pushed commit on all three runners. Fixed: Verify evidence is registered only under
+    `specs/<feature>/evidence/` (it registered anywhere and failed only at push time). Signature-mode push approval not walked.
+  - **G20-39 (w268, held `a72c582f1`, in w252 `2de3eecda`):** G20-24 plus C19-D2b made every rigor >= 1 close unreachable (the
+    finalizer labels a missing Source return `caller-authored-fallback`, the close accepts that only at rigor 0, the named repair
+    was not runnable). Producer: the Critic subagent's SubagentStop (Claude, Codex; the existing native-goldfish-host hook)
+    issues `pipeline.session-critic-source-return.v1` bound to the claimed packet and the verdict the Critic returned; the
+    finalizer reads it. Bridge: `approve-critic-acknowledgement --by <name> --critic-packet <id>` (chat or signature) admits the
+    identical close for exactly that packet, receipt digest and candidate; the refusal names it. HONEST LIMIT: Antigravity has no
+    producer yet (its stop event is measured in M4c/M14), so there a rigor >= 1 close needs this acknowledgement as a third
+    per-feature PO interaction. The acknowledgement reference is not yet carried into the close record (closed audit shape);
+    signature mode is rendered, not walked. The Critic must return its verdict as the last fenced json block (critic-review skill).
+  - **G20-38 (w267, held `ba8e31f07`, in w252 `9ba3cb66a`):** a reconcile plan that changes only result-class entries runs
+    agent-side with a readback and a ledger record labelled as carrying no PO proof; any other change keeps the PO signature.
+  - **G20-40 (Elephant, in w252 `7f6dbbaae`):** two Goldfish launched in one message collided: the pre-launch publish capped its
+    lock retry at 60 s from the first attempt, a 64 s prescan used it up, and the sibling's lock refused SDC-LOCK-HELD; the window
+    is now the remaining admission budget (NGHS65 RED then green, suite 79/79). The ~150 s admission in this repository stays slow.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## Moved from docs/state.md (2026-11-07, size cap): candidate 18/19 verification line, verbatim
