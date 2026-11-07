@@ -1,0 +1,623 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index fcbcbdca0..af89a1188 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -34,6 +34,14 @@ that a single module leaves no slice that can run in parallel. This is a
+ question in the review, never a block, and a justified single module (one
+ responsibility, small scope) is not a finding.
+ 
++Journeys: read each user-facing acceptance criterion of the Spec for the journeys
++and state transitions that prove it (every entry path, a reload in the middle of a
++transition, a second action after an error, a concurrent import, every dynamic text
++context) and for the actual effect asserted, not only that text changed. A
++criterion that names none is not ready: raise it as a finding naming the criterion
++and the typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and
++an `Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
++
+ Decisions to record: read the design for choices that need an ADR (module
+ boundaries, data keeping, offline and error strategy, a security trade-off). When
+ the design makes such a choice and no module names an ADR path for it in
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index 449f7ced3..3fa731e1a 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -10,14 +10,18 @@
+ //   critic-report-file    present when specs/<feature>/evidence/critic/<packetId>/report.md exists for any packet (written by exportSessionCriticEvidence); missing when none does.
+ //                         When the receipts are readable the row names a PASSING review's report (the last in listing order) and is missing when every report records a fail.
+ //   handover-freshness    present when the handover file was last updated no more than HANDOVER_FRESHNESS_BOUND_MS before the last commit, missing when it is older.
++//   journey-coverage      (G20-27) per user-facing criterion of specs/<feature>/spec.md: covered when it names journeys and an asserted effect, else not covered.
++//                         The evidence lists every such criterion as `AC-n: covered` / `AC-n: not covered`; present when none is not covered, not-applicable
++//                         when the Spec has no user-facing criterion, unknown when the Spec cannot be read.
+ // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
+ // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+ import { createHash } from "node:crypto";
+ import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
++import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
+ 
+ export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
+-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
+ export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
+ export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
+ 
+@@ -116,6 +120,19 @@ function criticRow(readers, featureId) {
+   return row(id, "present", reports[0].path);
+ }
+ 
++// G20-27: per user-facing criterion of the Spec, covered / not covered by a named journey and an asserted effect (never a bare count).
++function journeyRow(readers, specPath) {
++  const id = "journey-coverage";
++  const bytes = call(readers.readBytes, specPath);
++  if (!bytes.ok) return unknown(id, JOURNEY_REPAIR);
++  let coverage;
++  try { coverage = inspectSpecJourneys(Buffer.from(bytes.value).toString("utf8")); } catch { return unknown(id, JOURNEY_REPAIR); }
++  const userFacing = coverage.criteria.filter((entry) => entry.status !== "not-user-facing");
++  if (userFacing.length === 0) return row(id, "not-applicable");
++  const listing = userFacing.map((entry) => `${entry.id}: ${entry.status === "covered" ? "covered" : `not covered (no ${entry.missing.join(", no ")})`}`).join("; ");
++  return coverage.notCovered.length === 0 ? row(id, "present", `${specPath} (${listing})`) : row(id, "missing", `${specPath} (${listing})`, JOURNEY_REPAIR);
++}
++
+ function handoverRow(readers, handoverPath) {
+   const id = "handover-freshness";
+   const updated = call(readers.handoverUpdatedMs);
+@@ -124,13 +141,14 @@ function handoverRow(readers, handoverPath) {
+   return head.value - updated.value <= HANDOVER_FRESHNESS_BOUND_MS ? row(id, "present", handoverPath) : row(id, "missing", handoverPath);
+ }
+ 
+-export function closeQualityReadback({ featureId, handoverPath = "docs/state.md", readers = {} } = {}) {
++export function closeQualityReadback({ featureId, handoverPath = "docs/state.md", specPath = `specs/${featureId}/spec.md`, readers = {} } = {}) {
+   return [
+     securityRow(readers),
+     adrRow(readers),
+     fitnessRow(readers, featureId),
+     criticRow(readers, featureId),
+     handoverRow(readers, handoverPath),
++    journeyRow(readers, specPath),
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index cd1516533..62fd68e97 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -23,15 +23,20 @@ const full = (over = {}) => ({
+ });
+ const rows = (readers) => Object.fromEntries(closeQualityReadback({ root: "<root>", featureId: FEATURE, readers }).map((r) => [r.id, r]));
+ 
++// QG-04 restatement (C20 G20-27, AC-108): the original five ids are unchanged and keep their order and shape; the readback gained a sixth,
++// appended row, "journey-coverage", whose cases live in lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs. `full()`
++// carries no Spec reader, so that row is "unknown" here (never "present" without a signal), and the original "every row is present"
++// assertion now covers the five original rows.
+ test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
+   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
+-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
+   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
+   for (const row of list) {
+     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
+     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
+   }
+-  assert.ok(list.every((r) => r.status === "present"), JSON.stringify(list));
++  assert.ok(list.filter((r) => r.id !== "journey-coverage").every((r) => r.status === "present"), JSON.stringify(list));
++  assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
+ });
+ 
+ test("AC-239 security-scan: present with the envelope path, missing with the scan command, unknown when unreadable", () => {
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 7d46ecdc2..94b0d8e57 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -346,6 +346,7 @@ ${verify}
+   2. Implement.
+   3. Run exactly those cases GREEN, correct the implementation until they pass, then run the targeted checks below.
+   A case written in step 1 is changed after step 2 only with a written justification in the report that ties it to the criterion; never weaken it to make the implementation pass. Update only the cases the owned outcome needs.
++- Journey coverage: for a user-facing criterion, examine whole user journeys and state transitions, not only the unit - every entry path, a reload in the middle of a transition, a second action after an error, a concurrent import, every dynamic text context the Spec names - and assert the actual effect (stored state or produced output), not only that text changed. Report journey coverage per criterion as covered / not covered.
+ - Test fixtures mirror the real input, absolute paths included where a hook receives them.
+ - A new test FILE is not run by Verify until it is registered in the project's Verify suite list; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.${visualCheckBlock(pkg)}
+ 
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+new file mode 100644
+index 000000000..8b4340d4e
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -0,0 +1,160 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Pin: acceptance criteria are examined as whole user journeys and state transitions, not only as units (C20 finding G20-27, AC-108).
++ * Item: sprint-alfred-epic.c20-g2027-acceptance-criteria-are-examined-as-whole-user-journeys-and-state-transitions.
++ *
++ * Origin: the Codex greenfield report P0 row "Produktfehler und unzureichende Examiner" - green unit tests missed stored-HTML execution,
++ * play without a timer, an overwrite after an import with the same revision and the loss of the rescue candidate.
++ *
++ * Points (each case is written from these, not from the code):
++ *  J1 a Spec whose user-facing criterion names no journey is NOT ready: typed code PLR-HANDOFF-NO-JOURNEY at the plan hand-off,
++ *     naming every such criterion and one runnable repair; a Spec that names journeys and the asserted effect is ready.
++ *  J2 an effect that is only "text changed" does not count as an assertion on the actual effect.
++ *  J3 a criterion is not user-facing only by an explicit, reasoned tag; a bare "not user-facing" tag is not an exemption.
++ *  J4 the Spec template, the Critic review template and the Goldfish test-authorship briefing (template AND generated text) carry the
++ *     duty, root and vendored copy byte-identical; the readiness reviewer asks the question.
++ *  J5 the close readback reports journey coverage PER criterion as covered / not covered, never a bare count; unreadable is unknown.
++ * Reads the real files; the Spec fixtures are written to a temporary project directory.
++ */
++import test from "node:test";
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { fileURLToPath } from "node:url";
++
++const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
++const read = (rel) => readFileSync(join(root, rel), "utf8").replace(/\r\n/g, "\n");
++const flat = (text) => text.replace(/\s+/g, " ");
++const has = (text, pattern, message) => assert.ok(pattern.test(text), message);
++const load = async (rel) => {
++  const mod = await import(new URL(`../../${rel}`, import.meta.url)).catch(() => null);
++  assert.ok(mod, `plugins/pipeline-core/${rel} must exist and load`);
++  return mod;
++};
++
++const TABLE_HEAD = ["# Spec", "", "## Acceptance criteria", "", "| # | Criterion | Evidence |", "|---|---|---|"];
++const spec = (...rows) => [...TABLE_HEAD, ...rows, ""].join("\n");
++const RELOAD = "WHEN the user imports a backup, THE SYSTEM SHALL keep the current candidate.";
++const JOURNEYS = "Journeys: import from the menu and from the drop zone; reload in the middle of the import; a second import after an error; two imports at once. Asserts: the stored candidate still equals the pre-import candidate byte for byte.";
++// The Evidence cell names no test path on purpose: a path would send the hand-off inspection to git, which a temporary directory is not.
++const UNJOURNEYED = `| AC-1 | ${RELOAD} | named suite |`;
++const JOURNEYED = `| AC-1 | ${RELOAD} ${JOURNEYS} | named suite |`;
++const INTERNAL = "| AC-2 | WHEN the parser reads an empty list, THE SYSTEM SHALL return an empty list. | named suite |";
++
++function withProject(specText, run) {
++  const dir = mkdtempSync(join(tmpdir(), "g2027-"));
++  try {
++    mkdirSync(join(dir, "specs", "feat"), { recursive: true });
++    writeFileSync(join(dir, "specs", "feat", "spec.md"), specText);
++    return run(dir);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++}
++const handoff = async (specText) => {
++  const { inspectPlanDeliveryHandoff } = await load("lib/plan-handoff-readiness.mjs");
++  return withProject(specText, (dir) => inspectPlanDeliveryHandoff(
++    { rootDir: dir, specPath: "specs/feat/spec.md", expectedSpecSha256: createHash("sha256").update(readFileSync(join(dir, "specs", "feat", "spec.md"))).digest("hex") },
++    { observeScope: () => ({ requiresEnforcement: true }) }));
++};
++
++test("J1 a governed Spec whose user-facing criterion names no journey is not ready, with a typed code, the criterion and a repair", async () => {
++  const { PLAN_HANDOFF_CODES, planHandoffRefusal } = await load("lib/plan-handoff-readiness.mjs");
++  assert.ok(PLAN_HANDOFF_CODES.includes("PLR-HANDOFF-NO-JOURNEY"));
++  const verdict = await handoff(spec(UNJOURNEYED, INTERNAL));
++  assert.equal(verdict.ok, false, JSON.stringify(verdict));
++  assert.equal(verdict.code, "PLR-HANDOFF-NO-JOURNEY");
++  assert.match(verdict.message, /AC-1/u);
++  assert.doesNotMatch(verdict.message, /AC-2/u, "an internal criterion is not accused");
++  const text = planHandoffRefusal("submit-plan", verdict);
++  assert.match(text, /Repair: .*Journeys:.*Asserts:/u, "the repair names the clause to add");
++  assert.match(text, /then run submit-plan again/u);
++});
++
++test("J1 the same Spec with the journeys and the asserted effect is ready", async () => {
++  const verdict = await handoff(spec(JOURNEYED, INTERNAL));
++  assert.equal(verdict.ok, true, JSON.stringify(verdict));
++  assert.equal(verdict.code, "PLR-HANDOFF-READY");
++});
++
++test("J1 the clause works in a bullet criterion with an indented continuation line too", async () => {
++  const { inspectSpecJourneys } = await load("lib/spec-journey-coverage.mjs");
++  const body = (extra) => ["# Spec", "", "## Acceptance criteria", "", `- **AC-3:** ${RELOAD}`, ...extra, ""].join("\n");
++  assert.deepEqual(inspectSpecJourneys(body([])).notCovered, ["AC-3"]);
++  assert.deepEqual(inspectSpecJourneys(body([`  ${JOURNEYS}`])).notCovered, []);
++});
++
++test("J2 journeys without an effect assertion, or an effect that is only 'text changed', do not count", async () => {
++  const { inspectSpecJourneys } = await load("lib/spec-journey-coverage.mjs");
++  const only = (clause) => inspectSpecJourneys(spec(`| AC-1 | ${RELOAD} ${clause} | t |`)).criteria[0];
++  assert.equal(only("Journeys: menu import; reload mid import.").status, "not-covered");
++  assert.deepEqual(only("Journeys: menu import; reload mid import.").missing, ["effect"]);
++  assert.equal(only("Journeys: menu import. Asserts: text changed.").status, "not-covered");
++  assert.equal(only("Journeys: menu import. Asserts: the label is updated.").status, "not-covered");
++  assert.equal(only("Asserts: the stored candidate is unchanged.").status, "not-covered");
++  assert.deepEqual(only("Asserts: the stored candidate is unchanged.").missing, ["journeys"]);
++  assert.equal(only("Journeys: <list the journeys>. Asserts: <effect>.").status, "not-covered", "a skeleton placeholder is no journey");
++  assert.equal(only("Journeys: {{every entry path; reload}}. Asserts: {{the actual effect}}.").status, "not-covered", "the Spec template's own placeholder is no journey");
++  assert.equal(only("Journeys: menu import. Asserts: the stored candidate is unchanged after reload.").status, "covered");
++});
++
++test("J3 only a reasoned 'not user-facing' tag exempts a criterion; the explicit user-facing tag forces the duty", async () => {
++  const { inspectSpecJourneys } = await load("lib/spec-journey-coverage.mjs");
++  const one = (text) => inspectSpecJourneys(spec(`| AC-1 | ${text} | t |`)).criteria[0];
++  assert.equal(one("WHEN the user opens the page, THE SYSTEM SHALL show it. [not user-facing: logging only]").status, "not-user-facing");
++  assert.equal(one("WHEN the user opens the page, THE SYSTEM SHALL show it. [not user-facing]").status, "not-covered", "no reason, no exemption");
++  assert.equal(one("WHEN the user opens the page, THE SYSTEM SHALL show it. [not user-facing: {{reason}}]").status, "not-covered", "an unfilled reason exempts nothing");
++  assert.equal(one("WHEN the cache expires, THE SYSTEM SHALL refill it. [user-facing]").status, "not-covered");
++  assert.equal(one("WHEN the cache expires, THE SYSTEM SHALL refill it.").status, "not-user-facing");
++  assert.equal(inspectSpecJourneys(spec()).criteria.length, 0);
++});
++
++test("J4 the Spec template, the Critic template and the Goldfish test-authorship briefing carry the journey duty (root = vendored copy)", () => {
++  const spec = flat(read("templates/spec.md"));
++  for (const needle of ["Journeys:", "Asserts:", "[user-facing]", "reload in the middle of a transition", "concurrent import", "every dynamic text context", "second action after an error"]) {
++    assert.ok(spec.includes(needle), `templates/spec.md names "${needle}"`);
++  }
++  // `has` instead of assert.match: a failing assert.match prints the whole template.
++  for (const rel of ["templates/prompts/critic-review.md", "plugins/pipeline-core/templates/prompts/critic-review.md"]) {
++    const text = flat(read(rel));
++    has(text, /Journey coverage/u, `${rel} names journey coverage`);
++    has(text, /a missing journey is a finding/u, `${rel} makes a missing journey a finding`);
++  }
++  for (const rel of ["templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md"]) {
++    const text = flat(read(rel));
++    has(text, /Journey coverage/u, `${rel} names journey coverage`);
++    has(text, /actual effect/u, `${rel} demands an assertion on the actual effect`);
++    has(text, /not only "text changed"/u, `${rel} rules out "text changed" alone`);
++  }
++  for (const name of ["critic-review", "goldfish-task"]) {
++    assert.equal(read(`templates/prompts/${name}.md`), read(`plugins/pipeline-core/templates/prompts/${name}.md`), `${name}: root and vendored copy are byte-identical`);
++  }
++});
++
++test("J4 the generated Goldfish briefing and the readiness reviewer carry the duty", () => {
++  const build = flat(read("plugins/pipeline-core/lib/dispatch-briefing-build.mjs"));
++  has(build, /whole user journeys/u, "the generated test-first block names whole user journeys");
++  has(build, /actual effect/u, "the generated test-first block demands the actual effect");
++  const reviewer = flat(read("plugins/pipeline-core/agents/readiness-reviewer.md"));
++  has(reviewer, /PLR-HANDOFF-NO-JOURNEY/u, "the readiness reviewer names the typed code");
++  has(reviewer, /journey/iu, "the readiness reviewer asks about journeys");
++});
++
++test("J5 the close readback reports journey coverage per criterion as covered / not covered, never a bare count", async () => {
++  const { closeQualityReadback, QUALITY_ROW_IDS } = await load("lib/close-quality-readback.mjs");
++  assert.ok(QUALITY_ROW_IDS.includes("journey-coverage"));
++  const rowFor = (readers) => closeQualityReadback({ featureId: "feat", readers }).find((row) => row.id === "journey-coverage");
++  const bytes = (text) => ({ readBytes: (rel) => { if (rel !== "specs/feat/spec.md") throw new Error("absent"); return Buffer.from(text); } });
++  const mixed = rowFor(bytes(spec(JOURNEYED, UNJOURNEYED.replace("AC-1", "AC-4"), INTERNAL)));
++  assert.equal(mixed.status, "missing");
++  assert.match(mixed.evidence, /AC-1: covered/u);
++  assert.match(mixed.evidence, /AC-4: not covered/u);
++  assert.doesNotMatch(mixed.evidence, /AC-2/u);
++  assert.match(mixed.remedy, /Journeys:/u);
++  const covered = rowFor(bytes(spec(JOURNEYED, INTERNAL)));
++  assert.equal(covered.status, "present");
++  assert.match(covered.evidence, /AC-1: covered/u);
++  assert.equal(rowFor(bytes(spec(INTERNAL))).status, "not-applicable");
++  assert.equal(rowFor({}).status, "unknown", "no reader, no claim");
++  assert.equal(rowFor({ readBytes: () => { throw new Error("x"); } }).status, "unknown");
++});
+diff --git a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+index e65bf082e..9b2b49f58 100644
+--- a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
++++ b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+@@ -32,9 +32,10 @@ import { observeGovernanceScope } from './governance-scope.mjs';
+ import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from './critic-accepted-contract.mjs';
+ import { validateItemDeliveryBriefing } from './native-goldfish-host-return.mjs';
+ import { readConsumerVerifyConfiguration } from './consumer-verify.mjs';
++import { inspectSpecJourneys, JOURNEY_REPAIR } from './spec-journey-coverage.mjs';
+ 
+ export const PLAN_HANDOFF_CODES = Object.freeze([
+-  'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-SPEC-UNREADABLE',
++  'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-NO-JOURNEY', 'PLR-HANDOFF-SPEC-UNREADABLE',
+   'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-CHECK-UNREGISTERED', 'PLR-HANDOFF-UNAVAILABLE',
+ ]);
+ 
+@@ -94,6 +95,8 @@ function checkState(root, path) {
+ // One runnable repair per not-ready code. Every repair is an edit the author can make plus the command to re-run.
+ const HANDOFF_REPAIRS = Object.freeze({
+   'PLR-HANDOFF-NO-CRITERION': 'add a normative acceptance-criterion table to the Spec (header row, then rows such as `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |`, or numbered `1` / `R-2` rows under an acceptance-criteria heading), commit it',
++  // A getter: spec-journey-coverage.mjs and this module sit in one import cycle through the host parser, so the constant is read at call time.
++  get 'PLR-HANDOFF-NO-JOURNEY'() { return JOURNEY_REPAIR; },
+   'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
+   'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
+   'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
+@@ -156,6 +159,14 @@ export function inspectPlanDeliveryHandoff(input, deps = {}) {
+     }
+     if (admitted.length === 0) return refuse('PLR-HANDOFF-NO-CRITERION', 'the Spec has no normative acceptance criterion row the host parser admits for a delivery briefing');
+ 
++    // G20-27: a user-facing criterion is examined as whole journeys and state transitions. One that names no journey, or no asserted
++    // effect, is not ready (the Spec text decides; same reading as the close readback).
++    const unjourneyed = inspectSpecJourneys(source).criteria.filter((entry) => entry.status === 'not-covered');
++    if (unjourneyed.length > 0) {
++      const named = unjourneyed.slice(0, 20).map((entry) => `${entry.id} (no ${entry.missing.map((part) => (part === 'journeys' ? 'journey named' : 'asserted effect')).join(', no ')})`).join('; ');
++      return refuse('PLR-HANDOFF-NO-JOURNEY', `${unjourneyed.length} user-facing acceptance criteri${unjourneyed.length === 1 ? 'on' : 'a'} of the Spec ${unjourneyed.length === 1 ? 'is' : 'are'} not examined as a whole journey: ${named}${unjourneyed.length > 20 ? '; ...' : ''}`);
++    }
++
+     // Check paths: shape (the briefing validator's own rule) first for every path, then trackability and presence.
+     const paths = [...new Set([...source.matchAll(CHECK_TOKEN)].map((match) => match[0]))].sort();
+     const deliveryFor = (path) => ({ schema: 'pipeline.item-delivery-briefing.v1', sliceId: 'plan-readiness', itemId: 'plan-readiness-check',
+diff --git a/plugins/pipeline-core/lib/spec-journey-coverage.mjs b/plugins/pipeline-core/lib/spec-journey-coverage.mjs
+new file mode 100644
+index 000000000..5394f1db3
+--- /dev/null
++++ b/plugins/pipeline-core/lib/spec-journey-coverage.mjs
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Journey coverage of a Spec's acceptance criteria (C20 finding G20-27, Codex greenfield P0 "Produktfehler und unzureichende Examiner").
++ *
++ * WHY. Green unit tests missed stored-HTML execution, play without a timer, an overwrite after an import with the same revision and the loss
++ * of the rescue candidate: each criterion was examined as a unit, none as the journey a user takes through a state transition. A user-facing
++ * criterion therefore has to name the journeys that prove it (every entry path, a reload in the middle of a transition, a second action after
++ * an error, a concurrent import, every dynamic text context) and the actual effect asserted, not only that some text changed.
++ *
++ * WHAT IT READS. Only the Spec bytes, through the criterion rows the host parser already locates (scanAcceptedCriterionRows). Pure; nothing is
++ * written, run or fetched. One shared reading for the plan hand-off inspection (not ready) and the close readback (covered / not covered).
++ *
++ * THE CLOSED MARKERS (the same words the Spec template teaches):
++ *   `Journeys: <journeys>` and `Asserts: <the actual effect>` inside the criterion text (a table cell, or an indented continuation line of a
++ *   bullet criterion); `[user-facing]` forces the duty; `[not user-facing: <reason>]` exempts a criterion that no user sees (a bare tag with
++ *   no reason exempts nothing). A criterion with neither tag is user-facing when its text uses the closed vocabulary below (English only:
++ *   a Spec in another language tags its user-facing criteria with `[user-facing]`).
++ */
++import { scanAcceptedCriterionRows } from './critic-accepted-contract.mjs';
++
++export const JOURNEY_CLASSES = Object.freeze([
++  'every entry path to the transition',
++  'a reload in the middle of a transition',
++  'a second action after an error',
++  'a concurrent import',
++  'every dynamic text context (where stored text is rendered or executed)',
++]);
++
++export const JOURNEY_REPAIR = 'add to each named criterion in the Spec a `Journeys: <every entry path; reload in the middle of a transition; a second action after an error; a concurrent import; every dynamic text context that applies>` clause and an `Asserts: <the actual effect, such as the stored state, not only that text changed>` clause (a criterion no user sees is tagged `[not user-facing: <reason>]`), commit it';
++
++const USER_FACING_TAG = /\[user-facing\]/iu;
++const NOT_USER_FACING_TAG = /\[not user-facing:\s*(?!\{\{|<)\S[^\]]*\]/iu; // an unfilled `{{reason}}` / `<reason>` is no reason
++// A closed vocabulary, deliberately small: a false positive costs one clause, a false negative is the P0 this exists for.
++const USER_FACING_VOCABULARY = /\b(?:users?|players?|screens?|pages?|buttons?|clicks?|taps?|presses|pressed|browsers?|dialogs?|menus?|reload|displays?|displayed|renders?|rendered|UI)\b/iu;
++const CLAUSE_MARKER = /\b(Journeys?|Asserts?):/giu;
++// Both placeholder spellings: the generated skeleton's `<...>` and the Spec template's `{{...}}`.
++const PLACEHOLDER = /<[^>]*>|\{\{|REPLACE/u;
++// An effect that only says something changed is no assertion on the actual effect.
++const WEAK_EFFECT = /^(?:the\s+)?(?:text|label|title|output|value|content|page|view|screen|message|state)?\s*(?:is\s+|was\s+|has\s+|gets\s+)?(?:changed|updated|shown|displayed|visible|present|different|correct|ok|works?|set)$/iu;
++
++/** The text of one clause (`Journeys` or `Asserts`): from its marker to the next marker or the end, without trailing punctuation. */
++function clauseText(text, kind) {
++  const markers = [...text.matchAll(CLAUSE_MARKER)];
++  const index = markers.findIndex((match) => match[1].toLowerCase().startsWith(kind));
++  if (index === -1) return '';
++  const start = markers[index].index + markers[index][0].length;
++  const end = index + 1 < markers.length ? markers[index + 1].index : text.length;
++  return text.slice(start, end).replace(/\s+/gu, ' ').replace(/\[(?:not )?user-facing[^\]]*\]/giu, '').trim().replace(/[\s.;,]+$/u, '');
++}
++
++const isUserFacing = (text) => {
++  if (NOT_USER_FACING_TAG.test(text)) return false;
++  return USER_FACING_TAG.test(text) || USER_FACING_VOCABULARY.test(text.replace(/\[not user-facing\]/giu, ''));
++};
++
++/**
++ * @param {string} source the Spec text
++ * @returns {{criteria: {id: string, status: 'covered'|'not-covered'|'not-user-facing', missing: ('journeys'|'effect')[]}[], covered: string[], notCovered: string[]}}
++ */
++export function inspectSpecJourneys(source) {
++  const criteria = [];
++  const seen = new Set();
++  for (const row of scanAcceptedCriterionRows(String(source))) {
++    if (row.normative !== true || row.valid === false || typeof row.text !== 'string' || seen.has(row.id)) continue;
++    seen.add(row.id);
++    if (!isUserFacing(row.text)) { criteria.push({ id: row.id, status: 'not-user-facing', missing: [] }); continue; }
++    const journeys = clauseText(row.text, 'journey');
++    const effect = clauseText(row.text, 'assert');
++    const missing = [];
++    if (journeys === '' || PLACEHOLDER.test(journeys)) missing.push('journeys');
++    if (effect === '' || PLACEHOLDER.test(effect) || WEAK_EFFECT.test(effect)) missing.push('effect');
++    criteria.push({ id: row.id, status: missing.length === 0 ? 'covered' : 'not-covered', missing });
++  }
++  return {
++    criteria,
++    covered: criteria.filter((entry) => entry.status === 'covered').map((entry) => entry.id),
++    notCovered: criteria.filter((entry) => entry.status === 'not-covered').map((entry) => entry.id),
++  };
++}
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 3d468c43b..0f3b03b9c 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -1234,7 +1234,10 @@ function readQualityRows(root, coordinator) {
+     if (!bundle.ok) return null;
+     return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
+   };
+-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
++  // G20-27: the journey row reads the Spec the plan was bound to (the same path the audit index records), else the conventional one.
++  let specPath;
++  try { const bound = stateSnapshot(root).state?.planSubmission?.specPath; if (typeof bound === "string" && SAFE_RELATIVE.test(bound)) specPath = bound; } catch { /* the conventional spec path applies */ }
++  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
+ }
+ function auditPackageIndex(root, coordinator) {
+   const { readers } = qualityReaders(root);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 08036c5e8..2fe18acfa 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -1005,7 +1005,8 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+     },
+   });
+   for (const out of [seen.drive, seen.dry]) {
+-    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
++    // QG-04 restatement (C20 G20-27, AC-108): the five original ids keep their order; the readback gained an appended sixth row, "journey-coverage".
++    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
+     const scan = out.qualityReadback.find((r) => r.id === "security-scan");
+     assert.equal(scan.status, "missing");
+     const ids = out.actions.actions.map((a) => a.id);
+@@ -1019,7 +1020,7 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
+   const prd = seen.index.entries.find((e) => e.id === "prd");
+   assert.equal(prd.sha256, digest("# PRD\n"));
+-  assert.equal(seen.index.qualityRows.length, 5);
++  assert.equal(seen.index.qualityRows.length, 6); // QG-04 restatement (C20 G20-27): five original rows plus the appended journey-coverage row
+   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index fa2d14f6b..b86ac4d91 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -1310,7 +1310,9 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       assert.ok(generatedSpecBeforeRefusal.includes(skeletonCriterion), `${runner}: the generated Spec carries the skeleton criterion placeholder`);
+       assert.ok(generatedSpecBeforeRefusal.includes(skeletonTraceability), `${runner}: the generated Spec carries the skeleton traceability placeholder`);
+       const partialSpec = generatedSpecBeforeRefusal
+-        .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. | tests/game.test.mjs |")
++        // QG-04 restatement (C20 G20-27, AC-108): the criterion text and its test path are unchanged; a user-facing criterion now also names its
++        // journeys and the asserted effect, otherwise the plan hand-off refuses the Spec (PLR-HANDOFF-NO-JOURNEY) before submit-plan.
++        .replace(skeletonCriterion, "| AC-1 | WHEN the player presses a key, the game exports playable=true. Journeys: key press at game start and after a restart; reload in the middle of a game; a second key press after an error. Asserts: the exported playable flag is true after each journey. | tests/game.test.mjs |")
+         .replace(skeletonTraceability, "| design-input.md | The game is keyboard playable. | AC-1 | tests/game.test.mjs |");
+       const partialPrd = generatedPrdBeforeRefusal
+         .replace(/^<!-- DRAFT TEMPLATE:[^\n]*-->\n/mu, "")
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 720f64d0c..92bfec9ae 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -128,7 +128,8 @@ afterwards.
+   product framing (What/Why/Scope/Non-goals/Risks/Alternatives/DoD) authored
+   before binding.
+ - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+-  acceptance criteria and implementation detail authored before binding.
++  acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
++  clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
+ 
+ Use the accepted criterion table header `| # | Criterion | Evidence |` and a
+ row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index 61fad5be8..d661c0d41 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -246,7 +246,10 @@ success measures, scope/non-goals, testable-acceptance requirements,
+ assumptions/risks/open questions, and user-flow decisions. The Spec covers
+ linked source evidence, architecture, component responsibilities,
+ interfaces/state/data, operational constraints, test/verification approach,
+-and PRD-to-Spec traceability. Favor thorough, comprehensive coverage of the
++and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
++names its journeys and state transitions and the actual effect asserted
++(`Journeys:` and `Asserts:` clauses, template `templates/spec.md` §5); the plan
++hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). Favor thorough, comprehensive coverage of the
+ material input over brevity — a short initial goal is not a reason for a
+ thin PRD/Spec. When the initial goal is short relative to that coverage
+ list, treat the gap as a prompt to ask the user follow-up questions against
+diff --git a/plugins/pipeline-core/templates/prompts/critic-review.md b/plugins/pipeline-core/templates/prompts/critic-review.md
+index 674d24ed9..9aca5ac52 100644
+--- a/plugins/pipeline-core/templates/prompts/critic-review.md
++++ b/plugins/pipeline-core/templates/prompts/critic-review.md
+@@ -429,7 +429,14 @@ Hunt systematically, in this order:
+ 
+ 1. **Spec fidelity:** For each acceptance criterion ({{AC_IDS or "all in the
+    spec"}}): does the diff actually satisfy it? Any criterion without a
+-   covering change or test is a candidate finding.
++   covering change or test is a candidate finding. **Journey coverage
++   (user-facing criteria):** for each user-facing criterion, check the tests
++   against the journeys and state transitions the Spec names for it (every entry
++   path, a reload in the middle of a transition, a second action after an error,
++   a concurrent import, every dynamic text context) and against the actual effect
++   asserted, not only that text changed. Report journey coverage per criterion
++   as covered / not covered; a missing journey is a finding (a criterion that
++   names none is itself a Spec-readiness finding, `PLR-HANDOFF-NO-JOURNEY`).
+ 2. **Scope:** Compare the diff's file list against the spec's Detailed
+    Implementation enumeration. Unlisted files touched, listed files untouched,
+    silent deviations — candidates.
+diff --git a/plugins/pipeline-core/templates/prompts/goldfish-task.md b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+index 548db85b0..a2a92e187 100644
+--- a/plugins/pipeline-core/templates/prompts/goldfish-task.md
++++ b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+@@ -434,6 +434,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
+ - Regression RED-to-GREEN: name the intended behavior and meaningful original
+   failure. Update only the test cases required by the owned outcome; preserve
+   existing acceptance examiners and their original evidence.
++- Journey coverage (test authorship; user-facing criteria): examine the criterion
++  as a whole user journey and state transition, not only as a unit. For every
++  user-facing acceptance criterion, write cases for each journey the Spec names
++  (every entry path, a reload in the middle of a transition, a second action
++  after an error, a concurrent import, every dynamic text context) and assert the
++  actual effect (the stored state or produced output), not only "text changed".
++  Report journey coverage per criterion as covered / not covered; a Spec criterion
++  that names no journey is a stop condition (briefing defect), not a gap to guess.
+ - {{ADDITIONAL_CHECKS or delete this line}}
+ 
+ ### 4. Forbidden
+diff --git a/templates/prompts/critic-review.md b/templates/prompts/critic-review.md
+index 674d24ed9..9aca5ac52 100644
+--- a/templates/prompts/critic-review.md
++++ b/templates/prompts/critic-review.md
+@@ -429,7 +429,14 @@ Hunt systematically, in this order:
+ 
+ 1. **Spec fidelity:** For each acceptance criterion ({{AC_IDS or "all in the
+    spec"}}): does the diff actually satisfy it? Any criterion without a
+-   covering change or test is a candidate finding.
++   covering change or test is a candidate finding. **Journey coverage
++   (user-facing criteria):** for each user-facing criterion, check the tests
++   against the journeys and state transitions the Spec names for it (every entry
++   path, a reload in the middle of a transition, a second action after an error,
++   a concurrent import, every dynamic text context) and against the actual effect
++   asserted, not only that text changed. Report journey coverage per criterion
++   as covered / not covered; a missing journey is a finding (a criterion that
++   names none is itself a Spec-readiness finding, `PLR-HANDOFF-NO-JOURNEY`).
+ 2. **Scope:** Compare the diff's file list against the spec's Detailed
+    Implementation enumeration. Unlisted files touched, listed files untouched,
+    silent deviations — candidates.
+diff --git a/templates/prompts/goldfish-task.md b/templates/prompts/goldfish-task.md
+index 548db85b0..a2a92e187 100644
+--- a/templates/prompts/goldfish-task.md
++++ b/templates/prompts/goldfish-task.md
+@@ -434,6 +434,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
+ - Regression RED-to-GREEN: name the intended behavior and meaningful original
+   failure. Update only the test cases required by the owned outcome; preserve
+   existing acceptance examiners and their original evidence.
++- Journey coverage (test authorship; user-facing criteria): examine the criterion
++  as a whole user journey and state transition, not only as a unit. For every
++  user-facing acceptance criterion, write cases for each journey the Spec names
++  (every entry path, a reload in the middle of a transition, a second action
++  after an error, a concurrent import, every dynamic text context) and assert the
++  actual effect (the stored state or produced output), not only "text changed".
++  Report journey coverage per criterion as covered / not covered; a Spec criterion
++  that names no journey is a stop condition (briefing defect), not a gap to guess.
+ - {{ADDITIONAL_CHECKS or delete this line}}
+ 
+ ### 4. Forbidden
+diff --git a/templates/spec.md b/templates/spec.md
+index 37e1ff76e..d950638eb 100644
+--- a/templates/spec.md
++++ b/templates/spec.md
+@@ -32,6 +32,11 @@ HARD RULES (checkable)
+ - Every acceptance criterion MUST be EARS-formed and binary-checkable.
+   Why: EARS makes each criterion 1:1 a test case — the bridge spec → tests →
+   Critic (ADR-0004). Check: each criterion maps to at least one verify/test.
++- Every user-facing acceptance criterion MUST name the journeys and state
++  transitions that prove it and the actual effect asserted (§5, "Journeys and
++  state transitions"). Why: a criterion examined only as a unit lets a whole
++  journey break unseen (G20-27). Check: readiness check refuses a Spec without
++  them (PLR-HANDOFF-NO-JOURNEY); the Critic reports a missing journey.
+ - Detailed Implementation MUST enumerate EVERY file to be changed/created, each
+   with a rationale. Why: the critical anti-derailing instrument (Rensin K4/§5);
+   it is simultaneously the Goldfish task interface. Check: Critic compares the
+@@ -126,10 +131,33 @@ THE SYSTEM SHALL …" · State-driven "WHILE … THE SYSTEM SHALL …" · Option
+ feature "WHERE … THE SYSTEM SHALL …" · Unwanted behaviour "IF … THEN THE
+ SYSTEM SHALL …".}}
+ 
+-- AC-1: WHEN {{trigger/event}}, THE SYSTEM SHALL {{observable behaviour}}.
+-- AC-2: IF {{failure condition}}, THEN THE SYSTEM SHALL {{safe behaviour}}.
++- AC-1: WHEN {{trigger/event}}, THE SYSTEM SHALL {{observable behaviour}}. Journeys: {{every entry path; reload in the middle of the transition; a second action after an error; concurrent import; every dynamic text context}}. Asserts: {{the actual effect, e.g. the stored state}}.
++- AC-2: IF {{failure condition}}, THEN THE SYSTEM SHALL {{safe behaviour}}. [not user-facing: {{reason no user sees it}}]
+ - AC-3: {{...}}
+ 
++#### Journeys and state transitions (user-facing criteria)
++
++A criterion a user can reach is examined as a whole journey, not only as a unit
++(Codex greenfield P0: green tests missed stored-HTML execution, play without a
++timer, an overwrite after an import with the same revision and the loss of the
++rescue candidate). Every user-facing criterion therefore carries two clauses in
++its own text (a table cell, or an indented continuation line of a bullet):
++
++- `Journeys:` the journeys and state transitions that prove it: every entry
++  path to the transition; a reload in the middle of a transition; a second
++  action after an error; a concurrent import; every dynamic text context (each
++  place stored text is rendered or executed). List the ones that apply.
++- `Asserts:` the actual effect checked (the stored state, the produced output,
++  the refused write), never only that "text changed".
++
++`[user-facing]` forces the duty on a criterion the vocabulary check would miss
++(it recognises English wording only); `[not user-facing: <reason>]` exempts a
++criterion no user sees, and a tag without a reason exempts nothing. A Spec whose
++user-facing criterion names no journey is not ready: the plan hand-off refuses it
++with `PLR-HANDOFF-NO-JOURNEY` and this repair, the Critic reports the missing
++journey as a finding, and the close readback lists each criterion as covered or
++not covered.
++
+ #### Optional mechanical requirement map
+ 
+ Use this only for criteria whose minimum artifact presence is meaningful. Keep
