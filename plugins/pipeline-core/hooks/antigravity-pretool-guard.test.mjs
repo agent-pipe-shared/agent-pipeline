@@ -886,14 +886,13 @@ check("Antigravity native implementation dispatch is refused even when candidate
   }];
   prepareNative(root, nativeSubagents);
   const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
+  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): this case pinned the consent refusal AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE.
+  // Under the measured native route (lib/agy-native-goldfish.mjs) a goldfish call needs no consent: it is judged by the same guard-dispatch admission
+  // as a Claude Agent call. This fixture's prompt is a hand-written template, not a generated briefing, so the call is STILL refused, now by that
+  // admission, and the refusal must not name a missing consent, the Codex-to-Antigravity route or "ask the PO how implementation is to be dispatched".
   assert.equal(res.decision, "deny");
-  assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
-  // 17: the refusal is honest about the route it names (Codex-to-Antigravity, unproven from an AGY-hosted Elephant) and tells the Elephant to stop and ask.
-  assert.match(res.reason, /elephant-implementation-dispatch\.mjs \(argv: dispatch --root/u);
-  assert.match(res.reason, /Codex-to-Antigravity route/u);
-  assert.match(res.reason, /at most ONE attempt/u);
-  assert.match(res.reason, /ask the PO/u);
-  assert.match(res.reason, /Read-only roles \(critic, readiness-reviewer, plan-verifier, consult-advisor\)/u);
+  assert.doesNotMatch(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|nativeImplementation|Codex-to-Antigravity route/u);
+  assert.match(res.reason, /BLOCKED/u);
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -918,16 +917,15 @@ check("Antigravity native implementation dispatch names the admission check: no 
   }];
   prepareNative(root, nativeSubagents);
   const call = { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } };
+  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): the session-identity and stored-consent causes (AGY-NATIVE-SESSION-UNIDENTIFIED,
+  // -SESSION-UNKNOWN) belong to the consent route this call no longer takes; whether the hook names a session or the session is known no longer changes
+  // the verdict. Both calls are refused by the generated-briefing admission (hand-written prompt), and neither refusal may name the consent route.
   const noSession = decision(run({ tool_use_id: "agy-native-impl-nosession", toolCall: call }, root));
   assert.equal(noSession.decision, "deny");
-  assert.match(noSession.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
-  assert.match(noSession.reason, /Native admission check: AGY-NATIVE-SESSION-UNIDENTIFIED/u);
-  assert.match(noSession.reason, /pipeline\.agy-native-implementation-scope\.v1/u);
-  assert.match(noSession.reason, /not been measured on a real Antigravity host/u);
+  assert.doesNotMatch(noSession.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|Native admission check|pipeline\.agy-native-implementation-scope\.v1/u);
   const unknown = decision(run({ tool_use_id: "agy-native-impl-unknown", session_id: "fixture-session-1", toolCall: call }, root));
   assert.equal(unknown.decision, "deny");
-  assert.match(unknown.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
-  assert.match(unknown.reason, /Native admission check: AGY-NATIVE-SESSION-UNKNOWN/u);
+  assert.doesNotMatch(unknown.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|Native admission check/u);
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -1796,13 +1794,17 @@ check("Antigravity pretool guard clears stale handoffs on every shell call it ad
 
 check("Antigravity start hint never creates .git before Git initialization", () => {
   const root = uninitializedTempRoot();
+  // C20 G20-33: the optional hint is delivered once per session through a marker in the machine plane (<home>/.agent-pipeline/run).
+  // Each run gets its own home, so a marker left by an earlier run for the fixed session id "fresh" cannot suppress the hint, and the
+  // test never writes into the real home. The assertions are unchanged.
+  const home = uninitializedTempRoot();
   try {
     const input = JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: "fresh" });
-    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });
+    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000, env: { ...process.env, HOME: home, USERPROFILE: home } });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(existsSync(join(root, ".git")), false, "the pre-init hint must not manufacture a Git control directory");
     assert.match(result.stdout, /Agent Pipeline is available as an optional project workflow/u);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
 });
 
 // 5. Broadened inline-execution containment (D6)

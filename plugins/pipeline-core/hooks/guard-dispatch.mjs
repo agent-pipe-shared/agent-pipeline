@@ -977,7 +977,7 @@ if (isDirectInvocation(import.meta.url)) {
     }
     itemGovernanceRequired=governed.status==='required';
     const unsupported = governed.status === "required" && productive.some(({ dispatch }) =>
-      !["direct", "codex"].includes(dispatch.transport)
+      !["direct", "codex", "antigravity"].includes(dispatch.transport)
       || !parseNativeGoldfishBriefing(dispatch.prompt).ok);
     if (governed.status === "refused" || unsupported) {
       // PF-47: a queue-preparation refusal carries its own reason (and, where one exists, an exact repair);

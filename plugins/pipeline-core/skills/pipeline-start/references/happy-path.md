@@ -111,7 +111,7 @@ Owner: `docs/push-release-flow.md`.
 
 | Topic | Claude | Codex | Antigravity |
 | --- | --- | --- | --- |
-| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `antigravity-native-dispatch-prepare.mjs`, then `invoke_subagent`; implementation is not native |
+| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
 | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
 | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
 | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |

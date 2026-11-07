@@ -204,11 +204,17 @@ test("17: the AGY dispatch reference names the route per role, the implementatio
   assert.match(text, /## Which route a role takes on Antigravity/u);
   assert.match(text, /`critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` \(read-only\)/u);
   assert.match(text, /A runner-native type such as `research` is not a Pipeline role and is refused \(`DISPATCH-WRITE-CARRIER-REQUIRED`\)/u);
-  assert.match(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
+  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): the measured host (w252 notes, M5/M6/M1) contradicts the two statements this
+  // case pinned. (1) goldfish-mechanic and goldfish-deep are no longer "not available": all three Goldfish roles take the native route.
+  // (2) "end the parent turn" was an unmeasured safe form; the completion message arrives in the SAME parent turn. The legacy
+  // Codex-to-Antigravity route text it pinned stays asserted unchanged.
+  assert.match(text, /`goldfish-implementor`, `goldfish-mechanic`, `goldfish-deep` \| native `invoke_subagent`/u);
+  assert.doesNotMatch(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
   assert.match(text, /elephant-implementation-dispatch\.mjs dispatch --root <repository-root> --request/u);
   assert.match(text, /documented as the Codex-to-Antigravity route/u);
   assert.match(text, /Make at most one attempt and never retry a launched job/u);
-  assert.match(text, /end the parent turn without further tool calls/u);
+  assert.match(text, /completion message is delivered in the SAME parent turn/u);
+  assert.doesNotMatch(text, /end the parent turn without further tool calls/u);
   assert.doesNotMatch(text, /do not start another `agy` process/u, "the old sentence contradicted the implementation route");
 });
 

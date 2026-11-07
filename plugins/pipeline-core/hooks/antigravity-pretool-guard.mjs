@@ -41,7 +41,9 @@ import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
-import { evaluateNativeImplementationAdmission, NATIVE_IMPLEMENTATION_SCOPE_SCHEMA } from "../lib/agy-native-implementation-admission.mjs";
+import {
+  decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
+} from "../lib/agy-native-goldfish.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
@@ -232,7 +234,8 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
   // Case 1: Antigravity toolCall envelope
   if (rawEnvelope.toolCall) {
     const name = String(rawEnvelope.toolCall.name ?? "");
-    const args = rawEnvelope.toolCall.args ?? {};
+    // M1: the measured invoke_subagent args may arrive JSON-string-encoded (Model as the string "flash" with its quotes).
+    const args = name === "invoke_subagent" ? decodeNativeInvokeArgs(rawEnvelope.toolCall.args ?? {}) : (rawEnvelope.toolCall.args ?? {});
     if (name === "run_command") {
       const command = String(args.CommandLine ?? args.command ?? "");
       return {
@@ -406,13 +409,6 @@ export function foreignAntigravityExportReason({ input, command, projectRoot, to
   return `AGY-EXPORT-FOREIGN-CONVERSATION: an Antigravity transcript export may name only this conversation; pass --session-id ${host.conversationId} and --exclude-session ${host.conversationId}.`;
 }
 
-function isNativeImplementationSubagent(entry) {
-  const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
-    ? entry.TypeName.slice("pipeline-core:".length)
-    : entry?.TypeName;
-  return type === "goldfish-implementor" || type === "goldfish-mechanic";
-}
-
 // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
 // credential-root decision is NOT restated here, and neither is any outside-the-project rule. It is the one the Claude native
 // Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
@@ -584,21 +580,20 @@ export async function runAntigravityPreToolGuard(rawInput) {
   if (input?.toolCall?.name === "invoke_subagent" && normalized.nativeShapeError) {
     deny(`BLOCKED (Antigravity dispatch preflight): ${normalized.nativeShapeError}: use only the declared TypeName/Role/Prompt/Model/Workspace flat fields or the Subagents batch field.`);
   }
+  // G20-8 B: a hook call from a native CHILD is bound to its parent through the descriptor the host wrote and its resolved model is
+  // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
+  const nativeChild = evaluateNativeChildCall(input);
+  if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
+  // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
+  const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
+    ? nativeBrainWriteRefusal({ filePath: normalized.filePath, command: normalized.command }) : null;
+  if (brainRefusal !== null) deny(`BLOCKED (Antigravity native child): ${brainRefusal}`);
   if (input?.toolCall?.name === "invoke_subagent"
-    && normalized.nativeSubagents?.some(isNativeImplementationSubagent)) {
-    // Deny by default. A native implementation call is admitted only under a stored, valid session consent whose SIGNED scope grants the
-    // native route and the Model aliases (lib/agy-native-implementation-admission.mjs). The hook payload's session id is the one
-    // unmeasured assumption; nothing is written.
-    let admissionRoot = null;
-    try {
-      const rawRoot = Array.isArray(input?.workspacePaths) && input.workspacePaths.length > 0 ? input.workspacePaths[0]
-        : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd());
-      admissionRoot = realpathSync(resolve(rawRoot));
-    } catch { admissionRoot = null; }
-    const admission = evaluateNativeImplementationAdmission({
-      root: admissionRoot, hookSessionId: nativeHookSessionId(input, {}), subagents: normalized.nativeSubagents,
-    });
-    if (!admission.ok) deny(`BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding for goldfish-implementor or goldfish-mechanic, so it is not a route for implementation. The one sanctioned entry is scripts/elephant-implementation-dispatch.mjs (argv: dispatch --root <repo> --request <role-dispatch-request.json under the repo> --result-path <new relative file> --session-id <id> --descriptor-sha256 <sha256>), which is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered). Make at most ONE attempt, do not retry a launched job, and if it does not return authored-commit-recorded stop and ask the PO how implementation is to be dispatched. Do not write the implementation yourself unless the PO decides so. Read-only roles (critic, readiness-reviewer, plan-verifier, consult-advisor) are the native route: references/antigravity-native-dispatch.md. Native admission check: ${admission.code}: ${admission.reason}. A native implementation call is admitted only under a stored session consent whose signed scope carries a nativeImplementation grant (schema ${NATIVE_IMPLEMENTATION_SCOPE_SCHEMA}) for the role and the Model alias; the hook payload's session id is the one assumption that has not been measured on a real Antigravity host.`);
+    && normalized.nativeSubagents?.some((entry) => isNativeCodeWriterType(entry?.TypeName))) {
+    // A native Goldfish is admitted like a Claude Agent call: guard-dispatch judges the generated briefing, the selected model and the
+    // write-capable carrier below, with NO per-dispatch PO consent. What is left here is the shared-tree rule while M4b is unmeasured.
+    const parentCall = evaluateNativeGoldfishParentCall(input, normalized.nativeSubagents);
+    if (!parentCall.ok) deny(`BLOCKED (Antigravity dispatch preflight): ${parentCall.reason}`);
   }
 
   // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
@@ -910,7 +905,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
   // keeps its more useful diagnosis; a structurally valid but unprepared launch fails here.
   const nativeContainsPipelineRole = input?.toolCall?.name === "invoke_subagent"
     && Array.isArray(normalized.nativeSubagents)
-    && normalized.nativeSubagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
+    // A code-writing Goldfish is admitted by the generated-briefing route above (guard-dispatch), not by a prepared one-shot artifact.
+    && normalized.nativeSubagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName) && !isNativeCodeWriterType(entry?.TypeName));
   if (denials.length === 0 && nativeContainsPipelineRole) {
     const nativeVerdict = verifyAntigravityNativeDispatch({
       root: projectRoot,
