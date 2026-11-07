@@ -80,6 +80,14 @@ matters now. No solution language here.}}
 data flow, integration points. One diagram (mermaid/ASCII) where it clarifies.
 This is the "how" at architecture altitude — file-level detail belongs in §4.}}
 
+**Slice order (vertical first).** {{Name the first slice as ONE thin end-to-end path a
+user can walk (input → domain → persistence → visible result) for the most important
+journey in §5, with every layer only as deep as that journey needs. Later slices widen
+it journey by journey. Do not plan horizontal layers first (all models, then all
+services, then all screens): nothing is runnable or reviewable until the last layer
+lands, and a wrong assumption surfaces only at the end. Name each slice with the
+criteria (AC-n) it makes walkable.}}
+
 ### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)
 
 {{Complete this section before the first independent readiness dispatch WHEN the

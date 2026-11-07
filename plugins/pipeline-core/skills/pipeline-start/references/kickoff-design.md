@@ -249,7 +249,10 @@ interfaces/state/data, operational constraints, test/verification approach,
 and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
 names its journeys and state transitions and the actual effect asserted
 (`Journeys:` and `Asserts:` clauses, template `templates/spec.md` §5); the plan
-hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). Favor thorough, comprehensive coverage of the
+hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
+is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
+end-to-end path for the most important journey, then widened journey by journey,
+never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the
 material input over brevity — a short initial goal is not a reason for a
 thin PRD/Spec. When the initial goal is short relative to that coverage
 list, treat the gap as a prompt to ask the user follow-up questions against

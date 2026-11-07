@@ -130,6 +130,8 @@ afterwards.
 - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
   acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
   clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
+  Its plan is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
+  end-to-end path for the most important journey before any horizontal layer.
 
 Use the accepted criterion table header `| # | Criterion | Evidence |` and a
 row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
