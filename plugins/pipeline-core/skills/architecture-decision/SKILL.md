@@ -86,8 +86,19 @@ node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<
   the Markdown carries no status line.
 - Check one sidecar with `node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/draft-<slug>.json` (both sidecar
   schemas ship in the plugin; the digest is compared with the sibling Markdown). `submit-plan` runs the same structural check.
-- Bind the proposal to the common design approval where required (v2 `pipeline-design-decision-bindings` block with the
-  prospective-architecture manifest and the chat selection, see section 5); do not treat `status: "accepted"` as that proof.
+- Bind the proposals to the common design approval with the one sanctioned step, before the design review; never hand-build the
+  manifest, the chat selections or the `pipeline-design-decision-bindings` block, and do not treat `status: "accepted"` as that proof:
+  ```bash
+  node <plugin-root>/scripts/bind-adr-proposals.mjs --root "$PWD" --feature <feature-id> --carrier <design-companion>.md --selection <po-selection>.json --draft <slug> [--draft <slug>...]
+  ```
+  `--selection` is a JSON file holding the PO's own selection, saved verbatim from the PO's reply:
+  `{"attributedTo": "PO chat selection <date>", "selections": [{"topic": "...", "text": "<the PO's words>", "adr": "<optional slug>"}]}`.
+  The step copies it and never writes or edits it, so do not invent selection text; if the PO has not chosen yet, ask first. It
+  refuses a draft that still has `REPLACE:` lines or a stale digest and names the repair. On success it writes the manifest and one
+  chat selection per draft next to the carrier, puts the v2 bindings block into the carrier (re-running replaces it in place), numbers
+  the future records consecutively, and prints `companions`: pass every one of them as `--companion <path>` to
+  `design-review-receipt.mjs create`, commit the written files, then `submit-plan`, `present-plan`, `approve-plan` and
+  `materialize-architecture` as usual. A later edit of a draft needs `create-adr.mjs --refresh` and this step again.
 
 ### 3. Identify Applicable Inherited Decisions
 Resolve effective architecture decisions through authority layering:
@@ -129,7 +140,8 @@ Architecture decisions are immutable history. When reversing or replacing a deci
 - Never overwrite or rewrite the previous ADR file.
 - Draft the replacement with `create-adr.mjs ... --supersedes <previous-id>` (status `proposed`, `supersedes` recorded).
 - Include the replacement and its historical lineage in the common design
-  package. Only after its required aggregate approval may the sanctioned
+  package with `bind-adr-proposals.mjs` (section 2); a predecessor that already has a sidecar is covered too: the signed manifest
+  pre-binds the exact bytes it replaces, and nothing else may change. Only after its required aggregate approval may the sanctioned
   consumer materialize the replacement as `accepted` and the former record as
   `superseded`; the agent must not grant those statuses by itself.
 - How the statuses change, and why no digest breaks: `pipeline-state.mjs materialize-architecture` (an agent step, after

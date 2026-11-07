@@ -59,7 +59,7 @@ function adrDirectory(root, create) {
   return dir;
 }
 
-function nextFreeNumber(dir) {
+export function nextFreeNumber(dir) {
   const numbers = existsSync(dir) ? readdirSync(dir).map((name) => /^(\d{4})-/u.exec(name)?.[1]).filter(Boolean).map(Number) : [];
   return String(Math.max(0, ...numbers) + 1).padStart(4, "0");
 }

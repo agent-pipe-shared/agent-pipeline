@@ -409,7 +409,8 @@ export function prepareApprovedArchitectureMaterialization(handle) {
     const result = approved(held.root, held.area);
     requireValue(result.required && canonicalizeJson(result.approvalBasis) === canonicalizeJson(held.approvalBasis), 'DDB-APPROVAL-DRIFT');
     const prospectiveTargets = result.prospective?.targets ?? [];
-    const targets = prospectiveTargets.filter(target => !target.present).map(({ path, bytes }) => ({ path, bytes }));
+    // A predecessor sidecar the signed manifest allows to be replaced carries the digest of the exact bytes it replaces.
+    const targets = prospectiveTargets.filter(target => !target.present).map(({ path, bytes, preimageSha256 }) => ({ path, bytes, ...(preimageSha256 ? { preimageSha256 } : {}) }));
     const inventoryTargets = prospectiveTargets.map(({ path, bytes }) => ({ path, bytes }));
     const evidence = file => {
       const path = `project/design-approval-evidence/${file.sha256}.json`;

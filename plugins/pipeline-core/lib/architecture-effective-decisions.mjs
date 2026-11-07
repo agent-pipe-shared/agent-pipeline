@@ -17,8 +17,8 @@ const ADVISORY_CODES = new Set(["legacy-decision-without-sidecar", "module-appli
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const finding = (code, path) => ({ code, path });
 
-// Keep the accepted v1 sidecar's closed shape locally checkable in a
-// plugin-only installation. The root-level schema is not shipped there.
+// The closed shape of both sidecar versions, checked structurally. Both schemas ship in plugins/pipeline-core/schemas, but
+// schema-lite evaluates neither const, pattern, minItems, uniqueItems nor format, so this check is what enforces them.
 function validDecision(record) {
   if (record === null || typeof record !== "object" || Array.isArray(record)) return false;
   const required = ["schema", "id", "title", "status", "digest", "scope", "date"];

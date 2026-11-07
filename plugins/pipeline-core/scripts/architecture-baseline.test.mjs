@@ -24,8 +24,9 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { inspectProspectiveArchitectureManifest } from "../lib/architecture-prospective-materialization.mjs";
 
+// C20 G20-23 (c): fileURLToPath, not a string replace of "file://" (wrong on Windows); the path it names is unchanged.
 const DECISION_SCHEMA_PATH = path.join(
-  path.dirname(import.meta.url.replace(/^file:\/\//, "")),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
   "schemas",
   "pipeline.architecture-decision.v1.json"
@@ -543,6 +544,10 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
       fs.writeFileSync(path.join(root, "docs", "adr", "0004-earlier.md"), "# ADR-0004: Earlier\n");
       const out = JSON.parse(create(root, "--slug", "egm", "--title", "Item-owned EGM", "--date", "2026-11-07").stdout);
+      // QG-04 restatement (C20 G20-23 (b)): the consumer now refuses a draft that still holds a create-adr `REPLACE:` template line, so
+      // this case first proves that refusal on the untouched template and then does what the skill tells the agent to do before binding:
+      // write the Markdown and recompute the digest with --refresh. Every assertion below the inspector call is unchanged.
+      const build = () => {
       const files = new Map();
       const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
       const add = (rel, content) => {
@@ -571,7 +576,12 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
           chatSelection: { path: `project/architecture-chat-selections/${id}.json`, sha256: sha(jsonText(acceptedChoice)) } } };
       const manifest = add("specs/x/manifest.json", jsonText({ schema: "pipeline.architecture-prospective-materialization.v1", decisions: [row] }));
       const sources = { prd: add("specs/x/prd.md", "# prd\n"), spec: add("specs/x/spec.md", "# spec\n"), companions: [markdown, sidecar, origin, chatSelection, manifest] };
-      const inspected = inspectProspectiveArchitectureManifest({ manifest, sources, read: (name) => files.get(name), existing: () => null });
+      return { inspected: inspectProspectiveArchitectureManifest({ manifest, sources, read: (name) => files.get(name), existing: () => null }), files, sidecar, id };
+      };
+      assert.throws(build, /DDB-PROSPECTIVE-PLACEHOLDER-REMAINS/u);
+      fs.writeFileSync(path.join(root, out.markdown), "# Item-owned EGM\n\n## Decision\n\nOne owner performs the work.\n");
+      assert.equal(spawnSync(process.execPath, [CREATE_ADR, "--root", root, "--slug", "egm", "--refresh"], { encoding: "utf8" }).status, 0);
+      const { inspected, files, sidecar, id } = build();
       assert.equal(inspected.materialized, false);
       assert.deepEqual(inspected.targets.map((target) => target.path).sort(), [`docs/adr/${id}.json`, `docs/adr/${id}.md`, `project/architecture-chat-selections/${id}.json`]);
       assert.equal(inspected.decisions[0].record.status, "accepted");
@@ -597,6 +607,96 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       const again = create(root, "--slug", "ok", "--title", "Other", "--date", "2026-11-07");
       assert.notEqual(again.status, 0);
       assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-ok.md")).equals(before));
+    });
+
+    // C20 G20-23 (remainder): the sanctioned binding step. Everything below drives the real scripts and the real lifecycle:
+    // create-adr -> bind-adr-proposals -> design review receipt -> submit-plan -> present-plan -> approve-plan -> materialize-architecture.
+    const BIND = path.join(here, "bind-adr-proposals.mjs");
+    const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+    const ok = (script, ...args) => { const out = run(script, ...args); assert.equal(out.status, 0, `${path.basename(script)} ${args.join(" ")}: ${out.stderr}`); return out; };
+    const HISTORIC = "# ADR-9997: METHOD original\n\nAccepted original requirement.\n";
+    const filled = (title) => `# ${title}\n\n## Context\n\nOne owner performs analysis, tests, code and targeted fixes.\n\n## Decision\n\nThe item owner is the only writer.\n\n## Consequences\n\nOne review per item.\n\n## Affected Contracts\n\nnone\n`;
+    const SELECTION = { attributedTo: "PO chat selection 2026-11-07", selections: [{ topic: "ownership", text: "One item Goldfish owns analysis, tests, code and fixes." }] };
+    const fixtureWalk = async ({ predecessorSidecar }) => {
+      const fxt = await import("../lib/architecture-prospective-materialization.fixture.mjs");
+      const { readEffectiveDesignArchitectureAuthority } = await import("../lib/design-decision-bindings.mjs");
+      let bound, drafts;
+      const f = fxt.makeFixture("signature", { stage: "approved-unmaterialized", bindProposals(fixture, companions) {
+        fxt.write(fixture, "docs/adr/9997-method-original.md", HISTORIC);
+        if (predecessorSidecar) {
+          fxt.write(fixture, "docs/adr/9997-method-original.json", `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "9997-method-original",
+            title: "METHOD original", status: "accepted", digest: sha(HISTORIC), scope: "project", date: "2026-01-01" }, null, 2)}\n`);
+          fxt.git(fixture, "add", "--", "docs/adr/9997-method-original.json");
+        }
+        ok(CREATE_ADR, "--root", fixture.dir, "--slug", "method-egm", "--title", "METHOD item-owned EGM", "--supersedes", "9997-method-original", "--date", "2026-10-10");
+        fs.writeFileSync(path.join(fixture.dir, "docs/adr/draft-method-egm.md"), filled("METHOD item-owned EGM"));
+        ok(CREATE_ADR, "--root", fixture.dir, "--slug", "method-egm", "--refresh");
+        fxt.write(fixture, "specs/e2e/po-selection.json", `${JSON.stringify(SELECTION, null, 2)}\n`);
+        bound = JSON.parse(ok(BIND, "--root", fixture.dir, "--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "method-egm").stdout);
+        for (const name of bound.companions) if (!companions.includes(name)) companions.push(name);
+        drafts = ["docs/adr/draft-method-egm.md", "docs/adr/draft-method-egm.json"].map((name) => [name, fs.readFileSync(path.join(fixture.dir, name))]);
+      } });
+      assert.equal(bound.bound[0].id, "9998-method-egm");
+      for (const name of ["docs/adr/9998-method-egm.md", "docs/adr/9998-method-egm.json", "project/architecture-chat-selections/9998-method-egm.json"]) {
+        assert.equal(fs.existsSync(path.join(f.dir, name)), false, `${name} must not exist before the PO's approval is consumed`);
+      }
+      fxt.must(f, ["materialize-architecture"]);
+      const accepted = JSON.parse(fs.readFileSync(path.join(f.dir, "docs/adr/9998-method-egm.json"), "utf8"));
+      assert.equal(accepted.status, "accepted");
+      assert.equal(accepted.supersedes, "9997-method-original");
+      const predecessor = JSON.parse(fs.readFileSync(path.join(f.dir, "docs/adr/9997-method-original.json"), "utf8"));
+      assert.equal(predecessor.status, "superseded");
+      assert.equal(predecessor.id, "9997-method-original");
+      for (const name of ["docs/adr/9998-method-egm.json", "docs/adr/9997-method-original.json"]) assert.equal(validate(path.join(f.dir, name)).status, 0, name);
+      for (const [name, bytes] of drafts) assert.ok(fs.readFileSync(path.join(f.dir, name)).equals(bytes), `${name}: the signed proposal is never rewritten`);
+      const effective = readEffectiveDesignArchitectureAuthority({ rootDir: f.dir });
+      assert.equal(effective.ok, true, JSON.stringify(effective));
+      assert.deepEqual(effective.decisions.map((entry) => entry.id), ["9998-method-egm"]);
+      return { f, predecessor, accepted };
+    };
+
+    it("7.12 create-adr -> bind-adr-proposals -> approval -> materialize-architecture publishes the accepted record and the superseded Markdown-only predecessor with no hand-built file", async () => {
+      await fixtureWalk({ predecessorSidecar: false });
+    });
+
+    it("7.13 a predecessor that already has an accepted sidecar is superseded through the signed preimage (no TARGET-DRIFT) and keeps its own fields", async () => {
+      const { predecessor } = await fixtureWalk({ predecessorSidecar: true });
+      assert.equal(predecessor.title, "METHOD original");
+      assert.equal(predecessor.date, "2026-01-01", "the predecessor keeps its own date and scope; only the status changes");
+    });
+
+    it("7.14 the binding step refuses without the PO's own selection, with a REPLACE: placeholder or with a malformed selection, names the repair and leaves nothing behind", () => {
+      const root = makeRoot();
+      assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
+      fs.mkdirSync(path.join(root, "specs"), { recursive: true });
+      fs.writeFileSync(path.join(root, "specs", "design.md"), "# Design\n");
+      assert.equal(create(root, "--slug", "store", "--title", "Use a store", "--date", "2026-11-07").status, 0);
+      const tree = () => fs.readdirSync(root, { recursive: true }).map(String).filter((name) => !name.startsWith(".git")).sort().join("\n");
+      const base = ["--root", root, "--feature", "e2e", "--carrier", "specs/design.md", "--draft", "store"];
+      const carrier = fs.readFileSync(path.join(root, "specs", "design.md"));
+      const refuse = (args, pattern) => {
+        const before = tree();
+        const out = run(BIND, ...args);
+        assert.notEqual(out.status, 0, args.join(" "));
+        assert.match(out.stderr, pattern);
+        assert.equal(tree(), before, "a refused request leaves no file behind");
+        assert.ok(fs.readFileSync(path.join(root, "specs", "design.md")).equals(carrier), "and the carrier is untouched");
+      };
+      refuse([...base, "--selection", "specs/po-selection.json"], /specs\/po-selection\.json[\s\S]*attributedTo[\s\S]*selections/u);
+      refuse(base, /--selection/u);
+      fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(SELECTION)}\n`);
+      refuse([...base, "--selection", "specs/po-selection.json"], /REPLACE:[\s\S]*--refresh/u);
+      fs.writeFileSync(path.join(root, "docs", "adr", "draft-store.md"), filled("Use a store"));
+      ok(CREATE_ADR, "--root", root, "--slug", "store", "--refresh");
+      const refreshedTree = tree();
+      for (const bad of [{ selections: SELECTION.selections }, { attributedTo: "", selections: SELECTION.selections }, { attributedTo: "PO", selections: [] },
+        { attributedTo: "PO", selections: [{ topic: "t", text: "REPLACE: say it" }] }, { attributedTo: "PO", selections: [{ topic: "t" }] }]) {
+        fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(bad)}\n`);
+        const out = run(BIND, ...base, "--selection", "specs/po-selection.json");
+        assert.notEqual(out.status, 0, JSON.stringify(bad));
+        assert.match(out.stderr, /specs\/po-selection\.json/u);
+        assert.equal(tree(), refreshedTree);
+      }
     });
   });
 });

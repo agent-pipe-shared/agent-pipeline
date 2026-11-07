@@ -12142,7 +12142,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
-        if (!decisionDraft.ok) { console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.`); return 2; }
+        if (!decisionDraft.ok) {
+          // C20 G20-23 (b): the one refusal with a concrete repair of its own (an ADR draft the agent has not written yet).
+          const placeholder = decisionDraft.code === "DDB-PROSPECTIVE-PLACEHOLDER-REMAINS" ? " An ADR draft still has REPLACE: lines: write its Markdown, run create-adr.mjs --root <root> --slug <slug> --refresh, run bind-adr-proposals.mjs again, then commit and redo the design review." : "";
+          console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.${placeholder}`); return 2;
+        }
         // A draft package is presented only with a current, prepared seal plan: its digest becomes part of the binding the PO signs.
         const sealGate = checkPreparedSealPlan(dir, base);
         if (sealGate.draft && sealGate.refusal) { printSealRefusal("present-plan", sealGate.refusal); return 2; }

@@ -461,9 +461,12 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
     for (const target of targets) {
       const path = physical(root, target.path);
       const before = existsSync(path) ? readFileSync(path) : null;
-      requireValue(before === null || target.path === "architecture/map/index.md", "ARCHITECTURE-DESIGN-EXISTING-TARGET");
-      if (before !== null) requireValue(before.toString("utf8") === initialGreenfieldMapTargets("fresh")[0].bytes,
-        "ARCHITECTURE-DESIGN-TARGET-CHANGED");
+      // The only existing files a publication may replace: the scaffold map index, and a superseded predecessor sidecar whose
+      // exact preimage digest the PO-signed manifest pre-bound (`preimageSha256`).
+      requireValue(before === null || target.path === "architecture/map/index.md" || typeof target.preimageSha256 === "string", "ARCHITECTURE-DESIGN-EXISTING-TARGET");
+      if (before !== null) requireValue(typeof target.preimageSha256 === "string"
+        ? hash(before) === target.preimageSha256
+        : before.toString("utf8") === initialGreenfieldMapTargets("fresh")[0].bytes, "ARCHITECTURE-DESIGN-TARGET-CHANGED");
       const beforeIdentity = before === null ? null : identity(path);
       mkdirSync(dirname(path), { recursive: true });
       const tmp = `${path}.materializing-${lock.ownerNonce}`;

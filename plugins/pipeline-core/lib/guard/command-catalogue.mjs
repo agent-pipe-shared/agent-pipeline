@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
@@ -258,7 +258,8 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
         index += 1;
       } else remainder.push(args[index]);
     }
-    if (companions.length > 8 || findings.length > 64
+    // C20 w256: one superseding ADR binding already needs 8 companions (design, traceability, 6 binding files); the signed SourceSet bound is 64.
+    if (companions.length > 32 || findings.length > 64
       || new Set(companions).size !== companions.length || new Set(findings).size !== findings.length) return false;
     const input = (path) => physicalDesignCoursePath(root, path, { required: true });
     if (!companions.every(input) || !findings.every((id) => FINDING_ID.test(id))) return false;
@@ -342,6 +343,31 @@ function sanctionedCreateAdrArgs(args, root) {
       "--modules": (value) => CREATE_ADR_MODULES.test(value),
       "--supersedes": (value) => CREATE_ADR_ID.test(value),
       "--date": (value) => /^\d{4}-\d{2}-\d{2}$/u.test(value),
+    },
+  });
+}
+
+// C20 w256 (G20-23): scripts/bind-adr-proposals.mjs writes only the binding files next to the named design carrier and the bindings block
+// inside it (it has no output, status or authority flag; it validates its own inputs again and refuses with a repair). One closed argv
+// shape bound to this root: --feature, --carrier (.md), --selection (.json) once each, --draft one to sixteen times, order-free.
+const BIND_ADR_RELATIVE = /^[A-Za-z0-9_@][A-Za-z0-9._@/-]{0,239}$/u;
+const bindAdrPath = (extension) => (value) => typeof value === "string" && BIND_ADR_RELATIVE.test(value) && value.endsWith(extension)
+  && value.split("/").every((part) => part !== "" && !part.startsWith("."));
+function sanctionedBindAdrProposalsArgs(args, root) {
+  const drafts = args.filter((token, index) => token === "--draft" && index % 2 === 0);
+  if (drafts.length < 1 || drafts.length > 16) return false;
+  const named = [];
+  const rest = [];
+  for (let index = 0; index < args.length; index += 2) {
+    if (args[index] === "--draft") named.push(args[index + 1]); else rest.push(args[index], args[index + 1]);
+  }
+  if (rest.includes(undefined) || named.includes(undefined) || new Set(named).size !== named.length || !named.every((slug) => CREATE_ADR_SLUG.test(slug))) return false;
+  return matchFlagSpec(rest, {
+    requiredValue: {
+      "--root": (value) => value === root,
+      "--feature": (value) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value),
+      "--carrier": bindAdrPath(".md"),
+      "--selection": bindAdrPath(".json"),
     },
   });
 }
@@ -595,6 +621,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
   if (script === CREATE_ADR_SCRIPT) return sanctionedCreateAdrArgs(args, root);
+  if (script === BIND_ADR_PROPOSALS_SCRIPT) return sanctionedBindAdrProposalsArgs(args, root);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every

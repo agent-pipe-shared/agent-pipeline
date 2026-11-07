@@ -655,6 +655,39 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
   });
 });
 
+// ---- C20 w256 (G20-23): `bind-adr-proposals.mjs`, the sanctioned step that binds ADR proposals into the design package ----
+test("C20 w256 bind-adr-proposals: the closed shape is admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "bind-adr-proposals.mjs");
+    const bind = (...rest) => scriptAction(script, "--root", f.root, ...rest);
+    const core = ["--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json"];
+    bothAdmit(bind(...core, "--draft", "storage-adapter"), f, "one draft");
+    bothAdmit(bind("--draft", "a", "--selection", "specs/e2e/po-selection.json", "--draft", "b", "--carrier", "specs/e2e/design.md", "--feature", "e2e"), f, "several drafts, flag order is free");
+    for (const [label, action] of [
+      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), ...core, "--draft", "s")],
+      ["relative root", scriptAction(script, "--root", ".", ...core, "--draft", "s")],
+      ["no root", scriptAction(script, ...core, "--draft", "s")],
+      ["no draft", bind(...core)],
+      ["no feature", bind("--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["no carrier", bind("--feature", "e2e", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["no selection", bind("--feature", "e2e", "--carrier", "specs/e2e/design.md", "--draft", "s")],
+      ["duplicate draft", bind(...core, "--draft", "s", "--draft", "s")],
+      ["seventeen drafts", bind(...core, ...Array.from({ length: 17 }, (_, index) => ["--draft", `d${index}`]).flat())],
+      ["draft with a separator", bind(...core, "--draft", "a/b")],
+      ["upper-case draft", bind(...core, "--draft", "Abc")],
+      ["carrier that is not Markdown", bind("--feature", "e2e", "--carrier", "specs/e2e/design.json", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["selection that is not JSON", bind("--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.md", "--draft", "s")],
+      ["carrier with a dot segment", bind("--feature", "e2e", "--carrier", "specs/../design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["absolute carrier", bind("--feature", "e2e", "--carrier", "/etc/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["hidden carrier", bind("--feature", "e2e", "--carrier", ".claude/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["feature with a separator", bind("--feature", "a/b", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
+      ["repeated carrier", bind(...core, "--carrier", "specs/e2e/other.md", "--draft", "s")],
+      ["unknown flag", bind(...core, "--draft", "s", "--out", "x")],
+      ["extra positional", bind(...core, "--draft", "s", "extra")],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
 test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
   withFixture("feature", f => {
     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made

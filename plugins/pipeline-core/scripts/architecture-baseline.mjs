@@ -641,7 +641,7 @@ export function main(argv = process.argv.slice(2)) {
   process.exit(0);
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.url.replace(/^file:\/\//, ""));
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   main();
 }

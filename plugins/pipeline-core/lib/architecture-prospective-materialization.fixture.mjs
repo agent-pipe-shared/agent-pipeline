@@ -85,7 +85,9 @@ export function requireApproved(f){
 
 const architecture={schema:'pipeline.architecture-design.v1',repositoryKind:'greenfield',disposition:{decision:'approved-scoped',scope:['specs/','architecture/','src/','tests/'],rationale:'Synthetic scoped method fixture; no new material decision'},modules:[{id:'unit',responsibility:'Own synthetic unit',nonResponsibilities:['No external authority'],ownedPaths:['src/**','tests/**'],publicContracts:['src/index.mjs'],allowedDependencies:[],authorityEffects:[],verificationEntryPoints:['tests/unit.test.mjs'],adrReferences:[]}],implementationSurface:['src/index.mjs'],fitnessModel:{schema:'pipeline.fitness-model.v1',profileId:'synthetic-unit',revision:1,allowedBoundaryCrossings:[],antiFragmentationPolicy:{decision:'bounded'}}};
 
-export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion'}={}){
+// `bindProposals(f, companions)`, when given, replaces the hand-built prospective subjects: the caller drives the sanctioned
+// create-adr / bind-adr-proposals scripts in f.dir and appends every companion path they name (C20 G20-23 end-to-end).
+export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null}={}){
   assert(['draft','initialized','submitted','presented','approved-unmaterialized','approved','implementing'].includes(stage),'closed genuine fixture stage');
   COMPANIONS.splice(0, COMPANIONS.length, "specs/e2e/design.md", "specs/e2e/traceability.md");
   initialize();const f={dir:mkdtempSync(join(units,'unit-')),mode,trackedState,legacy,descriptorCarrier};
@@ -109,7 +111,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   write(f,SPEC,'# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n');
   write(f,PLAN,`${po.PO_GATE_PRD_LANGUAGE_MARKER('de')}\n${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${hash(bytes(f,SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture)}\n\`\`\`\n`);
   write(f,COMPANIONS[0],'# Synthetic Design\n');write(f,COMPANIONS[1],'| ID | Evidence |\n| --- | --- |\n');write(f,REPORT,'# Synthetic method review\nVerdict: pass.\n');
-  prospectiveSubjects(f, COMPANIONS);
+  if(bindProposals){bindProposals(f,COMPANIONS);COMPANIONS.sort();}else prospectiveSubjects(f, COMPANIONS);
 
   const common=join(f.dir,'.git'),profile=po.createPoGateProfileReceipt({repositoryFingerprint:po.derivePoGateRepositoryFingerprint({gitCommonDir:common,primaryRoot:f.dir}),primaryRoot:f.dir,sourceBytes:bytes(f,'pipeline.user.yaml'),runtimeBytes:bytes(f,'.claude/pipeline.yaml'),updatedAt:AT});
   const profilePath=po.poGateProfileReceiptPath(common);
