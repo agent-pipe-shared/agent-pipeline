@@ -95,6 +95,24 @@ test('AC-207 point 2: exactly `node scratch/<name>.mjs` is admitted in the draft
   assert.equal(refused('node scratch/a-b_c.1.mjs'), false);
 });
 
+test('G20-21: the same scratch script spelled with an absolute node and/or an absolute scratch path is admitted', () => {
+  const node = process.execPath;
+  assert.equal(refused(`${q(node)} scratch/forensics.mjs`), false);
+  assert.equal(refused(`node ${q(join(root, 'scratch', 'forensics.mjs'))}`), false);
+  assert.equal(refused(`${q(node)} ${q(join(root, 'scratch', 'forensics.mjs'))}`), false);
+});
+
+test('G20-21 control: absolute spellings outside <root>/scratch/, nested, with arguments, or a non-node interpreter stay refused', () => {
+  const node = process.execPath;
+  for (const command of [
+    `${q(node)} ${q(join(root, 'src', 'x.mjs'))}`,
+    `${q(node)} ${q(join(root, 'scratch', 'sub', 'x.mjs'))}`,
+    `${q(node)} ${q(join(repo, 'scratch', 'x.mjs'))}`,
+    `${q(node)} scratch/forensics.mjs arg`,
+    `"/usr/bin/python3" scratch/forensics.mjs`,
+  ]) assert.equal(refused(command), true, command);
+});
+
 test('AC-207 point 2 control: scratch-script near-misses stay refused', () => {
   for (const command of ['node scratch/forensics.mjs arg', 'node scratch/sub/x.mjs', 'node scratch/x.js', 'node scratch/../src/x.mjs', 'node src/x.mjs', 'node /tmp/x.mjs']) {
     assert.equal(refused(command), true, command);

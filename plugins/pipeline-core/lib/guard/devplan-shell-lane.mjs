@@ -115,8 +115,10 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
         || isSourceOwnedOwningVerificationControllerCommand(command, root, dependencies));
     // AC-207 (PO decision 2026-10-16 #10 B): exactly `node scratch/<name>.mjs` with no further
     // argument is a draft-phase scratch script, not an opaque implementation write.
-    const draftScratchScript = words !== null && words.length === 2 && words[0] === "node"
-      && /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(words[1]);
+    // G20-21: the Pipeline itself prints absolute interpreter and script paths, so the same scratch script spelled with an absolute
+    // `node` and/or an absolute path inside <root>/scratch/ is the same draft-phase shape, not an opaque implementation write.
+    const draftScratchScript = words !== null && words.length === 2 && isNodeInterpreterWord(words[0])
+      && scratchScriptRelative(words[1], root) !== null;
     const opaqueScript = words === null || draftScratchScript ? null : opaqueScriptExecutionCandidate(words, root);
     if (opaqueScript !== null
       && !ownedVerification
@@ -170,8 +172,9 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
       if (result.verdict === "block") {
         // Candidate 19 (D7): an absolute interpreter path is not the draft scratch-script shape, so the command reads as an opaque script run; say so and name the working spelling.
-        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 0
-          && isAbsolute(words[0]) && ["node", "node.exe"].includes(basename(words[0]).toLowerCase());
+        // G20-21: the scratch-script advice only fits a scratch script with extra words; for a Pipeline script it sent agents the wrong way.
+        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 2
+          && isNodeInterpreterWord(words[0]) && scratchScriptRelative(words[1], root) !== null;
         const reason = absoluteNode && typeof result.reason === "string"
           ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
           : result.reason;
@@ -186,6 +189,23 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
   } catch (error) {
     return { fault: true, error };
   }
+}
+
+function isNodeInterpreterWord(word) {
+  if (word === "node") return true;
+  return typeof word === "string" && isAbsolute(word) && ["node", "node.exe"].includes(basename(word).toLowerCase());
+}
+
+function scratchScriptRelative(word, root) {
+  if (typeof word !== "string" || word === "") return null;
+  const slashed = word.replace(/\\/gu, "/");
+  let rel = slashed;
+  if (isAbsolute(word)) {
+    const fromRoot = relative(resolve(root), resolve(word));
+    if (fromRoot === "" || fromRoot.startsWith("..") || isAbsolute(fromRoot)) return null;
+    rel = fromRoot.split(sep).join("/");
+  }
+  return /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(rel) ? rel : null;
 }
 
 function opaqueScriptExecutionCandidate(words, root) {

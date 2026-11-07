@@ -822,7 +822,9 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
 check("GIT03-6 block  a missing marker is enforced by default", 'git commit -m "chore: bump"', BLOCK, {
   projectDir: NO_CONFIG_DIR,
   // Candidate 19 (D7): the refusal also prints the accepted trailer form, so an agent does not need a second attempt to learn it.
-  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`"],
+  // G20-21: it also names the message-file route, since several -m flags split the trailers with a blank line.
+  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`",
+    "git commit -F scratch/<message-file>", "each `-m` adds a blank line"],
 });
 // GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
 // commitMessageFindings' readFile throw, the throw was swallowed, and the commit went

@@ -1124,7 +1124,9 @@ let inspection;
       "There is no override for this rule. Rewrite the message.",
       // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
       ...(blocking.some((f) => conventionCodes.has(f.code))
-        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own."]
+        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own.",
+          // G20-21 (AGY greenfield): several `-m` flags each start a new paragraph, so the two trailers were split by a blank line and refused again.
+          "Write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`; do not split the trailers across several `-m` flags (each `-m` adds a blank line)."]
         : []),
       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
     ]);
