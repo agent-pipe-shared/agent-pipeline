@@ -1819,6 +1819,12 @@ const cases = [
     let calls=0;
     const ok=retryPublishWhileLockHeld(()=>{calls+=1;if(calls<3)throw held();return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
     assert.deepEqual([ok,calls],[{ok:true},3]);
+    // G20-40 (measured 2026-11-07): a sibling launch of the same reply held the lock while this admission's own attempt spent 64 s in its
+    // lock-free prescan; a retry window fixed at 60 s from the first attempt had already expired, so the launch refused SDC-LOCK-HELD
+    // with 150 s of its admission budget left. The window is what remains of the admission deadline, however long one attempt takes.
+    clock=0;calls=0;
+    const slow=retryPublishWhileLockHeld(()=>{calls+=1;if(calls===1){clock+=64000;throw held();}return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
+    assert.deepEqual([slow,calls],[{ok:true},2]);
     // The budget is what remains of the admission deadline: with 100 ms left the held lock is refused, typed, after the wait.
     clock=0;calls=0;
     assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw held();},{startMs:0,budgetMs:100,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');

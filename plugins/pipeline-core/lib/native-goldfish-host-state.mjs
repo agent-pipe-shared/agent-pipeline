@@ -993,13 +993,15 @@ export function createAdmissionCheckpoint(deadline){
     }
   };
 }
-/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (capped at 60 s, the
- * deadline checkpoints still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a
- * held lock met before the boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does. */
+/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (the deadline checkpoints
+ * still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a held lock met before the
+ * boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does.
+ * G20-40: the former 60 s cap counted from the FIRST attempt, so one slow lock-free attempt (a 64 s prescan, measured) used it up and a
+ * sibling launch's held lock was refused with half the admission budget left; the window is now the whole remaining admission budget. */
 export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
   const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
   const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
-    ?Math.max(0,Math.min(60000,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs)))
+    ?Math.max(0,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs))
     :10000;
   return retryWhileSessionAuthorityLockHeld(attempt,{budgetMs:remaining,now,...(typeof options.sleep==='function'?{sleep:options.sleep}:{})});
 }
