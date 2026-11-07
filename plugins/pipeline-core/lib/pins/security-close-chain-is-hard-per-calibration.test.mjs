@@ -185,7 +185,7 @@ test("C7 the close.pre entry point: standard prints not executed and never GREEN
 // C8 (the normal delivery path): the Verify "security" check runs the configured scan. The scanner observation is injected as an
 // environment without any scanner (empty PATH, HOME in the fixture): no scanner binary is found, nothing is downloaded.
 test("C8 the Verify security check runs the scan: standard admits and reports, critical refuses the scanner that did not execute, no gate is not applicable", async () => {
-  const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
+  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs"); // QG-04: same function, moved to its own dispatcher (GMWKC01)
   const run = (root) => {
     const lines = [];
     const log = console.log; const error = console.error;
@@ -231,7 +231,7 @@ const MODE_OFF = `${HEADER}gates:\n  dev-plan:\n    mode: blocking\n    type: hu
 function put(dir, rel, text) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); }
 function verifyCheck(root) {
   return (async () => {
-    const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
+    const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs"); // QG-04: same function, moved to its own dispatcher (GMWKC01)
     const lines = [];
     const log = console.log; const error = console.error;
     console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));

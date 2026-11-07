@@ -812,6 +812,13 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
   "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
   "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+  // C20 (GMWKC01): three leaf modules the candidate-20 chain made kernel imports. path-spelling.mjs (the separator sweep: five
+  // guard/ modules spell paths through it), security-close-status.mjs (G20-25: security-completeness-gate.mjs reads the four
+  // close states from it) and spec-journey-coverage.mjs (G20-27: plan-handoff-readiness.mjs reads the per-criterion journey
+  // coverage from it; its one first-party import, critic-accepted-contract.mjs, is listed above). None imports further first-party code.
+  "plugins/pipeline-core/lib/path-spelling.mjs",
+  "plugins/pipeline-core/lib/security-close-status.mjs",
+  "plugins/pipeline-core/lib/spec-journey-coverage.mjs",
   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
