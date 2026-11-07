@@ -680,6 +680,10 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
     clone; forensics pagination; an OS-level sandbox for the AI observation boundary (node scripts read outside the repository).
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
+## Moved from docs/state.md (2026-11-07, size cap): candidate 18/19 verification line, verbatim
+
+Verification: Full Verify 5 on the stamped state (clone below the home directory, 3596 s): 4 red, exactly the open-by-design ones, no real finding; w114 proven; the two clone-location suites green in the main tree. Open by design: Critic preimage pin (PO re-pin), `g23-read-help`/`agy-item-delivery` (clone location), `security-scan` remote. Candidate 19 (applied by the PO, `4924916bf`, w120/w121 not): w115-w119, w122-w125; Full Verify 6 on the applied state: 4 red; one real (g23 case-completion policy lacked G23C004, fixed in w125, parser red/green), two open by design (Critic preimage, security-scan remote-ambiguous), one load (codex-pretool-guard). Next: stamp, Full Verify on the main tree, greenfield findings, G6 to 0.7.1.
+
 ## End note: derived files
 
 Adding or removing a script, suite or skill drifts the inventory baseline and the Reader inputs (`node scripts/refresh-derived-files.mjs --check` reports `inventory-baseline: DRIFT` since A1). The refresh touches `plugins/pipeline-core/` and is therefore part of the PO apply script (last step), not a separate commit by the Elephant.
