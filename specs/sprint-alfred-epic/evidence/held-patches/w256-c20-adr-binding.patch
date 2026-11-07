@@ -1,0 +1,786 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 5b40aa4b8..11dc517fa 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -461,9 +461,12 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
+     for (const target of targets) {
+       const path = physical(root, target.path);
+       const before = existsSync(path) ? readFileSync(path) : null;
+-      requireValue(before === null || target.path === "architecture/map/index.md", "ARCHITECTURE-DESIGN-EXISTING-TARGET");
+-      if (before !== null) requireValue(before.toString("utf8") === initialGreenfieldMapTargets("fresh")[0].bytes,
+-        "ARCHITECTURE-DESIGN-TARGET-CHANGED");
++      // The only existing files a publication may replace: the scaffold map index, and a superseded predecessor sidecar whose
++      // exact preimage digest the PO-signed manifest pre-bound (`preimageSha256`).
++      requireValue(before === null || target.path === "architecture/map/index.md" || typeof target.preimageSha256 === "string", "ARCHITECTURE-DESIGN-EXISTING-TARGET");
++      if (before !== null) requireValue(typeof target.preimageSha256 === "string"
++        ? hash(before) === target.preimageSha256
++        : before.toString("utf8") === initialGreenfieldMapTargets("fresh")[0].bytes, "ARCHITECTURE-DESIGN-TARGET-CHANGED");
+       const beforeIdentity = before === null ? null : identity(path);
+       mkdirSync(dirname(path), { recursive: true });
+       const tmp = `${path}.materializing-${lock.ownerNonce}`;
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+index 5e7f52c0d..edd936315 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+@@ -17,8 +17,8 @@ const ADVISORY_CODES = new Set(["legacy-decision-without-sidecar", "module-appli
+ const digest = (value) => createHash("sha256").update(value).digest("hex");
+ const finding = (code, path) => ({ code, path });
+ 
+-// Keep the accepted v1 sidecar's closed shape locally checkable in a
+-// plugin-only installation. The root-level schema is not shipped there.
++// The closed shape of both sidecar versions, checked structurally. Both schemas ship in plugins/pipeline-core/schemas, but
++// schema-lite evaluates neither const, pattern, minItems, uniqueItems nor format, so this check is what enforces them.
+ function validDecision(record) {
+   if (record === null || typeof record !== "object" || Array.isArray(record)) return false;
+   const required = ["schema", "id", "title", "status", "digest", "scope", "date"];
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+index 0f903bf32..64d0f8196 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+@@ -85,7 +85,9 @@ export function requireApproved(f){
+ 
+ const architecture={schema:'pipeline.architecture-design.v1',repositoryKind:'greenfield',disposition:{decision:'approved-scoped',scope:['specs/','architecture/','src/','tests/'],rationale:'Synthetic scoped method fixture; no new material decision'},modules:[{id:'unit',responsibility:'Own synthetic unit',nonResponsibilities:['No external authority'],ownedPaths:['src/**','tests/**'],publicContracts:['src/index.mjs'],allowedDependencies:[],authorityEffects:[],verificationEntryPoints:['tests/unit.test.mjs'],adrReferences:[]}],implementationSurface:['src/index.mjs'],fitnessModel:{schema:'pipeline.fitness-model.v1',profileId:'synthetic-unit',revision:1,allowedBoundaryCrossings:[],antiFragmentationPolicy:{decision:'bounded'}}};
+ 
+-export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion'}={}){
++// `bindProposals(f, companions)`, when given, replaces the hand-built prospective subjects: the caller drives the sanctioned
++// create-adr / bind-adr-proposals scripts in f.dir and appends every companion path they name (C20 G20-23 end-to-end).
++export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null}={}){
+   assert(['draft','initialized','submitted','presented','approved-unmaterialized','approved','implementing'].includes(stage),'closed genuine fixture stage');
+   COMPANIONS.splice(0, COMPANIONS.length, "specs/e2e/design.md", "specs/e2e/traceability.md");
+   initialize();const f={dir:mkdtempSync(join(units,'unit-')),mode,trackedState,legacy,descriptorCarrier};
+@@ -109,7 +111,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   write(f,SPEC,'# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n');
+   write(f,PLAN,`${po.PO_GATE_PRD_LANGUAGE_MARKER('de')}\n${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${hash(bytes(f,SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture)}\n\`\`\`\n`);
+   write(f,COMPANIONS[0],'# Synthetic Design\n');write(f,COMPANIONS[1],'| ID | Evidence |\n| --- | --- |\n');write(f,REPORT,'# Synthetic method review\nVerdict: pass.\n');
+-  prospectiveSubjects(f, COMPANIONS);
++  if(bindProposals){bindProposals(f,COMPANIONS);COMPANIONS.sort();}else prospectiveSubjects(f, COMPANIONS);
+ 
+   const common=join(f.dir,'.git'),profile=po.createPoGateProfileReceipt({repositoryFingerprint:po.derivePoGateRepositoryFingerprint({gitCommonDir:common,primaryRoot:f.dir}),primaryRoot:f.dir,sourceBytes:bytes(f,'pipeline.user.yaml'),runtimeBytes:bytes(f,'.claude/pipeline.yaml'),updatedAt:AT});
+   const profilePath=po.poGateProfileReceiptPath(common);
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
+index 10fa9ec30..5a4e2443b 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
+@@ -13,6 +13,33 @@ const pathOK = value => typeof value === 'string' && value.length <= 240
+   && value.split('/').every(part => part && !part.startsWith('.'));
+ const refOK = value => own(value, ['path', 'sha256']) && pathOK(value.path) && /^[a-f0-9]{64}$/u.test(value.sha256);
+ function need(value, code) { if (!value) throw new Error(`DDB-PROSPECTIVE-${code}`); }
++export const prospectiveJson = json;
++/** A draft that still carries a create-adr template line has not been written yet; signing it would freeze a placeholder. */
++export const PLACEHOLDER_LINE = /^REPLACE:/mu;
++
++/** The accepted records one row publishes. The inspector below and the binding generator both call this, so they cannot drift. */
++export function deriveAcceptedRecords({ id, proposed, markdownText, choice }) {
++  const acceptedMarkdown = `# ADR-${id}: ${proposed.title}\n\nAccepted through the canonical aggregate design approval.\n\n## Approved proposal, preserved verbatim\n\n${markdownText}`;
++  const acceptedSidecar = { ...proposed, id, status: 'accepted', digest: hash(acceptedMarkdown) };
++  const { origin: _origin, selections: _selections, ...selected } = choice;
++  const acceptedChoice = { ...selected, schema: 'pipeline.design-decision-chat-selection.v1', id, decision: 'accepted', markdownSha256: hash(acceptedMarkdown), sidecarSha256: hash(json(acceptedSidecar)) };
++  return { acceptedMarkdown, acceptedSidecar, acceptedChoice };
++}
++
++/** The superseded predecessor sidecar. `prior` is the predecessor's EXISTING sidecar file ({ bytes, sha256 }) or null.
++ * Without one the record is rebuilt from the historic Markdown. With one the record is that sidecar with only its status changed;
++ * `preimageSha256` is then the digest of the bytes the signed manifest must pre-bind (null once it is already superseded). */
++export function derivePredecessorSidecar({ supersedes, historic, proposed, prior }) {
++  if (prior) {
++    const base = parseStrictJson(prior.bytes);
++    need(validateArchitectureDecisionSidecar(base) && base.id === supersedes && base.digest === historic.sha256
++      && ['accepted', 'superseded'].includes(base.status), 'PREDECESSOR-INVALID');
++    return { record: { ...base, status: 'superseded' }, preimageSha256: base.status === 'accepted' ? prior.sha256 : null };
++  }
++  return { preimageSha256: null, record: { schema: 'pipeline.architecture-decision.v1', id: supersedes,
++    title: historic.text.split('\n')[0].replace(/^# ADR-\d+: /u, ''), status: 'superseded', digest: historic.sha256,
++    scope: proposed.scope, date: proposed.date } };
++}
+ 
+ /** All inputs, including the manifest, must be explicit signed Source companions.
+  * The reader supplies its normal physical custody checks; this function never
+@@ -27,13 +54,15 @@ export function inspectProspectiveArchitectureManifest({ manifest, sources, read
+   const manifestFile = get(manifest), value = parseStrictJson(manifestFile.bytes);
+   need(own(value, ['schema', 'decisions']) && value.schema === PROSPECTIVE_ARCHITECTURE_SCHEMA
+     && Array.isArray(value.decisions) && value.decisions.length > 0 && value.decisions.length <= 16, 'MANIFEST-SHAPE');
+-  const add = (path, bytes, sha256) => {
++  // `preimageSha256` (predecessor sidecars only) is the digest of an existing file the SIGNED manifest allows to be replaced by `bytes`.
++  const add = (path, bytes, sha256, preimageSha256 = null) => {
+     need(pathOK(path) && !paths.has(path.toLowerCase()) && !sources.companions.some(ref => ref.path.toLowerCase() === path.toLowerCase())
+       && path !== sources.prd.path && path !== sources.spec.path, 'TARGET-COLLISION');
+     need(hash(bytes) === sha256, 'TARGET-DIGEST'); paths.add(path.toLowerCase());
+     const present = existing(path);
+-    need(!present || present.bytes.equals(Buffer.from(bytes)), 'TARGET-DRIFT');
+-    targets.push({ path, bytes, sha256, present: !!present });
++    const replaceable = !!present && preimageSha256 !== null && present.sha256 === preimageSha256;
++    need(!present || replaceable || present.bytes.equals(Buffer.from(bytes)), 'TARGET-DRIFT');
++    targets.push({ path, bytes, sha256, present: !!present && !replaceable, ...(replaceable ? { preimageSha256 } : {}) });
+     return { path, sha256 };
+   };
+   const ids = [];
+@@ -43,6 +72,7 @@ export function inspectProspectiveArchitectureManifest({ manifest, sources, read
+     ids.push(row.id);
+     const markdown = get(row.proposedMarkdown), sidecar = get(row.proposedSidecar), selection = get(row.chatSelection);
+     const proposed = parseStrictJson(sidecar.bytes), choice = parseStrictJson(selection.bytes);
++    need(!PLACEHOLDER_LINE.test(markdown.text), 'PLACEHOLDER-REMAINS');
+     need(row.proposedMarkdown.path.startsWith('docs/adr/draft-') && row.proposedSidecar.path === row.proposedMarkdown.path.slice(0, -3) + '.json'
+       && validateArchitectureDecisionSidecar(proposed) && proposed.status === 'proposed' && !proposed.exception
+       && proposed.id === row.proposedMarkdown.path.slice('docs/adr/'.length, -3)
+@@ -58,11 +88,8 @@ export function inspectProspectiveArchitectureManifest({ manifest, sources, read
+       && Array.isArray(origin.selections) && choice.selections.every(item => own(item, ['topic', 'text'])
+         && typeof item.topic === 'string' && typeof item.text === 'string' && item.text.trim()
+         && origin.selections.some(original => original.topic === item.topic && original.text === item.text)), 'SELECTION-ORIGIN-DRIFT');
+-    const acceptedMarkdown = `# ADR-${row.id}: ${proposed.title}\n\nAccepted through the canonical aggregate design approval.\n\n## Approved proposal, preserved verbatim\n\n${markdown.text}`;
+-    const acceptedSidecar = { ...proposed, id: row.id, status: 'accepted', digest: hash(acceptedMarkdown) };
++    const { acceptedMarkdown, acceptedSidecar, acceptedChoice } = deriveAcceptedRecords({ id: row.id, proposed, markdownText: markdown.text, choice });
+     need(validateArchitectureDecisionSidecar(acceptedSidecar), 'POSTIMAGE-INVALID');
+-    const { origin: _origin, selections: _selections, ...selected } = choice;
+-    const acceptedChoice = { ...selected, schema: 'pipeline.design-decision-chat-selection.v1', id: row.id, decision: 'accepted', markdownSha256: hash(acceptedMarkdown), sidecarSha256: hash(json(acceptedSidecar)) };
+     need(own(row.outputs, ['markdown', 'sidecar', 'chatSelection']) && Object.values(row.outputs).every(refOK)
+       && row.outputs.markdown.path === `docs/adr/${row.id}.md` && row.outputs.sidecar.path === `docs/adr/${row.id}.json`
+       && row.outputs.chatSelection.path === `project/architecture-chat-selections/${row.id}.json`, 'OUTPUT-SHAPE');
+@@ -70,16 +97,20 @@ export function inspectProspectiveArchitectureManifest({ manifest, sources, read
+       sidecar: add(row.outputs.sidecar.path, json(acceptedSidecar), row.outputs.sidecar.sha256),
+       chatSelection: add(row.outputs.chatSelection.path, json(acceptedChoice), row.outputs.chatSelection.sha256) };
+     if (proposed.supersedes) {
+-      need(own(row.predecessor, ['markdown', 'sidecar']) && refOK(row.predecessor.markdown) && refOK(row.predecessor.sidecar)
++      // A predecessor that already has a sidecar names the digest of that file (`sidecarPreimageSha256`) inside the signed manifest:
++      // only bytes with exactly that digest may be replaced by the superseded postimage (C20 G20-23 (a)).
++      const preimage = row.predecessor !== null && typeof row.predecessor === 'object' && Object.hasOwn(row.predecessor, 'sidecarPreimageSha256');
++      need(own(row.predecessor, preimage ? ['markdown', 'sidecar', 'sidecarPreimageSha256'] : ['markdown', 'sidecar']) && refOK(row.predecessor.markdown) && refOK(row.predecessor.sidecar)
++        && (!preimage || /^[a-f0-9]{64}$/u.test(row.predecessor.sidecarPreimageSha256))
+         && row.predecessor.markdown.path === `docs/adr/${proposed.supersedes}.md`
+         && row.predecessor.sidecar.path === `docs/adr/${proposed.supersedes}.json`, 'PREDECESSOR-SHAPE');
+       const historic = get(row.predecessor.markdown);
+       need(historic.text.startsWith(`# ADR-${proposed.supersedes.slice(0,4)}:`), 'PREDECESSOR-TITLE');
+-      const record = { schema: 'pipeline.architecture-decision.v1', id: proposed.supersedes,
+-        title: historic.text.split('\n')[0].replace(/^# ADR-\d+: /u, ''), status: 'superseded', digest: historic.sha256,
+-        scope: proposed.scope, date: proposed.date };
+-      need(validateArchitectureDecisionSidecar(record) && record.scope !== 'module', 'PREDECESSOR-INVALID');
+-      add(row.predecessor.sidecar.path, json(record), row.predecessor.sidecar.sha256);
++      const prior = preimage ? existing(row.predecessor.sidecar.path) : null;
++      need(!preimage || prior, 'PREDECESSOR-PREIMAGE-MISSING');
++      const { record } = derivePredecessorSidecar({ supersedes: proposed.supersedes, historic, proposed, prior });
++      need(validateArchitectureDecisionSidecar(record) && (preimage || record.scope !== 'module'), 'PREDECESSOR-INVALID');
++      add(row.predecessor.sidecar.path, json(record), row.predecessor.sidecar.sha256, preimage ? row.predecessor.sidecarPreimageSha256 : null);
+     } else need(row.predecessor === null, 'PREDECESSOR-UNEXPECTED');
+     decisions.push({ entry, record: acceptedSidecar });
+   }
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index 0113bcd1a..846e9af16 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -409,7 +409,8 @@ export function prepareApprovedArchitectureMaterialization(handle) {
+     const result = approved(held.root, held.area);
+     requireValue(result.required && canonicalizeJson(result.approvalBasis) === canonicalizeJson(held.approvalBasis), 'DDB-APPROVAL-DRIFT');
+     const prospectiveTargets = result.prospective?.targets ?? [];
+-    const targets = prospectiveTargets.filter(target => !target.present).map(({ path, bytes }) => ({ path, bytes }));
++    // A predecessor sidecar the signed manifest allows to be replaced carries the digest of the exact bytes it replaces.
++    const targets = prospectiveTargets.filter(target => !target.present).map(({ path, bytes, preimageSha256 }) => ({ path, bytes, ...(preimageSha256 ? { preimageSha256 } : {}) }));
+     const inventoryTargets = prospectiveTargets.map(({ path, bytes }) => ({ path, bytes }));
+     const evidence = file => {
+       const path = `project/design-approval-evidence/${file.sha256}.json`;
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 498800d37..3bd5af025 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+@@ -258,7 +258,8 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+         index += 1;
+       } else remainder.push(args[index]);
+     }
+-    if (companions.length > 8 || findings.length > 64
++    // C20 w256: one superseding ADR binding already needs 8 companions (design, traceability, 6 binding files); the signed SourceSet bound is 64.
++    if (companions.length > 32 || findings.length > 64
+       || new Set(companions).size !== companions.length || new Set(findings).size !== findings.length) return false;
+     const input = (path) => physicalDesignCoursePath(root, path, { required: true });
+     if (!companions.every(input) || !findings.every((id) => FINDING_ID.test(id))) return false;
+@@ -346,6 +347,31 @@ function sanctionedCreateAdrArgs(args, root) {
+   });
+ }
+ 
++// C20 w256 (G20-23): scripts/bind-adr-proposals.mjs writes only the binding files next to the named design carrier and the bindings block
++// inside it (it has no output, status or authority flag; it validates its own inputs again and refuses with a repair). One closed argv
++// shape bound to this root: --feature, --carrier (.md), --selection (.json) once each, --draft one to sixteen times, order-free.
++const BIND_ADR_RELATIVE = /^[A-Za-z0-9_@][A-Za-z0-9._@/-]{0,239}$/u;
++const bindAdrPath = (extension) => (value) => typeof value === "string" && BIND_ADR_RELATIVE.test(value) && value.endsWith(extension)
++  && value.split("/").every((part) => part !== "" && !part.startsWith("."));
++function sanctionedBindAdrProposalsArgs(args, root) {
++  const drafts = args.filter((token, index) => token === "--draft" && index % 2 === 0);
++  if (drafts.length < 1 || drafts.length > 16) return false;
++  const named = [];
++  const rest = [];
++  for (let index = 0; index < args.length; index += 2) {
++    if (args[index] === "--draft") named.push(args[index + 1]); else rest.push(args[index], args[index + 1]);
++  }
++  if (rest.includes(undefined) || named.includes(undefined) || new Set(named).size !== named.length || !named.every((slug) => CREATE_ADR_SLUG.test(slug))) return false;
++  return matchFlagSpec(rest, {
++    requiredValue: {
++      "--root": (value) => value === root,
++      "--feature": (value) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value),
++      "--carrier": bindAdrPath(".md"),
++      "--selection": bindAdrPath(".json"),
++    },
++  });
++}
++
+ // AC-245 (D139): scripts/dispatch-recovery.mjs keeps ONE bounded recovery state file per dispatch under
+ // <root>/evidence (it validates its own inputs and refuses with a repair). Admitted as exactly three argv shapes,
+ // all bound to this root; the packet and result are repository-relative regular .json paths without a dot segment.
+@@ -595,6 +621,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
+   if (script === CREATE_ADR_SCRIPT) return sanctionedCreateAdrArgs(args, root);
++  if (script === BIND_ADR_PROPOSALS_SCRIPT) return sanctionedBindAdrProposalsArgs(args, root);
+   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
+   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
+   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 67d21806a..b69f69356 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -200,6 +200,8 @@ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scri
+ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+ // C20 w253 (G20-26): the one way an ADR proposal is created (docs/adr/draft-<slug>.md + .json); closed argv grammar in command-catalogue.mjs.
+ export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr.mjs", import.meta.url));
++// C20 w256 (G20-23): the one way ADR proposals are bound into the design package (manifest, chat selections, v2 bindings block).
++export const BIND_ADR_PROPOSALS_SCRIPT = fileURLToPath(new URL("../../scripts/bind-adr-proposals.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+ // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 106df4857..ac6dfaa0d 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -655,6 +655,39 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
+   });
+ });
+ 
++// ---- C20 w256 (G20-23): `bind-adr-proposals.mjs`, the sanctioned step that binds ADR proposals into the design package ----
++test("C20 w256 bind-adr-proposals: the closed shape is admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "bind-adr-proposals.mjs");
++    const bind = (...rest) => scriptAction(script, "--root", f.root, ...rest);
++    const core = ["--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json"];
++    bothAdmit(bind(...core, "--draft", "storage-adapter"), f, "one draft");
++    bothAdmit(bind("--draft", "a", "--selection", "specs/e2e/po-selection.json", "--draft", "b", "--carrier", "specs/e2e/design.md", "--feature", "e2e"), f, "several drafts, flag order is free");
++    for (const [label, action] of [
++      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), ...core, "--draft", "s")],
++      ["relative root", scriptAction(script, "--root", ".", ...core, "--draft", "s")],
++      ["no root", scriptAction(script, ...core, "--draft", "s")],
++      ["no draft", bind(...core)],
++      ["no feature", bind("--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["no carrier", bind("--feature", "e2e", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["no selection", bind("--feature", "e2e", "--carrier", "specs/e2e/design.md", "--draft", "s")],
++      ["duplicate draft", bind(...core, "--draft", "s", "--draft", "s")],
++      ["seventeen drafts", bind(...core, ...Array.from({ length: 17 }, (_, index) => ["--draft", `d${index}`]).flat())],
++      ["draft with a separator", bind(...core, "--draft", "a/b")],
++      ["upper-case draft", bind(...core, "--draft", "Abc")],
++      ["carrier that is not Markdown", bind("--feature", "e2e", "--carrier", "specs/e2e/design.json", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["selection that is not JSON", bind("--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.md", "--draft", "s")],
++      ["carrier with a dot segment", bind("--feature", "e2e", "--carrier", "specs/../design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["absolute carrier", bind("--feature", "e2e", "--carrier", "/etc/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["hidden carrier", bind("--feature", "e2e", "--carrier", ".claude/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["feature with a separator", bind("--feature", "a/b", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "s")],
++      ["repeated carrier", bind(...core, "--carrier", "specs/e2e/other.md", "--draft", "s")],
++      ["unknown flag", bind(...core, "--draft", "s", "--out", "x")],
++      ["extra positional", bind(...core, "--draft", "s", "extra")],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
+   withFixture("feature", f => {
+     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.mjs b/plugins/pipeline-core/scripts/architecture-baseline.mjs
+index 07d43a523..3b77867b0 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.mjs
+@@ -641,7 +641,7 @@ export function main(argv = process.argv.slice(2)) {
+   process.exit(0);
+ }
+ 
+-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.url.replace(/^file:\/\//, ""));
++const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+ if (isMain) {
+   main();
+ }
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index abe6d9fc1..67764c4f6 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -24,8 +24,9 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+ import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { inspectProspectiveArchitectureManifest } from "../lib/architecture-prospective-materialization.mjs";
+ 
++// C20 G20-23 (c): fileURLToPath, not a string replace of "file://" (wrong on Windows); the path it names is unchanged.
+ const DECISION_SCHEMA_PATH = path.join(
+-  path.dirname(import.meta.url.replace(/^file:\/\//, "")),
++  path.dirname(fileURLToPath(import.meta.url)),
+   "../../..",
+   "schemas",
+   "pipeline.architecture-decision.v1.json"
+@@ -543,6 +544,10 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
+       fs.writeFileSync(path.join(root, "docs", "adr", "0004-earlier.md"), "# ADR-0004: Earlier\n");
+       const out = JSON.parse(create(root, "--slug", "egm", "--title", "Item-owned EGM", "--date", "2026-11-07").stdout);
++      // QG-04 restatement (C20 G20-23 (b)): the consumer now refuses a draft that still holds a create-adr `REPLACE:` template line, so
++      // this case first proves that refusal on the untouched template and then does what the skill tells the agent to do before binding:
++      // write the Markdown and recompute the digest with --refresh. Every assertion below the inspector call is unchanged.
++      const build = () => {
+       const files = new Map();
+       const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
+       const add = (rel, content) => {
+@@ -571,7 +576,12 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+           chatSelection: { path: `project/architecture-chat-selections/${id}.json`, sha256: sha(jsonText(acceptedChoice)) } } };
+       const manifest = add("specs/x/manifest.json", jsonText({ schema: "pipeline.architecture-prospective-materialization.v1", decisions: [row] }));
+       const sources = { prd: add("specs/x/prd.md", "# prd\n"), spec: add("specs/x/spec.md", "# spec\n"), companions: [markdown, sidecar, origin, chatSelection, manifest] };
+-      const inspected = inspectProspectiveArchitectureManifest({ manifest, sources, read: (name) => files.get(name), existing: () => null });
++      return { inspected: inspectProspectiveArchitectureManifest({ manifest, sources, read: (name) => files.get(name), existing: () => null }), files, sidecar, id };
++      };
++      assert.throws(build, /DDB-PROSPECTIVE-PLACEHOLDER-REMAINS/u);
++      fs.writeFileSync(path.join(root, out.markdown), "# Item-owned EGM\n\n## Decision\n\nOne owner performs the work.\n");
++      assert.equal(spawnSync(process.execPath, [CREATE_ADR, "--root", root, "--slug", "egm", "--refresh"], { encoding: "utf8" }).status, 0);
++      const { inspected, files, sidecar, id } = build();
+       assert.equal(inspected.materialized, false);
+       assert.deepEqual(inspected.targets.map((target) => target.path).sort(), [`docs/adr/${id}.json`, `docs/adr/${id}.md`, `project/architecture-chat-selections/${id}.json`]);
+       assert.equal(inspected.decisions[0].record.status, "accepted");
+@@ -598,5 +608,95 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.notEqual(again.status, 0);
+       assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-ok.md")).equals(before));
+     });
++
++    // C20 G20-23 (remainder): the sanctioned binding step. Everything below drives the real scripts and the real lifecycle:
++    // create-adr -> bind-adr-proposals -> design review receipt -> submit-plan -> present-plan -> approve-plan -> materialize-architecture.
++    const BIND = path.join(here, "bind-adr-proposals.mjs");
++    const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
++    const ok = (script, ...args) => { const out = run(script, ...args); assert.equal(out.status, 0, `${path.basename(script)} ${args.join(" ")}: ${out.stderr}`); return out; };
++    const HISTORIC = "# ADR-9997: METHOD original\n\nAccepted original requirement.\n";
++    const filled = (title) => `# ${title}\n\n## Context\n\nOne owner performs analysis, tests, code and targeted fixes.\n\n## Decision\n\nThe item owner is the only writer.\n\n## Consequences\n\nOne review per item.\n\n## Affected Contracts\n\nnone\n`;
++    const SELECTION = { attributedTo: "PO chat selection 2026-11-07", selections: [{ topic: "ownership", text: "One item Goldfish owns analysis, tests, code and fixes." }] };
++    const fixtureWalk = async ({ predecessorSidecar }) => {
++      const fxt = await import("../lib/architecture-prospective-materialization.fixture.mjs");
++      const { readEffectiveDesignArchitectureAuthority } = await import("../lib/design-decision-bindings.mjs");
++      let bound, drafts;
++      const f = fxt.makeFixture("signature", { stage: "approved-unmaterialized", bindProposals(fixture, companions) {
++        fxt.write(fixture, "docs/adr/9997-method-original.md", HISTORIC);
++        if (predecessorSidecar) {
++          fxt.write(fixture, "docs/adr/9997-method-original.json", `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "9997-method-original",
++            title: "METHOD original", status: "accepted", digest: sha(HISTORIC), scope: "project", date: "2026-01-01" }, null, 2)}\n`);
++          fxt.git(fixture, "add", "--", "docs/adr/9997-method-original.json");
++        }
++        ok(CREATE_ADR, "--root", fixture.dir, "--slug", "method-egm", "--title", "METHOD item-owned EGM", "--supersedes", "9997-method-original", "--date", "2026-10-10");
++        fs.writeFileSync(path.join(fixture.dir, "docs/adr/draft-method-egm.md"), filled("METHOD item-owned EGM"));
++        ok(CREATE_ADR, "--root", fixture.dir, "--slug", "method-egm", "--refresh");
++        fxt.write(fixture, "specs/e2e/po-selection.json", `${JSON.stringify(SELECTION, null, 2)}\n`);
++        bound = JSON.parse(ok(BIND, "--root", fixture.dir, "--feature", "e2e", "--carrier", "specs/e2e/design.md", "--selection", "specs/e2e/po-selection.json", "--draft", "method-egm").stdout);
++        for (const name of bound.companions) if (!companions.includes(name)) companions.push(name);
++        drafts = ["docs/adr/draft-method-egm.md", "docs/adr/draft-method-egm.json"].map((name) => [name, fs.readFileSync(path.join(fixture.dir, name))]);
++      } });
++      assert.equal(bound.bound[0].id, "9998-method-egm");
++      for (const name of ["docs/adr/9998-method-egm.md", "docs/adr/9998-method-egm.json", "project/architecture-chat-selections/9998-method-egm.json"]) {
++        assert.equal(fs.existsSync(path.join(f.dir, name)), false, `${name} must not exist before the PO's approval is consumed`);
++      }
++      fxt.must(f, ["materialize-architecture"]);
++      const accepted = JSON.parse(fs.readFileSync(path.join(f.dir, "docs/adr/9998-method-egm.json"), "utf8"));
++      assert.equal(accepted.status, "accepted");
++      assert.equal(accepted.supersedes, "9997-method-original");
++      const predecessor = JSON.parse(fs.readFileSync(path.join(f.dir, "docs/adr/9997-method-original.json"), "utf8"));
++      assert.equal(predecessor.status, "superseded");
++      assert.equal(predecessor.id, "9997-method-original");
++      for (const name of ["docs/adr/9998-method-egm.json", "docs/adr/9997-method-original.json"]) assert.equal(validate(path.join(f.dir, name)).status, 0, name);
++      for (const [name, bytes] of drafts) assert.ok(fs.readFileSync(path.join(f.dir, name)).equals(bytes), `${name}: the signed proposal is never rewritten`);
++      const effective = readEffectiveDesignArchitectureAuthority({ rootDir: f.dir });
++      assert.equal(effective.ok, true, JSON.stringify(effective));
++      assert.deepEqual(effective.decisions.map((entry) => entry.id), ["9998-method-egm"]);
++      return { f, predecessor, accepted };
++    };
++
++    it("7.12 create-adr -> bind-adr-proposals -> approval -> materialize-architecture publishes the accepted record and the superseded Markdown-only predecessor with no hand-built file", async () => {
++      await fixtureWalk({ predecessorSidecar: false });
++    });
++
++    it("7.13 a predecessor that already has an accepted sidecar is superseded through the signed preimage (no TARGET-DRIFT) and keeps its own fields", async () => {
++      const { predecessor } = await fixtureWalk({ predecessorSidecar: true });
++      assert.equal(predecessor.title, "METHOD original");
++      assert.equal(predecessor.date, "2026-01-01", "the predecessor keeps its own date and scope; only the status changes");
++    });
++
++    it("7.14 the binding step refuses without the PO's own selection, with a REPLACE: placeholder or with a malformed selection, names the repair and leaves nothing behind", () => {
++      const root = makeRoot();
++      assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
++      fs.mkdirSync(path.join(root, "specs"), { recursive: true });
++      fs.writeFileSync(path.join(root, "specs", "design.md"), "# Design\n");
++      assert.equal(create(root, "--slug", "store", "--title", "Use a store", "--date", "2026-11-07").status, 0);
++      const tree = () => fs.readdirSync(root, { recursive: true }).map(String).filter((name) => !name.startsWith(".git")).sort().join("\n");
++      const base = ["--root", root, "--feature", "e2e", "--carrier", "specs/design.md", "--draft", "store"];
++      const carrier = fs.readFileSync(path.join(root, "specs", "design.md"));
++      const refuse = (args, pattern) => {
++        const before = tree();
++        const out = run(BIND, ...args);
++        assert.notEqual(out.status, 0, args.join(" "));
++        assert.match(out.stderr, pattern);
++        assert.equal(tree(), before, "a refused request leaves no file behind");
++        assert.ok(fs.readFileSync(path.join(root, "specs", "design.md")).equals(carrier), "and the carrier is untouched");
++      };
++      refuse([...base, "--selection", "specs/po-selection.json"], /specs\/po-selection\.json[\s\S]*attributedTo[\s\S]*selections/u);
++      refuse(base, /--selection/u);
++      fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(SELECTION)}\n`);
++      refuse([...base, "--selection", "specs/po-selection.json"], /REPLACE:[\s\S]*--refresh/u);
++      fs.writeFileSync(path.join(root, "docs", "adr", "draft-store.md"), filled("Use a store"));
++      ok(CREATE_ADR, "--root", root, "--slug", "store", "--refresh");
++      const refreshedTree = tree();
++      for (const bad of [{ selections: SELECTION.selections }, { attributedTo: "", selections: SELECTION.selections }, { attributedTo: "PO", selections: [] },
++        { attributedTo: "PO", selections: [{ topic: "t", text: "REPLACE: say it" }] }, { attributedTo: "PO", selections: [{ topic: "t" }] }]) {
++        fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(bad)}\n`);
++        const out = run(BIND, ...base, "--selection", "specs/po-selection.json");
++        assert.notEqual(out.status, 0, JSON.stringify(bad));
++        assert.match(out.stderr, /specs\/po-selection\.json/u);
++        assert.equal(tree(), refreshedTree);
++      }
++    });
+   });
+ });
+diff --git a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+new file mode 100644
+index 000000000..f92d82fa3
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+@@ -0,0 +1,267 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * bind-adr-proposals.mjs -- the sanctioned step that binds ADR proposals into the design package (C20 G20-23, remainder).
++ *
++ * Usage:
++ *   bind-adr-proposals.mjs --root <root> --feature <featureId> --carrier <design.md> --selection <po-selection.json> --draft <slug> [--draft <slug>...]
++ *
++ * `create-adr.mjs` writes the proposals docs/adr/draft-<slug>.{md,json}. This script turns them into what the PO's single design
++ * approval can sign, so that `pipeline-state.mjs materialize-architecture` publishes the accepted `docs/adr/NNNN-<slug>` records (and the
++ * superseded predecessor) with no hand-built file. It writes, BEFORE the design review:
++ *   - <dir of carrier>/prospective-chat-selection-<slug>.json for each draft (the pre-approval selection, bound to the exact proposal bytes),
++ *   - <dir of carrier>/prospective-architecture.json (the prospective materialization manifest, every output digest computed by the same
++ *     functions the consumer uses: lib/architecture-prospective-materialization.mjs),
++ *   - the `pipeline-design-decision-bindings` v2 block inside the carrier (an existing block is replaced in place; its architectureDecisions
++ *     and modelPolicy are kept).
++ * and prints every companion path the design review receipt must carry (`design-review-receipt.mjs create --companion ...`).
++ *
++ * Authority: this script never writes `accepted`, `superseded` or `waived` anywhere. Those statuses appear only in the files
++ * `materialize-architecture` publishes after the PO's approval, with the exact bytes the signed package pre-bound. The PO's own words
++ * come only from --selection, a file the PO's reply was saved into; the script validates and copies it, it never invents or edits it.
++ * Nothing is written unless the whole result passed the consumer's own manifest check; a refused request leaves no file behind.
++ */
++import { createHash } from "node:crypto";
++import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
++import { dirname, isAbsolute, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
++import {
++  PLACEHOLDER_LINE, PROSPECTIVE_ARCHITECTURE_SCHEMA, deriveAcceptedRecords, derivePredecessorSidecar,
++  inspectProspectiveArchitectureManifest, prospectiveJson,
++} from "../lib/architecture-prospective-materialization.mjs";
++import { parseDesignDecisionBindings } from "../lib/design-decision-bindings.mjs";
++import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
++import { nextFreeNumber } from "./create-adr.mjs";
++
++const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
++const FEATURE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const REL_PATH = /^[A-Za-z0-9_@][A-Za-z0-9._@/-]{0,239}$/u;
++const FLAGS = new Set(["--root", "--feature", "--carrier", "--selection", "--draft"]);
++const BLOCK = /^```pipeline-design-decision-bindings\r?\n[\s\S]*?^```[ \t]*\r?$\n?/mu;
++const CHOICE_SCHEMA = "pipeline.architecture-prospective-chat-selection.v1";
++const MAX_FILE = 1048576;
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++class Refusal extends Error {}
++const refuse = (message) => { throw new Refusal(message); };
++
++function parseArgs(argv) {
++  const values = new Map(), drafts = [];
++  for (let index = 0; index < argv.length; index += 1) {
++    const flag = argv[index];
++    if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
++    const value = argv[index + 1];
++    if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
++    index += 1;
++    if (flag === "--draft") { drafts.push(value); continue; }
++    if (values.has(flag)) refuse(`${flag} may be given only once`);
++    values.set(flag, value);
++  }
++  return { values, drafts };
++}
++
++function safeRelative(label, value) {
++  if (typeof value !== "string" || !REL_PATH.test(value) || value.split("/").some((part) => part === "" || part.startsWith("."))) {
++    refuse(`${label} must be a repository-relative path without dot segments, got ${JSON.stringify(value)}`);
++  }
++  return value;
++}
++
++/** A regular, non-link file below the root, read once; null when absent. */
++function readRegular(root, rel, { required = false } = {}) {
++  let cursor = root;
++  const parts = rel.split("/");
++  for (let index = 0; index < parts.length; index += 1) {
++    cursor = join(cursor, parts[index]);
++    if (!existsSync(cursor)) { if (required) refuse(`${rel} does not exist`); return null; }
++    const stat = lstatSync(cursor);
++    if (stat.isSymbolicLink() || (index < parts.length - 1 ? !stat.isDirectory() : !stat.isFile())) refuse(`${rel} must be a regular file below the project (no links)`);
++  }
++  const bytes = readFileSync(cursor);
++  if (bytes.length === 0 || bytes.length > MAX_FILE) refuse(`${rel} must be between 1 byte and 1 MiB`);
++  return { path: rel, bytes, text: bytes.toString("utf8"), sha256: sha256(bytes) };
++}
++
++function parseJson(file, what) {
++  try { return JSON.parse(file.text); } catch { return refuse(`${file.path} is not valid JSON (${what})`); }
++}
++
++function readSelection(root, rel) {
++  const shape = `{"attributedTo": "<who selected, e.g. PO chat selection 2026-11-07>", "selections": [{"topic": "<topic>", "text": "<the PO's own words>", "adr": "<optional draft slug>"}]}`;
++  const file = readRegular(root, rel);
++  if (!file) {
++    refuse(`${rel} does not exist. It carries the PO's own selection, and this step never writes or edits it: save what the PO chose, in the PO's words, as JSON at that path `
++      + `(shape ${shape}), then run this command again. Without the PO's selection the proposals cannot be bound.`);
++  }
++  const value = parseJson(file, `expected ${shape}`);
++  const fail = (why) => refuse(`${rel}: ${why}. Expected ${shape}. Fix the file with the PO's actual words, then run this command again.`);
++  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("not a JSON object");
++  const by = value.attributedTo;
++  if (typeof by !== "string" || by.trim() === "" || by.length > 160 || /[\r\n\0]/u.test(by)) fail("attributedTo must be 1 to 160 characters on one line");
++  if (!Array.isArray(value.selections) || value.selections.length === 0 || value.selections.length > 64) fail("selections must be 1 to 64 entries");
++  for (const item of value.selections) {
++    if (item === null || typeof item !== "object" || typeof item.topic !== "string" || item.topic.trim() === "" || typeof item.text !== "string" || item.text.trim() === "") {
++      fail("every selection needs a non-empty topic and text");
++    }
++    if (PLACEHOLDER_LINE.test(item.text) || PLACEHOLDER_LINE.test(item.topic)) fail("a selection still holds a REPLACE: placeholder, which is not the PO's words");
++    if (item.adr !== undefined && (typeof item.adr !== "string" || !SLUG.test(item.adr))) fail("adr, when present, must be a draft slug");
++  }
++  return { file, attributedTo: by, selections: value.selections };
++}
++
++function atomicWrite(root, rel, bytes) {
++  const target = join(root, rel);
++  mkdirSync(dirname(target), { recursive: true });
++  const temporary = `${target}.binding-${process.pid}`;
++  const fd = openSync(temporary, "wx", 0o644);
++  try { writeSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
++  renameSync(temporary, target);
++}
++
++/** Writes all files or none: every previous state is restored when one write fails. */
++function commitAll(root, writes) {
++  const previous = writes.map(({ rel }) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel)) : null));
++  const done = [];
++  try {
++    for (const { rel, bytes } of writes) { atomicWrite(root, rel, bytes); done.push(rel); }
++  } catch (error) {
++    for (const rel of done.reverse()) {
++      const before = previous[writes.findIndex((write) => write.rel === rel)];
++      try { if (before === null) unlinkSync(join(root, rel)); else atomicWrite(root, rel, before); } catch { /* best effort */ }
++    }
++    throw error;
++  }
++}
++
++function bind(root, values, slugs) {
++  const feature = values.get("--feature");
++  if (typeof feature !== "string" || !FEATURE.test(feature)) refuse("--feature must be the active feature id (letters, digits, '.', '_' and '-')");
++  const carrierPath = safeRelative("--carrier", values.get("--carrier"));
++  const selectionPath = safeRelative("--selection", values.get("--selection"));
++  if (!carrierPath.endsWith(".md")) refuse("--carrier must be the design Markdown file of this package (a .md file that is one of its companions)");
++  if (slugs.length === 0 || slugs.length > 16 || new Set(slugs).size !== slugs.length || !slugs.every((slug) => SLUG.test(slug))) {
++    refuse("name 1 to 16 distinct proposals with --draft <slug> (the slug given to create-adr.mjs)");
++  }
++  const carrier = readRegular(root, carrierPath, { required: true });
++  let existingBinding;
++  try { existingBinding = parseDesignDecisionBindings(carrier.bytes); }
++  catch (error) { return refuse(`${carrierPath} holds a malformed pipeline-design-decision-bindings block (${error.message}); repair or remove that block, then run this command again`); }
++  const selection = readSelection(root, selectionPath);
++  for (const item of selection.selections) {
++    if (item.adr !== undefined && !slugs.includes(item.adr)) refuse(`${selectionPath}: a selection names the draft ${JSON.stringify(item.adr)}, which is not among the --draft slugs (${slugs.join(", ")})`);
++  }
++
++  let fingerprint;
++  try { fingerprint = derivePoGateRepositoryFingerprint(resolvePoGateRepositoryTopology(root)); } catch { fingerprint = null; }
++  if (typeof fingerprint !== "string" || !/^[a-f0-9]{64}$/u.test(fingerprint)) refuse("--root is not a readable git repository; the design binding is bound to the repository, run this step inside the project checkout");
++
++  const dir = dirname(carrierPath) === "." ? "" : `${dirname(carrierPath)}/`;
++  const manifestPath = `${dir}prospective-architecture.json`;
++  const adrDirectory = join(root, "docs", "adr");
++  if (!existsSync(adrDirectory)) refuse("docs/adr does not exist; create the proposals with create-adr.mjs first");
++  const first = Number(nextFreeNumber(adrDirectory));
++  if (first + slugs.length > 10000) refuse("no free four-digit ADR numbers remain");
++
++  const files = new Map(), companions = new Set([carrierPath, manifestPath, selectionPath]), writes = [], rows = [], bound = [];
++  const remember = (file) => { files.set(file.path, file); companions.add(file.path); return { path: file.path, sha256: file.sha256 }; };
++  const origin = remember(selection.file);
++  slugs.forEach((slug, index) => {
++    const draftId = `draft-${slug}`, number = String(first + index).padStart(4, "0"), id = `${number}-${slug}`;
++    for (const name of [`${id}.md`, `${id}.json`]) {
++      if (existsSync(join(adrDirectory, name))) refuse(`docs/adr/${name} already exists: this proposal was already materialized. Create a new proposal with another slug instead`);
++    }
++    const markdown = readRegular(root, `docs/adr/${draftId}.md`), sidecar = readRegular(root, `docs/adr/${draftId}.json`);
++    if (!markdown || !sidecar) refuse(`docs/adr/${draftId}.md and docs/adr/${draftId}.json must both exist; create the proposal with create-adr.mjs --slug ${slug} --title "<title>" first`);
++    const proposed = parseJson(sidecar, "the proposal sidecar");
++    if (!validateArchitectureDecisionSidecar(proposed) || proposed.id !== draftId || proposed.status !== "proposed") {
++      refuse(`docs/adr/${draftId}.json is not a valid proposal for ${draftId} (status must be proposed)`);
++    }
++    if (PLACEHOLDER_LINE.test(markdown.text)) {
++      refuse(`docs/adr/${draftId}.md still has REPLACE: lines from the template. Replace each one with the real text, run create-adr.mjs --root <root> --slug ${slug} --refresh to recompute the digest, then run this command again`);
++    }
++    if (proposed.digest !== markdown.sha256) refuse(`docs/adr/${draftId}.json carries a stale digest. Run create-adr.mjs --root <root> --slug ${slug} --refresh, then run this command again`);
++    const own = selection.selections.filter((item) => item.adr === undefined || item.adr === slug).map(({ topic, text }) => ({ topic, text }));
++    if (own.length === 0) refuse(`${selectionPath} holds no selection for ${slug}: add the PO's words for it (an entry with "adr": ${JSON.stringify(slug)}), then run this command again`);
++    const choice = { schema: CHOICE_SCHEMA, id: draftId, decision: "selected", markdownSha256: markdown.sha256, sidecarSha256: sidecar.sha256,
++      scope: proposed.scope, moduleIds: proposed.moduleIds ?? [], supersedes: proposed.supersedes ?? null, attributedTo: selection.attributedTo, origin, selections: own };
++    const choicePath = `${dir}prospective-chat-selection-${slug}.json`;
++    const choiceBytes = Buffer.from(prospectiveJson(choice), "utf8");
++    const existingChoice = readRegular(root, choicePath);
++    if (existingChoice && parseJson(existingChoice, "an existing binding file").schema !== CHOICE_SCHEMA) refuse(`${choicePath} exists and is not a binding file written by this step; move it away or use another carrier directory`);
++    writes.push({ rel: choicePath, bytes: choiceBytes });
++    const chatSelection = remember({ path: choicePath, bytes: choiceBytes, text: choiceBytes.toString("utf8"), sha256: sha256(choiceBytes) });
++    const proposedMarkdown = remember(markdown), proposedSidecar = remember(sidecar);
++    const { acceptedMarkdown, acceptedSidecar, acceptedChoice } = deriveAcceptedRecords({ id, proposed, markdownText: markdown.text, choice });
++    const outputs = {
++      markdown: { path: `docs/adr/${id}.md`, sha256: sha256(acceptedMarkdown) },
++      sidecar: { path: `docs/adr/${id}.json`, sha256: sha256(prospectiveJson(acceptedSidecar)) },
++      chatSelection: { path: `project/architecture-chat-selections/${id}.json`, sha256: sha256(prospectiveJson(acceptedChoice)) },
++    };
++    let predecessor = null;
++    if (proposed.supersedes) {
++      const historic = readRegular(root, `docs/adr/${proposed.supersedes}.md`, { required: true });
++      if (!historic.text.startsWith(`# ADR-${proposed.supersedes.slice(0, 4)}:`)) refuse(`docs/adr/${proposed.supersedes}.md must start with "# ADR-${proposed.supersedes.slice(0, 4)}: <title>"`);
++      const prior = readRegular(root, `docs/adr/${proposed.supersedes}.json`);
++      let derived;
++      try { derived = derivePredecessorSidecar({ supersedes: proposed.supersedes, historic, proposed, prior }); }
++      catch (error) { return refuse(`docs/adr/${proposed.supersedes}.json cannot be superseded (${error.message}); only an accepted, valid record for ${proposed.supersedes} can be`); }
++      if (prior && derived.preimageSha256 === null) refuse(`docs/adr/${proposed.supersedes}.json is already superseded; this proposal supersedes ${proposed.supersedes} again, pick the record that is still accepted`);
++      predecessor = { markdown: remember(historic), sidecar: { path: `docs/adr/${proposed.supersedes}.json`, sha256: sha256(prospectiveJson(derived.record)) },
++        ...(prior ? { sidecarPreimageSha256: derived.preimageSha256 } : {}) };
++    }
++    rows.push({ id, proposedMarkdown, proposedSidecar, chatSelection, predecessor, outputs });
++    bound.push({ draft: slug, id, supersedes: proposed.supersedes ?? null });
++  });
++
++  const manifestBytes = Buffer.from(prospectiveJson({ schema: PROSPECTIVE_ARCHITECTURE_SCHEMA, decisions: rows }), "utf8");
++  const existingManifest = readRegular(root, manifestPath);
++  if (existingManifest && parseJson(existingManifest, "an existing binding file").schema !== PROSPECTIVE_ARCHITECTURE_SCHEMA) refuse(`${manifestPath} exists and is not a binding file written by this step; move it away or use another carrier directory`);
++  writes.push({ rel: manifestPath, bytes: manifestBytes });
++  const manifest = remember({ path: manifestPath, bytes: manifestBytes, text: manifestBytes.toString("utf8"), sha256: sha256(manifestBytes) });
++
++  const descriptor = { schema: "pipeline.design-decision-bindings.v2", repositoryFingerprint: fingerprint, featureId: feature,
++    architectureDecisions: existingBinding?.architectureDecisions ? structuredClone(existingBinding.architectureDecisions) : [],
++    modelPolicy: existingBinding?.modelPolicy ? structuredClone(existingBinding.modelPolicy) : null, prospectiveArchitecture: manifest };
++  const block = `\`\`\`pipeline-design-decision-bindings\n${prospectiveJson(descriptor)}\`\`\`\n`;
++  const carrierText = carrier.text;
++  const nextCarrier = BLOCK.test(carrierText) ? carrierText.replace(BLOCK, () => block) : `${carrierText}${carrierText.endsWith("\n") ? "" : "\n"}\n${block}`;
++  const carrierBytes = Buffer.from(nextCarrier, "utf8");
++  writes.push({ rel: carrierPath, bytes: carrierBytes });
++
++  // The consumer's own check, run on exactly what is about to be written. The carrier is not an input of the manifest.
++  const sourceRef = (path) => ({ path, sha256: "0".repeat(64) });
++  const sources = { prd: sourceRef("dry-run/prd.md"), spec: sourceRef("dry-run/spec.md"),
++    companions: [...companions].sort().map((path) => ({ path, sha256: path === carrierPath ? sha256(carrierBytes) : files.get(path).sha256 })) };
++  try {
++    inspectProspectiveArchitectureManifest({ manifest, sources, existing: (name) => readRegular(root, name),
++      read: (name) => files.get(name) ?? refuse(`internal: ${name} is not among the bound inputs`) });
++  } catch (error) {
++    if (error instanceof Refusal) throw error;
++    return refuse(`the generated binding was refused by the materialization check (${error.message}); nothing was written. Repair the named input and run this command again`);
++  }
++
++  commitAll(root, writes);
++  const written = writes.map(({ rel }) => rel).sort();
++  return { ok: true, bound, manifest: { path: manifestPath, sha256: manifest.sha256 }, carrier: carrierPath, written,
++    companions: [...companions].sort(),
++    next: "Stage and commit the written files together with the drafts; then create the design review receipt with design-review-receipt.mjs create and one --companion <path> for EVERY path in `companions` "
++      + "(plus the other companions of the package), and continue with submit-plan, present-plan and approve-plan. "
++      + "If a draft changes later, run create-adr.mjs --refresh and then this command again with the same arguments; it replaces its own files in place." };
++}
++
++export function main(argv = process.argv.slice(2)) {
++  try {
++    const { values, drafts } = parseArgs(argv);
++    const rootValue = values.get("--root");
++    if (typeof rootValue !== "string" || !isAbsolute(rootValue) || !existsSync(rootValue) || !lstatSync(rootValue).isDirectory()) refuse("--root must be the absolute project root directory");
++    console.log(JSON.stringify(bind(resolve(rootValue), values, drafts), null, 2));
++    return 0;
++  } catch (error) {
++    if (!(error instanceof Refusal)) console.error(`bind-adr-proposals: ${error?.message ?? error}`);
++    else console.error(`bind-adr-proposals refused: ${error.message}`);
++    return 1;
++  }
++}
++
++if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main());
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+index 03b10f185..842e8e5b6 100644
+--- a/plugins/pipeline-core/scripts/create-adr.mjs
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -59,7 +59,7 @@ function adrDirectory(root, create) {
+   return dir;
+ }
+ 
+-function nextFreeNumber(dir) {
++export function nextFreeNumber(dir) {
+   const numbers = existsSync(dir) ? readdirSync(dir).map((name) => /^(\d{4})-/u.exec(name)?.[1]).filter(Boolean).map(Number) : [];
+   return String(Math.max(0, ...numbers) + 1).padStart(4, "0");
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 73747b406..93b2f4904 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12142,7 +12142,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
+         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
+-        if (!decisionDraft.ok) { console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.`); return 2; }
++        if (!decisionDraft.ok) {
++          // C20 G20-23 (b): the one refusal with a concrete repair of its own (an ADR draft the agent has not written yet).
++          const placeholder = decisionDraft.code === "DDB-PROSPECTIVE-PLACEHOLDER-REMAINS" ? " An ADR draft still has REPLACE: lines: write its Markdown, run create-adr.mjs --root <root> --slug <slug> --refresh, run bind-adr-proposals.mjs again, then commit and redo the design review." : "";
++          console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.${placeholder}`); return 2;
++        }
+         // A draft package is presented only with a current, prepared seal plan: its digest becomes part of the binding the PO signs.
+         const sealGate = checkPreparedSealPlan(dir, base);
+         if (sealGate.draft && sealGate.refusal) { printSealRefusal("present-plan", sealGate.refusal); return 2; }
+diff --git a/plugins/pipeline-core/skills/architecture-decision/SKILL.md b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+index 57c201061..7df99ec5d 100644
+--- a/plugins/pipeline-core/skills/architecture-decision/SKILL.md
++++ b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+@@ -86,8 +86,19 @@ node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<
+   the Markdown carries no status line.
+ - Check one sidecar with `node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/draft-<slug>.json` (both sidecar
+   schemas ship in the plugin; the digest is compared with the sibling Markdown). `submit-plan` runs the same structural check.
+-- Bind the proposal to the common design approval where required (v2 `pipeline-design-decision-bindings` block with the
+-  prospective-architecture manifest and the chat selection, see section 5); do not treat `status: "accepted"` as that proof.
++- Bind the proposals to the common design approval with the one sanctioned step, before the design review; never hand-build the
++  manifest, the chat selections or the `pipeline-design-decision-bindings` block, and do not treat `status: "accepted"` as that proof:
++  ```bash
++  node <plugin-root>/scripts/bind-adr-proposals.mjs --root "$PWD" --feature <feature-id> --carrier <design-companion>.md --selection <po-selection>.json --draft <slug> [--draft <slug>...]
++  ```
++  `--selection` is a JSON file holding the PO's own selection, saved verbatim from the PO's reply:
++  `{"attributedTo": "PO chat selection <date>", "selections": [{"topic": "...", "text": "<the PO's words>", "adr": "<optional slug>"}]}`.
++  The step copies it and never writes or edits it, so do not invent selection text; if the PO has not chosen yet, ask first. It
++  refuses a draft that still has `REPLACE:` lines or a stale digest and names the repair. On success it writes the manifest and one
++  chat selection per draft next to the carrier, puts the v2 bindings block into the carrier (re-running replaces it in place), numbers
++  the future records consecutively, and prints `companions`: pass every one of them as `--companion <path>` to
++  `design-review-receipt.mjs create`, commit the written files, then `submit-plan`, `present-plan`, `approve-plan` and
++  `materialize-architecture` as usual. A later edit of a draft needs `create-adr.mjs --refresh` and this step again.
+ 
+ ### 3. Identify Applicable Inherited Decisions
+ Resolve effective architecture decisions through authority layering:
+@@ -129,7 +140,8 @@ Architecture decisions are immutable history. When reversing or replacing a deci
+ - Never overwrite or rewrite the previous ADR file.
+ - Draft the replacement with `create-adr.mjs ... --supersedes <previous-id>` (status `proposed`, `supersedes` recorded).
+ - Include the replacement and its historical lineage in the common design
+-  package. Only after its required aggregate approval may the sanctioned
++  package with `bind-adr-proposals.mjs` (section 2); a predecessor that already has a sidecar is covered too: the signed manifest
++  pre-binds the exact bytes it replaces, and nothing else may change. Only after its required aggregate approval may the sanctioned
+   consumer materialize the replacement as `accepted` and the former record as
+   `superseded`; the agent must not grant those statuses by itself.
+ - How the statuses change, and why no digest breaks: `pipeline-state.mjs materialize-architecture` (an agent step, after
