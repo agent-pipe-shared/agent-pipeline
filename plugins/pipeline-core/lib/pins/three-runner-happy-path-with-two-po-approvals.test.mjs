@@ -89,9 +89,11 @@ const INVENTORY = Object.freeze([
  *
  * `approve-critic-acknowledgement` (G20-39, PO decision 2026-11-07 "Producer + Brücke") is the PO's acknowledgement of a
  * caller-authored Critic verdict, the bridge for a runner that issues no Critic Source-return record. On Claude and Codex the
- * Critic subagent's stop issues that record, so the happy path never meets it. HONEST LIMIT: on Antigravity no producer exists
- * yet (its subagent stop event is being measured, M4c/M14), so there a rigor >= 1 feature close meets it as a third per-feature
- * PO interaction until a producer lands; recorded on the PO list, not hidden by this classification.
+ * Critic subagent's stop issues that record, and on Antigravity (G20-41, measured M4c) the Critic child's final `send_message` to its
+ * parent issues it from the PreToolUse hook, so the happy path never meets it on any of the three runners. HONEST LIMIT: it is still
+ * met as a third per-feature PO interaction by a Critic round whose runner issued no record (a stop or message the hook did not
+ * recognise, a Critic that returned no schema-shaped verdict, several open packets of one runner, a killed or failed child); the
+ * limit is that the Antigravity route is proven by fixtures shaped like the measured payload, not by a genuine installed host run.
  */
 const OFF_HAPPY_PATH_VERBS = Object.freeze([
   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",

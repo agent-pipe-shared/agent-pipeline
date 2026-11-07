@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, read, readFileSync, realpathSync, rmSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -42,9 +42,11 @@ import { commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import {
-  decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
+  bareNativeType, decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
   nativeChildWriteRefusal, projectNativeChildInput, resolveNativeChildGovernance,
 } from "../lib/agy-native-goldfish.mjs";
+import { issueCriticSourceReturnFromMessage } from "../lib/critic-source-return.mjs";
+import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
@@ -567,6 +569,32 @@ export function inspectScratchShellScript(command, projectRoot, {
   }
 }
 
+const isCriticName = (value) => typeof value === "string" && bareNativeType(value).trim().toLowerCase() === "critic";
+
+/**
+ * G20-41 (AC-108): the Critic CHILD's final `send_message` to its parent issues the Source return record. The child is recognised only through facts the
+ * runner wrote: its own conversationId in the payload (and an artifact directory of that same name), the host's descriptor under the PARENT's brain
+ * directory (`attributed`, from evaluateNativeChildCall) naming the Critic by type or role, and a Recipient equal to the parent the DESCRIPTOR names --
+ * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws and never decides the tool call;
+ * the hook fires twice per call (child worktree cwd, main repository cwd) and the record is created exclusively, so the second firing is `already-issued`.
+ * @returns {{ status: string, packetId?: string }}
+ */
+export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.now() } = {}) {
+  try {
+    if (input?.toolCall?.name !== "send_message" || attributed === null || typeof attributed !== "object") return { status: "not-applicable" };
+    if (!isCriticName(attributed.typeName) && !isCriticName(attributed.role)) return { status: "not-applicable" };
+    const args = decodeNativeInvokeArgs(input.toolCall.args ?? {});
+    if (typeof args?.Recipient !== "string" || args.Recipient !== attributed.parentConversationId || typeof args.Message !== "string") return { status: "not-applicable" };
+    if (typeof input.artifactDirectoryPath !== "string" || basename(input.artifactDirectoryPath) !== attributed.childConversationId) return { status: "not-applicable" };
+    // The packet lives in the repository's common git directory; every workspace of the child (its worktree, then the main repository) resolves to the same one.
+    const workspaces = (Array.isArray(input.workspacePaths) ? input.workspacePaths : []).filter((value) => typeof value === "string" && value.trim() !== "");
+    let commonDir = null;
+    for (const workspace of workspaces) { commonDir = resolveGitCommonDir(workspace); if (commonDir !== null) break; }
+    if (commonDir === null) return { status: "unavailable" };
+    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs });
+  } catch { return { status: "unavailable" }; }
+}
+
 export async function runAntigravityPreToolGuard(rawInput) {
   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
   // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
@@ -602,6 +630,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
   // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
   const nativeChild = evaluateNativeChildCall(input);
   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
+  // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
+  // only effect and one diagnostic line says what became of it when it was applicable.
+  if (input?.toolCall?.name === "send_message") {
+    const criticReturn = issueAntigravityCriticReturn(input, nativeChild.attributed);
+    if (criticReturn.status !== "not-applicable") diagnostic("critic-source-return", { status: criticReturn.status, packetId: criticReturn.packetId });
+  }
   // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
   const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
     ? nativeBrainWriteRefusal({ filePath: normalized.filePath, command: normalized.command }) : null;

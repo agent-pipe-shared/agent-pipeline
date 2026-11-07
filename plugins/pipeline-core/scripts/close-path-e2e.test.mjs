@@ -19,8 +19,9 @@
  * feature course, the audit route (Verify evidence registered under specs/<feature>/evidence/, package to verifying and completed, audit request,
  * feature-close-prepared with --audit-request and --critic-verify-lifecycle), the close to closed-local, the Critic-bound push Verify, push-prepare
  * `ready`, the push guard (blocked before approve-push, admitted after, bound to its destination), and the release preflight, which is the
- * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). One fixture stand-in is declared at
- * the finalize call: the Source return record that no runner issues yet (w266 finding 1).
+ * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). No stand-in remains at the finalize
+ * call: the Critic Source return record is issued by the runner's own hook on every identity (G20-39 stop hook for Claude and Codex, G20-41
+ * PreToolUse hook on the Critic child's send_message for Antigravity); a fourth, shorter walk keeps the PO acknowledgement bridge for a stop that issued nothing.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -233,8 +234,17 @@ const scannerEnv = {
 const scannerSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, shell: false });
 const assessScannerFixture = (path) => (typeof path === "string" && path.startsWith(SCANNER_DIR) ? { ok: true, path } : { ok: false, status: "untrusted_path" });
 
-test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 300_000 }, async () => {
-  for (const identity of RUNNER_IDENTITIES) {
+// G20-41: how the Critic Source return record is issued on each walk. Claude and Codex: the subagent STOP hook (G20-39). Antigravity: its PreToolUse hook
+// on the Critic child's final send_message to its parent (G20-41). "none": a runner stop that issued nothing; that walk keeps the PO acknowledgement
+// bridge (G20-39) and ends at the admitted close preparation.
+const ANTIGRAVITY_IDENTITY = RUNNER_IDENTITIES.find((entry) => entry.runner === "antigravity");
+const WALKS = Object.freeze([
+  ...RUNNER_IDENTITIES.map((identity) => Object.freeze({ identity, criticReturn: identity === ANTIGRAVITY_IDENTITY ? "send-message" : "stop-hook" })),
+  Object.freeze({ identity: ANTIGRAVITY_IDENTITY, criticReturn: "none" }),
+]);
+
+test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
+  for (const { identity, criticReturn } of WALKS) {
     const log = [];
     const fx = consumerFixture(log, identity);
     walkEnv = runnerEnv(identity.runner, fx.root);
@@ -304,7 +314,7 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const criticVerdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
         trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
       writeJson(join(fx.root, "evidence", "critic-verdict.json"), criticVerdict);
-      if (identity.runner !== "antigravity") {
+      if (criticReturn === "stop-hook") {
         // G20-39: the Critic subagent's stop is what issues the Source return record, never the calling agent. The stop hook runs as the runner runs
         // it (a child process fed the stop payload on stdin) with the Critic's final message carrying the verdict; the CLI finalize below then reads
         // the record from the private control area and the close gate admits it at rigor >= 1.
@@ -317,9 +327,39 @@ test("G20-35: the close path from implementation to release preflight is walked 
         assert.equal(stop.stdout, "", `${identity.runner}: a stop hook's stdout is read as a decision and stays empty`);
         assert.match(stop.stderr, /Critic Source return issued for packet/u, `${identity.runner}: ${stop.stderr}`);
         assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json")), true);
+      } else if (criticReturn === "send-message") {
+        // G20-41: the Critic CHILD ends by sending its verdict to its parent conversation (measured, M4c). The real PreToolUse hook runs as a child process
+        // fed a payload shaped like the measured one: the child's own conversationId, artifactDirectoryPath = <brain>/<child id>, modelName, stepIdx,
+        // toolCall {name, args {Message, Recipient}}, transcriptPath, workspacePaths; the host-written descriptor sits under the PARENT's brain directory.
+        const parentId = "7d1f0c52-2b7e-4a39-9f0e-3a5c1b8d2e41";
+        const childId = "c3a9e6b4-51d8-4f27-8a60-0e9b7d4c1f25";
+        const brain = join(fx.parent, "brain");
+        mkdirSync(join(brain, parentId, ".system_generated", "subagents"), { recursive: true });
+        mkdirSync(join(brain, childId), { recursive: true });
+        writeJson(join(brain, parentId, ".system_generated", "subagents", `${childId}.json`), { conversationId: childId,
+          subagentDescriptor: { typeName: "critic", role: "critic" }, state: "SUBAGENT_STATE_ALIVE", spawnStepIndex: 3, workspaceUris: [] });
+        const sendMessage = JSON.stringify({ conversationId: childId, artifactDirectoryPath: join(brain, childId), modelName: "gemini-3-pro", stepIdx: 9,
+          toolCall: { name: "send_message", args: { Message: `Review finished; notes are in the notes file.\n\n\`\`\`json\n${JSON.stringify(criticVerdict, null, 2)}\n\`\`\`\n`, Recipient: parentId } },
+          transcriptPath: join(brain, childId, "transcript.jsonl"), workspacePaths: [fx.root, fx.root] });
+        const fire = () => spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/antigravity-pretool-guard.mjs", import.meta.url))],
+          { input: sendMessage, cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 60_000 });
+        const recordPath = join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json");
+        const first = fire();
+        assert.equal(first.status, 0, `${identity.runner}: the hook never blocks the Critic's final message: ${first.stderr}`);
+        assert.equal(first.stdout.trim(), JSON.stringify({ decision: "allow" }));
+        assert.match(first.stderr, /code=critic-source-return status="issued"/u, `${identity.runner}: ${first.stderr}`);
+        assert.equal(existsSync(recordPath), true);
+        const issuedBytes = readFileSync(recordPath, "utf8");
+        // The hook fires twice per tool call (the child worktree cwd, then the main repository cwd): the second firing finds the record and changes nothing.
+        const second = fire();
+        assert.equal(second.status, 0, second.stderr);
+        assert.equal(second.stdout.trim(), JSON.stringify({ decision: "allow" }));
+        assert.match(second.stderr, /status="already-issued"/u, second.stderr);
+        assert.equal(readFileSync(recordPath, "utf8"), issuedBytes);
       }
       const finalized = json(finalizer("finalize", finalizeRequest));
       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
+      assert.equal(finalized.independence, criticReturn === "none" ? "caller-authored-fallback" : "source-issued-origin", `${identity.runner}: ${criticReturn}`);
       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
       writeFileSync(join(fx.root, "evidence", "critic-report.md"), "# Critic report\n\nNo findings.\n");
       const exported = json(finalizer("export", {
@@ -421,9 +461,9 @@ test("G20-35: the close path from implementation to release preflight is walked 
       assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
       writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
         packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
-      if (identity.runner === "antigravity") {
-        // G20-39 bridge: this identity has no Source return producer (its subagent stop event is still being measured), so its Critic finalized as
-        // caller-authored-fallback and the close gate refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
+      if (criticReturn === "none") {
+        // G20-39 bridge, kept (G20-41): a runner stop that issued no Source return record finalizes as caller-authored-fallback and the close gate
+        // refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
         // packet and candidate, recorded through the human-approval route (the fixture selects chat); then the IDENTICAL close command is admitted.
         const closeArgs = ["plan-transition", "--root", fx.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--audit-request", "evidence/audit-request.json",
           "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"];
@@ -441,6 +481,9 @@ test("G20-35: the close path from implementation to release preflight is walked 
       }
       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
       assert.equal(prepared.phase, "feature-close-prepared");
+      // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
+      // (identical on every route) is walked by the three issuing identities.
+      if (criticReturn === "none") continue;
       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
       // The State writer prints a plain sentence, not JSON.
       const closed = step(log, `${identity.runner}: close-feature (State writer action returned by the coordinator)`, prepared.nextAction.executable, prepared.nextAction.argv, { cwd: fx.root });

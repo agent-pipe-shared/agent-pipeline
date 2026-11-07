@@ -11,7 +11,9 @@
  * (verdictSha256); nothing is taken from the launching prompt or from a value the calling agent supplies. Zero or several open packets issue nothing.
  *
  * Storage: `<common-dir>/agent-pipeline/critic-packets/<packetId>/source-return.json`, mode 0600, created exclusively (a second stop never overwrites).
- * Antigravity has no producer in this slice: its subagent stop event is still being measured. Imports only the packet read half and the schema checker.
+ * Claude and Codex issue it from the subagent STOP hook. Antigravity (G20-41) issues it from its PreToolUse hook when the Critic child sends its final
+ * `send_message` to its parent (hooks/antigravity-pretool-guard.mjs recognises the child; whether a stop event fires for an Antigravity child is not
+ * measured and nothing is built on it). Imports only the packet read half and the schema checker.
  */
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
 import { join } from "node:path";
@@ -22,7 +24,8 @@ export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-retur
 export const CRITIC_SOURCE_RETURN_FILE = "source-return.json";
 const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
 const MAX_PACKETS = 4096;
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex"]); // the runners whose subagent STOP event issues the record
+const MESSAGE_RUNNERS = new Set(["antigravity"]); // the runners whose Critic child's final message to its parent issues it (G20-41)
 
 const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
 
@@ -79,21 +82,39 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
       const handback = readHandbackFn(input);
       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
     }
-    if (verdict === null) return { status: "no-verdict" };
-    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
-    if (!existsSync(controlRoot)) return { status: "no-open-packet" };
-    const open = openAdmittedPackets(controlRoot, runner, nowMs);
-    if (open === null) return { status: "unavailable" };
-    if (open.length === 0) return { status: "no-open-packet" };
-    if (open.length > 1) return { status: "ambiguous", count: open.length };
-    const [target] = open;
-    if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
-    const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
-      sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
-    const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
-    try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
-    return { status: "issued", packetId: target.packetId };
+    return issueForVerdict({ commonDir, runner, verdict, nowMs });
   } catch { return { status: "unavailable" }; }
+}
+
+/**
+ * G20-41: the Antigravity producer. The caller (hooks/antigravity-pretool-guard.mjs) has already recognised the Critic child's final `send_message`
+ * to its parent from runner-written facts; this takes only the message text and issues the record exactly like the stop path. Never throws.
+ * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number }} request
+ */
+export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now() } = {}) {
+  try {
+    if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
+    if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+    return issueForVerdict({ commonDir, runner, verdict: extractCriticVerdict(text), nowMs });
+  } catch { return { status: "unavailable" }; }
+}
+
+/** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
+function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+  if (verdict === null) return { status: "no-verdict" };
+  const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+  if (!existsSync(controlRoot)) return { status: "no-open-packet" };
+  const open = openAdmittedPackets(controlRoot, runner, nowMs);
+  if (open === null) return { status: "unavailable" };
+  if (open.length === 0) return { status: "no-open-packet" };
+  if (open.length > 1) return { status: "ambiguous", count: open.length };
+  const [target] = open;
+  if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
+  const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
+    sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
+  const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
+  try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
+  return { status: "issued", packetId: target.packetId };
 }
 
 /** The issued record of a packet exactly as stored (so a present-but-wrong record reaches the finalizer's binding check), or null when none exists. */

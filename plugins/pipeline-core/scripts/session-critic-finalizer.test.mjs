@@ -1948,6 +1948,124 @@ test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped 
   } finally { cleanup(fx); }
 });
 
+// G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
+// Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
+// the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.
+const AGY_PARENT = "7d1f0c52-2b7e-4a39-9f0e-3a5c1b8d2e41";
+const AGY_CHILD = "c3a9e6b4-51d8-4f27-8a60-0e9b7d4c1f25";
+function agyBrain({ typeName = "critic", role = "critic", childId = AGY_CHILD, parentId = AGY_PARENT, withDescriptor = true } = {}) {
+  const brain = mkdtempSync(join(tmpdir(), "agy-brain-"));
+  const subagents = join(brain, parentId, ".system_generated", "subagents");
+  mkdirSync(subagents, { recursive: true });
+  mkdirSync(join(brain, childId), { recursive: true });
+  if (withDescriptor) {
+    writeFileSync(join(subagents, `${childId}.json`), `${JSON.stringify({ conversationId: childId, subagentDescriptor: { typeName, role },
+      state: "SUBAGENT_STATE_ALIVE", spawnStepIndex: 3, workspaceUris: [] }, null, 2)}\n`);
+  }
+  return brain;
+}
+function agySendMessage(fx, brain, { message = criticReturn(), recipient = AGY_PARENT, name = "send_message", childId = AGY_CHILD, artifact = null } = {}) {
+  return { conversationId: childId, artifactDirectoryPath: artifact ?? join(brain, childId), modelName: "gemini-3-pro", stepIdx: 9,
+    toolCall: { name, args: { Message: message, Recipient: recipient } }, transcriptPath: join(brain, childId, "transcript.jsonl"), workspacePaths: [fx.root, fx.root] };
+}
+const AGY_ROUTE = { routeId: "session-critic", runner: "antigravity", adapter: "session-functional-equivalent", provider: "google", modelTier: "higher-capability", effortTier: "xhigh" };
+function admitAntigravity(fx) {
+  const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx, { route: AGY_ROUTE }));
+  const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
+  assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
+  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+  const packetId = "6".repeat(32);
+  return { requestPath, controlRoot, packetId, admission: inspectClaimedSessionAdmission({ controlRoot, packetId }).admission };
+}
+async function agyIssue(input) {
+  const { evaluateNativeChildCall } = await import("../lib/agy-native-goldfish.mjs");
+  const { issueAntigravityCriticReturn } = await import("../hooks/antigravity-pretool-guard.mjs");
+  return issueAntigravityCriticReturn(input, evaluateNativeChildCall(input).attributed);
+}
+
+test("G20-41 (a) the Critic child's send_message to its parent issues the record bound to the claimed packet and the returned verdict; finalize then reads it", async () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  try {
+    const admitted = admitAntigravity(fx);
+    const issued = await agyIssue(agySendMessage(fx, brain));
+    assert.equal(issued.status, "issued", JSON.stringify(issued));
+    assert.equal(issued.packetId, admitted.packetId);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const record = JSON.parse(readFileSync(target, "utf8"));
+    assert.equal(record.schema, ORIGIN_SCHEMA);
+    assert.equal(record.issuer, "source");
+    assert.equal(record.packetDigest, admitted.admission.packetDigest);
+    assert.equal(record.sessionId, admitted.admission.sessionId);
+    assert.deepEqual(record.claimant, { runner: "antigravity", adapter: "session-functional-equivalent" });
+    assert.equal(record.verdictSha256, verdictDigest(verdict()));
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const finalized = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(finalized.exitCode, 0, JSON.stringify(finalized.output));
+    assert.equal(finalized.output.independence, "source-issued-origin");
+    // The hook fires twice per tool call (child worktree cwd, then the main repository cwd): the second firing finds the record and changes nothing.
+    const bytes = readFileSync(target, "utf8");
+    const again = await agyIssue(agySendMessage(fx, brain));
+    assert.notEqual(again.status, "issued", JSON.stringify(again));
+    assert.equal(readFileSync(target, "utf8"), bytes);
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+});
+
+test("G20-41 (b) a send_message that the runner-written facts do not identify as the Critic child's final message to its parent is a silent no-op that writes nothing", async () => {
+  const fx = fixture();
+  const goldfishBrain = agyBrain({ typeName: "goldfish-implementor", role: "implementer" });
+  const criticBrain = agyBrain();
+  const bareBrain = agyBrain({ withDescriptor: false });
+  try {
+    const admitted = admitAntigravity(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const attempts = [
+      ["a Recipient that is not the parent", agySendMessage(fx, criticBrain, { recipient: "00000000-0000-4000-8000-000000000000" })],
+      ["no Recipient", { ...agySendMessage(fx, criticBrain), toolCall: { name: "send_message", args: { Message: criticReturn() } } }],
+      ["a non-Critic child", agySendMessage(fx, goldfishBrain)],
+      ["a conversation with no host descriptor (the parent itself)", agySendMessage(fx, bareBrain, { childId: AGY_PARENT })],
+      ["a conversation whose descriptor the host did not write", agySendMessage(fx, bareBrain)],
+      ["an artifact directory of another conversation", agySendMessage(fx, criticBrain, { artifact: join(criticBrain, AGY_PARENT) })],
+      ["another tool", agySendMessage(fx, criticBrain, { name: "view_file" })],
+      ["a message without a schema-shaped verdict", agySendMessage(fx, criticBrain, { message: "The review is finished; no machine-readable verdict was returned." })],
+      ["a verdict-shaped object that is not a verdict", agySendMessage(fx, criticBrain, { message: criticReturn({ pass: true }) })],
+    ];
+    for (const [label, input] of attempts) {
+      const outcome = await agyIssue(input);
+      assert.notEqual(outcome.status, "issued", `${label}: ${JSON.stringify(outcome)}`);
+      assert.equal(existsSync(target), false, label);
+    }
+  } finally { for (const dir of [goldfishBrain, criticBrain, bareBrain]) rmSync(dir, { recursive: true, force: true }); cleanup(fx); }
+});
+
+test("G20-41 (d) the Critic is named by the descriptor's type or its role, exactly (the plugin namespace is stripped); a name that merely contains the word is not the Critic", async () => {
+  for (const [descriptor, expected] of [
+    [{ typeName: "pipeline-core:critic", role: "reviewer" }, "issued"],
+    [{ typeName: "general", role: "critic" }, "issued"],
+    [{ typeName: "critic-helper", role: "scribe" }, "no-critic"],
+  ]) {
+    const fx = fixture();
+    const brain = agyBrain(descriptor);
+    try {
+      admitAntigravity(fx);
+      const outcome = await agyIssue(agySendMessage(fx, brain));
+      if (expected === "issued") assert.equal(outcome.status, "issued", JSON.stringify([descriptor, outcome]));
+      else assert.notEqual(outcome.status, "issued", JSON.stringify([descriptor, outcome]));
+    } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+  }
+});
+
+test("G20-41 (c) a packet of another runner is never answered by an Antigravity child", async () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  try {
+    const admitted = admitViaCli(fx); // the fixture route is codex
+    const outcome = await agyIssue(agySendMessage(fx, brain));
+    assert.notEqual(outcome.status, "issued", JSON.stringify(outcome));
+    assert.equal(existsSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE)), false);
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+});
+
 const FALLBACK_FLAG = "--allow-caller-authored-fallback";
 
 test("Cut A follow-up (1) CLI finalize without the flag and without a Source record reports the same result as with the flag", () => {
