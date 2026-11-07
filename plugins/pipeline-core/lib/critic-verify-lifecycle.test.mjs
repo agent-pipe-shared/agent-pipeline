@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -333,7 +333,7 @@ test("N23 the export commit of the consumed review carries the Critic; a forged,
   const deps = { readConsumedCandidateReceiptFn: () => read };
   const dir = `specs/${featureId}/evidence/critic/${read.receipt.packetId}`;
   const exportAt = (base, message, { receiptBytes = canonicalJson(read.receipt), report = "# Critic notes\n\nNo findings.\n",
-    index = {}, extra = null, source = null } = {}) => {
+    index = {}, extra = null, source = null, lineage = null } = {}) => {
     git(["checkout", "--quiet", "--detach", base]);
     mkdirSync(join(root, dir), { recursive: true });
     writeFileSync(join(root, dir, "receipt.json"), receiptBytes);
@@ -343,6 +343,21 @@ test("N23 the export commit of the consumed review carries the Critic; a forged,
       receiptSha256: sha256(receiptBytes), reportSha256: sha256(report), reviewPass: true, findingCount: 0, ...index }));
     if (extra) writeFileSync(join(root, dir, extra), "extra\n");
     if (source) writeFileSync(join(root, "source.txt"), source);
+    if (lineage) {
+      // G20-35 (w265): what the export itself registers is the lineage file (named by its own digest) and the manifest entry that lists it.
+      // (a fixture schema: the registered-history reader parses only the real lineage record; this test pins the commit classification)
+      const bytes = lineage.bytes ?? `${JSON.stringify({ schema: "pipeline.critic-review-lineage-fixture.v1", packetId: read.receipt.packetId })}\n`;
+      const lineagePath = `specs/${featureId}/evidence/critic-lineage-${lineage.name ?? sha256(bytes)}.json`;
+      mkdirSync(join(root, "specs", featureId, "evidence"), { recursive: true });
+      writeFileSync(join(root, lineagePath), bytes);
+      if (lineage.noManifest !== true) {
+        const manifestFile = join(root, `specs/${featureId}/lifecycle.json`);
+        const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+        manifest.artifacts.push({ class: "candidate-evidence", path: lineagePath, sha256: lineage.entrySha256 ?? sha256(bytes), authority: false, mutability: "immutable", retention: "retain" });
+        if (lineage.extraArtifact) manifest.artifacts.push({ class: "spec", path: `specs/${featureId}/spec.md`, sha256: sha256("spec"), authority: true, mutability: "mutable", retention: "active" });
+        writeFileSync(manifestFile, `${JSON.stringify(manifest)}\n`);
+      }
+    }
     return commitAll(message);
   };
   const carry = (target) => inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir: join(root, ".git"),
@@ -367,6 +382,25 @@ test("N23 the export commit of the consumed review carries the Critic; a forged,
   for (const [name, variant] of Object.entries(forged)) {
     assert.throws(() => carry(exportAt(reviewed.commit, name, variant)), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
   }
+  // G20-35 (w265): the lineage + manifest form is admitted only when the manifest delta is exactly what the export registers. A digest the
+  // registered history cannot read back ends the range classification itself (CVL-CARRY-RANGE); the rest is unreviewed content.
+  const forgedLineage = {
+    "a lineage file named by another digest": { lineage: { name: "d".repeat(64) } },
+    "a manifest entry with another digest": { lineage: { entrySha256: sha256("another lineage\n") } },
+    "a manifest delta with an extra artifact": { lineage: { extraArtifact: true } },
+    "a lineage file without its manifest entry": { lineage: { noManifest: true } },
+    "a lineage file that names another packet": { lineage: { bytes: `${JSON.stringify({ schema: "pipeline.critic-review-lineage-fixture.v1", packetId: "e".repeat(32) })}\n` } },
+  };
+  for (const [name, variant] of Object.entries(forgedLineage)) {
+    assert.throws(() => carry(exportAt(reviewed.commit, name, variant)), error => ["CVL-CARRY-CONTENT-CHANGED", "CVL-CARRY-RANGE"].includes(error.code), name);
+    assert.equal(courseAdmission.criticExportOnlyCommit(root, git(["rev-parse", "HEAD"]), [featureId], deps.readConsumedCandidateReceiptFn), false, `${name}: not an export commit`);
+  }
+  // G20-35 (w265, RED before the fix): the single commit the export's own output leaves (export files + lineage file + the manifest entry that
+  // lists it) carries the Critic, exactly like the export alone.
+  const combined = exportAt(reviewed.commit, "export, lineage and manifest in one commit", { lineage: {} });
+  assert.equal(courseAdmission.criticExportOnlyCommit(root, combined.commit, [featureId], deps.readConsumedCandidateReceiptFn), true,
+    "the combined export commit is an export commit");
+  assert.deepEqual(carry(combined).proof.evidenceOnlyCommits, [combined.commit]);
   git(["checkout", "--quiet", "--detach", exported.commit]);
   writeFileSync(join(root, dir, "report.md"), "# Critic notes\n\nRewritten after the export.\n");
   assert.throws(() => carry(commitAll("modify the exported report")), error => error.code === "CVL-CARRY-CONTENT-CHANGED",

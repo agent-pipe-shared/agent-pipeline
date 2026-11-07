@@ -272,8 +272,16 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
     const fields = gitBytes(root, ["diff", "--name-status", "-z", "--no-renames", parents[1], commit, "--"], "CCA-RANGE-READ").toString("utf8").split("\0").filter(Boolean);
     if (fields.length === 0 || fields.length % 2 !== 0) return false;
     const exports = new Map();
+    // G20-35 (w265): the export itself registers its lineage file and the manifest entry listing it. The single commit holding exactly that is
+    // an export commit too -- admitted below only after the manifest delta is recomputed from the export (never by path alone).
+    const lineage = [];
+    let manifestPath = null;
     for (let index = 0; index < fields.length; index += 2) {
       const match = /^specs\/([^/]+)\/evidence\/critic\/([a-f0-9]{32})\/([^/]+)$/u.exec(fields[index + 1]);
+      const lineageMatch = /^specs\/([^/]+)\/evidence\/critic-lineage-([a-f0-9]{64})\.json$/u.exec(fields[index + 1]);
+      if (fields[index] === "A" && lineageMatch && featureIds.includes(lineageMatch[1])) { lineage.push({ path: fields[index + 1], feature: lineageMatch[1], sha256: lineageMatch[2] }); continue; }
+      if (fields[index] === "M" && manifestPath === null && /^specs\/[^/]+\/lifecycle\.json$/u.test(fields[index + 1])
+        && featureIds.includes(fields[index + 1].split("/")[1])) { manifestPath = fields[index + 1]; continue; }
       if (fields[index] !== "A" || !match || !featureIds.includes(match[1]) || !CRITIC_EXPORT_FILES.includes(match[3])) return false;
       const key = `specs/${match[1]}/evidence/critic/${match[2]}`;
       if (!exports.has(key)) exports.set(key, { packetId: match[2], files: [] });
@@ -291,7 +299,24 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
         || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
         || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
     }
-    return true;
+    if (lineage.length === 0 && manifestPath === null) return true;
+    // The extended form: lineage files and the manifest change come together, one feature, every lineage file named by its own digest and
+    // naming one of the exports of this commit, and the manifest after the commit equals the manifest before plus exactly those entries.
+    if (lineage.length === 0 || manifestPath === null || exports.size === 0) return false;
+    const featureId = manifestPath.split("/")[1];
+    if (lineage.some((row) => row.feature !== featureId) || [...exports.keys()].some((dir) => dir.split("/")[1] !== featureId)) return false;
+    const packetIds = [...exports.values()].map((row) => row.packetId);
+    const entries = lineage.map((row) => {
+      regularBlobAt(root, commit, row.path);
+      const bytes = gitBytes(root, ["show", `${commit}:${row.path}`], "CCA-EVIDENCE-READ");
+      const text = bytes.toString("utf8");
+      if (digest(bytes) !== row.sha256 || !object(JSON.parse(text)) || !packetIds.some((packetId) => text.includes(packetId))) throw new Error("lineage file not bound");
+      return { class: "candidate-evidence", path: row.path, sha256: row.sha256, authority: false, mutability: "immutable", retention: "retain" };
+    });
+    const before = manifestAt(root, parents[1], manifestPath).value;
+    const after = manifestAt(root, commit, manifestPath).value;
+    if (before.feature?.id !== featureId || after.feature?.id !== featureId || !Array.isArray(before.artifacts)) return false;
+    return sha256Canonical({ ...before, artifacts: [...before.artifacts, ...entries] }) === sha256Canonical(after);
   } catch { return false; }
 }
 
