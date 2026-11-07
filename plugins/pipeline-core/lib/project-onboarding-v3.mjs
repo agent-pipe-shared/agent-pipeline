@@ -3678,6 +3678,17 @@ function designToImplementationHandoverAction(root, fs) {
       // (architecture-design.mjs ARCHITECTURE_DESIGN_REOPEN_CODES). Any other invalid result -- an
       // unexpected exception, a setup/availability/lock/symlink condition -- gets the same typed
       // diagnosis shape as the environment condition above, never a design reopen.
+      if (architecture.code === "ARCHITECTURE-DESIGN-EXISTING-ESTATE") {
+        // G20-12: a greenfield design package whose architecture/ directory holds anything besides the fresh
+        // map scaffold (typically architecture/adoption-state.json from the brownfield adoption route) cannot be
+        // materialized. Name the repair the agent can run itself; never send it to adoption or reopen-design.
+        return {
+          kind: "architecture-design-required",
+          prdPath: authority.planPath,
+          code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE",
+          guidance: "The approved design is valid, but architecture/ holds entries besides the fresh map scaffold (architecture/map/index.md and architecture/map/inventory.json), typically architecture/adoption-state.json left by the brownfield adoption route. Do not reopen design and do not run architecture-adoption.mjs. Move every other entry out of architecture/ into scratch/ (nothing is deleted), inspect again, then run the published materialize-architecture action.",
+        };
+      }
       if (!isArchitectureDesignReopenCode(architecture.code)) {
         return {
           kind: "architecture-design-required",

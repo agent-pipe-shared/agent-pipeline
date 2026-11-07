@@ -398,12 +398,28 @@ function validReadyDiagnostics(value, root) {
       && READY_WARNING_VALIDATORS[entry.code](entry, root));
 }
 
+// G20-12 (candidate 20, Claude on Windows): in `approved`/`implementing` an architecture inspection failure that is
+// NOT a verified content drift (ARCHITECTURE-DESIGN-EXISTING-ESTATE, DWP2-ENVIRONMENT-UNAVAILABLE, an unexpected
+// exception) publishes a non-mutating diagnosis, designToImplementationHandoverAction() in project-onboarding-v3.mjs.
+// The gate did not know it, so the ready observation became PORG-INVALID-OBSERVATION and every governed write was
+// refused -- including the one write that clears the diagnosed condition. Closed shape: exact keys, typed code only
+// (exception text never rides in), no action of its own.
+const TYPED_DIAGNOSIS_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
+function validArchitectureDesignDiagnosis(value) {
+  return exactKeys(value, ["kind", "prdPath", "code", "guidance"])
+    && value.kind === "architecture-design-required"
+    && typeof value.prdPath === "string" && value.prdPath.length > 0
+    && typeof value.code === "string" && value.code.length <= 96 && TYPED_DIAGNOSIS_CODE.test(value.code)
+    && typeof value.guidance === "string" && value.guidance.length > 0;
+}
+
 function validReadyNextAction(value, root) {
   if (value === null) return true;
   if (validPlanLifecycleInspectCommand(value)) return true;
   if (validImplementationHandoverCommand(value)) return true;
   if (validMaterializeArchitectureCommand(value)) return true;
   if (validReopenDesignCollectAction(value)) return true;
+  if (validArchitectureDesignDiagnosis(value)) return true;
   return exactKeys(value, [
     "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
   ])

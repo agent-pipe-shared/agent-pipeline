@@ -634,6 +634,70 @@ test("the materialize-architecture exception is exact about its keys, argv, flag
   }
 });
 
+// G20-12 (candidate 20, Claude on Windows): a non-drift architecture failure in `approved`/`implementing` publishes
+// a non-mutating diagnosis. Refusing that shape turned a ready session into PORG-INVALID-OBSERVATION and blocked
+// every governed write, including the move that clears ARCHITECTURE-DESIGN-EXISTING-ESTATE.
+const EXISTING_ESTATE_GUIDANCE = "The approved design is valid, but architecture/ holds entries besides the fresh map scaffold (architecture/map/index.md and architecture/map/inventory.json), typically architecture/adoption-state.json left by the brownfield adoption route. Do not reopen design and do not run architecture-adoption.mjs. Move every other entry out of architecture/ into scratch/ (nothing is deleted), inspect again, then run the published materialize-architecture action.";
+const ENVIRONMENT_GUIDANCE = "The approved design is not shown to be invalid: a registered git worktree cannot be resolved from this host (environment condition, not content drift). Do not reopen design. Run the check from the environment that owns that worktree, or remove/prune the stale registration with git, then inspect again.";
+
+function architectureDiagnosisAction(code = "ARCHITECTURE-DESIGN-EXISTING-ESTATE", guidance = EXISTING_ESTATE_GUIDANCE) {
+  return { kind: "architecture-design-required", prdPath: "specs/feat-x/prd_feat-x.md", code, guidance };
+}
+
+test("G20-12: the non-mutating architecture diagnosis published in approved and implementing keeps the session ready", () => {
+  const path = root();
+  try {
+    for (const build of [
+      () => architectureDiagnosisAction(),
+      () => architectureDiagnosisAction("DWP2-ENVIRONMENT-UNAVAILABLE", ENVIRONMENT_GUIDANCE),
+      () => architectureDiagnosisAction("ARCHITECTURE-DESIGN-INSPECTION-FAILED", "Resolve the diagnosed condition named by this code, then inspect again."),
+    ]) {
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        const observed = readyResultWithPushApprovalKeys(path, "session", runner);
+        observed.nextAction = build();
+        assert.deepEqual(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner, inspect: () => observed }), {
+          schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+          status: "ready",
+          intent: "session",
+        }, `${observed.nextAction.code} / ${runner}`);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("G20-12: the architecture diagnosis is exact about its keys, kind and typed code", () => {
+  const mutations = [
+    ["extra key", (a) => { a.mutation = false; }],
+    ["action smuggled in", (a) => { a.applyAction = materializeArchitectureAction(); }],
+    ["missing guidance", (a) => { delete a.guidance; }],
+    ["missing prdPath", (a) => { delete a.prdPath; }],
+    ["empty guidance", (a) => { a.guidance = ""; }],
+    ["empty prdPath", (a) => { a.prdPath = ""; }],
+    ["exception text as code", (a) => { a.code = "ENOENT: no such file or directory, open 'architecture/map/index.md'"; }],
+    ["lower-case code", (a) => { a.code = "architecture-design-existing-estate"; }],
+    ["overlong code", (a) => { a.code = `ARCHITECTURE-${"X".repeat(100)}`; }],
+    ["non-string code", (a) => { a.code = 7; }],
+    ["other kind", (a) => { a.kind = "repair-required"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const action = architectureDiagnosisAction();
+    mutate(action);
+    assertInvalidObservation(action, `architecture diagnosis: ${label}`);
+  }
+});
+
+test("G20-12: the diagnosis fixtures mirror the producer's literals (drift of project-onboarding-v3.mjs fails here)", () => {
+  const producer = readFileSync(fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url)), "utf8");
+  for (const literal of [
+    `kind: "architecture-design-required",`,
+    `code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE",`,
+    EXISTING_ESTATE_GUIDANCE,
+    ENVIRONMENT_GUIDANCE,
+  ]) {
+    assert.ok(producer.includes(literal), `the producer no longer contains the literal this suite mirrors: ${literal.slice(0, 90)}`);
+  }
+});
+
 test("the reopen-design exception is exact about its input, placeholder-bound apply argv, flags and confirmation", () => {
   const mutations = [
     ["extra key on the collect action", (a) => { a.unexpected = true; }],
