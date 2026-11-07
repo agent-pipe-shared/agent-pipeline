@@ -32,7 +32,7 @@ import {
 } from "../lib/governance-hgo-consumption-action.mjs";
 // `render-copy-safe` remains a backward-compatible view of the same shared
 // renderer now used in the default hook hand-off.
-import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { placeholder, renderHumanCopySafeCommand, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -504,10 +504,15 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         proofDirectory: typeof options.proofDirectory === "string" ? options.proofDirectory : null,
       });
       const output = hasReadiness ? { ...prepared, environmentReadiness: readiness } : prepared;
-      const signIntent = copySafeActionText(
-        "sign-intent",
-        prepared.signIntentCommand,
-      );
+      // G20-16 (Claude on Windows): the PO pasted the POSIX and the PowerShell block together into PowerShell. The PO's one
+      // command is rendered for the PO's own terminal only (WSL: two labelled options, PowerShell through wsl.exe).
+      const signIntent = renderPoTerminalCommand({
+        label: "sign-intent",
+        executable: prepared.signIntentCommand.executable,
+        argv: prepared.signIntentCommand.argv,
+        ...(options.terminalEnv === undefined ? {} : { env: options.terminalEnv }),
+        ...(options.hostPlatform === undefined ? {} : { hostPlatform: options.hostPlatform }),
+      }).text;
       // PO decision 2026-10-27: the operator-facing channel carries exactly ONE command. The import
       // (`authorizeBySignatureCommand`, with the full proof path) is an agent action in the JSON
       // channel only; the proof path is never printed into the operator block, whose lines stay

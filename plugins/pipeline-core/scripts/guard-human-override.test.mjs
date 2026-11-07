@@ -771,9 +771,22 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
     });
     // SIG-A (PO decision 2026-10-27, revises the two-block hand-off): the operator channel carries
     // the one signing command only; the import is an agent action in the JSON channel.
-    assert.match(first.stderr, /Step: sign-intent\nPOSIX:/u);
+    // Restated 2026-11-07 (candidate 20, G20-16, QG-04): the block is rendered for the PO's own terminal. The host is
+    // pinned per case, so the expectation no longer depends on where the suite runs; the bound and the one-command rule stay.
+    for (const [hostPlatform, terminalEnv, expectations] of [
+      ["linux", {}, { first: /^Step: sign-intent\nPOSIX:/mu, absent: /PowerShell:/u }],
+      ["win32", {}, { first: /^Step: sign-intent \(PowerShell\)\nPowerShell:/mu, absent: /POSIX:/u }],
+      ["linux", { WSL_DISTRO_NAME: "Ubuntu" }, { first: /^Step: sign-intent, option A: WSL terminal\nPOSIX:[\s\S]*^Step: sign-intent, option B: Windows PowerShell\nPowerShell:/mu, absent: /cmd\.exe:/u }],
+    ]) {
+      const rendered = io();
+      assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], rendered,
+        { proofDirectory: SYNTHETIC_PROOF_DIRECTORY, hostPlatform, terminalEnv }), 0, rendered.stderr);
+      assert.match(rendered.stderr, expectations.first, `${hostPlatform} ${JSON.stringify(terminalEnv)}`);
+      assert.doesNotMatch(rendered.stderr, expectations.absent);
+      assert.doesNotMatch(rendered.stderr, /Step: authorize-by-signature/u);
+      assert.equal(rendered.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, rendered.stderr);
+    }
     assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u);
-    assert.match(first.stderr, /PowerShell:/u);
     assert.equal(first.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, first.stderr);
     assert.doesNotMatch(first.stderr, /available on demand|render-copy-safe/u);
     assert.doesNotMatch(first.stdout, /Step:|POSIX:|PowerShell:/u,
@@ -830,7 +843,8 @@ test("SIG-A2 the operator hand-off is one command with no placeholder anywhere, 
       denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
     });
     const captured = io();
-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, captured.stderr);
+    // G20-16: pinned to a non-WSL host, where the one command is exactly one block; the WSL two-option form is pinned in §3.3 above.
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY, hostPlatform: "linux", terminalEnv: {} }), 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
     assert.equal(value.operatorCommandCount, 1);
     assert.equal((captured.stderr.match(/^Step: /gmu) ?? []).length, 1, captured.stderr);

@@ -197,6 +197,8 @@ export function humanOverrideRoute(code, reason, subject, root, toolName, toolIn
         overrideGuidance = [
           "",
           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
+          // G20-17 (PO decision "signing parity", 2026-11-02): in the Windows run the PO typed plan and prepare-for-signature by hand.
+          "The agent runs this read-only plan step and the preparation it returns itself; the PO only runs the one signing command.",
           planCommand.text,
           approvalMode === "chat"
             ? "The plan JSON gives the mode-specific nextAction; follow each returned action. The human confirms in-session; chat is attribution, not proof."
