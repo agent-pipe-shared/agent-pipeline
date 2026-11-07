@@ -807,6 +807,34 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
  * whose words do not have that shape cannot equal any observed action, so it
  * returns null without an inspection. The set of matching commands is unchanged.
  */
+const NODE_BASENAMES = new Set(["node", "node.exe"]);
+const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCase());
+/**
+ * C20 w252 (greenfield G20-1): the observed action names the Node of the process that inspected (`process.execPath`), and the guard
+ * inspects inside the hook, whose Node can differ from the one the agent's shell resolves (a runner sandbox and a version manager
+ * each bring their own). Byte equality of the interpreter then refused the very repair the inspection returned, a deadlock.
+ * Equality stays the first rule. Besides it, only when the observed executable is itself a Node interpreter, a command may name
+ * `node` from PATH, or an absolute path whose basename is node/node.exe, that resolves to an executable regular file OUTSIDE the
+ * project root (so an agent cannot plant its own "node" in scratch/ or anywhere in the repository). The argv stays byte-exact.
+ */
+export function sameNodeInterpreter(word, executable, root, dependencies = {}) {
+  if (word === executable) return true;
+  if (typeof word !== "string" || typeof executable !== "string" || !isNodeName(executable)) return false;
+  if (word === "node") return true;
+  if (!(win32.isAbsolute(word) || posix.isAbsolute(word)) || !isNodeName(word)) return false;
+  try {
+    const real = (dependencies.realpathFn ?? realpathSync)(word);
+    let realRoot;
+    try { realRoot = (dependencies.realpathFn ?? realpathSync)(root); } catch { realRoot = resolve(root); }
+    const rel = relative(realRoot, real);
+    if (rel === "" || !(rel.startsWith("..") || isAbsolute(rel))) return false;
+    const stat = (dependencies.lstatFn ?? lstatSync)(real);
+    return stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0);
+  } catch {
+    return false;
+  }
+}
+
 export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
   if (!words) return null;
@@ -835,7 +863,7 @@ export function observedOnboardingCommandMatch(command, root, dependencies = {})
     || typeof action.mutation !== "boolean"
     || typeof action.requiresConfirmation !== "boolean"
     || words.length !== action.argv.length + 1
-    || words[0] !== action.executable
+    || !sameNodeInterpreter(words[0], action.executable, root, dependencies)
     || action.argv.some((value, index) => words[index + 1] !== value)) return null;
   return {observed, action};
 }

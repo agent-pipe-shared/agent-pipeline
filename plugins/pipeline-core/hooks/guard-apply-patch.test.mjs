@@ -171,7 +171,8 @@ const spawn = (executable, argv, options) => {
   observed = {executable, argv, ambientClaudeCode: options.env.CLAUDECODE};
   return childProcess.spawn(executable, argv, options);
 };
-const CHILD_TIMEOUT_MS = 4000;
+const CHILD_TIMEOUT_MS = 12000;
+const childTimeoutMs = () => CHILD_TIMEOUT_MS;
 ${source.slice(start, end)}
 ${lifecycle.slice(runnerStart, runnerEnd)}
 (async () => {
@@ -793,6 +794,16 @@ check("RCM04 rename facts stay within their own file operation", () => {
   const marker = JSON.parse(readFileSync(guard, "utf8").match(/line\.includes\(("[^\n]+?")\)/u)[1]);
   const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: specs/plan.md", "*** Move to: specs/renamed-plan.md", "@@", `+${marker}`, "*** End of File", "*** Update File: docs/ordinary.md", "*** Move to: docs/renamed.md", "@@", "+ordinary", "*** End of File", "*** End Patch"].join("\n"));
   assert.deepEqual(Array.from(parsed.paths, path => path.patchContainsAcknowledgementMarker), [true, true, false, false]);
+});
+
+check("GAP-BUDGET01 (C20 w252, G20-2): each child guard gets 12 s, inside the outer cap of codex-pretool-guard, and a timeout names the guard and the budget", () => {
+  const source = readFileSync(guard, "utf8");
+  assert.match(source, /^const CHILD_TIMEOUT_MS = 12_000;$/mu);
+  assert.match(source, /\}, childTimeoutMs\(\)\);/u, "the per-child timer uses the 12 s cap");
+  const pretool = readFileSync(join(hookDir, "codex-pretool-guard.mjs"), "utf8");
+  const cap = Number(/"guard-apply-patch\.mjs": \{ capMs: ([0-9_]+), reserveMs: ([0-9_]+) \}/u.exec(pretool)?.[1].replaceAll("_", ""));
+  assert.ok(Number.isSafeInteger(cap) && 12_000 * 2 < cap, `one parallel round plus one lifecycle child fit inside the outer cap (${cap} ms)`);
+  assert.match(source, /Guard timed out for \$\{job\.filePath\} \(\$\{basename\(job\.path\)\}, cap/u, "the timeout names the guard that ran out of time");
 });
 
 if (process.exitCode) process.exit(process.exitCode);

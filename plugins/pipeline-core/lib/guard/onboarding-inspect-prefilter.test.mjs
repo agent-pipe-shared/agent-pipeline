@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch } from "./command-catalogue.mjs";
+import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter } from "./command-catalogue.mjs";
 import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
 import { simpleWords } from "./shell-grammar.mjs";
 
@@ -143,14 +143,46 @@ test("matching is identical to the pre-precondition behaviour for every producer
       `${commandFor(words)} && ${commandFor(words)}`,
     ];
   };
+  // C20 w252 restatement (QG-04, same table, no case dropped): every legacy match is still returned identically; a command the
+  // legacy body refused may match now ONLY when it differs from the observed action in the interpreter word alone and
+  // sameNodeInterpreter admits that word for the observed Node executable (G20-1). Every other legacy refusal stays a refusal.
   let matched = 0;
+  let widened = 0;
   for (const action of actions) {
     for (const command of commands(action)) {
       const deps = counting(action);
       const expected = legacyMatch(command, deps);
-      assert.deepEqual(observedOnboardingCommandMatch(command, root, counting(action)), expected, command);
-      if (expected !== null) matched += 1;
+      const actual = observedOnboardingCommandMatch(command, root, counting(action));
+      if (expected !== null) { assert.deepEqual(actual, expected, command); matched += 1; continue; }
+      if (actual === null) continue;
+      const words = simpleWords(command, root);
+      assert.ok(words && words.length === action.argv.length + 1 && action.argv.every((value, index) => words[index + 1] === value), `only the interpreter may differ: ${command}`);
+      assert.equal(sameNodeInterpreter(words[0], action.executable, root), true, `the interpreter must be an admitted Node: ${command}`);
+      assert.notEqual(words[0], action.executable);
+      widened += 1;
     }
   }
   assert.ok(matched >= actions.length, "the table must contain real matches, not only refusals");
+  assert.ok(widened >= 1, "the table must exercise the Node-interpreter equivalence");
+});
+
+test("C20 w252 (G20-1): the repair the hook's inspection returns is admitted when the agent's shell names a different real Node", () => {
+  const action = { kind: "command", executable: GUARD_NODE, argv: [onboardingScript, "intake-spec-marker-apply", "--root", rootWord, "--plan-sha256", "c".repeat(64), "--activate", "--runner", "codex"], mutation: true, requiresConfirmation: false };
+  const realNodeElsewhere = process.execPath;
+  // The guard's own Node differs from the agent's (simulated: the observed executable is a foreign node path, the agent names this Node).
+  const observedForeign = { ...action, executable: "/opt/producer-node/bin/node" };
+  assert.ok(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(observedForeign)), "a real Node outside the project is admitted");
+  assert.ok(observedOnboardingCommandMatch(commandFor(["node", ...action.argv]), root, counting(observedForeign)), "node from PATH is admitted");
+  // End to end through the admission (the fixture root admits the observed-only planner; the marker repair's argument check needs a real root).
+  const foreignPlanner = planner("/opt/producer-node/bin/node");
+  assert.equal(isExactObservedOnboardingNextAction(commandFor([realNodeElsewhere, ...foreignPlanner.argv]), root, counting(foreignPlanner)), true);
+  // Still refused: a non-Node interpreter, a missing Node path, a Node-named file inside the project, a changed argv, and any
+  // interpreter swap when the observed executable is not itself a Node.
+  for (const word of ["/bin/sh", "/opt/missing/bin/node", join(repository, "scratch", "node"), join(repository, "package.json")]) {
+    assert.equal(observedOnboardingCommandMatch(commandFor([word, ...action.argv]), root, counting(observedForeign)), null, word);
+  }
+  assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv, "--extra"]), root, counting(observedForeign)), null);
+  const nonNode = { ...action, executable: "/usr/bin/python3" };
+  assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(nonNode)), null);
+  assert.equal(sameNodeInterpreter(join(repository, "scratch", "node"), GUARD_NODE, repository, { realpathFn: (p) => p, lstatFn: () => ({ isFile: () => true, mode: 0o755 }) }), false, "a node inside the root is refused even when it is an executable file");
 });

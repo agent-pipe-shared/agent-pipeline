@@ -4,6 +4,7 @@
 /** Extract apply_patch paths and run the existing write-path guards per path. */
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -26,7 +27,12 @@ const GUARDS = [
   { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"], lane: "repository-serial" },
 ];
 const MAX_PARALLEL_GUARDS = 12;
-const CHILD_TIMEOUT_MS = 4_000;
+// C20 w252 (greenfield G20-2): the lifecycle guard alone takes about 3 to 5 s on an ordinary Linux machine (measured 3.1 to 4.9 s),
+// so a 4 s cap refused ordinary design writes as "timed out" whenever the machine was busy. Each child now gets up to 12 s; the whole
+// script stays bounded by the cap codex-pretool-guard.mjs gives it (no extra shared deadline: the lifecycle children run one per path,
+// in order, and a patch over many files legitimately needs the sum).
+const CHILD_TIMEOUT_MS = 12_000;
+const childTimeoutMs = () => CHILD_TIMEOUT_MS;
 
 function killGuardProcess(child) {
   if (child.pid === undefined) return;
@@ -51,7 +57,7 @@ function runGuard({ path, args, input }) {
       child.stderr.destroy();
       killGuardProcess(child);
       finish({ status: null, signal: "SIGKILL", timedOut: true });
-    }, CHILD_TIMEOUT_MS);
+    }, childTimeoutMs());
     const finish = (result) => {
       if (settled) return;
       settled = true;
@@ -238,7 +244,7 @@ for (const { job, result } of results) {
   if (result.stderr) stderr.push(result.stderr.trimEnd());
   if (result.timedOut) {
     exitCode = 2;
-    stderr.push(`[guard-apply-patch] Guard timed out for ${job.filePath}.`);
+    stderr.push(`[guard-apply-patch] Guard timed out for ${job.filePath} (${basename(job.path)}, cap ${CHILD_TIMEOUT_MS / 1000} s per guard). Retry the same patch once the machine is less busy, or split it into fewer files per patch.`);
   } else if (result.status === 2) exitCode = 2;
   else if (result.status === 1 && exitCode === 0) exitCode = 1;
   else if (![0, 1, 2].includes(result.status)) {
