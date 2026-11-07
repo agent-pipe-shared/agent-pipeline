@@ -131,6 +131,8 @@ import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 import { recordGovernanceEnrollmentAfterOnboarding, readGovernanceEnrollmentRetirement, prepareGovernanceEnrollmentBeforeIntake, governanceEnrollmentRecoveryAction, observeGovernanceScope, planGovernanceScopeDecision, applyGovernanceScopeDecision } from "./governance-scope.mjs";
 import { observeOnboardingEnrollmentHistory } from "./onboarding-continuity.mjs";
+import { readAnsweredIntakeValues, reaskViolations } from "./answered-intake-values.mjs";
+import { awaitSignatureFields } from "./signed-proof-wait.mjs";
 
 // Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe; NVA-W5-COORD-STEP6-1).
 // The three new v4Inspection statuses a genuinely fresh repo now settles into
@@ -3388,6 +3390,8 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         invocation: "user-copy-only",
         guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. action.copyCommand resolves the configured local approval directory itself without printing its private path and is the only human command: after its proof is written, the agent performs the binding readback. Run that copy-safe command in your actual terminal, not a hand-transcribed variant. Do not edit an acknowledgement marker manually.`,
         action: { ...action, command: rendered.command, copyCommand: rendered.copyCommand },
+        // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing.
+        ...(typeof signatureObservation.proofPath === "string" ? awaitSignatureFields({ root, proofPath: signatureObservation.proofPath }) : {}),
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
     }
@@ -7708,7 +7712,22 @@ function withPendingProjectAttributesGapAsk(observed, fs) {
 // instead. Byte-for-byte the same composition the two call sites spelled out
 // before this refactor -- a pure extraction, not a behavior change.
 function withAllPendingOnboardingAsksAttached(observed, fs) {
-  return withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs), fs);
+  return withReaskRefusals(withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs), fs), fs);
+}
+
+// C20 G20-30: the last step of the envelope. An ask whose key is already answered (lib/answered-intake-values.mjs) is refused by type,
+// never dropped silently: the nextAction keeps its shape and gains `reaskRefusals`, each naming the key, where the answer lives and the repair.
+export function withReaskRefusals(observed, fs) {
+  if (observed.repository?.mode !== "local" || observed.nextAction == null) return observed;
+  const nextAction = observed.nextAction;
+  let violations;
+  try {
+    const answered = readAnsweredIntakeValues({ rootDir: observed.root, deps: {
+      readOnboardingIntakeCheckpoint: (args) => (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({ ...args, repositoryCapability: observed.repository.mode, spawn: fs.spawnSync }),
+    } });
+    violations = reaskViolations([nextAction, ...(nextAction.pendingAsks ?? [])], answered);
+  } catch { return observed; }
+  return violations.length === 0 ? observed : { ...observed, nextAction: { ...nextAction, reaskRefusals: violations } };
 }
 
 // Sibling of `withAllPendingOnboardingAsksAttached()` immediately above, for

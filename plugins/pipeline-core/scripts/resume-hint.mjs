@@ -11,6 +11,8 @@ import {
   readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput,
 } from "../lib/onboarding-continuity.mjs";
 
+import { readAnsweredIntakeValues } from "../lib/answered-intake-values.mjs";
+
 function value(args, flag) { const index = args.indexOf(flag); return index < 0 ? null : args[index + 1] ?? null; }
 function basis(args) {
   const featureId = value(args, "--feature-id"); const planSha256 = value(args, "--plan-sha256"); const specSha256 = value(args, "--spec-sha256");
@@ -110,7 +112,9 @@ function main() {
     // so `inspect` can never drift from what capture actually persisted), or null when no
     // digest record is available -- absent card, no git directory yet, or a corrupt record.
     const digestRecord = readResumeHintCardDigest({ rootDir });
-    return { ...hint, intakeCheckpoint, cardDigest: digestRecord ? digestRecord.cardDigest : null };
+    // C20 G20-30: the one typed readback of every already-answered key (gitAuthor, language, profile, designAnswers, verifyCommand)
+    // and where each answer lives; a question whose key is answered here is never asked again (lib/answered-intake-values.mjs).
+    return { ...hint, intakeCheckpoint, answeredValues: readAnsweredIntakeValues({ rootDir }), cardDigest: digestRecord ? digestRecord.cardDigest : null };
   }
   if (command === "discard") return discardResumeHint({ rootDir });
   const cardFile = value(args, "--card-file");

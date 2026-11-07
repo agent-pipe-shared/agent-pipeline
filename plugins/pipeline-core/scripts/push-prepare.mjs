@@ -40,6 +40,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { awaitSignatureFields } from "../lib/signed-proof-wait.mjs";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -999,10 +1000,21 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   });
 
   report.subjectSha256 = subjectSha256;
+  // G20-30: the signature lands in the scratch mirror this report already names; the agent waits for that one file itself
+  // (the PO reports nothing back) and then runs the approve-push line below.
+  const proofRelative = relative(dir, artifacts.proof).split(sep).join("/");
+  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative }) : null;
+  if (awaitFields !== null) report.awaitSignature = awaitFields;
   return {
     ok: true,
     report,
     lines: withProfileNote({
+      // Lines stay within the 72-column bound; the exact argv is the report's awaitSignature.waitAction (one readback, no second spelling).
+      awaitProof: awaitFields === null ? null : [
+        "Agent, after the human line above (the PO reports nothing back):",
+        "run report.awaitSignature.waitAction (proof-wait.mjs), then",
+        "the approve-push line below.",
+      ].join("\n"),
       authorize: [
         "Human signature: authorizes only this prepared remote push.",
     "The configured approval directory is resolved automatically.",
@@ -1021,6 +1033,7 @@ export function printReport(result, io = {}) {
   write(`${JSON.stringify(result.report, null, 2)}\n`);
   if (result.lines) {
     writeError(`${result.lines.authorize.join("\n")}\n\n`);
+    if (result.lines.awaitProof) writeError(`${result.lines.awaitProof}\n\n`);
     writeError(`${result.lines.approvePush.join("\n")}\n\n`);
     writeError(`${result.lines.gitPush}\n`);
     if (result.lines.profileNote) writeError(`${result.lines.profileNote}\n`);

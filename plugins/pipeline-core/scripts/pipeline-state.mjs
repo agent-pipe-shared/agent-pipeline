@@ -395,6 +395,7 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
@@ -4384,7 +4385,9 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       const observed = observeDesignApprovalRequest({ dir, presentation, submission, deps, signature: mode?.mode === "signature" });
       if (!observed.ok) {
         if (observed.code !== "DAB-APPROVAL-PROOF-INVALID") return { kind: "repair-required", code: observed.code, mutation: false, requiresConfirmation: false, guidance: "Recheck sources and use present-plan --review-receipt." };
-        return { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true }), invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true };
+        return { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true }), invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true,
+          // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing.
+          ...awaitSignatureFields({ root: resolve(dir), proofPath: presentation.designApprovalRequestPath.replace("request-", "proof-") }) };
       }
       if (mode?.mode === "signature") return { kind: "command", executable: process.execPath, argv: [script, "approve-plan", "--design-approval-request", presentation.designApprovalRequestPath], mutation: true, requiresConfirmation: false };
       if (mode?.mode !== "chat") return { kind: "repair-required", code: "DAB-APPROVAL-MODE-UNAVAILABLE", mutation: false, requiresConfirmation: false };
@@ -12212,6 +12215,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           executable: process.execPath,
           argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, approvalRequestPath)] }).text);
         else console.log(`Next: approve-plan --by <name> --design-approval-request ${approvalRequestPath}`);
+        // G20-30: the agent waits for the signature itself; the PO is not asked to report back.
+        if (mode?.mode === "signature") console.log(`Agent, after handing over the signing command above (the PO reports nothing back): ${proofCommandText(proofWaitCommand(resolve(dir), approvalRequestPath.replace("request-", "proof-")))}`);
         console.log("The request is pending only; it does not approve the package or unlock implementation.");
       } else {
         console.log('Next: run `approve-plan --by <name>` once the PO has confirmed \'approved\'.');

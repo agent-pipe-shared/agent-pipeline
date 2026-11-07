@@ -44,6 +44,8 @@ import * as planHandoffModule from "../plan-handoff-readiness.mjs";
 // Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
 const { inspectPlanDeliveryHandoff, PLAN_HANDOFF_CODES, planHandoffRefusal } = planHandoffModule;
 import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+// Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
+import * as planHandoffModuleOnboarding from "../project-onboarding-v3.mjs";
 import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
 import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
 import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
@@ -348,6 +350,49 @@ test("AC-264: the default-mode present-plan hands the PO exactly one sign-intent
   assert.doesNotMatch(f.presentOut, /HGO-|no recorded request resolves|guard[- ]override/iu, "the present-plan output carries no guard-override code or warning");
 });
 
+// ---------------------------------------------------------------------------------------------------------------------
+// C20 G20-30 (Codex greenfield P2, AC-108): the signing step names the exact proof path and a bounded, sanctioned wait, so
+// the agent imports the PO's signature itself instead of asking the PO to report back; a missing proof after the bound gives
+// one clear recovery. These cases are appended to this registered pin (they reuse its signed design-approval fixture).
+// ---------------------------------------------------------------------------------------------------------------------
+const PROOF_WAIT_SCRIPT = join(PLUGIN, "scripts", "proof-wait.mjs");
+function inspectNextAction(root) {
+  const lines = [], realLog = console.log;
+  console.log = (...args) => { lines.push(args.map(String).join(" ")); };
+  try { assert.equal(run(["inspect"], { dir: root, now: () => DESIGN_AT }), 0); } finally { console.log = realLog; }
+  return JSON.parse(lines.join("\n")).nextAction;
+}
+function waitForProofCli(root, proofRel, seconds = 1) {
+  const child = spawnSync(process.execPath, [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proofRel, "--timeout", String(seconds)], { encoding: "utf8", timeout: 60000 });
+  return { status: child.status, out: child.stdout.trim() === "" ? null : JSON.parse(child.stdout), stderr: child.stderr };
+}
+
+test("G20-30: the design approval's signing step names the exact proof path and a bounded wait; a missing proof after the bound gives one recovery", () => {
+  const f = designPresentation();
+  const proofRel = f.requestRel.replace("request-", "proof-");
+  const action = inspectNextAction(f.root);
+  assert.ok(action.argv.includes("sign-intent"), "the pending step is the PO's one signing command");
+  assert.equal(action.proofPath, proofRel, "the signing step names the exact proof file the signature will land in");
+  assert.equal(action.reportBackRequired, false, "the PO is never asked to report back after signing");
+  assert.equal(action.waitAction.argv[0], PROOF_WAIT_SCRIPT);
+  assert.deepEqual(action.waitAction.argv.slice(1, 5), ["--root", f.root, "--proof", proofRel]);
+  assert.equal(action.waitAction.mutation, false);
+  assert.match(f.presentOut, /proof-wait\.mjs/u, "present-plan names the wait beside the one sign command");
+  // One readback: present-plan and inspect show the same single wait command, never two spellings of the next step.
+  const waitLines = f.presentOut.split(/\r?\n/u).filter((line) => /proof-wait\.mjs/u.test(line));
+  assert.equal(waitLines.length, 1);
+  assert.ok(waitLines[0].endsWith([action.waitAction.executable, ...action.waitAction.argv].join(" ")), "present-plan prints exactly inspect's waitAction");
+  assert.doesNotMatch(f.presentOut, /tell me|let me know|report back|reply when/iu);
+  const waited = waitForProofCli(f.root, proofRel, 1);
+  assert.equal(waited.status, 2, waited.stderr);
+  assert.equal(waited.out.code, "PROOF-WAIT-TIMEOUT");
+  assert.match(waited.out.repair, /sign-intent/u, "the one recovery is the signing command itself, then the same wait again");
+  assert.match(waited.out.repair, /proof-wait\.mjs/u);
+  const refusedPath = waitForProofCli(f.root, "../outside.json", 1);
+  assert.equal(refusedPath.status, 2);
+  assert.equal(refusedPath.out.code, "PROOF-WAIT-ARGS", "a proof reference outside scratch/ is refused by type");
+});
+
 test("AC-264: signing through that command discloses the design purpose: no HGO- code, no unresolved-request fallback, no typed confirmation", () => {
   const f = designPresentation();
   const withPassphrase = (args) => (args[0] === "pkeyutl" && args.includes("-sign") ? [...args, "-passin", "env:PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE"] : args);
@@ -367,6 +412,24 @@ test("AC-264: signing through that command discloses the design purpose: no HGO-
   assert.ok(disclosure.includes(f.candidate), "the disclosure names the candidate commit");
   assert.doesNotMatch(disclosure, /HGO-/u, "no guard-override (HGO-) code reaches the PO");
   assert.doesNotMatch(disclosure, /no recorded request resolves|purpose unavailable/u, "the unresolved-request fallback is never shown for a design approval");
+});
+
+test("G20-30: the proof is awaited and imported by the agent after the PO signs, with no reply from the PO", () => {
+  const f = designPresentation();
+  const proofRel = f.requestRel.replace("request-", "proof-");
+  assert.ok(existsSync(join(f.root, proofRel)), "the signature landed in the named proof file");
+  const waited = waitForProofCli(f.root, proofRel, 5);
+  assert.equal(waited.status, 0, waited.stderr);
+  assert.equal(waited.out.status, "proof-present");
+  assert.equal(waited.out.proofPath, proofRel);
+  const action = inspectNextAction(f.root);
+  assert.equal(action.kind, "command");
+  assert.deepEqual(action.argv.slice(1), ["approve-plan", "--design-approval-request", f.requestRel]);
+  assert.equal(action.requiresConfirmation, false, "the import is the agent's own step, not a PO question");
+  assert.equal(action.input, undefined);
+  const imported = run(["approve-plan", "--design-approval-request", f.requestRel], { dir: f.root, now: () => DESIGN_AT });
+  assert.equal(imported, 0, "the signed proof is imported by the agent's own command");
+  assert.equal(readState(f.root).state.planApproved, true);
 });
 
 test("RED mirror: the bare --intent-sha256 form (no resolvable request) discloses the guard-override fallback this pin forbids", () => {
@@ -599,6 +662,101 @@ test("AC-264 added (D64): the next session does not ask again for an answer the 
   const asked = (inspected.nextAction?.pendingAsks ?? []).flatMap((ask) => (ask.inputs ?? []).map((input) => input.name));
   assert.equal(asked.includes("language"), false, "the language held by the record is not asked again");
   assert.equal(asked.includes("gitAuthorName") || asked.includes("gitAuthorEmail"), false, `the Git author held by the record is not asked again: ${asked.join(",")}`);
+});
+
+// C20 G20-30 (AC-108): one typed readback of every answered intake key, and a typed refusal to ask one of them again.
+test("G20-30: an answered intake key is read back with where it lives after a restart, and asking it again is refused by type", async () => {
+  const mod = await import("../answered-intake-values.mjs");
+  const root = codexOnboardedRoot();
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
+  // A restart is a new process: the readback below comes from a fresh child, not from this process's memory.
+  const reader = pathToFileURL(resolve(PLUGIN, "lib", "answered-intake-values.mjs")).href;
+  const script = `import { readAnsweredIntakeValues } from ${JSON.stringify(reader)};process.stdout.write(JSON.stringify(readAnsweredIntakeValues({ rootDir: ${JSON.stringify(root)} })));`;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 60000 });
+  assert.equal(child.status, 0, child.stderr);
+  const answered = JSON.parse(child.stdout);
+  for (const key of ["language", "profile", "gitAuthor"]) {
+    assert.equal(answered[key].answered, true, key);
+    assert.match(answered[key].source, /^intake-checkpoint:values\./u, `${key} names the storage it lives in`);
+  }
+  assert.equal(answered.language.value, "de");
+  assert.equal(answered.designAnswers.answered, false, "the design round is not answered yet");
+  assert.equal(answered.verifyCommand.answered, false, "the verify command is still the placeholder");
+  const refused = mod.refuseReask(answered, "language");
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "INTAKE-REASK-REFUSED");
+  assert.equal(refused.key, "language");
+  assert.equal(refused.answerLives, answered.language.source);
+  assert.match(refused.repair, /answeredValues|resume-hint\.mjs inspect/u, "the refusal names the readback that holds the answer");
+  assert.equal(mod.refuseReask(answered, "designAnswers").ok, true, "an unanswered key may be asked");
+  const ask = { kind: "collect-input", inputs: [{ name: "language" }, { name: "profile" }, { name: "projectDescription" }, { name: "gitAuthorEmail" }] };
+  assert.deepEqual(mod.reaskViolations([ask], answered).map((entry) => entry.key), ["language", "profile", "gitAuthor"]);
+  // The real asks of a restarted session contain none of them.
+  const inspected = inspectProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
+  assert.deepEqual(mod.reaskViolations([inspected.nextAction, ...(inspected.nextAction?.pendingAsks ?? [])], answered), []);
+  // The session start reads the same typed readback (resume-hint inspect), so the next session finds the keys before it asks.
+  const hint = spawnSync(process.execPath, [join(PLUGIN, "scripts", "resume-hint.mjs"), "inspect", "--root", root], { encoding: "utf8", timeout: 60000 });
+  assert.equal(hint.status, 0, hint.stderr);
+  const hinted = JSON.parse(hint.stdout);
+  assert.equal(hinted.answeredValues.language.answered, true);
+  assert.equal(hinted.answeredValues.language.source, answered.language.source);
+});
+
+test("G20-30: the proof wait is admitted by exact argv only, and only for the plugin's own script", async () => {
+  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+  const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");
+  const digest = "a".repeat(64);
+  const wait = (...args) => `node ${PROOF_WAIT_SCRIPT} ${args.join(" ")}`;
+  const admitted = [
+    wait("--root", root, "--proof", `scratch/design-approval-proof-${digest}.json`),
+    wait("--root", root, "--proof", `scratch/design-approval-proof-${digest}.json`, "--timeout", "120"),
+    wait("--root", root, "--proof", `/keys/dir/proof-${digest}.json`, "--timeout", "600"),
+  ];
+  for (const command of admitted) assert.equal(isSanctionedLifecycleCommand(command, root), true, command);
+  const refused = {
+    "other root": wait("--root", join(root, "other"), "--proof", `scratch/x-proof-${digest}.json`),
+    "dot segment": wait("--root", root, "--proof", "scratch/../x-proof.json"),
+    "not a proof name": wait("--root", root, "--proof", "scratch/notes.json"),
+    "outside scratch": wait("--root", root, "--proof", "project/x-proof.json"),
+    "absolute without digest name": wait("--root", root, "--proof", "/keys/dir/proof.json"),
+    "timeout over bound": wait("--root", root, "--proof", `scratch/x-proof.json`, "--timeout", "601"),
+    "extra flag": wait("--root", root, "--proof", `scratch/x-proof.json`, "--verbose", "1"),
+    "repository copy": `node ${join(root, "scripts/proof-wait.mjs")} --root ${root} --proof scratch/x-proof.json`,
+  };
+  for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
+});
+
+// The runtime refusal: the last step of the onboarding envelope refuses (by type, never silently drops) an ask of an answered key.
+test("G20-30: the onboarding envelope refuses, by type, an ask for a key the intake record already answers", () => {
+  const { withReaskRefusals } = planHandoffModuleOnboarding;
+  assert.equal(typeof withReaskRefusals, "function", "the envelope exports its runtime re-ask check");
+  const answeredRecord = { status: "present", value: { values: { language: "de", profile: "feature", gitAuthor: null }, designQuestions: null } };
+  const fs = { readOnboardingIntakeCheckpoint: () => answeredRecord, spawnSync: () => ({ status: 1 }) };
+  const base = { root: "/nonexistent-reask-fixture", repository: { mode: "local" } };
+  const asking = { ...base, nextAction: { kind: "collect-input", inputs: [{ name: "language" }, { name: "projectDescription" }], pendingAsks: [{ kind: "collect-input", inputs: [{ name: "profile" }] }] } };
+  const refused = withReaskRefusals(asking, fs);
+  assert.deepEqual(refused.nextAction.reaskRefusals.map((entry) => [entry.code, entry.key, entry.answerLives]),
+    [["INTAKE-REASK-REFUSED", "language", "intake-checkpoint:values.language"], ["INTAKE-REASK-REFUSED", "profile", "intake-checkpoint:values.profile"]]);
+  assert.deepEqual(refused.nextAction.inputs, asking.nextAction.inputs, "the ask itself is kept, never silently dropped");
+  const clean = { ...base, nextAction: { kind: "collect-input", inputs: [{ name: "projectDescription" }] } };
+  assert.equal(withReaskRefusals(clean, fs), clean, "an envelope that asks nothing answered is returned unchanged");
+  assert.equal(withReaskRefusals({ ...asking, repository: { mode: "host" } }, fs).nextAction.reaskRefusals, undefined);
+});
+
+test("G20-30: a design-question round and a verify command that were answered are read back as answered", async () => {
+  const mod = await import("../answered-intake-values.mjs");
+  const root = codexOnboardedRoot();
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
+  const { applyOnboardingIntakeDesignQuestions } = await import("../onboarding-continuity.mjs");
+  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: { disposition: "no-open-questions" }, activate: true });
+  const answered = mod.readAnsweredIntakeValues({ rootDir: root });
+  assert.equal(answered.designAnswers.answered, true);
+  assert.match(answered.designAnswers.source, /^intake-checkpoint:designQuestions/u);
+  const asked = mod.reaskViolations([{ kind: "collect-input", input: { name: "answersJson" } }], answered);
+  assert.deepEqual(asked.map((entry) => entry.key), ["designAnswers"]);
+  const configured = mod.readAnsweredIntakeValues({ rootDir: root, deps: { checkVerifyContractConfigured: () => ({ ok: true, status: "configured" }) } });
+  assert.equal(configured.verifyCommand.answered, true);
+  assert.equal(configured.verifyCommand.source, "project/pipeline.json:verify");
 });
 
 test("E: per-runner end-to-end greenfield scenario (Claude Windows, Codex, Antigravity) reaches a pushed branch with exactly two PO proofs and zero guard overrides",

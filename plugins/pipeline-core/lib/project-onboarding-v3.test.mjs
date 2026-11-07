@@ -6083,6 +6083,13 @@ test("the seeded security gate refuses a push with missing security evidence and
     });
     assert.equal(approved.code, 0, approved.stderr);
 
+    // QG-04 restatement (C20 G20-25): the normal Verify now runs the configured security gate itself (suite baseline-security),
+    // so the push-mode Verify above already wrote the security evidence. That is asserted here as the new duty; the evidence is
+    // then removed (evidence/ is ignored, the tree stays clean) so the original duty below stays isolated: with the push bucket
+    // satisfied, the security bucket alone refuses missing evidence, and the shipped scan command admits the push again.
+    assert.equal(existsSync(join(path, "evidence", "security-latest.json")), true, "the push-mode Verify ran the configured security gate (G20-25)");
+    for (const name of ["security-latest.json", "security-latest.v2.json", "security-latest.v2.verdict.json"]) rmSync(join(path, "evidence", name), { force: true });
+
     // The push bucket is fully satisfied now. Only the security bucket can still refuse.
     const stillRefused = attemptPush();
     assert.equal(stillRefused.status, 2, "the push gate is satisfied, but the security gate alone must still refuse");
@@ -6185,6 +6192,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
       // QG-04 restatement (C19 D4b/E3): the completeness gate now takes the shared freshness verdict, so its local import closure grew by this module (no local imports of its own).
       ["./evidence-freshness-codes.mjs", ["plugins", "pipeline-core", "lib", "evidence-freshness-codes.mjs"]],
+      // QG-04 restatement (C20 G20-25): the completeness gate and security-scan.mjs read the four close states from this module (no local imports of its own).
+      ["./security-close-status.mjs", ["plugins", "pipeline-core", "lib", "security-close-status.mjs"]],
       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
       ["./security-policy-resolver.mjs", ["plugins", "pipeline-core", "lib", "security-policy-resolver.mjs"]],

@@ -39,7 +39,9 @@ only immediately before the first commit, never sooner.
 
 When `resume-hint.mjs inspect` reports material-input chunks or answered
 values at the start of the next session, read them in that same turn and use
-them; never re-ask answered values. A failed or skipped read must be surfaced.
+them; never re-ask answered values. `inspect` also returns `answeredValues`: for each of gitAuthor, language,
+profile, designAnswers and verifyCommand whether it is answered and where the answer lives; an answered key is
+never asked again (`INTAKE-REASK-REFUSED` names the place). A failed or skipped read must be surfaced.
 This remains a consumption duty, never a readiness precondition.
 
 On resumed intake, checkpoint-origin material chunks are the original

@@ -819,6 +819,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/path-spelling.mjs",
   "plugins/pipeline-core/lib/security-close-status.mjs",
   "plugins/pipeline-core/lib/spec-journey-coverage.mjs",
+  // C20 G20-30 (GMWKC01): the answered-value readback the onboarding asks consult before asking again, and the bounded
+  // signed-proof wait every PO signing step (design approval, push approval, override, bootstrap acknowledgement) names.
+  "plugins/pipeline-core/lib/answered-intake-values.mjs",
+  "plugins/pipeline-core/lib/signed-proof-wait.mjs",
   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",

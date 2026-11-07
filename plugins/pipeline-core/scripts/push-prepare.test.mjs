@@ -804,6 +804,26 @@ test("A18-M2 pushPrepareReport names materialize-push-threat-model when prepare-
   assert.doesNotMatch(other.report.checks.find(entry => entry.id === "subject-hash").remedy, /materialize-push-threat-model/u, "an unrelated refusal keeps its own remedy");
 });
 
+// C20 G20-30: the signature lands in the scratch mirror the report names; the agent waits for that one file itself (the PO reports nothing back).
+test("G20-30 pushPrepareReport: the signing step names the scratch proof and the agent's own bounded wait", () => {
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
+    criticalPushScratchArtifactPaths: () => ({
+      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
+      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
+      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
+      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
+    }),
+  }));
+  assert.equal(result.report.ready, true);
+  const wait = result.report.awaitSignature;
+  assert.equal(wait.proofPath, "scratch/critical-push-proof-0123456789ab.json");
+  assert.equal(wait.reportBackRequired, false);
+  assert.ok(wait.waitAction.argv[0].endsWith("proof-wait.mjs"));
+  assert.deepEqual(wait.waitAction.argv.slice(1, 5), ["--root", FIXTURE_DIR, "--proof", wait.proofPath]);
+  assert.match(result.lines.awaitProof, /report\.awaitSignature\.waitAction \(proof-wait\.mjs\)/u);
+  assert.doesNotMatch(result.lines.awaitProof, /tell me|let me know|report back to/iu);
+});
+
 test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
   assert.equal(result.ok, true);

@@ -881,6 +881,17 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
         humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
       });
       assert.equal(signing.intentSha256, armed.intent.sha256, "the published index must key the independently rebuilt intent digest");
+      // C20 G20-30: without a resolvable key directory there is no proof path and so no wait; with one, the result carries the agent's own
+      // bounded wait on exactly that proof file and states that the PO reports nothing back.
+      assert.equal(signing.waitAction, undefined);
+      const keyDirectory = join(dirname(root), "po-key-dir-fixture");
+      const withDirectory = prepareHumanGuardOverrideForSignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: armed.recorded.requestSha256, scriptPath: armed.scriptPath,
+        humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"), proofDirectory: keyDirectory,
+      });
+      assert.equal(withDirectory.proofPath, join(keyDirectory, `proof-${armed.intent.sha256}.json`));
+      assert.equal(withDirectory.reportBackRequired, false);
+      assert.deepEqual(withDirectory.waitAction.argv.slice(1, 5), ["--root", withDirectory.root, "--proof", withDirectory.proofPath]);
     }
 
     const resolvedSecond = describeHumanGuardOverrideSelection({

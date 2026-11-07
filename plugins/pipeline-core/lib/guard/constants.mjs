@@ -222,6 +222,8 @@ export const AGY_NATIVE_INTEGRATE_SCRIPT = fileURLToPath(new URL("../../scripts/
 // `session-authority-repair.mjs inspect` (or `wait`) as the diagnosis, and in a draft feature the devplan lane refused exactly
 // that command as an opaque script. Its read-only verbs are admitted by an exact grammar in command-catalogue.mjs.
 export const SESSION_AUTHORITY_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url));
+// C20 G20-30: the agent's bounded, read-only wait for the PO's signed proof file (admitted by an exact grammar in command-catalogue.mjs).
+export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait.mjs", import.meta.url));
 
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 

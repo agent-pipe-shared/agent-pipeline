@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
+import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -615,7 +615,20 @@ function sanctionedSessionAuthorityRepairReadArgs(args, root) {
   return false;
 }
 
+// C20 G20-30: scripts/proof-wait.mjs observes one named proof file (read-only, never prints it, never verifies it). Exact argv only:
+// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>]`, no dot segment, no backslash.
+function sanctionedProofWaitArgs(args, root) {
+  if (args[0] !== "--root" || args[1] !== root || args[2] !== "--proof" || typeof args[3] !== "string") return false;
+  const proof = args[3];
+  if (proof.length > 400 || /[\u0000-\u001f\u007f\\]/u.test(proof) || proof.split("/").some((part) => part === "." || part === "..")) return false;
+  const shaped = proof.startsWith("/") ? /\/proof-[a-f0-9]{64}\.json$/u.test(proof) : /^scratch\/[A-Za-z0-9._-]*proof[A-Za-z0-9._-]*\.json$/u.test(proof);
+  if (!shaped) return false;
+  if (args.length === 4) return true;
+  return args.length === 6 && args[4] === "--timeout" && /^(?:[1-9][0-9]{0,2})$/u.test(args[5] ?? "") && Number(args[5]) <= 600;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
   if (script === AGY_NATIVE_INTEGRATE_SCRIPT) return sanctionedAgyNativeIntegrateArgs(args, root);

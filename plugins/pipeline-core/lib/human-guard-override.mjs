@@ -25,6 +25,7 @@ import {
 } from "node:fs";
 import { hostname, uptime } from "node:os";
 import { observeWindowsProcessIdentity } from "./windows-process-identity.mjs";
+import { awaitSignatureFields } from "./signed-proof-wait.mjs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -4410,6 +4411,8 @@ export function prepareHumanGuardOverrideForSignature({
     },
     operatorCommandCount: 1,
     proofPath,
+    // G20-30: the agent's own bounded wait on that one proof file (the PO reports nothing back); only when a proof path exists.
+    ...(proofPath === null ? {} : awaitSignatureFields({ root: planned.root, proofPath })),
     authorizeBySignatureCommand: proofPath === null ? null : {
       executable: process.execPath,
       argv: [
