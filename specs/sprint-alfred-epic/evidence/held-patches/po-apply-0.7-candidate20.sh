@@ -4,7 +4,8 @@
 # Greenfield findings of the 19m runs (Codex, Antigravity, Claude on Windows), plan: specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md
 #   w252  G20-1 Codex onboarding repair deadlock, G20-2 apply-patch guard budget, G20-3 missing plugin path label, G20-4 stop-pair release race,
 #         G20-5 greenfield architecture entry (materialize-architecture, signed adoption apply), G20-7 ADR checks in draft,
-#         G20-9 canon pointer names the plugin copy, G20-10 CGB-REFERENCE names its path, G20-11 reader-review reports bound as retained results
+#         G20-9 canon pointer names the plugin copy, G20-10 CGB-REFERENCE names its path, G20-11 reader-review reports bound as retained results,
+#         G20-12 a ready session with an architecture diagnosis no longer refuses every write
 # Run with: bash /absolute/path/to/specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate20.sh   (from the repository root, clean tree, HEAD = the commit that carries this script)
 set -euo pipefail
 H=specs/sprint-alfred-epic/evidence/held-patches

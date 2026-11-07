@@ -148,4 +148,26 @@ das zu korrigieren was wir schon sehen"). Held for candidate 20; no apply script
   `--allow-caller-authored-fallback`, and the session rightly did not take the weaker marker on its own. No runner issues a Source return
   record yet, so every finalize meets this refusal first; whether the labelled fallback should be the default is a PO decision.
 
+## G20-12 (P0, Claude on Windows): a ready session refused every write, including the one that clears its own diagnosis
+
+- **Seen:** after the G20-5 detour the Windows project held `architecture/adoption-state.json`. The session inspection reported `ready` with a
+  nextAction `architecture-design-required`, yet every mutating shell command (`mv architecture/adoption-state.json scratch/...`,
+  `node scratch/x.mjs`) was refused with `GUARD-LIFECYCLE-NOT-READY` / `PORG-INVALID-OBSERVATION`. The agent could not move the file and had to
+  ask the PO for one more `!` command.
+- **Cause:** in `approved`/`implementing`, `designToImplementationHandoverAction()` (`lib/project-onboarding-v3.mjs`) publishes a non-mutating
+  diagnosis `{kind: "architecture-design-required", prdPath, code, guidance}` for every architecture inspection failure that is not a verified
+  content drift (here `ARCHITECTURE-DESIGN-EXISTING-ESTATE`; also `DWP2-ENVIRONMENT-UNAVAILABLE` and unexpected exceptions). The ready gate
+  (`lib/project-onboarding-ready-gate.mjs` `validReadyNextAction`) knew five shapes but not this one, so the ready observation became a shape
+  verdict and locked all governed writes. Same class as ALFRED-W0-4.
+- **Fix:** the gate admits the diagnosis as a closed shape (exact keys, typed code only, no action of its own). For
+  `ARCHITECTURE-DESIGN-EXISTING-ESTATE` the producer now names the repair the agent can run itself: move every entry besides the fresh map
+  scaffold out of `architecture/` into `scratch/`, inspect again, then run the published `materialize-architecture`.
+- **Tests:** `project-onboarding-ready-gate.test.mjs` three new cases: the diagnosis keeps the session ready on all three runners (three codes),
+  an exactness table (extra key, smuggled action, missing/empty fields, exception text, lower-case, overlong and non-string code, other kind),
+  and a producer-literal mirror. 33/33. The related pins and `architecture-entry-readiness` 87/87.
+- **Not shown live:** the Linux copy of the Windows project is not a ready session on this host (`continuity-observation-unavailable`), so the
+  gate could not be exercised against it here. The live proof is the Windows retest after install.
+- **Interim for the PO (until candidate 20 is installed):** the Windows session asks for exactly one command, `! node scratch/move-adoption-state.mjs`
+  (moves the file into `scratch/`, deletes nothing). The agent then materializes and switches to implementation on its own.
+
 Not yet: live greenfield retest of all of the above, Full Verify, Critic, PO acceptance.
