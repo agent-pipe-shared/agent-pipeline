@@ -1,3 +1,46 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 2a69e4c56..2ad373d87 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -802,6 +802,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-governed-check-child-ignores-inherited-node-test-context-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-adr-references-keep-navigation-current-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-approval-policy-applies-after-intake-transition-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-greenfield-architecture-entry-names-materialization-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-design-course-cost-and-proportionality-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-implementation-entry-with-pending-verification-surfaces-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-machine-output-and-skill-budget-tests",
+@@ -825,6 +826,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-lifecycle-read-scope-blocks-host-declared-system-skill-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-mandatory-hook-readiness-returned-refusal-skips-rollback-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-merge-commit-message-skips-conventional-type-check-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-missing-canon-pointer-names-the-plugin-copy-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-model-family-approval-with-automatic-version-upgrades-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-model-role-confirmation-prompt-obscures-required-digest-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 2fb3d0500..99ec8daa7 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3809,6 +3809,18 @@
+       "invariantPinned": "Every script the happy-path guide names ships in scripts/, the start skill loads the guide, and the guide keeps its gap markers and holds no host path",
+       "nonOverlapNote": "Unique source-text pin for the happy-path reference (candidate 17); the owning references pin their own commands"
+     },
++    {
++      "name": "pin-greenfield-architecture-entry-names-materialization-tests",
++      "file": "plugins/pipeline-core/lib/pins/greenfield-architecture-entry-names-materialization.test.mjs",
++      "invariantPinned": "An approved greenfield design awaiting materialization is reported as materialization-required with the exact materialize-architecture command, the guard drops the PO adoption line only for that disposition, the adoption CLI refuses prepare/apply only then, and the design-pending orientation warns off the adoption route",
++      "nonOverlapNote": "Unique cases for candidate 20 G20-5; the readiness repair is pinned in architecture-entry-readiness.test.mjs and the signed apply admission in guard-lifecycle-ready.test.mjs"
++    },
++    {
++      "name": "pin-missing-canon-pointer-names-the-plugin-copy-tests",
++      "file": "plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs",
++      "invariantPinned": "A missing project read whose project-relative path the running plugin ships as a regular file names that plugin copy in GUARD-READ-TARGET-MISSING; dot, hidden, outside-root, directory and linked paths keep the previous text, and the read stays refused",
++      "nonOverlapNote": "Unique cases for candidate 20 G20-9; the missing-plugin-path label of G20-3 is pinned in guard-lifecycle-ready.test.mjs"
++    },
+     {
+       "name": "close-chain-guide-tests",
+       "file": "plugins/pipeline-core/lib/close-chain-guide.test.mjs",
 diff --git a/plugins/pipeline-core/hooks/guard-apply-patch.mjs b/plugins/pipeline-core/hooks/guard-apply-patch.mjs
 index 56dfe3817..d0900c7e2 100644
 --- a/plugins/pipeline-core/hooks/guard-apply-patch.mjs
