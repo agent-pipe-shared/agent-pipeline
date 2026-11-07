@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter } from "./command-catalogue.mjs";
+import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter, sameObservedArgvWord } from "./command-catalogue.mjs";
 import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
 import { simpleWords } from "./shell-grammar.mjs";
 
@@ -185,4 +185,23 @@ test("C20 w252 (G20-1): the repair the hook's inspection returns is admitted whe
   const nonNode = { ...action, executable: "/usr/bin/python3" };
   assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(nonNode)), null);
   assert.equal(sameNodeInterpreter(join(repository, "scratch", "node"), GUARD_NODE, repository, { realpathFn: (p) => p, lstatFn: () => ({ isFile: () => true, mode: 0o755 }) }), false, "a node inside the root is refused even when it is an executable file");
+});
+
+test("C20 separator sweep: on win32 node.exe and any spelling of the observed Node are that Node; absolute argv paths match in any native spelling", () => {
+  const win = { platform: "win32" };
+  const observedNode = "C:\\Program Files\\nodejs\\node.exe";
+  const winRoot = "D:\\Dev\\App";
+  for (const word of ["node", "node.exe", "NODE.EXE", "C:/Program Files/nodejs/node.exe", "c:\\program files\\nodejs\\node.exe", "/c/Program Files/nodejs/node.exe"]) {
+    assert.equal(sameNodeInterpreter(word, observedNode, winRoot, win), true, word);
+  }
+  assert.equal(sameNodeInterpreter("node.exe", observedNode, winRoot, { platform: "linux" }), false, "node.exe is no interpreter word on Linux");
+  assert.equal(sameNodeInterpreter("C:/Program Files/nodejs/python.exe", observedNode, winRoot, win), false);
+  // argv: an absolute expected path in another native spelling matches; flags, digests and relative values stay exact
+  assert.equal(sameObservedArgvWord("d:/dev/app", winRoot, win), true);
+  assert.equal(sameObservedArgvWord("/d/Dev/App/scripts/x.mjs", "D:\\Dev\\App\\scripts\\x.mjs", win), true);
+  assert.equal(sameObservedArgvWord("D:/Dev/AppOther", winRoot, win), false);
+  assert.equal(sameObservedArgvWord("--ROOT", "--root", win), false);
+  assert.equal(sameObservedArgvWord("ABCDEF", "abcdef", win), false, "a digest is never case-folded");
+  assert.equal(sameObservedArgvWord("scratch\\x.json", "scratch/x.json", win), false, "a relative value stays byte-exact");
+  assert.equal(sameObservedArgvWord("/home/u/app/", "/home/u/app", { platform: "linux" }), false, "Linux stays byte-exact");
 });

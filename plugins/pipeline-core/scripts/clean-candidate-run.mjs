@@ -61,6 +61,7 @@ import {
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { parseArgs as parsePushInitArgs } from "./push-init.mjs";
+import { isNodeInterpreterWord, sameNativePath } from "../lib/path-spelling.mjs";
 
 const USAGE = `Usage:
   clean-candidate-run.mjs --repo <checkout> --oid <candidate-ref> [--purpose <label>] [--runner claude|codex] -- <command> [args...]
@@ -173,12 +174,13 @@ function hasExactlyOneRootArg(command) {
  * checkout to the newly-created detached candidate.
  */
 function preparePushInitCommand(command, repo, worktreePath) {
-  if (!(["node", process.execPath].includes(command[0])) || !isAbsolute(command[1] ?? "") || basename(command[1]) !== "push-init.mjs") return null;
+  // C20 separator sweep: the shared interpreter predicate (node.exe, any spelling of this Node, a real Node outside the repo).
+  if (!isNodeInterpreterWord(command[0], { root: repo }) || !isAbsolute(command[1] ?? "") || basename(command[1]) !== "push-init.mjs") return null;
   const parsed = parsePushInitArgs(command.slice(2));
   if (parsed.error || parsed.help || !hasExactlyOneRootArg(command)) {
     fail("CCR-PUSH-INIT-ARGV", "push-init handoff requires one valid, non-help push-init argv with exactly one --root");
   }
-  if (resolve(parsed.root) !== repo) {
+  if (!sameNativePath(resolve(parsed.root), repo) && !sameNativePath(parsed.root, repo)) {
     fail("CCR-PUSH-INIT-ROOT", "push-init handoff may only replace an exact --root naming the primary checkout");
   }
   const remapped = command.map((value, index) => command[index - 1] === "--root" ? worktreePath : value);

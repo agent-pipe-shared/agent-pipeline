@@ -204,6 +204,10 @@ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts
 export const PHOENIX_AUTHORITY_REVISION_SCRIPT = fileURLToPath(new URL("../../scripts/phoenix-authority-revision.mjs", import.meta.url));
 export const ARCHITECTURE_MEASURE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-measure.mjs", import.meta.url));
 export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
+// C20 separator sweep (S2): moved here from command-catalogue.mjs so canonicalSanctionedScript (which only knows the `*_SCRIPT`
+// exports of this module) resolves every separator / drive-letter-case / MSYS spelling of them, like every other sanctioned script.
+export const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
+export const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
 
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 

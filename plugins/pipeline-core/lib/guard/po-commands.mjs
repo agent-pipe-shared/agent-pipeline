@@ -11,6 +11,7 @@ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, 
 import { commandPath, isShellExternalPathToken, pathInside, pipelineSourceRoot } from "./path-containment.mjs";
 import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isReadOnlyDiagnosticCommand, isReadOnlyDiagnosticCommandWithTrailingStderrRedirect, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
+import { sameNativePath } from "../path-spelling.mjs";
 import { hasExternalOutputRedirect, isNullDeviceStderrRedirect } from "./read-scope.mjs";
 
 // Signing parity (AC-262): one shared source for the "who acts next" sentences, so the Codex and
@@ -27,10 +28,14 @@ export function externalPoSigningOnly() {
   );
 }
 
+// C20 separator sweep: the script word and `--repo-root` are compared through the shared native-path equivalence
+// (lib/path-spelling.mjs: exact on Linux; separator / drive-letter case / MSYS on win32; NFC and measured case on darwin).
+// For the human-signing detection below this makes the protection catch every spelling, not only the canonical one.
 function poApprovalArgs(command, root, scriptPath) {
   const words = simpleWords(command, root);
-  if (!words || words.length < 3 || resolve(root, words[1]) !== scriptPath) return null;
-  return words.slice(2);
+  if (!words || words.length < 3) return null;
+  if (!sameNativePath(words[1], scriptPath) && !sameNativePath(resolve(root, words[1]), scriptPath)) return null;
+  return words.slice(2).map((value) => (sameNativePath(value, root) ? root : value));
 }
 
 function externalApprovalDirectory(args, root, index) {

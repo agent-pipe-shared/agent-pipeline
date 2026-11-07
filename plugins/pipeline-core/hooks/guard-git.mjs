@@ -289,6 +289,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { appendGuardOverrideLedgerEntry, guardOverrideLedger, readGuardOverrideLedgerEntries } from "../lib/guard-override-ledger.mjs";
 import { UNION_BLOCKERS, RAW_BLOCKERS, PRENORM_BLOCKERS, dangerousGitFindings } from "./git-dangerous-policy.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+import { msysToWindows, relativeUnderRoot, sameNativePath } from "../lib/path-spelling.mjs";
 
 
 // The plugin root this guard is itself running from -- same self-location resolution
@@ -524,7 +525,12 @@ function overrideTarget() {
     for (const match of segment.matchAll(/(?:^|\s)-C\s+((?:"[^"]*"|'[^']*'|[^\s;&|])+)/gu)) {
       const raw = match[1];
       const value = (raw.startsWith("\"") && raw.endsWith("\"")) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw;
-      try { roots.add(realpathSync(resolve(coordinator, value))); } catch { return { ok: false }; }
+      // C20 separator sweep: a native spelling of the coordinator root (MSYS, drive-letter case) is that root.
+      const physical = process.platform === "win32" ? msysToWindows(value) : value;
+      try {
+        const real = realpathSync(resolve(coordinator, physical));
+        roots.add(sameNativePath(real, coordinator) ? coordinator : real);
+      } catch { return { ok: false }; }
     }
   }
   if (roots.size !== 1 || !roots.has(coordinator)) return { ok: false };
@@ -1059,8 +1065,11 @@ let inspection;
         const out = String(toplevel.stdout ?? "").trim();
         if (out) commitRoot = resolve(out);
       }
-      const absolute = resolve(commitCwd, path);
-      if (!absolute.startsWith(`${commitRoot}${sep}`) && absolute !== commitRoot) {
+      // C20 separator sweep: an MSYS (`/d/...`) or other-drive-letter-case spelling of a file inside the project is inside
+      // it (lib/path-spelling.mjs); every other location stays "outside the project".
+      const absolute = resolve(commitCwd, process.platform === "win32" ? msysToWindows(path) : path);
+      if (!absolute.startsWith(`${commitRoot}${sep}`) && absolute !== commitRoot
+        && relativeUnderRoot(absolute, commitRoot) === null) {
         throw new Error("outside the project");
       }
       return readFileSync(absolute, "utf8");
@@ -1167,7 +1176,10 @@ if (inspection.message !== null) {
  * fails every `backlog/`-prefixed check below instead of silently stopping at the root the way
  * a filesystem `path.resolve` would.
  */
-function normalizePathspecLexically(token) {
+function normalizePathspecLexically(rawToken, platform = process.platform) {
+  // C20 separator sweep: Git for Windows accepts `\` in a pathspec; split it like `/` there so `backlog\items\x.md` cannot
+  // skip the backlog checks below. POSIX keeps `\` as an ordinary file-name character.
+  const token = platform === "win32" ? rawToken.replace(/\\/gu, "/") : rawToken;
   const isAbsolute = token.startsWith("/");
   const out = [];
   for (const segment of token.split("/")) {

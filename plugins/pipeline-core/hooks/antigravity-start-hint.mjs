@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { machinePlaneFilePath } from '../lib/machine-plane.mjs';
 import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
 import { armAntigravityBootstrapSession } from './antigravity-bootstrap-lock.mjs';
@@ -38,6 +39,37 @@ function reportFailure(code, error) {
       { ephemeralMessage: message }
     ]
   }) + '\n');
+}
+
+/**
+ * C20 (greenfield Antigravity run, measured 2026-11-07): `invocationNum` restarts at 0/1 on EVERY turn -- each PO reply and
+ * each delivered subagent message starts a new execution -- so this hook re-sent the full "run pipeline-start" context 21
+ * times in one session and the agent re-bootstrapped repeatedly; in a repository that never opted in, the optional onboarding
+ * offer was likewise repeated every turn. The full context is now delivered once per native session; later turns of a
+ * governed session get one short line that forbids a re-bootstrap (pipeline-start SKILL.md: a bootstrap is session-bound).
+ */
+export const AGY_SESSION_CONTINUATION_NOTE = (sessionId) =>
+  `Agent Pipeline: this Antigravity session (${sessionId}) was already bootstrapped. Do not re-run pipeline-start for a new `
+  + "turn, a PO reply or a delivered subagent message; continue the active work. Re-run it only after a restart, a context "
+  + "clear, or a typed recovery that names it.";
+
+/**
+ * Once-per-session marker for the OPTIONAL onboarding hint of a repository that never opted in. It lives in the machine plane
+ * (`<home>/.agent-pipeline/run/agy-start-hint/`), never in that repository. Any failure answers "not yet delivered", so the
+ * hint stays visible rather than silently lost.
+ */
+export function claimOptionalHintDelivery(sessionId, dependencies = {}) {
+  if (typeof sessionId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/u.test(sessionId)) return false;
+  try {
+    const plane = (dependencies.machinePlaneFilePathFn ?? machinePlaneFilePath)();
+    if (typeof plane !== 'string') return false;
+    const dir = join(dirname(plane), 'run', 'agy-start-hint');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${sessionId}.delivered`), '1\n', { flag: 'wx' });
+    return false;
+  } catch (error) {
+    return error?.code === 'EEXIST';
+  }
 }
 
 export function antigravityRepositoryRoot(input) {
@@ -86,7 +118,7 @@ function main() {
     // arbitrary Git repository. An optional onboarding hint must not arm a
     // mandatory implementation block before the repository opts in.
     if (!decision.governed) {
-      if (!decision.context) { process.stdout.write('{}\n'); return; }
+      if (!decision.context || claimOptionalHintDelivery(sessionId)) { process.stdout.write('{}\n'); return; }
       process.stdout.write(JSON.stringify({
         injectSteps: [{ ephemeralMessage: decision.context }],
       }) + '\n');
@@ -130,7 +162,11 @@ function main() {
     // Keep the hook-authored proof lock for preflight and a separate one-shot
     // barrier for the guard. An allowed bootstrap read consumes only the
     // barrier; repeated ready inference hooks do not re-arm the session.
-    armAntigravityBootstrapSession(sessionDir, version);
+    const armed = armAntigravityBootstrapSession(sessionDir, version);
+    if (armed?.status === 'already-armed') {
+      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: AGY_SESSION_CONTINUATION_NOTE(sessionId) }] }) + '\n');
+      return;
+    }
   } catch (e) {
     reportFailure('bootstrap-lock-not-written', e);
     return;

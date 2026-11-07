@@ -12,6 +12,7 @@ import { GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT, HEX, START_PREFLIGHT_SCRIPT, VALID_RU
 import { isRealpathedWithinBoundary, pathInside } from "./path-containment.mjs";
 import * as SANCTIONED_CONSTANTS from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
 
 export function sanctionedSessionCriticFinalizerArgs(args, root) {
   const exactProjectRoot = exactRoot(args, root, 1)
@@ -305,7 +306,8 @@ export function isNarrowRepositoryRecoveryCommand(command, root) {
   index += 1;
   if (words[index] === "-C") {
     const target = words[index + 1];
-    if (typeof target !== "string" || resolve(root, target) !== root) return false;
+    // C20 separator sweep (S3/S4): any native spelling of the root (MSYS, drive-letter case, separator) is the root.
+    if (typeof target !== "string" || !(sameNativePath(target, root) || sameNativePath(resolve(root, target), root))) return false;
     index += 2;
   }
   return words[index] === "rebase"
@@ -760,33 +762,23 @@ export function sanctionedHumanOverrideArgs(args, root) {
  * (an agent cannot plant its own "node" in the repository). Bare `node` from PATH is already admitted, so this widens no authority:
  * every script/argv rule below still applies unchanged.
  */
-function foreignNodeInterpreter(word, root, options = {}) {
-  if (typeof word !== "string" || typeof root !== "string" || root === "") return false;
-  const isAbs = /^[A-Za-z]:[\\/]/u.test(word) || word.startsWith("/") || word.startsWith("\\\\");
-  if (!isAbs || !["node", "node.exe"].includes(basename(word.replace(/\\/gu, "/")).toLowerCase())) return false;
-  try {
-    const realpathFn = options.realpathFn ?? realpathSync;
-    const real = realpathFn(word);
-    let realRoot;
-    try { realRoot = realpathFn(root); } catch { realRoot = resolve(root); }
-    const inside = (options.platform ?? process.platform) === "win32"
-      ? (real.toLowerCase() === realRoot.toLowerCase() || real.toLowerCase().startsWith(`${realRoot.toLowerCase().replace(/[\\/]+$/u, "")}\\`))
-      : (real === realRoot || real.startsWith(`${realRoot.replace(/\/+$/u, "")}/`));
-    if (inside) return false;
-    const stat = (options.lstatFn ?? lstatSync)(real);
-    return stat.isFile() && ((options.platform ?? process.platform) === "win32" || (stat.mode & 0o111) !== 0);
-  } catch {
-    return false;
-  }
+// C20 separator sweep: the interpreter rule lives in lib/path-spelling.mjs (isNodeInterpreterWord) so every lane shares it;
+// it also admits any separator / drive-letter-case / MSYS spelling of the trusted interpreter itself.
+export function sanctionedNodeInterpreter(word, root, options = {}) {
+  return isNodeInterpreterWord(word, {
+    root,
+    platform: options.platform ?? process.platform,
+    trustedNode: options.processExecPath ?? process.execPath,
+    realpathFn: options.realpathFn,
+    lstatFn: options.lstatFn,
+  });
 }
 
 export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   const words = simpleWords(command, root, options);
   const platform = options.platform ?? process.platform;
-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
-  const trustedNode = options.processExecPath ?? process.execPath;
   if (!words || words.length < 2) return null;
-  if (![...directNode, trustedNode].includes(words[0]) && !foreignNodeInterpreter(words[0], root, options)) return null;
+  if (!sanctionedNodeInterpreter(words[0], root, options)) return null;
   const [script, ...args] = words.slice(1);
   // Windows accepts either separator spelling of this one trusted script identity.
   // Keep every other script lexical and preserve case, roots, segments and argv.
@@ -794,7 +786,7 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   // matched by physical identity, so forward-slash, backslash, MSYS (/d/...) and
   // repository-relative spellings of the SAME file resolve to the canonical spelling
   // (case-folded on win32). A different file, or any spelling with a "." / ".." segment, stays lexical.
-  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args: canonicalRootSpelling(args, root, platform) };
+  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args: canonicalRootSpelling(args, root, platform, options) };
 }
 
 /**
@@ -806,17 +798,19 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
  * spelling BEFORE the matchers run, so every matcher keeps its strict comparison. Only win32 (a case-insensitive, separator-agnostic
  * file system) is touched; a path with a dot segment, any other directory, or a prefix of the root is never rewritten.
  */
-export function canonicalRootSpelling(args, root, platform) {
-  if (platform !== "win32" || typeof root !== "string" || root === "") return args;
-  const flat = (value) => value.replace(/^\/([A-Za-z])\/(?=.)/u, (_m, drive) => `${drive.toUpperCase()}:/`).replace(/\\/gu, "/").replace(/\/+$/u, "").toLowerCase();
-  const authorRoot = join(root, "plugins", "pipeline-core");
-  const rootKey = flat(root);
-  const authorKey = flat(authorRoot);
+// C20 separator sweep (S1): an absolute argument BELOW the root (`--request`, `--card-file`, `--root <root>/plugins/...`) is
+// rewritten too, through the shared helper. win32 and darwin only: on Linux every spelling difference is a real difference.
+// The guard compares this canonical copy; the shell still runs the typed text (S5), so a script that compares its own
+// `--root` must accept the same equivalence (path-spelling.mjs) itself.
+export function canonicalRootSpelling(args, root, platform, options = {}) {
+  if ((platform !== "win32" && platform !== "darwin") || typeof root !== "string" || root === "") return args;
+  const spelling = { platform, lstatFn: options.lstatFn };
   return args.map((value) => {
-    if (typeof value !== "string" || value === root || value === authorRoot || /[\x00-\x1f\x7f]/u.test(value)) return value;
-    if (value.split(/[\\/]/u).some((part) => part === "." || part === "..")) return value;
-    const key = flat(value);
-    return key === rootKey ? root : key === authorKey ? authorRoot : value;
+    if (typeof value !== "string" || value === root || /[\x00-\x1f\x7f]/u.test(value)) return value;
+    // Rebuilt with the same `join` every matcher uses for its expected value (`join(root, "plugins", "pipeline-core")`, ...),
+    // so the canonical copy is byte-identical to what the matcher computes on this host.
+    const rel = relativeUnderRoot(value, root, spelling);
+    return rel === null ? value : rel === "" ? root : join(root, ...rel.split("/"));
   });
 }
 

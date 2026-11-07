@@ -9,6 +9,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
 import { ONBOARDING_CONSENT_MARK_SCRIPT, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, RESTART_RESUME_HINT_INPUT_PATH, RESUME_HINT_SCRIPT, WRITE_TOOLS } from "./constants.mjs";
 import { isPathWithinRealpathedRoot, isProjectWritePath } from "./path-containment.mjs";
 import { simpleWords } from "./shell-grammar.mjs";
+import { isNodeInterpreterWord, sameNativePath } from "../path-spelling.mjs";
 import { verdict } from "./verdict.mjs";
 
 // ALFRED-QP3 (W0-4 F-2): the lane admits EXACTLY these three first path segments -- backlog, docs AND scratch -- and no
@@ -415,32 +416,38 @@ export function restartResumeHintNearMissWrite(input, root) {
 // that admits it. It was not, and the two disagreed: the bootstrap skill described a
 // free `--card-file <json>` while this admits one fixed path, so the §6 duty was
 // unsatisfiable in the pre-restart state that imposes it (measured 2026-08-09).
-export function isRestartResumeHintCapture(command, root, options = {}) {
+// C20 separator sweep: these two lanes bypass resolveSanctionedScriptInvocation (an import of it here would close a module
+// cycle), so they apply the same shared rules directly: the interpreter predicate and the native path equivalence of
+// lib/path-spelling.mjs (exact on Linux; separator / drive-letter case / MSYS on win32; NFC and measured case on darwin).
+function restartResumeHintWords(command, root, options) {
   const words = simpleWords(command, root, options);
-  const platform = options.platform ?? process.platform;
-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
-  const trustedNode = options.processExecPath ?? process.execPath;
-  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
-  const [script, ...args] = words.slice(1);
-  return script === RESUME_HINT_SCRIPT
-    && args[0] === "capture"
-    && args[1] === "--root" && args[2] === root
-    && args[3] === "--card-file" && args[4] === join(root, RESTART_RESUME_HINT_INPUT_PATH)
+  if (!words || words.length < 2) return null;
+  const spelling = { platform: options.platform ?? process.platform, lstatFn: options.lstatFn };
+  const interpreter = isNodeInterpreterWord(words[0], {
+    ...spelling, root, trustedNode: options.processExecPath ?? process.execPath, realpathFn: options.realpathFn,
+  });
+  if (!interpreter || !sameNativePath(words[1], RESUME_HINT_SCRIPT, spelling)) return null;
+  return { args: words.slice(2), same: (typed, canonical) => sameNativePath(typed, canonical, spelling) };
+}
+
+export function isRestartResumeHintCapture(command, root, options = {}) {
+  const match = restartResumeHintWords(command, root, options);
+  if (!match) return false;
+  const { args, same } = match;
+  return args[0] === "capture"
+    && args[1] === "--root" && same(args[2], root)
+    && args[3] === "--card-file" && same(args[4], join(root, RESTART_RESUME_HINT_INPUT_PATH))
     && args[5] === "--consume-card" && args.length === 6;
 }
 
 // Reading the captured handover is the required step immediately after
 // capture. This exact root-bound shape is passive and cannot change state.
 export function isRestartResumeHintInspect(command, root, options = {}) {
-  const words = simpleWords(command, root, options);
-  const platform = options.platform ?? process.platform;
-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
-  const trustedNode = options.processExecPath ?? process.execPath;
-  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
-  const [script, ...args] = words.slice(1);
-  return script === RESUME_HINT_SCRIPT
-    && args[0] === "inspect"
-    && args[1] === "--root" && args[2] === root
+  const match = restartResumeHintWords(command, root, options);
+  if (!match) return false;
+  const { args, same } = match;
+  return args[0] === "inspect"
+    && args[1] === "--root" && same(args[2], root)
     && args.length === 3;
 }
 

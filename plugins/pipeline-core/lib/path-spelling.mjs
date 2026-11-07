@@ -88,6 +88,28 @@ export function samePathSpelling(a, b, options = {}) {
 }
 
 /**
+ * The guard-side comparison for an agent-typed path: byte equality everywhere, plus the spelling equivalence above only where
+ * the host file system makes two spellings name one file (win32, darwin). On Linux a different spelling stays different, so
+ * no admission widens there.
+ */
+export function sameNativePath(typed, canonical, options = {}) {
+  if (typed === canonical && typeof typed === "string") return true;
+  const platform = platformOf(options);
+  return (platform === "win32" || platform === "darwin") && samePathSpelling(typed, canonical, options);
+}
+
+/**
+ * S5 (the guard admits a canonical copy, but the shell runs the typed text): a script that requires its `--root` to be the
+ * exact native real path maps an equivalent spelling of the current working directory -- where the agent's shell runs it --
+ * to that directory's own spelling. Any other value is returned unchanged, so every later exactness check still applies.
+ */
+export function typedRootSpelling(typed, options = {}) {
+  if (typeof typed !== "string") return typed;
+  const cwd = options.cwd ?? process.cwd();
+  return typed !== cwd && sameNativePath(typed, cwd, options) ? cwd : typed;
+}
+
+/**
  * The `/`-separated path of `value` relative to `root` when `value` is the root ("") or below it in any equivalent spelling;
  * otherwise null. A relative `value` is not resolved here (it is the caller's spelling of a relative path) and returns null.
  */

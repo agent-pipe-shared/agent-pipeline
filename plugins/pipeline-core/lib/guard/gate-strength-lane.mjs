@@ -11,6 +11,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PLUGIN_ROOT } from "./constants.mjs
 import { isPathWithinRealpathedRoot } from "./path-containment.mjs";
 import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
+import { isNodeInterpreterWord } from "../path-spelling.mjs";
 
 /**
  * GS-1..GS-6 refuse an Edit or a Write. A shell command is neither.
@@ -287,8 +288,8 @@ export function signedQualityPackageCommandAdmission(command, root, dependencies
   const words = simpleWords(command, root, nativeWin32 ? { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM } : {});
   if (!words || words.length !== 7) return false;
   if (nativeWin32 && command.includes("\\") && !win32CanonicalWordRendering(command, words)) return false;
-  const directNode = nativeWin32 ? ["node", "node.exe"] : ["node"];
-  if (![...directNode, dependencies.processExecPath ?? process.execPath].includes(words[0])) return false;
+  // C20 separator sweep: the shared interpreter predicate (lib/path-spelling.mjs, the G20-1 rule).
+  if (!isNodeInterpreterWord(words[0], { root, platform: nativeWin32 ? "win32" : (dependencies.platform ?? process.platform), trustedNode: dependencies.processExecPath ?? process.execPath })) return false;
   try {
     const pluginRoot = realpathSync(PLUGIN_ROOT);
     const script = join(pluginRoot, "scripts", "quality-package-materializer.mjs");
@@ -313,9 +314,7 @@ function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies = 
   const words = simpleWords(command, root);
   if (!words || words.length < 2) return false;
   const platform = dependencies.platform ?? process.platform;
-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
-  const trustedNode = dependencies.processExecPath ?? process.execPath;
-  if (![...directNode, trustedNode].includes(words[0])) return false;
+  if (!isNodeInterpreterWord(words[0], { root, platform, trustedNode: dependencies.processExecPath ?? process.execPath })) return false;
   const scriptArg = words[1];
   if (typeof scriptArg !== "string" || scriptArg === "" || scriptArg.startsWith("-")) return false;
   const realpath = dependencies.realpathSyncFn ?? realpathSync;

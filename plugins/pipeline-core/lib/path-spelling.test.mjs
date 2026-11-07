@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { canonicalUnderRoot, caseInsensitiveVolume, isNodeInterpreterWord, msysToWindows, pathSpellingKey, relativeUnderRoot, samePathSpelling } from "./path-spelling.mjs";
+import { canonicalUnderRoot, caseInsensitiveVolume, isNodeInterpreterWord, msysToWindows, pathSpellingKey, relativeUnderRoot, sameNativePath, samePathSpelling, typedRootSpelling } from "./path-spelling.mjs";
 
 const win = { platform: "win32" };
 const mac = { platform: "darwin" };
@@ -66,6 +66,15 @@ test("relativeUnderRoot and canonicalUnderRoot rewrite any spelling under the ro
   assert.equal(relativeUnderRoot("scratch/x.json", "D:\\Dev\\App", win), null, "a relative value is not resolved here");
   assert.equal(canonicalUnderRoot("/home/u/app//scratch/x.json", "/home/u/app", linux), "/home/u/app/scratch/x.json");
   assert.equal(canonicalUnderRoot("/home/u/other/x.json", "/home/u/app", linux), "/home/u/other/x.json");
+});
+
+test("sameNativePath widens only on win32/darwin; typedRootSpelling maps only the working directory", () => {
+  assert.equal(sameNativePath("D:/Dev/App", "D:\\Dev\\App", win), true);
+  assert.equal(sameNativePath("/home/u/app/", "/home/u/app", linux), false, "Linux stays byte-exact");
+  assert.equal(sameNativePath("/home/u/app", "/home/u/app", linux), true);
+  assert.equal(typedRootSpelling("/d/Dev/App", { ...win, cwd: "D:\\Dev\\App" }), "D:\\Dev\\App");
+  assert.equal(typedRootSpelling("D:/Dev/Other", { ...win, cwd: "D:\\Dev\\App" }), "D:/Dev/Other");
+  assert.equal(typedRootSpelling("/home/u/app/", { ...linux, cwd: "/home/u/app" }), "/home/u/app/");
 });
 
 test("isNodeInterpreterWord: bare node, node.exe on win32, any spelling of the trusted node, a real node outside the root", () => {

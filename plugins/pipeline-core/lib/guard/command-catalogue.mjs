@@ -13,6 +13,7 @@ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-pref
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
 import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
 
@@ -341,7 +342,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT } from "./constants.mjs";
+import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -481,7 +482,6 @@ function sanctionedPhoenixRevisionArgs(args, root) {
 // W7 D197: the plugin's OWN routine-repair verb. The closed D194 list must stay reachable exactly when the lifecycle is not ready, so
 // its argv shapes are admitted here by exact match (never by prefix or basename): `list`, or `run <kind> --root <this root>
 // --reason <non-empty one-line value>` plus the kind's own flags, each flag at most once, in any order.
-const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
 const ROUTINE_REPAIR_KINDS = new Set(["heal", "stop-failure-aside", "settled-pending-aside", "move-aside", "slice-cancel"]);
 const ROUTINE_REPAIR_CANCEL_CLASSES = new Set(["budget", "integrated-elsewhere"]);
 function sanctionedRoutineRepairArgs(args, root) {
@@ -518,7 +518,6 @@ function sanctionedRoutineRepairArgs(args, root) {
 // Admitted as exact argv shapes bound to this root: `plan --root <root>` or `apply --root <root> ... --expect-sha256 <64 hex>`, with
 // optional --dispatch-id (once) and repeated --allowed-path / --path (repository-relative or absolute, no dot segment).
 // The script validates its own inputs and refuses with a typed code; `--expect-sha256` is required for apply and refused for plan.
-const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
 const HOST_COMMIT_RECOVER_DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // briefed ids are upper case (e.g. C18-1B-...)
 function sanctionedHostCommitRecoverArgs(args, root) {
   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
@@ -843,7 +842,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
  * returns null without an inspection. The set of matching commands is unchanged.
  */
 const NODE_BASENAMES = new Set(["node", "node.exe"]);
-const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCase());
+const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path).replace(/\\/gu, "/")).toLowerCase());
 /**
  * C20 w252 (greenfield G20-1): the observed action names the Node of the process that inspected (`process.execPath`), and the guard
  * inspects inside the hook, whose Node can differ from the one the agent's shell resolves (a runner sandbox and a version manager
@@ -855,26 +854,35 @@ const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCa
 export function sameNodeInterpreter(word, executable, root, dependencies = {}) {
   if (word === executable) return true;
   if (typeof word !== "string" || typeof executable !== "string" || !isNodeName(executable)) return false;
-  if (word === "node") return true;
-  if (!(win32.isAbsolute(word) || posix.isAbsolute(word)) || !isNodeName(word)) return false;
-  try {
-    const real = (dependencies.realpathFn ?? realpathSync)(word);
-    let realRoot;
-    try { realRoot = (dependencies.realpathFn ?? realpathSync)(root); } catch { realRoot = resolve(root); }
-    const rel = relative(realRoot, real);
-    if (rel === "" || !(rel.startsWith("..") || isAbsolute(rel))) return false;
-    const stat = (dependencies.lstatFn ?? lstatSync)(real);
-    return stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0);
-  } catch {
-    return false;
-  }
+  // C20 separator sweep: the shared rule (lib/path-spelling.mjs) also admits node.exe on win32 and any separator /
+  // drive-letter-case / MSYS spelling of the observed executable itself.
+  return isNodeInterpreterWord(word, {
+    root,
+    platform: dependencies.platform ?? process.platform,
+    trustedNode: executable,
+    realpathFn: dependencies.realpathFn,
+    lstatFn: dependencies.lstatFn,
+  });
+}
+
+/**
+ * C20 separator sweep: an observed argv word is matched exactly, except that an ABSOLUTE expected path may be typed in any
+ * equivalent spelling on win32/darwin (lib/path-spelling.mjs). Flags, digests and relative values stay byte-exact.
+ */
+export function sameObservedArgvWord(word, expected, dependencies = {}) {
+  if (word === expected) return true;
+  if (typeof word !== "string" || typeof expected !== "string") return false;
+  const platform = dependencies.platform ?? process.platform;
+  if (platform !== "win32" && platform !== "darwin") return false;
+  if (!(win32.isAbsolute(expected) || posix.isAbsolute(expected))) return false;
+  return samePathSpelling(word, expected, { platform, lstatFn: dependencies.lstatFn });
 }
 
 export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
   if (!words) return null;
   const abs = (word) => win32.isAbsolute(word) || posix.isAbsolute(word);
-  if (words.length < 2 || !(words[0] === "node" || abs(words[0])) || !abs(words[1])) return null;
+  if (words.length < 2 || !(isNodeName(words[0]) || abs(words[0])) || !abs(words[1])) return null;
   let observed;
   try {
     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
@@ -899,7 +907,7 @@ export function observedOnboardingCommandMatch(command, root, dependencies = {})
     || typeof action.requiresConfirmation !== "boolean"
     || words.length !== action.argv.length + 1
     || !sameNodeInterpreter(words[0], action.executable, root, dependencies)
-    || action.argv.some((value, index) => words[index + 1] !== value)) return null;
+    || action.argv.some((value, index) => !sameObservedArgvWord(words[index + 1], value, dependencies))) return null;
   return {observed, action};
 }
 
@@ -978,8 +986,8 @@ export function isExactObservedInstalledPluginAttestationAction(command, root, d
     && expected.schema === "pipeline.installed-plugin-attestation-host-result.v1"
     && expected.status === "written"
     && words.length === action.argv.length + 1
-    && words[0] === action.executable
-    && action.argv.every((value, index) => words[index + 1] === value);
+    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
+    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
 }
 
 /**
@@ -1031,8 +1039,8 @@ export function isExactObservedRunnerPermissionsRepairAction(command, root, depe
     && Array.isArray(expected.statuses) && expected.statuses.length === 2
     && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op"
     && words.length === action.argv.length + 1
-    && words[0] === action.executable
-    && action.argv.every((value, index) => words[index + 1] === value);
+    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
+    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
 }
 
 export function isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies = {}) {
@@ -1083,8 +1091,8 @@ export function isExactObservedRunnerPermissionsPlannerAction(command, root, dep
     && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
     && observedPlannerAction
     && words.length === action.argv.length + 1
-    && words[0] === action.executable
-    && action.argv.every((value, index) => words[index + 1] === value);
+    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
+    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
 }
 
 /**

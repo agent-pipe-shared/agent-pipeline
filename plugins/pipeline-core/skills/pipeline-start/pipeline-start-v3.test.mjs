@@ -172,6 +172,21 @@ assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* o
     false,
     "a freely chosen card path is refused before a restart",
   );
+  // C20 separator sweep: on native Windows the same fixed capture is admitted in every native spelling of the root and
+  // the card path (forward slash, drive-letter case, MSYS) and with node.exe; another card path stays refused, and Linux
+  // keeps the byte-exact rule.
+  const winRoot = "D:\\Dev\\App";
+  const script = join(pluginRoot, "scripts", "resume-hint.mjs");
+  const win = { platform: "win32" };
+  for (const [interpreter, rootSpelling, card] of [
+    ["node", "D:/Dev/App", "D:/Dev/App/project/.resume-hint-input.json"],
+    ["node.exe", "/d/Dev/App", "'d:\\dev\\app\\project\\.resume-hint-input.json'"],
+  ]) {
+    assert.equal(guard.isRestartResumeHintCapture(`${interpreter} ${script} capture --root ${rootSpelling} --card-file ${card} --consume-card`, winRoot, win), true, `${rootSpelling} ${card}`);
+  }
+  assert.equal(guard.isRestartResumeHintCapture(`node ${script} capture --root D:/Dev/App --card-file D:/Dev/App/scratch/card.json --consume-card`, winRoot, win), false);
+  assert.equal(guard.isRestartResumeHintInspect(`node.exe ${script} inspect --root d:/dev/app`, winRoot, win), true);
+  assert.equal(guard.isRestartResumeHintInspect(`node ${script} inspect --root ${projectRoot}/`, projectRoot, { platform: "linux" }), false);
 }
 {
   const { buildResumeHint, validateResumeHint } = await import("../../lib/resume-hint.mjs");

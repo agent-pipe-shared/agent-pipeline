@@ -6,10 +6,11 @@ import {isAbsolute,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {observeGovernanceScope,governanceScopeFailureDiagnostic} from '../lib/governance-scope.mjs';
 import {isDirectInvocation} from '../lib/entrypoint.mjs';
+import {normalizeRootArgument} from '../lib/root-argument.mjs';
 const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join('|')===[...keys].sort().join('|');
 export function parseGovernanceScopeDiagnosticArgs(argv,{realpathSyncFn=realpathSync,lstatSyncFn=lstatSync}={}){
   if(!Array.isArray(argv)||argv.length!==2||argv[0]!=='--root')return {ok:false,code:'GSD-ARGS'};
-  const rootDir=argv[1];
+  const rootDir=normalizeRootArgument(argv[1]);
   try{if(typeof rootDir!=='string'||!isAbsolute(rootDir)||resolve(rootDir)!==rootDir||/[\x00-\x1f\x7f]/u.test(rootDir))return {ok:false,code:'GSD-ROOT'};
     const st=lstatSyncFn(rootDir);if(!st.isDirectory()||st.isSymbolicLink()||realpathSyncFn(rootDir)!==rootDir)return {ok:false,code:'GSD-ROOT'};
     return {ok:true,rootDir};

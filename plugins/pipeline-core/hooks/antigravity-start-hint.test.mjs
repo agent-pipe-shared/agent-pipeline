@@ -45,16 +45,64 @@ test("antigravity-start-hint: missing workspace paths fail-closed", () => {
   assert.match(res.stderr, /AGY-REPOSITORY-CONTEXT-UNAVAILABLE/);
 });
 
+// The optional-hint delivery marker lives in the machine plane; every fixture gets its own home so no run touches the real one.
+function fixtureEnv() {
+  const home = testTemp("agy-start-hint-home-");
+  return { home, env: { ...process.env, HOME: home, USERPROFILE: home } };
+}
+
 test("antigravity-start-hint: absolute ungoverned workspace remains an onboarding hint without creating Git", () => {
   const root = testTemp("agy-start-hint-");
+  const { home, env } = fixtureEnv();
   try {
     const input = { invocationNum: 1, workspacePaths: [root], conversationId: "fixture" };
-    const res = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8" });
+    const res = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8", env });
     assert.equal(res.status, 0, res.stderr);
     const output = JSON.parse(res.stdout);
     assert.equal(typeof output.injectSteps?.[0]?.ephemeralMessage, "string");
     assert.match(output.injectSteps[0].ephemeralMessage, /pipeline-start|Pipeline/u);
     assert.equal(existsSync(join(root, ".git")), false, "an onboarding hint must not manufacture a Git control directory");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("C20 agy: the optional onboarding offer is delivered once per session, not on every turn", () => {
+  const root = initializedRoot();
+  const { home, env } = fixtureEnv();
+  try {
+    const run = (session) => spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }), encoding: "utf8", env,
+    });
+    const first = run("optional-once");
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /optional project workflow/u);
+    const second = run("optional-once");
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(second.stdout.trim(), "{}", "a later turn of the same session repeats no offer");
+    const otherSession = run("optional-other");
+    assert.match(otherSession.stdout, /optional project workflow/u, "a new session gets the offer again");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false, "the marker never lands in a repository that did not opt in");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("C20 agy: a later turn of a bootstrapped session gets the no-re-bootstrap note instead of the full start context", () => {
+  const root = initializedRoot();
+  try {
+    markGoverned(root);
+    const run = () => spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ invocationNum: 0, workspacePaths: [root], conversationId: "agy-turns" }), encoding: "utf8",
+    });
+    const first = JSON.parse(run().stdout).injectSteps[0].ephemeralMessage;
+    assert.match(first, /--runner antigravity --host-session-id/u);
+    const later = JSON.parse(run().stdout).injectSteps[0].ephemeralMessage;
+    assert.match(later, /already bootstrapped/u);
+    assert.match(later, /Do not re-run pipeline-start/u);
+    assert.doesNotMatch(later, /--host-session-id/u, "the full start context is not repeated");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -134,16 +182,18 @@ test("antigravity-start-hint: path-shaped conversationId cannot create a bootstr
 
 test("antigravity-start-hint: initialized but ungoverned Git root remains optional", () => {
   const root = initializedRoot();
+  const { home, env } = fixtureEnv();
   try {
     const session = "optional-git";
     const start = spawnSync(process.execPath, [HOOK], {
       input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }),
-      encoding: "utf8",
+      encoding: "utf8", env,
     });
     assert.equal(start.status, 0, start.stderr);
     assert.match(start.stdout, /optional project workflow/u);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "run", `session-${session}`)), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
   }
 });
