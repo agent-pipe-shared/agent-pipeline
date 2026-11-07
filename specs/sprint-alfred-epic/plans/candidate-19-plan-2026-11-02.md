@@ -790,6 +790,28 @@ PO decisions (tiles, 2026-11-06): verify on Windows only (no Linux pair); 19l is
   - **G20-40 (Elephant, in w252 `7f6dbbaae`):** two Goldfish launched in one message collided: the pre-launch publish capped its
     lock retry at 60 s from the first attempt, a 64 s prescan used it up, and the sibling's lock refused SDC-LOCK-HELD; the window
     is now the remaining admission budget (NGHS65 RED then green, suite 79/79). The ~150 s admission in this repository stays slow.
+  - **M4c/M10 (Antigravity, PO run 2026-11-07):** the subagent Model alias selects nothing: `flash` and `pro` both resolve to
+    `gemini-3.8-flash-tiered`; without a Model the child inherits the main model (`gemini-4-argon-medium`). The descriptor exists
+    ~13 s before the child's first hook, its state is only ALIVE or KILLED, a child ends with `send_message` to its parent, every
+    hook fires twice (child worktree and main `.agents`), no Stop event was seen for a child. Consequence: the registry model
+    check denied every native Antigravity Goldfish (`AGY-NATIVE-CHILD-MODEL-MISMATCH`, repair only by a PO config edit).
+  - **G20-41 (w269, held `e065098c7`, in w252 `15a85d597`):** Antigravity Critic Source-return producer on the child's final
+    `send_message`; a rigor >= 1 close needs no PO acknowledgement on any runner now (the bridge stays as fallback).
+  - **G20-42 (PO "Versions-Tag"):** consumer release = `VERSION` created at onboarding, release preflight, a `RELEASE-NOTES`
+    entry, one PO release approval, the agent creates the annotated tag `vX.Y.Z` and pushes it (no hosted release object).
+    Built in clone s-rel (w270): walk green to the pushed tag in chat mode; signature mode not walked (left to the real runs).
+  - **G20-43 (PO 2026-11-07):** the Antigravity child model check records the resolved model and shows a notice instead of
+    refusing; routing: Critic inherits (no Model; argon medium/high), implementor flash medium, deep flash high, mechanic flash
+    low. Built by C20-G2043-AGY-MODEL-ROUTING (w271, held `b8c013e6c`); the Elephant carried the repository's own
+    `pipeline.user.yaml` (registry digest `20ee1ddb…` and the three changed Antigravity cells) into the chain.
+  - **G20-44 (Elephant, found while integrating G20-43):** the registry digest was `c1641d49…` for every 0.7 candidate; G20-43 is
+    its first change, and `refreshKnownV3RegistryDelta` upgraded only one older digest, so every project bound to `c1641d49…`
+    would have been refused (`frozen_mapping`) with no runnable repair. Now a table of known older shipped digests gets the
+    existing v3-refresh route (plan, explicit activation; routing and critic_export are Core-owned); an unknown digest keeps the
+    refusal. New case RPM17 (suite 61/61). Rule: add the outgoing digest to `KNOWN_OLDER_REGISTRY_SHA256` at every registry change.
+  - **G20-42 done in the chain:** w270 held `9c789bbb1`; the Elephant added the release module to the never-liftable kernel set.
+  - **Apply route (PO 2026-11-07, "Alles in einem Apply"):** single suites green → the whole w252 chain as one PO apply script
+    (`scripts/export-held-chain.mjs`) → Elephant stamps → PO installs → Full Verify in parallel with the new greenfields.
 - **Follow-up (PO 2026-11-06):** the operating model and generator should steer the tier choice so small fixes are never sent to goldfish-deep ("das sollte eigentlich eh jedem pipeline user mehr als klar durch unsere vorgaben und operating modell sein").
 
 ## Moved from docs/state.md (2026-11-07, size cap): candidate 18/19 verification line, verbatim
